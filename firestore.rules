@@ -1,0 +1,278 @@
+rules_version = '2';
+
+/**
+ * Firestore Security Rules for Quran Revision App
+ *
+ * Security Model:
+ * - Users can only access their own data
+ * - All writes require authentication
+ * - Data validation at the database level
+ * - No public read/write access
+ *
+ * Collection Structure:
+ * - users/{userId} - User profile and settings
+ * - users/{userId}/pages/{pageNumber} - Page progress (604 documents)
+ * - users/{userId}/sessions/{sessionId} - Daily revision sessions
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // HELPER FUNCTIONS
+    // ========================================================================
+
+    // Check if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns this document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if a field exists in the request data
+    function hasField(field) {
+      return field in request.resource.data;
+    }
+
+    // Get the current data (before update)
+    function currentData() {
+      return resource.data;
+    }
+
+    // Get the incoming data (after update)
+    function incomingData() {
+      return request.resource.data;
+    }
+
+    // Validate that a value is within a range (inclusive)
+    function isInRange(value, min, max) {
+      return value >= min && value <= max;
+    }
+
+    // Validate page number (1-604)
+    function isValidPageNumber(pageNumber) {
+      return pageNumber is int && isInRange(pageNumber, 1, 604);
+    }
+
+    // Validate weakness rating (1-5)
+    function isValidWeaknessRating(rating) {
+      return rating is int && isInRange(rating, 1, 5);
+    }
+
+    // Validate page status
+    function isValidPageStatus(status) {
+      return status in ['not_memorized', 'learning', 'memorized'];
+    }
+
+    // Validate revision mode
+    function isValidRevisionMode(mode) {
+      return mode in ['weighted', 'sequential'];
+    }
+
+    // Validate session state
+    function isValidSessionState(state) {
+      return state in ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'];
+    }
+
+    // Validate theme preference
+    function isValidTheme(theme) {
+      return theme in ['light', 'dark', 'system'];
+    }
+
+    // Validate day of week array (0-6)
+    function isValidActiveDays(days) {
+      return days is list &&
+             days.size() >= 0 &&
+             days.size() <= 7;
+    }
+
+    // Validate date string format (YYYY-MM-DD)
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+             dateStr.size() == 10 &&
+             dateStr.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // Validate time string format (HH:mm)
+    function isValidTimeString(timeStr) {
+      return timeStr is string &&
+             timeStr.size() == 5 &&
+             timeStr.matches('^[0-9]{2}:[0-9]{2}$');
+    }
+
+    // ========================================================================
+    // USER DOCUMENT RULES
+    // ========================================================================
+
+    match /users/{userId} {
+      // Users can only read their own data
+      allow read: if isOwner(userId);
+
+      // Users can create their own document (on signup)
+      allow create: if isOwner(userId) &&
+                       hasField('uid') &&
+                       incomingData().uid == userId &&
+                       hasField('createdAt') &&
+                       hasField('updatedAt') &&
+                       // Validate required settings
+                       hasField('dailyPageCapacity') &&
+                       incomingData().dailyPageCapacity is int &&
+                       isInRange(incomingData().dailyPageCapacity, 1, 100) &&
+                       hasField('dangerThresholdDays') &&
+                       incomingData().dangerThresholdDays is int &&
+                       isInRange(incomingData().dangerThresholdDays, 1, 60) &&
+                       hasField('revisionMode') &&
+                       isValidRevisionMode(incomingData().revisionMode) &&
+                       hasField('theme') &&
+                       isValidTheme(incomingData().theme) &&
+                       // Validate stats are initialized correctly
+                       hasField('streak') &&
+                       incomingData().streak >= 0 &&
+                       hasField('totalMemorizedPages') &&
+                       incomingData().totalMemorizedPages >= 0 &&
+                       hasField('totalLearningPages') &&
+                       incomingData().totalLearningPages >= 0;
+
+      // Users can update their own document
+      allow update: if isOwner(userId) &&
+                       // Cannot change uid
+                       (!hasField('uid') || incomingData().uid == currentData().uid) &&
+                       // Cannot change createdAt
+                       (!hasField('createdAt') || incomingData().createdAt == currentData().createdAt) &&
+                       // Validate optional fields if present
+                       (!hasField('dailyPageCapacity') ||
+                        (incomingData().dailyPageCapacity is int &&
+                         isInRange(incomingData().dailyPageCapacity, 1, 100))) &&
+                       (!hasField('dangerThresholdDays') ||
+                        (incomingData().dangerThresholdDays is int &&
+                         isInRange(incomingData().dangerThresholdDays, 1, 60))) &&
+                       (!hasField('revisionMode') ||
+                        isValidRevisionMode(incomingData().revisionMode)) &&
+                       (!hasField('theme') ||
+                        isValidTheme(incomingData().theme)) &&
+                       // Streak cannot be negative
+                       (!hasField('streak') || incomingData().streak >= 0) &&
+                       // Page counts cannot be negative or exceed 604
+                       (!hasField('totalMemorizedPages') ||
+                        (incomingData().totalMemorizedPages >= 0 &&
+                         incomingData().totalMemorizedPages <= 604)) &&
+                       (!hasField('totalLearningPages') ||
+                        (incomingData().totalLearningPages >= 0 &&
+                         incomingData().totalLearningPages <= 604));
+
+      // Users cannot delete their account document (use admin SDK for this)
+      allow delete: if false;
+
+      // ======================================================================
+      // PAGE DOCUMENT RULES
+      // ======================================================================
+
+      match /pages/{pageId} {
+        // Users can read their own pages
+        allow read: if isOwner(userId);
+
+        // Users can create pages (during initialization)
+        allow create: if isOwner(userId) &&
+                         hasField('pageNumber') &&
+                         isValidPageNumber(incomingData().pageNumber) &&
+                         // pageId must match pageNumber
+                         pageId == string(incomingData().pageNumber) &&
+                         hasField('status') &&
+                         isValidPageStatus(incomingData().status) &&
+                         hasField('weaknessRating') &&
+                         isValidWeaknessRating(incomingData().weaknessRating) &&
+                         hasField('totalRevisionCount') &&
+                         incomingData().totalRevisionCount >= 0 &&
+                         hasField('skipCount') &&
+                         incomingData().skipCount >= 0;
+
+        // Users can update their pages
+        allow update: if isOwner(userId) &&
+                         // Cannot change pageNumber
+                         (!hasField('pageNumber') ||
+                          incomingData().pageNumber == currentData().pageNumber) &&
+                         // Validate status if present
+                         (!hasField('status') ||
+                          isValidPageStatus(incomingData().status)) &&
+                         // Validate weakness rating if present
+                         (!hasField('weaknessRating') ||
+                          isValidWeaknessRating(incomingData().weaknessRating)) &&
+                         // Counts cannot be negative
+                         (!hasField('totalRevisionCount') ||
+                          incomingData().totalRevisionCount >= 0) &&
+                         (!hasField('skipCount') ||
+                          incomingData().skipCount >= 0);
+
+        // Users cannot delete pages
+        allow delete: if false;
+      }
+
+      // ======================================================================
+      // SESSION DOCUMENT RULES
+      // ======================================================================
+
+      match /sessions/{sessionId} {
+        // Users can read their own sessions
+        allow read: if isOwner(userId);
+
+        // Users can create sessions
+        allow create: if isOwner(userId) &&
+                         hasField('id') &&
+                         incomingData().id == sessionId &&
+                         hasField('date') &&
+                         isValidDateString(incomingData().date) &&
+                         // Session ID should match date for uniqueness
+                         sessionId == incomingData().date &&
+                         hasField('state') &&
+                         isValidSessionState(incomingData().state) &&
+                         hasField('assignedPages') &&
+                         incomingData().assignedPages is list &&
+                         incomingData().assignedPages.size() <= 100 &&
+                         hasField('pagesRevised') &&
+                         incomingData().pagesRevised is list &&
+                         hasField('pagesSkipped') &&
+                         incomingData().pagesSkipped is list;
+
+        // Users can update sessions
+        allow update: if isOwner(userId) &&
+                         // Cannot change id or date
+                         (!hasField('id') || incomingData().id == currentData().id) &&
+                         (!hasField('date') || incomingData().date == currentData().date) &&
+                         // Cannot change assigned pages after creation
+                         (!hasField('assignedPages') ||
+                          incomingData().assignedPages == currentData().assignedPages) &&
+                         // Validate state if present
+                         (!hasField('state') ||
+                          isValidSessionState(incomingData().state)) &&
+                         // Cannot go backwards in state
+                         (!hasField('state') ||
+                          (currentData().state == 'NOT_STARTED') ||
+                          (currentData().state == 'IN_PROGRESS' &&
+                           incomingData().state in ['IN_PROGRESS', 'COMPLETED']) ||
+                          (currentData().state == 'COMPLETED' &&
+                           incomingData().state == 'COMPLETED')) &&
+                         // Duration must be positive if set
+                         (!hasField('durationMinutes') ||
+                          incomingData().durationMinutes == null ||
+                          incomingData().durationMinutes > 0) &&
+                         // Completion percentage must be valid
+                         (!hasField('completionPercentage') ||
+                          isInRange(incomingData().completionPercentage, 0, 100));
+
+        // Users can delete their own sessions (for cleanup)
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // ========================================================================
+    // DEFAULT DENY
+    // ========================================================================
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
