@@ -103,6 +103,54 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // FIELD ALLOWLISTS
+    // Each update rule restricts which top-level fields can be written.
+    // This blocks arbitrary key injection (e.g. a client setting isAdmin: true)
+    // even before any future privileged field is added to the schema.
+    // TODO: stat fields (streak, totalMemorizedPages, totalLearningPages,
+    // totalSessionsCompleted, totalPagesRevisedAllTime, lastRevisionDate)
+    // should move to a Cloud Function with admin SDK and be removed from
+    // the client allowlist below. Tracked as a launch-checklist item.
+    // ========================================================================
+
+    function userMutableFields() {
+      return [
+        'updatedAt', 'lastActiveAt',
+        'displayName', 'photoURL', 'email',
+        'dailyPageCapacity', 'activeDays', 'dangerThresholdDays',
+        'dangerAlertEnabled', 'revisionMode', 'theme',
+        'notifications', 'notificationsEnabled', 'reminderTime',
+        'currentMemorizationJuz', 'currentMemorizationPage', 'currentKhatamPage',
+        'onboardingComplete',
+        // Stat fields — currently client-written; will move server-side later.
+        'streak', 'totalMemorizedPages', 'totalLearningPages',
+        'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate'
+      ];
+    }
+
+    function pageMutableFields() {
+      return [
+        'status', 'weaknessRating',
+        'dateMemorized', 'lastRevisedAt',
+        'totalRevisionCount', 'skipCount',
+        'updatedAt'
+      ];
+    }
+
+    function sessionMutableFields() {
+      return [
+        'state',
+        'pagesRevised', 'pagesSkipped', 'weaknessUpdates',
+        'completedAt', 'durationMinutes', 'completionPercentage',
+        'updatedAt'
+      ];
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ========================================================================
     // USER DOCUMENT RULES
     // ========================================================================
 
@@ -137,6 +185,8 @@ service cloud.firestore {
 
       // Users can update their own document
       allow update: if isOwner(userId) &&
+                       // Block arbitrary key injection
+                       changedKeys().hasOnly(userMutableFields()) &&
                        // Cannot change uid
                        (!hasField('uid') || incomingData().uid == currentData().uid) &&
                        // Cannot change createdAt
@@ -190,6 +240,8 @@ service cloud.firestore {
 
         // Users can update their pages
         allow update: if isOwner(userId) &&
+                         // Block arbitrary key injection
+                         changedKeys().hasOnly(pageMutableFields()) &&
                          // Cannot change pageNumber
                          (!hasField('pageNumber') ||
                           incomingData().pageNumber == currentData().pageNumber) &&
@@ -229,7 +281,10 @@ service cloud.firestore {
                          isValidSessionState(incomingData().state) &&
                          hasField('assignedPages') &&
                          incomingData().assignedPages is list &&
-                         incomingData().assignedPages.size() <= 100 &&
+                         // Cap is generous: a juz can be ~20 pages and a user
+                         // can revise multiple juz in one session. 604 covers
+                         // an entire mushaf review.
+                         incomingData().assignedPages.size() <= 604 &&
                          hasField('pagesRevised') &&
                          incomingData().pagesRevised is list &&
                          hasField('pagesSkipped') &&
@@ -237,6 +292,8 @@ service cloud.firestore {
 
         // Users can update sessions
         allow update: if isOwner(userId) &&
+                         // Block arbitrary key injection
+                         changedKeys().hasOnly(sessionMutableFields()) &&
                          // Cannot change id or date
                          (!hasField('id') || incomingData().id == currentData().id) &&
                          (!hasField('date') || incomingData().date == currentData().date) &&

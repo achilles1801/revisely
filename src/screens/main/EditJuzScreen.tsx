@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { SettingsStackParamList } from '../../navigation/MainNavigator';
+import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { Button } from '../../components/Button';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
@@ -24,7 +25,7 @@ import {
 } from '../../lib/quranData';
 import { UserPage } from '../../types';
 
-type NavigationProp = NativeStackNavigationProp<SettingsStackParamList, 'SettingsMain'>;
+type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'EditJuz'>;
 
 interface JuzCardProps {
   juzNumber: number;
@@ -55,6 +56,8 @@ function JuzCard({
   onToggleSurah,
   onClearAll,
 }: JuzCardProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const isComplete = memorizedCount === totalPages;
   const isPartial = memorizedCount > 0 && memorizedCount < totalPages;
   const progress = totalPages > 0 ? memorizedCount / totalPages : 0;
@@ -217,6 +220,8 @@ function JuzCard({
 
 export default function EditJuzScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { pages, updatePages } = useApp();
 
   const [expandedJuz, setExpandedJuz] = useState<number | null>(null);
@@ -366,10 +371,10 @@ export default function EditJuzScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: 'transparent',
   },
   header: {
     paddingHorizontal: spacing.lg,
@@ -381,16 +386,16 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...typography.bodyMedium,
-    color: colors.textSecondary,
+    color: theme.textSecondary,
   },
   headline: {
     ...typography.displaySmall,
-    color: colors.textPrimary,
+    color: theme.textPrimary,
     marginBottom: spacing.xs,
   },
   subtext: {
     ...typography.bodyMedium,
-    color: colors.textSecondary,
+    color: theme.textSecondary,
   },
   scrollView: {
     flex: 1,
@@ -400,7 +405,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   card: {
-    backgroundColor: colors.bgAlt,
+    backgroundColor: theme.bgAlt,
     borderRadius: 12,
     marginBottom: spacing.sm,
     overflow: 'hidden',
@@ -420,28 +425,28 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.bg,
+    backgroundColor: theme.bg,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: theme.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
   },
   juzNumberComplete: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
   },
   juzNumberPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
+    backgroundColor: theme.warningBg,
+    borderColor: theme.warning,
   },
   juzNumberText: {
     ...typography.bodyLarge,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: theme.textSecondary,
   },
   juzNumberTextComplete: {
-    color: colors.textInverse,
+    color: theme.textInverse,
   },
   cardInfo: {
     flex: 1,
@@ -449,11 +454,11 @@ const styles = StyleSheet.create({
   juzName: {
     ...typography.bodyMedium,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: theme.textPrimary,
   },
   pageRange: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.textMuted,
     marginTop: 2,
   },
   cardRight: {
@@ -465,58 +470,58 @@ const styles = StyleSheet.create({
   },
   progressText: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.textMuted,
   },
   checkbox: {
     width: 28,
     height: 28,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
   },
   checkboxPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
+    backgroundColor: theme.warningBg,
+    borderColor: theme.warning,
   },
   checkmark: {
-    color: colors.textInverse,
+    color: theme.textInverse,
     fontSize: 16,
     fontWeight: '700',
   },
   partialMark: {
-    color: colors.warningText,
+    color: theme.warningText,
     fontSize: 18,
     fontWeight: '700',
   },
   progressBar: {
     height: 3,
-    backgroundColor: colors.border,
+    backgroundColor: theme.border,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
     borderRadius: 2,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.warning,
+    backgroundColor: theme.warning,
     borderRadius: 2,
   },
   expandedSection: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: theme.border,
     paddingTop: spacing.md,
   },
   expandedLabel: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.textMuted,
     marginBottom: spacing.sm,
   },
   surahList: {
@@ -527,19 +532,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.bg,
+    backgroundColor: theme.bg,
     borderRadius: 8,
     padding: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.border,
   },
   surahItemComplete: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
   },
   surahItemPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
+    backgroundColor: theme.warningBg,
+    borderColor: theme.warning,
   },
   surahInfo: {
     flexDirection: 'row',
@@ -548,7 +553,7 @@ const styles = StyleSheet.create({
   },
   surahNumber: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.textMuted,
     width: 28,
     textAlign: 'center',
   },
@@ -558,12 +563,12 @@ const styles = StyleSheet.create({
   },
   surahNameArabic: {
     ...typography.bodyMedium,
-    color: colors.textPrimary,
+    color: theme.textPrimary,
     fontWeight: '500',
   },
   surahNameEnglish: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.textMuted,
   },
   surahRight: {
     flexDirection: 'row',
@@ -572,41 +577,41 @@ const styles = StyleSheet.create({
   },
   surahPages: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.textMuted,
   },
   surahCheck: {
     width: 22,
     height: 22,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   surahCheckComplete: {
-    backgroundColor: colors.textInverse,
-    borderColor: colors.textInverse,
+    backgroundColor: theme.textInverse,
+    borderColor: theme.textInverse,
   },
   surahCheckPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
+    backgroundColor: theme.warningBg,
+    borderColor: theme.warning,
   },
   surahCheckmark: {
-    color: colors.bgDark,
+    color: theme.accent,
     fontSize: 12,
     fontWeight: '700',
   },
   surahPartialMark: {
-    color: colors.warningText,
+    color: theme.warningText,
     fontSize: 14,
     fontWeight: '700',
   },
   surahTextComplete: {
-    color: colors.textInverse,
+    color: theme.textInverse,
   },
   surahTextCompleteSecondary: {
-    color: colors.textMuted,
+    color: theme.textMuted,
   },
   quickActions: {
     flexDirection: 'row',
@@ -616,36 +621,36 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.sm,
     borderRadius: 8,
-    backgroundColor: colors.bg,
+    backgroundColor: theme.bg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.border,
     alignItems: 'center',
   },
   quickActionPrimary: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
   },
   quickActionText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: theme.textSecondary,
     fontWeight: '500',
   },
   quickActionTextPrimary: {
-    color: colors.textInverse,
+    color: theme.textInverse,
   },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
+    borderTopColor: theme.border,
+    backgroundColor: theme.bg,
   },
   summary: {
     marginBottom: spacing.md,
   },
   summaryText: {
     ...typography.bodyMedium,
-    color: colors.textSecondary,
+    color: theme.textSecondary,
     textAlign: 'center',
   },
   button: {

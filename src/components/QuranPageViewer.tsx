@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { getQuranPageImageUrl } from '../lib/quranImages';
+import { getRatingLabel } from '../lib/ratings';
 import { QuranPage } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -51,23 +52,12 @@ interface PageItemProps {
   compact?: boolean;
 }
 
-function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, theme, isDark, compact }: PageItemProps) {
+const PageItem = React.memo(function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, theme, isDark, compact }: PageItemProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const quranPage = quranData.find(q => q.pageNumber === item.pageNumber);
   const imageUrl = getQuranPageImageUrl(item.pageNumber);
-
-  const getWeaknessLabel = (rating: number): string => {
-    switch (rating) {
-      case 1: return 'Very Weak';
-      case 2: return 'Weak';
-      case 3: return 'Moderate';
-      case 4: return 'Strong';
-      case 5: return 'Very Strong';
-      default: return 'Not Rated';
-    }
-  };
 
   const getWeaknessColor = (rating: number): string => {
     if (rating <= 2) return theme.error;
@@ -127,10 +117,15 @@ function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, t
       {/* Compact action bar at bottom */}
       <View style={[styles.actionBar, { borderTopColor: theme.border }]}>
         {/* Strength button */}
-        <TouchableOpacity onPress={onRate} style={styles.strengthButton}>
+        <TouchableOpacity
+          onPress={onRate}
+          style={styles.strengthButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Strength ${getRatingLabel(item.weaknessRating)}, tap to rate`}
+        >
           <Text style={[styles.strengthLabel, { color: theme.textMuted }]}>Strength</Text>
           <Text style={[styles.strengthValue, { color: getWeaknessColor(item.weaknessRating) }]}>
-            {getWeaknessLabel(item.weaknessRating)}
+            {getRatingLabel(item.weaknessRating)}
           </Text>
         </TouchableOpacity>
 
@@ -144,6 +139,8 @@ function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, t
             styles.markButton,
             item.isCompleted && { backgroundColor: theme.successBg }
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={item.isCompleted ? 'Mark as not revised' : 'Mark as revised'}
         >
           <Ionicons
             name={item.isCompleted ? 'checkmark-circle' : 'checkmark-circle-outline'}
@@ -160,7 +157,7 @@ function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, t
       </View>
     </View>
   );
-}
+});
 
 export function QuranPageViewer({
   pages,

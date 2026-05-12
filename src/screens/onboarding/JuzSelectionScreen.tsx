@@ -1,26 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingStackParamList, JourneyStage } from '../../navigation/OnboardingNavigator';
+import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { Button } from '../../components/Button';
-import { colors } from '../../theme/colors';
+import { PressableScale } from '../../components/PressableScale';
+import { Stepper } from '../../components/Stepper';
+import { ProgressBar } from '../../components/ProgressBar';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import {
   getPagesForJuz,
-  getJuzRange,
   getJuzName,
   getSurahsInJuz,
-  getPagesForSurah,
   SurahInJuz,
 } from '../../lib/quranData';
 import { UserPage } from '../../types';
@@ -28,15 +34,20 @@ import { UserPage } from '../../types';
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JuzSelection'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'JuzSelection'>;
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 interface JuzCardProps {
   juzNumber: number;
   name: string;
-  pageRange: { start: number; end: number };
   memorizedCount: number;
   totalPages: number;
   isExpanded: boolean;
   surahs: SurahInJuz[];
   pages: UserPage[];
+  theme: ThemeColors;
+  styles: ReturnType<typeof makeStyles>;
   onToggleJuz: () => void;
   onExpand: () => void;
   onToggleSurah: (surahNumber: number) => void;
@@ -46,12 +57,13 @@ interface JuzCardProps {
 function JuzCard({
   juzNumber,
   name,
-  pageRange,
   memorizedCount,
   totalPages,
   isExpanded,
   surahs,
   pages,
+  theme,
+  styles,
   onToggleJuz,
   onExpand,
   onToggleSurah,
@@ -59,33 +71,36 @@ function JuzCard({
 }: JuzCardProps) {
   const isComplete = memorizedCount === totalPages;
   const isPartial = memorizedCount > 0 && memorizedCount < totalPages;
-  const progress = totalPages > 0 ? memorizedCount / totalPages : 0;
+  const progress = totalPages > 0 ? (memorizedCount / totalPages) * 100 : 0;
 
-  const getSurahMemorizedCount = (surah: SurahInJuz) => {
-    return surah.pagesInJuz.filter(pageNum => {
-      const page = pages.find(p => p.pageNumber === pageNum);
+  const getSurahMemorizedCount = (surah: SurahInJuz) =>
+    surah.pagesInJuz.filter((pageNum) => {
+      const page = pages.find((p) => p.pageNumber === pageNum);
       return page?.status === 'memorized';
     }).length;
-  };
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        {/* Card content - tappable to expand */}
-        <TouchableOpacity
-          style={styles.cardContent}
+        <PressableScale
           onPress={onExpand}
-          activeOpacity={0.7}
+          haptic="light"
+          style={styles.cardContent}
+          scale={0.99}
         >
-          <View style={[
-            styles.juzNumber,
-            isComplete && styles.juzNumberComplete,
-            isPartial && styles.juzNumberPartial,
-          ]}>
-            <Text style={[
-              styles.juzNumberText,
-              isComplete && styles.juzNumberTextComplete,
-            ]}>
+          <View
+            style={[
+              styles.juzNumberWrap,
+              isComplete && { backgroundColor: theme.accent },
+              isPartial && { backgroundColor: theme.accentSoft },
+            ]}
+          >
+            <Text
+              style={[
+                styles.juzNumberText,
+                { color: isComplete ? theme.textInverse : isPartial ? theme.accent : theme.textSecondary },
+              ]}
+            >
               {juzNumber}
             </Text>
           </View>
@@ -95,44 +110,42 @@ function JuzCard({
               {surahs.length} surah{surahs.length !== 1 ? 's' : ''} · {totalPages} pages
             </Text>
           </View>
-        </TouchableOpacity>
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={theme.textMuted}
+          />
+        </PressableScale>
 
-        {/* Checkbox - separate touch target with larger hit area */}
-        <TouchableOpacity
-          style={styles.cardRight}
+        <PressableScale
           onPress={onToggleJuz}
-          activeOpacity={0.6}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          haptic="medium"
+          style={styles.checkboxWrap}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          {isPartial && (
-            <Text style={styles.progressText}>
-              {memorizedCount}/{totalPages}
-            </Text>
-          )}
+          {isPartial && <Text style={styles.progressText}>{memorizedCount}/{totalPages}</Text>}
           <View
             style={[
               styles.checkbox,
-              isComplete && styles.checkboxChecked,
-              isPartial && styles.checkboxPartial,
+              isComplete && { backgroundColor: theme.accent, borderColor: theme.accent },
+              isPartial && { backgroundColor: theme.accentSoft, borderColor: theme.accent },
             ]}
           >
-            {isComplete && <Text style={styles.checkmark}>✓</Text>}
-            {isPartial && <Text style={styles.partialMark}>−</Text>}
+            {isComplete && <Ionicons name="checkmark" size={16} color={theme.textInverse} />}
+            {isPartial && <Ionicons name="remove" size={16} color={theme.accent} />}
           </View>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {isPartial && (
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        <View style={styles.progressBarRow}>
+          <ProgressBar progress={progress} height={3} color={theme.accent} />
         </View>
       )}
 
       {isExpanded && (
         <View style={styles.expandedSection}>
-          <Text style={styles.expandedLabel}>
-            Tap surahs to mark as memorized
-          </Text>
+          <Text style={styles.expandedLabel}>Tap surahs to mark as memorized</Text>
 
           <View style={styles.surahList}>
             {surahs.map((surah) => {
@@ -142,74 +155,51 @@ function JuzCard({
               const isSurahPartial = surahMemorized > 0 && surahMemorized < surahTotal;
 
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={surah.number}
+                  onPress={() => onToggleSurah(surah.number)}
+                  haptic="selection"
+                  scale={0.99}
                   style={[
                     styles.surahItem,
-                    isSurahComplete && styles.surahItemComplete,
-                    isSurahPartial && styles.surahItemPartial,
+                    isSurahComplete && { backgroundColor: theme.accentSoft, borderColor: theme.accent },
+                    isSurahPartial && { borderColor: theme.accent },
                   ]}
-                  onPress={() => onToggleSurah(surah.number)}
-                  activeOpacity={0.7}
                 >
-                  <View style={styles.surahInfo}>
-                    <Text style={[
-                      styles.surahNumber,
-                      isSurahComplete && styles.surahTextComplete,
-                    ]}>
-                      {surah.number}
-                    </Text>
-                    <View style={styles.surahNames}>
-                      <Text style={[
-                        styles.surahNameArabic,
-                        isSurahComplete && styles.surahTextComplete,
-                      ]}>
-                        {surah.nameArabic}
-                      </Text>
-                      <Text style={[
-                        styles.surahNameEnglish,
-                        isSurahComplete && styles.surahTextCompleteSecondary,
-                      ]}>
-                        {surah.name}
-                      </Text>
-                    </View>
+                  <Text style={styles.surahNumber}>{surah.number}</Text>
+                  <View style={styles.surahNames}>
+                    <Text style={styles.surahNameArabic}>{surah.nameArabic}</Text>
+                    <Text style={styles.surahNameEnglish}>{surah.name}</Text>
                   </View>
-                  <View style={styles.surahRight}>
-                    <Text style={[
-                      styles.surahPages,
-                      isSurahComplete && styles.surahTextCompleteSecondary,
-                    ]}>
-                      {surahTotal} pg{surahTotal !== 1 ? 's' : ''}
-                    </Text>
-                    <View style={[
+                  <Text style={styles.surahPages}>{surahTotal}p</Text>
+                  <View
+                    style={[
                       styles.surahCheck,
-                      isSurahComplete && styles.surahCheckComplete,
-                      isSurahPartial && styles.surahCheckPartial,
-                    ]}>
-                      {isSurahComplete && <Text style={styles.surahCheckmark}>✓</Text>}
-                      {isSurahPartial && <Text style={styles.surahPartialMark}>−</Text>}
-                    </View>
+                      isSurahComplete && { backgroundColor: theme.accent, borderColor: theme.accent },
+                      isSurahPartial && { backgroundColor: theme.accentSoft, borderColor: theme.accent },
+                    ]}
+                  >
+                    {isSurahComplete && <Ionicons name="checkmark" size={12} color={theme.textInverse} />}
+                    {isSurahPartial && <Ionicons name="remove" size={12} color={theme.accent} />}
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>
 
           <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={styles.quickAction}
-              onPress={onClearAll}
-            >
-              <Text style={styles.quickActionText}>Clear All</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickAction, styles.quickActionPrimary]}
+            <PressableScale onPress={onClearAll} haptic="light" style={styles.quickAction}>
+              <Text style={styles.quickActionText}>Clear all</Text>
+            </PressableScale>
+            <PressableScale
               onPress={onToggleJuz}
+              haptic="medium"
+              style={[styles.quickAction, styles.quickActionPrimary]}
             >
-              <Text style={[styles.quickActionText, styles.quickActionTextPrimary]}>
-                {isComplete ? 'Unmark All' : 'Mark All Complete'}
+              <Text style={[styles.quickActionText, { color: theme.textInverse }]}>
+                {isComplete ? 'Unmark all' : 'Mark all'}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </View>
       )}
@@ -220,17 +210,18 @@ function JuzCard({
 export default function JuzSelectionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { journeyStage } = route.params;
   const { pages, updatePages } = useApp();
 
   const [expandedJuz, setExpandedJuz] = useState<number | null>(null);
 
-  // For 'complete' journey, mark all juz as memorized by default
   useEffect(() => {
     if (journeyStage === 'complete' && pages.length > 0) {
-      const allNotMemorized = pages.every(p => p.status !== 'memorized');
+      const allNotMemorized = pages.every((p) => p.status !== 'memorized');
       if (allNotMemorized) {
-        const allMemorized = pages.map(p => ({
+        const allMemorized = pages.map((p) => ({
           ...p,
           status: 'memorized' as const,
           dateMemorized: new Date().toISOString(),
@@ -240,83 +231,80 @@ export default function JuzSelectionScreen() {
     }
   }, [journeyStage, pages.length]);
 
-  const getJuzStats = useCallback((juzNumber: number) => {
-    const juzPages = getPagesForJuz(juzNumber);
-    const juzPageData = pages.filter(p => juzPages.includes(p.pageNumber));
-    const memorizedCount = juzPageData.filter(p => p.status === 'memorized').length;
-    return { memorizedCount, totalPages: juzPages.length };
-  }, [pages]);
+  const getJuzStats = useCallback(
+    (juzNumber: number) => {
+      const juzPages = getPagesForJuz(juzNumber);
+      const juzPageData = pages.filter((p) => juzPages.includes(p.pageNumber));
+      const memorizedCount = juzPageData.filter((p) => p.status === 'memorized').length;
+      return { memorizedCount, totalPages: juzPages.length };
+    },
+    [pages],
+  );
 
-  const handleToggleJuz = useCallback((juz: number) => {
-    const juzPageNumbers = getPagesForJuz(juz);
-    const { memorizedCount, totalPages } = getJuzStats(juz);
-    const isComplete = memorizedCount === totalPages;
+  const handleToggleJuz = useCallback(
+    (juz: number) => {
+      const juzPageNumbers = getPagesForJuz(juz);
+      const { memorizedCount, totalPages } = getJuzStats(juz);
+      const isComplete = memorizedCount === totalPages;
+      const updatedPages = pages.map((p) =>
+        juzPageNumbers.includes(p.pageNumber)
+          ? {
+              ...p,
+              status: (isComplete ? 'not_memorized' : 'memorized') as 'not_memorized' | 'memorized',
+              dateMemorized: isComplete ? null : new Date().toISOString(),
+            }
+          : p,
+      );
+      updatePages(updatedPages, juzPageNumbers);
+    },
+    [pages, getJuzStats, updatePages],
+  );
 
-    const updatedPages = pages.map(p => {
-      if (juzPageNumbers.includes(p.pageNumber)) {
-        return {
-          ...p,
-          status: (isComplete ? 'not_memorized' : 'memorized') as 'not_memorized' | 'memorized',
-          dateMemorized: isComplete ? null : new Date().toISOString(),
-        };
-      }
-      return p;
-    });
+  const handleClearJuz = useCallback(
+    (juz: number) => {
+      const juzPageNumbers = getPagesForJuz(juz);
+      const updatedPages = pages.map((p) =>
+        juzPageNumbers.includes(p.pageNumber)
+          ? { ...p, status: 'not_memorized' as const, dateMemorized: null }
+          : p,
+      );
+      updatePages(updatedPages, juzPageNumbers);
+    },
+    [pages, updatePages],
+  );
 
-    // Only sync the changed pages
-    updatePages(updatedPages, juzPageNumbers);
-  }, [pages, getJuzStats, updatePages]);
+  const handleExpandJuz = useCallback(
+    (juz: number) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setExpandedJuz(expandedJuz === juz ? null : juz);
+    },
+    [expandedJuz],
+  );
 
-  const handleClearJuz = useCallback((juz: number) => {
-    const juzPageNumbers = getPagesForJuz(juz);
-
-    const updatedPages = pages.map(p => {
-      if (juzPageNumbers.includes(p.pageNumber)) {
-        return {
-          ...p,
-          status: 'not_memorized' as const,
-          dateMemorized: null,
-        };
-      }
-      return p;
-    });
-
-    // Only sync the changed pages
-    updatePages(updatedPages, juzPageNumbers);
-  }, [pages, updatePages]);
-
-  const handleExpandJuz = useCallback((juz: number) => {
-    setExpandedJuz(expandedJuz === juz ? null : juz);
-  }, [expandedJuz]);
-
-  const handleToggleSurah = useCallback((juz: number, surahNumber: number) => {
-    const surahs = getSurahsInJuz(juz);
-    const surah = surahs.find(s => s.number === surahNumber);
-    if (!surah) return;
-
-    // Check if all pages of this surah (within this juz) are memorized
-    const surahPagesInJuz = surah.pagesInJuz;
-    const memorizedCount = surahPagesInJuz.filter(pageNum => {
-      const page = pages.find(p => p.pageNumber === pageNum);
-      return page?.status === 'memorized';
-    }).length;
-
-    const isComplete = memorizedCount === surahPagesInJuz.length;
-
-    const updatedPages = pages.map(p => {
-      if (surahPagesInJuz.includes(p.pageNumber)) {
-        return {
-          ...p,
-          status: (isComplete ? 'not_memorized' : 'memorized') as 'not_memorized' | 'memorized',
-          dateMemorized: isComplete ? null : new Date().toISOString(),
-        };
-      }
-      return p;
-    });
-
-    // Only sync the changed pages
-    updatePages(updatedPages, surahPagesInJuz);
-  }, [pages, updatePages]);
+  const handleToggleSurah = useCallback(
+    (juz: number, surahNumber: number) => {
+      const surahs = getSurahsInJuz(juz);
+      const surah = surahs.find((s) => s.number === surahNumber);
+      if (!surah) return;
+      const surahPagesInJuz = surah.pagesInJuz;
+      const memorizedCount = surahPagesInJuz.filter((pageNum) => {
+        const page = pages.find((p) => p.pageNumber === pageNum);
+        return page?.status === 'memorized';
+      }).length;
+      const isComplete = memorizedCount === surahPagesInJuz.length;
+      const updatedPages = pages.map((p) =>
+        surahPagesInJuz.includes(p.pageNumber)
+          ? {
+              ...p,
+              status: (isComplete ? 'not_memorized' : 'memorized') as 'not_memorized' | 'memorized',
+              dateMemorized: isComplete ? null : new Date().toISOString(),
+            }
+          : p,
+      );
+      updatePages(updatedPages, surahPagesInJuz);
+    },
+    [pages, updatePages],
+  );
 
   const handleContinue = () => {
     navigation.navigate('Schedule', {
@@ -326,36 +314,33 @@ export default function JuzSelectionScreen() {
     });
   };
 
-  const getTotalMemorized = () => {
-    return pages.filter(p => p.status === 'memorized').length;
-  };
+  const totalMemorized = pages.filter((p) => p.status === 'memorized').length;
 
-  const getInstructionText = () => {
-    switch (journeyStage) {
-      case 'beginning':
-        return 'Select the surahs or juz you have already memorized.';
-      case 'in_progress':
-        return 'Mark your completed surahs and juz.';
-      case 'complete':
-        return 'All marked as memorized. Adjust if needed.';
-      default:
-        return 'Tap the checkbox to mark a juz complete, or expand to select surahs.';
-    }
-  };
+  const headlineText =
+    journeyStage === 'beginning' ? 'What have you memorized?' : 'Select memorized portions';
+  const instructionText =
+    journeyStage === 'beginning'
+      ? 'Tap a juz to expand and select surahs.'
+      : journeyStage === 'in_progress'
+      ? 'Mark your completed surahs and juz.'
+      : 'All marked as memorized — adjust if needed.';
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.stepIndicator}>Step 2 of 4</Text>
-        <Text style={styles.headline}>
-          {journeyStage === 'beginning'
-            ? 'What have you memorized?'
-            : 'Select memorized portions'}
-        </Text>
-        <Text style={styles.subtext}>{getInstructionText()}</Text>
+        <View style={styles.topRow}>
+          <PressableScale
+            onPress={() => navigation.goBack()}
+            haptic="light"
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.textSecondary} />
+          </PressableScale>
+          <Stepper total={4} current={2} />
+        </View>
+        <Text style={styles.headline}>{headlineText}</Text>
+        <Text style={styles.subtext}>{instructionText}</Text>
       </View>
 
       <ScrollView
@@ -365,7 +350,6 @@ export default function JuzSelectionScreen() {
       >
         {Array.from({ length: 30 }, (_, i) => {
           const juzNumber = i + 1;
-          const range = getJuzRange(juzNumber);
           const stats = getJuzStats(juzNumber);
           const surahs = getSurahsInJuz(juzNumber);
 
@@ -374,12 +358,13 @@ export default function JuzSelectionScreen() {
               key={juzNumber}
               juzNumber={juzNumber}
               name={getJuzName(juzNumber)}
-              pageRange={range}
               memorizedCount={stats.memorizedCount}
               totalPages={stats.totalPages}
               isExpanded={expandedJuz === juzNumber}
               surahs={surahs}
               pages={pages}
+              theme={theme}
+              styles={styles}
               onToggleJuz={() => handleToggleJuz(juzNumber)}
               onExpand={() => handleExpandJuz(juzNumber)}
               onToggleSurah={(surahNum) => handleToggleSurah(juzNumber, surahNum)}
@@ -390,310 +375,161 @@ export default function JuzSelectionScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <View style={styles.summary}>
-          <Text style={styles.summaryText}>
-            {getTotalMemorized()} of 604 pages memorized
-          </Text>
-        </View>
-        <Button
-          title="Continue"
-          onPress={handleContinue}
-          variant="primary"
-          style={styles.button}
-        />
+        <Text style={styles.summaryText}>
+          <Text style={{ color: theme.accent, fontWeight: '600' }}>{totalMemorized}</Text>
+          {' of 604 pages memorized'}
+        </Text>
+        <Button title="Continue" onPress={handleContinue} variant="primary" style={styles.button} />
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    marginBottom: spacing.md,
-  },
-  backButtonText: {
-    ...typography.bodyMedium,
-    color: colors.textSecondary,
-  },
-  stepIndicator: {
-    ...typography.label,
-    color: colors.textMuted,
-    marginBottom: spacing.xs,
-  },
-  headline: {
-    ...typography.displaySmall,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  subtext: {
-    ...typography.bodyMedium,
-    color: colors.textSecondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  card: {
-    backgroundColor: colors.bgAlt,
-    borderRadius: 12,
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  juzNumber: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.bg,
-    borderWidth: 2,
-    borderColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  juzNumberComplete: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
-  },
-  juzNumberPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
-  },
-  juzNumberText: {
-    ...typography.bodyLarge,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  juzNumberTextComplete: {
-    color: colors.textInverse,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  juzName: {
-    ...typography.bodyMedium,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  pageRange: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  cardRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingLeft: spacing.md,
-  },
-  progressText: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-  },
-  checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
-  },
-  checkboxPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
-  },
-  checkmark: {
-    color: colors.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  partialMark: {
-    color: colors.warningText,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  progressBar: {
-    height: 3,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    borderRadius: 2,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.warning,
-    borderRadius: 2,
-  },
-  expandedSection: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
-  },
-  expandedLabel: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  surahList: {
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  surahItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.bg,
-    borderRadius: 8,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  surahItemComplete: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
-  },
-  surahItemPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
-  },
-  surahInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  surahNumber: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    width: 28,
-    textAlign: 'center',
-  },
-  surahNames: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  surahNameArabic: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
-  surahNameEnglish: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-  },
-  surahRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  surahPages: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-  },
-  surahCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  surahCheckComplete: {
-    backgroundColor: colors.textInverse,
-    borderColor: colors.textInverse,
-  },
-  surahCheckPartial: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warning,
-  },
-  surahCheckmark: {
-    color: colors.bgDark,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  surahPartialMark: {
-    color: colors.warningText,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  surahTextComplete: {
-    color: colors.textInverse,
-  },
-  surahTextCompleteSecondary: {
-    color: colors.textMuted,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  quickAction: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  quickActionPrimary: {
-    backgroundColor: colors.bgDark,
-    borderColor: colors.bgDark,
-  },
-  quickActionText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  quickActionTextPrimary: {
-    color: colors.textInverse,
-  },
-  footer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  summary: {
-    marginBottom: spacing.md,
-  },
-  summaryText: {
-    ...typography.bodyMedium,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  button: {
-    width: '100%',
-  },
-});
+const makeStyles = (theme: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.bg },
+    header: {
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
+    },
+    topRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    backButton: { padding: spacing.xxs },
+    headline: { ...typography.displaySmall, color: theme.textPrimary, marginBottom: spacing.xxs },
+    subtext: { ...typography.bodyMedium, color: theme.textSecondary },
+    scrollView: { flex: 1 },
+    scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+    card: {
+      backgroundColor: theme.bgAlt,
+      borderRadius: radius.md,
+      marginBottom: spacing.xs,
+      overflow: 'hidden',
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    cardContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: spacing.sm,
+    },
+    juzNumberWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.full,
+      backgroundColor: theme.bg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    juzNumberText: {
+      ...typography.titleSmall,
+      fontWeight: '600',
+    },
+    cardInfo: { flex: 1 },
+    juzName: { ...typography.titleSmall, color: theme.textPrimary },
+    pageRange: { ...typography.bodySmall, color: theme.textMuted, marginTop: 2 },
+    checkboxWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingLeft: spacing.sm,
+    },
+    progressText: { ...typography.bodySmall, color: theme.textMuted },
+    checkbox: {
+      width: 26,
+      height: 26,
+      borderRadius: radius.xs,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.bg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    progressBarRow: {
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    expandedSection: {
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      paddingTop: spacing.md,
+    },
+    expandedLabel: { ...typography.bodySmall, color: theme.textMuted, marginBottom: spacing.xs },
+    surahList: { gap: spacing.xxs, marginBottom: spacing.sm },
+    surahItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: theme.bg,
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    surahNumber: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      width: 22,
+      textAlign: 'center',
+    },
+    surahNames: { flex: 1 },
+    surahNameArabic: { ...typography.bodyMedium, color: theme.textPrimary, fontWeight: '500' },
+    surahNameEnglish: { ...typography.bodySmall, color: theme.textMuted },
+    surahPages: { ...typography.bodySmall, color: theme.textMuted },
+    surahCheck: {
+      width: 20,
+      height: 20,
+      borderRadius: radius.xs,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.bg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    quickActions: { flexDirection: 'row', gap: spacing.xs },
+    quickAction: {
+      flex: 1,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.sm,
+      backgroundColor: theme.bg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+    },
+    quickActionPrimary: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    quickActionText: {
+      ...typography.bodySmall,
+      color: theme.textSecondary,
+      fontWeight: '600',
+    },
+    footer: {
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      backgroundColor: theme.bg,
+      gap: spacing.sm,
+    },
+    summaryText: {
+      ...typography.bodyMedium,
+      color: theme.textSecondary,
+      textAlign: 'center',
+    },
+    button: { width: '100%' },
+  });

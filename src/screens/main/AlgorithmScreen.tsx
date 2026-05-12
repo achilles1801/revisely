@@ -1,47 +1,85 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
-  Dimensions,
   RefreshControl,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../components/Card';
+import { GlassCard } from '../../components/GlassCard';
+import { PressableScale } from '../../components/PressableScale';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
+import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
+import { ThemeColors } from '../../theme/colors';
 import { calculatePageUrgency } from '../../lib/algorithm';
-import { getQuranData } from '../../lib/quranData';
+import {
+  getQuranData,
+  getSurahForPage,
+  getJuzName,
+} from '../../lib/quranData';
+import { getQuranPageImageUrl } from '../../lib/quranImages';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_OUTER_MARGIN = spacing.lg * 2;
+const FOCUS_ITEM_WIDTH = SCREEN_WIDTH - CARD_OUTER_MARGIN;
 
-interface PageUrgencyData {
+type BrowseMode = 'pages' | 'surahs' | 'juz';
+
+interface PageRow {
   pageNumber: number;
   juzNumber: number;
-  urgency: number;
-  weaknessRating: number;
-  components: {
-    timeUrgency: number;
-    recencyMultiplier: number;
-    weaknessMultiplier: number;
-    skipPenalty: number;
-  };
+  surahNumber: number;
+  surahName: string;
+  surahNameArabic: string;
+  strength: number;
   daysSinceRevision: number;
-  isDanger: boolean;
+  reason: string;
+  urgency: number;
+}
+
+interface SurahRow {
+  surahNumber: number;
+  surahName: string;
+  surahNameArabic: string;
+  weakestPage: number;
+  avgStrength: number;
+  pageCount: number;
+}
+
+interface JuzRow {
+  juzNumber: number;
+  weakestPage: number;
+  avgStrength: number;
+  pageCount: number;
 }
 
 export default function AlgorithmScreen() {
   const { theme } = useTheme();
   const { user, pages, loadData } = useApp();
-  const quranData = getQuranData();
+  const quranData = useMemo(() => getQuranData(), []);
 
-  const [expandedPage, setExpandedPage] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [juzFilter, setJuzFilter] = useState<number | null>(null);
+  const [browseMode, setBrowseMode] = useState<BrowseMode>('pages');
+  const [juzPickerOpen, setJuzPickerOpen] = useState(false);
+  const [previewPage, setPreviewPage] = useState<number | null>(null);
+  const [focusIndex, setFocusIndex] = useState(0);
+  const focusListRef = useRef<FlatList>(null);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -49,123 +87,176 @@ export default function AlgorithmScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  // Calculate urgency for all memorized pages with breakdown
-  const pageUrgencies = useMemo((): PageUrgencyData[] => {
+  const allPageRows = useMemo((): PageRow[] => {
     if (!user) return [];
-
     const today = new Date();
 
     return pages
-      .filter(p => p.status === 'memorized' && p.lastRevisedDate)
-      .map(page => {
+      .filter((p) => p.status === 'memorized' && p.lastRevisedDate)
+      .map((page) => {
         const lastRevised = new Date(page.lastRevisedDate!);
         const daysSinceRevision = Math.floor(
-          (today.getTime() - lastRevised.getTime()) / (1000 * 60 * 60 * 24)
+          (today.getTime() - lastRevised.getTime()) / (1000 * 60 * 60 * 24),
         );
 
-        // Calculate individual components
-        const timeUrgency = daysSinceRevision / user.dangerThresholdDays;
-
-        let recencyMultiplier = 1.0;
+        let daysSinceMemorized: number | null = null;
         if (page.dateMemorized) {
           const dateMemorized = new Date(page.dateMemorized);
-          const daysSinceMemorized = Math.floor(
-            (today.getTime() - dateMemorized.getTime()) / (1000 * 60 * 60 * 24)
+          daysSinceMemorized = Math.floor(
+            (today.getTime() - dateMemorized.getTime()) / (1000 * 60 * 60 * 24),
           );
-          if (daysSinceMemorized < 30) {
-            recencyMultiplier = 2.0 - (daysSinceMemorized / 30);
-          }
         }
 
-        const weaknessMultiplier = (6 - page.weaknessRating) / 5;
-        const skipPenalty = 1 + (page.skipCount * 0.2);
-
-        const quranPage = quranData.find(q => q.pageNumber === page.pageNumber);
         const urgency = calculatePageUrgency(page, user, today);
+        const surah = getSurahForPage(page.pageNumber);
+        const quranPage = quranData.find((q) => q.pageNumber === page.pageNumber);
+
+        let reason: string;
+        if (daysSinceRevision > user.dangerThresholdDays) {
+          reason = `Overdue · ${daysSinceRevision}d ago`;
+        } else if (page.weaknessRating <= 2) {
+          reason =
+            page.weaknessRating === 1
+              ? 'You marked this as struggling'
+              : 'You marked this as shaky';
+        } else if (daysSinceMemorized !== null && daysSinceMemorized < 30) {
+          reason = 'Recently memorized — keep it fresh';
+        } else if (page.skipCount > 0) {
+          reason = 'Postponed earlier — time to revisit';
+        } else {
+          reason = `Last reviewed ${daysSinceRevision}d ago`;
+        }
 
         return {
           pageNumber: page.pageNumber,
-          juzNumber: quranPage?.juzNumber || 0,
-          urgency,
-          weaknessRating: page.weaknessRating,
-          components: {
-            timeUrgency,
-            recencyMultiplier,
-            weaknessMultiplier,
-            skipPenalty,
-          },
+          juzNumber: quranPage?.juzNumber ?? 0,
+          surahNumber: surah.number,
+          surahName: surah.name,
+          surahNameArabic: surah.nameArabic,
+          strength: page.weaknessRating,
           daysSinceRevision,
-          isDanger: daysSinceRevision > user.dangerThresholdDays,
+          reason,
+          urgency,
         };
-      })
-      .sort((a, b) => b.urgency - a.urgency);
+      });
   }, [user, pages, quranData]);
 
-  // Get top N based on daily capacity
-  const topPages = useMemo(() => {
-    if (!user) return [];
-    return pageUrgencies.slice(0, user.dailyPageCapacity);
-  }, [pageUrgencies, user]);
+  const filteredPageRows = useMemo((): PageRow[] => {
+    if (juzFilter === null) return allPageRows;
+    return allPageRows.filter((p) => p.juzNumber === juzFilter);
+  }, [allPageRows, juzFilter]);
 
-  // Calculate juz-level coverage and danger stats
-  const juzStats = useMemo(() => {
-    const stats = new Map<number, { total: number; danger: number; avgUrgency: number }>();
+  const focusPages = useMemo((): PageRow[] => {
+    return [...filteredPageRows]
+      .sort((a, b) => {
+        if (a.strength !== b.strength) return a.strength - b.strength;
+        return b.urgency - a.urgency;
+      })
+      .slice(0, 10);
+  }, [filteredPageRows]);
 
-    for (let juz = 1; juz <= 30; juz++) {
-      const juzPages = pageUrgencies.filter(p => p.juzNumber === juz);
-      const dangerPages = juzPages.filter(p => p.isDanger);
-      const avgUrgency = juzPages.length > 0
-        ? juzPages.reduce((sum, p) => sum + p.urgency, 0) / juzPages.length
-        : 0;
+  const sortedPages = useMemo((): PageRow[] => {
+    return [...filteredPageRows].sort((a, b) => {
+      if (a.strength !== b.strength) return a.strength - b.strength;
+      return b.urgency - a.urgency;
+    });
+  }, [filteredPageRows]);
 
-      stats.set(juz, {
-        total: juzPages.length,
-        danger: dangerPages.length,
-        avgUrgency,
-      });
+  const sortedSurahs = useMemo((): SurahRow[] => {
+    const bySurah = new Map<number, PageRow[]>();
+    for (const row of filteredPageRows) {
+      const list = bySurah.get(row.surahNumber) ?? [];
+      list.push(row);
+      bySurah.set(row.surahNumber, list);
     }
 
-    return stats;
-  }, [pageUrgencies]);
+    const rows: SurahRow[] = [];
+    bySurah.forEach((list, surahNumber) => {
+      const avg = list.reduce((s, p) => s + p.strength, 0) / list.length;
+      const weakest = [...list].sort((a, b) => a.strength - b.strength)[0];
+      rows.push({
+        surahNumber,
+        surahName: list[0].surahName,
+        surahNameArabic: list[0].surahNameArabic,
+        weakestPage: weakest.pageNumber,
+        avgStrength: Math.round(avg * 10) / 10,
+        pageCount: list.length,
+      });
+    });
 
-  // Get max urgency for heatmap scaling
-  const maxUrgency = useMemo(() => {
-    return Math.max(...pageUrgencies.map(p => p.urgency), 1);
-  }, [pageUrgencies]);
+    return rows.sort((a, b) => a.avgStrength - b.avgStrength);
+  }, [filteredPageRows]);
+
+  // Juz view always shows all juz with memorized pages — juz filter doesn't narrow this.
+  const sortedJuz = useMemo((): JuzRow[] => {
+    const byJuz = new Map<number, PageRow[]>();
+    for (const row of allPageRows) {
+      const list = byJuz.get(row.juzNumber) ?? [];
+      list.push(row);
+      byJuz.set(row.juzNumber, list);
+    }
+
+    const rows: JuzRow[] = [];
+    byJuz.forEach((list, juzNumber) => {
+      const avg = list.reduce((s, p) => s + p.strength, 0) / list.length;
+      const weakest = [...list].sort((a, b) => a.strength - b.strength)[0];
+      rows.push({
+        juzNumber,
+        weakestPage: weakest.pageNumber,
+        avgStrength: Math.round(avg * 10) / 10,
+        pageCount: list.length,
+      });
+    });
+
+    return rows.sort((a, b) => a.avgStrength - b.avgStrength);
+  }, [allPageRows]);
+
+  const availableJuz = useMemo(() => {
+    const set = new Set<number>();
+    for (const row of allPageRows) set.add(row.juzNumber);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [allPageRows]);
+
+  const handleFocusScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / FOCUS_ITEM_WIDTH);
+    setFocusIndex(idx);
+  };
+
+  const openPagePreview = (pageNumber: number) => setPreviewPage(pageNumber);
+
+  const handleJuzRowTap = (juzNumber: number) => {
+    setJuzFilter(juzNumber);
+    setBrowseMode('pages');
+  };
+
+  React.useEffect(() => {
+    setFocusIndex(0);
+    focusListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [juzFilter]);
 
   if (!user) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+            Loading...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const dangerCount = pageUrgencies.filter(p => p.isDanger).length;
-
-  // Helper function to get weakness rating color
-  const getWeaknessRatingColor = (rating: number): string => {
-    if (rating === 1) return '#ef4444'; // Cannot recall - red
-    if (rating === 2) return '#f59e0b'; // Major difficulty - amber
-    if (rating === 3) return '#eab308'; // Some hesitation - yellow
-    if (rating === 4) return '#84cc16'; // Mostly smooth - lime
-    if (rating === 5) return '#22c55e'; // Completely solid - green
-    return '#9ca3af'; // Default gray
+  const getStrengthColor = (rating: number): string => {
+    if (rating <= 1) return theme.error;
+    if (rating === 2) return theme.warning;
+    if (rating === 3) return theme.gold;
+    return theme.accent;
   };
 
-  const getWeaknessLabel = (rating: number): string => {
-    if (rating === 1) return 'Cannot recall';
-    if (rating === 2) return 'Major difficulty';
-    if (rating === 3) return 'Some hesitation';
-    if (rating === 4) return 'Mostly smooth';
-    if (rating === 5) return 'Completely solid';
-    return 'Not rated';
-  };
+  const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -177,421 +268,550 @@ export default function AlgorithmScreen() {
           />
         }
       >
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Algorithm Insights</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Insights</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            How your pages are prioritized
+            Where you stand and what to focus on
           </Text>
         </View>
 
-        {/* System Parameters Card */}
-        <Card style={StyleSheet.flatten([styles.card, { backgroundColor: theme.bgAlt, borderColor: theme.border }])}>
-          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>SYSTEM PARAMETERS</Text>
+        <PressableScale
+          onPress={() => setJuzPickerOpen(true)}
+          haptic="light"
+          style={[
+            styles.filterChip,
+            { backgroundColor: theme.bgAlt, borderColor: theme.border },
+          ]}
+        >
+          <Ionicons name="filter-outline" size={16} color={theme.textSecondary} />
+          <Text style={[styles.filterText, { color: theme.textPrimary }]}>
+            {filterLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={16} color={theme.textMuted} />
+        </PressableScale>
 
-          <View style={styles.paramRow}>
-            <View style={styles.paramItem}>
-              <Text style={[styles.paramValue, { color: theme.textPrimary }]}>
-                {user.dangerThresholdDays}
-              </Text>
-              <Text style={[styles.paramLabel, { color: theme.textSecondary }]}>
-                Danger Threshold (days)
-              </Text>
-            </View>
-            <View style={styles.paramItem}>
-              <Text style={[styles.paramValue, { color: theme.textPrimary }]}>
-                {user.dailyPageCapacity}
-              </Text>
-              <Text style={[styles.paramLabel, { color: theme.textSecondary }]}>
-                Daily Capacity (pages)
-              </Text>
-            </View>
+        <Card variant="flat" style={{ ...styles.card, paddingHorizontal: 0 }}>
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardLabel, { color: theme.textMuted }]}>
+              TODAY'S FOCUS
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: theme.textSecondary }]}>
+              {focusPages.length === 0
+                ? juzFilter === null
+                  ? 'Memorize some pages from Progress to see what to revise'
+                  : `No memorized pages in Juz ${juzFilter} yet`
+                : 'Your weakest page right now — swipe for more'}
+            </Text>
           </View>
 
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          {focusPages.length > 0 && (
+            <>
+              <FlatList
+                ref={focusListRef}
+                data={focusPages}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={handleFocusScroll}
+                keyExtractor={(item) => `focus-${item.pageNumber}`}
+                renderItem={({ item }) => (
+                  <FocusCard
+                    page={item}
+                    theme={theme}
+                    onPress={() => openPagePreview(item.pageNumber)}
+                    strengthColor={getStrengthColor(item.strength)}
+                  />
+                )}
+                getItemLayout={(_, index) => ({
+                  length: FOCUS_ITEM_WIDTH,
+                  offset: FOCUS_ITEM_WIDTH * index,
+                  index,
+                })}
+              />
 
-          <View style={styles.paramRow}>
-            <View style={styles.paramItem}>
-              <Text style={[styles.paramValue, { color: theme.textPrimary }]}>
-                {pageUrgencies.length}
-              </Text>
-              <Text style={[styles.paramLabel, { color: theme.textSecondary }]}>
-                Memorized Pages
-              </Text>
-            </View>
-            <View style={styles.paramItem}>
-              <Text style={[styles.paramValue, { color: dangerCount > 0 ? theme.warning : theme.success }]}>
-                {dangerCount}
-              </Text>
-              <Text style={[styles.paramLabel, { color: theme.textSecondary }]}>
-                In Danger Zone
-              </Text>
-            </View>
-          </View>
+              {focusPages.length > 1 && (
+                <View style={styles.dotRow}>
+                  {focusPages.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.dot,
+                        {
+                          backgroundColor:
+                            i === focusIndex ? theme.accent : theme.border,
+                          width: i === focusIndex ? 16 : 6,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
+          )}
         </Card>
 
-        {/* Weakness Rating Summary */}
-        {pageUrgencies.length > 0 && (
-          <Card style={StyleSheet.flatten([styles.card, { backgroundColor: theme.bgAlt, borderColor: theme.border }])}>
-            <Text style={[styles.cardLabel, { color: theme.textMuted }]}>WEAKNESS RATING SUMMARY</Text>
-            
-            {(() => {
-              const memorizedPages = pages.filter(p => p.status === 'memorized');
-              const ratingCounts = [0, 0, 0, 0, 0]; // Counts for ratings 1-5
-              let totalRatingSum = 0;
-              
-              memorizedPages.forEach(page => {
-                const rating = page.weaknessRating;
-                if (rating >= 1 && rating <= 5) {
-                  ratingCounts[rating - 1]++;
-                  totalRatingSum += rating;
-                }
-              });
-              
-              const avgRating = memorizedPages.length > 0 
-                ? Math.round((totalRatingSum / memorizedPages.length) * 10) / 10 
-                : 0;
-              const weakPages = ratingCounts[0] + ratingCounts[1]; // Ratings 1-2
-              
-              return (
-                <>
-                  <View style={styles.paramRow}>
-                    <View style={styles.paramItem}>
-                      <Text style={[styles.paramValue, { color: getWeaknessRatingColor(Math.round(avgRating)) }]}>
-                        {avgRating.toFixed(1)}
-                      </Text>
-                      <Text style={[styles.paramLabel, { color: theme.textSecondary }]}>
-                        Average Rating
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={[styles.paramValue, { color: weakPages > 0 ? '#f59e0b' : theme.success }]}>
-                        {weakPages}
-                      </Text>
-                      <Text style={[styles.paramLabel, { color: theme.textSecondary }]}>
-                        Need Practice
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  {/* Rating Distribution */}
-                  <View style={[styles.divider, { backgroundColor: theme.border }]} />
-                  <Text style={[styles.cardSubtitle, { color: theme.textSecondary, marginBottom: spacing.md }]}>
-                    Rating Distribution
-                  </Text>
-                  <View style={styles.ratingDistribution}>
-                    {[5, 4, 3, 2, 1].map((rating) => {
-                      const count = ratingCounts[rating - 1];
-                      const percentage = memorizedPages.length > 0 
-                        ? (count / memorizedPages.length) * 100 
-                        : 0;
-                      
-                      return (
-                        <View key={rating} style={styles.ratingBarItem}>
-                          <View style={styles.ratingBarLabel}>
-                            <View style={[styles.ratingDot, { backgroundColor: getWeaknessRatingColor(rating) }]} />
-                            <Text style={[styles.ratingLabel, { color: theme.textSecondary }]}>
-                              {rating} - {getWeaknessLabel(rating)}
-                            </Text>
-                          </View>
-                          <View style={[styles.ratingBarContainer, { backgroundColor: theme.border }]}>
-                            <View 
-                              style={[
-                                styles.ratingBarFill, 
-                                { 
-                                  width: `${percentage}%`, 
-                                  backgroundColor: getWeaknessRatingColor(rating) 
-                                }
-                              ]} 
-                            />
-                          </View>
-                          <Text style={[styles.ratingCount, { color: theme.textMuted }]}>
-                            {count}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </>
-              );
-            })()}
-          </Card>
-        )}
-
-        {/* Juz Heatmap */}
-        <Card style={StyleSheet.flatten([styles.card, { backgroundColor: theme.bgAlt, borderColor: theme.border }])}>
-          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>JUZ COVERAGE HEATMAP</Text>
-          <Text style={[styles.cardSubtitle, { color: theme.textSecondary }]}>
-            Urgency level across all 30 juz
+        <Card variant="flat" style={styles.card}>
+          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>
+            WEAKEST
           </Text>
 
-          <View style={styles.heatmapGrid}>
-            {Array.from({ length: 30 }, (_, i) => i + 1).map(juz => {
-              const stat = juzStats.get(juz);
-              const hasPages = (stat?.total || 0) > 0;
-              const hasDanger = (stat?.danger || 0) > 0;
-              const urgency = stat?.avgUrgency || 0;
-
-              // Calculate opacity based on urgency
-              const opacity = hasPages ? Math.min(urgency / maxUrgency, 1) : 0;
-
-              let backgroundColor = theme.border;
-              if (hasPages) {
-                backgroundColor = hasDanger ? theme.warning : theme.textMuted;
-              }
-
+          <View style={[styles.segmented, { backgroundColor: theme.bg }]}>
+            {(['pages', 'surahs', 'juz'] as BrowseMode[]).map((mode) => {
+              const isSelected = browseMode === mode;
               return (
-                <View
-                  key={juz}
+                <PressableScale
+                  key={mode}
+                  onPress={() => setBrowseMode(mode)}
+                  haptic="selection"
+                  scale={0.97}
                   style={[
-                    styles.heatmapCell,
-                    {
-                      backgroundColor,
-                      opacity: hasPages ? Math.max(opacity, 0.15) : 0.1,
-                      borderColor: theme.border,
-                    },
+                    styles.segment,
+                    isSelected && [
+                      styles.segmentSelected,
+                      { backgroundColor: theme.surface, ...shadows.sm },
+                    ],
                   ]}
                 >
                   <Text
                     style={[
-                      styles.heatmapCellText,
+                      styles.segmentText,
                       {
-                        color: hasPages && urgency > maxUrgency * 0.5 ? '#fff' : theme.textMuted,
+                        color: isSelected
+                          ? theme.textPrimary
+                          : theme.textSecondary,
+                        fontWeight: '600',
                       },
                     ]}
                   >
-                    {juz}
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
                   </Text>
-                </View>
+                </PressableScale>
               );
             })}
           </View>
 
-          <View style={styles.heatmapLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: theme.textMuted, opacity: 0.2 }]} />
-              <Text style={[styles.legendText, { color: theme.textSecondary }]}>Low urgency</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: theme.warning }]} />
-              <Text style={[styles.legendText, { color: theme.textSecondary }]}>Danger zone</Text>
-            </View>
-          </View>
-        </Card>
-
-        {/* Top Priority Pages */}
-        <Card style={StyleSheet.flatten([styles.card, { backgroundColor: theme.bgAlt, borderColor: theme.border }])}>
-          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>TODAY'S PRIORITY QUEUE</Text>
-          <Text style={[styles.cardSubtitle, { color: theme.textSecondary }]}>
-            Top {topPages.length} pages by urgency score
-          </Text>
-
-          {topPages.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No pages scheduled for today
-            </Text>
-          ) : (
-            <View style={styles.pageList}>
-              {topPages.map((page, index) => {
-                const isExpanded = expandedPage === page.pageNumber;
-
-                return (
-                  <View key={page.pageNumber}>
-                    <TouchableOpacity
-                      style={[
-                        styles.pageRow,
-                        { borderLeftColor: page.isDanger ? theme.warning : theme.success },
-                      ]}
-                      onPress={() => setExpandedPage(isExpanded ? null : page.pageNumber)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.pageRowHeader}>
-                        <View style={styles.pageInfo}>
-                          <Text style={[styles.pageRank, { color: theme.textMuted }]}>
-                            #{index + 1}
-                          </Text>
-                          <Text style={[styles.pageNumber, { color: theme.textPrimary }]}>
-                            Page {page.pageNumber}
-                          </Text>
-                          <Text style={[styles.juzBadge, { color: theme.textSecondary }]}>
-                            Juz {page.juzNumber}
-                          </Text>
-                          <View style={[styles.weaknessIndicator, { backgroundColor: getWeaknessRatingColor(page.weaknessRating) + '20', borderColor: getWeaknessRatingColor(page.weaknessRating) }]}>
-                            <Text style={[styles.weaknessIndicatorText, { color: getWeaknessRatingColor(page.weaknessRating) }]}>
-                              {page.weaknessRating}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.pageScore}>
-                          <Text style={[styles.urgencyScore, { color: theme.textPrimary }]}>
-                            {page.urgency.toFixed(2)}
-                          </Text>
-                          <Ionicons
-                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                            size={16}
-                            color={theme.textMuted}
-                          />
-                        </View>
-                      </View>
-
-                      {isExpanded && (
-                        <View style={styles.pageBreakdown}>
-                          <View style={[styles.breakdownDivider, { backgroundColor: theme.border }]} />
-
-                          <View style={styles.breakdownRow}>
-                            <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                              Time Urgency
-                            </Text>
-                            <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>
-                              {page.components.timeUrgency.toFixed(2)}
-                            </Text>
-                          </View>
-                          <Text style={[styles.breakdownHint, { color: theme.textMuted }]}>
-                            {page.daysSinceRevision} days since last revision
-                          </Text>
-
-                          <View style={styles.breakdownRow}>
-                            <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                              Recency Multiplier
-                            </Text>
-                            <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>
-                              {page.components.recencyMultiplier.toFixed(2)}x
-                            </Text>
-                          </View>
-                          <Text style={[styles.breakdownHint, { color: theme.textMuted }]}>
-                            {page.components.recencyMultiplier > 1
-                              ? 'Recently memorized - needs extra attention'
-                              : 'Stable memorization'}
-                          </Text>
-
-                          <View style={styles.breakdownRow}>
-                            <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                              Weakness Rating
-                            </Text>
-                            <View style={styles.weaknessRatingDisplay}>
-                              <Text style={[styles.breakdownValue, { color: getWeaknessRatingColor(page.weaknessRating) }]}>
-                                {page.weaknessRating}/5
-                              </Text>
-                              <View style={[styles.weaknessRatingBadge, { backgroundColor: getWeaknessRatingColor(page.weaknessRating) + '20' }]}>
-                                <Text style={[styles.weaknessRatingText, { color: getWeaknessRatingColor(page.weaknessRating) }]}>
-                                  {getWeaknessLabel(page.weaknessRating)}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                          <View style={styles.breakdownRow}>
-                            <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                              Weakness Multiplier
-                            </Text>
-                            <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>
-                              {page.components.weaknessMultiplier.toFixed(2)}x
-                            </Text>
-                          </View>
-                          <Text style={[styles.breakdownHint, { color: theme.textMuted }]}>
-                            {page.components.weaknessMultiplier > 0.6
-                              ? 'Higher weakness - prioritized for revision'
-                              : 'Strong retention - lower priority'}
-                          </Text>
-
-                          <View style={styles.breakdownRow}>
-                            <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                              Skip Penalty
-                            </Text>
-                            <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>
-                              {page.components.skipPenalty.toFixed(2)}x
-                            </Text>
-                          </View>
-                          <Text style={[styles.breakdownHint, { color: theme.textMuted }]}>
-                            {page.components.skipPenalty > 1
-                              ? 'Previously skipped - boosted priority'
-                              : 'No skip history'}
-                          </Text>
-
-                          <View style={[styles.formulaBox, { backgroundColor: theme.bg }]}>
-                            <Text style={[styles.formulaLabel, { color: theme.textMuted }]}>
-                              Final Score =
-                            </Text>
-                            <Text style={[styles.formulaText, { color: theme.textSecondary }]}>
-                              {page.components.timeUrgency.toFixed(2)} × {page.components.recencyMultiplier.toFixed(2)} × {page.components.weaknessMultiplier.toFixed(2)} × {page.components.skipPenalty.toFixed(2)}
-                            </Text>
-                            <Text style={[styles.formulaResult, { color: theme.textPrimary }]}>
-                              = {page.urgency.toFixed(2)}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </View>
+          {browseMode === 'pages' && (
+            <PagesList
+              rows={sortedPages}
+              theme={theme}
+              getStrengthColor={getStrengthColor}
+              onTap={openPagePreview}
+            />
+          )}
+          {browseMode === 'surahs' && (
+            <SurahsList
+              rows={sortedSurahs}
+              theme={theme}
+              getStrengthColor={getStrengthColor}
+              onTap={openPagePreview}
+            />
+          )}
+          {browseMode === 'juz' && (
+            <JuzList
+              rows={sortedJuz}
+              theme={theme}
+              getStrengthColor={getStrengthColor}
+              onTap={handleJuzRowTap}
+            />
           )}
         </Card>
-
-        {/* How it Works */}
-        <Card style={StyleSheet.flatten([styles.card, { backgroundColor: theme.bgAlt, borderColor: theme.border }])}>
-          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>HOW IT WORKS</Text>
-
-          <View style={styles.explanationItem}>
-            <View style={[styles.explanationBullet, { backgroundColor: theme.textPrimary }]} />
-            <View style={styles.explanationContent}>
-              <Text style={[styles.explanationTitle, { color: theme.textPrimary }]}>
-                Time Urgency
-              </Text>
-              <Text style={[styles.explanationText, { color: theme.textSecondary }]}>
-                Pages approach danger as days since revision increase. Crosses 1.0 at your danger threshold ({user.dangerThresholdDays} days).
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.explanationItem}>
-            <View style={[styles.explanationBullet, { backgroundColor: theme.textPrimary }]} />
-            <View style={styles.explanationContent}>
-              <Text style={[styles.explanationTitle, { color: theme.textPrimary }]}>
-                Recency Boost
-              </Text>
-              <Text style={[styles.explanationText, { color: theme.textSecondary }]}>
-                Newly memorized pages (under 30 days) get 1.0-2.0x multiplier for reinforcement.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.explanationItem}>
-            <View style={[styles.explanationBullet, { backgroundColor: theme.textPrimary }]} />
-            <View style={styles.explanationContent}>
-              <Text style={[styles.explanationTitle, { color: theme.textPrimary }]}>
-                Weakness Priority
-              </Text>
-              <Text style={[styles.explanationText, { color: theme.textSecondary }]}>
-                Your 1-5 weakness ratings directly affect urgency. Lower ratings (1-2: Cannot recall/Major difficulty) get highest priority multipliers. Rating of 1 gets 1.0x multiplier, rating of 5 gets 0.2x multiplier.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.explanationItem}>
-            <View style={[styles.explanationBullet, { backgroundColor: theme.textPrimary }]} />
-            <View style={styles.explanationContent}>
-              <Text style={[styles.explanationTitle, { color: theme.textPrimary }]}>
-                Skip Prevention
-              </Text>
-              <Text style={[styles.explanationText, { color: theme.textSecondary }]}>
-                Each skip adds 0.2x multiplier to prevent repeatedly postponing the same pages.
-              </Text>
-            </View>
-          </View>
-        </Card>
       </ScrollView>
+
+      <JuzPickerSheet
+        visible={juzPickerOpen}
+        onClose={() => setJuzPickerOpen(false)}
+        availableJuz={availableJuz}
+        currentValue={juzFilter}
+        onSelect={(juz) => {
+          setJuzFilter(juz);
+          setJuzPickerOpen(false);
+        }}
+        theme={theme}
+      />
+
+      <PagePreviewModal
+        pageNumber={previewPage}
+        onClose={() => setPreviewPage(null)}
+        theme={theme}
+      />
     </SafeAreaView>
   );
 }
 
+function FocusCard({
+  page,
+  theme,
+  onPress,
+  strengthColor,
+}: {
+  page: PageRow;
+  theme: ThemeColors;
+  onPress: () => void;
+  strengthColor: string;
+}) {
+  return (
+    <View style={{ width: FOCUS_ITEM_WIDTH, paddingHorizontal: spacing.lg }}>
+      <PressableScale
+        onPress={onPress}
+        haptic="light"
+        scale={0.98}
+        style={[
+          styles.focusInner,
+          {
+            backgroundColor: theme.bgAlt,
+            borderLeftColor: strengthColor,
+          },
+        ]}
+      >
+        <View style={styles.focusHeaderRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.focusPageLabel, { color: theme.textMuted }]}>
+              Page {page.pageNumber}
+            </Text>
+            <Text style={[styles.focusSurahName, { color: theme.textPrimary }]}>
+              {page.surahName}
+            </Text>
+            <Text
+              style={[styles.focusSurahArabic, { color: theme.textSecondary }]}
+            >
+              {page.surahNameArabic}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.strengthBadge,
+              {
+                backgroundColor: strengthColor + '20',
+                borderColor: strengthColor,
+              },
+            ]}
+          >
+            <Text style={[styles.strengthBadgeText, { color: strengthColor }]}>
+              {page.strength}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.focusFooter}>
+          <Text style={[styles.focusReason, { color: theme.textMuted }]}>
+            {page.reason}
+          </Text>
+          <View style={styles.openHint}>
+            <Text style={[styles.openHintText, { color: theme.accent }]}>
+              Open
+            </Text>
+            <Ionicons name="open-outline" size={14} color={theme.accent} />
+          </View>
+        </View>
+      </PressableScale>
+    </View>
+  );
+}
+
+function PagesList({
+  rows,
+  theme,
+  getStrengthColor,
+  onTap,
+}: {
+  rows: PageRow[];
+  theme: ThemeColors;
+  getStrengthColor: (rating: number) => string;
+  onTap: (pageNumber: number) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+        No pages match this filter
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.rowList}>
+      {rows.map((row) => (
+        <PressableScale
+          key={`page-${row.pageNumber}`}
+          onPress={() => onTap(row.pageNumber)}
+          haptic="light"
+          scale={0.99}
+          style={[
+            styles.browseRow,
+            { backgroundColor: theme.bg, borderColor: theme.border },
+          ]}
+        >
+          <View
+            style={[
+              styles.strengthDot,
+              { backgroundColor: getStrengthColor(row.strength) },
+            ]}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.browseRowTitle, { color: theme.textPrimary }]}>
+              Page {row.pageNumber} · {row.surahName}
+            </Text>
+            <Text style={[styles.browseRowMeta, { color: theme.textMuted }]}>
+              Juz {row.juzNumber} · last reviewed {row.daysSinceRevision}d ago
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+        </PressableScale>
+      ))}
+    </View>
+  );
+}
+
+function SurahsList({
+  rows,
+  theme,
+  getStrengthColor,
+  onTap,
+}: {
+  rows: SurahRow[];
+  theme: ThemeColors;
+  getStrengthColor: (rating: number) => string;
+  onTap: (pageNumber: number) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+        No surahs match this filter
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.rowList}>
+      {rows.map((row) => (
+        <PressableScale
+          key={`surah-${row.surahNumber}`}
+          onPress={() => onTap(row.weakestPage)}
+          haptic="light"
+          scale={0.99}
+          style={[
+            styles.browseRow,
+            { backgroundColor: theme.bg, borderColor: theme.border },
+          ]}
+        >
+          <View
+            style={[
+              styles.strengthDot,
+              {
+                backgroundColor: getStrengthColor(Math.round(row.avgStrength)),
+              },
+            ]}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.browseRowTitle, { color: theme.textPrimary }]}>
+              {row.surahName}
+            </Text>
+            <Text style={[styles.browseRowMeta, { color: theme.textMuted }]}>
+              {row.pageCount} page{row.pageCount === 1 ? '' : 's'} memorized · avg{' '}
+              {row.avgStrength.toFixed(1)}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+        </PressableScale>
+      ))}
+    </View>
+  );
+}
+
+function JuzList({
+  rows,
+  theme,
+  getStrengthColor,
+  onTap,
+}: {
+  rows: JuzRow[];
+  theme: ThemeColors;
+  getStrengthColor: (rating: number) => string;
+  onTap: (juzNumber: number) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+        Nothing memorized yet
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.rowList}>
+      {rows.map((row) => (
+        <PressableScale
+          key={`juz-${row.juzNumber}`}
+          onPress={() => onTap(row.juzNumber)}
+          haptic="light"
+          scale={0.99}
+          style={[
+            styles.browseRow,
+            { backgroundColor: theme.bg, borderColor: theme.border },
+          ]}
+        >
+          <View
+            style={[
+              styles.strengthDot,
+              {
+                backgroundColor: getStrengthColor(Math.round(row.avgStrength)),
+              },
+            ]}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.browseRowTitle, { color: theme.textPrimary }]}>
+              Juz {row.juzNumber}
+            </Text>
+            <Text style={[styles.browseRowMeta, { color: theme.textMuted }]}>
+              {getJuzName(row.juzNumber)} · {row.pageCount} page
+              {row.pageCount === 1 ? '' : 's'} · avg {row.avgStrength.toFixed(1)}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+        </PressableScale>
+      ))}
+    </View>
+  );
+}
+
+function JuzPickerSheet({
+  visible,
+  onClose,
+  availableJuz,
+  currentValue,
+  onSelect,
+  theme,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  availableJuz: number[];
+  currentValue: number | null;
+  onSelect: (juz: number | null) => void;
+  theme: ThemeColors;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.sheetOverlay} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={styles.sheet}
+        >
+          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
+          <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>
+            Filter by juz
+          </Text>
+          <ScrollView style={styles.sheetScroll}>
+            <PressableScale
+              onPress={() => onSelect(null)}
+              haptic="selection"
+              scale={0.99}
+              style={[
+                styles.sheetOption,
+                currentValue === null && { backgroundColor: theme.accentSoft },
+                { borderBottomColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.sheetOptionText, { color: theme.textPrimary }]}>
+                All juz
+              </Text>
+              {currentValue === null && (
+                <Ionicons name="checkmark" size={18} color={theme.accent} />
+              )}
+            </PressableScale>
+            {availableJuz.map((juz) => (
+              <PressableScale
+                key={juz}
+                onPress={() => onSelect(juz)}
+                haptic="selection"
+                scale={0.99}
+                style={[
+                  styles.sheetOption,
+                  currentValue === juz && { backgroundColor: theme.accentSoft },
+                  { borderBottomColor: theme.border },
+                ]}
+              >
+                <View>
+                  <Text style={[styles.sheetOptionText, { color: theme.textPrimary }]}>
+                    Juz {juz}
+                  </Text>
+                  <Text
+                    style={[styles.sheetOptionMeta, { color: theme.textMuted }]}
+                  >
+                    {getJuzName(juz)}
+                  </Text>
+                </View>
+                {currentValue === juz && (
+                  <Ionicons name="checkmark" size={18} color={theme.accent} />
+                )}
+              </PressableScale>
+            ))}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function PagePreviewModal({
+  pageNumber,
+  onClose,
+  theme,
+}: {
+  pageNumber: number | null;
+  onClose: () => void;
+  theme: ThemeColors;
+}) {
+  const [loading, setLoading] = useState(true);
+
+  if (pageNumber === null) return null;
+
+  const surah = getSurahForPage(pageNumber);
+  const imageUrl = getQuranPageImageUrl(pageNumber);
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      {/* Tap-anywhere-to-dismiss outside the card. */}
+      <Pressable style={styles.previewBackdrop} onPress={onClose}>
+        {/* Inner Pressable swallows taps so they don't dismiss the popup. */}
+        <Pressable style={styles.previewCard} onPress={() => {}}>
+          <View style={styles.previewCardHeader}>
+            <View style={styles.previewHeaderText}>
+              <Text style={styles.previewTitle}>Page {pageNumber}</Text>
+              <Text style={styles.previewSubtitle}>
+                {surah.name} · {surah.nameArabic}
+              </Text>
+            </View>
+            <PressableScale
+              onPress={onClose}
+              haptic="light"
+              style={styles.previewClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="close" size={20} color="#000" />
+            </PressableScale>
+          </View>
+          <View style={styles.previewImageWrap}>
+            {loading && (
+              <ActivityIndicator size="large" color="#666" style={styles.previewLoader} />
+            )}
+            <Image
+              source={{ uri: imageUrl }}
+              resizeMode="contain"
+              resizeMethod="scale"
+              style={styles.previewImage}
+              onLoadStart={() => setLoading(true)}
+              onLoad={() => setLoading(false)}
+              onError={() => setLoading(false)}
+            />
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -602,256 +822,255 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    ...typography.bodyMedium,
-  },
-  header: {
-    marginBottom: spacing.xl,
-  },
+  loadingText: { ...typography.bodyMedium },
+  header: { marginBottom: spacing.lg },
   title: {
     ...typography.displaySmall,
     marginBottom: spacing.xs,
   },
-  subtitle: {
-    ...typography.bodyMedium,
+  subtitle: { ...typography.bodyMedium },
+
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
   },
+  filterText: {
+    ...typography.bodySmall,
+    fontWeight: '600',
+  },
+
   card: {
     marginBottom: spacing.lg,
     padding: spacing.lg,
-    borderWidth: 1,
+  },
+  cardHeader: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
   },
   cardLabel: {
     ...typography.label,
     marginBottom: spacing.xs,
   },
-  cardSubtitle: {
-    ...typography.bodySmall,
-    marginBottom: spacing.lg,
+  cardSubtitle: { ...typography.bodySmall },
+
+  focusInner: {
+    borderLeftWidth: 3,
+    borderRadius: radius.md,
+    padding: spacing.lg,
   },
-  paramRow: {
+  focusHeaderRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    alignItems: 'flex-start',
+    gap: spacing.md,
     marginBottom: spacing.md,
   },
-  paramItem: {
+  focusPageLabel: {
+    ...typography.bodySmall,
+    marginBottom: 2,
+  },
+  focusSurahName: {
+    ...typography.titleMedium,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  focusSurahArabic: { ...typography.bodyMedium },
+  focusFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  focusReason: {
+    ...typography.bodySmall,
     flex: 1,
   },
-  paramValue: {
-    ...typography.displayMedium,
-    marginBottom: spacing.xs,
-  },
-  paramLabel: {
-    ...typography.bodySmall,
-  },
-  divider: {
-    height: 1,
-    marginVertical: spacing.md,
-  },
-  heatmapGrid: {
+  openHint: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
+    alignItems: 'center',
+    gap: 4,
   },
-  heatmapCell: {
-    width: (SCREEN_WIDTH - spacing.lg * 2 - spacing.lg * 2 - spacing.xs * 5) / 6,
-    aspectRatio: 1,
-    borderWidth: 1,
+  openHintText: {
+    ...typography.bodySmall,
+    fontWeight: '600',
+  },
+  strengthBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  heatmapCellText: {
+  strengthBadgeText: {
     ...typography.bodySmall,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
-  heatmapLegend: {
+
+  dotRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
-    marginTop: spacing.sm,
-  },
-  legendItem: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.xs,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 0,
-  },
-  legendText: {
-    ...typography.bodySmall,
-  },
-  pageList: {
-    gap: spacing.md,
-  },
-  pageRow: {
-    padding: spacing.md,
-    borderLeftWidth: 3,
-  },
-  pageRowHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  pageInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-  },
-  pageRank: {
-    ...typography.bodySmall,
-    fontWeight: '600',
-    width: 28,
-  },
-  pageNumber: {
-    ...typography.bodyMedium,
-    fontWeight: '600',
-  },
-  juzBadge: {
-    ...typography.bodySmall,
-  },
-  pageScore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  urgencyScore: {
-    ...typography.bodyLarge,
-    fontWeight: '600',
-  },
-  pageBreakdown: {
+    gap: 6,
     marginTop: spacing.md,
   },
-  breakdownDivider: {
-    height: 1,
-    marginBottom: spacing.md,
+  dot: {
+    height: 6,
+    borderRadius: radius.full,
   },
-  breakdownRow: {
+
+  segmented: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  breakdownLabel: {
-    ...typography.bodySmall,
-  },
-  breakdownValue: {
-    ...typography.bodyMedium,
-    fontWeight: '600',
-  },
-  breakdownHint: {
-    ...typography.bodySmall,
+    padding: 3,
+    borderRadius: radius.full,
     marginBottom: spacing.md,
-    marginLeft: spacing.xs,
   },
-  formulaBox: {
-    padding: spacing.md,
-    marginTop: spacing.sm,
+  segment: {
+    flex: 1,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  formulaLabel: {
-    ...typography.label,
-    marginBottom: spacing.xs,
+  segmentSelected: {},
+  segmentText: { ...typography.bodySmall },
+
+  rowList: { gap: spacing.xs },
+  browseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  formulaText: {
-    ...typography.bodySmall,
-    fontFamily: 'Courier',
-    marginBottom: spacing.xs,
+  strengthDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
   },
-  formulaResult: {
+  browseRowTitle: {
     ...typography.bodyMedium,
     fontWeight: '600',
-    fontFamily: 'Courier',
+    marginBottom: 2,
+  },
+  browseRowMeta: {
+    ...typography.bodySmall,
+    fontSize: 11,
   },
   emptyText: {
     ...typography.bodyMedium,
     textAlign: 'center',
     paddingVertical: spacing.lg,
   },
-  explanationItem: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  explanationBullet: {
-    width: 6,
-    height: 6,
-    marginTop: 6,
-  },
-  explanationContent: {
+
+  sheetOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
   },
-  explanationTitle: {
+  sheet: {
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    maxHeight: '75%',
+    overflow: 'hidden',
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: radius.full,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  sheetTitle: {
+    ...typography.titleMedium,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  sheetScroll: {
+    paddingHorizontal: spacing.lg,
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetOptionText: {
     ...typography.bodyMedium,
     fontWeight: '600',
-    marginBottom: spacing.xs,
   },
-  explanationText: {
+  sheetOptionMeta: {
     ...typography.bodySmall,
-    lineHeight: 20,
+    marginTop: 2,
   },
-  weaknessRatingDisplay: {
-    alignItems: 'flex-end',
-    gap: spacing.xs,
+
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
   },
-  weaknessRatingBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
+  previewCard: {
+    backgroundColor: '#fff',
+    borderRadius: radius.lg,
+    width: '100%',
+    // Quran page aspect is roughly 2:3 — give the card enough vertical room
+    // for the page to render at near-native size without filling the screen.
+    maxWidth: 380,
+    maxHeight: '80%',
+    overflow: 'hidden',
   },
-  weaknessRatingText: {
+  previewCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+  },
+  previewHeaderText: { flex: 1 },
+  previewTitle: {
+    ...typography.titleMedium,
+    color: '#000',
+    marginBottom: 2,
+  },
+  previewSubtitle: {
     ...typography.bodySmall,
-    fontSize: 10,
-    fontWeight: '500',
+    color: 'rgba(0,0,0,0.6)',
   },
-  weaknessIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
+  previewClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.06)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  weaknessIndicatorText: {
-    ...typography.bodySmall,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  ratingDistribution: {
-    gap: spacing.sm,
-  },
-  ratingBarItem: {
-    flexDirection: 'row',
+  previewImageWrap: {
+    aspectRatio: 2 / 3,
+    width: '100%',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.sm,
   },
-  ratingBarLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    width: 140,
-  },
-  ratingDot: {
-    width: 8,
-    height: 8,
-  },
-  ratingLabel: {
-    ...typography.bodySmall,
-    fontSize: 11,
-  },
-  ratingBarContainer: {
-    flex: 1,
-    height: 8,
-    overflow: 'hidden',
-  },
-  ratingBarFill: {
+  previewLoader: { position: 'absolute' },
+  previewImage: {
+    width: '100%',
     height: '100%',
-  },
-  ratingCount: {
-    ...typography.bodySmall,
-    fontSize: 11,
-    width: 30,
-    textAlign: 'right',
   },
 });

@@ -1,0 +1,4 @@
+# Maestro project config — applies to all flows in this directory.
+# https://docs.maestro.dev/cli/configuration
+flows:
+  - flows/*.yaml

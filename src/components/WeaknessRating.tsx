@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, Alert } from 'react-native';
-import { colors } from '../theme/colors';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Modal, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
+import { shadows } from '../theme/shadows';
 import { Button } from './Button';
+import { PressableScale } from './PressableScale';
 import { useApp } from '../context/AppContext';
 import { getQuranData } from '../lib/quranData';
+import { logger } from '../lib/logger';
+import { RATINGS } from '../lib/ratings';
 
 interface WeaknessModalProps {
   pageNumber: number;
@@ -15,15 +23,22 @@ interface WeaknessModalProps {
   onClose: () => void;
 }
 
-const RATINGS = [
-  { value: 1, label: 'Cannot recall', color: '#ef4444' },
-  { value: 2, label: 'Major difficulty', color: '#f59e0b' },
-  { value: 3, label: 'Some hesitation', color: '#eab308' },
-  { value: 4, label: 'Mostly smooth', color: '#84cc16' },
-  { value: 5, label: 'Completely solid', color: '#22c55e' },
-];
+// Maps a 1–5 rating to a semantic color from the theme.
+function ratingTone(rating: number, theme: ThemeColors): string {
+  if (rating <= 2) return theme.error;
+  if (rating === 3) return theme.warning;
+  return theme.accent;
+}
 
-export function WeaknessModal({ pageNumber, surahName, currentRating, onSave, onClose }: WeaknessModalProps) {
+export function WeaknessModal({
+  pageNumber,
+  surahName,
+  currentRating,
+  onSave,
+  onClose,
+}: WeaknessModalProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { pages, updatePages } = useApp();
   const [selectedRating, setSelectedRating] = useState<number | null>(currentRating ?? null);
   const [applyToJuz, setApplyToJuz] = useState(false);
@@ -31,7 +46,6 @@ export function WeaknessModal({ pageNumber, surahName, currentRating, onSave, on
 
   const handleSave = async () => {
     if (!selectedRating) return;
-
     setSaving(true);
 
     try {
@@ -39,7 +53,6 @@ export function WeaknessModal({ pageNumber, surahName, currentRating, onSave, on
       const changedPageNumbers: number[] = [];
       const pageJuz = quranData.find(q => q.pageNumber === pageNumber)?.juzNumber;
 
-      // Determine which pages to update
       if (applyToJuz && pageJuz) {
         const juzPages = quranData
           .filter(q => q.juzNumber === pageJuz)
@@ -49,190 +62,189 @@ export function WeaknessModal({ pageNumber, surahName, currentRating, onSave, on
         changedPageNumbers.push(pageNumber);
       }
 
-      // Update pages in context
-      const updatedPages = pages.map(p => {
-        if (changedPageNumbers.includes(p.pageNumber)) {
-          return { ...p, weaknessRating: selectedRating };
-        }
-        return p;
-      });
+      const updatedPages = pages.map(p =>
+        changedPageNumbers.includes(p.pageNumber)
+          ? { ...p, weaknessRating: selectedRating }
+          : p,
+      );
 
-      // Call onSave FIRST to update local UI state in parent
-      if (onSave) {
-        onSave(selectedRating, applyToJuz);
-      }
-
-      // Then save to Firestore
+      onSave?.(selectedRating, applyToJuz);
       await updatePages(updatedPages, changedPageNumbers);
-
-      // Close modal
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
     } catch (err: any) {
-      console.error('[WeaknessModal] Save error:', err);
+      logger.error('[WeaknessModal] Save error:', err);
       Alert.alert('Error', 'Failed to save rating. Please try again.');
       setSaving(false);
     }
   };
 
   return (
-    <Modal
-      visible={true}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.modal}>
-              <View style={styles.dragHandle} />
-              
-              <View style={styles.content}>
-                <Text style={styles.headline}>Rate this page</Text>
-                <Text style={styles.subtext}>
-                  Page {pageNumber} · {surahName}
-                </Text>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <PressableScale
+        onPress={onClose}
+        haptic="none"
+        scale={1}
+        style={styles.overlay}
+      >
+        <PressableScale haptic="none" scale={1} style={styles.sheet}>
+          <View style={styles.dragHandle} />
 
-                <View style={styles.ratingsContainer}>
-                  {RATINGS.map((rating) => (
-                    <TouchableOpacity
-                      key={rating.value}
+          <View style={styles.content}>
+            <Text style={styles.headline}>Rate this page</Text>
+            <Text style={styles.subtext}>
+              Page {pageNumber} · {surahName}
+            </Text>
+
+            <View style={styles.ratingsContainer}>
+              {RATINGS.map((rating) => {
+                const isSelected = selectedRating === rating.value;
+                const tone = ratingTone(rating.value, theme);
+                return (
+                  <PressableScale
+                    key={rating.value}
+                    onPress={() => setSelectedRating(rating.value)}
+                    haptic="selection"
+                    style={[
+                      styles.ratingButton,
+                      isSelected && {
+                        backgroundColor: theme.accentSoft,
+                        borderColor: tone,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.ratingDot, { backgroundColor: tone }]} />
+                    <Text
                       style={[
-                        styles.ratingButton,
-                        selectedRating === rating.value && {
-                          backgroundColor: rating.color + '20',
-                          borderColor: rating.color,
-                          borderWidth: 2,
-                        },
+                        styles.ratingText,
+                        isSelected && { color: theme.textPrimary, fontWeight: '600' },
                       ]}
-                      onPress={() => setSelectedRating(rating.value)}
-                      activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.ratingText,
-                          selectedRating === rating.value && {
-                            color: rating.color,
-                            fontWeight: '600',
-                          },
-                        ]}
-                      >
-                        {rating.value}. {rating.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setApplyToJuz(!applyToJuz)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.checkbox, applyToJuz && styles.checkboxChecked]}>
-                    {applyToJuz && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Apply to entire juz</Text>
-                </TouchableOpacity>
-
-                <Button
-                  title={saving ? "Saving..." : "Save"}
-                  onPress={handleSave}
-                  variant="primary"
-                  style={styles.saveButton}
-                  disabled={!selectedRating || saving}
-                />
-              </View>
+                      {rating.label}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={20} color={tone} />
+                    )}
+                  </PressableScale>
+                );
+              })}
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+
+            <PressableScale
+              onPress={() => setApplyToJuz(!applyToJuz)}
+              haptic="selection"
+              style={styles.checkboxRow}
+            >
+              <View style={[styles.checkbox, applyToJuz && styles.checkboxChecked]}>
+                {applyToJuz && (
+                  <Ionicons name="checkmark" size={14} color={theme.textInverse} />
+                )}
+              </View>
+              <Text style={styles.checkboxLabel}>Apply to entire juz</Text>
+            </PressableScale>
+
+            <Button
+              title="Save"
+              onPress={handleSave}
+              variant="primary"
+              loading={saving}
+              style={styles.saveButton}
+              disabled={!selectedRating}
+            />
+          </View>
+        </PressableScale>
+      </PressableScale>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modal: {
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-    maxHeight: '80%',
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.border,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-    borderRadius: 0,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-  },
-  headline: {
-    ...typography.displaySmall,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  subtext: {
-    ...typography.bodyMedium,
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
-  },
-  ratingsContainer: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  ratingButton: {
-    width: '100%',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.bgAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 0,
-    alignItems: 'center',
-  },
-  ratingText: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: 0,
-    marginRight: spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  checkmark: {
-    color: colors.textInverse,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  checkboxLabel: {
-    ...typography.bodyMedium,
-    color: colors.textPrimary,
-  },
-  saveButton: {
-    width: '100%',
-  },
-});
-
+const makeStyles = (theme: ThemeColors) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: theme.surface,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xl,
+      maxHeight: '85%',
+      ...shadows.lg,
+    },
+    dragHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: theme.border,
+      alignSelf: 'center',
+      marginBottom: spacing.md,
+      borderRadius: radius.full,
+    },
+    content: {
+      paddingHorizontal: spacing.lg,
+    },
+    headline: {
+      ...typography.titleLarge,
+      color: theme.textPrimary,
+      marginBottom: spacing.xxs,
+    },
+    subtext: {
+      ...typography.bodyMedium,
+      color: theme.textSecondary,
+      marginBottom: spacing.lg,
+    },
+    ratingsContainer: {
+      gap: spacing.xs,
+      marginBottom: spacing.md,
+    },
+    ratingButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      backgroundColor: theme.bgAlt,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+      borderRadius: radius.sm,
+    },
+    ratingDot: {
+      width: 8,
+      height: 8,
+      borderRadius: radius.full,
+    },
+    ratingText: {
+      ...typography.bodyMedium,
+      color: theme.textPrimary,
+      flex: 1,
+    },
+    checkboxRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+      paddingVertical: spacing.xs,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.xs,
+      marginRight: spacing.sm,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    checkboxChecked: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    checkboxLabel: {
+      ...typography.bodyMedium,
+      color: theme.textPrimary,
+    },
+    saveButton: {
+      width: '100%',
+    },
+  });

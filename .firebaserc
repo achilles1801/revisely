@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "revision-buddy-3a398"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

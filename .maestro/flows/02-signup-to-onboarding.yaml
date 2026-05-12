@@ -1,0 +1,44 @@
+# Critical golden path: a brand-new user signs up and lands in onboarding.
+#
+# This flow uses email + password so it works without Google OAuth in CI.
+# To make it deterministic across runs, point the app at the Firebase Auth
+# emulator before running (set FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099)
+# or use a unique throwaway email each run via shell substitution.
+appId: com.revisionbuddy.app
+env:
+  EMAIL: maestro+${MAESTRO_RUN_TIMESTAMP}@example.com
+  PASSWORD: TestPassword123!
+  NAME: Maestro Tester
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+# Switch from the default Sign-in tab to Sign-up.
+- tapOn: "Sign up"
+
+- tapOn:
+    text: "Name"
+    index: 0
+- inputText: ${NAME}
+
+- tapOn:
+    text: "Email"
+- inputText: ${EMAIL}
+
+- tapOn:
+    text: "Password"
+    index: 0
+- inputText: ${PASSWORD}
+
+- tapOn:
+    text: "Confirm Password"
+- inputText: ${PASSWORD}
+
+- tapOn: "Create account"
+
+# After signup, the user should land in onboarding.
+- assertVisible:
+    text: "remembered"          # WelcomeScreen headline ("Your Quran, remembered.")
+    timeout: 10000

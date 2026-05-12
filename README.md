@@ -1,138 +1,91 @@
 # Revisley
 
-A minimalist Quran revision tracking app built with React Native and Expo, designed to help users maintain consistent memorization review through intelligent scheduling.
+A Quran revision tracker that schedules daily review using a weakness-weighted algorithm.
 
-## Features
+Built with Expo SDK 54, React Native, and Firebase. AI-assisted memorization input is powered by a Cloud Function that calls Claude.
 
-- **Smart Revision Algorithm** - Prioritizes pages based on weakness ratings, time since last review, and skip history
-- **Progress Tracking** - View memorization progress across juz, surahs, and individual pages
-- **Weakness Rating System** - Rate each page's strength (1-5) to inform the scheduling algorithm
-- **Session History** - Track revision sessions with detailed statistics
-- **Dark Mode** - Full dark mode support for comfortable reading
-- **Offline Support** - Works offline with automatic sync when connected
-- **Cloud Sync** - Firebase integration for cross-device data persistence
+## Stack
 
-## Screenshots
+- **App**: Expo (new architecture), React Native 0.81, React 19, TypeScript
+- **Backend**: Firebase Auth, Firestore, App Check
+- **Functions**: Cloud Functions v2 + Anthropic SDK
+- **Tests**: Jest + RNTL, `@firebase/rules-unit-testing`, `firebase-functions-test`, Maestro
 
-*Coming soon*
+## Setup
 
-## Tech Stack
+```bash
+npm install --legacy-peer-deps
+npm --prefix functions install
+npm --prefix tests/firestore-rules install
+cp .env.example .env   # then fill in Firebase + Google client IDs
+```
 
-- **Framework**: React Native with Expo
-- **Language**: TypeScript
-- **Backend**: Firebase (Authentication, Firestore)
-- **Navigation**: React Navigation
-- **State Management**: React Context
+Place `GoogleService-Info.plist` at the project root for iOS builds.
 
-## Getting Started
+> Expo Go is not supported. The app uses native Firebase modules and the new architecture, so you need a dev client.
 
-### Prerequisites
+## Run
 
-- Node.js (v18 or later)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- iOS Simulator (Mac) or Android Emulator, or Expo Go app on your device
+```bash
+npx expo start                  # JS server (use with a dev client build)
+npx expo run:ios                # build + install dev client (iOS)
+npx expo run:android            # build + install dev client (Android)
+```
 
-### Installation
+## Verify a change
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/achilles1801/revisley.git
-   cd revisley
-   ```
+```bash
+npx tsc --noEmit                # type check
+npm test                        # unit + component tests
+npx expo export --platform ios  # bundle check
+```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## Tests
 
-3. **Set up environment variables**
+| Layer | Command | Notes |
+|---|---|---|
+| Unit + component | `npm test` | — |
+| Cloud Functions | `npm run test:functions` | — |
+| Firestore rules | `npm run test:rules` | needs Java for the emulator |
+| Everything above | `npm run test:all` | — |
+| E2E (Maestro) | `npm run test:e2e:ios` | needs Maestro + simulator + dev client |
 
-   Copy the example environment file and fill in your Firebase credentials:
-   ```bash
-   cp .env.example .env
-   ```
+CI runs all of the above on every PR via [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-   Edit `.env` with your Firebase configuration:
-   ```
-   FIREBASE_API_KEY=your_api_key
-   FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   FIREBASE_PROJECT_ID=your_project_id
-   FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
-   FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-   FIREBASE_APP_ID=your_app_id
-   FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
-   GOOGLE_IOS_CLIENT_ID=your_ios_client_id.apps.googleusercontent.com
-   GOOGLE_WEB_CLIENT_ID=your_web_client_id.apps.googleusercontent.com
-   GOOGLE_REVERSED_CLIENT_ID=com.googleusercontent.apps.your_client_id
-   ```
+## Workflow
 
-4. **Set up Firebase (for iOS builds)**
+The three commands you'll actually use day-to-day:
 
-   Download `GoogleService-Info.plist` from your Firebase Console and place it in the project root.
+```bash
+# 1. Local dev — runs on iOS simulator with hot reload
+npx expo run:ios
 
-5. **Start the development server**
-   ```bash
-   npm start
-   ```
+# 2. Rebuild for iPhone (~15 min, EAS) — needed for any native change
+#    (new npm packages with native code, app.config.js plugins/ios.*)
+eas build --profile preview --platform ios
 
-6. **Run on your device**
-   - Press `i` for iOS simulator
-   - Press `a` for Android emulator
-   - Scan the QR code with Expo Go app
+# 3. Push JS-only changes to existing iPhone build (~30 sec)
+eas update --branch preview --message "what you changed"
+```
 
-## Project Structure
+Quit + reopen the app on iPhone after `eas update` to pick up the new code
+(takes one launch to download, applies on the next).
+
+## Deploy backend (Firebase)
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only functions
+firebase deploy --only firestore:rules,functions   # both at once
+```
+
+## Layout
 
 ```
 src/
-├── components/       # Reusable UI components
-├── context/          # React Context providers
-├── hooks/            # Custom React hooks
-├── lib/              # Utility functions and configurations
-├── navigation/       # Navigation setup
-├── screens/          # Screen components
-│   ├── auth/         # Authentication screens
-│   ├── main/         # Main app screens
-│   ├── onboarding/   # Onboarding flow
-│   └── revision/     # Revision session screens
-├── services/         # External service integrations
-├── theme/            # Design tokens (colors, typography, spacing)
-└── types/            # TypeScript type definitions
+  components/   context/   hooks/   lib/
+  navigation/   screens/   theme/   types/
+functions/                # Cloud Functions (Anthropic-powered parser)
+tests/firestore-rules/    # security-rules tests
+.maestro/                 # E2E flows
 ```
-
-## Firebase Setup
-
-1. Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable Authentication with Email/Password and Google Sign-In
-3. Create a Firestore database
-4. Add your iOS and Web apps to get the configuration values
-5. Download `GoogleService-Info.plist` for iOS native builds
-
-### Firestore Security Rules
-
-Deploy the included security rules:
-```bash
-firebase deploy --only firestore:rules
-```
-
-## Algorithm
-
-The revision scheduling algorithm considers:
-
-1. **Days Since Last Review** - Pages not reviewed recently get higher priority
-2. **Weakness Rating** - Lower-rated pages (harder to recall) appear more frequently
-3. **Skip Count** - Pages skipped in previous sessions get boosted priority
-4. **User's Daily Goal** - Respects the user's configured pages per day
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Quran page images from [Quran.com API](https://quran.com)
-- Icons from [Expo Vector Icons](https://icons.expo.fyi/)

@@ -8,23 +8,30 @@ import {
   resetPassword,
   subscribeToAuthChanges,
   signInWithGoogleCredential,
+  signInWithAppleCredential,
 } from '../lib/firebase';
 import * as firestoreService from '../services/firestoreService';
+import { identifyUser } from '../lib/sentry';
 import { User, UserPage, RevisionLog } from '../types';
+import { logger } from '../lib/logger';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  isOfflineMode: boolean;
   // Auth actions
   signUp: (email: string, password: string, name?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (idToken: string) => Promise<void>;
+  signInWithApple: (
+    identityToken: string,
+    rawNonce: string,
+    fullName?: { givenName?: string | null; familyName?: string | null },
+  ) => Promise<void>;
   signOutUser: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  continueOffline: () => void;
   clearError: () => void;
 }
 
@@ -34,11 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthChanges((user) => {
       setFirebaseUser(user);
+      identifyUser(user?.uid ?? null);
       setIsLoading(false);
     });
     return unsubscribe;
@@ -49,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const user = await registerUser(email, password, name);
-      setIsOfflineMode(false);
 
       // Initialize user in Firestore with all 604 pages
       try {
@@ -60,10 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: user.email,
             displayName: name || user.displayName,
           });
-          console.log('New user initialized in Firestore with 604 pages');
+          logger.log('New user initialized in Firestore with 604 pages');
         }
       } catch (firestoreErr) {
-        console.error('Failed to initialize Firestore user:', firestoreErr);
+        logger.error('Failed to initialize Firestore user:', firestoreErr);
         // Don't throw - auth succeeded, Firestore init can be retried
       }
     } catch (err: any) {
@@ -79,7 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const user = await loginUser(email, password);
-      setIsOfflineMode(false);
 
       // Ensure user exists in Firestore (for users who signed up before Firestore integration)
       try {
@@ -90,10 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: user.email,
             displayName: user.displayName,
           });
-          console.log('Existing auth user initialized in Firestore');
+          logger.log('Existing auth user initialized in Firestore');
         }
       } catch (firestoreErr) {
-        console.error('Failed to check/create Firestore user:', firestoreErr);
+        logger.error('Failed to check/create Firestore user:', firestoreErr);
       }
     } catch (err: any) {
       setError(getErrorMessage(err.code));
@@ -108,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const user = await signInWithGoogleCredential(idToken);
-      setIsOfflineMode(false);
 
       // Initialize user in Firestore if needed
       try {
@@ -120,13 +124,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             displayName: user.displayName,
             photoURL: user.photoURL,
           });
-          console.log('Google user initialized in Firestore');
+          logger.log('Google user initialized in Firestore');
         }
       } catch (firestoreErr) {
-        console.error('Failed to initialize Google user in Firestore:', firestoreErr);
+        logger.error('Failed to initialize Google user in Firestore:', firestoreErr);
       }
     } catch (err: any) {
       setError(getErrorMessage(err.code));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signInWithApple = async (
+    identityToken: string,
+    rawNonce: string,
+    fullName?: { givenName?: string | null; familyName?: string | null },
+  ) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const user = await signInWithAppleCredential(identityToken, rawNonce);
+
+      // Apple only sends fullName on the FIRST sign-in. Use it to seed displayName.
+      const displayName =
+        user.displayName ||
+        [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ') ||
+        null;
+
+      try {
+        const existingUser = await firestoreService.getUser(user.uid);
+        if (!existingUser) {
+          await firestoreService.createUser({
+            uid: user.uid,
+            email: user.email,
+            displayName,
+            photoURL: user.photoURL,
+          });
+        }
+      } catch (firestoreErr) {
+        logger.error('Failed to initialize Apple user in Firestore:', firestoreErr);
+      }
+    } catch (err: any) {
+      setError(getErrorMessage(err.code));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await firestoreService.deleteAccount();
+      // signOutUser is implicit — Firebase Auth user is gone, onAuthStateChanged
+      // fires with null. We sign out locally to be sure.
+      try {
+        await logoutUser();
+      } catch {
+        // Already signed out by the delete call.
+      }
+    } catch (err: any) {
+      setError(getErrorMessage(err.code) || err?.message || 'Failed to delete account.');
       throw err;
     } finally {
       setIsLoading(false);
@@ -156,11 +217,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const continueOffline = () => {
-    setIsOfflineMode(true);
-    setIsLoading(false);
-  };
-
   const clearError = () => {
     setError(null);
   };
@@ -172,13 +228,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!firebaseUser,
         isLoading,
         error,
-        isOfflineMode,
         signUp,
         signIn,
         signInWithGoogle,
+        signInWithApple,
         signOutUser,
+        deleteAccount,
         sendPasswordReset,
-        continueOffline,
         clearError,
       }}
     >

@@ -1,91 +1,112 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors } from '../theme/colors';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
+import { PressableScale } from './PressableScale';
+
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'destructive' | 'ghost';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: ButtonVariant;
   disabled?: boolean;
+  loading?: boolean;
   style?: ViewStyle;
+  accessibilityLabel?: string;
 }
 
-export function Button({ 
-  title, 
-  onPress, 
-  variant = 'primary', 
+export function Button({
+  title,
+  onPress,
+  variant = 'primary',
   disabled = false,
-  style 
+  loading = false,
+  style,
+  accessibilityLabel,
 }: ButtonProps) {
-  const buttonStyle = [
-    styles.button,
-    variant === 'primary' && styles.primary,
-    variant === 'secondary' && styles.secondary,
-    variant === 'outline' && styles.outline,
-    disabled && styles.disabled,
-    style,
-  ];
+  const { theme } = useTheme();
+  const isDisabled = disabled || loading;
 
-  const textStyle = [
-    styles.text,
-    variant === 'primary' && styles.primaryText,
-    variant === 'secondary' && styles.secondaryText,
-    variant === 'outline' && styles.outlineText,
-    disabled && styles.disabledText,
-  ];
+  const variantStyle: ViewStyle = (() => {
+    if (isDisabled) {
+      return {
+        backgroundColor: theme.bgAlt,
+        borderWidth: 1,
+        borderColor: theme.border,
+      };
+    }
+    switch (variant) {
+      case 'primary':
+        return { backgroundColor: theme.accent };
+      case 'secondary':
+        return { backgroundColor: theme.bgAlt };
+      case 'outline':
+        return {
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: theme.border,
+        };
+      case 'destructive':
+        return { backgroundColor: theme.error };
+      case 'ghost':
+        return { backgroundColor: 'transparent' };
+    }
+  })();
+
+  const textColor = (() => {
+    if (isDisabled) return theme.textMuted;
+    if (variant === 'primary' || variant === 'destructive') return theme.textInverse;
+    if (variant === 'ghost') return theme.accent;
+    return theme.textPrimary;
+  })();
 
   return (
-    <TouchableOpacity
-      style={buttonStyle}
+    <PressableScale
       onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
+      disabled={isDisabled}
+      haptic={variant === 'primary' || variant === 'destructive' ? 'medium' : 'light'}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      style={[styles.button, variantStyle, style]}
     >
-      <Text style={textStyle}>{title}</Text>
-    </TouchableOpacity>
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator size="small" color={textColor} />
+        ) : (
+          <Text style={[styles.text, { color: textColor }]}>{title}</Text>
+        )}
+      </View>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 0, // Sharp rectangles
+    borderRadius: radius.sm,
     minHeight: 48,
   },
-  primary: {
-    backgroundColor: colors.accent,
-  },
-  secondary: {
-    backgroundColor: colors.bgAlt,
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  disabled: {
-    opacity: 0.5,
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
-    ...typography.bodyMedium,
-    fontWeight: '500',
-  },
-  primaryText: {
-    color: colors.textInverse,
-  },
-  secondaryText: {
-    color: colors.textPrimary,
-  },
-  outlineText: {
-    color: colors.textPrimary,
-  },
-  disabledText: {
-    color: colors.textMuted,
+    ...typography.titleSmall,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });
-

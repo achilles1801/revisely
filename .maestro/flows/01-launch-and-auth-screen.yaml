@@ -1,0 +1,13 @@
+# Smoke flow: app launches cleanly and lands on the auth screen.
+# Run:  maestro test .maestro/flows/01-launch-and-auth-screen.yaml
+appId: com.revisionbuddy.app
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- assertVisible:
+    text: "Sign in"
+    optional: true
+# Either the auth-screen call to action or the sign-up toggle should be on screen.
+- assertVisible: "Don't have an account?"

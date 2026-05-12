@@ -1,55 +1,77 @@
+/**
+ * "Mihrab" palette — warm earth tones + deep jade accent.
+ * Inspired by Quran manuscript bindings and mosque interiors.
+ *
+ * Usage:
+ *   bg          → screen background
+ *   bgAlt       → secondary surfaces (rows, sections without elevation)
+ *   surface     → elevated surfaces (cards with shadow, sheets)
+ *   accent      → single primary color: CTAs, active states, links
+ *   accentSoft  → tinted background for accent chips, badges
+ *   gold        → reserved for special moments only (streaks, milestones)
+ */
 export const colors = {
   // Backgrounds
-  bg: '#fafaf9',           // stone-50 - main background
-  bgAlt: '#f5f5f4',        // stone-100 - cards, inputs
-  bgDark: '#292524',       // stone-800 - dark elements
+  bg: '#FBF8F3',           // warm parchment
+  bgAlt: '#F4EFE6',        // oatmeal — secondary surfaces
+  surface: '#FFFFFF',      // elevated cards (paired with shadow)
+  bgDark: '#1A201B',       // legacy slot, kept for compat
 
   // Text
-  textPrimary: '#1c1917',  // stone-900
-  textSecondary: '#57534e', // stone-600
-  textMuted: '#a8a29e',    // stone-400
-  textInverse: '#fafaf9',  // stone-50
+  textPrimary: '#1A1A1A',
+  textSecondary: '#5C5147',
+  textMuted: '#8B8275',
+  textInverse: '#FBF8F3',
 
   // Accents
-  accent: '#292524',       // stone-800 - primary buttons
-  warning: '#f59e0b',      // amber-500
-  warningBg: '#fef3c7',    // amber-100
-  warningText: '#92400e',  // amber-800
-  success: '#059669',      // emerald-600
-  successBg: '#ecfdf5',    // emerald-50
-  error: '#dc2626',        // red-600
-  errorBg: '#fef2f2',      // red-50
+  accent: '#0E6B5A',       // jade — primary CTA + brand color
+  accentSoft: '#E5F0EC',   // tinted bg for chips
+  gold: '#B8893E',         // streak / milestone highlight ONLY
+
+  // Semantic
+  success: '#0E6B5A',      // unified with accent
+  successBg: '#E5F0EC',
+  warning: '#C0833D',
+  warningBg: '#FBEFD9',
+  warningText: '#7A4D17',
+  error: '#B23B3B',
+  errorBg: '#FBE5E5',
 
   // Borders
-  border: '#e7e5e4',       // stone-200
-  borderLight: '#f5f5f4',  // stone-100
+  border: '#E8E1D4',
+  borderLight: '#F0EAE0',
 };
 
 export const darkColors: typeof colors = {
   // Backgrounds
-  bg: '#1c1917',           // stone-900 - main background
-  bgAlt: '#292524',        // stone-800 - cards, inputs
-  bgDark: '#0c0a09',       // stone-950 - dark elements
+  bg: '#0F1410',           // deep ink
+  bgAlt: '#1A201B',        // forest ink
+  surface: '#222B23',      // elevated cards
+  bgDark: '#070A07',
 
   // Text
-  textPrimary: '#fafaf9',  // stone-50
-  textSecondary: '#a8a29e', // stone-400
-  textMuted: '#78716c',    // stone-500
-  textInverse: '#1c1917',  // stone-900
+  textPrimary: '#F5F1EA',
+  textSecondary: '#A8A095',
+  textMuted: '#6B6359',
+  textInverse: '#0F1410',
 
   // Accents
-  accent: '#fafaf9',       // stone-50 - primary buttons
-  warning: '#f59e0b',      // amber-500
-  warningBg: '#451a03',    // amber-950
-  warningText: '#fcd34d',  // amber-300
-  success: '#34d399',      // emerald-400
-  successBg: '#022c22',    // emerald-950
-  error: '#f87171',        // red-400
-  errorBg: '#450a0a',      // red-950
+  accent: '#34A88F',
+  accentSoft: '#0E2A24',
+  gold: '#D4A968',
+
+  // Semantic
+  success: '#34A88F',
+  successBg: '#0E2A24',
+  warning: '#E0A158',
+  warningBg: '#3A2A12',
+  warningText: '#F0D8A8',
+  error: '#E07070',
+  errorBg: '#3A1A1A',
 
   // Borders
-  border: '#44403c',       // stone-700
-  borderLight: '#292524',  // stone-800
+  border: '#2D332E',
+  borderLight: '#252A26',
 };
 
 export type ThemeColors = typeof colors;
@@ -57,4 +79,3 @@ export type ThemeColors = typeof colors;
 export function getColors(isDark: boolean): ThemeColors {
   return isDark ? darkColors : colors;
 }
-

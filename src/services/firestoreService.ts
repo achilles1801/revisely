@@ -59,6 +59,7 @@ import {
 } from '../types/firestore';
 // Import initialized Firebase instances from firebase.ts
 import { db, auth } from '../lib/firebase';
+import { logger } from '../lib/logger';
 
 /**
  * Get the current authenticated user's ID
@@ -502,24 +503,14 @@ export async function batchUpdatePages(
   updates: BatchPageUpdate[],
   userId?: string
 ): Promise<void> {
-  console.log('[batchUpdatePages] Called with', updates.length, 'updates');
-
-  if (updates.length === 0) {
-    console.log('[batchUpdatePages] No updates, returning early');
-    return;
-  }
+  if (updates.length === 0) return;
 
   const uid = userId || getCurrentUserId();
-  console.log('[batchUpdatePages] User ID:', uid);
-
   const BATCH_SIZE = 450;
 
-  // Process in batches
   for (let i = 0; i < updates.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
     const batchUpdates = updates.slice(i, i + BATCH_SIZE);
-
-    console.log('[batchUpdatePages] Processing batch', i / BATCH_SIZE + 1, 'with', batchUpdates.length, 'updates');
 
     for (const { pageNumber, updates: pageUpdates } of batchUpdates) {
       const pageRef = getPageRef(pageNumber, uid);
@@ -534,19 +525,13 @@ export async function batchUpdatePages(
       if (pageUpdates.totalRevisionCount !== undefined) updateData.totalRevisionCount = pageUpdates.totalRevisionCount;
       if (pageUpdates.skipCount !== undefined) updateData.skipCount = pageUpdates.skipCount;
 
-      // Log first update for debugging
-      if (i === 0 && pageNumber === batchUpdates[0].pageNumber) {
-        console.log('[batchUpdatePages] First update - page:', pageNumber, 'weaknessRating:', pageUpdates.weaknessRating);
-      }
-
       batch.update(pageRef, updateData);
     }
 
     try {
       await batch.commit();
-      console.log('[batchUpdatePages] Batch committed successfully');
     } catch (error) {
-      console.error('[batchUpdatePages] Batch commit error:', error);
+      logger.error('[batchUpdatePages] Batch commit failed', error, { batchIndex: i, count: batchUpdates.length });
       throw error;
     }
   }
@@ -599,7 +584,7 @@ export function subscribeToPages(
     const pages = snapshot.docs.map((doc) => doc.data() as FirestorePage);
     callback(pages);
   }, (error) => {
-    console.error('subscribeToPages error:', error);
+    logger.error('subscribeToPages failed', error);
   });
 }
 
@@ -1253,4 +1238,60 @@ export async function exportUserData(userId?: string): Promise<{
   ]);
 
   return { user, pages, sessions };
+}
+
+/**
+ * Permanently delete the current user's account and all associated data.
+ * Calls the deleteUserAccount Cloud Function (uses admin SDK to bypass rules
+ * + clean up Firebase Auth user).
+ *
+ * After this resolves, the user is signed out and their data is gone.
+ * Required by Apple App Store guideline 5.1.1(v).
+ */
+export async function deleteAccount(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('No signed-in user.');
+  }
+  const idToken = await user.getIdToken(/* forceRefresh */ true);
+
+  // App Check token (best-effort — function enforces it server-side).
+  let appCheckToken: string | null = null;
+  try {
+    const { getAppCheckToken } = await import('../lib/appCheck');
+    appCheckToken = await getAppCheckToken();
+  } catch {
+    // ignore
+  }
+
+  const projectId =
+    (await import('expo-constants')).default.expoConfig?.extra?.firebase?.projectId;
+  if (!projectId) {
+    throw new Error('Firebase projectId is not configured.');
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${idToken}`,
+  };
+  if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+
+  const url = `https://us-central1-${projectId}.cloudfunctions.net/deleteUserAccount`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ data: {} }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    let message = `HTTP ${resp.status}: ${text.slice(0, 200)}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.error?.message) message = parsed.error.message;
+    } catch {
+      // keep raw
+    }
+    throw new Error(message);
+  }
 }

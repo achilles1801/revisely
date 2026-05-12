@@ -1,155 +1,102 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { GlassCard } from '../components/GlassCard';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import AlgorithmScreen from '../screens/main/AlgorithmScreen';
 import ProgressScreen from '../screens/main/ProgressScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
+import EditJuzScreen from '../screens/main/EditJuzScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import { useTheme } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
+import { spacing } from '../theme/spacing';
 
 export type MainTabParamList = {
   Home: undefined;
   Algorithm: undefined;
   Progress: undefined;
-  Settings: undefined;
 };
 
 export type HomeStackParamList = {
   Dashboard: undefined;
   ActiveRevision: undefined;
-};
-
-export type SettingsStackParamList = {
-  SettingsMain: undefined;
+  Settings: undefined;
+  EditJuz: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
-const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 function HomeStackNavigator() {
-  const { theme } = useTheme();
   return (
     <HomeStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: theme.bg },
+        contentStyle: { backgroundColor: 'transparent' },
+        animation: 'slide_from_right',
       }}
     >
       <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
       <HomeStack.Screen name="ActiveRevision" component={ActiveRevisionScreen} />
+      <HomeStack.Screen name="Settings" component={SettingsScreen} />
+      <HomeStack.Screen name="EditJuz" component={EditJuzScreen} />
     </HomeStack.Navigator>
   );
 }
 
-function SettingsStackNavigator() {
-  const { theme } = useTheme();
-  return (
-    <SettingsStack.Navigator
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: theme.bg },
-      }}
-    >
-      <SettingsStack.Screen name="SettingsMain" component={SettingsScreen} />
-    </SettingsStack.Navigator>
-  );
-}
+type IconName = keyof typeof Ionicons.glyphMap;
 
-// Simple text-based tab icon
-function TabIcon({ label, focused, theme }: { label: string; focused: boolean; theme: any }) {
-  const getIcon = () => {
-    switch (label) {
-      case 'HOME':
-        return '⌂'; // House
-      case 'ALGORITHM':
-        return '◈'; // Diamond with center dot - represents algorithm/logic
-      case 'PROGRESS':
-        return '◎'; // Bullseye
-      case 'SETTINGS':
-        return '☰'; // Menu lines - cleaner than gear
-      default:
-        return '•';
-    }
-  };
-
-  return (
-    <View style={styles.tabIconContainer}>
-      <Text style={[styles.tabIcon, { color: focused ? theme.textPrimary : theme.textMuted }]}>
-        {getIcon()}
-      </Text>
-    </View>
-  );
-}
+const TAB_ICONS: Record<keyof MainTabParamList, { active: IconName; inactive: IconName }> = {
+  Home: { active: 'home', inactive: 'home-outline' },
+  Algorithm: { active: 'analytics', inactive: 'analytics-outline' },
+  Progress: { active: 'bookmarks', inactive: 'bookmarks-outline' },
+};
 
 export function MainNavigator() {
   const { theme } = useTheme();
 
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarBackground: () => (
+          <GlassCard style={StyleSheet.absoluteFillObject} />
+        ),
         tabBarStyle: {
-          backgroundColor: theme.bgAlt,
-          borderTopWidth: 1,
+          backgroundColor: 'transparent',
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: theme.border,
-          height: 70,
-          paddingBottom: 12,
-          paddingTop: 8,
+          height: 76,
+          paddingBottom: spacing.sm,
+          paddingTop: spacing.xs,
+          elevation: 0,
         },
         tabBarLabelStyle: {
           ...typography.label,
           fontSize: 10,
+          letterSpacing: 0.8,
+          marginTop: 2,
         },
-        tabBarActiveTintColor: theme.textPrimary,
+        tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textMuted,
-      }}
+        tabBarIcon: ({ focused, color }) => {
+          const icons = TAB_ICONS[route.name as keyof MainTabParamList];
+          return (
+            <Ionicons
+              name={focused ? icons.active : icons.inactive}
+              size={22}
+              color={color}
+            />
+          );
+        },
+      })}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeStackNavigator}
-        options={{
-          tabBarLabel: 'HOME',
-          tabBarIcon: ({ focused }) => <TabIcon label="HOME" focused={focused} theme={theme} />,
-        }}
-      />
-      <Tab.Screen
-        name="Algorithm"
-        component={AlgorithmScreen}
-        options={{
-          tabBarLabel: 'INSIGHTS',
-          tabBarIcon: ({ focused }) => <TabIcon label="ALGORITHM" focused={focused} theme={theme} />,
-        }}
-      />
-      <Tab.Screen
-        name="Progress"
-        component={ProgressScreen}
-        options={{
-          tabBarLabel: 'PROGRESS',
-          tabBarIcon: ({ focused }) => <TabIcon label="PROGRESS" focused={focused} theme={theme} />,
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsStackNavigator}
-        options={{
-          tabBarLabel: 'SETTINGS',
-          tabBarIcon: ({ focused }) => <TabIcon label="SETTINGS" focused={focused} theme={theme} />,
-        }}
-      />
+      <Tab.Screen name="Home" component={HomeStackNavigator} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Algorithm" component={AlgorithmScreen} options={{ tabBarLabel: 'Insights' }} />
+      <Tab.Screen name="Progress" component={ProgressScreen} options={{ tabBarLabel: 'Progress' }} />
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  tabIconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabIcon: {
-    fontSize: 20,
-  },
-});

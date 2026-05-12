@@ -31,6 +31,7 @@ import {
   DEFAULT_USER_SETTINGS,
 } from '../types/firestore';
 import * as firestoreService from '../services/firestoreService';
+import { logger } from '../lib/logger';
 
 // ============================================================================
 // TYPES
@@ -494,7 +495,7 @@ export function useJuzPages(juzNumber: number): {
         const juzPages = await firestoreService.getPagesByJuz(juzNumber, JUZ_PAGE_RANGES);
         setPages(juzPages);
       } catch (err) {
-        console.error('Failed to fetch juz pages:', err);
+        logger.error('Failed to fetch juz pages:', err);
       } finally {
         setLoading(false);
       }
@@ -522,7 +523,7 @@ export function useSessionHistory(limitCount: number = 30): {
         const recentSessions = await firestoreService.getRecentSessions(limitCount);
         setSessions(recentSessions);
       } catch (err) {
-        console.error('Failed to fetch session history:', err);
+        logger.error('Failed to fetch session history:', err);
       } finally {
         setLoading(false);
       }
@@ -553,7 +554,7 @@ export function useDangerZonePages(): {
         const dangerPages = await firestoreService.getPagesInDangerZone(user.dangerThresholdDays);
         setPages(dangerPages);
       } catch (err) {
-        console.error('Failed to fetch danger zone pages:', err);
+        logger.error('Failed to fetch danger zone pages:', err);
       } finally {
         setLoading(false);
       }

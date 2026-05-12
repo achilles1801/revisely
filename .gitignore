@@ -45,3 +45,10 @@ google-services.json
 # generated native folders
 /ios
 /android
+
+.env.local
+
+# Personal Claude Code workspace config (skills, MCP servers, agent state)
+.claude/
+.mcp.json
+

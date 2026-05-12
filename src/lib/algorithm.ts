@@ -1,4 +1,57 @@
-import { User, UserPage, QuranPage, DailyAssignment } from '../types';
+import { User, UserPage, QuranPage, DailyAssignment, RevisionLog } from '../types';
+
+const DEFAULT_WEAKNESS_RATING = 4;
+
+/**
+ * Re-derive per-page revision state from the canonical list of session logs.
+ *
+ * The fields that depend on session history (`lastRevisedDate`,
+ * `totalRevisionCount`, `skipCount`, `weaknessRating`) are recomputed from
+ * scratch. User-controlled fields (`status`, `dateMemorized`, `pageNumber`)
+ * are preserved.
+ *
+ * Use this whenever logs change (add / edit / delete) so insights and the
+ * scheduling algorithm stay consistent with what the user has actually logged.
+ */
+export function recomputePagesFromLogs(
+  pages: UserPage[],
+  logs: RevisionLog[],
+): UserPage[] {
+  // Sort chronologically so the *last* matching log wins for rating / date.
+  const sortedLogs = [...logs].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
+
+  return pages.map((page) => {
+    let lastRevisedDate: string | null = null;
+    let totalRevisionCount = 0;
+    let weaknessRating = DEFAULT_WEAKNESS_RATING;
+
+    for (const log of sortedLogs) {
+      if (log.pagesRevised.includes(page.pageNumber)) {
+        totalRevisionCount++;
+        lastRevisedDate = log.date;
+      }
+      const wu = log.weaknessUpdates.find((w) => w.page === page.pageNumber);
+      if (wu) weaknessRating = wu.rating;
+    }
+
+    // skipCount = consecutive skips since the most recent revision.
+    let skipCount = 0;
+    for (const log of sortedLogs) {
+      if (lastRevisedDate && log.date <= lastRevisedDate) continue;
+      if (log.pagesSkipped.includes(page.pageNumber)) skipCount++;
+    }
+
+    return {
+      ...page,
+      lastRevisedDate,
+      totalRevisionCount,
+      skipCount,
+      weaknessRating,
+    };
+  });
+}
 
 /**
  * Calculate urgency score for a single page.

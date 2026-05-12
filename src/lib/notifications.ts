@@ -1,10 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import { logger } from './logger';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
@@ -32,16 +32,16 @@ export async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
+      logger.log('Failed to get push token for push notification!');
       return;
     }
     try {
       token = (await Notifications.getExpoPushTokenAsync()).data;
     } catch (error) {
-      console.log('Error getting push token:', error);
+      logger.log('Error getting push token:', error);
     }
   } else {
-    console.log('Must use physical device for Push Notifications');
+    logger.log('Must use physical device for Push Notifications');
   }
 
   return token;
@@ -59,7 +59,7 @@ export async function scheduleDailyReminder(time: string, enabled: boolean) {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Revision Buddy',
+      title: 'Revisely',
       body: 'Time for your daily Quran revision',
       sound: true,
     },
@@ -78,8 +78,8 @@ export async function scheduleDangerAlert(juz: number, enabled: boolean) {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Revision Alert',
-      body: `Juz ${juz} needs attention - revision overdue`,
+      title: 'Time to review',
+      body: `Juz ${juz} is due for review`,
       sound: true,
     },
     trigger: null, // Immediate

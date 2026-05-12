@@ -12,6 +12,8 @@ import {
 } from '../types/firestore';
 import * as firestoreService from '../services/firestoreService';
 import { generateId } from '../lib/utils';
+import { recomputePagesFromLogs } from '../lib/algorithm';
+import { logger } from '../lib/logger';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -129,7 +131,9 @@ interface AppContextType extends AppState {
   addLog: (log: Omit<RevisionLog, 'id'>) => Promise<void>;
   updateLog: (log: RevisionLog) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
+  deleteLogs: (logIds: string[]) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  resetOnboarding: () => Promise<void>;
   createDefaultUser: (overrides?: Partial<User>) => User;
   initializeUserInFirestore: (uid: string, email?: string | null, displayName?: string | null) => Promise<void>;
 }
@@ -151,6 +155,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const hasInitialLoadCompleted = useRef(false);
   const lastSaveTimestamp = useRef(0);
+  // Ref to current pages so log mutations can recompute derived state
+  // without making the mutation callbacks depend on pages.
+  const pagesRef = useRef<UserPage[]>([]);
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
+  // Guard so the initial-load self-heal runs at most once per session.
+  const hasSelfHealedOnLoad = useRef(false);
 
   // ============================================================================
   // AUTH LISTENER - Listen for auth state changes
@@ -212,7 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return;
           }
         } catch (err) {
-          console.error('Failed to initialize pages:', err);
+          logger.error('Failed to initialize pages:', err);
         }
         setLoading(false);
         return;
@@ -240,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const localLogs = sessions.map(firestoreSessionToLog);
         setLogs(localLogs);
       } catch (err) {
-        console.error('Failed to load sessions:', err);
+        logger.error('Failed to load sessions:', err);
       }
     };
     loadSessions();
@@ -263,20 +275,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       // Check if user already exists
       const existingUser = await firestoreService.getUser(uid);
-      if (existingUser) {
-        console.log('User already exists in Firestore');
-        return;
-      }
+      if (existingUser) return;
 
-      // Create new user with all 604 pages
-      await firestoreService.createUser({
-        uid,
-        email,
-        displayName,
-      });
-      console.log('User initialized in Firestore with 604 pages');
+      await firestoreService.createUser({ uid, email, displayName });
     } catch (err) {
-      console.error('Failed to initialize user in Firestore:', err);
+      logger.error('Failed to initialize user in Firestore:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize user');
     }
   }, []);
@@ -307,11 +310,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setOnboardingComplete(fsUser.onboardingComplete);
       }
 
-      setPages(fsPages.map(firestorePageToLocal));
-      setLogs(fsSessions.map(firestoreSessionToLog));
+      const freshPages = fsPages.map(firestorePageToLocal);
+      const freshLogs = fsSessions.map(firestoreSessionToLog);
+      setPages(freshPages);
+      setLogs(freshLogs);
       hasInitialLoadCompleted.current = true;
+
+      // Self-heal stale per-page state from prior app versions (or any data
+      // that drifted from the canonical log history). Runs after every load /
+      // pull-to-refresh; no-op when state already matches.
+      await syncPagesFromLogs(freshPages, freshLogs);
     } catch (err) {
-      console.error('Error loading data:', err);
+      logger.error('Error loading data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       if (isInitialLoad) {
@@ -344,7 +354,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       // State will be updated by subscription
     } catch (err) {
-      console.error('Error saving user:', err);
+      logger.error('Error saving user:', err);
       setError(err instanceof Error ? err.message : 'Failed to save user');
       throw err;
     }
@@ -376,8 +386,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await firestoreService.updateUser({ onboardingComplete: true });
       setOnboardingComplete(true);
     } catch (err) {
-      console.error('Error completing onboarding:', err);
+      logger.error('Error completing onboarding:', err);
       setError(err instanceof Error ? err.message : 'Failed to complete onboarding');
+      throw err;
+    }
+  }, []);
+
+  const resetOnboarding = useCallback(async () => {
+    try {
+      setError(null);
+      await firestoreService.updateUser({ onboardingComplete: false });
+      setOnboardingComplete(false);
+    } catch (err) {
+      logger.error('Error resetting onboarding:', err);
+      setError(err instanceof Error ? err.message : 'Failed to reset onboarding');
       throw err;
     }
   }, []);
@@ -387,29 +409,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ============================================================================
 
   const savePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
-    console.log('[savePages] Called with', updatedPages.length, 'pages, changedPageNumbers:', changedPageNumbers?.length);
-
     // Update local state immediately (optimistic update)
     setPages(updatedPages);
     lastSaveTimestamp.current = Date.now();
 
-    // If no specific pages provided, skip Firestore sync
-    if (!changedPageNumbers || changedPageNumbers.length === 0) {
-      console.log('[savePages] No changedPageNumbers, skipping Firestore sync');
-      return;
-    }
+    if (!changedPageNumbers || changedPageNumbers.length === 0) return;
 
-    // Get only the changed pages
     const pagesToSync = updatedPages.filter(p => changedPageNumbers.includes(p.pageNumber));
-    console.log('[savePages] pagesToSync count:', pagesToSync.length);
-
-    if (pagesToSync.length === 0) {
-      console.log('[savePages] No pages to sync, returning');
-      return;
-    }
-
-    // Log the weakness ratings being saved
-    console.log('[savePages] First page weaknessRating:', pagesToSync[0]?.weaknessRating);
+    if (pagesToSync.length === 0) return;
 
     // Fire-and-forget Firestore update (don't await to avoid blocking UI)
     const updates = pagesToSync.map(p => ({
@@ -424,16 +431,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     }));
 
-    console.log('[savePages] Calling batchUpdatePages with', updates.length, 'updates');
-
-    firestoreService.batchUpdatePages(updates)
-      .then(() => {
-        console.log('[savePages] batchUpdatePages succeeded');
-      })
-      .catch(err => {
-        console.error('[savePages] batchUpdatePages error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to save pages');
-      });
+    firestoreService.batchUpdatePages(updates).catch(err => {
+      logger.error('[savePages] batchUpdatePages error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save pages');
+    });
   }, []);
 
   const updatePage = useCallback(async (page: UserPage) => {
@@ -449,7 +450,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       // State will be updated by subscription
     } catch (err) {
-      console.error('Error updating page:', err);
+      logger.error('Error updating page:', err);
       setError(err instanceof Error ? err.message : 'Failed to update page');
       throw err;
     }
@@ -458,6 +459,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
     await savePages(updatedPages, changedPageNumbers);
   }, [savePages]);
+
+  // Re-derive per-page state (lastRevisedDate, totalRevisionCount, skipCount,
+  // weaknessRating) from the canonical session logs and persist any diffs.
+  // Called after every log mutation AND at the end of loadData so stale page
+  // state from older app versions (or pre-recompute deletes) self-heals.
+  const syncPagesFromLogs = useCallback(
+    async (currentPages: UserPage[], freshLogs: RevisionLog[]) => {
+      if (currentPages.length === 0) return;
+      const next = recomputePagesFromLogs(currentPages, freshLogs);
+      const changed = next
+        .filter((p) => {
+          const old = currentPages.find((c) => c.pageNumber === p.pageNumber);
+          if (!old) return false;
+          return (
+            old.lastRevisedDate !== p.lastRevisedDate ||
+            old.totalRevisionCount !== p.totalRevisionCount ||
+            old.skipCount !== p.skipCount ||
+            old.weaknessRating !== p.weaknessRating
+          );
+        })
+        .map((p) => p.pageNumber);
+      if (changed.length === 0) return;
+      await savePages(next, changed);
+    },
+    [savePages],
+  );
+
+  // Self-heal on initial load: subscriptions populate pages/logs separately,
+  // so wait until both are present, then reconcile once. Subsequent drift is
+  // handled by per-mutation recompute and pull-to-refresh (loadData).
+  useEffect(() => {
+    if (hasSelfHealedOnLoad.current) return;
+    if (pages.length === 0 || logs.length === 0) return;
+    hasSelfHealedOnLoad.current = true;
+    syncPagesFromLogs(pages, logs);
+  }, [pages, logs, syncPagesFromLogs]);
 
   // ============================================================================
   // LOG/SESSION OPERATIONS
@@ -469,6 +506,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Check if session exists for this date
       const existingSession = await firestoreService.getSession(log.date);
+
+      // Clamp to [0, 100] — Firestore rules reject anything outside that range,
+      // and we can hit Infinity/NaN if a stale session has totalAssignedPages = 0
+      // or if the user revises more pages than were originally assigned.
+      const safePercent = (revised: number, total: number): number => {
+        if (!total || total <= 0) return revised > 0 ? 100 : 0;
+        const pct = (revised / total) * 100;
+        if (!Number.isFinite(pct)) return 0;
+        return Math.max(0, Math.min(100, pct));
+      };
 
       if (existingSession) {
         // Merge with existing session
@@ -482,13 +529,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           changedAt: Timestamp.now(),
         }));
 
+        const totalAssigned = existingSession.totalAssignedPages || mergedPagesRevised.length;
+
         await firestoreService.updateSession(existingSession.id, {
           pagesRevised: mergedPagesRevised,
           pagesSkipped: mergedPagesSkipped,
-          durationMinutes: (existingSession.durationMinutes || 0) + (log.durationMinutes || 0),
+          durationMinutes: Math.max(1, (existingSession.durationMinutes || 0) + (log.durationMinutes || 0)),
           weaknessUpdates: [...existingSession.weaknessUpdates, ...newWeaknessUpdates],
-          state: mergedPagesRevised.length >= existingSession.totalAssignedPages ? 'COMPLETED' : 'IN_PROGRESS',
-          completionPercentage: (mergedPagesRevised.length / existingSession.totalAssignedPages) * 100,
+          state: mergedPagesRevised.length >= totalAssigned ? 'COMPLETED' : 'IN_PROGRESS',
+          completionPercentage: safePercent(mergedPagesRevised.length, totalAssigned),
         });
       } else {
         // Create new session
@@ -502,12 +551,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (log.pagesRevised.length > 0) {
           const session = await firestoreService.getSession(log.date);
           if (session) {
+            const totalAssigned = session.totalAssignedPages || log.pagesRevised.length;
             await firestoreService.updateSession(session.id, {
               pagesRevised: log.pagesRevised,
               pagesSkipped: log.pagesSkipped,
-              durationMinutes: log.durationMinutes,
-              state: log.pagesRevised.length >= session.totalAssignedPages ? 'COMPLETED' : 'IN_PROGRESS',
-              completionPercentage: (log.pagesRevised.length / session.totalAssignedPages) * 100,
+              durationMinutes: Math.max(1, log.durationMinutes || 1),
+              state: log.pagesRevised.length >= totalAssigned ? 'COMPLETED' : 'IN_PROGRESS',
+              completionPercentage: safePercent(log.pagesRevised.length, totalAssigned),
               weaknessUpdates: log.weaknessUpdates.map(wu => ({
                 pageNumber: wu.page,
                 previousRating: 4 as WeaknessRating,
@@ -523,7 +573,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const sessions = await firestoreService.getRecentSessions(100);
       setLogs(sessions.map(firestoreSessionToLog));
     } catch (err) {
-      console.error('Error adding log:', err);
+      logger.error('Error adding log:', err);
       setError(err instanceof Error ? err.message : 'Failed to add log');
       throw err;
     }
@@ -546,13 +596,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Refresh logs
       const sessions = await firestoreService.getRecentSessions(100);
-      setLogs(sessions.map(firestoreSessionToLog));
+      const freshLogs = sessions.map(firestoreSessionToLog);
+      setLogs(freshLogs);
+      await syncPagesFromLogs(pagesRef.current, freshLogs);
     } catch (err) {
-      console.error('Error updating log:', err);
+      logger.error('Error updating log:', err);
       setError(err instanceof Error ? err.message : 'Failed to update log');
       throw err;
     }
-  }, []);
+  }, [syncPagesFromLogs]);
 
   const deleteLog = useCallback(async (logId: string) => {
     try {
@@ -561,13 +613,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Refresh logs
       const sessions = await firestoreService.getRecentSessions(100);
-      setLogs(sessions.map(firestoreSessionToLog));
+      const freshLogs = sessions.map(firestoreSessionToLog);
+      setLogs(freshLogs);
+      await syncPagesFromLogs(pagesRef.current, freshLogs);
     } catch (err) {
-      console.error('Error deleting log:', err);
+      logger.error('Error deleting log:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete log');
       throw err;
     }
-  }, []);
+  }, [syncPagesFromLogs]);
+
+  const deleteLogs = useCallback(async (logIds: string[]) => {
+    if (logIds.length === 0) return;
+    try {
+      setError(null);
+      await Promise.all(logIds.map((id) => firestoreService.deleteSession(id)));
+
+      // Refresh logs once after all deletions
+      const sessions = await firestoreService.getRecentSessions(100);
+      const freshLogs = sessions.map(firestoreSessionToLog);
+      setLogs(freshLogs);
+      await syncPagesFromLogs(pagesRef.current, freshLogs);
+    } catch (err) {
+      logger.error('Error deleting logs:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete sessions');
+      throw err;
+    }
+  }, [syncPagesFromLogs]);
 
   // ============================================================================
   // RENDER
@@ -591,7 +663,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addLog,
         updateLog,
         deleteLog,
+        deleteLogs,
         completeOnboarding,
+        resetOnboarding,
         createDefaultUser,
         initializeUserInFirestore,
       }}

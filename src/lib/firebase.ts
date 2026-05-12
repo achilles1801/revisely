@@ -1,6 +1,10 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
+  initializeAuth,
+  // @ts-expect-error — getReactNativePersistence is exported from firebase/auth at runtime
+  // but is missing from the published TypeScript types as of firebase 12.x.
+  getReactNativePersistence,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
@@ -10,8 +14,11 @@ import {
   updateProfile,
   Auth,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from './logger';
 import {
   getFirestore,
   doc,
@@ -44,8 +51,17 @@ const firebaseConfig = {
 // Initialize Firebase only if not already initialized
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Auth
-const auth: Auth = getAuth(app);
+// Initialize Auth with AsyncStorage persistence so users stay logged in across
+// app restarts. initializeAuth throws if called twice (e.g. on Fast Refresh),
+// so fall back to getAuth on the second call.
+let auth: Auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch {
+  auth = getAuth(app);
+}
 
 // Initialize Firestore with offline persistence
 const db = getFirestore(app);
@@ -55,10 +71,10 @@ const db = getFirestore(app);
 enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === 'failed-precondition') {
     // Multiple tabs open, persistence can only be enabled in one tab at a time
-    console.warn('Firestore persistence failed: Multiple tabs open');
+    logger.warn('Firestore persistence failed: Multiple tabs open');
   } else if (err.code === 'unimplemented') {
     // The current browser doesn't support persistence
-    console.warn('Firestore persistence not supported in this browser');
+    logger.warn('Firestore persistence not supported in this browser');
   }
 });
 
@@ -89,6 +105,16 @@ export async function resetPassword(email: string) {
 
 export async function signInWithGoogleCredential(idToken: string) {
   const credential = GoogleAuthProvider.credential(idToken);
+  const userCredential = await signInWithCredential(auth, credential);
+  return userCredential.user;
+}
+
+export async function signInWithAppleCredential(
+  identityToken: string,
+  rawNonce: string,
+) {
+  const provider = new OAuthProvider('apple.com');
+  const credential = provider.credential({ idToken: identityToken, rawNonce });
   const userCredential = await signInWithCredential(auth, credential);
   return userCredential.user;
 }

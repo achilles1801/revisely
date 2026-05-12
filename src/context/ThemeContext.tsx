@@ -18,7 +18,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load saved theme preference
@@ -36,9 +36,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
   };
 
-  // Determine if dark mode is active
+  // Dark by default. System mode tracks OS; explicit modes override.
   const isDark = themeMode === 'system'
-    ? systemColorScheme === 'dark'
+    ? systemColorScheme !== 'light'
     : themeMode === 'dark';
 
   const theme = isDark ? darkColors : colors;

@@ -5,41 +5,61 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
   RefreshControl,
+  Modal,
+  Pressable,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
+import { GlassCard } from '../../components/GlassCard';
 import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
-import { StatBox } from '../../components/StatBox';
+import { PressableScale } from '../../components/PressableScale';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
+import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { ThemeColors } from '../../theme/colors';
 import { generateDailyAssignment } from '../../lib/algorithm';
-import { getQuranData, getJuzForPage } from '../../lib/quranData';
+import {
+  getQuranData,
+  getJuzForPage,
+  getJuzName,
+  getSurahForPage,
+} from '../../lib/quranData';
 import { formatDateReadable } from '../../lib/utils';
-import { scheduleDangerAlert, registerForPushNotificationsAsync } from '../../lib/notifications';
+import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { RevisionLog } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
+const COMPACT_SESSION_LIMIT = 3;
+
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const { user, pages, logs, updateLog, deleteLog, loadData } = useApp();
+  const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error } = useApp();
   const { firebaseUser } = useAuth();
 
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [sessionsExpanded, setSessionsExpanded] = useState(false);
+  const [juzFilter, setJuzFilter] = useState<number | null>(null);
+  const [juzPickerOpen, setJuzPickerOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -54,117 +74,115 @@ export default function DashboardScreen() {
     return generateDailyAssignment(pages, quranData, user);
   }, [user, pages]);
 
-  // Check if today has been completed
   const todayStatus = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todayLogs = logs.filter(log => log.date === today);
+    const todayLogs = logs.filter((log) => log.date === today);
+    if (todayLogs.length === 0)
+      return { status: 'not_started' as const, pagesCompleted: 0 };
 
-    if (todayLogs.length === 0) {
-      return { status: 'not_started', pagesCompleted: 0 };
-    }
-
-    // Sum up all pages revised today
     const pagesRevisedToday = new Set<number>();
-    todayLogs.forEach(log => {
-      log.pagesRevised.forEach(p => pagesRevisedToday.add(p));
-    });
-
+    todayLogs.forEach((log) =>
+      log.pagesRevised.forEach((p) => pagesRevisedToday.add(p)),
+    );
     const totalAssigned = assignment?.totalPages || 0;
     const completed = pagesRevisedToday.size;
-
     if (completed >= totalAssigned && totalAssigned > 0) {
-      return { status: 'completed', pagesCompleted: completed };
-    } else if (completed > 0) {
-      return { status: 'partial', pagesCompleted: completed };
+      return { status: 'completed' as const, pagesCompleted: completed };
     }
-
-    return { status: 'not_started', pagesCompleted: 0 };
+    if (completed > 0)
+      return { status: 'partial' as const, pagesCompleted: completed };
+    return { status: 'not_started' as const, pagesCompleted: 0 };
   }, [logs, assignment]);
 
-  // Calculate danger juz (pages not revised past danger threshold)
-  const dangerJuz = useMemo(() => {
-    if (!user) return [];
-    const now = new Date();
-    const dangerPages = pages.filter(p => {
-      if (p.status !== 'memorized') return false;
-      if (!p.lastRevisedDate) return true;
-      const daysSinceRevision = (now.getTime() - new Date(p.lastRevisedDate).getTime()) / (1000 * 60 * 60 * 24);
-      return daysSinceRevision > user.dangerThresholdDays;
-    });
-
-    const juzSet = new Set(dangerPages.map(p => getJuzForPage(p.pageNumber)));
-    return Array.from(juzSet).sort((a, b) => a - b);
-  }, [user, pages]);
-
-  // Register for notifications and check danger alerts on mount
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
 
-  // Send danger alerts if enabled
-  useEffect(() => {
-    if (user?.dangerAlertEnabled && dangerJuz.length > 0) {
-      scheduleDangerAlert(dangerJuz[0], true);
-    }
-  }, [user?.dangerAlertEnabled, dangerJuz]);
-
-  // Calculate streak
   const calculatedStreak = useMemo(() => {
     if (logs.length === 0) return 0;
-
-    const sortedLogs = [...logs].sort((a, b) =>
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+    const sortedLogs = [...logs].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
-
     let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     for (let i = 0; i < sortedLogs.length; i++) {
       const logDate = new Date(sortedLogs[i].date);
       logDate.setHours(0, 0, 0, 0);
-
       const expectedDate = new Date(today);
       expectedDate.setDate(today.getDate() - streak);
-
       if (logDate.getTime() === expectedDate.getTime()) {
         streak++;
       } else if (logDate.getTime() < expectedDate.getTime()) {
         break;
       }
     }
-
     return streak;
   }, [logs]);
 
-  // Get recent sessions for history display
-  const recentSessions = useMemo(() => {
-    return logs.slice(0, 7); // Last 7 sessions
-  }, [logs]);
+  // Sessions
+  const sessionLogs = useMemo(
+    () =>
+      logs
+        .filter((l) => l.pagesRevised.length > 0)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [logs],
+  );
 
-  // Get user's display name
+  const filteredSessions = useMemo(() => {
+    if (juzFilter === null) return sessionLogs;
+    return sessionLogs.filter((log) =>
+      log.pagesRevised.some((p) => getJuzForPage(p) === juzFilter),
+    );
+  }, [sessionLogs, juzFilter]);
+
+  const visibleSessions = useMemo(
+    () =>
+      sessionsExpanded
+        ? filteredSessions
+        : filteredSessions.slice(0, COMPACT_SESSION_LIMIT),
+    [filteredSessions, sessionsExpanded],
+  );
+
+  const availableJuz = useMemo(() => {
+    const set = new Set<number>();
+    for (const log of sessionLogs) {
+      for (const p of log.pagesRevised) set.add(getJuzForPage(p));
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [sessionLogs]);
+
   const userName = user?.name || firebaseUser?.displayName || '';
 
-  
   if (!user || !assignment) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading...</Text>
+          {error ? (
+            <>
+              <Text style={styles.errorTitle}>Couldn't load your data</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+              <Button
+                title="Try again"
+                onPress={loadData}
+                variant="primary"
+                style={styles.retryButton}
+              />
+            </>
+          ) : (
+            <Text style={styles.loadingText}>Loading…</Text>
+          )}
         </View>
       </SafeAreaView>
     );
   }
 
   const today = new Date();
-  const pagesThisWeek = pages.filter(
-    p => p.lastRevisedDate &&
-    new Date(p.lastRevisedDate) >= new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-  ).length;
 
   const handleEditSession = (log: RevisionLog) => {
-    // Get the pages that were part of this session (both revised and skipped)
-    const sessionPages = [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b);
+    const sessionPages = [...log.pagesRevised, ...log.pagesSkipped].sort(
+      (a, b) => a - b,
+    );
     setSelectedLog(log);
     setSelectedSessionPages(sessionPages);
     setShowEditModal(true);
@@ -186,44 +204,152 @@ export default function DashboardScreen() {
     }
   };
 
-  const getRevisionCardContent = () => {
-    if (todayStatus.status === 'completed') {
-      return {
-        badge: { bg: theme.success, text: 'Completed' },
-        message: 'Excellent! You\'ve completed today\'s revision.',
-        buttonText: 'View Session',
-        buttonDisabled: false,
-        showButton: true,
-      };
-    } else if (todayStatus.status === 'partial') {
-      const remaining = assignment.totalPages - todayStatus.pagesCompleted;
-      return {
-        badge: { bg: theme.warning, text: 'In Progress' },
-        message: `${remaining} page${remaining !== 1 ? 's' : ''} remaining for today.`,
-        buttonText: 'Continue Revision',
-        buttonDisabled: false,
-        showButton: true,
-      };
+  const enterSelectionMode = (initialId?: string) => {
+    setSelectionMode(true);
+    setSelectedSessionIds(initialId ? new Set([initialId]) : new Set());
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedSessionIds(new Set());
+  };
+
+  const toggleSessionSelection = (id: string) => {
+    setSelectedSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSessionPress = (log: RevisionLog) => {
+    if (selectionMode) {
+      toggleSessionSelection(log.id);
     } else {
-      return {
-        badge: dangerJuz.length > 0
-          ? { bg: theme.warning, text: `${dangerJuz.length} juz need attention` }
-          : { bg: theme.success, text: 'Ready' },
-        message: 'Review your memorized pages to strengthen retention',
-        buttonText: 'Start Revision',
-        buttonDisabled: assignment.totalPages === 0,
-        showButton: assignment.totalPages > 0,
-      };
+      handleEditSession(log);
     }
   };
 
-  const cardContent = getRevisionCardContent();
+  const handleSessionLongPress = (log: RevisionLog) => {
+    if (!selectionMode) enterSelectionMode(log.id);
+  };
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedSessionIds);
+    if (ids.length === 0) return;
+    Alert.alert(
+      `Delete ${ids.length} session${ids.length !== 1 ? 's' : ''}?`,
+      'This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteLogs(ids);
+            exitSelectionMode();
+          },
+        },
+      ],
+    );
+  };
+
+  const heroContent = (() => {
+    if (todayStatus.status === 'completed') {
+      return {
+        eyebrow: 'Today',
+        title: "You're done for today",
+        subtitle: `Revised ${todayStatus.pagesCompleted} page${
+          todayStatus.pagesCompleted !== 1 ? 's' : ''
+        } · come back tomorrow`,
+        ctaTitle: 'Review session',
+      };
+    }
+    if (todayStatus.status === 'partial') {
+      const remaining = assignment.totalPages - todayStatus.pagesCompleted;
+      return {
+        eyebrow: 'In progress',
+        title: `${remaining} page${remaining !== 1 ? 's' : ''} to go`,
+        subtitle: `${todayStatus.pagesCompleted} of ${assignment.totalPages} done so far`,
+        ctaTitle: 'Continue revision',
+      };
+    }
+    if (assignment.totalPages === 0) {
+      return {
+        eyebrow: 'All caught up',
+        title: 'Nothing to revise yet',
+        subtitle: 'Mark pages as memorized from Progress to begin.',
+        ctaTitle: '',
+      };
+    }
+    const primaryJuz = assignment.juzBreakdown[0]?.juz;
+    const moreJuz = assignment.juzBreakdown.length - 1;
+    return {
+      eyebrow: "Today's revision",
+      title: primaryJuz
+        ? `Juz ${primaryJuz}${moreJuz > 0 ? ` + ${moreJuz} more` : ''}`
+        : 'Ready when you are',
+      subtitle: `${assignment.totalPages} page${
+        assignment.totalPages !== 1 ? 's' : ''
+      } · ~${assignment.estimatedMinutes} min`,
+      ctaTitle: 'Start revision',
+    };
+  })();
+
+  const handleCtaPress = () => {
+    if (todayStatus.status === 'completed') {
+      const todayLog = logs.find(
+        (log) => log.date === new Date().toISOString().split('T')[0],
+      );
+      if (todayLog) handleEditSession(todayLog);
+    } else {
+      navigation.navigate('ActiveRevision');
+    }
+  };
+
+  const renderHeroContent = () => (
+    <>
+      <View style={styles.heroTopRow}>
+        <Text style={styles.heroEyebrow}>{heroContent.eyebrow}</Text>
+        {calculatedStreak > 0 && (
+          <View style={styles.streakBadge}>
+            <Ionicons name="flame" size={14} color={theme.gold} />
+            <Text style={styles.streakBadgeText}>{calculatedStreak}</Text>
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.heroTitle}>{heroContent.title}</Text>
+      <Text style={styles.heroSubtitle}>{heroContent.subtitle}</Text>
+
+      {heroContent.ctaTitle && (
+        <PressableScale
+          onPress={handleCtaPress}
+          haptic="medium"
+          scale={0.97}
+          style={styles.heroCta}
+        >
+          <Text style={styles.heroCtaText}>{heroContent.ctaTitle}</Text>
+          <Ionicons name="arrow-forward" size={18} color="#fff" />
+        </PressableScale>
+      )}
+    </>
+  );
+
+  // Show filter chip only when there's enough variety to make filtering useful.
+  const showFilterChip = availableJuz.length > 1;
+  const showSeeAllToggle = filteredSessions.length > COMPACT_SESSION_LIMIT;
+  const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          selectionMode && styles.contentWithSelectionBar,
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -232,131 +358,163 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Header with greeting */}
         <View style={styles.header}>
-          <Text style={[styles.date, { color: theme.textMuted }]}>{formatDateReadable(today)}</Text>
-          <Text style={[styles.greeting, { color: theme.textPrimary }]}>
-            Assalamu Alaikum{userName ? `, ${userName}` : ''}
-          </Text>
-        </View>
-
-        {/* Danger Alert Banner */}
-        {dangerJuz.length > 0 && todayStatus.status !== 'completed' && (
-          <View style={[styles.dangerBanner, { backgroundColor: theme.warningBg, borderColor: theme.warning }]}>
-            <Text style={[styles.dangerText, { color: theme.textPrimary }]}>
-              Juz {dangerJuz.slice(0, 3).join(', ')}{dangerJuz.length > 3 ? ` +${dangerJuz.length - 3} more` : ''} overdue for revision
-            </Text>
-          </View>
-        )}
-
-        {/* Today's Revision Card */}
-        <Card style={StyleSheet.flatten([styles.assignmentCard, { backgroundColor: theme.bgAlt, borderColor: theme.border }])}>
-          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>TODAY'S REVISION</Text>
-          <View style={styles.assignmentHeader}>
-            {todayStatus.status === 'completed' ? (
-              <View style={styles.completedHeader}>
-                <Ionicons name="checkmark-circle" size={32} color={theme.success} />
-                <Text style={[styles.completedText, { color: theme.success }]}>All Done!</Text>
-              </View>
-            ) : (
-              <>
-                {assignment.juzBreakdown.length > 0 ? (
-                  <Text style={[styles.juzNumber, { color: theme.textPrimary }]}>
-                    Juz {assignment.juzBreakdown[0].juz}
-                    {assignment.juzBreakdown.length > 1 ? ` +${assignment.juzBreakdown.length - 1}` : ''}
-                  </Text>
-                ) : (
-                  <Text style={[styles.juzNumber, { color: theme.textPrimary }]}>No pages to revise</Text>
-                )}
-              </>
-            )}
-            <View style={[styles.badge, { backgroundColor: cardContent.badge.bg }]}>
-              <Text style={styles.badgeText}>{cardContent.badge.text}</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.date}>{formatDateReadable(today)}</Text>
+            <View style={styles.greetingRow}>
+              {userName ? (
+                <Text style={styles.greetingName}>{userName.split(' ')[0]}</Text>
+              ) : null}
+              <Text style={styles.greetingArabic}>السلام عليكم</Text>
             </View>
           </View>
-
-          {todayStatus.status !== 'completed' && (
-            <Text style={[styles.pageCount, { color: theme.textSecondary }]}>
-              {todayStatus.status === 'partial'
-                ? `${todayStatus.pagesCompleted}/${assignment.totalPages} pages completed`
-                : `${assignment.totalPages} pages · ~${assignment.estimatedMinutes} min`
-              }
-            </Text>
-          )}
-
-          <Text style={[styles.revisionHint, { color: theme.textMuted }]}>
-            {cardContent.message}
-          </Text>
-
-          {cardContent.showButton && (
-            <Button
-              title={cardContent.buttonText}
-              onPress={() => {
-                if (todayStatus.status === 'completed') {
-                  // Find today's log and open edit modal
-                  const todayLog = logs.find(log => log.date === new Date().toISOString().split('T')[0]);
-                  if (todayLog) handleEditSession(todayLog);
-                } else {
-                  navigation.navigate('ActiveRevision');
-                }
-              }}
-              variant={todayStatus.status === 'completed' ? 'outline' : 'primary'}
-              style={styles.beginButton}
-              disabled={cardContent.buttonDisabled}
+          <PressableScale
+            onPress={() => navigation.navigate('Settings')}
+            haptic="light"
+            style={styles.settingsButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Open settings"
+          >
+            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <Ionicons
+              name="settings-outline"
+              size={20}
+              color={theme.textPrimary}
             />
-          )}
-        </Card>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <StatBox
-            label="Day Streak"
-            value={calculatedStreak}
-            style={styles.statBox}
-          />
-          <StatBox
-            label="Pages This Week"
-            value={pagesThisWeek}
-            style={styles.statBox}
-          />
+          </PressableScale>
         </View>
 
-        {/* Recent Sessions */}
-        {recentSessions.length > 0 && (
-          <View style={styles.historySection}>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Recent Sessions</Text>
-            {recentSessions.map((log) => {
-              const logDate = new Date(log.date);
-              const isToday = log.date === new Date().toISOString().split('T')[0];
-              const isYesterday = log.date === new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        {/* Hero — Liquid Glass on iOS 26+, frosted BlurView fallback elsewhere.
+            The gradient backdrop behind the SafeAreaView gives the glass
+            something to refract. */}
+        <View style={styles.heroCenter}>
+          <View style={styles.heroShadow}>
+            {isLiquidGlassAvailable() ? (
+              <GlassView
+                glassEffectStyle="regular"
+                colorScheme={isDark ? 'dark' : 'light'}
+                style={styles.heroSurface}
+              >
+                {renderHeroContent()}
+              </GlassView>
+            ) : (
+              <BlurView
+                intensity={50}
+                tint={isDark ? 'systemThinMaterialDark' : 'systemThinMaterialLight'}
+                style={styles.heroSurface}
+              >
+                {renderHeroContent()}
+              </BlurView>
+            )}
+          </View>
+        </View>
 
-              let dateLabel = formatDateReadable(logDate);
-              if (isToday) dateLabel = 'Today';
-              else if (isYesterday) dateLabel = 'Yesterday';
-
-              return (
-                <TouchableOpacity
-                  key={log.id}
-                  style={[styles.sessionRow, { borderBottomColor: theme.border }]}
-                  onPress={() => handleEditSession(log)}
-                  activeOpacity={0.7}
+        {/* Sessions — hidden entirely when the user has no sessions yet. */}
+        {sessionLogs.length > 0 && (
+          <View style={styles.sessionsSection}>
+            <View style={styles.sessionsHeader}>
+              <Text style={styles.sessionsLabel}>RECENT SESSIONS</Text>
+              <View style={styles.sessionsHeaderRight}>
+                {showFilterChip && !selectionMode && (
+                  <PressableScale
+                    onPress={() => setJuzPickerOpen(true)}
+                    haptic="light"
+                    style={styles.filterChip}
+                  >
+                    <GlassCard style={StyleSheet.absoluteFillObject} />
+                    <Ionicons
+                      name="filter-outline"
+                      size={12}
+                      color={theme.textSecondary}
+                    />
+                    <Text style={styles.filterChipText}>{filterLabel}</Text>
+                    <Ionicons
+                      name="chevron-down"
+                      size={12}
+                      color={theme.textMuted}
+                    />
+                  </PressableScale>
+                )}
+                <PressableScale
+                  onPress={() =>
+                    selectionMode ? exitSelectionMode() : enterSelectionMode()
+                  }
+                  haptic="light"
+                  style={styles.selectChip}
                 >
-                  <View style={styles.sessionInfo}>
-                    <Text style={[styles.sessionDate, { color: theme.textPrimary }]}>{dateLabel}</Text>
-                    <Text style={[styles.sessionPages, { color: theme.textSecondary }]}>
-                      {log.pagesRevised.length} page{log.pagesRevised.length !== 1 ? 's' : ''} revised
-                      {log.durationMinutes ? ` · ${log.durationMinutes} min` : ''}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
-                </TouchableOpacity>
-              );
-            })}
+                  <Text style={styles.selectChipText}>
+                    {selectionMode ? 'Cancel' : 'Select'}
+                  </Text>
+                </PressableScale>
+              </View>
+            </View>
+
+            {visibleSessions.length === 0 ? (
+              <Text style={styles.emptySessions}>
+                No sessions match {filterLabel}
+              </Text>
+            ) : (
+              <View style={styles.sessionList}>
+                <GlassCard style={StyleSheet.absoluteFillObject} />
+                {visibleSessions.map((log, idx, arr) => (
+                  <SessionRow
+                    key={log.id}
+                    log={log}
+                    isLast={idx === arr.length - 1}
+                    theme={theme}
+                    selectionMode={selectionMode}
+                    isSelected={selectedSessionIds.has(log.id)}
+                    onPress={() => handleSessionPress(log)}
+                    onLongPress={() => handleSessionLongPress(log)}
+                  />
+                ))}
+              </View>
+            )}
+
+            {showSeeAllToggle && (
+              <PressableScale
+                onPress={() => setSessionsExpanded((v) => !v)}
+                haptic="light"
+                scale={0.99}
+                style={styles.seeAllBtn}
+              >
+                <Text style={styles.seeAllText}>
+                  {sessionsExpanded
+                    ? 'Show less'
+                    : `See all ${filteredSessions.length}`}
+                </Text>
+                <Ionicons
+                  name={sessionsExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={theme.accent}
+                />
+              </PressableScale>
+            )}
           </View>
         )}
       </ScrollView>
 
-      {/* Edit Session Modal */}
+      {selectionMode && (
+        <View style={styles.selectionBar}>
+          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <Text style={styles.selectionCount}>
+            {selectedSessionIds.size} selected
+          </Text>
+          <PressableScale
+            onPress={handleBulkDelete}
+            haptic="medium"
+            disabled={selectedSessionIds.size === 0}
+            style={[
+              styles.bulkDeleteBtn,
+              selectedSessionIds.size === 0 && styles.bulkDeleteBtnDisabled,
+            ]}
+          >
+            <Ionicons name="trash-outline" size={16} color="#fff" />
+            <Text style={styles.bulkDeleteText}>Delete</Text>
+          </PressableScale>
+        </View>
+      )}
+
       {selectedLog && (
         <EditSessionModal
           visible={showEditModal}
@@ -372,129 +530,545 @@ export default function DashboardScreen() {
           onDelete={handleDeleteSession}
         />
       )}
+
+      <JuzPickerSheet
+        visible={juzPickerOpen}
+        onClose={() => setJuzPickerOpen(false)}
+        availableJuz={availableJuz}
+        currentValue={juzFilter}
+        onSelect={(juz) => {
+          setJuzFilter(juz);
+          setJuzPickerOpen(false);
+        }}
+        theme={theme}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    ...typography.bodyMedium,
-  },
-  header: {
-    marginBottom: spacing.xl,
-  },
-  date: {
-    ...typography.label,
-    marginBottom: spacing.xs,
-  },
-  greeting: {
-    ...typography.displaySmall,
-  },
-  dangerBanner: {
-    borderWidth: 1,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  dangerText: {
-    ...typography.bodyMedium,
-  },
-  assignmentCard: {
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-  },
-  cardLabel: {
-    ...typography.label,
-    marginBottom: spacing.sm,
-    letterSpacing: 1,
-  },
-  assignmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  completedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  completedText: {
-    ...typography.displayMedium,
-  },
-  juzNumber: {
-    ...typography.displayMedium,
-    flex: 1,
-  },
-  badge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 0,
-  },
-  badgeText: {
-    ...typography.label,
-    color: '#fff',
-    fontSize: 10,
-  },
-  pageCount: {
-    ...typography.bodyMedium,
-    marginBottom: spacing.xs,
-  },
-  revisionHint: {
-    ...typography.bodySmall,
-    marginBottom: spacing.lg,
-  },
-  beginButton: {
-    width: '100%',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  statBox: {
-    flex: 1,
-  },
-  historySection: {
-    marginTop: spacing.md,
-  },
-  sectionTitle: {
-    ...typography.bodyLarge,
-    fontWeight: '600',
-    marginBottom: spacing.md,
-  },
-  sessionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-  },
-  sessionInfo: {
-    flex: 1,
-  },
-  sessionDate: {
-    ...typography.bodyMedium,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  sessionPages: {
-    ...typography.bodySmall,
-  },
-});
+function SessionRow({
+  log,
+  isLast,
+  theme,
+  onPress,
+  onLongPress,
+  selectionMode = false,
+  isSelected = false,
+}: {
+  log: RevisionLog;
+  isLast: boolean;
+  theme: ThemeColors;
+  onPress: () => void;
+  onLongPress?: () => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+}) {
+  const juzNumbers = useMemo(
+    () =>
+      Array.from(new Set(log.pagesRevised.map((p) => getJuzForPage(p)))).sort(
+        (a, b) => a - b,
+      ),
+    [log.pagesRevised],
+  );
+  const surahNames = useMemo(() => {
+    const seen = new Set<number>();
+    const names: string[] = [];
+    for (const pageNum of log.pagesRevised) {
+      const surah = getSurahForPage(pageNum);
+      if (!seen.has(surah.number)) {
+        seen.add(surah.number);
+        names.push(surah.name);
+      }
+    }
+    return names;
+  }, [log.pagesRevised]);
+
+  const juzLabel = formatJuzLabel(juzNumbers);
+  const surahLabel = formatSurahLabel(surahNames);
+  const logDate = new Date(log.date);
+  const monthDay = logDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  const year = logDate.getFullYear().toString();
+
+  const styles = useMemo(() => makeRowStyles(theme), [theme]);
+
+  return (
+    <PressableScale
+      onPress={onPress}
+      onLongPress={onLongPress}
+      haptic="light"
+      scale={0.99}
+      style={[styles.row, !isLast && styles.divider]}
+    >
+      {selectionMode && (
+        <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+          {isSelected && (
+            <Ionicons name="checkmark" size={14} color={theme.textInverse} />
+          )}
+        </View>
+      )}
+      <View style={styles.info}>
+        {juzLabel.length > 0 && <Text style={styles.primary}>{juzLabel}</Text>}
+        {surahLabel.length > 0 && (
+          <Text style={styles.secondary} numberOfLines={1}>
+            {surahLabel}
+          </Text>
+        )}
+      </View>
+      <View style={styles.dateBox}>
+        <Text style={styles.dateMonth}>{monthDay}</Text>
+        <Text style={styles.dateYear}>{year}</Text>
+      </View>
+    </PressableScale>
+  );
+}
+
+function formatJuzLabel(juzNumbers: number[]): string {
+  if (juzNumbers.length === 0) return '';
+  const visible = juzNumbers.slice(0, 2).join(', ');
+  const more = juzNumbers.length > 2 ? ` +${juzNumbers.length - 2}` : '';
+  return `Juz ${visible}${more}`;
+}
+
+function formatSurahLabel(surahNames: string[]): string {
+  if (surahNames.length === 0) return '';
+  const visible = surahNames.slice(0, 2).join(', ');
+  const more = surahNames.length > 2 ? ` +${surahNames.length - 2}` : '';
+  return `${visible}${more}`;
+}
+
+function JuzPickerSheet({
+  visible,
+  onClose,
+  availableJuz,
+  currentValue,
+  onSelect,
+  theme,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  availableJuz: number[];
+  currentValue: number | null;
+  onSelect: (juz: number | null) => void;
+  theme: ThemeColors;
+}) {
+  const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={sheetStyles.overlay} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={sheetStyles.sheet}
+        >
+          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <View style={sheetStyles.dragHandle} />
+          <Text style={sheetStyles.title}>Filter by juz</Text>
+          <ScrollView style={sheetStyles.list}>
+            <PressableScale
+              onPress={() => onSelect(null)}
+              haptic="selection"
+              scale={0.99}
+              style={[
+                sheetStyles.option,
+                currentValue === null && sheetStyles.optionSelected,
+              ]}
+            >
+              <Text style={sheetStyles.optionText}>All juz</Text>
+              {currentValue === null && (
+                <Ionicons name="checkmark" size={18} color={theme.accent} />
+              )}
+            </PressableScale>
+            {availableJuz.map((juz) => (
+              <PressableScale
+                key={juz}
+                onPress={() => onSelect(juz)}
+                haptic="selection"
+                scale={0.99}
+                style={[
+                  sheetStyles.option,
+                  currentValue === juz && sheetStyles.optionSelected,
+                ]}
+              >
+                <View>
+                  <Text style={sheetStyles.optionText}>Juz {juz}</Text>
+                  <Text style={sheetStyles.optionMeta}>{getJuzName(juz)}</Text>
+                </View>
+                {currentValue === juz && (
+                  <Ionicons name="checkmark" size={18} color={theme.accent} />
+                )}
+              </PressableScale>
+            ))}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const makeStyles = (theme: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: 'transparent' },
+    scrollView: { flex: 1 },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.lg,
+    },
+    contentWithSelectionBar: {
+      paddingBottom: 96,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    loadingText: { ...typography.bodyMedium, color: theme.textSecondary },
+    errorTitle: {
+      ...typography.titleLarge,
+      color: theme.textPrimary,
+      marginBottom: spacing.xs,
+      textAlign: 'center',
+    },
+    errorMessage: {
+      ...typography.bodyMedium,
+      color: theme.textSecondary,
+      marginBottom: spacing.xl,
+      textAlign: 'center',
+    },
+    retryButton: { minWidth: 160 },
+
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      marginBottom: spacing.xl,
+      gap: spacing.sm,
+    },
+    headerText: { flex: 1, alignItems: 'flex-start' },
+    date: {
+      ...typography.label,
+      color: theme.textMuted,
+      marginBottom: spacing.xxs,
+      textAlign: 'left',
+    },
+    greetingRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: spacing.sm,
+    },
+    greetingArabic: {
+      ...typography.displaySmall,
+      color: theme.textPrimary,
+      textAlign: 'left',
+      writingDirection: 'ltr',
+    },
+    greetingName: {
+      ...typography.displaySmall,
+      color: theme.textPrimary,
+      textAlign: 'left',
+    },
+    settingsButton: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.full,
+      overflow: 'hidden',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    heroCenter: {
+      flex: 1,
+      justifyContent: 'center',
+      marginVertical: spacing.lg,
+    },
+    heroShadow: {
+      borderRadius: radius.lg,
+      ...shadows.lg,
+    },
+    heroSurface: {
+      borderRadius: radius.lg,
+      padding: spacing.xl,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+    },
+    heroTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    heroEyebrow: {
+      ...typography.label,
+      color: theme.accent,
+      letterSpacing: 0.8,
+    },
+    streakBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: radius.full,
+      backgroundColor: theme.gold + '1F',
+    },
+    streakBadgeText: {
+      ...typography.bodySmall,
+      color: theme.gold,
+      fontWeight: '700',
+    },
+    heroTitle: {
+      ...typography.displayMedium,
+      color: theme.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    heroSubtitle: {
+      ...typography.bodyMedium,
+      color: theme.textSecondary,
+      marginBottom: spacing.xl,
+    },
+    heroCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.full,
+      backgroundColor: theme.accent,
+    },
+    heroCtaText: {
+      ...typography.titleSmall,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+      color: '#fff',
+    },
+
+    sessionsSection: { marginTop: spacing.sm },
+    sessionsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.xs,
+    },
+    sessionsHeaderRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    selectChip: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radius.full,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+    },
+    selectChipText: {
+      ...typography.bodySmall,
+      fontSize: 11,
+      color: theme.accent,
+      fontWeight: '600',
+    },
+    selectionBar: {
+      position: 'absolute',
+      left: spacing.lg,
+      right: spacing.lg,
+      bottom: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+      ...shadows.lg,
+    },
+    selectionCount: {
+      ...typography.bodyMedium,
+      color: theme.textPrimary,
+      fontWeight: '600',
+    },
+    bulkDeleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+      backgroundColor: theme.error,
+    },
+    bulkDeleteBtnDisabled: {
+      opacity: 0.5,
+    },
+    bulkDeleteText: {
+      ...typography.bodySmall,
+      color: '#fff',
+      fontWeight: '700',
+    },
+    sessionsLabel: {
+      ...typography.label,
+      color: theme.textMuted,
+      letterSpacing: 0.8,
+    },
+    filterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radius.full,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+    },
+    filterChipText: {
+      ...typography.bodySmall,
+      fontSize: 11,
+      color: theme.textPrimary,
+      fontWeight: '600',
+    },
+    sessionList: {
+      borderRadius: radius.md,
+      overflow: 'hidden',
+    },
+    emptySessions: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      textAlign: 'center',
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.md,
+      backgroundColor: theme.bgAlt,
+      borderRadius: radius.md,
+    },
+    seeAllBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingVertical: spacing.sm,
+      marginTop: spacing.xs,
+    },
+    seeAllText: {
+      ...typography.bodySmall,
+      color: theme.accent,
+      fontWeight: '600',
+    },
+  });
+
+const makeRowStyles = (theme: ThemeColors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    divider: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    info: { flex: 1 },
+    primary: {
+      ...typography.titleSmall,
+      color: theme.textPrimary,
+    },
+    secondary: {
+      ...typography.bodySmall,
+      color: theme.textSecondary,
+      marginTop: 2,
+    },
+    dateBox: {
+      alignItems: 'flex-end',
+      marginLeft: spacing.md,
+    },
+    dateMonth: {
+      ...typography.titleSmall,
+      color: theme.textPrimary,
+      fontWeight: '700',
+    },
+    dateYear: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      marginTop: 2,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: radius.xs,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+  });
+
+const makeSheetStyles = (theme: ThemeColors) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xl,
+      maxHeight: '75%',
+      overflow: 'hidden',
+    },
+    dragHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: radius.full,
+      alignSelf: 'center',
+      marginBottom: spacing.md,
+      backgroundColor: theme.border,
+    },
+    title: {
+      ...typography.titleMedium,
+      color: theme.textPrimary,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    list: { paddingHorizontal: spacing.lg },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    optionSelected: { backgroundColor: theme.accentSoft },
+    optionText: {
+      ...typography.bodyMedium,
+      color: theme.textPrimary,
+      fontWeight: '600',
+    },
+    optionMeta: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      marginTop: 2,
+    },
+  });

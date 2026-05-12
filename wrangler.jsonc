@@ -1,0 +1,12 @@
+{
+  // Cloudflare Workers config for the static site at /docs (privacy + terms).
+  // No Worker code — `assets.directory` tells Wrangler to serve everything in
+  // /docs as static files. The Pages project named "revisely" picks this up
+  // on each git push.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "revisely",
+  "compatibility_date": "2026-05-12",
+  "assets": {
+    "directory": "docs"
+  }
+}
