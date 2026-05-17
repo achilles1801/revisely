@@ -119,6 +119,18 @@ export async function signInWithAppleCredential(
   return userCredential.user;
 }
 
+/**
+ * Update the signed-in user's Firebase Auth displayName.
+ * Keeps `auth.currentUser.displayName` in sync with what we write to Firestore
+ * — otherwise screens that fall back to `firebaseUser.displayName` (e.g. the
+ * dashboard greeting) keep showing the original sign-up name forever.
+ */
+export async function updateAuthDisplayName(displayName: string | null): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  await updateProfile(user, { displayName });
+}
+
 export function subscribeToAuthChanges(callback: (user: FirebaseUser | null) => void) {
   return onAuthStateChanged(auth, callback);
 }

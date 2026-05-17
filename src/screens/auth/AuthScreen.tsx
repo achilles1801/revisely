@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +18,12 @@ import { spacing } from '../../theme/spacing';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useGoogleAuth, getIdTokenFromResponse } from '../../lib/googleAuth';
+import {
+  signInWithGoogle as triggerGoogleSignIn,
+  isGoogleAuthAvailable,
+  statusCodes,
+  isErrorWithCode,
+} from '../../lib/googleAuth';
 import { signInWithApple as triggerAppleSignIn } from '../../lib/appleAuth';
 
 type AuthMode = 'login' | 'signup' | 'reset';
@@ -27,7 +31,6 @@ type AuthMode = 'login' | 'signup' | 'reset';
 export default function AuthScreen() {
   const { signIn, signUp, signInWithGoogle, signInWithApple, sendPasswordReset, error, isLoading, clearError } = useAuth();
   const { theme } = useTheme();
-  const { request, response, promptAsync } = useGoogleAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,29 +48,24 @@ export default function AuthScreen() {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
   }, []);
 
-  // Handle Google sign-in response
-  useEffect(() => {
-    const handleGoogleResponse = async () => {
-      const idToken = getIdTokenFromResponse(response);
-      if (idToken) {
-        setGoogleLoading(true);
-        clearError();
-        try {
-          await signInWithGoogle(idToken);
-        } catch (err) {
-          // Error handled by AuthContext
-        } finally {
-          setGoogleLoading(false);
-        }
-      }
-    };
-    handleGoogleResponse();
-  }, [response]);
-
   const handleGoogleSignIn = async () => {
     clearError();
     setLocalError('');
-    await promptAsync();
+    setGoogleLoading(true);
+    try {
+      const { idToken } = await triggerGoogleSignIn();
+      await signInWithGoogle(idToken);
+    } catch (err: unknown) {
+      // User cancelled the sheet — not an error worth surfacing.
+      if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
+        return;
+      }
+      const message =
+        err instanceof Error ? err.message : "Couldn't sign in with Google.";
+      setLocalError(message);
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const handleAppleSignIn = async () => {
@@ -343,19 +341,21 @@ export default function AuthScreen() {
                 />
               )}
 
-              <TouchableOpacity
-                style={[styles.googleButton, { backgroundColor: theme.bgAlt, borderColor: theme.border }]}
-                onPress={handleGoogleSignIn}
-                disabled={!request || isLoading || googleLoading || appleLoading}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Continue with Google"
-              >
-                <Text style={[styles.googleIcon, { color: '#4285F4' }]}>G</Text>
-                <Text style={[styles.googleButtonText, { color: theme.textPrimary }]}>
-                  {googleLoading ? 'Signing in…' : 'Continue with Google'}
-                </Text>
-              </TouchableOpacity>
+              {isGoogleAuthAvailable && (
+                <TouchableOpacity
+                  style={[styles.googleButton, { backgroundColor: theme.bgAlt, borderColor: theme.border }]}
+                  onPress={handleGoogleSignIn}
+                  disabled={isLoading || googleLoading || appleLoading}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Google"
+                >
+                  <Text style={[styles.googleIcon, { color: '#4285F4' }]}>G</Text>
+                  <Text style={[styles.googleButtonText, { color: theme.textPrimary }]}>
+                    {googleLoading ? 'Signing in…' : 'Continue with Google'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </ScrollView>

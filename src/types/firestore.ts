@@ -13,7 +13,7 @@
  * - Denormalized stats in user document for quick dashboard reads
  */
 
-import { Timestamp, FieldValue } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 // ============================================================================
 // ENUMS AND CONSTANTS
@@ -22,8 +22,12 @@ import { Timestamp, FieldValue } from 'firebase/firestore';
 /** Status of a page in user's memorization journey */
 export type PageStatus = 'not_memorized' | 'learning' | 'memorized';
 
-/** Revision mode determines how pages are selected for daily revision */
-export type RevisionMode = 'weighted' | 'sequential';
+/** User-edited schedule shape persisted on the user doc. */
+export interface FirestoreCustomPlan {
+  days: number[][];
+  cycleStartDate: string;
+  direction: 'forward' | 'reverse';
+}
 
 /** Theme preference for the app */
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -44,12 +48,11 @@ export const TOTAL_QURAN_PAGES = 604;
 export const DEFAULT_USER_SETTINGS = {
   dailyPageCapacity: 20,
   activeDays: [0, 1, 2, 3, 4, 5, 6] as DayOfWeek[],
-  dangerThresholdDays: 10,
-  revisionMode: 'weighted' as RevisionMode,
+  smartTrackingEnabled: false,
+  hasSeenSmartTrackingPreview: false,
   theme: 'system' as ThemePreference,
   notificationsEnabled: true,
   reminderTime: '08:00',
-  dangerAlertEnabled: true,
 } as const;
 
 /** Default weakness rating for new pages */
@@ -67,8 +70,6 @@ export interface NotificationSettings {
   enabled: boolean;
   /** Daily reminder time in HH:mm format */
   reminderTime: string;
-  /** Whether to alert when pages enter danger zone */
-  dangerAlertEnabled: boolean;
 }
 
 /**
@@ -101,12 +102,12 @@ export interface FirestoreUser {
   // Revision Settings
   /** How many pages to revise per day */
   dailyPageCapacity: number;
-  /** Which days of the week the user revises (0=Sun, 6=Sat) */
+  /** Which days of the week the user revises (0=Sun, 6=Sat) — legacy; Phase 6 derives this from the plan */
   activeDays: DayOfWeek[];
-  /** How many days before a page becomes "in danger" */
-  dangerThresholdDays: number;
-  /** Revision mode: weighted (urgency-based) or sequential (khatam-style) */
-  revisionMode: RevisionMode;
+  /** Whether Smart Tracking (page ratings + Insights tab) is enabled */
+  smartTrackingEnabled: boolean;
+  /** Whether the user has finished (or dismissed) the Smart Tracking preview tour */
+  hasSeenSmartTrackingPreview: boolean;
 
   // UI Preferences
   /** Theme preference */
@@ -119,8 +120,11 @@ export interface FirestoreUser {
   currentMemorizationJuz: number | null;
   /** For users actively memorizing: current page number within juz */
   currentMemorizationPage: number | null;
-  /** For sequential mode: which page to start khatam from */
+  /** Position in the user's khatam cycle */
   currentKhatamPage: number;
+  /** Optional user-edited schedule (Phase 7 plan editor). Null means use the
+   *  default sequential resolver. */
+  customPlan: FirestoreCustomPlan | null;
 
   // Aggregated Stats (denormalized for quick reads)
   /** Current revision streak in days */
@@ -151,8 +155,8 @@ export interface CreateUserInput {
   photoURL?: string | null;
   dailyPageCapacity?: number;
   activeDays?: DayOfWeek[];
-  dangerThresholdDays?: number;
-  revisionMode?: RevisionMode;
+  smartTrackingEnabled?: boolean;
+  hasSeenSmartTrackingPreview?: boolean;
   theme?: ThemePreference;
   notifications?: Partial<NotificationSettings>;
 }
@@ -164,14 +168,18 @@ export interface UpdateUserInput {
   displayName?: string | null;
   dailyPageCapacity?: number;
   activeDays?: DayOfWeek[];
-  dangerThresholdDays?: number;
-  revisionMode?: RevisionMode;
+  smartTrackingEnabled?: boolean;
+  hasSeenSmartTrackingPreview?: boolean;
   theme?: ThemePreference;
   notifications?: Partial<NotificationSettings>;
   currentMemorizationJuz?: number | null;
   currentMemorizationPage?: number | null;
   currentKhatamPage?: number;
+  customPlan?: FirestoreCustomPlan | null;
   onboardingComplete?: boolean;
+  totalMemorizedPages?: number;
+  streak?: number;
+  lastRevisionDate?: string | null;
 }
 
 // ============================================================================
@@ -316,75 +324,8 @@ export interface UpdateSessionInput {
 }
 
 // ============================================================================
-// QUERY RESULT TYPES
-// ============================================================================
-
-/**
- * Page data with computed urgency score
- * Used by the revision algorithm
- */
-export interface PageWithUrgency extends FirestorePage {
-  /** Computed urgency score (higher = more urgent to revise) */
-  urgencyScore: number;
-  /** Days since last revision */
-  daysSinceRevision: number;
-  /** Whether this page is in the danger zone */
-  inDangerZone: boolean;
-}
-
-/**
- * Summary stats for the dashboard
- */
-export interface UserStats {
-  totalMemorizedPages: number;
-  totalLearningPages: number;
-  pagesInDangerZone: number;
-  currentStreak: number;
-  totalSessionsCompleted: number;
-  totalPagesRevisedAllTime: number;
-  averageSessionDuration: number;
-  weakestPages: number[]; // Page numbers with rating 1-2
-}
-
-/**
- * Filter options for querying pages
- */
-export interface PageQueryFilters {
-  status?: PageStatus;
-  minWeaknessRating?: WeaknessRating;
-  maxWeaknessRating?: WeaknessRating;
-  hasNotBeenRevisedSince?: Date;
-  juzNumber?: number;
-}
-
-/**
- * Sort options for querying pages
- */
-export interface PageQuerySort {
-  field: 'lastRevisedAt' | 'weaknessRating' | 'skipCount' | 'pageNumber' | 'urgencyScore';
-  direction: 'asc' | 'desc';
-}
-
-// ============================================================================
 // ALGORITHM SUPPORT TYPES
 // ============================================================================
-
-/**
- * Parameters for urgency calculation
- * These can be user-specific and learned over time
- */
-export interface UrgencyParameters {
-  /** User's danger threshold in days */
-  dangerThresholdDays: number;
-  /** Weight for time-based urgency (default 1.0) */
-  timeWeight: number;
-  /** Weight for weakness-based urgency (default 1.0) */
-  weaknessWeight: number;
-  /** Weight for skip penalty (default 0.2 per skip) */
-  skipPenaltyWeight: number;
-  /** Weight for recency multiplier (for newly memorized pages) */
-  recencyWeight: number;
-}
 
 /**
  * Daily assignment generated by the algorithm
@@ -398,45 +339,4 @@ export interface DailyAssignment {
   juzBreakdown: { juz: number; pages: number[] }[];
   /** Total pages in this assignment */
   totalPages: number;
-  /** Estimated time to complete in minutes */
-  estimatedMinutes: number;
-}
-
-// ============================================================================
-// OFFLINE SUPPORT TYPES
-// ============================================================================
-
-/**
- * Pending write operation for offline support
- * Stored locally and synced when online
- */
-export interface PendingWrite {
-  /** Unique ID for this pending operation */
-  id: string;
-  /** Type of operation */
-  type: 'UPDATE_PAGE' | 'UPDATE_SESSION' | 'CREATE_SESSION' | 'UPDATE_USER';
-  /** Document path */
-  path: string;
-  /** Data to write */
-  data: Record<string, unknown>;
-  /** When this operation was queued */
-  queuedAt: number;
-  /** Number of retry attempts */
-  retryCount: number;
-}
-
-/**
- * Sync status for offline-first support
- */
-export interface SyncStatus {
-  /** Last successful sync timestamp */
-  lastSyncAt: number | null;
-  /** Whether there are pending writes */
-  hasPendingWrites: boolean;
-  /** Number of pending write operations */
-  pendingWriteCount: number;
-  /** Whether currently syncing */
-  isSyncing: boolean;
-  /** Last sync error if any */
-  lastError: string | null;
 }

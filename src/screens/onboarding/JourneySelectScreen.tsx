@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList, JourneyStage } from '../../navigation/OnboardingNavigator';
 import { Button } from '../../components/Button';
+import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { Stepper } from '../../components/Stepper';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,44 +13,28 @@ import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { useApp } from '../../context/AppContext';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JourneySelect'>;
 
 const OPTIONS: Array<{ value: JourneyStage; title: string; description: string; icon: keyof typeof Ionicons.glyphMap }> = [
-  { value: 'beginning', title: 'Beginning', description: 'Starting my first juz', icon: 'leaf-outline' },
-  { value: 'in_progress', title: 'In Progress', description: 'Memorizing actively', icon: 'flame-outline' },
-  { value: 'complete', title: 'Complete', description: 'Maintaining 30 juz', icon: 'star-outline' },
+  { value: 'in_progress', title: 'In Progress', description: 'I’ve memorized part of the Quran', icon: 'flame-outline' },
+  { value: 'complete', title: 'Complete', description: 'I’ve memorized the whole Quran', icon: 'star-outline' },
 ];
 
 export default function JourneySelectScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { pages, updatePages } = useApp();
   const [selectedStage, setSelectedStage] = useState<JourneyStage>('in_progress');
 
-  const handleContinue = async () => {
-    if (selectedStage === 'complete') {
-      const allMemorized = pages.map((p) => ({
-        ...p,
-        status: 'memorized' as const,
-        dateMemorized: new Date().toISOString(),
-      }));
-      await updatePages(allMemorized);
-      navigation.navigate('Schedule', {
-        journeyStage: selectedStage,
-        currentJuz: undefined,
-        currentPage: undefined,
-      });
-    } else if (selectedStage === 'in_progress') {
-      navigation.navigate('NaturalLanguageInput', { journeyStage: selectedStage });
-    } else {
-      navigation.navigate('JuzSelection', { journeyStage: selectedStage });
-    }
+  // No pre-seeding here. JuzSelection initializes its local pendingChanges
+  // buffer from the journeyStage param and only flushes to global state on
+  // Continue. This screen's tap is just a navigation.
+  const handleContinue = () => {
+    navigation.navigate('JuzSelection', { journeyStage: selectedStage });
   };
 
-  const totalSteps = selectedStage === 'complete' ? 3 : 4;
+  const totalSteps = 3;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -68,7 +53,6 @@ export default function JourneySelectScreen() {
 
         <View style={styles.headerSection}>
           <Text style={styles.headline}>Where are you in your journey?</Text>
-          <Text style={styles.subtext}>We'll personalize your setup from here.</Text>
         </View>
 
         <View style={styles.cardsSection}>
@@ -80,29 +64,39 @@ export default function JourneySelectScreen() {
                 onPress={() => setSelectedStage(option.value)}
                 haptic="selection"
                 style={[
-                  styles.card,
+                  styles.cardOuter,
                   isSelected && styles.cardSelected,
                 ]}
               >
-                <View
-                  style={[
-                    styles.iconWrap,
-                    isSelected && { backgroundColor: theme.accent },
-                  ]}
-                >
-                  <Ionicons
-                    name={option.icon}
-                    size={20}
-                    color={isSelected ? theme.textInverse : theme.accent}
-                  />
+                <GlassCard
+                  style={StyleSheet.absoluteFillObject}
+                  tintColor={
+                    isSelected
+                      ? theme.accent + '33' // ~20% accent tint for selected
+                      : undefined
+                  }
+                />
+                <View style={styles.cardInner}>
+                  <View
+                    style={[
+                      styles.iconWrap,
+                      isSelected && { backgroundColor: theme.accent },
+                    ]}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={20}
+                      color={isSelected ? theme.textInverse : theme.accent}
+                    />
+                  </View>
+                  <View style={styles.cardText}>
+                    <Text style={styles.cardTitle}>{option.title}</Text>
+                    <Text style={styles.cardDescription}>{option.description}</Text>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={22} color={theme.accent} />
+                  )}
                 </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{option.title}</Text>
-                  <Text style={styles.cardDescription}>{option.description}</Text>
-                </View>
-                {isSelected && (
-                  <Ionicons name="checkmark-circle" size={22} color={theme.accent} />
-                )}
               </PressableScale>
             );
           })}
@@ -110,7 +104,7 @@ export default function JourneySelectScreen() {
 
         <View style={styles.bottomSection}>
           <Button
-            title={selectedStage === 'complete' ? 'Continue to schedule' : 'Continue'}
+            title="Continue"
             onPress={handleContinue}
             variant="primary"
             style={styles.button}
@@ -125,7 +119,8 @@ const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.bg,
+      // Transparent so the app-wide gradient shows through.
+      backgroundColor: 'transparent',
     },
     content: {
       flex: 1,
@@ -158,19 +153,20 @@ const makeStyles = (theme: ThemeColors) =>
       flex: 1,
       gap: spacing.sm,
     },
-    card: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      backgroundColor: theme.bgAlt,
+    cardOuter: {
       borderWidth: 1.5,
       borderColor: 'transparent',
       borderRadius: radius.md,
-      padding: spacing.md,
       minHeight: 76,
+      overflow: 'hidden',
+    },
+    cardInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.md,
     },
     cardSelected: {
-      backgroundColor: theme.accentSoft,
       borderColor: theme.accent,
     },
     iconWrap: {

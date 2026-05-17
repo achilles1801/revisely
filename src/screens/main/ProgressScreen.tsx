@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -7,38 +8,30 @@ import {
   ScrollView,
   RefreshControl,
   LayoutAnimation,
-  Platform,
-  UIManager,
   Modal,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Card } from '../../components/Card';
 import { EmptyState } from '../../components/EmptyState';
 import { GlassCard } from '../../components/GlassCard';
+import {
+  JuzBrowser,
+  PageStatus,
+  applyPendingChanges,
+} from '../../components/JuzBrowser';
+import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
+import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { PressableScale } from '../../components/PressableScale';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-import {
-  getPagesForJuz,
-  getJuzName,
-  getSurahsInJuz,
-  SurahInJuz,
-} from '../../lib/quranData';
+import { getPagesForJuz, getSurahsInJuz } from '../../lib/quranData';
 
 type StatMode = 'juz' | 'pages' | 'surahs';
 type StatusFilter = 'all' | 'in_progress' | 'complete' | 'not_started';
-type PageStatus = 'memorized' | 'not_memorized';
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
@@ -47,6 +40,10 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'not_started', label: 'Not started' },
 ];
 
+// Keep the browse compact by default so the bottom of the screen reads as
+// empty space above the floating tab bar. Tap View more to scroll the rest.
+const BROWSE_PREVIEW_LIMIT = 2;
+
 function formatFractional(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1);
@@ -54,19 +51,29 @@ function formatFractional(value: number): string {
 
 export default function ProgressScreen() {
   const { pages, loadData, updatePages } = useApp();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
+  const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedJuz, setExpandedJuz] = useState<number | null>(null);
-  const [expandedSurah, setExpandedSurah] = useState<string | null>(null);
   const [statMode, setStatMode] = useState<StatMode>('juz');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [filterPickerOpen, setFilterPickerOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [pendingChanges, setPendingChanges] = useState<Map<number, PageStatus>>(
-    new Map(),
-  );
+  const [browseExpanded, setBrowseExpanded] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<
+    Map<number, PageStatus>
+  >(new Map());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Hide the tab bar while editing so the screen reads as a full-screen flow.
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: editMode ? { display: 'none' } : undefined,
+    });
+    return () => {
+      navigation.setOptions({ tabBarStyle: undefined });
+    };
+  }, [editMode, navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -74,38 +81,28 @@ export default function ProgressScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  // Merge base pages with pending edits — everything visual reads from this.
-  const effectivePages = useMemo(() => {
-    if (pendingChanges.size === 0) return pages;
-    return pages.map((p) => {
-      const override = pendingChanges.get(p.pageNumber);
-      if (override === undefined) return p;
-      return {
-        ...p,
-        status: override,
-        dateMemorized:
-          override === 'memorized'
-            ? p.dateMemorized ?? new Date().toISOString()
-            : null,
-      };
-    });
-  }, [pages, pendingChanges]);
+  // Effective status lookup includes pendingChanges so stats update live as
+  // the user edits in edit mode.
+  const getEffectiveStatus = useCallback(
+    (pageNumber: number): PageStatus => {
+      const override = pendingChanges.get(pageNumber);
+      if (override !== undefined) return override;
+      const page = pages.find((p) => p.pageNumber === pageNumber);
+      return page?.status === 'memorized' ? 'memorized' : 'not_memorized';
+    },
+    [pages, pendingChanges],
+  );
 
   const getJuzStats = useCallback(
     (juzNumber: number) => {
-      const juzPageNumbers = getPagesForJuz(juzNumber);
-      const juzPages = effectivePages.filter((p) =>
-        juzPageNumbers.includes(p.pageNumber),
-      );
-      const memorizedCount = juzPages.filter(
-        (p) => p.status === 'memorized',
-      ).length;
-      return {
-        memorizedCount,
-        totalPages: juzPageNumbers.length,
-      };
+      const juzPages = getPagesForJuz(juzNumber);
+      let memorizedCount = 0;
+      for (const pn of juzPages) {
+        if (getEffectiveStatus(pn) === 'memorized') memorizedCount++;
+      }
+      return { memorizedCount, totalPages: juzPages.length };
     },
-    [effectivePages],
+    [getEffectiveStatus],
   );
 
   const stats = useMemo(() => {
@@ -121,15 +118,15 @@ export default function ProgressScreen() {
       if (memorizedCount === totalPages) completeJuz++;
 
       const surahs = getSurahsInJuz(i);
-      surahs.forEach((surah) => {
-        const surahMemorized = surah.pagesInJuz.filter((pageNum) => {
-          const page = effectivePages.find((p) => p.pageNumber === pageNum);
-          return page?.status === 'memorized';
-        }).length;
+      for (const surah of surahs) {
+        let surahMemorized = 0;
+        for (const pn of surah.pagesInJuz) {
+          if (getEffectiveStatus(pn) === 'memorized') surahMemorized++;
+        }
         if (surahMemorized === surah.pagesInJuz.length) {
           completedSurahs.add(surah.number);
         }
-      });
+      }
     }
 
     return {
@@ -138,7 +135,7 @@ export default function ProgressScreen() {
       totalMemorized,
       completedSurahs: completedSurahs.size,
     };
-  }, [getJuzStats, effectivePages]);
+  }, [getJuzStats, getEffectiveStatus]);
 
   const visibleJuzNumbers = useMemo(() => {
     const all = Array.from({ length: 30 }, (_, i) => i + 1);
@@ -155,94 +152,6 @@ export default function ProgressScreen() {
     });
   }, [statusFilter, getJuzStats]);
 
-  const getSurahMemorizedCount = (surah: SurahInJuz) => {
-    return surah.pagesInJuz.filter((pageNum) => {
-      const page = effectivePages.find((p) => p.pageNumber === pageNum);
-      return page?.status === 'memorized';
-    }).length;
-  };
-
-  const handleToggleExpand = (juzNumber: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedJuz(expandedJuz === juzNumber ? null : juzNumber);
-  };
-
-  const handleToggleSurahExpand = (juzNumber: number, surahNumber: number) => {
-    const key = `${juzNumber}-${surahNumber}`;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedSurah(expandedSurah === key ? null : key);
-  };
-
-  // Buffer changes locally — smart-clear: if a toggle restores original state, remove from map.
-  const setBulkChanges = useCallback(
-    (pageNumbers: number[], targetStatus: PageStatus) => {
-      setPendingChanges((prev) => {
-        const next = new Map(prev);
-        for (const pageNum of pageNumbers) {
-          const original = pages.find((p) => p.pageNumber === pageNum);
-          if (original?.status === targetStatus) {
-            next.delete(pageNum);
-          } else {
-            next.set(pageNum, targetStatus);
-          }
-        }
-        return next;
-      });
-    },
-    [pages],
-  );
-
-  const handleToggleJuz = useCallback(
-    (juzNumber: number) => {
-      if (!editMode) return;
-      const juzPageNumbers = getPagesForJuz(juzNumber);
-      const { memorizedCount, totalPages } = getJuzStats(juzNumber);
-      const target: PageStatus =
-        memorizedCount === totalPages ? 'not_memorized' : 'memorized';
-      setBulkChanges(juzPageNumbers, target);
-    },
-    [editMode, getJuzStats, setBulkChanges],
-  );
-
-  const handleToggleSurah = useCallback(
-    (juzNumber: number, surahNumber: number) => {
-      if (!editMode) return;
-      const surahs = getSurahsInJuz(juzNumber);
-      const surah = surahs.find((s) => s.number === surahNumber);
-      if (!surah) return;
-
-      const memorizedCount = surah.pagesInJuz.filter((pageNum) => {
-        const page = effectivePages.find((p) => p.pageNumber === pageNum);
-        return page?.status === 'memorized';
-      }).length;
-      const target: PageStatus =
-        memorizedCount === surah.pagesInJuz.length ? 'not_memorized' : 'memorized';
-      setBulkChanges(surah.pagesInJuz, target);
-    },
-    [editMode, effectivePages, setBulkChanges],
-  );
-
-  const handleClearJuz = useCallback(
-    (juzNumber: number) => {
-      if (!editMode) return;
-      const juzPageNumbers = getPagesForJuz(juzNumber);
-      setBulkChanges(juzPageNumbers, 'not_memorized');
-    },
-    [editMode, setBulkChanges],
-  );
-
-  const handleTogglePage = useCallback(
-    (pageNumber: number) => {
-      if (!editMode) return;
-      const page = effectivePages.find((p) => p.pageNumber === pageNumber);
-      if (!page) return;
-      const target: PageStatus =
-        page.status === 'memorized' ? 'not_memorized' : 'memorized';
-      setBulkChanges([pageNumber], target);
-    },
-    [editMode, effectivePages, setBulkChanges],
-  );
-
   const handleEnterEdit = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setEditMode(true);
@@ -257,20 +166,13 @@ export default function ProgressScreen() {
   const handleConfirmSave = async () => {
     setSaving(true);
     try {
-      const updated = pages.map((p) => {
-        const override = pendingChanges.get(p.pageNumber);
-        if (override === undefined) return p;
-        return {
-          ...p,
-          status: override,
-          dateMemorized:
-            override === 'memorized'
-              ? p.dateMemorized ?? new Date().toISOString()
-              : null,
-        };
-      });
-      const changedPageNumbers = Array.from(pendingChanges.keys());
-      await updatePages(updated, changedPageNumbers);
+      const { updatedPages, changedPageNumbers } = applyPendingChanges(
+        pages,
+        pendingChanges,
+      );
+      if (changedPageNumbers.length > 0) {
+        await updatePages(updatedPages, changedPageNumbers);
+      }
       setPendingChanges(new Map());
       setEditMode(false);
       setConfirmOpen(false);
@@ -335,14 +237,19 @@ export default function ProgressScreen() {
   const filterLabel =
     STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label ?? 'All';
 
+  // Edit mode shows every juz that passes the filter; non-edit mode collapses
+  // to a preview that the user can expand via "View more".
+  const showAll = editMode || browseExpanded;
+  const browsedJuzNumbers = showAll
+    ? visibleJuzNumbers
+    : visibleJuzNumbers.slice(0, BROWSE_PREVIEW_LIMIT);
+  const hasMore = visibleJuzNumbers.length > BROWSE_PREVIEW_LIMIT;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.content,
-          editMode && { paddingBottom: 100 },
-        ]}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -361,11 +268,9 @@ export default function ProgressScreen() {
         <PressableScale
           onPress={() => setFilterPickerOpen(true)}
           haptic="light"
-          style={[
-            styles.filterChip,
-            { backgroundColor: theme.bgAlt, borderColor: theme.border },
-          ]}
+          style={[styles.filterChip, { borderColor: theme.border }]}
         >
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <Ionicons name="filter-outline" size={16} color={theme.textSecondary} />
           <Text style={[styles.filterText, { color: theme.textPrimary }]}>
             {filterLabel}
@@ -374,42 +279,24 @@ export default function ProgressScreen() {
         </PressableScale>
 
         {/* Overall */}
-        <Card variant="flat" style={styles.card}>
+        <GlassCard
+          glassStyle="clear"
+          specular
+          tintColor={isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.08)'}
+          style={styles.card}
+        >
           <Text style={[styles.cardLabel, { color: theme.textMuted }]}>OVERALL</Text>
 
-          <View style={[styles.segmented, { backgroundColor: theme.bg }]}>
-            {(['juz', 'surahs', 'pages'] as StatMode[]).map((mode) => {
-              const isSelected = statMode === mode;
-              return (
-                <PressableScale
-                  key={mode}
-                  onPress={() => setStatMode(mode)}
-                  haptic="selection"
-                  scale={0.97}
-                  style={[
-                    styles.segment,
-                    isSelected && {
-                      backgroundColor: theme.surface,
-                      ...shadows.sm,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      {
-                        color: isSelected
-                          ? theme.textPrimary
-                          : theme.textSecondary,
-                        fontWeight: '600',
-                      },
-                    ]}
-                  >
-                    {mode === 'juz' ? 'Juz' : mode === 'surahs' ? 'Surahs' : 'Pages'}
-                  </Text>
-                </PressableScale>
-              );
-            })}
+          <View style={styles.segmentedWrap}>
+            <LiquidGlassSegmentedControl<StatMode>
+              options={[
+                { value: 'juz', label: 'Juz' },
+                { value: 'surahs', label: 'Surahs' },
+                { value: 'pages', label: 'Pages' },
+              ]}
+              value={statMode}
+              onChange={setStatMode}
+            />
           </View>
 
           <View style={styles.statsMain}>
@@ -442,13 +329,18 @@ export default function ProgressScreen() {
               {remaining} to go
             </Text>
           </View>
-        </Card>
+        </GlassCard>
 
-        {/* Browse */}
-        <Card variant="flat" style={styles.card}>
+        {/* Browse — clear liquid glass so the gradient lenses through the list. */}
+        <GlassCard glassStyle="clear" specular style={styles.card}>
           <View style={styles.browseHeader}>
             <View style={styles.browseTitleRow}>
-              <Text style={[styles.cardLabel, { color: theme.textMuted, marginBottom: 0 }]}>
+              <Text
+                style={[
+                  styles.cardLabel,
+                  { color: theme.textMuted, marginBottom: 0 },
+                ]}
+              >
                 BROWSE
               </Text>
               {editMode && (
@@ -469,18 +361,11 @@ export default function ProgressScreen() {
               <PressableScale
                 onPress={handleEnterEdit}
                 haptic="light"
-                scale={0.96}
-                style={[
-                  styles.editBtn,
-                  { backgroundColor: theme.bg, borderColor: theme.border },
-                ]}
+                scale={0.94}
+                style={styles.editBtn}
+                hitSlop={8}
               >
-                <Ionicons
-                  name="pencil-outline"
-                  size={14}
-                  color={theme.textPrimary}
-                />
-                <Text style={[styles.editBtnText, { color: theme.textPrimary }]}>
+                <Text style={[styles.editBtnText, { color: theme.accent }]}>
                   Edit
                 </Text>
               </PressableScale>
@@ -493,409 +378,67 @@ export default function ProgressScreen() {
               : 'Tap a juz to expand and see surahs and pages'}
           </Text>
 
-          {visibleJuzNumbers.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No juz match this filter
-            </Text>
-          ) : (
-            <View style={styles.juzList}>
-              {visibleJuzNumbers.map((juzNumber) => {
-                const { memorizedCount, totalPages } = getJuzStats(juzNumber);
-                const surahs = getSurahsInJuz(juzNumber);
-                const isExpanded = expandedJuz === juzNumber;
-                const isComplete = memorizedCount === totalPages;
-                const isPartial = memorizedCount > 0 && !isComplete;
-                const progress = totalPages > 0 ? memorizedCount / totalPages : 0;
+          <JuzBrowser
+            pages={pages}
+            pendingChanges={pendingChanges}
+            onChange={setPendingChanges}
+            juzNumbers={browsedJuzNumbers}
+            editMode={editMode}
+            emptyMessage="No juz match this filter"
+          />
 
-                return (
-                  <View
-                    key={juzNumber}
-                    style={[
-                      styles.juzCard,
-                      { backgroundColor: theme.bg, borderColor: theme.border },
-                    ]}
-                  >
-                    <View style={styles.juzHeader}>
-                      <PressableScale
-                        onPress={() => handleToggleExpand(juzNumber)}
-                        haptic="light"
-                        scale={0.99}
-                        style={styles.juzHeaderLeft}
-                      >
-                        <View
-                          style={[
-                            styles.juzCircle,
-                            { backgroundColor: theme.bgAlt },
-                            isComplete && {
-                              backgroundColor: theme.accent,
-                              borderColor: theme.accent,
-                            },
-                            isPartial && {
-                              backgroundColor: theme.accentSoft,
-                              borderColor: theme.accent,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.juzCircleText,
-                              { color: theme.textSecondary },
-                              isComplete && { color: theme.textInverse },
-                              isPartial && { color: theme.accent },
-                            ]}
-                          >
-                            {juzNumber}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={[styles.juzName, { color: theme.textPrimary }]}
-                          >
-                            {getJuzName(juzNumber)}
-                          </Text>
-                          <Text style={[styles.juzMeta, { color: theme.textMuted }]}>
-                            {surahs.length} surah{surahs.length !== 1 ? 's' : ''} ·{' '}
-                            {memorizedCount}/{totalPages} pages
-                          </Text>
-                        </View>
-                      </PressableScale>
-
-                      {editMode && (
-                        <PressableScale
-                          onPress={() => handleToggleJuz(juzNumber)}
-                          haptic="medium"
-                          style={styles.checkboxHit}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                          <View
-                            style={[
-                              styles.checkbox,
-                              { backgroundColor: theme.bg, borderColor: theme.border },
-                              isComplete && {
-                                backgroundColor: theme.accent,
-                                borderColor: theme.accent,
-                              },
-                              isPartial && {
-                                backgroundColor: theme.accentSoft,
-                                borderColor: theme.accent,
-                              },
-                            ]}
-                          >
-                            {isComplete && (
-                              <Ionicons name="checkmark" size={16} color={theme.textInverse} />
-                            )}
-                            {isPartial && (
-                              <Ionicons name="remove" size={16} color={theme.accent} />
-                            )}
-                          </View>
-                        </PressableScale>
-                      )}
-                    </View>
-
-                    {isPartial && (
-                      <View
-                        style={[
-                          styles.juzProgressBar,
-                          { backgroundColor: theme.border },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.juzProgressFill,
-                            {
-                              width: `${progress * 100}%`,
-                              backgroundColor: theme.accent,
-                            },
-                          ]}
-                        />
-                      </View>
-                    )}
-
-                    {isExpanded && (
-                      <View
-                        style={[
-                          styles.expandedSection,
-                          { borderTopColor: theme.border },
-                        ]}
-                      >
-                        {surahs.map((surah) => {
-                          const surahMemorized = getSurahMemorizedCount(surah);
-                          const surahTotal = surah.pagesInJuz.length;
-                          const isSurahComplete = surahMemorized === surahTotal;
-                          const isSurahPartial =
-                            surahMemorized > 0 && !isSurahComplete;
-                          const surahKey = `${juzNumber}-${surah.number}`;
-                          const isSurahExpanded = expandedSurah === surahKey;
-
-                          return (
-                            <View key={surah.number} style={styles.surahWrap}>
-                              <View
-                                style={[
-                                  styles.surahRow,
-                                  {
-                                    backgroundColor: theme.bgAlt,
-                                    borderColor: theme.border,
-                                  },
-                                  isSurahComplete && {
-                                    backgroundColor: theme.accentSoft,
-                                    borderColor: theme.accent,
-                                  },
-                                  isSurahPartial && { borderColor: theme.accent },
-                                ]}
-                              >
-                                <PressableScale
-                                  onPress={() =>
-                                    handleToggleSurahExpand(juzNumber, surah.number)
-                                  }
-                                  haptic="light"
-                                  scale={0.99}
-                                  style={styles.surahInfo}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.surahNumber,
-                                      { color: theme.textMuted },
-                                    ]}
-                                  >
-                                    {surah.number}
-                                  </Text>
-                                  <View style={styles.surahNames}>
-                                    <Text
-                                      style={[
-                                        styles.surahNameArabic,
-                                        { color: theme.textPrimary },
-                                      ]}
-                                    >
-                                      {surah.nameArabic}
-                                    </Text>
-                                    <Text
-                                      style={[
-                                        styles.surahNameEnglish,
-                                        { color: theme.textMuted },
-                                      ]}
-                                    >
-                                      {surah.name} · {surahMemorized}/{surahTotal}
-                                    </Text>
-                                  </View>
-                                  <Ionicons
-                                    name={
-                                      isSurahExpanded ? 'chevron-up' : 'chevron-down'
-                                    }
-                                    size={16}
-                                    color={theme.textMuted}
-                                  />
-                                </PressableScale>
-
-                                {editMode && (
-                                  <PressableScale
-                                    onPress={() =>
-                                      handleToggleSurah(juzNumber, surah.number)
-                                    }
-                                    haptic="selection"
-                                    style={styles.surahCheckHit}
-                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                  >
-                                    <View
-                                      style={[
-                                        styles.surahCheck,
-                                        {
-                                          backgroundColor: theme.bg,
-                                          borderColor: theme.border,
-                                        },
-                                        isSurahComplete && {
-                                          backgroundColor: theme.accent,
-                                          borderColor: theme.accent,
-                                        },
-                                        isSurahPartial && {
-                                          backgroundColor: theme.accentSoft,
-                                          borderColor: theme.accent,
-                                        },
-                                      ]}
-                                    >
-                                      {isSurahComplete && (
-                                        <Ionicons
-                                          name="checkmark"
-                                          size={12}
-                                          color={theme.textInverse}
-                                        />
-                                      )}
-                                      {isSurahPartial && (
-                                        <Ionicons
-                                          name="remove"
-                                          size={12}
-                                          color={theme.accent}
-                                        />
-                                      )}
-                                    </View>
-                                  </PressableScale>
-                                )}
-                              </View>
-
-                              {isSurahExpanded && (
-                                <View
-                                  style={[
-                                    styles.pagesList,
-                                    { borderLeftColor: theme.accent },
-                                  ]}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.pagesHint,
-                                      { color: theme.textMuted },
-                                    ]}
-                                  >
-                                    {editMode
-                                      ? 'Tap to toggle individual pages'
-                                      : 'Memorized pages shown in accent'}
-                                  </Text>
-                                  <View style={styles.pagesGrid}>
-                                    {surah.pagesInJuz.map((pageNum) => {
-                                      const page = effectivePages.find(
-                                        (p) => p.pageNumber === pageNum,
-                                      );
-                                      const isPageMemorized =
-                                        page?.status === 'memorized';
-                                      const ChipWrapper = editMode
-                                        ? PressableScale
-                                        : View;
-                                      const wrapperProps = editMode
-                                        ? {
-                                            onPress: () =>
-                                              handleTogglePage(pageNum),
-                                            haptic: 'selection' as const,
-                                            scale: 0.94,
-                                          }
-                                        : {};
-
-                                      return (
-                                        <ChipWrapper
-                                          key={pageNum}
-                                          {...wrapperProps}
-                                          style={[
-                                            styles.pageChip,
-                                            { backgroundColor: theme.bg },
-                                            isPageMemorized && {
-                                              backgroundColor: theme.accent,
-                                            },
-                                          ]}
-                                        >
-                                          <Text
-                                            style={[
-                                              styles.pageChipText,
-                                              { color: theme.textSecondary },
-                                              isPageMemorized && {
-                                                color: theme.textInverse,
-                                                fontWeight: '600',
-                                              },
-                                            ]}
-                                          >
-                                            {pageNum}
-                                          </Text>
-                                        </ChipWrapper>
-                                      );
-                                    })}
-                                  </View>
-                                </View>
-                              )}
-                            </View>
-                          );
-                        })}
-
-                        {editMode && (
-                          <View style={styles.quickActions}>
-                            <PressableScale
-                              onPress={() => handleClearJuz(juzNumber)}
-                              haptic="light"
-                              style={[
-                                styles.quickAction,
-                                {
-                                  backgroundColor: theme.bg,
-                                  borderColor: theme.border,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.quickActionText,
-                                  { color: theme.textSecondary },
-                                ]}
-                              >
-                                Clear all
-                              </Text>
-                            </PressableScale>
-                            <PressableScale
-                              onPress={() => handleToggleJuz(juzNumber)}
-                              haptic="medium"
-                              style={[
-                                styles.quickAction,
-                                {
-                                  backgroundColor: theme.accent,
-                                  borderColor: theme.accent,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.quickActionText,
-                                  { color: theme.textInverse },
-                                ]}
-                              >
-                                {isComplete ? 'Unmark all' : 'Mark all complete'}
-                              </Text>
-                            </PressableScale>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
+          {hasMore && !editMode && (
+            <PressableScale
+              onPress={() => setBrowseExpanded((v) => !v)}
+              haptic="light"
+              scale={0.99}
+              style={styles.browseExpandToggle}
+            >
+              <Text style={[styles.browseExpandText, { color: theme.accent }]}>
+                {browseExpanded
+                  ? 'Show less'
+                  : `View more (${visibleJuzNumbers.length - BROWSE_PREVIEW_LIMIT})`}
+              </Text>
+              <Ionicons
+                name={browseExpanded ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={theme.accent}
+              />
+            </PressableScale>
           )}
-        </Card>
+        </GlassCard>
       </ScrollView>
 
-      {/* Edit-mode sticky footer */}
+      {/* Replaces the tab bar in edit mode — same shape, action-specific content. */}
       {editMode && (
-        <View
-          style={[
-            styles.editFooter,
-            {
-              backgroundColor: theme.surface,
-              borderTopColor: theme.border,
-            },
-          ]}
-        >
+        <LiquidGlassActionBar>
           <PressableScale
             onPress={handleCancelEdit}
             haptic="light"
-            style={[
-              styles.footerBtn,
-              { backgroundColor: theme.bgAlt, borderColor: theme.border },
-            ]}
+            hitSlop={8}
+            style={styles.actionTextBtn}
           >
-            <Text style={[styles.footerBtnText, { color: theme.textPrimary }]}>
+            <Text style={[styles.actionTextBtnLabel, { color: theme.textPrimary }]}>
               Cancel
             </Text>
           </PressableScale>
+          <View style={{ flex: 1 }} />
           <PressableScale
             onPress={() => setConfirmOpen(true)}
             haptic="medium"
             disabled={changeSummary.total === 0}
             style={[
-              styles.footerBtn,
+              styles.actionPrimary,
               {
                 backgroundColor:
-                  changeSummary.total === 0 ? theme.bgAlt : theme.accent,
-                borderColor:
-                  changeSummary.total === 0 ? theme.border : theme.accent,
-                opacity: changeSummary.total === 0 ? 0.6 : 1,
+                  changeSummary.total === 0 ? 'transparent' : theme.accent,
+                opacity: changeSummary.total === 0 ? 0.5 : 1,
               },
             ]}
           >
             <Text
               style={[
-                styles.footerBtnText,
+                styles.actionPrimaryLabel,
                 {
                   color:
                     changeSummary.total === 0
@@ -909,7 +452,7 @@ export default function ProgressScreen() {
                 : `Save (${changeSummary.total})`}
             </Text>
           </PressableScale>
-        </View>
+        </LiquidGlassActionBar>
       )}
 
       <StatusPickerSheet
@@ -1099,7 +642,8 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    // Clearance for the floating tab bar (~76px pill+gap).
+    paddingBottom: 96,
   },
   header: { marginBottom: spacing.lg },
   title: {
@@ -1118,6 +662,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     borderWidth: 1,
     marginBottom: spacing.lg,
+    overflow: 'hidden',
   },
   filterText: {
     ...typography.bodySmall,
@@ -1127,6 +672,7 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.lg,
     padding: spacing.lg,
+    borderRadius: radius.lg,
   },
   cardLabel: {
     ...typography.label,
@@ -1150,16 +696,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 4,
-    borderRadius: radius.full,
-    borderWidth: 1,
   },
   editBtnText: {
     ...typography.bodySmall,
+    fontSize: 14,
     fontWeight: '600',
   },
   editingPill: {
@@ -1184,21 +726,9 @@ const styles = StyleSheet.create({
   },
 
   // Overall card
-  segmented: {
-    flexDirection: 'row',
-    padding: 3,
-    borderRadius: radius.full,
+  segmentedWrap: {
     marginBottom: spacing.lg,
   },
-  segment: {
-    flex: 1,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentText: { ...typography.bodySmall },
   statsMain: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -1240,194 +770,38 @@ const styles = StyleSheet.create({
   },
   progressRemaining: { ...typography.bodySmall },
 
-  // Browse list
-  juzList: { gap: spacing.xs },
-  juzCard: {
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  juzHeader: {
+  browseExpandToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  juzHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: spacing.sm,
-  },
-  juzCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 4,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
   },
-  juzCircleText: {
-    ...typography.bodyMedium,
-    fontWeight: '700',
-  },
-  juzName: {
-    ...typography.bodyMedium,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  juzMeta: {
-    ...typography.bodySmall,
-    fontSize: 11,
-  },
-  checkboxHit: {
-    paddingVertical: spacing.xs,
-    paddingLeft: spacing.sm,
-  },
-  checkbox: {
-    width: 26,
-    height: 26,
-    borderRadius: radius.xs,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  juzProgressBar: {
-    height: 3,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    borderRadius: radius.full,
-    overflow: 'hidden',
-  },
-  juzProgressFill: {
-    height: '100%',
-    borderRadius: radius.full,
-  },
-  expandedSection: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: spacing.xs,
-  },
-  surahWrap: { gap: spacing.xs },
-  surahRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: radius.sm,
-    padding: spacing.sm,
-    borderWidth: 1,
-  },
-  surahInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  surahNumber: {
-    ...typography.bodySmall,
-    width: 24,
-    textAlign: 'center',
-  },
-  surahNames: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  surahNameArabic: {
-    ...typography.bodyMedium,
-    fontWeight: '500',
-  },
-  surahNameEnglish: {
-    ...typography.bodySmall,
-    fontSize: 11,
-  },
-  surahCheckHit: {
-    paddingLeft: spacing.sm,
-  },
-  surahCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.xs,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pagesList: {
-    marginLeft: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderLeftWidth: 2,
-  },
-  pagesHint: {
-    ...typography.bodySmall,
-    fontSize: 11,
-    marginBottom: spacing.xs,
-  },
-  pagesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  pageChip: {
-    width: 42,
-    height: 32,
-    borderRadius: radius.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pageChipText: {
-    ...typography.bodySmall,
-    fontWeight: '500',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  quickAction: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  quickActionText: {
+  browseExpandText: {
     ...typography.bodySmall,
     fontWeight: '600',
-  },
-
-  emptyText: {
-    ...typography.bodyMedium,
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
   },
 
   // Edit-mode sticky footer
-  editFooter: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg + spacing.md,
-    borderTopWidth: 1,
+  actionTextBtn: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
   },
-  footerBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footerBtnText: {
+  actionTextBtnLabel: {
     ...typography.bodyMedium,
+    fontSize: 15,
     fontWeight: '600',
+  },
+  actionPrimary: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+  },
+  actionPrimaryLabel: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // Sheet

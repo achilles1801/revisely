@@ -7,7 +7,6 @@ import { useTheme } from '../context/ThemeContext';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import { MainNavigator } from './MainNavigator';
 import AuthScreen from '../screens/auth/AuthScreen';
-import { OfflineBanner } from '../components/OfflineBanner';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 export function RootNavigator() {
@@ -58,10 +57,7 @@ export function RootNavigator() {
         pointerEvents="none"
       />
       <NavigationContainer theme={navigationTheme}>
-        <View style={{ flex: 1 }}>
-          <OfflineBanner />
-          {content}
-        </View>
+        <View style={{ flex: 1 }}>{content}</View>
       </NavigationContainer>
     </View>
   );

@@ -51,8 +51,8 @@ export const darkColors: typeof colors = {
 
   // Text
   textPrimary: '#F5F1EA',
-  textSecondary: '#A8A095',
-  textMuted: '#6B6359',
+  textSecondary: '#B5AC9E',
+  textMuted: '#9A9285',
   textInverse: '#0F1410',
 
   // Accents

@@ -36,6 +36,7 @@ export default {
     },
     android: {
       package: "com.revisionbuddy.app",
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#03372A"
@@ -72,6 +73,13 @@ export default {
       // unsupported" failures.
       "@react-native-firebase/app",
       "@react-native-firebase/app-check",
+      // Native Google Sign-In SDK (replaces expo-auth-session/providers/google,
+      // which is broken on Android since Google deprecated custom URI schemes
+      // for new Android OAuth clients in late 2023). The plugin reads the
+      // REVERSED_CLIENT_ID from GoogleService-Info.plist for iOS URL scheme
+      // setup, and the Android client info from google-services.json — no
+      // plugin options needed.
+      "@react-native-google-signin/google-signin",
       // Sentry: keep the bare plugin form — the configured @sentry/react-native/expo
       // plugin (added by the wizard with org/project) does extra Podfile work
       // that interacts badly with RNFirebase + static frameworks. The bare
@@ -100,6 +108,7 @@ export default {
         measurementId: process.env.FIREBASE_MEASUREMENT_ID,
       },
       googleIosClientId: process.env.GOOGLE_IOS_CLIENT_ID,
+      googleAndroidClientId: process.env.GOOGLE_ANDROID_CLIENT_ID,
       googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID,
       // Sentry crash reporting. Empty DSN → Sentry stays off (fine for dev).
       // Set SENTRY_DSN in EAS env vars + .env when you're ready to capture errors.

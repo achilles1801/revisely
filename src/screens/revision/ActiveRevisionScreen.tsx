@@ -1,11 +1,21 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  Alert,
+  Modal,
+  Pressable,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { Button } from '../../components/Button';
+import { GlassCard } from '../../components/GlassCard';
 import { ProgressBar } from '../../components/ProgressBar';
 import { PressableScale } from '../../components/PressableScale';
 import { QuranPageViewer } from '../../components/QuranPageViewer';
@@ -13,11 +23,15 @@ import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
+import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { generateDailyAssignment } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
+
+const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
 
@@ -26,6 +40,8 @@ export default function ActiveRevisionScreen() {
   const { user, pages, logs, updatePages, addLog, loadData, error } = useApp();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
 
   const assignment = useMemo(() => {
     if (!user) return null;
@@ -50,16 +66,18 @@ export default function ActiveRevisionScreen() {
   }, [logs, assignment]);
 
   // Ratings the user has already saved today — replayed so the session resumes
-  // with the same weakness rating they last picked.
+  // with the same weakness rating they last picked. Only relevant when Smart
+  // Tracking is on; otherwise we never collect or render ratings.
   const ratingsFromTodaysLogs = useMemo(() => {
     const map = new Map<number, number>();
+    if (!smartTrackingEnabled) return map;
     const today = new Date().toISOString().split('T')[0];
     for (const log of logs) {
       if (log.date !== today) continue;
       for (const wu of log.weaknessUpdates) map.set(wu.page, wu.rating);
     }
     return map;
-  }, [logs]);
+  }, [logs, smartTrackingEnabled]);
 
   const [completedPages, setCompletedPages] = useState<Set<number>>(
     () => new Set(alreadyRevisedToday),
@@ -71,6 +89,14 @@ export default function ActiveRevisionScreen() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(null);
   const [sessionStartTime] = useState(Date.now());
+  const [saving, setSaving] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(REVISION_GUIDE_DISMISSED_KEY).then((v) => {
+      if (v !== 'true') setShowGuide(true);
+    });
+  }, []);
 
   if (!user || !assignment) {
     return (
@@ -156,6 +182,52 @@ export default function ActiveRevisionScreen() {
     }
   };
 
+  // Persist progress without finalizing. Unmarked pages stay open — they are
+  // not counted as skipped, so the user can resume later without penalty.
+  const handleSave = async () => {
+    if (saving) return;
+    const pagesRevised = Array.from(completedPages).filter(
+      (p) => !alreadyRevisedToday.has(p),
+    );
+    if (pagesRevised.length === 0) {
+      navigation.goBack();
+      return;
+    }
+    setSaving(true);
+    try {
+      const durationMinutes = Math.round(
+        (Date.now() - sessionStartTime) / (1000 * 60),
+      );
+      const updatedPages = pages.map((p) =>
+        pagesRevised.includes(p.pageNumber)
+          ? {
+              ...p,
+              lastRevisedDate: new Date().toISOString(),
+              totalRevisionCount: p.totalRevisionCount + 1,
+              skipCount: 0,
+            }
+          : p,
+      );
+      await updatePages(updatedPages, pagesRevised);
+
+      const weaknessUpdatesArray = Array.from(localRatings.entries())
+        .filter(([page]) => pagesRevised.includes(page))
+        .map(([page, rating]) => ({ page, rating }));
+
+      await addLog({
+        date: new Date().toISOString().split('T')[0],
+        pagesRevised,
+        pagesSkipped: [],
+        weaknessUpdates: weaknessUpdatesArray,
+        durationMinutes: durationMinutes || 1,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitSession = async () => {
     const durationMinutes = Math.round((Date.now() - sessionStartTime) / (1000 * 60));
     // Exclude pages already revised in a prior session today so we don't
@@ -205,6 +277,11 @@ export default function ActiveRevisionScreen() {
     navigation.goBack();
   };
 
+  const dismissGuideForever = async () => {
+    setShowGuide(false);
+    await AsyncStorage.setItem(REVISION_GUIDE_DISMISSED_KEY, 'true');
+  };
+
   // Resume at the first page that isn't already done; fall back to page 1 of
   // the assignment if everything is somehow already complete.
   const resumePage =
@@ -231,15 +308,26 @@ export default function ActiveRevisionScreen() {
           <Text style={styles.headerSubtitle}>Page {displayPageNumber}</Text>
         </View>
 
-        <PressableScale
-          onPress={() => setShowBulkActions(true)}
-          haptic="light"
-          style={styles.headerButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Bulk actions"
-        >
-          <Ionicons name="ellipsis-horizontal" size={22} color={theme.textPrimary} />
-        </PressableScale>
+        <View style={styles.headerActions}>
+          <PressableScale
+            onPress={() => setShowGuide(true)}
+            haptic="light"
+            style={styles.headerButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="How this works"
+          >
+            <Ionicons name="help-circle-outline" size={22} color={theme.textPrimary} />
+          </PressableScale>
+          <PressableScale
+            onPress={() => setShowBulkActions(true)}
+            haptic="light"
+            style={styles.headerButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Bulk actions"
+          >
+            <Ionicons name="ellipsis-horizontal" size={22} color={theme.textPrimary} />
+          </PressableScale>
+        </View>
       </View>
 
       <View style={styles.progressSection}>
@@ -258,19 +346,29 @@ export default function ActiveRevisionScreen() {
           quranData={quranData}
           onPageComplete={handlePageComplete}
           onPageUncomplete={handlePageUncomplete}
-          onRatePage={setSelectedPageForRating}
+          onRatePage={smartTrackingEnabled ? setSelectedPageForRating : undefined}
           initialPage={resumePage}
           onPageChange={setCurrentPageNumber}
         />
       </View>
 
       <View style={styles.footer}>
-        <Button
-          title={completedCount === totalPages ? 'Complete session' : 'Submit session'}
-          onPress={handleEndSession}
-          variant="primary"
-          style={{ width: '100%' }}
-        />
+        {completedCount === totalPages && totalPages > 0 ? (
+          <Button
+            title="Submit session"
+            onPress={handleEndSession}
+            variant="primary"
+            style={{ width: '100%' }}
+          />
+        ) : (
+          <Button
+            title={saving ? 'Saving…' : 'Save'}
+            onPress={handleSave}
+            variant="primary"
+            disabled={saving}
+            style={{ width: '100%' }}
+          />
+        )}
       </View>
 
       <BulkActionsModal
@@ -284,7 +382,14 @@ export default function ActiveRevisionScreen() {
         onTogglePage={handleTogglePage}
       />
 
-      {selectedPageForRating && (
+      <RevisionGuideModal
+        visible={showGuide}
+        onClose={() => setShowGuide(false)}
+        onDismissForever={dismissGuideForever}
+        theme={theme}
+      />
+
+      {smartTrackingEnabled && selectedPageForRating && (
         <WeaknessModal
           pageNumber={selectedPageForRating}
           surahName={quranData.find((q) => q.pageNumber === selectedPageForRating)?.surahName || ''}
@@ -352,6 +457,11 @@ const makeStyles = (theme: ThemeColors) =>
       borderRadius: 999,
       backgroundColor: theme.bgAlt,
     },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
     headerCenter: { flex: 1, alignItems: 'center' },
     headerTitle: { ...typography.titleLarge, color: theme.textPrimary },
     headerSubtitle: { ...typography.bodySmall, color: theme.textSecondary, marginTop: 2 },
@@ -380,5 +490,178 @@ const makeStyles = (theme: ThemeColors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: theme.border,
       backgroundColor: theme.bg,
+    },
+  });
+
+function RevisionGuideModal({
+  visible,
+  onClose,
+  onDismissForever,
+  theme,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onDismissForever: () => void;
+  theme: ThemeColors;
+}) {
+  const styles = useMemo(() => makeGuideStyles(theme), [theme]);
+  const steps: Array<{ icon: keyof typeof Ionicons.glyphMap; title: string; body: string }> = [
+    {
+      icon: 'book-outline',
+      title: 'Read each page',
+      body: 'Swipe through the pages assigned to you for today.',
+    },
+    {
+      icon: 'checkmark-circle-outline',
+      title: 'Mark pages as done',
+      body: 'Tap to mark each page once you have revised it.',
+    },
+    {
+      icon: 'save-outline',
+      title: 'Save to keep your progress',
+      body: 'Leaving without tapping Save will lose what you have marked. Save persists your work and you can come back later.',
+    },
+    {
+      icon: 'flag-outline',
+      title: 'Submit when fully done',
+      body: 'Once every page is marked, the Save button becomes Submit session to finish the day.',
+    },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
+          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>How revision works</Text>
+            <PressableScale
+              onPress={onClose}
+              haptic="light"
+              style={styles.closeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={20} color={theme.textSecondary} />
+            </PressableScale>
+          </View>
+
+          <View style={styles.steps}>
+            {steps.map((s, i) => (
+              <View key={i} style={styles.step}>
+                <View style={styles.stepIcon}>
+                  <Ionicons name={s.icon} size={18} color={theme.accent} />
+                </View>
+                <View style={styles.stepText}>
+                  <Text style={styles.stepTitle}>{s.title}</Text>
+                  <Text style={styles.stepBody}>{s.body}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.actions}>
+            <PressableScale
+              onPress={onDismissForever}
+              haptic="light"
+              scale={0.98}
+              style={styles.secondaryBtn}
+            >
+              <Text style={styles.secondaryBtnText}>Don't show this again</Text>
+            </PressableScale>
+            <PressableScale
+              onPress={onClose}
+              haptic="medium"
+              scale={0.98}
+              style={styles.primaryBtn}
+            >
+              <Text style={styles.primaryBtnText}>Got it</Text>
+            </PressableScale>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const makeGuideStyles = (theme: ThemeColors) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    card: {
+      width: '100%',
+      maxWidth: 420,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+      ...shadows.lg,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    title: { ...typography.titleLarge, color: theme.textPrimary },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 999,
+    },
+    steps: { gap: spacing.md, marginBottom: spacing.lg },
+    step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    stepIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.xs,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.accent + '20',
+    },
+    stepText: { flex: 1 },
+    stepTitle: {
+      ...typography.titleSmall,
+      color: theme.textPrimary,
+      marginBottom: 2,
+    },
+    stepBody: { ...typography.bodySmall, color: theme.textSecondary },
+    actions: { flexDirection: 'row', gap: spacing.sm },
+    secondaryBtn: {
+      flex: 1,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+    },
+    secondaryBtnText: {
+      ...typography.bodySmall,
+      color: theme.textSecondary,
+      fontWeight: '600',
+    },
+    primaryBtn: {
+      flex: 1,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.accent,
+    },
+    primaryBtnText: {
+      ...typography.bodySmall,
+      color: '#fff',
+      fontWeight: '700',
     },
   });

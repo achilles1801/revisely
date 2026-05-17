@@ -9,6 +9,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
@@ -55,15 +56,17 @@ function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <AppProvider>
-              <RootNavigator />
-            </AppProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </BottomSheetModalProvider>
+      <SafeAreaProvider>
+        <BottomSheetModalProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <AppProvider>
+                <RootNavigator />
+              </AppProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </BottomSheetModalProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

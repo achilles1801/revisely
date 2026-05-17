@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Switch, Platform } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -13,83 +13,69 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { RevisionMode } from '../../types';
 import { scheduleDailyReminder } from '../../lib/notifications';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Schedule'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'Schedule'>;
-
-const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-const MODES: Array<{ value: RevisionMode; title: string; description: string; icon: keyof typeof Ionicons.glyphMap }> = [
-  { value: 'weighted', title: 'Weighted', description: 'Focus on the pages that need review most', icon: 'flash-outline' },
-  { value: 'sequential', title: 'Sequential', description: 'Revise in order, page by page', icon: 'list-outline' },
-];
 
 export default function ScheduleScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { journeyStage, currentJuz, currentPage } = route.params;
-  const { createDefaultUser, saveUser, completeOnboarding } = useApp();
+  const { journeyStage } = route.params;
+  const { pages, createDefaultUser, saveUser, completeOnboarding } = useApp();
   const { firebaseUser } = useAuth();
 
-  const defaultCapacity = journeyStage === 'beginning' ? 10 : journeyStage === 'complete' ? 30 : 20;
-  const defaultMode: RevisionMode = journeyStage === 'beginning' ? 'sequential' : 'weighted';
+  const defaultCapacity = journeyStage === 'complete' ? 20 : 10;
 
   const [dailyCapacity, setDailyCapacity] = useState(defaultCapacity);
-  const [activeDays, setActiveDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
-  const [mode, setMode] = useState<RevisionMode>(defaultMode);
-  const [lastTickValue, setLastTickValue] = useState(defaultCapacity);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [lastCapacityTick, setLastCapacityTick] = useState(defaultCapacity);
 
-  const toggleDay = (dayIndex: number) => {
-    Haptics.selectionAsync();
-    setActiveDays(
-      activeDays.includes(dayIndex)
-        ? activeDays.filter((d) => d !== dayIndex)
-        : [...activeDays, dayIndex].sort(),
-    );
-  };
+  const memorizedCount = useMemo(
+    () => pages.filter((p) => p.status === 'memorized').length,
+    [pages],
+  );
 
-  const handleSliderChange = (v: number) => {
-    if (Math.floor(v) !== Math.floor(lastTickValue)) {
+  // Cycle length is derived from how many pages the user has memorized and how
+  // many they want to revise per day. No need to ask — they'd just be doing
+  // this math in their head.
+  const derivedCycleDays = useMemo(() => {
+    if (memorizedCount === 0 || dailyCapacity === 0) return 0;
+    return Math.ceil(memorizedCount / dailyCapacity);
+  }, [memorizedCount, dailyCapacity]);
+
+  const handleCapacityChange = (v: number) => {
+    const rounded = Math.round(v);
+    if (rounded !== lastCapacityTick) {
       Haptics.selectionAsync();
-      setLastTickValue(v);
+      setLastCapacityTick(rounded);
     }
-    setDailyCapacity(Math.round(v));
+    setDailyCapacity(rounded);
   };
 
   const handleStart = async () => {
     const user = createDefaultUser({
       name: firebaseUser?.displayName || undefined,
       dailyPageCapacity: dailyCapacity,
-      activeDays,
-      mode,
-      currentMemorizationJuz: currentJuz ?? null,
-      currentMemorizationPage: currentPage ?? null,
+      notificationsEnabled,
     });
-    await saveUser(user);
-    await scheduleDailyReminder(user.reminderTime, user.notificationsEnabled);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await completeOnboarding();
+    // saveUser, the daily reminder schedule, and the onboarding flag flip are
+    // independent — running them in parallel collapses three sequential
+    // round-trips into one so the navigation flip to Main is near-instant.
+    await Promise.all([
+      saveUser(user),
+      scheduleDailyReminder(user.reminderTime, user.notificationsEnabled),
+      completeOnboarding(),
+    ]);
   };
 
   const headlineText =
-    journeyStage === 'beginning'
-      ? 'Set your starting rhythm'
-      : journeyStage === 'complete'
-      ? 'Set your maintenance schedule'
-      : 'Set your rhythm';
-
-  const capacityHint =
-    dailyCapacity <= 10 ? 'Light' : dailyCapacity <= 20 ? '~1 juz' : dailyCapacity <= 40 ? '~2 juz' : 'Intensive';
-
-  const totalSteps = journeyStage === 'complete' ? 3 : 4;
-  const currentStep = journeyStage === 'complete' ? 2 : 3;
+    journeyStage === 'complete' ? 'Set your maintenance schedule' : 'Set your rhythm';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -103,93 +89,67 @@ export default function ScheduleScreen() {
           >
             <Ionicons name="chevron-back" size={24} color={theme.textSecondary} />
           </PressableScale>
-          <Stepper total={totalSteps} current={currentStep} />
+          <Stepper total={3} current={3} />
         </View>
 
         <View style={styles.headerSection}>
           <Text style={styles.headline}>{headlineText}</Text>
-          {journeyStage === 'beginning' && (
-            <Text style={styles.subtext}>Start with a manageable pace. You can always adjust later.</Text>
-          )}
+          <Text style={styles.subtext}>You can always adjust later.</Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pages per day</Text>
-          <View style={styles.capacityDisplay}>
-            <Text style={styles.capacityNumber}>{dailyCapacity}</Text>
-            <Text style={styles.capacityLabel}>pages · {capacityHint.toLowerCase()}</Text>
+          <View style={styles.bigNumberRow}>
+            <Text style={styles.bigNumber}>{dailyCapacity}</Text>
+            <Text style={styles.bigNumberLabel}>pages</Text>
           </View>
           <Slider
             style={styles.slider}
-            minimumValue={5}
+            minimumValue={1}
             maximumValue={60}
             step={1}
             value={dailyCapacity}
-            onValueChange={handleSliderChange}
+            onValueChange={handleCapacityChange}
             minimumTrackTintColor={theme.accent}
             maximumTrackTintColor={theme.border}
             thumbTintColor={theme.accent}
           />
           <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabel}>5</Text>
+            <Text style={styles.sliderLabel}>1</Text>
             <Text style={styles.sliderLabel}>60</Text>
           </View>
+          {derivedCycleDays > 0 && (
+            <Text style={styles.helperText}>
+              Full revision cycle: ~{derivedCycleDays} day{derivedCycleDays === 1 ? '' : 's'}
+            </Text>
+          )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Active days</Text>
-          <View style={styles.daysRow}>
-            {DAYS.map((day, index) => {
-              const isActive = activeDays.includes(index);
-              return (
-                <PressableScale
-                  key={index}
-                  onPress={() => toggleDay(index)}
-                  haptic="none"
-                  style={[styles.dayButton, isActive && styles.dayButtonActive]}
-                >
-                  <Text style={[styles.dayButtonText, isActive && styles.dayButtonTextActive]}>
-                    {day}
-                  </Text>
-                </PressableScale>
-              );
-            })}
+          <View style={styles.notificationRow}>
+            <View style={styles.notificationText}>
+              <Text style={styles.sectionTitle}>Daily reminders</Text>
+              <Text style={styles.helperText}>
+                Get a nudge each day so revision stays consistent.
+              </Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={(v) => {
+                Haptics.selectionAsync();
+                setNotificationsEnabled(v);
+              }}
+              trackColor={{ false: theme.border, true: theme.accent }}
+              thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+            />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Revision mode</Text>
-          <View style={styles.modeCards}>
-            {MODES.map((m) => {
-              const isSelected = mode === m.value;
-              return (
-                <PressableScale
-                  key={m.value}
-                  onPress={() => setMode(m.value)}
-                  haptic="selection"
-                  style={[styles.modeCard, isSelected && styles.modeCardSelected]}
-                >
-                  <View
-                    style={[
-                      styles.modeIcon,
-                      isSelected && { backgroundColor: theme.accent },
-                    ]}
-                  >
-                    <Ionicons
-                      name={m.icon}
-                      size={18}
-                      color={isSelected ? theme.textInverse : theme.accent}
-                    />
-                  </View>
-                  <View style={styles.modeText}>
-                    <Text style={styles.modeCardTitle}>{m.title}</Text>
-                    <Text style={styles.modeCardDescription}>{m.description}</Text>
-                  </View>
-                  {isSelected && <Ionicons name="checkmark-circle" size={20} color={theme.accent} />}
-                </PressableScale>
-              );
-            })}
-          </View>
+        <View style={styles.disclosureRow}>
+          <Ionicons name="time-outline" size={16} color={theme.textMuted} />
+          <Text style={styles.disclosureText}>
+            New sessions start each day at midnight in your local timezone.
+          </Text>
         </View>
 
         <View style={styles.bottomSection}>
@@ -202,7 +162,7 @@ export default function ScheduleScreen() {
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bg },
+    container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
     content: {
       paddingHorizontal: spacing.lg,
@@ -221,18 +181,18 @@ const makeStyles = (theme: ThemeColors) =>
     subtext: { ...typography.bodyMedium, color: theme.textSecondary },
     section: { marginBottom: spacing.xl },
     sectionTitle: { ...typography.label, color: theme.textMuted, marginBottom: spacing.md },
-    capacityDisplay: {
+    bigNumberRow: {
       flexDirection: 'row',
       alignItems: 'baseline',
       justifyContent: 'center',
       gap: spacing.xs,
       marginBottom: spacing.sm,
     },
-    capacityNumber: {
+    bigNumber: {
       ...typography.displayLarge,
       color: theme.accent,
     },
-    capacityLabel: { ...typography.bodyLarge, color: theme.textSecondary },
+    bigNumberLabel: { ...typography.bodyLarge, color: theme.textSecondary },
     slider: { width: '100%', height: 40 },
     sliderLabels: {
       flexDirection: 'row',
@@ -240,62 +200,29 @@ const makeStyles = (theme: ThemeColors) =>
       paddingHorizontal: spacing.xs,
     },
     sliderLabel: { ...typography.bodySmall, color: theme.textMuted },
-    daysRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: spacing.xs,
+    helperText: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      marginTop: spacing.xs,
+      textAlign: 'center',
     },
-    dayButton: {
-      flex: 1,
-      aspectRatio: 1,
-      backgroundColor: theme.bgAlt,
-      borderRadius: radius.full,
-      justifyContent: 'center',
-      alignItems: 'center',
-      maxHeight: 48,
-    },
-    dayButtonActive: {
-      backgroundColor: theme.accent,
-    },
-    dayButtonText: {
-      ...typography.titleSmall,
-      color: theme.textSecondary,
-    },
-    dayButtonTextActive: {
-      color: theme.textInverse,
-    },
-    modeCards: { gap: spacing.sm },
-    modeCard: {
+    notificationRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      backgroundColor: theme.bgAlt,
-      borderWidth: 1.5,
-      borderColor: 'transparent',
-      borderRadius: radius.md,
-      padding: spacing.md,
     },
-    modeCardSelected: {
-      backgroundColor: theme.accentSoft,
-      borderColor: theme.accent,
-    },
-    modeIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.full,
-      backgroundColor: theme.bg,
-      justifyContent: 'center',
+    notificationText: { flex: 1 },
+    disclosureRow: {
+      flexDirection: 'row',
       alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      marginBottom: spacing.lg,
     },
-    modeText: { flex: 1 },
-    modeCardTitle: {
-      ...typography.titleMedium,
-      color: theme.textPrimary,
-      marginBottom: 2,
-    },
-    modeCardDescription: {
+    disclosureText: {
       ...typography.bodySmall,
-      color: theme.textSecondary,
+      color: theme.textMuted,
+      flex: 1,
     },
     bottomSection: { width: '100%', marginTop: spacing.md },
     button: { width: '100%' },

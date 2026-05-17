@@ -41,7 +41,8 @@ export function EditSessionModal({
 }: EditSessionModalProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { pages } = useApp();
+  const { user, pages } = useApp();
+  const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const [revisedPages, setRevisedPages] = useState<Set<number>>(
     new Set(log.pagesRevised),
   );
@@ -160,7 +161,7 @@ export function EditSessionModal({
             quranData={quranData}
             onPageComplete={handlePageComplete}
             onPageUncomplete={handlePageUncomplete}
-            onRatePage={setSelectedPageForRating}
+            onRatePage={smartTrackingEnabled ? setSelectedPageForRating : undefined}
             initialPage={sessionPages[0]}
           />
         </View>
@@ -174,7 +175,7 @@ export function EditSessionModal({
           />
         </View>
 
-        {selectedPageForRating && (
+        {smartTrackingEnabled && selectedPageForRating && (
           <WeaknessModal
             pageNumber={selectedPageForRating}
             surahName={

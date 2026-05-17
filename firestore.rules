@@ -66,11 +66,6 @@ service cloud.firestore {
       return status in ['not_memorized', 'learning', 'memorized'];
     }
 
-    // Validate revision mode
-    function isValidRevisionMode(mode) {
-      return mode in ['weighted', 'sequential'];
-    }
-
     // Validate session state
     function isValidSessionState(state) {
       return state in ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'];
@@ -117,10 +112,12 @@ service cloud.firestore {
       return [
         'updatedAt', 'lastActiveAt',
         'displayName', 'photoURL', 'email',
-        'dailyPageCapacity', 'activeDays', 'dangerThresholdDays',
-        'dangerAlertEnabled', 'revisionMode', 'theme',
+        'dailyPageCapacity', 'activeDays',
+        'smartTrackingEnabled', 'hasSeenSmartTrackingPreview',
+        'theme',
         'notifications', 'notificationsEnabled', 'reminderTime',
         'currentMemorizationJuz', 'currentMemorizationPage', 'currentKhatamPage',
+        'customPlan',
         'onboardingComplete',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
@@ -168,11 +165,10 @@ service cloud.firestore {
                        hasField('dailyPageCapacity') &&
                        incomingData().dailyPageCapacity is int &&
                        isInRange(incomingData().dailyPageCapacity, 1, 100) &&
-                       hasField('dangerThresholdDays') &&
-                       incomingData().dangerThresholdDays is int &&
-                       isInRange(incomingData().dangerThresholdDays, 1, 60) &&
-                       hasField('revisionMode') &&
-                       isValidRevisionMode(incomingData().revisionMode) &&
+                       hasField('smartTrackingEnabled') &&
+                       incomingData().smartTrackingEnabled is bool &&
+                       hasField('hasSeenSmartTrackingPreview') &&
+                       incomingData().hasSeenSmartTrackingPreview is bool &&
                        hasField('theme') &&
                        isValidTheme(incomingData().theme) &&
                        // Validate stats are initialized correctly
@@ -195,11 +191,10 @@ service cloud.firestore {
                        (!hasField('dailyPageCapacity') ||
                         (incomingData().dailyPageCapacity is int &&
                          isInRange(incomingData().dailyPageCapacity, 1, 100))) &&
-                       (!hasField('dangerThresholdDays') ||
-                        (incomingData().dangerThresholdDays is int &&
-                         isInRange(incomingData().dangerThresholdDays, 1, 60))) &&
-                       (!hasField('revisionMode') ||
-                        isValidRevisionMode(incomingData().revisionMode)) &&
+                       (!hasField('smartTrackingEnabled') ||
+                        incomingData().smartTrackingEnabled is bool) &&
+                       (!hasField('hasSeenSmartTrackingPreview') ||
+                        incomingData().hasSeenSmartTrackingPreview is bool) &&
                        (!hasField('theme') ||
                         isValidTheme(incomingData().theme)) &&
                        // Streak cannot be negative
@@ -321,6 +316,23 @@ service cloud.firestore {
         // Users can delete their own sessions (for cleanup)
         allow delete: if isOwner(userId);
       }
+    }
+
+    // ========================================================================
+    // FEEDBACK COLLECTION
+    // ========================================================================
+    // Top-level write-only inbox. Authenticated users can submit feedback for
+    // themselves; nobody reads/updates/deletes from the client. Read from the
+    // Firebase console (or via the admin SDK in Cloud Functions).
+    match /feedback/{feedbackId} {
+      allow create: if isAuthenticated() &&
+                       hasField('uid') &&
+                       incomingData().uid == request.auth.uid &&
+                       hasField('message') &&
+                       incomingData().message is string &&
+                       incomingData().message.size() > 0 &&
+                       incomingData().message.size() <= 5000;
+      allow read, update, delete: if false;
     }
 
     // ========================================================================

@@ -1,31 +1,62 @@
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { AuthSessionResult } from 'expo-auth-session';
+import {
+  GoogleSignin,
+  statusCodes,
+  isErrorWithCode,
+} from '@react-native-google-signin/google-signin';
 import Constants from 'expo-constants';
 
-// Required for web browser redirect
-WebBrowser.maybeCompleteAuthSession();
-
-// Client IDs from environment variables
 const extra = Constants.expoConfig?.extra;
 
-export function useGoogleAuth() {
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: extra?.googleIosClientId,
+let configured = false;
+
+// Call once at app startup. Idempotent — safe to call again if the user signs
+// out and back in. Uses the Firebase Web client ID as `webClientId` (required
+// to get an ID token back that Firebase can verify); iOS client ID is read
+// from GoogleService-Info.plist via the config plugin, but we still pass it
+// explicitly as a belt-and-suspenders measure.
+export function configureGoogleSignIn() {
+  if (configured) return;
+  GoogleSignin.configure({
     webClientId: extra?.googleWebClientId,
+    iosClientId: extra?.googleIosClientId,
+    offlineAccess: false,
   });
-
-  return {
-    request,
-    response,
-    promptAsync,
-  };
+  configured = true;
 }
 
-export function getIdTokenFromResponse(response: AuthSessionResult | null): string | null {
-  if (response?.type === 'success') {
-    const { id_token } = response.params;
-    return id_token || null;
+export const isGoogleAuthAvailable = true;
+
+export type GoogleSignInResult = {
+  idToken: string;
+};
+
+/**
+ * Triggers the native Google Sign-In sheet and returns an ID token suitable
+ * for `GoogleAuthProvider.credential(idToken)`. Throws on any error other
+ * than user cancellation (which throws with `code === 'SIGN_IN_CANCELLED'`,
+ * callers should let that bubble or handle quietly).
+ */
+export async function signInWithGoogle(): Promise<GoogleSignInResult> {
+  configureGoogleSignIn();
+  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  const result = await GoogleSignin.signIn();
+  // SDK v16+ returns { type: 'success' | 'cancelled', data: {...} }.
+  // Older shape returned the user directly. Handle both defensively.
+  const idToken =
+    (result as { data?: { idToken?: string } })?.data?.idToken ??
+    (result as { idToken?: string })?.idToken;
+  if (!idToken) {
+    throw new Error('Google sign-in returned no ID token');
   }
-  return null;
+  return { idToken };
 }
+
+export async function signOutGoogle(): Promise<void> {
+  try {
+    await GoogleSignin.signOut();
+  } catch {
+    // Already signed out — ignore.
+  }
+}
+
+export { statusCodes, isErrorWithCode };

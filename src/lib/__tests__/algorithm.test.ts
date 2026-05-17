@@ -1,23 +1,27 @@
 import {
+  buildDefaultPlanDays,
   calculatePageUrgency,
+  countCompletedSessions,
   generateDailyAssignment,
-  updateDangerThreshold,
+  getMissedScheduledRevisions,
+  getPagesScheduledForDate,
+  INSIGHTS_MIN_SESSIONS,
 } from '../algorithm';
-import type { User, UserPage, QuranPage } from '../../types';
+import type { User, UserPage, QuranPage, RevisionLog, CustomPlan } from '../../types';
 
 const baseUser: User = {
   id: 'u1',
-  createdAt: '2026-01-01',
-  mode: 'weighted',
+  createdAt: '2026-01-01T00:00:00Z',
+  smartTrackingEnabled: false,
+  hasSeenSmartTrackingPreview: false,
   dailyPageCapacity: 5,
   activeDays: [0, 1, 2, 3, 4, 5, 6],
   reminderTime: '08:00',
   notificationsEnabled: true,
-  dangerAlertEnabled: true,
-  dangerThresholdDays: 10,
   currentMemorizationJuz: null,
   currentMemorizationPage: null,
   currentKhatamPage: 1,
+  customPlan: null,
   streak: 0,
   lastRevisionDate: null,
 };
@@ -35,54 +39,179 @@ function makePage(overrides: Partial<UserPage>): UserPage {
   };
 }
 
-describe('calculatePageUrgency', () => {
-  const today = new Date('2026-05-10T00:00:00Z');
+function makeLog(overrides: Partial<RevisionLog>): RevisionLog {
+  return {
+    id: `log-${Math.random()}`,
+    date: '2026-05-01',
+    pagesRevised: [],
+    pagesSkipped: [],
+    weaknessUpdates: [],
+    durationMinutes: 10,
+    ...overrides,
+  };
+}
+
+describe('getPagesScheduledForDate', () => {
+  // 10 memorized pages, 5 per day → 2-day cycle.
+  const memorized: UserPage[] = Array.from({ length: 10 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+  const user = { ...baseUser, dailyPageCapacity: 5 };
+
+  it('returns the first slice on day 0', () => {
+    const result = getPagesScheduledForDate(user, new Date('2026-01-01'), memorized);
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('advances to the next slice on day 1', () => {
+    const result = getPagesScheduledForDate(user, new Date('2026-01-02'), memorized);
+    expect(result).toEqual([6, 7, 8, 9, 10]);
+  });
+
+  it('wraps back to the start after one full cycle', () => {
+    const result = getPagesScheduledForDate(user, new Date('2026-01-03'), memorized);
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('returns empty when no pages are memorized', () => {
+    expect(getPagesScheduledForDate(user, new Date('2026-01-01'), [])).toEqual([]);
+  });
+
+  it('caps the slice size at the memorized count', () => {
+    const tiny = [makePage({ pageNumber: 1 }), makePage({ pageNumber: 2 })];
+    const result = getPagesScheduledForDate(user, new Date('2026-01-01'), tiny);
+    expect(result).toEqual([1, 2]);
+  });
+});
+
+describe('getMissedScheduledRevisions', () => {
+  const memorized: UserPage[] = Array.from({ length: 5 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+  // With dailyPageCapacity 5 and 5 memorized pages, every day all 5 pages
+  // are scheduled.
+  const user = { ...baseUser, dailyPageCapacity: 5, createdAt: '2026-01-01T00:00:00Z' };
+
+  it('returns 0 when the page was revised in every scheduled session', () => {
+    const page = makePage({ pageNumber: 1, lastRevisedDate: '2026-01-04' });
+    const sessions: RevisionLog[] = [
+      makeLog({ date: '2026-01-02', pagesRevised: [1] }),
+      makeLog({ date: '2026-01-03', pagesRevised: [1] }),
+      makeLog({ date: '2026-01-04', pagesRevised: [1] }),
+    ];
+    const today = new Date('2026-01-04T12:00:00Z');
+    expect(
+      getMissedScheduledRevisions(page, user, memorized, sessions, today),
+    ).toBe(0);
+  });
+
+  it('counts each scheduled-but-not-revised day after the last revision', () => {
+    const page = makePage({ pageNumber: 1, lastRevisedDate: '2026-01-01' });
+    const sessions: RevisionLog[] = [
+      makeLog({ date: '2026-01-01', pagesRevised: [1] }),
+    ];
+    // Today is Jan 4 → Jan 2, 3, 4 all scheduled and missed = 3 misses.
+    const today = new Date('2026-01-04T12:00:00Z');
+    expect(
+      getMissedScheduledRevisions(page, user, memorized, sessions, today),
+    ).toBe(3);
+  });
+
+  it('counts a submitted session that skipped the page as a miss', () => {
+    const page = makePage({ pageNumber: 1, lastRevisedDate: '2026-01-01' });
+    const sessions: RevisionLog[] = [
+      makeLog({ date: '2026-01-01', pagesRevised: [1] }),
+      makeLog({ date: '2026-01-02', pagesRevised: [2, 3], pagesSkipped: [1] }),
+    ];
+    const today = new Date('2026-01-02T12:00:00Z');
+    expect(
+      getMissedScheduledRevisions(page, user, memorized, sessions, today),
+    ).toBe(1);
+  });
 
   it('returns 0 for non-memorized pages', () => {
-    const page = makePage({ status: 'in_progress' });
-    expect(calculatePageUrgency(page, baseUser, today)).toBe(0);
+    const page = makePage({ pageNumber: 1, status: 'in_progress' });
+    expect(
+      getMissedScheduledRevisions(page, user, memorized, [], new Date('2026-01-04')),
+    ).toBe(0);
+  });
+});
+
+describe('calculatePageUrgency', () => {
+  const memorized: UserPage[] = Array.from({ length: 5 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+  const user = { ...baseUser, dailyPageCapacity: 5, createdAt: '2026-01-01T00:00:00Z' };
+  const today = new Date('2026-01-10T12:00:00Z');
+
+  it('returns 0 for non-memorized pages', () => {
+    const page = makePage({ pageNumber: 1, status: 'in_progress' });
+    expect(calculatePageUrgency(page, user, memorized, [], today)).toBe(0);
   });
 
-  it('returns 0 when lastRevisedDate is missing', () => {
-    const page = makePage({ lastRevisedDate: null });
-    expect(calculatePageUrgency(page, baseUser, today)).toBe(0);
+  it('grows with consistency debt (more missed = higher urgency)', () => {
+    const onTime = makePage({
+      pageNumber: 1,
+      lastRevisedDate: '2026-01-10',
+      dateMemorized: '2020-01-01',
+    });
+    const behind = makePage({
+      pageNumber: 1,
+      lastRevisedDate: '2026-01-05',
+      dateMemorized: '2020-01-01',
+    });
+    expect(
+      calculatePageUrgency(behind, user, memorized, [], today),
+    ).toBeGreaterThan(calculatePageUrgency(onTime, user, memorized, [], today));
   });
 
-  it('grows with days since last revision', () => {
-    const recent = makePage({ lastRevisedDate: '2026-05-08' });
-    const stale = makePage({ lastRevisedDate: '2026-04-20' });
-    expect(calculatePageUrgency(stale, baseUser, today)).toBeGreaterThan(
-      calculatePageUrgency(recent, baseUser, today),
+  it('weights weaker pages higher than strong pages with the same debt', () => {
+    const weak = makePage({
+      pageNumber: 1,
+      lastRevisedDate: '2026-01-05',
+      weaknessRating: 1,
+      dateMemorized: '2020-01-01',
+    });
+    const strong = makePage({
+      pageNumber: 1,
+      lastRevisedDate: '2026-01-05',
+      weaknessRating: 5,
+      dateMemorized: '2020-01-01',
+    });
+    expect(
+      calculatePageUrgency(weak, user, memorized, [], today),
+    ).toBeGreaterThan(
+      calculatePageUrgency(strong, user, memorized, [], today),
     );
   });
 
-  it('penalises pages with a high skip count', () => {
-    const fresh = makePage({ skipCount: 0 });
-    const skipped = makePage({ skipCount: 5 });
-    expect(calculatePageUrgency(skipped, baseUser, today)).toBeGreaterThan(
-      calculatePageUrgency(fresh, baseUser, today),
-    );
-  });
-
-  it('weights weaker pages higher than strong pages', () => {
-    const strong = makePage({ weaknessRating: 5 });
-    const weak = makePage({ weaknessRating: 1 });
-    expect(calculatePageUrgency(weak, baseUser, today)).toBeGreaterThan(
-      calculatePageUrgency(strong, baseUser, today),
-    );
-  });
-
-  it('boosts recently-memorized pages via the recency multiplier', () => {
-    const justMemorized = makePage({ dateMemorized: '2026-05-01' });
-    const longAgoMemorized = makePage({ dateMemorized: '2024-01-01' });
-    expect(calculatePageUrgency(justMemorized, baseUser, today)).toBeGreaterThan(
-      calculatePageUrgency(longAgoMemorized, baseUser, today),
+  it('boosts recently-memorized pages via the recency bonus', () => {
+    // Both pages on schedule (no missed revisions) but one is newly memorized.
+    const sessions: RevisionLog[] = Array.from({ length: 10 }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0');
+      return makeLog({ date: `2026-01-${day}`, pagesRevised: [1] });
+    });
+    const justMemorized = makePage({
+      pageNumber: 1,
+      lastRevisedDate: '2026-01-10',
+      dateMemorized: '2026-01-01',
+    });
+    const longAgo = makePage({
+      pageNumber: 1,
+      lastRevisedDate: '2026-01-10',
+      dateMemorized: '2020-01-01',
+    });
+    expect(
+      calculatePageUrgency(justMemorized, user, memorized, sessions, today),
+    ).toBeGreaterThan(
+      calculatePageUrgency(longAgo, user, memorized, sessions, today),
     );
   });
 });
 
 describe('generateDailyAssignment', () => {
-  const today = new Date('2026-05-10T00:00:00Z');
+  const today = new Date('2026-01-01T12:00:00Z');
+  const user = { ...baseUser, dailyPageCapacity: 2, createdAt: '2026-01-01T00:00:00Z' };
   const quranData: QuranPage[] = [
     { pageNumber: 1, juzNumber: 1, surahNumber: 1, surahName: 'Al-Fatihah', surahNameArabic: 'الفاتحة', startingAyah: 1 },
     { pageNumber: 2, juzNumber: 1, surahNumber: 2, surahName: 'Al-Baqarah', surahNameArabic: 'البقرة', startingAyah: 1 },
@@ -90,12 +219,11 @@ describe('generateDailyAssignment', () => {
     { pageNumber: 22, juzNumber: 2, surahNumber: 2, surahName: 'Al-Baqarah', surahNameArabic: 'البقرة', startingAyah: 142 },
   ];
 
-  it('returns at most dailyPageCapacity pages', () => {
-    const user = { ...baseUser, dailyPageCapacity: 2 };
+  it('returns exactly dailyPageCapacity pages from the schedule', () => {
     const pages = [
-      makePage({ pageNumber: 1, lastRevisedDate: '2026-04-01' }),
-      makePage({ pageNumber: 2, lastRevisedDate: '2026-04-15' }),
-      makePage({ pageNumber: 3, lastRevisedDate: '2026-05-01' }),
+      makePage({ pageNumber: 1 }),
+      makePage({ pageNumber: 2 }),
+      makePage({ pageNumber: 3 }),
     ];
     const result = generateDailyAssignment(pages, quranData, user, today);
     expect(result.totalPages).toBe(2);
@@ -107,55 +235,118 @@ describe('generateDailyAssignment', () => {
       makePage({ pageNumber: 1, status: 'in_progress' }),
       makePage({ pageNumber: 2, status: 'memorized' }),
     ];
-    const result = generateDailyAssignment(pages, quranData, baseUser, today);
+    const result = generateDailyAssignment(pages, quranData, user, today);
     expect(result.pages).toEqual([2]);
   });
 
   it('groups returned pages by juz in juzBreakdown', () => {
-    const pages = [
-      makePage({ pageNumber: 1 }),
-      makePage({ pageNumber: 22 }),
-    ];
-    const result = generateDailyAssignment(pages, quranData, baseUser, today);
+    const pages = [makePage({ pageNumber: 1 }), makePage({ pageNumber: 22 })];
+    const result = generateDailyAssignment(pages, quranData, user, today);
     const juzNumbers = result.juzBreakdown.map((j) => j.juz);
     expect(juzNumbers).toEqual([1, 2]);
   });
 
-  it('estimates duration at ~1.25 minutes per page', () => {
-    const pages = [
-      makePage({ pageNumber: 1 }),
-      makePage({ pageNumber: 2 }),
-      makePage({ pageNumber: 3 }),
-      makePage({ pageNumber: 22 }),
-    ];
-    const result = generateDailyAssignment(pages, quranData, baseUser, today);
-    expect(result.estimatedMinutes).toBe(Math.round(4 * 1.25));
-  });
-
   it('includes the date in YYYY-MM-DD format', () => {
-    const result = generateDailyAssignment([], quranData, baseUser, today);
-    expect(result.date).toBe('2026-05-10');
+    const result = generateDailyAssignment([], quranData, user, today);
+    expect(result.date).toBe('2026-01-01');
   });
 });
 
-describe('updateDangerThreshold', () => {
-  it('returns the current threshold when fewer than 10 data points', () => {
-    expect(updateDangerThreshold(baseUser, [3, 4, 5])).toBe(baseUser.dangerThresholdDays);
+describe('countCompletedSessions', () => {
+  it('counts only sessions with at least one page revised', () => {
+    const logs: RevisionLog[] = [
+      makeLog({ date: '2026-01-01', pagesRevised: [1] }),
+      makeLog({ date: '2026-01-02', pagesRevised: [] }),
+      makeLog({ date: '2026-01-03', pagesRevised: [2, 3] }),
+    ];
+    expect(countCompletedSessions(logs)).toBe(2);
   });
 
-  it('clamps to a minimum of 5 days', () => {
-    const samples = Array(20).fill(1);
-    expect(updateDangerThreshold(baseUser, samples)).toBe(5);
+  it('returns 0 for an empty array', () => {
+    expect(countCompletedSessions([])).toBe(0);
+  });
+});
+
+describe('INSIGHTS_MIN_SESSIONS', () => {
+  it('is set to 5 (the agreed populated-tab threshold)', () => {
+    expect(INSIGHTS_MIN_SESSIONS).toBe(5);
+  });
+});
+
+describe('buildDefaultPlanDays', () => {
+  const memorized: UserPage[] = Array.from({ length: 10 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+  const user = { ...baseUser, dailyPageCapacity: 4 };
+
+  it('slices forward into pagesPerDay-sized days', () => {
+    const days = buildDefaultPlanDays(user, memorized, 'forward');
+    expect(days).toEqual([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10]]);
   });
 
-  it('clamps to a maximum of 30 days', () => {
-    const samples = Array(20).fill(60);
-    expect(updateDangerThreshold(baseUser, samples)).toBe(30);
+  it('reverses the order when direction is reverse', () => {
+    const days = buildDefaultPlanDays(user, memorized, 'reverse');
+    expect(days).toEqual([[10, 9, 8, 7], [6, 5, 4, 3], [2, 1]]);
   });
 
-  it('uses the 25th percentile of the data', () => {
-    const samples = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-    const result = updateDangerThreshold(baseUser, samples);
-    expect(result).toBe(12);
+  it('returns an empty list when no pages are memorized', () => {
+    expect(buildDefaultPlanDays(user, [], 'forward')).toEqual([]);
+  });
+});
+
+describe('getPagesScheduledForDate with customPlan', () => {
+  const memorized: UserPage[] = Array.from({ length: 5 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+
+  it('uses the custom plan when present', () => {
+    const customPlan: CustomPlan = {
+      days: [[100], [200], []],
+      cycleStartDate: '2026-01-01',
+      direction: 'forward',
+    };
+    const user = { ...baseUser, customPlan };
+    expect(
+      getPagesScheduledForDate(user, new Date('2026-01-01'), memorized),
+    ).toEqual([100]);
+    expect(
+      getPagesScheduledForDate(user, new Date('2026-01-02'), memorized),
+    ).toEqual([200]);
+    // Off day
+    expect(
+      getPagesScheduledForDate(user, new Date('2026-01-03'), memorized),
+    ).toEqual([]);
+  });
+
+  it('loops the custom plan after one full cycle', () => {
+    const customPlan: CustomPlan = {
+      days: [[100], [200]],
+      cycleStartDate: '2026-01-01',
+      direction: 'forward',
+    };
+    const user = { ...baseUser, customPlan };
+    expect(
+      getPagesScheduledForDate(user, new Date('2026-01-03'), memorized),
+    ).toEqual([100]);
+    expect(
+      getPagesScheduledForDate(user, new Date('2026-01-04'), memorized),
+    ).toEqual([200]);
+  });
+
+  it('falls back to the default plan when customPlan is empty', () => {
+    const customPlan: CustomPlan = {
+      days: [],
+      cycleStartDate: '2026-01-01',
+      direction: 'forward',
+    };
+    const user = {
+      ...baseUser,
+      dailyPageCapacity: 5,
+      createdAt: '2026-01-01T00:00:00Z',
+      customPlan,
+    };
+    expect(
+      getPagesScheduledForDate(user, new Date('2026-01-01'), memorized),
+    ).toEqual([1, 2, 3, 4, 5]);
   });
 });

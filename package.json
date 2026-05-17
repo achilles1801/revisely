@@ -25,6 +25,7 @@
     "@react-native-community/slider": "5.0.1",
     "@react-native-firebase/app": "^24.0.0",
     "@react-native-firebase/app-check": "^24.0.0",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-navigation/bottom-tabs": "^7.9.0",
     "@react-navigation/native": "^7.1.26",
     "@react-navigation/native-stack": "^7.9.0",

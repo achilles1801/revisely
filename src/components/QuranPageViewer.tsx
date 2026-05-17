@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   ViewToken,
   Modal,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -34,10 +33,10 @@ interface QuranPageViewerProps {
   quranData: QuranPage[];
   onPageComplete: (pageNumber: number) => void;
   onPageUncomplete: (pageNumber: number) => void;
-  onRatePage: (pageNumber: number) => void;
+  /** When omitted, the per-page strength button is hidden (used when Smart Tracking is off). */
+  onRatePage?: (pageNumber: number) => void;
   initialPage?: number;
   onPageChange?: (pageNumber: number) => void;
-  compact?: boolean; // For edit mode
 }
 
 interface PageItemProps {
@@ -45,14 +44,14 @@ interface PageItemProps {
   quranData: QuranPage[];
   onComplete: () => void;
   onUncomplete: () => void;
-  onRate: () => void;
+  /** When omitted, the strength button is hidden. */
+  onRate?: () => void;
   onZoom: () => void;
   theme: any;
   isDark: boolean;
-  compact?: boolean;
 }
 
-const PageItem = React.memo(function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, theme, isDark, compact }: PageItemProps) {
+const PageItem = React.memo(function PageItem({ item, quranData, onComplete, onUncomplete, onRate, onZoom, theme, isDark }: PageItemProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -116,21 +115,25 @@ const PageItem = React.memo(function PageItem({ item, quranData, onComplete, onU
 
       {/* Compact action bar at bottom */}
       <View style={[styles.actionBar, { borderTopColor: theme.border }]}>
-        {/* Strength button */}
-        <TouchableOpacity
-          onPress={onRate}
-          style={styles.strengthButton}
-          accessibilityRole="button"
-          accessibilityLabel={`Strength ${getRatingLabel(item.weaknessRating)}, tap to rate`}
-        >
-          <Text style={[styles.strengthLabel, { color: theme.textMuted }]}>Strength</Text>
-          <Text style={[styles.strengthValue, { color: getWeaknessColor(item.weaknessRating) }]}>
-            {getRatingLabel(item.weaknessRating)}
-          </Text>
-        </TouchableOpacity>
+        {/* Strength button — only shown when Smart Tracking is enabled (onRate provided) */}
+        {onRate && (
+          <>
+            <TouchableOpacity
+              onPress={onRate}
+              style={styles.strengthButton}
+              accessibilityRole="button"
+              accessibilityLabel={`Strength ${getRatingLabel(item.weaknessRating)}, tap to rate`}
+            >
+              <Text style={[styles.strengthLabel, { color: theme.textMuted }]}>Strength</Text>
+              <Text style={[styles.strengthValue, { color: getWeaknessColor(item.weaknessRating) }]}>
+                {getRatingLabel(item.weaknessRating)}
+              </Text>
+            </TouchableOpacity>
 
-        {/* Divider */}
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            {/* Divider */}
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          </>
+        )}
 
         {/* Mark/Unmark button */}
         <TouchableOpacity
@@ -167,7 +170,6 @@ export function QuranPageViewer({
   onRatePage,
   initialPage,
   onPageChange,
-  compact = false,
 }: QuranPageViewerProps) {
   const { theme, isDark } = useTheme();
   const flatListRef = useRef<FlatList>(null);
@@ -218,13 +220,12 @@ export function QuranPageViewer({
       quranData={quranData}
       onComplete={() => onPageComplete(item.pageNumber)}
       onUncomplete={() => onPageUncomplete(item.pageNumber)}
-      onRate={() => onRatePage(item.pageNumber)}
+      onRate={onRatePage ? () => onRatePage(item.pageNumber) : undefined}
       onZoom={() => setIsZoomed(true)}
       theme={theme}
       isDark={isDark}
-      compact={compact}
     />
-  ), [quranData, onPageComplete, onPageUncomplete, onRatePage, theme, isDark, compact, pages]);
+  ), [quranData, onPageComplete, onPageUncomplete, onRatePage, theme, isDark, pages]);
 
   // Include rating and completion in key to force re-render when they change
   const keyExtractor = useCallback((item: PageData) =>

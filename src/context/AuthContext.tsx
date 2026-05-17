@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import {
-  auth,
   FirebaseUser,
   registerUser,
   loginUser,
@@ -11,8 +10,8 @@ import {
   signInWithAppleCredential,
 } from '../lib/firebase';
 import * as firestoreService from '../services/firestoreService';
+import { signOutGoogle } from '../lib/googleAuth';
 import { identifyUser } from '../lib/sentry';
-import { User, UserPage, RevisionLog } from '../types';
 import { logger } from '../lib/logger';
 
 interface AuthContextType {
@@ -199,6 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       await logoutUser();
+      // Clear the native Google session too so the next sign-in shows the
+      // account chooser instead of silently picking the previous account.
+      await signOutGoogle();
     } catch (err: any) {
       setError(getErrorMessage(err.code));
       throw err;

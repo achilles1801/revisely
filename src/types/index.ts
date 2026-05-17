@@ -1,36 +1,49 @@
 // Status of a page in user's memorization journey
 export type PageStatus = 'not_memorized' | 'in_progress' | 'memorized';
 
-// Revision modes
-export type RevisionMode = 'weighted' | 'sequential';
-
 // User profile and preferences
 export interface User {
   id: string;
   createdAt: string;
   name?: string;                    // User's display name
 
+  // Smart Tracking opt-in feature
+  smartTrackingEnabled: boolean;
+  hasSeenSmartTrackingPreview: boolean;
+
   // Preferences
-  mode: RevisionMode;
   dailyPageCapacity: number;        // e.g., 20 pages
-  activeDays: number[];             // 0=Sun, 1=Mon, etc.
+  activeDays: number[];             // 0=Sun, 1=Mon, etc. (legacy; Phase 6 derives this from the plan)
   reminderTime: string;             // "08:00"
   notificationsEnabled: boolean;
-  dangerAlertEnabled: boolean;
-  
-  // Learned parameters
-  dangerThresholdDays: number;      // starts at 10, learned over time
-  
+
   // Current progress
   currentMemorizationJuz: number | null;
   currentMemorizationPage: number | null;
-  
-  // For sequential mode
+
+  // Position in the user's khatam cycle
   currentKhatamPage: number;
-  
+
+  // Optional custom schedule (Phase 7 plan editor). When null, the default
+  // sequential resolver is used. When set, this plan overrides what's due
+  // on each calendar day, looping after one full cycle.
+  customPlan: CustomPlan | null;
+
   // Stats
   streak: number;
   lastRevisionDate: string | null;
+}
+
+/** A user-edited schedule that overrides the default sequential plan. */
+export interface CustomPlan {
+  /** One entry per day in the cycle. Each entry is the list of page numbers
+   *  scheduled for that day; an empty array means an off day. */
+  days: number[][];
+  /** The date (YYYY-MM-DD) that maps to `days[0]`. The plan loops from here. */
+  cycleStartDate: string;
+  /** Which direction the user generated the plan from — useful for re-rendering
+   *  the editor in the same orientation. */
+  direction: 'forward' | 'reverse';
 }
 
 // User's relationship with each Quran page
@@ -70,6 +83,5 @@ export interface DailyAssignment {
   pages: number[];
   juzBreakdown: { juz: number; pages: number[] }[];
   totalPages: number;
-  estimatedMinutes: number;
 }
 

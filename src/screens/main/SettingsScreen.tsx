@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
   Modal,
   Platform,
   Linking,
+  Share,
   TextInput,
+  Pressable,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useNavigation } from '@react-navigation/native';
@@ -18,7 +20,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { typography } from '../../theme/typography';
@@ -31,13 +32,25 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { scheduleDailyReminder } from '../../lib/notifications';
-import { RevisionMode } from '../../types';
+import * as firestoreService from '../../services/firestoreService';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 15, 30, 45];
+
+function formatActiveDays(days: number[]): string {
+  if (days.length === 0) return 'None';
+  if (days.length === 7) return 'Every day';
+  const sorted = [...days].sort();
+  const isWeekdays =
+    sorted.length === 5 && sorted.every((d, i) => d === i + 1);
+  if (isWeekdays) return 'Weekdays';
+  if (sorted.length === 2 && sorted[0] === 0 && sorted[1] === 6) return 'Weekends';
+  return sorted.map((d) => DAY_NAMES_SHORT[d]).join(', ');
+}
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -45,18 +58,20 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Reusable bits — kept inline since they're tightly coupled to settings rows.
 // ---------------------------------------------------------------------------
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title?: string; children: React.ReactNode }) {
   const { theme } = useTheme();
   return (
     <View style={{ marginBottom: spacing.lg }}>
-      <Text
-        style={[
-          typography.label,
-          { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
-        ]}
-      >
-        {title}
-      </Text>
+      {title && (
+        <Text
+          style={[
+            typography.label,
+            { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
+          ]}
+        >
+          {title}
+        </Text>
+      )}
       <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
         <GlassCard style={StyleSheet.absoluteFillObject} />
         {children}
@@ -135,7 +150,9 @@ function Row({
   );
 }
 
-function SegmentedControl<T extends string>({
+// Theme picker uses the legacy segmented control (LiquidGlassSegmentedControl
+// dropped Ionicon glyphs inside the glass surface — root cause unclear).
+function ThemeSegmentedControl<T extends string>({
   options,
   value,
   onChange,
@@ -146,7 +163,8 @@ function SegmentedControl<T extends string>({
 }) {
   const { theme } = useTheme();
   return (
-    <View style={[styles.segmented, { backgroundColor: theme.bg }]}>
+    <View style={styles.segmented}>
+      <GlassCard style={StyleSheet.absoluteFillObject} />
       {options.map((opt) => {
         const isSelected = opt.value === value;
         return (
@@ -174,7 +192,10 @@ function SegmentedControl<T extends string>({
             <Text
               style={[
                 typography.bodySmall,
-                { color: isSelected ? theme.textPrimary : theme.textSecondary, fontWeight: '600' },
+                {
+                  color: isSelected ? theme.textPrimary : theme.textSecondary,
+                  fontWeight: '600',
+                },
               ]}
             >
               {opt.label}
@@ -186,24 +207,39 @@ function SegmentedControl<T extends string>({
   );
 }
 
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, saveUser, pages, logs, savePages, loadData, resetOnboarding } = useApp();
+  const { user, saveUser, resetOnboarding } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
-  const { theme, themeMode, setThemeMode } = useTheme();
+  const { theme, themeMode, setThemeMode, isDark } = useTheme();
   const screenStyles = useMemo(() => makeStyles(theme), [theme]);
   const [localUser, setLocalUser] = useState(user);
+
+  // Keep `localUser` in sync with the context user so we never persist a
+  // stale snapshot back to Firestore. Without this, opening Settings,
+  // changing one field elsewhere (or via Firestore subscription), then
+  // saving from Settings would overwrite the freshly-changed field with
+  // the stale value captured at mount.
+  useEffect(() => {
+    if (user) setLocalUser(user);
+  }, [user]);
   const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showActiveDaysModal, setShowActiveDaysModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
   const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
   const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
+  const [tempActiveDays, setTempActiveDays] = useState<number[]>(user?.activeDays ?? []);
 
   if (!localUser) {
     return (
@@ -221,21 +257,39 @@ export default function SettingsScreen() {
     await saveUser(updated);
   };
 
-  const toggleDay = (dayIndex: number) => {
+  const openActiveDaysModal = () => {
+    setTempActiveDays(localUser.activeDays);
+    setShowActiveDaysModal(true);
+  };
+
+  const toggleTempDay = (dayIndex: number) => {
     Haptics.selectionAsync();
-    const next = localUser.activeDays.includes(dayIndex)
-      ? localUser.activeDays.filter((d) => d !== dayIndex)
-      : [...localUser.activeDays, dayIndex].sort();
-    updateUser({ activeDays: next });
+    setTempActiveDays((prev) =>
+      prev.includes(dayIndex)
+        ? prev.filter((d) => d !== dayIndex)
+        : [...prev, dayIndex].sort(),
+    );
+  };
+
+  const handleSaveActiveDays = async () => {
+    await updateUser({ activeDays: tempActiveDays });
+    setShowActiveDaysModal(false);
+  };
+
+  const handleShareApp = async () => {
+    try {
+      await Share.share({
+        message:
+          "I've been using Revisely to stay on top of my Quran memorization — give it a try: https://revisely.app",
+        url: 'https://revisely.app',
+      });
+    } catch {
+      // User dismissed the sheet or platform refused — nothing to do.
+    }
   };
 
   const handleNotificationToggle = async (enabled: boolean) => {
-    // Single switch governs both daily reminders AND overdue alerts — modern
-    // apps don't ask users to toggle each notification type separately.
-    await updateUser({
-      notificationsEnabled: enabled,
-      dangerAlertEnabled: enabled,
-    });
+    await updateUser({ notificationsEnabled: enabled });
     await scheduleDailyReminder(localUser.reminderTime, enabled);
   };
 
@@ -248,6 +302,29 @@ export default function SettingsScreen() {
     const trimmed = tempName.trim();
     await updateUser({ name: trimmed.length > 0 ? trimmed : undefined });
     setShowNameModal(false);
+  };
+
+  const handleSubmitFeedback = async () => {
+    const trimmed = feedbackText.trim();
+    if (!trimmed || feedbackSubmitting) return;
+    setFeedbackSubmitting(true);
+    try {
+      await firestoreService.submitFeedback({
+        message: trimmed,
+        appVersion: Constants.expoConfig?.version,
+        platform: Platform.OS,
+      });
+      setShowFeedbackModal(false);
+      setFeedbackText('');
+      Alert.alert('Thank you', 'Your feedback was sent. We appreciate it.');
+    } catch (err) {
+      Alert.alert(
+        'Couldn’t send feedback',
+        err instanceof Error ? err.message : 'Please try again later.',
+      );
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   };
 
   const handleSaveTime = async () => {
@@ -358,33 +435,108 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={screenStyles.content}>
         {firebaseUser && (
-          <View style={screenStyles.profileCard}>
-            <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
-              <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
-                {(firebaseUser.displayName ?? firebaseUser.email ?? '?')
-                  .trim()
-                  .charAt(0)
-                  .toUpperCase()}
-              </Text>
-            </View>
-            <View style={{ flex: 1, marginLeft: spacing.md }}>
-              {firebaseUser.displayName && (
+          <Section title="Account">
+            <View
+              style={[
+                screenStyles.profileRow,
+                { borderBottomColor: theme.border },
+              ]}
+            >
+              <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
+                <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
+                  {(localUser.name ?? firebaseUser.email ?? '?')
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                {localUser.name && (
+                  <Text
+                    style={[typography.titleMedium, { color: theme.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {localUser.name}
+                  </Text>
+                )}
                 <Text
-                  style={[typography.titleMedium, { color: theme.textPrimary }]}
+                  style={[typography.bodySmall, { color: theme.textSecondary }]}
                   numberOfLines={1}
                 >
-                  {firebaseUser.displayName}
+                  {firebaseUser.email}
                 </Text>
-              )}
-              <Text
-                style={[typography.bodySmall, { color: theme.textSecondary }]}
-                numberOfLines={1}
-              >
-                {firebaseUser.email}
-              </Text>
+              </View>
             </View>
-          </View>
+            <Row
+              icon="person-outline"
+              label="Display name"
+              value={localUser.name ?? 'Not set'}
+              onPress={() => {
+                setTempName(localUser.name ?? '');
+                setShowNameModal(true);
+              }}
+              isLast
+            />
+          </Section>
         )}
+
+        <Section title="Revision">
+          <View
+            style={[
+              styles.row,
+              {
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: spacing.xs,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: theme.border,
+              },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', gap: spacing.sm }}>
+              <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
+                <Ionicons name="sparkles-outline" size={16} color={theme.accent} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
+              </View>
+              <Switch
+                value={localUser.smartTrackingEnabled}
+                onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            </View>
+            <Text
+              style={[
+                typography.bodySmall,
+                { color: theme.textSecondary, marginLeft: 36, marginRight: spacing.md },
+              ]}
+            >
+              {localUser.smartTrackingEnabled
+                ? 'Rate pages during revision and unlock the Insights tab.'
+                : 'Turn on to rate pages and see personalized insights.'}
+            </Text>
+          </View>
+
+          <Row
+            icon="layers-outline"
+            label="Pages per day"
+            value={`${localUser.dailyPageCapacity} pages`}
+            onPress={() => {
+              setTempCapacity(localUser.dailyPageCapacity);
+              setShowCapacityModal(true);
+            }}
+          />
+
+          <Row
+            icon="calendar-outline"
+            label="Active days"
+            value={formatActiveDays(localUser.activeDays)}
+            onPress={openActiveDaysModal}
+            isLast
+          />
+        </Section>
 
         <Section title="Notifications">
           <Row
@@ -425,120 +577,30 @@ export default function SettingsScreen() {
             <View style={styles.rowText}>
               <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
             </View>
-            <SegmentedControl
+            <ThemeSegmentedControl
               value={themeMode}
               onChange={setThemeMode}
               options={[
                 { value: 'light', label: 'Light', icon: 'sunny-outline' },
                 { value: 'dark', label: 'Dark', icon: 'moon-outline' },
-                { value: 'system', label: 'Auto', icon: 'phone-portrait-outline' },
               ]}
             />
           </View>
         </Section>
 
-        <Section title="Revision">
-          <View
-            style={[
-              styles.row,
-              {
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: spacing.xs,
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: theme.border,
-              },
-            ]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
-              <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-                <Ionicons name="flash-outline" size={16} color={theme.accent} />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Mode</Text>
-              </View>
-              <SegmentedControl
-                value={localUser.mode}
-                onChange={(v: RevisionMode) => updateUser({ mode: v })}
-                options={[
-                  { value: 'weighted', label: 'Weighted' },
-                  { value: 'sequential', label: 'Sequential' },
-                ]}
-              />
-            </View>
-            <Text
-              style={[
-                typography.bodySmall,
-                { color: theme.textSecondary, marginLeft: 36, marginRight: spacing.md },
-              ]}
-            >
-              {localUser.mode === 'weighted'
-                ? 'Smartly picks the pages that need review most.'
-                : 'Pages reviewed in order from beginning to end.'}
-            </Text>
-          </View>
-
+        <Section title="Support">
           <Row
-            icon="layers-outline"
-            label="Pages per day"
-            value={`${localUser.dailyPageCapacity} pages`}
+            icon="share-outline"
+            label="Share Revisely"
+            onPress={handleShareApp}
+          />
+          <Row
+            icon="chatbubble-ellipses-outline"
+            label="Send feedback"
             onPress={() => {
-              setTempCapacity(localUser.dailyPageCapacity);
-              setShowCapacityModal(true);
+              setFeedbackText('');
+              setShowFeedbackModal(true);
             }}
-          />
-
-          <View style={[styles.row, { borderBottomWidth: 0 }]}>
-            <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-              <Ionicons name="calendar-outline" size={16} color={theme.accent} />
-            </View>
-            <View style={styles.rowText}>
-              <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Active days</Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              {DAYS.map((day, index) => {
-                const active = localUser.activeDays.includes(index);
-                return (
-                  <PressableScale
-                    key={index}
-                    onPress={() => toggleDay(index)}
-                    haptic="none"
-                    scale={0.92}
-                    style={[
-                      screenStyles.dayChip,
-                      { backgroundColor: active ? theme.accent : theme.bg },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        typography.bodySmall,
-                        {
-                          color: active ? theme.textInverse : theme.textSecondary,
-                          fontWeight: '600',
-                        },
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                  </PressableScale>
-                );
-              })}
-            </View>
-          </View>
-        </Section>
-
-        <Section title="About">
-          <Row
-            icon="document-text-outline"
-            label="Privacy Policy"
-            // GitHub Pages URL — swap to https://revisely.app/privacy/ once
-            // the custom domain is set up.
-            onPress={() => Linking.openURL('https://achilles1801.github.io/revisley/privacy/')}
-          />
-          <Row
-            icon="document-outline"
-            label="Terms of Service"
-            onPress={() => Linking.openURL('https://achilles1801.github.io/revisley/terms/')}
           />
           <Row
             icon="mail-outline"
@@ -550,17 +612,22 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <Section title="About">
+          <Row
+            icon="document-text-outline"
+            label="Privacy Policy"
+            onPress={() => Linking.openURL('https://revisely.app/privacy/')}
+          />
+          <Row
+            icon="document-outline"
+            label="Terms of Service"
+            onPress={() => Linking.openURL('https://revisely.app/terms/')}
+            isLast
+          />
+        </Section>
+
         {firebaseUser && (
-          <Section title="Account">
-            <Row
-              icon="person-outline"
-              label="Display name"
-              value={localUser.name ?? 'Not set'}
-              onPress={() => {
-                setTempName(localUser.name ?? '');
-                setShowNameModal(true);
-              }}
-            />
+          <Section>
             <Row
               icon="log-out-outline"
               label="Sign out"
@@ -583,27 +650,10 @@ export default function SettingsScreen() {
 
         {__DEV__ && (
           <Section title="Dev">
-            <Row icon="refresh-outline" label="Replay onboarding" onPress={handleReplayOnboarding} />
             <Row
-              icon="bug-outline"
-              label="Send test crash to Sentry"
-              onPress={() => {
-                throw new Error('Sentry test from Revisely Settings');
-              }}
-              isLast
-            />
-          </Section>
-        )}
-
-        {/* TODO: remove after verifying Sentry receives events from this device on the preview build. */}
-        {!__DEV__ && (
-          <Section title="Diagnostics">
-            <Row
-              icon="bug-outline"
-              label="Send test crash to Sentry"
-              onPress={() => {
-                throw new Error('Sentry test from Revisely Settings');
-              }}
+              icon="refresh-outline"
+              label="Replay onboarding"
+              onPress={handleReplayOnboarding}
               isLast
             />
           </Section>
@@ -745,6 +795,65 @@ export default function SettingsScreen() {
         </View>
       </BottomSheetModal>
 
+      {/* Active days sheet */}
+      <BottomSheetModal
+        visible={showActiveDaysModal}
+        onClose={() => setShowActiveDaysModal(false)}
+      >
+        <View style={screenStyles.sheetHeader}>
+          <PressableScale
+            onPress={() => setShowActiveDaysModal(false)}
+            haptic="light"
+            style={{ padding: spacing.xxs }}
+          >
+            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
+          </PressableScale>
+          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Active days</Text>
+          <PressableScale
+            onPress={handleSaveActiveDays}
+            haptic="medium"
+            style={{ padding: spacing.xxs }}
+          >
+            <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
+          </PressableScale>
+        </View>
+
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+          <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.md }]}>
+            Pick the days you want to review on.
+          </Text>
+          <View style={screenStyles.dayPickerRow}>
+            {DAYS.map((day, index) => {
+              const active = tempActiveDays.includes(index);
+              return (
+                <PressableScale
+                  key={index}
+                  onPress={() => toggleTempDay(index)}
+                  haptic="none"
+                  scale={0.92}
+                  style={[
+                    screenStyles.dayChipLarge,
+                    { backgroundColor: active ? theme.accent : theme.bgAlt },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      typography.bodyMedium,
+                      {
+                        color: active ? theme.textInverse : theme.textSecondary,
+                        fontWeight: '600',
+                      },
+                    ]}
+                  >
+                    {day}
+                  </Text>
+                </PressableScale>
+              );
+            })}
+          </View>
+        </View>
+      </BottomSheetModal>
+
       {/* Display name sheet */}
       <BottomSheetModal visible={showNameModal} onClose={() => setShowNameModal(false)}>
         <View style={screenStyles.sheetHeader}>
@@ -782,12 +891,81 @@ export default function SettingsScreen() {
               {
                 ...typography.bodyLarge,
                 color: theme.textPrimary,
-                backgroundColor: theme.bgAlt,
+                backgroundColor: isDark
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'rgba(0,0,0,0.06)',
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.sm,
                 borderRadius: radius.sm,
                 borderWidth: 1,
                 borderColor: theme.border,
+              },
+            ]}
+          />
+        </View>
+      </BottomSheetModal>
+
+      <BottomSheetModal
+        visible={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+      >
+        <View style={screenStyles.sheetHeader}>
+          <PressableScale
+            onPress={() => setShowFeedbackModal(false)}
+            haptic="light"
+            style={{ padding: spacing.xxs }}
+          >
+            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
+          </PressableScale>
+          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Send feedback</Text>
+          <PressableScale
+            onPress={handleSubmitFeedback}
+            haptic="medium"
+            style={{ padding: spacing.xxs }}
+            disabled={feedbackSubmitting || feedbackText.trim().length === 0}
+          >
+            <Text
+              style={[
+                typography.bodyMedium,
+                {
+                  color:
+                    feedbackSubmitting || feedbackText.trim().length === 0
+                      ? theme.textMuted
+                      : theme.accent,
+                  fontWeight: '700',
+                },
+              ]}
+            >
+              {feedbackSubmitting ? 'Sending…' : 'Submit'}
+            </Text>
+          </PressableScale>
+        </View>
+
+        <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
+          <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
+            Found a bug or have an idea? Tell us anything — we read every note.
+          </Text>
+          <TextInput
+            value={feedbackText}
+            onChangeText={setFeedbackText}
+            placeholder="What's on your mind?"
+            placeholderTextColor={theme.textMuted}
+            multiline
+            maxLength={2000}
+            textAlignVertical="top"
+            style={[
+              {
+                ...typography.bodyMedium,
+                color: theme.textPrimary,
+                backgroundColor: isDark
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'rgba(0,0,0,0.06)',
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: radius.sm,
+                borderWidth: 1,
+                borderColor: theme.border,
+                minHeight: 140,
               },
             ]}
           />
@@ -811,18 +989,13 @@ function BottomSheetModal({
   const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <PressableScale
-        haptic="none"
-        scale={1}
-        onPress={onClose}
-        style={sheetStyles.overlay}
-      >
-        <PressableScale haptic="none" scale={1} style={sheetStyles.sheet}>
+      <Pressable style={sheetStyles.overlay} onPress={onClose}>
+        <Pressable style={sheetStyles.sheet} onPress={() => {}}>
           <GlassCard style={StyleSheet.absoluteFillObject} />
           <View style={sheetStyles.dragHandle} />
           {children}
-        </PressableScale>
-      </PressableScale>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -855,6 +1028,7 @@ const styles = StyleSheet.create({
     padding: 3,
     borderRadius: radius.sm,
     gap: 2,
+    overflow: 'hidden',
   },
   segment: {
     flexDirection: 'row',
@@ -884,26 +1058,29 @@ const makeStyles = (theme: ThemeColors) =>
       paddingTop: spacing.sm,
       paddingBottom: spacing.xl,
     },
-    dayChip: {
-      width: 30,
-      height: 30,
+    dayChipLarge: {
+      width: 40,
+      height: 40,
       borderRadius: radius.full,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    profileCard: {
+    dayPickerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    profileRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.lg,
-      marginBottom: spacing.md,
-      backgroundColor: theme.bgAlt,
-      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
     },
     avatar: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -952,6 +1129,7 @@ const makeSheetStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
     sheet: {
+      backgroundColor: theme.surface,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
       paddingTop: spacing.sm,

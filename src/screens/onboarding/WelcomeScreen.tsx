@@ -86,7 +86,8 @@ const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.bg,
+      // Transparent so the app-wide gradient shows through.
+      backgroundColor: 'transparent',
     },
     content: {
       flex: 1,
@@ -101,7 +102,9 @@ const makeStyles = (theme: ThemeColors) =>
     },
     bismillah: {
       fontFamily: fonts.arabic,
-      color: theme.accent,
+      // Match the dashboard's salam color (textPrimary) so Arabic text is
+      // consistent across the app instead of being one-off accent-colored.
+      color: theme.textPrimary,
       fontSize: 24,
       letterSpacing: 0.5,
       textAlign: 'center',

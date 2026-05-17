@@ -6,11 +6,11 @@ import {
   FirestoreUser,
   FirestorePage,
   FirestoreSession,
-  DEFAULT_USER_SETTINGS,
   DEFAULT_WEAKNESS_RATING,
   WeaknessRating,
 } from '../types/firestore';
 import * as firestoreService from '../services/firestoreService';
+import { updateAuthDisplayName } from '../lib/firebase';
 import { generateId } from '../lib/utils';
 import { recomputePagesFromLogs } from '../lib/algorithm';
 import { logger } from '../lib/logger';
@@ -46,16 +46,16 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     id: fsUser.uid,
     createdAt: timestampToISOString(fsUser.createdAt),
     name: fsUser.displayName || undefined,
-    mode: fsUser.revisionMode || 'weighted',
+    smartTrackingEnabled: fsUser.smartTrackingEnabled ?? false,
+    hasSeenSmartTrackingPreview: fsUser.hasSeenSmartTrackingPreview ?? false,
     dailyPageCapacity: fsUser.dailyPageCapacity || 20,
     activeDays: (fsUser.activeDays || [0, 1, 2, 3, 4, 5, 6]) as number[],
     reminderTime: fsUser.notifications?.reminderTime || '08:00',
     notificationsEnabled: fsUser.notifications?.enabled ?? true,
-    dangerAlertEnabled: fsUser.notifications?.dangerAlertEnabled ?? true,
-    dangerThresholdDays: fsUser.dangerThresholdDays || 10,
     currentMemorizationJuz: fsUser.currentMemorizationJuz,
     currentMemorizationPage: fsUser.currentMemorizationPage,
     currentKhatamPage: fsUser.currentKhatamPage || 1,
+    customPlan: fsUser.customPlan ?? null,
     streak: fsUser.streak || 0,
     lastRevisionDate: fsUser.lastRevisionDate,
   };
@@ -84,27 +84,6 @@ function firestoreSessionToLog(fsSession: FirestoreSession): RevisionLog {
       rating: wu.newRating,
     })),
     durationMinutes: fsSession.durationMinutes,
-  };
-}
-
-function localUserToFirestore(user: User, uid: string): Partial<FirestoreUser> {
-  return {
-    uid,
-    displayName: user.name || null,
-    revisionMode: user.mode,
-    dailyPageCapacity: user.dailyPageCapacity,
-    activeDays: user.activeDays as (0 | 1 | 2 | 3 | 4 | 5 | 6)[],
-    dangerThresholdDays: user.dangerThresholdDays,
-    notifications: {
-      enabled: user.notificationsEnabled,
-      reminderTime: user.reminderTime,
-      dangerAlertEnabled: user.dangerAlertEnabled,
-    },
-    currentMemorizationJuz: user.currentMemorizationJuz,
-    currentMemorizationPage: user.currentMemorizationPage,
-    currentKhatamPage: user.currentKhatamPage,
-    streak: user.streak,
-    lastRevisionDate: user.lastRevisionDate,
   };
 }
 
@@ -337,22 +316,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const saveUser = useCallback(async (updatedUser: User) => {
     try {
       setError(null);
+      // Optimistically update local context state so other screens (e.g. the
+      // Dashboard greeting) see the change immediately — don't wait for the
+      // Firestore subscription to round-trip.
+      setUser(updatedUser);
       await firestoreService.updateUser({
         displayName: updatedUser.name || null,
-        revisionMode: updatedUser.mode,
+        smartTrackingEnabled: updatedUser.smartTrackingEnabled,
+        hasSeenSmartTrackingPreview: updatedUser.hasSeenSmartTrackingPreview,
         dailyPageCapacity: updatedUser.dailyPageCapacity,
         activeDays: updatedUser.activeDays as (0 | 1 | 2 | 3 | 4 | 5 | 6)[],
-        dangerThresholdDays: updatedUser.dangerThresholdDays,
         notifications: {
           enabled: updatedUser.notificationsEnabled,
           reminderTime: updatedUser.reminderTime,
-          dangerAlertEnabled: updatedUser.dangerAlertEnabled,
         },
         currentMemorizationJuz: updatedUser.currentMemorizationJuz,
         currentMemorizationPage: updatedUser.currentMemorizationPage,
         currentKhatamPage: updatedUser.currentKhatamPage,
+        customPlan: updatedUser.customPlan,
       });
-      // State will be updated by subscription
+      // Also sync the Firebase Auth profile so screens that fall back to
+      // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore
+      // round-trip is mid-flight) reflect the new name. Failures here are
+      // best-effort — the Firestore write is the source of truth.
+      try {
+        await updateAuthDisplayName(updatedUser.name ?? null);
+      } catch (authErr) {
+        logger.warn('Failed to sync Firebase Auth displayName', authErr);
+      }
     } catch (err) {
       logger.error('Error saving user:', err);
       setError(err instanceof Error ? err.message : 'Failed to save user');
@@ -364,16 +355,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       id: generateId(),
       createdAt: new Date().toISOString(),
-      mode: 'weighted',
+      smartTrackingEnabled: false,
+      hasSeenSmartTrackingPreview: false,
       dailyPageCapacity: 20,
       activeDays: [0, 1, 2, 3, 4, 5, 6],
       reminderTime: '08:00',
       notificationsEnabled: true,
-      dangerAlertEnabled: true,
-      dangerThresholdDays: 10,
       currentMemorizationJuz: null,
       currentMemorizationPage: null,
       currentKhatamPage: 1,
+      customPlan: null,
       streak: 0,
       lastRevisionDate: null,
       ...overrides,
@@ -395,7 +386,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const resetOnboarding = useCallback(async () => {
     try {
       setError(null);
-      await firestoreService.updateUser({ onboardingComplete: false });
+
+      const pageResets = pagesRef.current.map((p) => ({
+        pageNumber: p.pageNumber,
+        updates: {
+          status: 'not_memorized' as const,
+          dateMemorized: null,
+          lastRevisedAt: null,
+          weaknessRating: DEFAULT_WEAKNESS_RATING,
+          totalRevisionCount: 0,
+          skipCount: 0,
+        },
+      }));
+
+      // Session deletion needs the IDs first, so kick that chain off as a
+      // single promise we can race alongside the independent page/user resets.
+      // Sessions, pages, and user doc are independent writes — parallelizing
+      // collapses the round-trip cost from ~4 sequential to ~2.
+      const sessionWipe = (async () => {
+        const sessions = await firestoreService.getRecentSessions(100);
+        if (sessions.length === 0) return;
+        await Promise.all(
+          sessions.map((s) => firestoreService.deleteSession(s.id)),
+        );
+      })();
+
+      await Promise.all([
+        sessionWipe,
+        pageResets.length > 0
+          ? firestoreService.batchUpdatePages(pageResets)
+          : Promise.resolve(),
+        firestoreService.updateUser({
+          onboardingComplete: false,
+          totalMemorizedPages: 0,
+          streak: 0,
+          lastRevisionDate: null,
+        }),
+      ]);
+
+      // Mirror the reset locally so the UI doesn't flash stale state before
+      // subscriptions catch up.
+      setLogs([]);
+      setPages((prev) =>
+        prev.map((p) => ({
+          ...p,
+          status: 'not_memorized',
+          dateMemorized: null,
+          lastRevisedDate: null,
+          weaknessRating: DEFAULT_WEAKNESS_RATING,
+          totalRevisionCount: 0,
+          skipCount: 0,
+        })),
+      );
       setOnboardingComplete(false);
     } catch (err) {
       logger.error('Error resetting onboarding:', err);

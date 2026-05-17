@@ -10,20 +10,18 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { GlassCard } from '../../components/GlassCard';
+import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
 import { Button } from '../../components/Button';
 import { PressableScale } from '../../components/PressableScale';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -46,7 +44,7 @@ const COMPACT_SESSION_LIMIT = 3;
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { theme, isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const styles = useMemo(() => makeStyles(theme, isDark), [theme, isDark]);
 
   const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error } = useApp();
   const { firebaseUser } = useAuth();
@@ -97,6 +95,19 @@ export default function DashboardScreen() {
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
+
+  // Replace the tab bar with the selection action bar (Mail/Photos pattern).
+  // Targets the Home tab descriptor so the custom LiquidGlassTabBar hides itself.
+  useFocusEffect(
+    useCallback(() => {
+      navigation.getParent()?.setOptions({
+        tabBarStyle: selectionMode ? { display: 'none' } : undefined,
+      });
+      return () => {
+        navigation.getParent()?.setOptions({ tabBarStyle: undefined });
+      };
+    }, [selectionMode, navigation]),
+  );
 
   const calculatedStreak = useMemo(() => {
     if (logs.length === 0) return 0;
@@ -292,7 +303,7 @@ export default function DashboardScreen() {
         : 'Ready when you are',
       subtitle: `${assignment.totalPages} page${
         assignment.totalPages !== 1 ? 's' : ''
-      } · ~${assignment.estimatedMinutes} min`,
+      }`,
       ctaTitle: 'Start revision',
     };
   })();
@@ -312,12 +323,27 @@ export default function DashboardScreen() {
     <>
       <View style={styles.heroTopRow}>
         <Text style={styles.heroEyebrow}>{heroContent.eyebrow}</Text>
-        {calculatedStreak > 0 && (
-          <View style={styles.streakBadge}>
-            <Ionicons name="flame" size={14} color={theme.gold} />
-            <Text style={styles.streakBadgeText}>{calculatedStreak}</Text>
-          </View>
-        )}
+        <View style={styles.heroTopRight}>
+          {calculatedStreak > 0 && (
+            <View style={styles.streakBadge}>
+              <Ionicons name="flame" size={14} color={theme.gold} />
+              <Text style={styles.streakBadgeText}>{calculatedStreak}</Text>
+            </View>
+          )}
+          <PressableScale
+            onPress={() => navigation.navigate('PlanEdit')}
+            haptic="light"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Edit schedule"
+            style={styles.heroEditButton}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={theme.textSecondary}
+            />
+          </PressableScale>
+        </View>
       </View>
 
       <Text style={styles.heroTitle}>{heroContent.title}</Text>
@@ -346,10 +372,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.content,
-          selectionMode && styles.contentWithSelectionBar,
-        ]}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -363,7 +386,13 @@ export default function DashboardScreen() {
             <Text style={styles.date}>{formatDateReadable(today)}</Text>
             <View style={styles.greetingRow}>
               {userName ? (
-                <Text style={styles.greetingName}>{userName.split(' ')[0]}</Text>
+                <Text
+                  style={styles.greetingName}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {userName}
+                </Text>
               ) : null}
               <Text style={styles.greetingArabic}>السلام عليكم</Text>
             </View>
@@ -371,42 +400,25 @@ export default function DashboardScreen() {
           <PressableScale
             onPress={() => navigation.navigate('Settings')}
             haptic="light"
-            style={styles.settingsButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Open settings"
           >
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <Ionicons
-              name="settings-outline"
-              size={20}
-              color={theme.textPrimary}
-            />
+            <GlassCard style={styles.settingsButton}>
+              <Ionicons
+                name="settings-outline"
+                size={20}
+                color={theme.textPrimary}
+              />
+            </GlassCard>
           </PressableScale>
         </View>
 
-        {/* Hero — Liquid Glass on iOS 26+, frosted BlurView fallback elsewhere.
-            The gradient backdrop behind the SafeAreaView gives the glass
-            something to refract. */}
+        {/* Hero — clear liquid glass lets the gradient lens through.
+            elevated/specular sell the floating wet-glass surface. */}
         <View style={styles.heroCenter}>
-          <View style={styles.heroShadow}>
-            {isLiquidGlassAvailable() ? (
-              <GlassView
-                glassEffectStyle="regular"
-                colorScheme={isDark ? 'dark' : 'light'}
-                style={styles.heroSurface}
-              >
-                {renderHeroContent()}
-              </GlassView>
-            ) : (
-              <BlurView
-                intensity={50}
-                tint={isDark ? 'systemThinMaterialDark' : 'systemThinMaterialLight'}
-                style={styles.heroSurface}
-              >
-                {renderHeroContent()}
-              </BlurView>
-            )}
-          </View>
+          <GlassCard elevated specular style={styles.heroSurface}>
+            {renderHeroContent()}
+          </GlassCard>
         </View>
 
         {/* Sessions — hidden entirely when the user has no sessions yet. */}
@@ -419,20 +431,20 @@ export default function DashboardScreen() {
                   <PressableScale
                     onPress={() => setJuzPickerOpen(true)}
                     haptic="light"
-                    style={styles.filterChip}
                   >
-                    <GlassCard style={StyleSheet.absoluteFillObject} />
-                    <Ionicons
-                      name="filter-outline"
-                      size={12}
-                      color={theme.textSecondary}
-                    />
-                    <Text style={styles.filterChipText}>{filterLabel}</Text>
-                    <Ionicons
-                      name="chevron-down"
-                      size={12}
-                      color={theme.textMuted}
-                    />
+                    <GlassCard style={styles.filterChip}>
+                      <Ionicons
+                        name="filter-outline"
+                        size={12}
+                        color={theme.textSecondary}
+                      />
+                      <Text style={styles.filterChipText}>{filterLabel}</Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={12}
+                        color={theme.textMuted}
+                      />
+                    </GlassCard>
                   </PressableScale>
                 )}
                 <PressableScale
@@ -454,8 +466,7 @@ export default function DashboardScreen() {
                 No sessions match {filterLabel}
               </Text>
             ) : (
-              <View style={styles.sessionList}>
-                <GlassCard style={StyleSheet.absoluteFillObject} />
+              <GlassCard glassStyle='clear' elevated specular style={styles.sessionList}>
                 {visibleSessions.map((log, idx, arr) => (
                   <SessionRow
                     key={log.id}
@@ -468,7 +479,7 @@ export default function DashboardScreen() {
                     onLongPress={() => handleSessionLongPress(log)}
                   />
                 ))}
-              </View>
+              </GlassCard>
             )}
 
             {showSeeAllToggle && (
@@ -495,24 +506,43 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {selectionMode && (
-        <View style={styles.selectionBar}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <Text style={styles.selectionCount}>
-            {selectedSessionIds.size} selected
+        <LiquidGlassActionBar>
+          <Text style={[styles.selectionCount, { textAlign: 'left' }]}>
+            {selectedSessionIds.size === 0
+              ? 'Select sessions'
+              : `${selectedSessionIds.size} selected`}
           </Text>
           <PressableScale
             onPress={handleBulkDelete}
             haptic="medium"
             disabled={selectedSessionIds.size === 0}
             style={[
-              styles.bulkDeleteBtn,
-              selectedSessionIds.size === 0 && styles.bulkDeleteBtnDisabled,
+              styles.actionDestructive,
+              {
+                backgroundColor:
+                  selectedSessionIds.size === 0 ? 'transparent' : theme.error,
+                opacity: selectedSessionIds.size === 0 ? 0.5 : 1,
+              },
             ]}
           >
-            <Ionicons name="trash-outline" size={16} color="#fff" />
-            <Text style={styles.bulkDeleteText}>Delete</Text>
+            <Ionicons
+              name="trash-outline"
+              size={14}
+              color={selectedSessionIds.size === 0 ? theme.textMuted : '#fff'}
+            />
+            <Text
+              style={[
+                styles.actionDestructiveLabel,
+                {
+                  color:
+                    selectedSessionIds.size === 0 ? theme.textMuted : '#fff',
+                },
+              ]}
+            >
+              Delete
+            </Text>
           </PressableScale>
-        </View>
+        </LiquidGlassActionBar>
       )}
 
       {selectedLog && (
@@ -592,7 +622,8 @@ function SessionRow({
   });
   const year = logDate.getFullYear().toString();
 
-  const styles = useMemo(() => makeRowStyles(theme), [theme]);
+  const { isDark } = useTheme();
+  const styles = useMemo(() => makeRowStyles(theme, isDark), [theme, isDark]);
 
   return (
     <PressableScale
@@ -712,7 +743,7 @@ function JuzPickerSheet({
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
+const makeStyles = (theme: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
@@ -720,9 +751,8 @@ const makeStyles = (theme: ThemeColors) =>
       flexGrow: 1,
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
-      paddingBottom: spacing.lg,
-    },
-    contentWithSelectionBar: {
+      // Clearance for the floating tab bar (~76px pill+gap) so content
+      // scrolls behind it without being permanently hidden.
       paddingBottom: 96,
     },
     loadingContainer: {
@@ -770,11 +800,14 @@ const makeStyles = (theme: ThemeColors) =>
       color: theme.textPrimary,
       textAlign: 'left',
       writingDirection: 'ltr',
+      // Arabic salam stays at full size; the name (left) shrinks first.
+      flexShrink: 0,
     },
     greetingName: {
       ...typography.displaySmall,
       color: theme.textPrimary,
       textAlign: 'left',
+      flexShrink: 1,
     },
     settingsButton: {
       width: 36,
@@ -790,22 +823,28 @@ const makeStyles = (theme: ThemeColors) =>
       justifyContent: 'center',
       marginVertical: spacing.lg,
     },
-    heroShadow: {
-      borderRadius: radius.lg,
-      ...shadows.lg,
-    },
     heroSurface: {
       borderRadius: radius.lg,
       padding: spacing.xl,
-      overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
     },
     heroTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: spacing.md,
+    },
+    heroTopRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    heroEditButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme.bgAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     heroEyebrow: {
       ...typography.label,
@@ -867,54 +906,34 @@ const makeStyles = (theme: ThemeColors) =>
       gap: spacing.xs,
     },
     selectChip: {
-      paddingHorizontal: spacing.sm,
+      paddingHorizontal: spacing.xs,
       paddingVertical: 4,
-      borderRadius: radius.full,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
     },
     selectChipText: {
       ...typography.bodySmall,
-      fontSize: 11,
+      fontSize: 14,
       color: theme.accent,
       fontWeight: '600',
     },
-    selectionBar: {
-      position: 'absolute',
-      left: spacing.lg,
-      right: spacing.lg,
-      bottom: spacing.lg,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.full,
-      overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-      ...shadows.lg,
-    },
     selectionCount: {
       ...typography.bodyMedium,
+      fontSize: 14,
       color: theme.textPrimary,
       fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
     },
-    bulkDeleteBtn: {
+    actionDestructive: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       borderRadius: radius.full,
-      backgroundColor: theme.error,
     },
-    bulkDeleteBtnDisabled: {
-      opacity: 0.5,
-    },
-    bulkDeleteText: {
+    actionDestructiveLabel: {
       ...typography.bodySmall,
-      color: '#fff',
+      fontSize: 14,
       fontWeight: '700',
     },
     sessionsLabel: {
@@ -949,7 +968,7 @@ const makeStyles = (theme: ThemeColors) =>
       textAlign: 'center',
       paddingVertical: spacing.lg,
       paddingHorizontal: spacing.md,
-      backgroundColor: theme.bgAlt,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
       borderRadius: radius.md,
     },
     seeAllBtn: {
@@ -967,7 +986,7 @@ const makeStyles = (theme: ThemeColors) =>
     },
   });
 
-const makeRowStyles = (theme: ThemeColors) =>
+const makeRowStyles = (theme: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
     row: {
       flexDirection: 'row',
@@ -1009,8 +1028,8 @@ const makeRowStyles = (theme: ThemeColors) =>
       height: 22,
       borderRadius: radius.xs,
       borderWidth: 1.5,
-      borderColor: theme.border,
-      backgroundColor: theme.bg,
+      borderColor: 'transparent',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
       alignItems: 'center',
       justifyContent: 'center',
     },

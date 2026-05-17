@@ -18,7 +18,6 @@ import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
 import {
   getPagesForJuz,
-  getJuzRange,
   getJuzName,
   getSurahsInJuz,
   SurahInJuz,
@@ -30,7 +29,6 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'EditJuz'>;
 interface JuzCardProps {
   juzNumber: number;
   name: string;
-  pageRange: { start: number; end: number };
   memorizedCount: number;
   totalPages: number;
   isExpanded: boolean;
@@ -45,7 +43,6 @@ interface JuzCardProps {
 function JuzCard({
   juzNumber,
   name,
-  pageRange,
   memorizedCount,
   totalPages,
   isExpanded,
@@ -330,7 +327,6 @@ export default function EditJuzScreen() {
       >
         {Array.from({ length: 30 }, (_, i) => {
           const juzNumber = i + 1;
-          const range = getJuzRange(juzNumber);
           const stats = getJuzStats(juzNumber);
           const surahs = getSurahsInJuz(juzNumber);
 
@@ -339,7 +335,6 @@ export default function EditJuzScreen() {
               key={juzNumber}
               juzNumber={juzNumber}
               name={getJuzName(juzNumber)}
-              pageRange={range}
               memorizedCount={stats.memorizedCount}
               totalPages={stats.totalPages}
               isExpanded={expandedJuz === juzNumber}
