@@ -26,7 +26,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
-import { generateDailyAssignment } from '../../lib/algorithm';
+import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import {
   getQuranData,
   getJuzForPage,
@@ -73,7 +73,7 @@ export default function DashboardScreen() {
   }, [user, pages]);
 
   const todayStatus = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCurrentRevisionDay(user);
     const todayLogs = logs.filter((log) => log.date === today);
     if (todayLogs.length === 0)
       return { status: 'not_started' as const, pagesCompleted: 0 };
@@ -311,7 +311,7 @@ export default function DashboardScreen() {
   const handleCtaPress = () => {
     if (todayStatus.status === 'completed') {
       const todayLog = logs.find(
-        (log) => log.date === new Date().toISOString().split('T')[0],
+        (log) => log.date === getCurrentRevisionDay(user),
       );
       if (todayLog) handleEditSession(todayLog);
     } else {
@@ -335,13 +335,17 @@ export default function DashboardScreen() {
             haptic="light"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Edit schedule"
-            style={styles.heroEditButton}
           >
-            <Ionicons
-              name="calendar-outline"
-              size={16}
-              color={theme.textSecondary}
-            />
+            <GlassCard
+              style={styles.heroEditButton}
+              tintColor={theme.accent + '33'}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={theme.accent}
+              />
+            </GlassCard>
           </PressableScale>
         </View>
       </View>
@@ -466,7 +470,7 @@ export default function DashboardScreen() {
                 No sessions match {filterLabel}
               </Text>
             ) : (
-              <GlassCard glassStyle='clear' elevated specular style={styles.sessionList}>
+              <GlassCard elevated specular style={styles.sessionList}>
                 {visibleSessions.map((log, idx, arr) => (
                   <SessionRow
                     key={log.id}
@@ -842,7 +846,7 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: theme.bgAlt,
+      overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
     },

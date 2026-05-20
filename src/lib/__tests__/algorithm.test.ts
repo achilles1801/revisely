@@ -11,11 +11,10 @@ import type { User, UserPage, QuranPage, RevisionLog, CustomPlan } from '../../t
 
 const baseUser: User = {
   id: 'u1',
-  createdAt: '2026-01-01T00:00:00Z',
+  createdAt: '2026-01-01T12:00:00Z',
   smartTrackingEnabled: false,
   hasSeenSmartTrackingPreview: false,
   dailyPageCapacity: 5,
-  activeDays: [0, 1, 2, 3, 4, 5, 6],
   reminderTime: '08:00',
   notificationsEnabled: true,
   currentMemorizationJuz: null,
@@ -24,6 +23,11 @@ const baseUser: User = {
   customPlan: null,
   streak: 0,
   lastRevisionDate: null,
+  memorizedSurahs: [],
+  fajrBoundaryEnabled: false,
+  locationCoords: null,
+  fajrCalculationMethod: 'NorthAmerica',
+  scheduleAnchorDate: '2026-01-01T12:00:00Z',
 };
 
 function makePage(overrides: Partial<UserPage>): UserPage {
@@ -59,27 +63,27 @@ describe('getPagesScheduledForDate', () => {
   const user = { ...baseUser, dailyPageCapacity: 5 };
 
   it('returns the first slice on day 0', () => {
-    const result = getPagesScheduledForDate(user, new Date('2026-01-01'), memorized);
+    const result = getPagesScheduledForDate(user, new Date('2026-01-01T12:00:00Z'), memorized);
     expect(result).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('advances to the next slice on day 1', () => {
-    const result = getPagesScheduledForDate(user, new Date('2026-01-02'), memorized);
+    const result = getPagesScheduledForDate(user, new Date('2026-01-02T12:00:00Z'), memorized);
     expect(result).toEqual([6, 7, 8, 9, 10]);
   });
 
   it('wraps back to the start after one full cycle', () => {
-    const result = getPagesScheduledForDate(user, new Date('2026-01-03'), memorized);
+    const result = getPagesScheduledForDate(user, new Date('2026-01-03T12:00:00Z'), memorized);
     expect(result).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('returns empty when no pages are memorized', () => {
-    expect(getPagesScheduledForDate(user, new Date('2026-01-01'), [])).toEqual([]);
+    expect(getPagesScheduledForDate(user, new Date('2026-01-01T12:00:00Z'), [])).toEqual([]);
   });
 
   it('caps the slice size at the memorized count', () => {
     const tiny = [makePage({ pageNumber: 1 }), makePage({ pageNumber: 2 })];
-    const result = getPagesScheduledForDate(user, new Date('2026-01-01'), tiny);
+    const result = getPagesScheduledForDate(user, new Date('2026-01-01T12:00:00Z'), tiny);
     expect(result).toEqual([1, 2]);
   });
 });
@@ -90,7 +94,7 @@ describe('getMissedScheduledRevisions', () => {
   );
   // With dailyPageCapacity 5 and 5 memorized pages, every day all 5 pages
   // are scheduled.
-  const user = { ...baseUser, dailyPageCapacity: 5, createdAt: '2026-01-01T00:00:00Z' };
+  const user = { ...baseUser, dailyPageCapacity: 5, createdAt: '2026-01-01T12:00:00Z' };
 
   it('returns 0 when the page was revised in every scheduled session', () => {
     const page = makePage({ pageNumber: 1, lastRevisedDate: '2026-01-04' });
@@ -132,7 +136,7 @@ describe('getMissedScheduledRevisions', () => {
   it('returns 0 for non-memorized pages', () => {
     const page = makePage({ pageNumber: 1, status: 'in_progress' });
     expect(
-      getMissedScheduledRevisions(page, user, memorized, [], new Date('2026-01-04')),
+      getMissedScheduledRevisions(page, user, memorized, [], new Date('2026-01-04T12:00:00Z')),
     ).toBe(0);
   });
 });
@@ -141,7 +145,7 @@ describe('calculatePageUrgency', () => {
   const memorized: UserPage[] = Array.from({ length: 5 }, (_, i) =>
     makePage({ pageNumber: i + 1 }),
   );
-  const user = { ...baseUser, dailyPageCapacity: 5, createdAt: '2026-01-01T00:00:00Z' };
+  const user = { ...baseUser, dailyPageCapacity: 5, createdAt: '2026-01-01T12:00:00Z' };
   const today = new Date('2026-01-10T12:00:00Z');
 
   it('returns 0 for non-memorized pages', () => {
@@ -211,7 +215,7 @@ describe('calculatePageUrgency', () => {
 
 describe('generateDailyAssignment', () => {
   const today = new Date('2026-01-01T12:00:00Z');
-  const user = { ...baseUser, dailyPageCapacity: 2, createdAt: '2026-01-01T00:00:00Z' };
+  const user = { ...baseUser, dailyPageCapacity: 2, createdAt: '2026-01-01T12:00:00Z' };
   const quranData: QuranPage[] = [
     { pageNumber: 1, juzNumber: 1, surahNumber: 1, surahName: 'Al-Fatihah', surahNameArabic: 'الفاتحة', startingAyah: 1 },
     { pageNumber: 2, juzNumber: 1, surahNumber: 2, surahName: 'Al-Baqarah', surahNameArabic: 'البقرة', startingAyah: 1 },
@@ -277,20 +281,37 @@ describe('buildDefaultPlanDays', () => {
   const memorized: UserPage[] = Array.from({ length: 10 }, (_, i) =>
     makePage({ pageNumber: i + 1 }),
   );
-  const user = { ...baseUser, dailyPageCapacity: 4 };
+  const user = { ...baseUser, dailyPageCapacity: 4, createdAt: '2026-01-01T12:00:00Z' };
+  const createdToday = new Date('2026-01-01T12:00:00Z');
 
-  it('slices forward into pagesPerDay-sized days', () => {
-    const days = buildDefaultPlanDays(user, memorized, 'forward');
-    expect(days).toEqual([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10]]);
+  it('every day is exactly pagesPerDay pages, wrapping at the end', () => {
+    // 10 pages, 4/day → cycle length 3. Last day wraps tail-to-head so
+    // every day has the full 4 pages.
+    const days = buildDefaultPlanDays(user, memorized, 'forward', createdToday);
+    expect(days).toEqual([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 1, 2]]);
   });
 
   it('reverses the order when direction is reverse', () => {
-    const days = buildDefaultPlanDays(user, memorized, 'reverse');
-    expect(days).toEqual([[10, 9, 8, 7], [6, 5, 4, 3], [2, 1]]);
+    const days = buildDefaultPlanDays(user, memorized, 'reverse', createdToday);
+    expect(days).toEqual([[10, 9, 8, 7], [6, 5, 4, 3], [2, 1, 10, 9]]);
+  });
+
+  it('rotates so today is index 0', () => {
+    // Day 1 of usage — sliding window advances by perDay (4).
+    const today = new Date('2026-01-02T12:00:00Z');
+    const days = buildDefaultPlanDays(user, memorized, 'forward', today);
+    expect(days).toEqual([[5, 6, 7, 8], [9, 10, 1, 2], [3, 4, 5, 6]]);
+  });
+
+  it('matches the live scheduler for today (editor and revision session agree)', () => {
+    const today = new Date('2026-01-02T12:00:00Z');
+    const editorDays = buildDefaultPlanDays(user, memorized, 'forward', today);
+    const scheduledToday = getPagesScheduledForDate(user, today, memorized);
+    expect(editorDays[0]).toEqual(scheduledToday);
   });
 
   it('returns an empty list when no pages are memorized', () => {
-    expect(buildDefaultPlanDays(user, [], 'forward')).toEqual([]);
+    expect(buildDefaultPlanDays(user, [], 'forward', createdToday)).toEqual([]);
   });
 });
 
@@ -307,14 +328,14 @@ describe('getPagesScheduledForDate with customPlan', () => {
     };
     const user = { ...baseUser, customPlan };
     expect(
-      getPagesScheduledForDate(user, new Date('2026-01-01'), memorized),
+      getPagesScheduledForDate(user, new Date('2026-01-01T12:00:00Z'), memorized),
     ).toEqual([100]);
     expect(
-      getPagesScheduledForDate(user, new Date('2026-01-02'), memorized),
+      getPagesScheduledForDate(user, new Date('2026-01-02T12:00:00Z'), memorized),
     ).toEqual([200]);
     // Off day
     expect(
-      getPagesScheduledForDate(user, new Date('2026-01-03'), memorized),
+      getPagesScheduledForDate(user, new Date('2026-01-03T12:00:00Z'), memorized),
     ).toEqual([]);
   });
 
@@ -326,10 +347,10 @@ describe('getPagesScheduledForDate with customPlan', () => {
     };
     const user = { ...baseUser, customPlan };
     expect(
-      getPagesScheduledForDate(user, new Date('2026-01-03'), memorized),
+      getPagesScheduledForDate(user, new Date('2026-01-03T12:00:00Z'), memorized),
     ).toEqual([100]);
     expect(
-      getPagesScheduledForDate(user, new Date('2026-01-04'), memorized),
+      getPagesScheduledForDate(user, new Date('2026-01-04T12:00:00Z'), memorized),
     ).toEqual([200]);
   });
 
@@ -342,11 +363,11 @@ describe('getPagesScheduledForDate with customPlan', () => {
     const user = {
       ...baseUser,
       dailyPageCapacity: 5,
-      createdAt: '2026-01-01T00:00:00Z',
+      createdAt: '2026-01-01T12:00:00Z',
       customPlan,
     };
     expect(
-      getPagesScheduledForDate(user, new Date('2026-01-01'), memorized),
+      getPagesScheduledForDate(user, new Date('2026-01-01T12:00:00Z'), memorized),
     ).toEqual([1, 2, 3, 4, 5]);
   });
 });

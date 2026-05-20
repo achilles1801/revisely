@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { GlassCard } from './GlassCard';
 
 interface EmptyStateProps {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -20,9 +21,9 @@ export function EmptyState({ icon = 'sparkles-outline', title, message, action }
   const { theme } = useTheme();
   return (
     <View style={styles.container}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.bgAlt }]}>
+      <GlassCard style={styles.iconWrap}>
         <Ionicons name={icon} size={32} color={theme.textMuted} />
-      </View>
+      </GlassCard>
       <Text style={[typography.titleMedium, styles.title, { color: theme.textPrimary }]}>
         {title}
       </Text>

@@ -22,6 +22,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
+import { QuranFoundationCard } from '../../components/QuranFoundationCard';
+import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -36,21 +38,8 @@ import * as firestoreService from '../../services/firestoreService';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
-const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 15, 30, 45];
-
-function formatActiveDays(days: number[]): string {
-  if (days.length === 0) return 'None';
-  if (days.length === 7) return 'Every day';
-  const sorted = [...days].sort();
-  const isWeekdays =
-    sorted.length === 5 && sorted.every((d, i) => d === i + 1);
-  if (isWeekdays) return 'Weekdays';
-  if (sorted.length === 2 && sorted[0] === 0 && sorted[1] === 6) return 'Weekends';
-  return sorted.map((d) => DAY_NAMES_SHORT[d]).join(', ');
-}
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -232,14 +221,12 @@ export default function SettingsScreen() {
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [showActiveDaysModal, setShowActiveDaysModal] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
   const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
   const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
-  const [tempActiveDays, setTempActiveDays] = useState<number[]>(user?.activeDays ?? []);
 
   if (!localUser) {
     return (
@@ -255,25 +242,6 @@ export default function SettingsScreen() {
     const updated = { ...localUser, ...updates };
     setLocalUser(updated);
     await saveUser(updated);
-  };
-
-  const openActiveDaysModal = () => {
-    setTempActiveDays(localUser.activeDays);
-    setShowActiveDaysModal(true);
-  };
-
-  const toggleTempDay = (dayIndex: number) => {
-    Haptics.selectionAsync();
-    setTempActiveDays((prev) =>
-      prev.includes(dayIndex)
-        ? prev.filter((d) => d !== dayIndex)
-        : [...prev, dayIndex].sort(),
-    );
-  };
-
-  const handleSaveActiveDays = async () => {
-    await updateUser({ activeDays: tempActiveDays });
-    setShowActiveDaysModal(false);
   };
 
   const handleShareApp = async () => {
@@ -480,6 +448,14 @@ export default function SettingsScreen() {
           </Section>
         )}
 
+        <Section title="Quran.com">
+          <QuranFoundationCard />
+        </Section>
+
+        <Section title="Day boundary">
+          <FajrBoundaryCard />
+        </Section>
+
         <Section title="Revision">
           <View
             style={[
@@ -507,16 +483,16 @@ export default function SettingsScreen() {
                 thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             </View>
-            <Text
+            {/* <Text
               style={[
                 typography.bodySmall,
                 { color: theme.textSecondary, marginLeft: 36, marginRight: spacing.md },
               ]}
             >
               {localUser.smartTrackingEnabled
-                ? 'Rate pages during revision and unlock the Insights tab.'
+                ? ''
                 : 'Turn on to rate pages and see personalized insights.'}
-            </Text>
+            </Text> */}
           </View>
 
           <Row
@@ -527,13 +503,6 @@ export default function SettingsScreen() {
               setTempCapacity(localUser.dailyPageCapacity);
               setShowCapacityModal(true);
             }}
-          />
-
-          <Row
-            icon="calendar-outline"
-            label="Active days"
-            value={formatActiveDays(localUser.activeDays)}
-            onPress={openActiveDaysModal}
             isLast
           />
         </Section>
@@ -795,65 +764,6 @@ export default function SettingsScreen() {
         </View>
       </BottomSheetModal>
 
-      {/* Active days sheet */}
-      <BottomSheetModal
-        visible={showActiveDaysModal}
-        onClose={() => setShowActiveDaysModal(false)}
-      >
-        <View style={screenStyles.sheetHeader}>
-          <PressableScale
-            onPress={() => setShowActiveDaysModal(false)}
-            haptic="light"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-          </PressableScale>
-          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Active days</Text>
-          <PressableScale
-            onPress={handleSaveActiveDays}
-            haptic="medium"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
-          </PressableScale>
-        </View>
-
-        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
-          <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.md }]}>
-            Pick the days you want to review on.
-          </Text>
-          <View style={screenStyles.dayPickerRow}>
-            {DAYS.map((day, index) => {
-              const active = tempActiveDays.includes(index);
-              return (
-                <PressableScale
-                  key={index}
-                  onPress={() => toggleTempDay(index)}
-                  haptic="none"
-                  scale={0.92}
-                  style={[
-                    screenStyles.dayChipLarge,
-                    { backgroundColor: active ? theme.accent : theme.bgAlt },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      typography.bodyMedium,
-                      {
-                        color: active ? theme.textInverse : theme.textSecondary,
-                        fontWeight: '600',
-                      },
-                    ]}
-                  >
-                    {day}
-                  </Text>
-                </PressableScale>
-              );
-            })}
-          </View>
-        </View>
-      </BottomSheetModal>
-
       {/* Display name sheet */}
       <BottomSheetModal visible={showNameModal} onClose={() => setShowNameModal(false)}>
         <View style={screenStyles.sheetHeader}>
@@ -1058,18 +968,6 @@ const makeStyles = (theme: ThemeColors) =>
       paddingTop: spacing.sm,
       paddingBottom: spacing.xl,
     },
-    dayChipLarge: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.full,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    dayPickerRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
     profileRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1129,7 +1027,6 @@ const makeSheetStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
     sheet: {
-      backgroundColor: theme.surface,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
       paddingTop: spacing.sm,

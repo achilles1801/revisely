@@ -296,6 +296,7 @@ export default function PlanEditScreen() {
 
               return (
                 <View key={index} style={styles.dayCard}>
+                  <GlassCard style={StyleSheet.absoluteFillObject} />
                   <PressableScale
                     onPress={() => toggleExpand(index)}
                     haptic="light"
@@ -373,6 +374,7 @@ export default function PlanEditScreen() {
                             index === 0 && styles.actionButtonDisabled,
                           ]}
                         >
+                          <GlassCard style={StyleSheet.absoluteFillObject} />
                           <Ionicons
                             name="arrow-up"
                             size={16}
@@ -403,6 +405,7 @@ export default function PlanEditScreen() {
                               styles.actionButtonDisabled,
                           ]}
                         >
+                          <GlassCard style={StyleSheet.absoluteFillObject} />
                           <Ionicons
                             name="arrow-down"
                             size={16}
@@ -432,6 +435,10 @@ export default function PlanEditScreen() {
                             scale={0.98}
                             style={styles.actionButton}
                           >
+                            <GlassCard
+                              style={StyleSheet.absoluteFillObject}
+                              tintColor={theme.error + '1A'}
+                            />
                             <Ionicons
                               name="pause-outline"
                               size={16}
@@ -477,6 +484,7 @@ export default function PlanEditScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        <GlassCard style={StyleSheet.absoluteFillObject} />
         <Button
           title={isDirty ? 'Save schedule' : 'No changes'}
           onPress={handleSave}
@@ -508,7 +516,7 @@ const makeStyles = (theme: ThemeColors) =>
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 999,
+      borderRadius: radius.full,
     },
     headerCenter: { flex: 1, alignItems: 'center' },
     headerTitle: { ...typography.titleLarge, color: theme.textPrimary },
@@ -536,10 +544,7 @@ const makeStyles = (theme: ThemeColors) =>
 
     list: { gap: spacing.xs, marginBottom: spacing.md },
     dayCard: {
-      backgroundColor: theme.bgAlt,
       borderRadius: radius.md,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
       overflow: 'hidden',
     },
     dayRow: {
@@ -604,9 +609,7 @@ const makeStyles = (theme: ThemeColors) =>
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.sm,
       borderRadius: radius.sm,
-      backgroundColor: theme.bg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
+      overflow: 'hidden',
     },
     actionButtonDisabled: {
       opacity: 0.45,
@@ -681,9 +684,7 @@ const makeStyles = (theme: ThemeColors) =>
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.sm,
       paddingBottom: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
-      backgroundColor: theme.bg,
+      overflow: 'hidden',
     },
     saveButton: { width: '100%' },
   });

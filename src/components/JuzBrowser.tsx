@@ -8,6 +8,7 @@ import {
   UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme/colors';
@@ -18,6 +19,7 @@ import {
   getPagesForJuz,
   getJuzName,
   getSurahsInJuz,
+  getSurahsForPage,
 } from '../lib/quranData';
 import { UserPage } from '../types';
 
@@ -36,6 +38,13 @@ interface JuzBrowserProps {
   pages: UserPage[];
   pendingChanges: Map<number, PageStatus>;
   onChange: (next: Map<number, PageStatus>) => void;
+  /** Surah numbers the user has explicitly marked memorized (persisted state).
+   *  Defaults to empty — callers that don't track surah-level intent fall back
+   *  to the legacy "all pages memorized → surah checked" derivation. */
+  baseMemorizedSurahs?: number[];
+  /** Pending surah-level toggles. Same smart-clear pattern as page changes. */
+  pendingSurahChanges?: Map<number, PageStatus>;
+  onSurahChange?: (next: Map<number, PageStatus>) => void;
   /** Subset of juz to display. Defaults to all 30. */
   juzNumbers?: number[];
   /** When true, checkboxes are shown and rows are tappable to toggle. */
@@ -58,6 +67,9 @@ export function JuzBrowser({
   pages,
   pendingChanges,
   onChange,
+  baseMemorizedSurahs = [],
+  pendingSurahChanges,
+  onSurahChange,
   juzNumbers = ALL_JUZ_NUMBERS,
   editMode = true,
   emptyMessage = 'No juz to display',
@@ -67,6 +79,30 @@ export function JuzBrowser({
 
   const [expandedJuz, setExpandedJuz] = useState<number | null>(null);
   const [expandedSurah, setExpandedSurah] = useState<string | null>(null);
+
+  // Surah-level intent is tracked explicitly so that toggling one short surah
+  // doesn't flip its page-sharing neighbors (the Shams/Layl/Duha case).
+  // When the caller doesn't wire surah state through, fall back to deriving
+  // from page state.
+  const surahTrackingEnabled = !!pendingSurahChanges && !!onSurahChange;
+
+  const baseSurahSet = useMemo(
+    () => new Set(baseMemorizedSurahs),
+    [baseMemorizedSurahs],
+  );
+
+  // Effective surah set = base ∪ pending(memorized) − pending(not_memorized).
+  // Used for shared-page protection: a page stays memorized as long as some
+  // other surah in this set still claims it.
+  const effectiveSurahSet = useMemo(() => {
+    if (!surahTrackingEnabled) return new Set<number>();
+    const next = new Set(baseSurahSet);
+    pendingSurahChanges!.forEach((status, num) => {
+      if (status === 'memorized') next.add(num);
+      else next.delete(num);
+    });
+    return next;
+  }, [surahTrackingEnabled, baseSurahSet, pendingSurahChanges]);
 
   // O(1) base-status lookup. Effective status = pendingChanges override else this.
   const baseStatusByPage = useMemo(() => {
@@ -108,6 +144,63 @@ export function JuzBrowser({
       return n;
     },
     [getStatus],
+  );
+
+  const isSurahMemorized = useCallback(
+    (surahNumber: number, surahPagesInJuz: number[]): boolean => {
+      if (surahTrackingEnabled) {
+        const override = pendingSurahChanges!.get(surahNumber);
+        if (override !== undefined) return override === 'memorized';
+        return baseSurahSet.has(surahNumber);
+      }
+      // Fallback: legacy derivation from page state.
+      return countMemorized(surahPagesInJuz) === surahPagesInJuz.length;
+    },
+    [surahTrackingEnabled, pendingSurahChanges, baseSurahSet, countMemorized],
+  );
+
+  const setSurahPending = useCallback(
+    (surahNumber: number, target: PageStatus) => {
+      if (!surahTrackingEnabled) return;
+      const next = new Map(pendingSurahChanges!);
+      const baseTarget: PageStatus = baseSurahSet.has(surahNumber)
+        ? 'memorized'
+        : 'not_memorized';
+      if (baseTarget === target) next.delete(surahNumber);
+      else next.set(surahNumber, target);
+      onSurahChange!(next);
+    },
+    [surahTrackingEnabled, pendingSurahChanges, baseSurahSet, onSurahChange],
+  );
+
+  // Cascading toggle for a single surah. Updates both the surah set and the
+  // affected pages, with shared-page protection: a page stays memorized while
+  // any other still-memorized surah lives on it.
+  const toggleSurahAndPages = useCallback(
+    (surahNumber: number, surahPagesInJuz: number[], target: PageStatus) => {
+      if (surahTrackingEnabled) setSurahPending(surahNumber, target);
+
+      if (target === 'memorized') {
+        applyBulk(surahPagesInJuz, 'memorized');
+        return;
+      }
+
+      if (!surahTrackingEnabled) {
+        applyBulk(surahPagesInJuz, 'not_memorized');
+        return;
+      }
+
+      // Compute the surah set as it will be after this toggle, then keep
+      // pages that another set-member still claims.
+      const futureSet = new Set(effectiveSurahSet);
+      futureSet.delete(surahNumber);
+      const pagesToClear = surahPagesInJuz.filter((pn) => {
+        const surahsOnPage = getSurahsForPage(pn);
+        return !surahsOnPage.some((s) => futureSet.has(s.number));
+      });
+      if (pagesToClear.length > 0) applyBulk(pagesToClear, 'not_memorized');
+    },
+    [surahTrackingEnabled, setSurahPending, effectiveSurahSet, applyBulk],
   );
 
   const handleToggleJuz = (juz: number) => {
@@ -380,7 +473,11 @@ export function JuzBrowser({
                         )}
                       </View>
 
-                      {isSurahExpanded && (
+                      {isSurahExpanded && (() => {
+                        const hasSharedPage = surah.pagesInJuz.some(
+                          (p) => getSurahsForPage(p).length > 1,
+                        );
+                        return (
                         <View
                           style={[
                             styles.pagesList,
@@ -392,6 +489,16 @@ export function JuzBrowser({
                               ? 'Tap to toggle individual pages'
                               : 'Memorized pages shown in accent'}
                           </Text>
+                          {hasSharedPage && (
+                            <Text
+                              style={[
+                                styles.pagesHint,
+                                { color: theme.textSecondary, fontStyle: 'italic' },
+                              ]}
+                            >
+                              This surah shares a page with a neighbor — marking one will appear to mark the other.
+                            </Text>
+                          )}
                           <View style={styles.pagesGrid}>
                             {surah.pagesInJuz.map((pageNum) => {
                               const isPageMemorized =
@@ -440,7 +547,8 @@ export function JuzBrowser({
                             })}
                           </View>
                         </View>
-                      )}
+                        );
+                      })()}
                     </View>
                   );
                 })}
@@ -450,14 +558,9 @@ export function JuzBrowser({
                     <PressableScale
                       onPress={() => handleClearJuz(juzNumber)}
                       haptic="light"
-                      style={[
-                        styles.quickAction,
-                        {
-                          backgroundColor: theme.bg,
-                          borderColor: theme.border,
-                        },
-                      ]}
+                      style={styles.quickAction}
                     >
+                      <GlassCard style={StyleSheet.absoluteFillObject} />
                       <Text
                         style={[
                           styles.quickActionText,
@@ -471,11 +574,8 @@ export function JuzBrowser({
                       onPress={() => handleToggleJuz(juzNumber)}
                       haptic="medium"
                       style={[
-                        styles.quickAction,
-                        {
-                          backgroundColor: theme.accent,
-                          borderColor: theme.accent,
-                        },
+                        styles.quickActionPrimary,
+                        { backgroundColor: theme.accent },
                       ]}
                     >
                       <Text
@@ -496,6 +596,45 @@ export function JuzBrowser({
       })}
     </View>
   );
+}
+
+/**
+ * Builds a fresh pendingSurahChanges Map that brings the current
+ * `baseMemorizedSurahs` set into the target onboarding stage. For 'complete',
+ * every surah (1–114) is added; for 'in_progress' the set is cleared so the
+ * user can pick what they actually know.
+ */
+export function buildInitialPendingSurahsForJourney(
+  baseMemorizedSurahs: number[],
+  stage: 'in_progress' | 'complete',
+): Map<number, PageStatus> {
+  const m = new Map<number, PageStatus>();
+  const base = new Set(baseMemorizedSurahs);
+  if (stage === 'complete') {
+    for (let n = 1; n <= 114; n++) {
+      if (!base.has(n)) m.set(n, 'memorized');
+    }
+  } else {
+    for (const n of base) m.set(n, 'not_memorized');
+  }
+  return m;
+}
+
+/**
+ * Applies a pendingSurahChanges map to the current `baseMemorizedSurahs` set
+ * and returns the resulting (sorted) array. Caller persists this on the user.
+ */
+export function applyPendingSurahChanges(
+  baseMemorizedSurahs: number[],
+  pendingSurahChanges: Map<number, PageStatus>,
+): number[] {
+  if (pendingSurahChanges.size === 0) return baseMemorizedSurahs;
+  const next = new Set(baseMemorizedSurahs);
+  pendingSurahChanges.forEach((status, num) => {
+    if (status === 'memorized') next.add(num);
+    else next.delete(num);
+  });
+  return Array.from(next).sort((a, b) => a - b);
 }
 
 /**
@@ -703,7 +842,13 @@ const makeStyles = (theme: ThemeColors) =>
       flex: 1,
       paddingVertical: spacing.sm,
       borderRadius: radius.sm,
-      borderWidth: 1,
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    quickActionPrimary: {
+      flex: 1,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.sm,
       alignItems: 'center',
     },
     quickActionText: {

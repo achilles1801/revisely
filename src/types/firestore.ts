@@ -38,16 +38,12 @@ export type SessionState = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 /** Weakness rating scale: 1 = very weak, 5 = very strong */
 export type WeaknessRating = 1 | 2 | 3 | 4 | 5;
 
-/** Days of the week (0 = Sunday, 6 = Saturday) */
-export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
 /** Total number of pages in the Quran */
 export const TOTAL_QURAN_PAGES = 604;
 
 /** Default values for new users */
 export const DEFAULT_USER_SETTINGS = {
   dailyPageCapacity: 20,
-  activeDays: [0, 1, 2, 3, 4, 5, 6] as DayOfWeek[],
   smartTrackingEnabled: false,
   hasSeenSmartTrackingPreview: false,
   theme: 'system' as ThemePreference,
@@ -102,8 +98,6 @@ export interface FirestoreUser {
   // Revision Settings
   /** How many pages to revise per day */
   dailyPageCapacity: number;
-  /** Which days of the week the user revises (0=Sun, 6=Sat) — legacy; Phase 6 derives this from the plan */
-  activeDays: DayOfWeek[];
   /** Whether Smart Tracking (page ratings + Insights tab) is enabled */
   smartTrackingEnabled: boolean;
   /** Whether the user has finished (or dismissed) the Smart Tracking preview tour */
@@ -143,6 +137,22 @@ export interface FirestoreUser {
   // Onboarding
   /** Whether the user has completed onboarding */
   onboardingComplete: boolean;
+
+  /** Surah numbers the user explicitly marked memorized at the surah level.
+   *  Tracked separately from page-level status so checking one short surah
+   *  doesn't visually flip its neighbors that share the same physical page. */
+  memorizedSurahs?: number[];
+
+  /** When true, the "current day" for revision rolls over at fajr instead of
+   *  midnight. Requires `locationCoords` to be set. */
+  fajrBoundaryEnabled?: boolean;
+  /** User location for prayer-time calculation. */
+  locationCoords?: { latitude: number; longitude: number } | null;
+  /** adhan calculation method (e.g. "MuslimWorldLeague", "NorthAmerica", "Egyptian"). */
+  fajrCalculationMethod?: string;
+  /** ISO timestamp the user's current schedule cycle started. Reset when the
+   *  user finishes onboarding so Day 1 aligns to their latest setup. */
+  scheduleAnchorDate?: string;
 }
 
 /**
@@ -154,7 +164,6 @@ export interface CreateUserInput {
   email?: string | null;
   photoURL?: string | null;
   dailyPageCapacity?: number;
-  activeDays?: DayOfWeek[];
   smartTrackingEnabled?: boolean;
   hasSeenSmartTrackingPreview?: boolean;
   theme?: ThemePreference;
@@ -167,7 +176,6 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   displayName?: string | null;
   dailyPageCapacity?: number;
-  activeDays?: DayOfWeek[];
   smartTrackingEnabled?: boolean;
   hasSeenSmartTrackingPreview?: boolean;
   theme?: ThemePreference;
@@ -180,6 +188,11 @@ export interface UpdateUserInput {
   totalMemorizedPages?: number;
   streak?: number;
   lastRevisionDate?: string | null;
+  memorizedSurahs?: number[];
+  fajrBoundaryEnabled?: boolean;
+  locationCoords?: { latitude: number; longitude: number } | null;
+  fajrCalculationMethod?: string;
+  scheduleAnchorDate?: string;
 }
 
 // ============================================================================

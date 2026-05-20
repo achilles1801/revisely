@@ -7,13 +7,16 @@ import {
   Alert,
   SafeAreaView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme/colors';
 import { useApp } from '../context/AppContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
 import { Button } from './Button';
+import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { QuranPageViewer } from './QuranPageViewer';
 import { WeaknessModal } from './WeaknessRating';
@@ -39,9 +42,12 @@ export function EditSessionModal({
   onSave,
   onDelete,
 }: EditSessionModalProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages } = useApp();
+  const gradientColors: readonly [string, string, string] = isDark
+    ? ['#0F1410', '#1F4538', '#0F1410']
+    : ['#FBF8F3', '#C6DDD3', '#FBF8F3'];
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const [revisedPages, setRevisedPages] = useState<Set<number>>(
     new Set(log.pagesRevised),
@@ -124,15 +130,22 @@ export function EditSessionModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>
+        <LinearGradient
+          colors={gradientColors}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <View style={styles.header}>
           <PressableScale
             onPress={onClose}
             haptic="light"
-            style={styles.headerButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Close"
           >
-            <Ionicons name="close" size={24} color={theme.textPrimary} />
+            <GlassCard style={styles.headerButton}>
+              <Ionicons name="close" size={24} color={theme.textPrimary} />
+            </GlassCard>
           </PressableScale>
           <View style={styles.headerCenter}>
             <Text style={styles.title}>Edit session</Text>
@@ -141,15 +154,17 @@ export function EditSessionModal({
           <PressableScale
             onPress={handleDelete}
             haptic="light"
-            style={styles.headerButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Delete session"
           >
-            <Ionicons name="trash-outline" size={22} color={theme.error} />
+            <GlassCard style={styles.headerButton}>
+              <Ionicons name="trash-outline" size={22} color={theme.error} />
+            </GlassCard>
           </PressableScale>
         </View>
 
         <View style={styles.summaryBar}>
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <Text style={styles.summaryText}>
             {completedCount} of {totalCount} pages marked revised
           </Text>
@@ -167,6 +182,7 @@ export function EditSessionModal({
         </View>
 
         <View style={styles.footer}>
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <Button
             title="Save changes"
             onPress={handleSave}
@@ -217,7 +233,7 @@ export function EditSessionModal({
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bg },
+    container: { flex: 1, backgroundColor: 'transparent' },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -228,8 +244,8 @@ const makeStyles = (theme: ThemeColors) =>
     headerButton: {
       width: 40,
       height: 40,
-      borderRadius: 999,
-      backgroundColor: theme.bgAlt,
+      borderRadius: radius.full,
+      overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -243,9 +259,9 @@ const makeStyles = (theme: ThemeColors) =>
     summaryBar: {
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.md,
-      backgroundColor: theme.bgAlt,
       marginHorizontal: spacing.md,
-      borderRadius: 999,
+      borderRadius: radius.full,
+      overflow: 'hidden',
       alignSelf: 'center',
       marginTop: spacing.xs,
     },
@@ -259,8 +275,6 @@ const makeStyles = (theme: ThemeColors) =>
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.sm,
       paddingBottom: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
-      backgroundColor: theme.bg,
+      overflow: 'hidden',
     },
   });

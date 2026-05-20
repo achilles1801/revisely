@@ -76,10 +76,11 @@ export function BulkActionsModal({
             <PressableScale
               onPress={onClose}
               haptic="light"
-              style={styles.closeButton}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="close" size={20} color={theme.textPrimary} />
+              <GlassCard style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={theme.textPrimary} />
+              </GlassCard>
             </PressableScale>
           </View>
 
@@ -92,6 +93,7 @@ export function BulkActionsModal({
           </View>
 
           <View style={styles.tabs}>
+            <GlassCard style={StyleSheet.absoluteFillObject} />
             <PressableScale
               onPress={() => setActiveTab('juz')}
               haptic="selection"
@@ -202,7 +204,7 @@ const makeStyles = (theme: ThemeColors) =>
       width: 32,
       height: 32,
       borderRadius: radius.full,
-      backgroundColor: theme.bgAlt,
+      overflow: 'hidden',
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -214,10 +216,10 @@ const makeStyles = (theme: ThemeColors) =>
       flexDirection: 'row',
       marginHorizontal: spacing.lg,
       marginBottom: spacing.sm,
-      backgroundColor: theme.bgAlt,
       borderRadius: radius.sm,
       padding: 3,
       gap: 2,
+      overflow: 'hidden',
     },
     tab: {
       flex: 1,

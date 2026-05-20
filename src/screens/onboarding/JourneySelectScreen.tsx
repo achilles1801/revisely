@@ -173,7 +173,7 @@ const makeStyles = (theme: ThemeColors) =>
       width: 40,
       height: 40,
       borderRadius: radius.full,
-      backgroundColor: theme.bg,
+      backgroundColor: 'transparent',
       justifyContent: 'center',
       alignItems: 'center',
     },

@@ -224,6 +224,22 @@ export function getSurahForPage(pageNumber: number): SurahInfo {
   return SURAHS[SURAHS.length - 1];
 }
 
+export interface SurahOnPage {
+  number: number;
+  name: string;
+  nameArabic: string;
+}
+
+// Multiple short surahs can share a single page (e.g., Shams/Layl/Duha on
+// page 595). Callers that need to reason about every surah on a page —
+// shared-page protection, viewer chips — should use this instead of the
+// single-surah helper.
+export function getSurahsForPage(pageNumber: number): SurahOnPage[] {
+  return SURAHS
+    .filter((s) => pageNumber >= s.startPage && pageNumber <= s.endPage)
+    .map((s) => ({ number: s.number, name: s.name, nameArabic: s.nameArabic }));
+}
+
 export function getSurahNameForPage(pageNumber: number): string {
   return getSurahForPage(pageNumber).name;
 }

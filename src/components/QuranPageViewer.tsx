@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { radius } from '../theme/radius';
 import { getQuranPageImageUrl } from '../lib/quranImages';
 import { getRatingLabel } from '../lib/ratings';
+import { getSurahsForPage } from '../lib/quranData';
 import { QuranPage } from '../types';
+import { GlassCard } from './GlassCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_WIDTH = SCREEN_WIDTH;
@@ -64,15 +67,38 @@ const PageItem = React.memo(function PageItem({ item, quranData, onComplete, onU
     return theme.success;
   };
 
+  // Honest about what's on the page: short surahs (e.g. Shams/Layl/Duha on
+  // page 595) all show here so the user can revise what they know and skip
+  // past what they don't, exactly like a paper mushaf.
+  const surahsOnPage = getSurahsForPage(item.pageNumber);
+
   return (
     <View style={[styles.pageContainer, { backgroundColor: theme.bg }]}>
-      {/* Minimal header - just surah name */}
       <View style={styles.pageHeader}>
-        <Text style={[styles.surahArabic, { color: theme.textPrimary }]}>
-          {quranPage?.surahNameArabic || ''}
-        </Text>
+        {surahsOnPage.length > 1 ? (
+          <View style={styles.surahChipRow}>
+            {surahsOnPage.map((s, i) => (
+              <View key={s.number} style={styles.surahChipGroup}>
+                <Text style={[styles.surahArabicChip, { color: theme.textPrimary }]}>
+                  {s.nameArabic}
+                </Text>
+                {i < surahsOnPage.length - 1 && (
+                  <Text style={[styles.surahChipSeparator, { color: theme.textMuted }]}>
+                    ·
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={[styles.surahArabic, { color: theme.textPrimary }]}>
+            {quranPage?.surahNameArabic || ''}
+          </Text>
+        )}
         <Text style={[styles.surahEnglish, { color: theme.textMuted }]}>
-          {quranPage?.surahName || ''} · {item.pageNumber}
+          {surahsOnPage.length > 1
+            ? `${surahsOnPage.map((s) => s.name).join(' · ')} · ${item.pageNumber}`
+            : `${quranPage?.surahName || ''} · ${item.pageNumber}`}
         </Text>
       </View>
 
@@ -175,13 +201,7 @@ export function QuranPageViewer({
   const flatListRef = useRef<FlatList>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
-
-  // Calculate unrevised pages for quick navigation
-  const unrevisedPages = useMemo(() => {
-    return pages
-      .map((p, idx) => ({ ...p, index: idx }))
-      .filter(p => !p.isCompleted);
-  }, [pages]);
+  const [jumpSheetOpen, setJumpSheetOpen] = useState(false);
 
   // For RTL Quran reading: page 1 should be rightmost, swipe LEFT to go to page 2
   // We achieve this by NOT reversing the array, but using inverted={true} on FlatList
@@ -237,25 +257,12 @@ export function QuranPageViewer({
     }
   };
 
-  // Jump to next unrevised page
-  const goToNextUnrevised = useCallback(() => {
-    // Find the next unrevised page after current index
-    const nextUnrevised = unrevisedPages.find(p => p.index > currentIndex);
-    if (nextUnrevised) {
-      goToIndex(nextUnrevised.index);
-    } else if (unrevisedPages.length > 0) {
-      // Wrap around to first unrevised
-      goToIndex(unrevisedPages[0].index);
-    }
-  }, [unrevisedPages, currentIndex]);
-
   // With inverted list: "next" means higher index (appears on left), "prev" means lower index (appears on right)
   const goToNext = () => goToIndex(currentIndex + 1);
   const goToPrev = () => goToIndex(currentIndex - 1);
 
   const canGoNext = currentIndex < pages.length - 1;
   const canGoPrev = currentIndex > 0;
-  const hasUnrevised = unrevisedPages.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -282,7 +289,7 @@ export function QuranPageViewer({
       />
 
       {/* Navigation bar with quick jump to unrevised */}
-      <View style={[styles.navBar, { backgroundColor: theme.bg }]}>
+      <View style={styles.navBar}>
         <TouchableOpacity
           onPress={goToNext}
           disabled={!canGoNext}
@@ -295,24 +302,22 @@ export function QuranPageViewer({
           />
         </TouchableOpacity>
 
-        <View style={styles.navCenter}>
+        <TouchableOpacity
+          style={styles.navCenter}
+          onPress={() => setJumpSheetOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Jump to page"
+        >
           <Text style={[styles.pageIndicator, { color: theme.textSecondary }]}>
             {currentIndex + 1} / {pages.length}
           </Text>
-
-          {/* Quick jump to unrevised button */}
-          {hasUnrevised && (
-            <TouchableOpacity
-              onPress={goToNextUnrevised}
-              style={[styles.skipToUnrevisedButton, { backgroundColor: theme.warningBg, borderColor: theme.warning }]}
-            >
-              <Text style={[styles.skipToUnrevisedText, { color: theme.warning }]}>
-                {unrevisedPages.length} left
-              </Text>
-              <Ionicons name="arrow-forward" size={12} color={theme.warning} />
-            </TouchableOpacity>
-          )}
-        </View>
+          <Ionicons
+            name="chevron-down"
+            size={14}
+            color={theme.textMuted}
+            style={{ marginLeft: 4 }}
+          />
+        </TouchableOpacity>
 
         <TouchableOpacity
           onPress={goToPrev}
@@ -342,14 +347,9 @@ export function QuranPageViewer({
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => {}} // Prevent closing when tapping on popup
-            style={[
-              styles.zoomPopup,
-              {
-                backgroundColor: theme.bg,
-                borderColor: theme.border,
-              }
-            ]}
+            style={styles.zoomPopup}
           >
+            <GlassCard style={StyleSheet.absoluteFillObject} />
             {/* Header */}
             <View style={[styles.zoomHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.zoomPageNumber, { color: theme.textPrimary }]}>
@@ -411,6 +411,95 @@ export function QuranPageViewer({
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Quick-jump sheet — tap a row to scroll the viewer to that page. */}
+      <Modal
+        visible={jumpSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setJumpSheetOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.jumpOverlay}
+          activeOpacity={1}
+          onPress={() => setJumpSheetOpen(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.jumpSheet}
+          >
+            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <View style={[styles.jumpDragHandle, { backgroundColor: theme.border }]} />
+            <Text style={[styles.jumpTitle, { color: theme.textPrimary }]}>
+              Jump to page
+            </Text>
+            <FlatList
+              data={pages}
+              keyExtractor={(p) => `jump-${p.pageNumber}`}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item, index }) => {
+                const quranPage = quranData.find(
+                  (q) => q.pageNumber === item.pageNumber,
+                );
+                const isCurrent = index === currentIndex;
+                return (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setJumpSheetOpen(false);
+                      goToIndex(index);
+                    }}
+                    style={[
+                      styles.jumpRow,
+                      { borderBottomColor: theme.border },
+                      isCurrent && { backgroundColor: theme.accent + '14' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.jumpIndexBubble,
+                        {
+                          backgroundColor: item.isCompleted
+                            ? theme.success + '22'
+                            : 'transparent',
+                        },
+                      ]}
+                    >
+                      {item.isCompleted ? (
+                        <Ionicons name="checkmark" size={14} color={theme.success} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.jumpIndexText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          {index + 1}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.jumpPageLabel, { color: theme.textPrimary }]}>
+                        Page {item.pageNumber}
+                      </Text>
+                      {quranPage && (
+                        <Text style={[styles.jumpSurahLabel, { color: theme.textMuted }]}>
+                          {quranPage.surahName} · Juz {quranPage.juzNumber}
+                        </Text>
+                      )}
+                    </View>
+                    {isCurrent && (
+                      <Text style={[styles.jumpCurrentTag, { color: theme.accent }]}>
+                        Current
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -430,6 +519,25 @@ const styles = StyleSheet.create({
   surahArabic: {
     fontSize: 20,
     fontFamily: 'System',
+  },
+  surahChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  surahChipGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  surahArabicChip: {
+    fontSize: 18,
+    fontFamily: 'System',
+    paddingHorizontal: 4,
+  },
+  surahChipSeparator: {
+    fontSize: 14,
+    paddingHorizontal: 2,
   },
   surahEnglish: {
     ...typography.bodySmall,
@@ -488,7 +596,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.sm,
-    borderRadius: 4,
+    borderRadius: radius.xs,
   },
   markButtonText: {
     ...typography.bodySmall,
@@ -503,7 +611,9 @@ const styles = StyleSheet.create({
   },
   navCenter: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
   },
   navButton: {
@@ -517,18 +627,63 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  skipToUnrevisedButton: {
+  jumpOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  jumpSheet: {
+    maxHeight: '70%',
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    overflow: 'hidden',
+  },
+  jumpDragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: radius.full,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  jumpTitle: {
+    ...typography.titleMedium,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  jumpRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.md,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderRadius: 12,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.xs,
   },
-  skipToUnrevisedText: {
-    ...typography.label,
-    fontSize: 10,
+  jumpIndexBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jumpIndexText: {
+    ...typography.bodySmall,
+    fontWeight: '600',
+  },
+  jumpPageLabel: {
+    ...typography.bodyMedium,
+    fontWeight: '600',
+  },
+  jumpSurahLabel: {
+    ...typography.bodySmall,
+    marginTop: 2,
+  },
+  jumpCurrentTag: {
+    ...typography.bodySmall,
+    fontWeight: '700',
   },
   zoomOverlay: {
     flex: 1,
@@ -539,8 +694,7 @@ const styles = StyleSheet.create({
   zoomPopup: {
     width: SCREEN_WIDTH * 0.92,
     height: SCREEN_HEIGHT * 0.75,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: radius.md,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

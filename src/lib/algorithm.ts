@@ -1,4 +1,5 @@
 import { User, UserPage, QuranPage, DailyAssignment, RevisionLog } from '../types';
+import { getRevisionDayForUser } from './fajrBoundary';
 
 const DEFAULT_WEAKNESS_RATING = 4;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -59,7 +60,27 @@ function startOfDay(date: Date): Date {
 }
 
 function dateToISODay(date: Date): string {
-  return startOfDay(date).toISOString().split('T')[0];
+  const d = startOfDay(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Single source of truth for "what day are we in for revision purposes."
+// When the user has opted into the fajr boundary, the day rolls over at
+// fajr instead of midnight; otherwise it's the local calendar date. Pass
+// the user to opt in; passing null/undefined falls back to local midnight.
+export function getCurrentRevisionDay(user?: User | null): string {
+  return getRevisionDayForUser(user ?? null);
+}
+
+// YYYY-MM-DD → local midnight Date. Without this, `new Date('2026-01-01')`
+// parses as UTC midnight which can shift the day backward in negative
+// timezones — silently breaking schedule lookups.
+function parseLocalDateString(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
 }
 
 /**
@@ -68,11 +89,13 @@ function dateToISODay(date: Date): string {
  * If the user has a custom plan (from the editor), that wins — each day
  * maps to a slot in `customPlan.days`, looping after the cycle ends.
  *
- * Otherwise we fall back to the default sequential plan: walk through the
- * user's memorized pages in page-number order, advancing by
- * `dailyPageCapacity` each calendar day from when the user created their
- * account. When it reaches the end of the memorized set it wraps around —
- * this is the khatam cycle.
+ * Otherwise: sliding window. Every day shows exactly `dailyPageCapacity`
+ * pages (or the whole memorized set if it's smaller). The cursor
+ * advances by `dailyPageCapacity` pages each calendar day, wrapping back
+ * to the start when it reaches the end of the memorized set. Returned
+ * pages stay in slice order — on a wrap day, that means tail-of-cycle
+ * pages come first, then start-of-cycle pages, reflecting "finishing the
+ * old cycle and starting the new one mid-day."
  */
 export function getPagesScheduledForDate(
   user: User,
@@ -83,7 +106,7 @@ export function getPagesScheduledForDate(
 
   // Custom plan takes precedence when present.
   if (user.customPlan && user.customPlan.days.length > 0) {
-    const cycleStart = startOfDay(new Date(user.customPlan.cycleStartDate));
+    const cycleStart = parseLocalDateString(user.customPlan.cycleStartDate);
     const target = startOfDay(date);
     const daysSinceStart = Math.floor(
       (target.getTime() - cycleStart.getTime()) / MS_PER_DAY,
@@ -104,7 +127,7 @@ export function getPagesScheduledForDate(
   const perDay = Math.min(user.dailyPageCapacity, total);
   if (perDay <= 0) return [];
 
-  const start = startOfDay(new Date(user.createdAt));
+  const start = startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
   const target = startOfDay(date);
   const daysSinceStart = Math.floor((target.getTime() - start.getTime()) / MS_PER_DAY);
   if (daysSinceStart < 0) return [];
@@ -118,13 +141,17 @@ export function getPagesScheduledForDate(
 }
 
 /**
- * Build the default sequential plan as a list of day-by-day page slices.
- * Used as the editor's starting point.
+ * Build the default sequential plan as the editor sees it: one full pass
+ * (`ceil(total / perDay)` days) through the memorized set with the
+ * sliding window, **rotated so today's day is at index 0**. Each day is
+ * exactly `perDay` pages; the last day of the cycle wraps from the tail
+ * back to the start of the memorized set.
  */
 export function buildDefaultPlanDays(
   user: User,
   memorizedPages: UserPage[],
   direction: 'forward' | 'reverse' = 'forward',
+  today: Date = new Date(),
 ): number[][] {
   if (memorizedPages.length === 0) return [];
 
@@ -137,9 +164,25 @@ export function buildDefaultPlanDays(
   const perDay = Math.min(user.dailyPageCapacity, total);
   if (perDay <= 0) return [];
 
+  const cycleLength = Math.ceil(total / perDay);
+
+  // Today's offset matches the live scheduler exactly.
+  const start = startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
+  const todayStart = startOfDay(today);
+  const daysSinceStart = Math.max(
+    0,
+    Math.floor((todayStart.getTime() - start.getTime()) / MS_PER_DAY),
+  );
+  const startOffset = ((daysSinceStart * perDay) % total + total) % total;
+
   const days: number[][] = [];
-  for (let offset = 0; offset < total; offset += perDay) {
-    days.push(ordered.slice(offset, offset + perDay));
+  for (let d = 0; d < cycleLength; d++) {
+    const dayStart = (startOffset + d * perDay) % total;
+    const slice: number[] = [];
+    for (let i = 0; i < perDay; i++) {
+      slice.push(ordered[(dayStart + i) % total]);
+    }
+    days.push(slice);
   }
   return days;
 }
@@ -243,10 +286,12 @@ export function generateDailyAssignment(
   today: Date = new Date(),
 ): DailyAssignment {
   const memorized = pages.filter((p) => p.status === 'memorized');
-  const selectedPages = getPagesScheduledForDate(user, today, memorized).sort(
-    (a, b) => a - b,
-  );
+  // Slice order preserved on purpose — on wrap days the user sees the
+  // tail of the previous cycle before the start of the new one, which
+  // matches the scheduler's "you crossed the cycle boundary today" model.
+  const selectedPages = getPagesScheduledForDate(user, today, memorized);
 
+  // juzBreakdown collapses by juz (insertion order) for display.
   const juzMap = new Map<number, number[]>();
   for (const pageNum of selectedPages) {
     const quranPage = quranData.find((q) => q.pageNumber === pageNum);
@@ -257,9 +302,10 @@ export function generateDailyAssignment(
     }
   }
 
-  const juzBreakdown = Array.from(juzMap.entries())
-    .map(([juz, ps]) => ({ juz, pages: ps }))
-    .sort((a, b) => a.juz - b.juz);
+  const juzBreakdown = Array.from(juzMap.entries()).map(([juz, ps]) => ({
+    juz,
+    pages: ps,
+  }));
 
   return {
     date: dateToISODay(today),

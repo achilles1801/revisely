@@ -11,10 +11,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { Button } from '../../components/Button';
+import { GlassCard } from '../../components/GlassCard';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import {
   getPagesForJuz,
@@ -68,6 +70,7 @@ function JuzCard({
 
   return (
     <View style={styles.card}>
+      <GlassCard style={StyleSheet.absoluteFillObject} />
       <View style={styles.cardHeader}>
         {/* Card content - tappable to expand */}
         <TouchableOpacity
@@ -150,6 +153,9 @@ function JuzCard({
                   onPress={() => onToggleSurah(surah.number)}
                   activeOpacity={0.7}
                 >
+                  {!isSurahComplete && !isSurahPartial && (
+                    <GlassCard style={StyleSheet.absoluteFillObject} />
+                  )}
                   <View style={styles.surahInfo}>
                     <Text style={[
                       styles.surahNumber,
@@ -198,6 +204,7 @@ function JuzCard({
               style={styles.quickAction}
               onPress={onClearAll}
             >
+              <GlassCard style={StyleSheet.absoluteFillObject} />
               <Text style={styles.quickActionText}>Clear All</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -350,6 +357,7 @@ export default function EditJuzScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        <GlassCard style={StyleSheet.absoluteFillObject} />
         <View style={styles.summary}>
           <Text style={styles.summaryText}>
             {getTotalMemorized()} of 604 pages memorized
@@ -400,8 +408,7 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   card: {
-    backgroundColor: theme.bgAlt,
-    borderRadius: 12,
+    borderRadius: radius.md,
     marginBottom: spacing.sm,
     overflow: 'hidden',
   },
@@ -419,9 +426,9 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   juzNumber: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.bg,
-    borderWidth: 2,
+    borderRadius: radius.full,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
     borderColor: theme.border,
     justifyContent: 'center',
     alignItems: 'center',
@@ -470,10 +477,10 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   checkbox: {
     width: 28,
     height: 28,
-    borderRadius: 6,
-    borderWidth: 2,
+    borderRadius: radius.xs,
+    borderWidth: 1.5,
     borderColor: theme.border,
-    backgroundColor: theme.bg,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -497,20 +504,21 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   },
   progressBar: {
     height: 3,
-    backgroundColor: theme.border,
+    backgroundColor: theme.borderLight,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    borderRadius: 2,
+    borderRadius: radius.full,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: theme.warning,
-    borderRadius: 2,
+    borderRadius: radius.full,
   },
   expandedSection: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.border,
     paddingTop: spacing.md,
   },
@@ -527,11 +535,9 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.bg,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.border,
+    overflow: 'hidden',
   },
   surahItemComplete: {
     backgroundColor: theme.accent,
@@ -577,10 +583,10 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   surahCheck: {
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     borderWidth: 1.5,
     borderColor: theme.border,
-    backgroundColor: theme.bg,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -615,15 +621,12 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   quickAction: {
     flex: 1,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
-    backgroundColor: theme.bg,
-    borderWidth: 1,
-    borderColor: theme.border,
+    borderRadius: radius.sm,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   quickActionPrimary: {
     backgroundColor: theme.accent,
-    borderColor: theme.accent,
   },
   quickActionText: {
     ...typography.bodySmall,
@@ -636,9 +639,7 @@ const makeStyles = (theme: ThemeColors) => StyleSheet.create({
   footer: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-    backgroundColor: theme.bg,
+    overflow: 'hidden',
   },
   summary: {
     marginBottom: spacing.md,

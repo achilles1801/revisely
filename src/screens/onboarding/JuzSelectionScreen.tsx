@@ -11,13 +11,16 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { Button } from '../../components/Button';
+import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { Stepper } from '../../components/Stepper';
 import {
   JuzBrowser,
   PageStatus,
   applyPendingChanges,
+  applyPendingSurahChanges,
   buildInitialPendingForJourney,
+  buildInitialPendingSurahsForJourney,
 } from '../../components/JuzBrowser';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -34,7 +37,7 @@ export default function JuzSelectionScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { journeyStage } = route.params;
-  const { pages, updatePages } = useApp();
+  const { user, pages, updatePages, saveUser } = useApp();
 
   // Local buffer for the user's selection. Stays in component state until
   // Continue is tapped, then flushes to global pages + Firestore in one batch.
@@ -43,6 +46,9 @@ export default function JuzSelectionScreen() {
   const [pendingChanges, setPendingChanges] = useState<Map<number, PageStatus>>(
     new Map(),
   );
+  const [pendingSurahChanges, setPendingSurahChanges] = useState<
+    Map<number, PageStatus>
+  >(new Map());
 
   // Seed the buffer once pages have loaded so the initial selection matches
   // the chosen journey stage. Subsequent edits replace this baseline.
@@ -52,7 +58,13 @@ export default function JuzSelectionScreen() {
     if (pages.length === 0) return;
     hasSeededRef.current = true;
     setPendingChanges(buildInitialPendingForJourney(pages, journeyStage));
-  }, [pages, journeyStage]);
+    setPendingSurahChanges(
+      buildInitialPendingSurahsForJourney(
+        user?.memorizedSurahs ?? [],
+        journeyStage,
+      ),
+    );
+  }, [pages, journeyStage, user]);
 
   // Effective memorized count = base memorized status with pendingChanges applied.
   const effectiveMemorizedCount = useMemo(() => {
@@ -73,6 +85,13 @@ export default function JuzSelectionScreen() {
     );
     if (changedPageNumbers.length > 0) {
       await updatePages(updatedPages, changedPageNumbers);
+    }
+    if (user && pendingSurahChanges.size > 0) {
+      const nextSurahs = applyPendingSurahChanges(
+        user.memorizedSurahs ?? [],
+        pendingSurahChanges,
+      );
+      await saveUser({ ...user, memorizedSurahs: nextSurahs });
     }
     navigation.navigate('Schedule', { journeyStage });
   };
@@ -110,11 +129,15 @@ export default function JuzSelectionScreen() {
           pages={pages}
           pendingChanges={pendingChanges}
           onChange={setPendingChanges}
+          baseMemorizedSurahs={user?.memorizedSurahs ?? []}
+          pendingSurahChanges={pendingSurahChanges}
+          onSurahChange={setPendingSurahChanges}
           editMode
         />
       </ScrollView>
 
       <View style={styles.footer}>
+        <GlassCard style={StyleSheet.absoluteFillObject} />
         <Text style={styles.summaryText}>
           <Text style={{ color: theme.accent, fontWeight: '600' }}>
             {effectiveMemorizedCount}
@@ -156,9 +179,7 @@ const makeStyles = (theme: ThemeColors) =>
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
       paddingBottom: spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-      backgroundColor: theme.bg,
+      overflow: 'hidden',
       gap: spacing.sm,
     },
     summaryText: {

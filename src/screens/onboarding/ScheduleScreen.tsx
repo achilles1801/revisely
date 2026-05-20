@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Switch, Platform, Alert } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
@@ -13,9 +14,16 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { scheduleDailyReminder } from '../../lib/notifications';
+import {
+  ensureNotificationsPermission,
+  scheduleDailyReminder,
+} from '../../lib/notifications';
+import { DEFAULT_FAJR_METHOD } from '../../lib/fajrBoundary';
+
+type DayBoundary = 'midnight' | 'fajr';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Schedule'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'Schedule'>;
@@ -34,6 +42,8 @@ export default function ScheduleScreen() {
   const [dailyCapacity, setDailyCapacity] = useState(defaultCapacity);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [lastCapacityTick, setLastCapacityTick] = useState(defaultCapacity);
+  const [dayBoundary, setDayBoundary] = useState<DayBoundary>('fajr');
+  const [starting, setStarting] = useState(false);
 
   const memorizedCount = useMemo(
     () => pages.filter((p) => p.status === 'memorized').length,
@@ -57,11 +67,61 @@ export default function ScheduleScreen() {
     setDailyCapacity(rounded);
   };
 
+  const requestLocationOrFallback = async (): Promise<
+    { latitude: number; longitude: number } | null
+  > => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return null;
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+    } catch {
+      return null;
+    }
+  };
+
   const handleStart = async () => {
+    if (starting) return;
+    setStarting(true);
+
+    // Resolve fajr coords up-front so the boundary works on day one. If the
+    // user picked fajr but permission isn't granted, fall back to midnight
+    // and let them re-enable it in Settings later.
+    let fajrBoundaryEnabled = false;
+    let locationCoords: { latitude: number; longitude: number } | null = null;
+    if (dayBoundary === 'fajr') {
+      const coords = await requestLocationOrFallback();
+      if (coords) {
+        fajrBoundaryEnabled = true;
+        locationCoords = coords;
+      } else {
+        Alert.alert(
+          'Location not available',
+          'Without location we can\'t compute fajr. Defaulting to midnight — switch in Settings once you grant location.',
+        );
+      }
+    }
+
+    // Ask for notification permission inline with the onboarding toggle — if
+    // the user declined the OS prompt, flip our own flag off so the Settings
+    // toggle reflects reality rather than promising notifications we can't
+    // deliver. Skipping this means we'd silently schedule against a denied
+    // permission and the user would never know why nothing fires.
+    let finalNotificationsEnabled = notificationsEnabled;
+    if (notificationsEnabled) {
+      const granted = await ensureNotificationsPermission();
+      if (!granted) finalNotificationsEnabled = false;
+    }
+
     const user = createDefaultUser({
       name: firebaseUser?.displayName || undefined,
       dailyPageCapacity: dailyCapacity,
-      notificationsEnabled,
+      notificationsEnabled: finalNotificationsEnabled,
+      fajrBoundaryEnabled,
+      locationCoords,
+      fajrCalculationMethod: DEFAULT_FAJR_METHOD,
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // saveUser, the daily reminder schedule, and the onboarding flag flip are
@@ -126,6 +186,93 @@ export default function ScheduleScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>When does your day reset?</Text>
+          <View style={styles.boundaryRow}>
+            <PressableScale
+              onPress={() => {
+                Haptics.selectionAsync();
+                setDayBoundary('fajr');
+              }}
+              haptic="none"
+              scale={0.98}
+              style={[
+                styles.boundaryButton,
+                {
+                  borderColor: dayBoundary === 'fajr' ? theme.accent : theme.border,
+                  backgroundColor:
+                    dayBoundary === 'fajr' ? theme.accent + '15' : 'transparent',
+                },
+              ]}
+            >
+              <Ionicons
+                name="moon-outline"
+                size={18}
+                color={dayBoundary === 'fajr' ? theme.accent : theme.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.boundaryLabel,
+                  {
+                    color:
+                      dayBoundary === 'fajr' ? theme.textPrimary : theme.textSecondary,
+                    fontWeight: dayBoundary === 'fajr' ? '600' : '500',
+                  },
+                ]}
+              >
+                At fajr
+              </Text>
+              {/* <Text style={[styles.boundarySub, { color: theme.textMuted }]}>
+                Late-night counts as today
+              </Text> */}
+            </PressableScale>
+
+            <PressableScale
+              onPress={() => {
+                Haptics.selectionAsync();
+                setDayBoundary('midnight');
+              }}
+              haptic="none"
+              scale={0.98}
+              style={[
+                styles.boundaryButton,
+                {
+                  borderColor:
+                    dayBoundary === 'midnight' ? theme.accent : theme.border,
+                  backgroundColor:
+                    dayBoundary === 'midnight' ? theme.accent + '15' : 'transparent',
+                },
+              ]}
+            >
+              <Ionicons
+                name="time-outline"
+                size={18}
+                color={dayBoundary === 'midnight' ? theme.accent : theme.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.boundaryLabel,
+                  {
+                    color:
+                      dayBoundary === 'midnight' ? theme.textPrimary : theme.textSecondary,
+                    fontWeight: dayBoundary === 'midnight' ? '600' : '500',
+                  },
+                ]}
+              >
+                At midnight
+              </Text>
+              {/* <Text style={[styles.boundarySub, { color: theme.textMuted }]}>
+                Standard clock day
+              </Text> */}
+            </PressableScale>
+          </View>
+          {dayBoundary === 'fajr' && (
+            <Text style={styles.helperText}>
+              We'll ask for your location to compute fajr accurately.
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
           <View style={styles.notificationRow}>
             <View style={styles.notificationText}>
               <Text style={styles.sectionTitle}>Daily reminders</Text>
@@ -146,14 +293,20 @@ export default function ScheduleScreen() {
         </View>
 
         <View style={styles.disclosureRow}>
-          <Ionicons name="time-outline" size={16} color={theme.textMuted} />
+          <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
           <Text style={styles.disclosureText}>
-            New sessions start each day at midnight in your local timezone.
+            You can change any of these later in Settings.
           </Text>
         </View>
 
         <View style={styles.bottomSection}>
-          <Button title="Start" onPress={handleStart} variant="primary" style={styles.button} />
+          <Button
+            title={starting ? 'Setting up…' : 'Start'}
+            onPress={handleStart}
+            variant="primary"
+            disabled={starting}
+            style={styles.button}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -212,6 +365,26 @@ const makeStyles = (theme: ThemeColors) =>
       gap: spacing.md,
     },
     notificationText: { flex: 1 },
+    boundaryRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    boundaryButton: {
+      flex: 1,
+      borderWidth: 1.5,
+      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      gap: spacing.xs,
+      alignItems: 'flex-start',
+    },
+    boundaryLabel: {
+      ...typography.bodyMedium,
+    },
+    boundarySub: {
+      ...typography.bodySmall,
+      fontSize: 11,
+    },
     disclosureRow: {
       flexDirection: 'row',
       alignItems: 'center',

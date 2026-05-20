@@ -12,9 +12,11 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerForPushNotificationsAsync() {
-  let token;
-
+// Requests notification permission (idempotent — no-op if already granted).
+// Returns true if the user has granted permission, false otherwise.
+// Works on simulators for local notifications; the device gate only applies
+// to fetching a push token below.
+export async function ensureNotificationsPermission(): Promise<boolean> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
@@ -24,27 +26,29 @@ export async function registerForPushNotificationsAsync() {
     });
   }
 
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      logger.log('Failed to get push token for push notification!');
-      return;
-    }
-    try {
-      token = (await Notifications.getExpoPushTokenAsync()).data;
-    } catch (error) {
-      logger.log('Error getting push token:', error);
-    }
-  } else {
-    logger.log('Must use physical device for Push Notifications');
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  if (existingStatus === 'granted') return true;
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
+}
+
+export async function registerForPushNotificationsAsync() {
+  const granted = await ensureNotificationsPermission();
+  if (!granted) {
+    logger.log('Notification permission not granted');
+    return;
   }
 
-  return token;
+  if (!Device.isDevice) {
+    logger.log('Must use physical device for push token');
+    return;
+  }
+
+  try {
+    return (await Notifications.getExpoPushTokenAsync()).data;
+  } catch (error) {
+    logger.log('Error getting push token:', error);
+  }
 }
 
 export async function scheduleDailyReminder(time: string, enabled: boolean) {

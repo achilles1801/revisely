@@ -9,6 +9,7 @@ import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
 import { shadows } from '../theme/shadows';
 import { Button } from './Button';
+import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useApp } from '../context/AppContext';
 import { getQuranData } from '../lib/quranData';
@@ -88,6 +89,7 @@ export function WeaknessModal({
         style={styles.overlay}
       >
         <PressableScale haptic="none" scale={1} style={styles.sheet}>
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
 
           <View style={styles.content}>
@@ -113,6 +115,9 @@ export function WeaknessModal({
                       },
                     ]}
                   >
+                    {!isSelected && (
+                      <GlassCard style={StyleSheet.absoluteFillObject} />
+                    )}
                     <View style={[styles.ratingDot, { backgroundColor: tone }]} />
                     <Text
                       style={[
@@ -166,12 +171,12 @@ const makeStyles = (theme: ThemeColors) =>
       justifyContent: 'flex-end',
     },
     sheet: {
-      backgroundColor: theme.surface,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
       paddingTop: spacing.sm,
       paddingBottom: spacing.xl,
       maxHeight: '85%',
+      overflow: 'hidden',
       ...shadows.lg,
     },
     dragHandle: {
@@ -205,10 +210,10 @@ const makeStyles = (theme: ThemeColors) =>
       gap: spacing.sm,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      backgroundColor: theme.bgAlt,
       borderWidth: 1.5,
       borderColor: 'transparent',
       borderRadius: radius.sm,
+      overflow: 'hidden',
     },
     ratingDot: {
       width: 8,

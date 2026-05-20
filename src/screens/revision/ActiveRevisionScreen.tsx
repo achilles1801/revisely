@@ -20,6 +20,7 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { PressableScale } from '../../components/PressableScale';
 import { QuranPageViewer } from '../../components/QuranPageViewer';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
+import { TranslationSheet } from '../../components/TranslationSheet';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -28,7 +29,7 @@ import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
-import { generateDailyAssignment } from '../../lib/algorithm';
+import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
 
 const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
@@ -53,7 +54,7 @@ export default function ActiveRevisionScreen() {
   // resume the session from where the user left off.
   const alreadyRevisedToday = useMemo(() => {
     if (!assignment) return new Set<number>();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCurrentRevisionDay(user);
     const assignmentSet = new Set(assignment.pages);
     const revised = new Set<number>();
     for (const log of logs) {
@@ -71,7 +72,7 @@ export default function ActiveRevisionScreen() {
   const ratingsFromTodaysLogs = useMemo(() => {
     const map = new Map<number, number>();
     if (!smartTrackingEnabled) return map;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCurrentRevisionDay(user);
     for (const log of logs) {
       if (log.date !== today) continue;
       for (const wu of log.weaknessUpdates) map.set(wu.page, wu.rating);
@@ -87,6 +88,7 @@ export default function ActiveRevisionScreen() {
   );
   const [selectedPageForRating, setSelectedPageForRating] = useState<number | null>(null);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(false);
   const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(null);
   const [sessionStartTime] = useState(Date.now());
   const [saving, setSaving] = useState(false);
@@ -215,7 +217,7 @@ export default function ActiveRevisionScreen() {
         .map(([page, rating]) => ({ page, rating }));
 
       await addLog({
-        date: new Date().toISOString().split('T')[0],
+        date: getCurrentRevisionDay(user),
         pagesRevised,
         pagesSkipped: [],
         weaknessUpdates: weaknessUpdatesArray,
@@ -265,7 +267,7 @@ export default function ActiveRevisionScreen() {
         rating,
       }));
       await addLog({
-        date: new Date().toISOString().split('T')[0],
+        date: getCurrentRevisionDay(user),
         pagesRevised,
         pagesSkipped,
         weaknessUpdates: weaknessUpdatesArray,
@@ -296,11 +298,12 @@ export default function ActiveRevisionScreen() {
         <PressableScale
           onPress={() => navigation.goBack()}
           haptic="light"
-          style={styles.headerButton}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityLabel="Go back"
         >
-          <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
+          <GlassCard style={styles.headerButton}>
+            <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
+          </GlassCard>
         </PressableScale>
 
         <View style={styles.headerCenter}>
@@ -310,25 +313,43 @@ export default function ActiveRevisionScreen() {
 
         <View style={styles.headerActions}>
           <PressableScale
+            onPress={() => setShowTranslation(true)}
+            haptic="light"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="View translation"
+          >
+            <GlassCard style={styles.headerButton}>
+              <Ionicons name="language-outline" size={22} color={theme.textPrimary} />
+            </GlassCard>
+          </PressableScale>
+          <PressableScale
             onPress={() => setShowGuide(true)}
             haptic="light"
-            style={styles.headerButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="How this works"
           >
-            <Ionicons name="help-circle-outline" size={22} color={theme.textPrimary} />
+            <GlassCard style={styles.headerButton}>
+              <Ionicons name="help-circle-outline" size={22} color={theme.textPrimary} />
+            </GlassCard>
           </PressableScale>
           <PressableScale
             onPress={() => setShowBulkActions(true)}
             haptic="light"
-            style={styles.headerButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Bulk actions"
           >
-            <Ionicons name="ellipsis-horizontal" size={22} color={theme.textPrimary} />
+            <GlassCard style={styles.headerButton}>
+              <Ionicons name="ellipsis-horizontal" size={22} color={theme.textPrimary} />
+            </GlassCard>
           </PressableScale>
         </View>
       </View>
+
+      <TranslationSheet
+        visible={showTranslation}
+        pageNumber={displayPageNumber}
+        onClose={() => setShowTranslation(false)}
+      />
 
       <View style={styles.progressSection}>
         <View style={styles.progressHeader}>
@@ -353,6 +374,7 @@ export default function ActiveRevisionScreen() {
       </View>
 
       <View style={styles.footer}>
+        <GlassCard style={StyleSheet.absoluteFillObject} />
         {completedCount === totalPages && totalPages > 0 ? (
           <Button
             title="Submit session"
@@ -454,8 +476,8 @@ const makeStyles = (theme: ThemeColors) =>
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 999,
-      backgroundColor: theme.bgAlt,
+      borderRadius: radius.full,
+      overflow: 'hidden',
     },
     headerActions: {
       flexDirection: 'row',
@@ -487,9 +509,7 @@ const makeStyles = (theme: ThemeColors) =>
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.sm,
       paddingBottom: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
-      backgroundColor: theme.bg,
+      overflow: 'hidden',
     },
   });
 
@@ -567,6 +587,7 @@ function RevisionGuideModal({
               scale={0.98}
               style={styles.secondaryBtn}
             >
+              <GlassCard style={StyleSheet.absoluteFillObject} />
               <Text style={styles.secondaryBtnText}>Don't show this again</Text>
             </PressableScale>
             <PressableScale
@@ -599,8 +620,6 @@ const makeGuideStyles = (theme: ThemeColors) =>
       borderRadius: radius.lg,
       padding: spacing.lg,
       overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
       ...shadows.lg,
     },
     headerRow: {
@@ -615,7 +634,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
       height: 32,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 999,
+      borderRadius: radius.full,
     },
     steps: { gap: spacing.md, marginBottom: spacing.lg },
     step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
@@ -642,8 +661,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
       borderRadius: radius.full,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
+      overflow: 'hidden',
     },
     secondaryBtnText: {
       ...typography.bodySmall,

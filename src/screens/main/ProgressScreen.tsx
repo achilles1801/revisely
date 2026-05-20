@@ -18,6 +18,7 @@ import {
   JuzBrowser,
   PageStatus,
   applyPendingChanges,
+  applyPendingSurahChanges,
 } from '../../components/JuzBrowser';
 import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
 import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
@@ -50,7 +51,7 @@ function formatFractional(value: number): string {
 }
 
 export default function ProgressScreen() {
-  const { pages, loadData, updatePages } = useApp();
+  const { user, pages, loadData, updatePages, saveUser } = useApp();
   const { theme, isDark } = useTheme();
   const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
@@ -60,6 +61,9 @@ export default function ProgressScreen() {
   const [editMode, setEditMode] = useState(false);
   const [browseExpanded, setBrowseExpanded] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<
+    Map<number, PageStatus>
+  >(new Map());
+  const [pendingSurahChanges, setPendingSurahChanges] = useState<
     Map<number, PageStatus>
   >(new Map());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -160,6 +164,7 @@ export default function ProgressScreen() {
   const handleCancelEdit = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setPendingChanges(new Map());
+    setPendingSurahChanges(new Map());
     setEditMode(false);
   };
 
@@ -173,7 +178,15 @@ export default function ProgressScreen() {
       if (changedPageNumbers.length > 0) {
         await updatePages(updatedPages, changedPageNumbers);
       }
+      if (user && pendingSurahChanges.size > 0) {
+        const nextSurahs = applyPendingSurahChanges(
+          user.memorizedSurahs ?? [],
+          pendingSurahChanges,
+        );
+        await saveUser({ ...user, memorizedSurahs: nextSurahs });
+      }
       setPendingChanges(new Map());
+      setPendingSurahChanges(new Map());
       setEditMode(false);
       setConfirmOpen(false);
     } finally {
@@ -268,7 +281,7 @@ export default function ProgressScreen() {
         <PressableScale
           onPress={() => setFilterPickerOpen(true)}
           haptic="light"
-          style={[styles.filterChip, { borderColor: theme.border }]}
+          style={styles.filterChip}
         >
           <GlassCard style={StyleSheet.absoluteFillObject} />
           <Ionicons name="filter-outline" size={16} color={theme.textSecondary} />
@@ -309,7 +322,8 @@ export default function ProgressScreen() {
             </Text>
           </View>
 
-          <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+          <View style={styles.progressTrack}>
+            <GlassCard style={StyleSheet.absoluteFillObject} />
             <View
               style={[
                 styles.progressFill,
@@ -382,6 +396,9 @@ export default function ProgressScreen() {
             pages={pages}
             pendingChanges={pendingChanges}
             onChange={setPendingChanges}
+            baseMemorizedSurahs={user?.memorizedSurahs ?? []}
+            pendingSurahChanges={pendingSurahChanges}
+            onSurahChange={setPendingSurahChanges}
             juzNumbers={browsedJuzNumbers}
             editMode={editMode}
             emptyMessage="No juz match this filter"
@@ -598,11 +615,9 @@ function ConfirmSaveSheet({
                 onPress={onClose}
                 haptic="light"
                 disabled={saving}
-                style={[
-                  styles.confirmBtn,
-                  { backgroundColor: theme.bgAlt, borderColor: theme.border },
-                ]}
+                style={styles.confirmBtn}
               >
+                <GlassCard style={StyleSheet.absoluteFillObject} />
                 <Text
                   style={[styles.confirmBtnText, { color: theme.textPrimary }]}
                 >
@@ -614,10 +629,9 @@ function ConfirmSaveSheet({
                 haptic="medium"
                 disabled={saving}
                 style={[
-                  styles.confirmBtn,
+                  styles.confirmBtnPrimary,
                   {
                     backgroundColor: theme.accent,
-                    borderColor: theme.accent,
                     opacity: saving ? 0.6 : 1,
                   },
                 ]}
@@ -660,7 +674,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.full,
-    borderWidth: 1,
     marginBottom: spacing.lg,
     overflow: 'hidden',
   },
@@ -877,7 +890,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.sm + 2,
     borderRadius: radius.full,
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  confirmBtnPrimary: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },

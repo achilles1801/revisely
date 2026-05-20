@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -172,6 +173,16 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
     >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={[styles.container, { paddingTop: insets.top }]}>
+        <LinearGradient
+          colors={
+            isDark
+              ? ['#0F1410', '#1F4538', '#0F1410']
+              : ['#FBF8F3', '#C6DDD3', '#FBF8F3']
+          }
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.eyebrow}>SMART TRACKING PREVIEW</Text>
@@ -180,11 +191,12 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             <PressableScale
               onPress={handleClose}
               haptic="light"
-              style={styles.closeButton}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityLabel="Close preview"
             >
-              <Ionicons name="close" size={22} color={theme.textSecondary} />
+              <GlassCard style={styles.closeButton}>
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </GlassCard>
             </PressableScale>
           )}
         </View>
@@ -261,6 +273,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             { paddingBottom: Math.max(insets.bottom, spacing.md) },
           ]}
         >
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           {step === 'intro' && (
             <Button
               title="Show me"
@@ -648,6 +661,7 @@ function NotNowPointerStep({
 
       <Text style={styles.settingsSectionLabel}>REVISION</Text>
       <View style={styles.settingsCard}>
+        <GlassCard style={StyleSheet.absoluteFillObject} />
         {/* Smart Tracking — the glowing row */}
         <View style={styles.settingsRowOuter}>
           <Animated.View
@@ -738,9 +752,10 @@ function SandboxPagePreviewModal({
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={previewModalStyles.backdrop} onPress={onClose}>
         <Pressable
-          style={[previewModalStyles.card, { backgroundColor: theme.surface }]}
+          style={previewModalStyles.card}
           onPress={() => {}}
         >
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <View
             style={[
               previewModalStyles.headerRow,
@@ -762,10 +777,11 @@ function SandboxPagePreviewModal({
             <PressableScale
               onPress={onClose}
               haptic="light"
-              style={[previewModalStyles.closeBtn, { backgroundColor: theme.bgAlt }]}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="close" size={20} color={theme.textPrimary} />
+              <GlassCard style={previewModalStyles.closeBtn}>
+                <Ionicons name="close" size={20} color={theme.textPrimary} />
+              </GlassCard>
             </PressableScale>
           </View>
           <View
@@ -829,7 +845,8 @@ const previewModalStyles = StyleSheet.create({
   closeBtn: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: radius.full,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -873,6 +890,7 @@ function SandboxRatingSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()} style={styles.sheet}>
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
           <Text style={styles.headline}>Rate this page</Text>
           <Text style={styles.subtext}>
@@ -896,6 +914,9 @@ function SandboxRatingSheet({
                     },
                   ]}
                 >
+                  {!isSelected && (
+                    <GlassCard style={StyleSheet.absoluteFillObject} />
+                  )}
                   <Text
                     style={[
                       styles.ratingChipText,
@@ -922,7 +943,7 @@ const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.bg,
+      backgroundColor: 'transparent',
     },
     header: {
       flexDirection: 'row',
@@ -938,8 +959,8 @@ const makeStyles = (theme: ThemeColors) =>
     closeButton: {
       width: 40,
       height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.bgAlt,
+      borderRadius: radius.full,
+      overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1012,7 +1033,7 @@ const makeStyles = (theme: ThemeColors) =>
     coachDot: {
       width: 8,
       height: 8,
-      borderRadius: 4,
+      borderRadius: radius.full,
       marginTop: 7,
     },
     coachText: {
@@ -1231,11 +1252,8 @@ const makeStyles = (theme: ThemeColors) =>
       letterSpacing: 1,
     },
     settingsCard: {
-      backgroundColor: theme.bgAlt,
       borderRadius: radius.md,
       overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
     },
     settingsRowOuter: {
       position: 'relative',
@@ -1286,9 +1304,7 @@ const makeStyles = (theme: ThemeColors) =>
     footer: {
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
-      backgroundColor: theme.bg,
+      overflow: 'hidden',
     },
     fullButton: { width: '100%' },
     ctaButtons: {
@@ -1306,17 +1322,17 @@ const makeSheetStyles = (theme: ThemeColors) =>
       justifyContent: 'flex-end',
     },
     sheet: {
-      backgroundColor: theme.bg,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.sm,
       paddingBottom: spacing.xl,
+      overflow: 'hidden',
     },
     dragHandle: {
       width: 40,
       height: 4,
-      borderRadius: 2,
+      borderRadius: radius.full,
       backgroundColor: theme.border,
       alignSelf: 'center',
       marginBottom: spacing.md,
@@ -1340,10 +1356,10 @@ const makeSheetStyles = (theme: ThemeColors) =>
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: radius.md,
-      backgroundColor: theme.bgAlt,
       borderWidth: 1.5,
       borderColor: 'transparent',
       alignItems: 'center',
+      overflow: 'hidden',
     },
     ratingChipText: {
       ...typography.bodyMedium,

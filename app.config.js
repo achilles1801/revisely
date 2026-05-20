@@ -5,6 +5,7 @@ export default {
     name: "Revisely",
     slug: "revision-buddy",
     owner: "achilles1801",
+    scheme: "revisely",
     version: "1.0.0",
     runtimeVersion: { policy: "appVersion" },
     updates: {
@@ -25,6 +26,14 @@ export default {
       googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST ?? "./GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // Apple requires these strings whenever the binary contains photo
+        // library API symbols, even if our app code never touches them.
+        // Some SDKs (Sentry attachments, Google Sign-In profile picture
+        // handling) link the symbols transitively.
+        NSPhotoLibraryUsageDescription:
+          "Allow Revisely to access your photos so you can attach screenshots when contacting support.",
+        NSPhotoLibraryAddUsageDescription:
+          "Allow Revisely to save images to your photo library.",
         CFBundleURLTypes: [
           {
             CFBundleURLSchemes: [
@@ -95,6 +104,13 @@ export default {
           speechRecognitionPermission: "Allow Revisely to convert your speech to text so it can record what you've memorized.",
           androidSpeechServicePackages: ["com.google.android.googlequicksearchbox"]
         }
+      ],
+      [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary.",
+          locationWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary."
+        }
       ]
     ],
     extra: {
@@ -110,6 +126,24 @@ export default {
       googleIosClientId: process.env.GOOGLE_IOS_CLIENT_ID,
       googleAndroidClientId: process.env.GOOGLE_ANDROID_CLIENT_ID,
       googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID,
+      qf: {
+        clientId: process.env.QF_CLIENT_ID,
+        clientSecret: process.env.QF_CLIENT_SECRET,
+        oauthBase: process.env.QF_OAUTH_BASE || "https://prelive-oauth2.quran.foundation",
+        apiBase: process.env.QF_API_BASE || "https://apis-prelive.quran.foundation",
+      },
+      qfContent: {
+        clientId: process.env.QF_CONTENT_CLIENT_ID,
+        clientSecret: process.env.QF_CONTENT_CLIENT_SECRET,
+        oauthBase: process.env.QF_CONTENT_OAUTH_BASE || "https://oauth2.quran.foundation",
+        apiBase: process.env.QF_CONTENT_API_BASE || "https://apis.quran.foundation",
+      },
+      qfUser: {
+        clientId: process.env.QF_USER_CLIENT_ID,
+        clientSecret: process.env.QF_USER_CLIENT_SECRET,
+        oauthBase: process.env.QF_USER_OAUTH_BASE || "https://prelive-oauth2.quran.foundation",
+        apiBase: process.env.QF_USER_API_BASE || "https://apis-prelive.quran.foundation",
+      },
       // Sentry crash reporting. Empty DSN → Sentry stays off (fine for dev).
       // Set SENTRY_DSN in EAS env vars + .env when you're ready to capture errors.
       sentryDsn: process.env.SENTRY_DSN,

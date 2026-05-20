@@ -13,6 +13,7 @@ import * as firestoreService from '../services/firestoreService';
 import { updateAuthDisplayName } from '../lib/firebase';
 import { generateId } from '../lib/utils';
 import { recomputePagesFromLogs } from '../lib/algorithm';
+import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
 
 // ============================================================================
@@ -49,7 +50,6 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     smartTrackingEnabled: fsUser.smartTrackingEnabled ?? false,
     hasSeenSmartTrackingPreview: fsUser.hasSeenSmartTrackingPreview ?? false,
     dailyPageCapacity: fsUser.dailyPageCapacity || 20,
-    activeDays: (fsUser.activeDays || [0, 1, 2, 3, 4, 5, 6]) as number[],
     reminderTime: fsUser.notifications?.reminderTime || '08:00',
     notificationsEnabled: fsUser.notifications?.enabled ?? true,
     currentMemorizationJuz: fsUser.currentMemorizationJuz,
@@ -58,6 +58,14 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     customPlan: fsUser.customPlan ?? null,
     streak: fsUser.streak || 0,
     lastRevisionDate: fsUser.lastRevisionDate,
+    memorizedSurahs: fsUser.memorizedSurahs ?? [],
+    fajrBoundaryEnabled: fsUser.fajrBoundaryEnabled ?? false,
+    locationCoords: fsUser.locationCoords ?? null,
+    fajrCalculationMethod: fsUser.fajrCalculationMethod ?? 'NorthAmerica',
+    // Legacy users predate scheduleAnchorDate — fall back to createdAt so
+    // the scheduler still produces a sensible cycle for them.
+    scheduleAnchorDate:
+      fsUser.scheduleAnchorDate ?? timestampToISOString(fsUser.createdAt),
   };
 }
 
@@ -142,6 +150,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [pages]);
   // Guard so the initial-load self-heal runs at most once per session.
   const hasSelfHealedOnLoad = useRef(false);
+  // Tracks which user.id we've already (re)scheduled the daily reminder for
+  // this session. The OS notification scheduler is per-device, so a fresh
+  // install or a new device won't have any schedule even if the Firestore
+  // profile says notifications are on — this rehydrates it.
+  const lastScheduledUserIdRef = useRef<string | null>(null);
 
   // ============================================================================
   // AUTH LISTENER - Listen for auth state changes
@@ -159,6 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLogs([]);
         setOnboardingComplete(false);
         hasInitialLoadCompleted.current = false;
+        lastScheduledUserIdRef.current = null;
         setLoading(false);
         return;
       }
@@ -179,15 +193,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
 
-    // Subscribe to user document
-    const unsubscribeUser = firestoreService.subscribeToUser((fsUser) => {
+    // Subscribe to user document. If Firebase Auth says we're logged in but
+    // the Firestore doc is missing (e.g. a dev wiped the users collection,
+    // or first launch after re-creating an account), recreate the doc so
+    // subsequent updates have something to land on.
+    let userRecreationInFlight = false;
+    const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser) => {
       if (fsUser) {
+        userRecreationInFlight = false;
         setUser(firestoreUserToLocal(fsUser));
         setOnboardingComplete(fsUser.onboardingComplete);
-      } else {
-        setUser(null);
-        setOnboardingComplete(false);
+        return;
       }
+
+      const currentAuth = getAuth();
+      const fbUser = currentAuth.currentUser;
+      if (fbUser && !userRecreationInFlight) {
+        userRecreationInFlight = true;
+        try {
+          await firestoreService.createUser({
+            uid: fbUser.uid,
+            email: fbUser.email,
+            displayName: fbUser.displayName,
+            photoURL: fbUser.photoURL,
+          });
+          // Subscription will refire with the new doc — fall through.
+          return;
+        } catch (err) {
+          logger.error('Failed to recreate missing user doc:', err);
+          userRecreationInFlight = false;
+        }
+      }
+      setUser(null);
+      setOnboardingComplete(false);
     });
 
     // Subscribe to pages
@@ -325,7 +363,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         smartTrackingEnabled: updatedUser.smartTrackingEnabled,
         hasSeenSmartTrackingPreview: updatedUser.hasSeenSmartTrackingPreview,
         dailyPageCapacity: updatedUser.dailyPageCapacity,
-        activeDays: updatedUser.activeDays as (0 | 1 | 2 | 3 | 4 | 5 | 6)[],
         notifications: {
           enabled: updatedUser.notificationsEnabled,
           reminderTime: updatedUser.reminderTime,
@@ -334,6 +371,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentMemorizationPage: updatedUser.currentMemorizationPage,
         currentKhatamPage: updatedUser.currentKhatamPage,
         customPlan: updatedUser.customPlan,
+        memorizedSurahs: updatedUser.memorizedSurahs,
+        fajrBoundaryEnabled: updatedUser.fajrBoundaryEnabled,
+        locationCoords: updatedUser.locationCoords,
+        fajrCalculationMethod: updatedUser.fajrCalculationMethod,
+        scheduleAnchorDate: updatedUser.scheduleAnchorDate,
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore
@@ -358,7 +400,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       smartTrackingEnabled: false,
       hasSeenSmartTrackingPreview: false,
       dailyPageCapacity: 20,
-      activeDays: [0, 1, 2, 3, 4, 5, 6],
       reminderTime: '08:00',
       notificationsEnabled: true,
       currentMemorizationJuz: null,
@@ -367,6 +408,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       customPlan: null,
       streak: 0,
       lastRevisionDate: null,
+      memorizedSurahs: [],
+      fajrBoundaryEnabled: false,
+      locationCoords: null,
+      fajrCalculationMethod: 'NorthAmerica',
+      scheduleAnchorDate: new Date().toISOString(),
       ...overrides,
     };
   }, []);
@@ -537,6 +583,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hasSelfHealedOnLoad.current = true;
     syncPagesFromLogs(pages, logs);
   }, [pages, logs, syncPagesFromLogs]);
+
+  // Rehydrate the daily reminder once per user identity per session. Settings
+  // and onboarding already schedule on mutation; this only covers cold starts
+  // on a device whose OS scheduler is empty (fresh install, new phone,
+  // sign-in to an existing account). Gated on onboardingComplete so we don't
+  // schedule against default placeholders for users still in the flow.
+  useEffect(() => {
+    if (!user || !onboardingComplete) return;
+    if (lastScheduledUserIdRef.current === user.id) return;
+    lastScheduledUserIdRef.current = user.id;
+    scheduleDailyReminder(user.reminderTime, user.notificationsEnabled).catch(
+      (err) => logger.error('Failed to rehydrate daily reminder:', err),
+    );
+  }, [user, onboardingComplete]);
 
   // ============================================================================
   // LOG/SESSION OPERATIONS

@@ -26,6 +26,7 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp,
+  deleteField,
   DocumentReference,
   onSnapshot,
   Unsubscribe,
@@ -101,7 +102,6 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
     updatedAt: now,
     lastActiveAt: now,
     dailyPageCapacity: input.dailyPageCapacity ?? DEFAULT_USER_SETTINGS.dailyPageCapacity,
-    activeDays: input.activeDays ?? [...DEFAULT_USER_SETTINGS.activeDays],
     smartTrackingEnabled: input.smartTrackingEnabled ?? DEFAULT_USER_SETTINGS.smartTrackingEnabled,
     hasSeenSmartTrackingPreview: input.hasSeenSmartTrackingPreview ?? DEFAULT_USER_SETTINGS.hasSeenSmartTrackingPreview,
     theme: input.theme ?? DEFAULT_USER_SETTINGS.theme,
@@ -120,6 +120,11 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
     totalSessionsCompleted: 0,
     totalPagesRevisedAllTime: 0,
     onboardingComplete: false,
+    memorizedSurahs: [],
+    fajrBoundaryEnabled: false,
+    locationCoords: null,
+    fajrCalculationMethod: 'NorthAmerica',
+    scheduleAnchorDate: new Date().toISOString(),
   };
 
   await setDoc(getUserRef(input.uid), userData);
@@ -167,11 +172,18 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   const updateData: Record<string, unknown> = {
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
+    // Cleanup: evict fields removed in Phase 1 / 6 / 8 from any legacy user
+    // doc. No-ops on fresh docs; cleans up old ones the first time anything
+    // updates the user (e.g. settings change, onboarding replay).
+    dangerThresholdDays: deleteField(),
+    revisionMode: deleteField(),
+    activeDays: deleteField(),
+    'notifications.dangerAlertEnabled': deleteField(),
+    'notifications.dayStartHour': deleteField(),
   };
 
   if (updates.displayName !== undefined) updateData.displayName = updates.displayName;
   if (updates.dailyPageCapacity !== undefined) updateData.dailyPageCapacity = updates.dailyPageCapacity;
-  if (updates.activeDays !== undefined) updateData.activeDays = updates.activeDays;
   if (updates.smartTrackingEnabled !== undefined) updateData.smartTrackingEnabled = updates.smartTrackingEnabled;
   if (updates.hasSeenSmartTrackingPreview !== undefined) updateData.hasSeenSmartTrackingPreview = updates.hasSeenSmartTrackingPreview;
   if (updates.theme !== undefined) updateData.theme = updates.theme;
@@ -183,6 +195,11 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.totalMemorizedPages !== undefined) updateData.totalMemorizedPages = updates.totalMemorizedPages;
   if (updates.streak !== undefined) updateData.streak = updates.streak;
   if (updates.lastRevisionDate !== undefined) updateData.lastRevisionDate = updates.lastRevisionDate;
+  if (updates.memorizedSurahs !== undefined) updateData.memorizedSurahs = updates.memorizedSurahs;
+  if (updates.fajrBoundaryEnabled !== undefined) updateData.fajrBoundaryEnabled = updates.fajrBoundaryEnabled;
+  if (updates.locationCoords !== undefined) updateData.locationCoords = updates.locationCoords;
+  if (updates.fajrCalculationMethod !== undefined) updateData.fajrCalculationMethod = updates.fajrCalculationMethod;
+  if (updates.scheduleAnchorDate !== undefined) updateData.scheduleAnchorDate = updates.scheduleAnchorDate;
 
   if (updates.notifications) {
     if (updates.notifications.enabled !== undefined) {

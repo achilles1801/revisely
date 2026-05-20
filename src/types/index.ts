@@ -13,7 +13,6 @@ export interface User {
 
   // Preferences
   dailyPageCapacity: number;        // e.g., 20 pages
-  activeDays: number[];             // 0=Sun, 1=Mon, etc. (legacy; Phase 6 derives this from the plan)
   reminderTime: string;             // "08:00"
   notificationsEnabled: boolean;
 
@@ -32,6 +31,26 @@ export interface User {
   // Stats
   streak: number;
   lastRevisionDate: string | null;
+
+  // Surah numbers the user has explicitly marked memorized at the surah level.
+  // Distinct from page-level state because short surahs that share a page
+  // (e.g., Shams/Layl/Duha on page 595) shouldn't all flip checked just
+  // because the shared page was marked via one of them.
+  memorizedSurahs: number[];
+
+  // Fajr-based day boundary. When enabled, "today's session" rolls over at
+  // fajr (computed locally from coords + method) instead of midnight, so
+  // night-revisers who finish at 1 AM still count as the previous day.
+  fajrBoundaryEnabled: boolean;
+  locationCoords: { latitude: number; longitude: number } | null;
+  /** adhan calculation method id — see `FajrCalculationMethod` in lib/fajrBoundary. */
+  fajrCalculationMethod: string;
+
+  // Anchor for the default sliding-window schedule. Reset when the user
+  // finishes onboarding (including replays) so "Day 1 of the cycle" lines
+  // up with whatever they just configured. Falls back to `createdAt` for
+  // legacy users who don't have the field yet.
+  scheduleAnchorDate: string;
 }
 
 /** A user-edited schedule that overrides the default sequential plan. */

@@ -25,46 +25,28 @@ export function Card({
 }: CardProps) {
   const { theme } = useTheme();
 
-  if (variant === 'elevated' || variant === 'flat') {
-    return (
-      <View
-        style={[
-          styles.glassCard,
-          variant === 'elevated' && shadows.md,
-          !noPadding && styles.padding,
-          style,
-        ]}
-      >
-        <GlassCard style={StyleSheet.absoluteFillObject} />
-        {children}
-      </View>
-    );
-  }
-
-  const variantStyle: ViewStyle = {
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-  };
+  const outlineStyle: ViewStyle | null =
+    variant === 'outlined'
+      ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border }
+      : null;
 
   return (
     <View
       style={[
-        styles.card,
-        variantStyle,
+        styles.glassCard,
+        variant === 'elevated' && shadows.md,
+        outlineStyle,
         !noPadding && styles.padding,
         style,
       ]}
     >
+      <GlassCard style={StyleSheet.absoluteFillObject} />
       {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.md,
-  },
   glassCard: {
     borderRadius: radius.md,
     overflow: 'hidden',

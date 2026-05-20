@@ -1089,9 +1089,10 @@ function PagePreviewModal({
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.previewBackdrop} onPress={onClose}>
         <Pressable
-          style={[styles.previewCard, { backgroundColor: theme.surface }]}
+          style={styles.previewCard}
           onPress={() => {}}
         >
+          <GlassCard style={StyleSheet.absoluteFillObject} />
           <View
             style={[
               styles.previewCardHeader,
@@ -1111,10 +1112,11 @@ function PagePreviewModal({
             <PressableScale
               onPress={onClose}
               haptic="light"
-              style={[styles.previewClose, { backgroundColor: theme.bgAlt }]}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="close" size={20} color={theme.textPrimary} />
+              <GlassCard style={styles.previewClose}>
+                <Ionicons name="close" size={20} color={theme.textPrimary} />
+              </GlassCard>
             </PressableScale>
           </View>
           <View
@@ -1469,7 +1471,8 @@ const styles = StyleSheet.create({
   previewClose: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: radius.full,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },

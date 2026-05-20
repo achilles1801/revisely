@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components/Button';
+import { GlassCard } from '../../components/GlassCard';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -141,7 +143,7 @@ export default function AuthScreen() {
   const displayError = localError || error;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -156,17 +158,21 @@ export default function AuthScreen() {
             <Text style={[styles.title, { color: theme.textPrimary }]}>
               {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
             </Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            {/* <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               {mode === 'login'
                 ? 'Sign in to sync your progress across devices'
                 : mode === 'signup'
                 ? 'Create an account to save your progress'
                 : 'We\'ll send you a reset link'}
-            </Text>
+            </Text> */}
           </View>
 
           {resetSent ? (
-            <View style={[styles.successBox, { backgroundColor: theme.successBg, borderColor: theme.success }]}>
+            <View style={styles.successBox}>
+              <GlassCard
+                style={StyleSheet.absoluteFillObject}
+                tintColor={theme.success + '22'}
+              />
               <Text style={[styles.successText, { color: theme.success }]}>
                 Password reset email sent! Check your inbox.
               </Text>
@@ -180,7 +186,11 @@ export default function AuthScreen() {
           ) : (
             <>
               {displayError && (
-                <View style={[styles.errorBox, { backgroundColor: theme.errorBg, borderColor: theme.error }]}>
+                <View style={styles.errorBox}>
+                  <GlassCard
+                    style={StyleSheet.absoluteFillObject}
+                    tintColor={theme.error + '22'}
+                  />
                   <Text style={[styles.errorText, { color: theme.error }]}>{displayError}</Text>
                 </View>
               )}
@@ -189,37 +199,44 @@ export default function AuthScreen() {
                 {mode === 'signup' && (
                   <View style={styles.inputContainer}>
                     <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Name</Text>
-                    <TextInput
-                      style={[styles.input, { backgroundColor: theme.bgAlt, borderColor: theme.border, color: theme.textPrimary }]}
-                      value={name}
-                      onChangeText={setName}
-                      placeholder="Your name"
-                      placeholderTextColor={theme.textMuted}
-                      autoCapitalize="words"
-                      autoCorrect={false}
-                    />
+                    <View style={styles.inputShell}>
+                      <GlassCard style={StyleSheet.absoluteFillObject} />
+                      <TextInput
+                        style={[styles.input, { color: theme.textPrimary }]}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="Your name"
+                        placeholderTextColor={theme.textMuted}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                    </View>
                   </View>
                 )}
 
                 <View style={styles.inputContainer}>
                   <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Email</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.bgAlt, borderColor: theme.border, color: theme.textPrimary }]}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="your@email.com"
-                    placeholderTextColor={theme.textMuted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                  />
+                  <View style={styles.inputShell}>
+                    <GlassCard style={StyleSheet.absoluteFillObject} />
+                    <TextInput
+                      style={[styles.input, { color: theme.textPrimary }]}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="your@email.com"
+                      placeholderTextColor={theme.textMuted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="email"
+                    />
+                  </View>
                 </View>
 
                 {mode !== 'reset' && (
                   <View style={styles.inputContainer}>
                     <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Password</Text>
-                    <View style={[styles.passwordContainer, { backgroundColor: theme.bgAlt, borderColor: theme.border }]}>
+                    <View style={styles.passwordContainer}>
+                      <GlassCard style={StyleSheet.absoluteFillObject} />
                       <TextInput
                         style={[styles.passwordInput, { color: theme.textPrimary }]}
                         value={password}
@@ -249,7 +266,8 @@ export default function AuthScreen() {
                 {mode === 'signup' && (
                   <View style={styles.inputContainer}>
                     <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Confirm Password</Text>
-                    <View style={[styles.passwordContainer, { backgroundColor: theme.bgAlt, borderColor: theme.border }]}>
+                    <View style={styles.passwordContainer}>
+                      <GlassCard style={StyleSheet.absoluteFillObject} />
                       <TextInput
                         style={[styles.passwordInput, { color: theme.textPrimary }]}
                         value={confirmPassword}
@@ -343,13 +361,14 @@ export default function AuthScreen() {
 
               {isGoogleAuthAvailable && (
                 <TouchableOpacity
-                  style={[styles.googleButton, { backgroundColor: theme.bgAlt, borderColor: theme.border }]}
+                  style={styles.googleButton}
                   onPress={handleGoogleSignIn}
                   disabled={isLoading || googleLoading || appleLoading}
                   activeOpacity={0.7}
                   accessibilityRole="button"
                   accessibilityLabel="Continue with Google"
                 >
+                  <GlassCard style={StyleSheet.absoluteFillObject} />
                   <Text style={[styles.googleIcon, { color: '#4285F4' }]}>G</Text>
                   <Text style={[styles.googleButtonText, { color: theme.textPrimary }]}>
                     {googleLoading ? 'Signing in…' : 'Continue with Google'}
@@ -399,20 +418,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorBox: {
-    borderWidth: 1,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    borderRadius: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   errorText: {
     ...typography.bodyMedium,
   },
   successBox: {
-    borderWidth: 1,
     padding: spacing.lg,
     marginBottom: spacing.lg,
     alignItems: 'center',
-    borderRadius: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   successText: {
     ...typography.bodyMedium,
@@ -429,9 +448,11 @@ const styles = StyleSheet.create({
     ...typography.label,
     marginBottom: spacing.xs,
   },
+  inputShell: {
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
   input: {
-    borderWidth: 1,
-    borderRadius: 2,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     ...typography.bodyMedium,
@@ -439,8 +460,8 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
   },
   passwordInput: {
     flex: 1,
@@ -501,12 +522,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
     minHeight: 48,
+    overflow: 'hidden',
   },
   googleIcon: {
     fontSize: 18,

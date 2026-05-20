@@ -112,16 +112,28 @@ service cloud.firestore {
       return [
         'updatedAt', 'lastActiveAt',
         'displayName', 'photoURL', 'email',
-        'dailyPageCapacity', 'activeDays',
+        'dailyPageCapacity',
         'smartTrackingEnabled', 'hasSeenSmartTrackingPreview',
         'theme',
         'notifications', 'notificationsEnabled', 'reminderTime',
         'currentMemorizationJuz', 'currentMemorizationPage', 'currentKhatamPage',
         'customPlan',
         'onboardingComplete',
+        // Surah-level memorization intent — separate from page status so
+        // shared-page surahs (Shams/Layl/Duha) don't auto-flip together.
+        'memorizedSurahs',
+        // Fajr-based day boundary settings.
+        'fajrBoundaryEnabled', 'locationCoords', 'fajrCalculationMethod',
+        // Schedule cycle anchor — reset on onboarding (incl. replays) so
+        // Day 1 of the cycle aligns with the latest setup.
+        'scheduleAnchorDate',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
-        'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate'
+        'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
+        // Deprecated top-level fields — kept in the allowlist so the client
+        // can issue FieldValue.delete() against legacy user docs that still
+        // carry them. New writes never set these; this is delete-only sweep.
+        'dangerThresholdDays', 'revisionMode', 'activeDays'
       ];
     }
 
