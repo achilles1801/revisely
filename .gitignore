@@ -52,3 +52,11 @@ google-services.json
 .claude/
 .mcp.json
 
+# Internal docs (kept locally for reference, not part of the public repo)
+SUBMISSION.md
+TASKS.md
+ALGORITHM_SCREEN_IMPLEMENTATION.md
+ALGORITHM_SCREEN_VISUAL_GUIDE.md
+docs/REDESIGN_WORKBOARD.md
+docs/security-audit-2026-05-10.md
+
