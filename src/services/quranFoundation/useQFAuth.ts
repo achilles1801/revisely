@@ -11,7 +11,7 @@ import { exchangeCodeForToken, isQFConnected, disconnectQF } from './oauth';
 // Required to close the in-app browser when the OAuth redirect comes back.
 WebBrowser.maybeCompleteAuthSession();
 
-const SCOPES = ['openid', 'offline_access', 'streak', 'goal', 'reading_session'];
+const SCOPES = ['openid', 'offline_access', 'streak', 'goal', 'reading_session', 'activity_day'];
 const SCOPE_STRING = SCOPES.join(' ');
 
 const discovery = {

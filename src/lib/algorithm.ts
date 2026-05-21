@@ -316,7 +316,7 @@ export function generateDailyAssignment(
 }
 
 /** Minimum completed sessions before the Insights tab populates with data. */
-export const INSIGHTS_MIN_SESSIONS = 5;
+export const INSIGHTS_MIN_SESSIONS = 3;
 
 /**
  * Count sessions where the user actually revised at least one page. Used to

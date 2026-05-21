@@ -15,6 +15,7 @@ import { generateId } from '../lib/utils';
 import { recomputePagesFromLogs } from '../lib/algorithm';
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
+import { postActivityDayForRevision } from '../services/quranFoundation';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -674,6 +675,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Refresh logs
       const sessions = await firestoreService.getRecentSessions(100);
       setLogs(sessions.map(firestoreSessionToLog));
+
+      // Write activity day to QF so the streak in Settings (and across the
+      // Quran.com ecosystem) reflects revision done in Revisely. Fire-and-
+      // forget — failures are logged but never block the local save.
+      if (log.pagesRevised.length > 0) {
+        postActivityDayForRevision({
+          pages: log.pagesRevised,
+          durationMinutes: log.durationMinutes,
+        });
+      }
     } catch (err) {
       logger.error('Error adding log:', err);
       setError(err instanceof Error ? err.message : 'Failed to add log');

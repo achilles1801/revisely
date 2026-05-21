@@ -19,5 +19,6 @@ export {
 } from './oauth';
 export { getCurrentStreak } from './streaks';
 export type { CurrentStreak } from './streaks';
+export { postActivityDayForRevision } from './activityDays';
 export { loadQFSession, clearQFSession } from './storage';
 export type { QFUserSession } from './storage';

@@ -15,30 +15,26 @@ export async function getCurrentStreak(): Promise<CurrentStreak | null> {
   const token = await getValidUserAccessToken();
   if (!token) return null;
 
-  const res = await fetch(`${QF_USER_API_BASE}/streaks/current_streak_days`, {
-    headers: {
-      'x-auth-token': token,
-      'x-client-id': QF_USER_CONFIG.clientId,
+  // `type=QURAN` is required — QF distinguishes reading-streak types and
+  // returns 422 without it.
+  const res = await fetch(
+    `${QF_USER_API_BASE}/streaks/current-streak-days?type=QURAN`,
+    {
+      headers: {
+        'x-auth-token': token,
+        'x-client-id': QF_USER_CONFIG.clientId,
+      },
     },
-  });
+  );
 
-  if (!res.ok) {
-    // 401 likely means the token was revoked server-side — caller can
-    // decide whether to prompt re-auth; for now just return null.
-    return null;
-  }
+  if (!res.ok) return null;
 
-  // Endpoint shape varies by version. Be defensive: read several likely keys.
-  const data = (await res.json()) as Record<string, unknown>;
-  const days =
-    (typeof data.current_streak_days === 'number' && data.current_streak_days) ||
-    (typeof data.days === 'number' && data.days) ||
-    (typeof data.streak === 'number' && data.streak) ||
-    0;
-  const lastActiveDate =
-    (typeof data.last_active_date === 'string' && data.last_active_date) ||
-    (typeof data.last_activity_date === 'string' && data.last_activity_date) ||
-    null;
-
-  return { days, lastActiveDate };
+  // Response shape per QF docs: { success: true, data: { days: number } }
+  const body = (await res.json()) as {
+    data?: { days?: number; last_active_date?: string };
+  };
+  return {
+    days: body.data?.days ?? 0,
+    lastActiveDate: body.data?.last_active_date ?? null,
+  };
 }

@@ -272,8 +272,8 @@ describe('countCompletedSessions', () => {
 });
 
 describe('INSIGHTS_MIN_SESSIONS', () => {
-  it('is set to 5 (the agreed populated-tab threshold)', () => {
-    expect(INSIGHTS_MIN_SESSIONS).toBe(5);
+  it('is set to 3 (the agreed populated-tab threshold)', () => {
+    expect(INSIGHTS_MIN_SESSIONS).toBe(3);
   });
 });
 
