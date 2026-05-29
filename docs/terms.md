@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-05-11**
+**Last updated: 2026-05-28**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
@@ -34,9 +34,9 @@ Revisely is a tool to help you track and review your Quran memorization. Specifi
 - A daily revision schedule based on a weighted algorithm that considers your weakness ratings, recency of review, and skip history.
 - Progress tracking across pages, surahs, and juz.
 - Push notifications for revision reminders (when enabled).
-- Future features may include voice-based recitation feedback and a paid premium tier.
+- Future features may include voice-based recitation feedback.
 
-We may add, change, or remove features at any time. We will not retroactively remove paid features you have purchased without offering a refund or equivalent value.
+We may add, change, or remove features at any time.
 
 ## 4. Acceptable use
 
@@ -64,16 +64,11 @@ The Holy Quran itself is in the public domain. Page images displayed in the app 
 
 ## 7. Third-party services
 
-Revisely uses third-party services to operate, including Firebase (Google), Apple, Anthropic, and Sentry. Your use of those services through Revisely is governed by their respective terms. We are not responsible for the practices of third parties beyond ensuring they are appropriate processors of the data we share with them as described in our Privacy Policy.
+Revisely uses third-party services to operate, including Firebase (Google), Apple, Anthropic, Sentry, and — if you choose to connect your Quran.com account — Quran Foundation. Your use of those services through Revisely is governed by their respective terms. We are not responsible for the practices of third parties beyond ensuring they are appropriate processors of the data we share with them as described in our Privacy Policy.
 
-## 8. Subscriptions and payments
+## 8. Pricing
 
-Some features of Revisely may require a paid subscription, processed exclusively through Apple's In-App Purchase system. By purchasing a subscription, you agree to:
-
-- Apple's payment terms ([apple.com/legal/internet-services/itunes](https://www.apple.com/legal/internet-services/itunes/)).
-- Automatic renewal at the end of each billing period unless you cancel at least 24 hours before the renewal date through your Apple ID account settings.
-
-Refunds are handled by Apple, not by us. To request a refund, visit [reportaproblem.apple.com](https://reportaproblem.apple.com). We will assist where reasonable but cannot directly issue refunds for App Store purchases.
+Revisely is currently free to download and use, and contains no in-app purchases or subscriptions. If we introduce paid features in the future, they will be sold exclusively through Apple's In-App Purchase system, any auto-renewing terms will be clearly disclosed at the point of sale, and these Terms will be updated before any charge applies.
 
 ## 9. Disclaimer of warranties
 
@@ -85,7 +80,7 @@ To the fullest extent permitted by law, we disclaim all implied warranties, incl
 
 To the maximum extent permitted by law, in no event shall `Majd Khawaldeh`, our affiliates, or our processors be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits, revenue, data, or use, arising out of or related to your use of Revisely, even if we have been advised of the possibility of such damages.
 
-Our total liability to you for any claim arising from or related to Revisely is limited to the greater of (a) the amount you have paid us in the 12 months preceding the claim, or (b) USD $10.
+Our total liability to you for any claim arising from or related to Revisely is limited to the greater of (a) the amount you have paid us, if any, in the 12 months preceding the claim, or (b) USD $10.
 
 Some jurisdictions do not allow the exclusion or limitation of incidental or consequential damages, so the above limitation may not apply to you.
 
