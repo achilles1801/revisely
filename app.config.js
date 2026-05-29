@@ -21,7 +21,7 @@ export default {
       backgroundColor: "#03372A"
     },
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: "com.revisionbuddy.app",
       googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST ?? "./GoogleService-Info.plist",
       infoPlist: {
@@ -97,6 +97,12 @@ export default {
       "@sentry/react-native",
       "expo-font",
       "expo-web-browser",
+      // Adds the com.apple.developer.applesignin entitlement during prebuild.
+      // REQUIRED: ios/ is gitignored, so EAS regenerates the native project from
+      // this plugins list on every build. Without this entry the Sign in with
+      // Apple button ships with no entitlement and fails at runtime — an
+      // automatic App Review rejection (Guideline 4.8).
+      "expo-apple-authentication",
       [
         "expo-location",
         {
