@@ -13,6 +13,14 @@ export interface User {
 
   // Preferences
   dailyPageCapacity: number;        // e.g., 20 pages
+  // How the daily quota is interpreted. 'pages' uses dailyPageCapacity as a
+  // raw page count; 'juz' uses dailyJuzCount and ignores dailyPageCapacity.
+  // 'pages' is the historical default; 'juz' was added so users who think
+  // in juz ("one juz a day") don't have to math their way through uneven
+  // juz lengths.
+  scheduleMode: 'pages' | 'juz';
+  // Only meaningful when scheduleMode === 'juz'. Defaults to 1 for new users.
+  dailyJuzCount: number;
   reminderTime: string;             // "08:00"
   notificationsEnabled: boolean;
 
@@ -80,6 +88,11 @@ export interface UserPage {
 export interface RevisionLog {
   id: string;
   date: string;
+  // Every page the user was scheduled to revise this day. Source of truth for
+  // "the whole session" — UI surfaces (recent sessions row, edit modal) should
+  // reference this rather than reconstructing from revised + skipped, since
+  // skipped is only populated on Submit, not on intermediate Save.
+  assignedPages?: number[];
   pagesRevised: number[];
   pagesSkipped: number[];
   weaknessUpdates: { page: number; rating: number }[];

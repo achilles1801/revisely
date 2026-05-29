@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,23 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
-  LayoutAnimation,
+  Modal,
   Platform,
-  UIManager,
+  Pressable,
+  Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
-import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { PressableScale } from '../../components/PressableScale';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -25,58 +30,22 @@ import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { buildDefaultPlanDays } from '../../lib/algorithm';
+import { buildDefaultPlanDays, buildJuzCycleDays } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
 import { CustomPlan } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
+type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
 type Direction = 'forward' | 'reverse';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-interface SurahGroup {
-  surahName: string;
-  surahNameArabic: string;
-  startPage: number;
-  endPage: number;
-}
-
-function groupPagesBySurah(
-  pages: number[],
-  quranData: ReturnType<typeof getQuranData>,
-): SurahGroup[] {
-  if (pages.length === 0) return [];
-  const groups: SurahGroup[] = [];
-  let current: SurahGroup | null = null;
-  for (const p of pages) {
-    const meta = quranData.find((q) => q.pageNumber === p);
-    if (!meta) continue;
-    if (current && current.surahName === meta.surahName) {
-      current.endPage = p;
-    } else {
-      if (current) groups.push(current);
-      current = {
-        surahName: meta.surahName,
-        surahNameArabic: meta.surahNameArabic,
-        startPage: p,
-        endPage: p,
-      };
-    }
-  }
-  if (current) groups.push(current);
-  return groups;
-}
-
-function dateLabel(daysFromToday: number): string {
+function dayLabel(daysFromToday: number): string {
   if (daysFromToday === 0) return 'Today';
   if (daysFromToday === 1) return 'Tomorrow';
-  return `+${daysFromToday} days`;
+  return `In ${daysFromToday} days`;
 }
 
 function summariseJuz(pages: number[], quranData: ReturnType<typeof getQuranData>): string {
-  if (pages.length === 0) return 'Off day';
+  if (pages.length === 0) return 'Rest day';
   const juzSet = new Set<number>();
   for (const p of pages) {
     const juz = quranData.find((q) => q.pageNumber === p)?.juzNumber;
@@ -85,12 +54,33 @@ function summariseJuz(pages: number[], quranData: ReturnType<typeof getQuranData
   const juzList = Array.from(juzSet).sort((a, b) => a - b);
   if (juzList.length === 0) return `${pages.length} pages`;
   if (juzList.length === 1) return `Juz ${juzList[0]}`;
-  if (juzList.length <= 3) return `Juz ${juzList.join(', ')}`;
-  return `Juz ${juzList[0]}–${juzList[juzList.length - 1]}`;
+  if (juzList.length <= 3) return `Ajzaʼ ${juzList.join(', ')}`;
+  return `Ajzaʼ ${juzList[0]}–${juzList[juzList.length - 1]}`;
+}
+
+function summarisePrimarySurah(
+  pages: number[],
+  quranData: ReturnType<typeof getQuranData>,
+): string | null {
+  if (pages.length === 0) return null;
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const p of pages) {
+    const name = quranData.find((q) => q.pageNumber === p)?.surahName;
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  }
+  if (names.length === 0) return null;
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return names.join(', ');
+  return `${names[0]}, ${names[1]} +${names.length - 2}`;
 }
 
 export default function PlanEditScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages, saveUser } = useApp();
@@ -101,28 +91,43 @@ export default function PlanEditScreen() {
     [pages],
   );
 
+  const isJuzMode =
+    !!user && user.scheduleMode === 'juz' && (user.dailyJuzCount ?? 0) > 0;
+
   const initialState = useMemo(() => {
+    // CustomPlan is a universal override — show it whenever it exists,
+    // regardless of mode. Mode only controls the default when no customPlan.
     if (user?.customPlan && user.customPlan.days.length > 0) {
       return {
         days: user.customPlan.days.map((d) => [...d]),
         direction: user.customPlan.direction,
       };
     }
+    if (isJuzMode && user) {
+      return {
+        days: buildJuzCycleDays(user, memorizedPages),
+        direction: 'forward' as Direction,
+      };
+    }
     return {
       days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward') : [],
       direction: 'forward' as Direction,
     };
-  }, [user, memorizedPages]);
+  }, [user, memorizedPages, isJuzMode]);
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<Direction>(initialState.direction);
-  const [expandedDay, setExpandedDay] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const toggleExpand = (index: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedDay((current) => (current === index ? null : index));
-  };
+  useEffect(() => {
+    const edited = route.params?.editedDay;
+    if (!edited) return;
+    setDays((prev) =>
+      prev.map((d, i) => (i === edited.index ? [...edited.pages] : [...d])),
+    );
+    navigation.setParams({ editedDay: undefined });
+  }, [route.params?.editedDay, navigation]);
 
   const isDirty = useMemo(() => {
     if (direction !== initialState.direction) return true;
@@ -136,47 +141,58 @@ export default function PlanEditScreen() {
     return false;
   }, [days, direction, initialState]);
 
-  const handleDirectionChange = (next: Direction) => {
-    if (next === direction || !user) return;
-    Haptics.selectionAsync();
-    setDirection(next);
-    setDays(buildDefaultPlanDays(user, memorizedPages, next));
-  };
-
-  const moveDay = (index: number, delta: -1 | 1) => {
-    const target = index + delta;
-    if (target < 0 || target >= days.length) return;
-    Haptics.selectionAsync();
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setDays((prev) => {
-      const next = prev.map((d) => [...d]);
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
+  const saveBarTranslate = useSharedValue(0);
+  useEffect(() => {
+    saveBarTranslate.value = withSpring(isDirty ? 1 : 0, {
+      damping: 22,
+      stiffness: 240,
+      mass: 0.8,
     });
-    // Move the expansion with the row that the user is acting on.
-    setExpandedDay(target);
-  };
+  }, [isDirty, saveBarTranslate]);
+  const saveBarStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - saveBarTranslate.value) * 120 }],
+    opacity: saveBarTranslate.value,
+  }));
 
-  const markDayOff = (index: number) => {
+  const handleDirectionChange = useCallback(
+    (next: Direction) => {
+      if (next === direction || !user) return;
+      Haptics.selectionAsync();
+      setDirection(next);
+      setDays(buildDefaultPlanDays(user, memorizedPages, next));
+    },
+    [direction, user, memorizedPages],
+  );
+
+  const goToDayEditor = (index: number) => {
     Haptics.selectionAsync();
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setDays((prev) => prev.map((d, i) => (i === index ? [] : [...d])));
+    navigation.navigate('PlanDayEdit', {
+      dayIndex: index,
+      initialPages: days[index],
+    });
   };
 
-  const resetToDefault = () => {
-    if (!user) return;
+  const handleClearCustom = () => {
+    if (!user || saving) return;
+    setMenuOpen(false);
     Alert.alert(
-      'Reset schedule?',
-      'This restores the auto-generated cycle for your memorized pages.',
+      'Use the default schedule?',
+      'Your custom edits will be removed and Revisely will resume the auto-generated cycle.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reset',
+          text: 'Use default',
           style: 'destructive',
-          onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            setDirection('forward');
-            setDays(buildDefaultPlanDays(user, memorizedPages, 'forward'));
+          onPress: async () => {
+            setSaving(true);
+            try {
+              await saveUser({ ...user, customPlan: null });
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              navigation.goBack();
+            } catch {
+              setSaving(false);
+              Alert.alert("Couldn't save", 'Please try again.');
+            }
           },
         },
       ],
@@ -197,34 +213,8 @@ export default function PlanEditScreen() {
       navigation.goBack();
     } catch {
       setSaving(false);
-      Alert.alert('Couldn’t save', 'Please try again.');
+      Alert.alert("Couldn't save", 'Please try again.');
     }
-  };
-
-  const handleClearCustom = async () => {
-    if (!user || saving) return;
-    Alert.alert(
-      'Use the default schedule?',
-      'Your custom edits will be removed and Revisley will resume the auto-generated cycle.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Use default',
-          style: 'destructive',
-          onPress: async () => {
-            setSaving(true);
-            try {
-              await saveUser({ ...user, customPlan: null });
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              navigation.goBack();
-            } catch {
-              setSaving(false);
-              Alert.alert('Couldn’t save', 'Please try again.');
-            }
-          },
-        },
-      ],
-    );
   };
 
   if (!user) {
@@ -237,22 +227,42 @@ export default function PlanEditScreen() {
     );
   }
 
+  const cycleDescriptor =
+    days.length === 0
+      ? 'Nothing to schedule'
+      : days.length === 1
+        ? '1 day, repeats every day'
+        : `${days.length} days · repeats every ${days.length} days`;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <PressableScale
           onPress={() => navigation.goBack()}
           haptic="light"
+          style={styles.backButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Back"
+        >
+          <Ionicons name="chevron-back" size={20} color={theme.textSecondary} />
+          <Text style={styles.backText}>Back</Text>
+        </PressableScale>
+        <PressableScale
+          onPress={() => {
+            Haptics.selectionAsync();
+            setMenuOpen(true);
+          }}
+          haptic="none"
           style={styles.headerButton}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Cancel"
+          accessibilityLabel="More options"
         >
-          <Ionicons name="close" size={22} color={theme.textPrimary} />
+          <Ionicons
+            name="ellipsis-horizontal"
+            size={20}
+            color={theme.textSecondary}
+          />
         </PressableScale>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Your schedule</Text>
-        </View>
-        <View style={styles.headerButton} />
       </View>
 
       <ScrollView
@@ -260,241 +270,171 @@ export default function PlanEditScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionLabel}>DIRECTION</Text>
-        <View style={styles.directionWrap}>
-          <LiquidGlassSegmentedControl<Direction>
-            options={[
-              { value: 'forward', label: '1 → 30' },
-              { value: 'reverse', label: '30 → 1' },
-            ]}
-            value={direction}
-            onChange={handleDirectionChange}
-          />
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>Your cycle</Text>
+          <Text style={styles.heroSubtitle}>{cycleDescriptor}</Text>
         </View>
 
-        <Text style={styles.sectionLabel}>CYCLE</Text>
-        <Text style={styles.sectionHelper}>
-          Tap a day to move it or mark it off. The cycle loops from day 1 once it
-          ends.
-        </Text>
-
         {days.length === 0 ? (
-          <GlassCard style={styles.emptyCard}>
+          <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>
               You haven't marked any pages as memorized yet — there's nothing to
               schedule.
             </Text>
-          </GlassCard>
+          </View>
         ) : (
           <View style={styles.list}>
             {days.map((dayPages, index) => {
               const isOff = dayPages.length === 0;
-              const isExpanded = expandedDay === index;
-              const surahGroups = isExpanded
-                ? groupPagesBySurah(dayPages, quranData)
-                : [];
-
+              const surahLine = summarisePrimarySurah(dayPages, quranData);
+              const juzLine = summariseJuz(dayPages, quranData);
+              const isFirst = index === 0;
+              const isLast = index === days.length - 1;
               return (
-                <View key={index} style={styles.dayCard}>
-                  <GlassCard style={StyleSheet.absoluteFillObject} />
-                  <PressableScale
-                    onPress={() => toggleExpand(index)}
-                    haptic="light"
-                    scale={0.99}
-                    style={styles.dayRow}
-                  >
-                    <View style={styles.dayIndexCircle}>
-                      <Text style={styles.dayIndexText}>{index + 1}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.dayLabel}>{dateLabel(index)}</Text>
-                      <Text
-                        style={[
-                          styles.dayAssignment,
-                          isOff && {
-                            color: theme.textMuted,
-                            fontStyle: 'italic',
-                          },
-                        ]}
-                      >
-                        {summariseJuz(dayPages, quranData)}
-                      </Text>
-                    </View>
-                    {!isOff && (
-                      <Text style={styles.dayPageCount}>
-                        {dayPages.length} page{dayPages.length === 1 ? '' : 's'}
+                <PressableScale
+                  key={index}
+                  onPress={() => goToDayEditor(index)}
+                  haptic="light"
+                  scale={0.995}
+                  style={[
+                    styles.row,
+                    isFirst && styles.rowFirst,
+                    !isLast && styles.rowDivider,
+                  ]}
+                >
+                  <View style={styles.rowLeft}>
+                    <Text
+                      style={[
+                        styles.rowDayLabel,
+                        isFirst && styles.rowDayLabelToday,
+                      ]}
+                    >
+                      {dayLabel(index)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.rowPrimary,
+                        isOff && styles.rowPrimaryOff,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {juzLine}
+                    </Text>
+                    {surahLine && (
+                      <Text style={styles.rowSecondary} numberOfLines={1}>
+                        {surahLine}
                       </Text>
                     )}
+                  </View>
+                  <View style={styles.rowRight}>
+                    {!isOff && (
+                      <Text style={styles.rowCount}>{dayPages.length}</Text>
+                    )}
                     <Ionicons
-                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                      size={18}
+                      name="chevron-forward"
+                      size={16}
                       color={theme.textMuted}
+                      style={{ opacity: 0.5 }}
                     />
-                  </PressableScale>
-
-                  {isExpanded && (
-                    <View style={styles.expanded}>
-                      {isOff ? (
-                        <Text style={styles.offHint}>
-                          No revision is scheduled for this day. Use "Reset
-                          edits" to restore it.
-                        </Text>
-                      ) : (
-                        <>
-                          <Text style={styles.expandedLabel}>CONTENTS</Text>
-                          <View style={styles.surahList}>
-                            {surahGroups.map((g, gi) => (
-                              <View key={gi} style={styles.surahRow}>
-                                <Text style={styles.surahArabic}>
-                                  {g.surahNameArabic}
-                                </Text>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.surahName}>
-                                    {g.surahName}
-                                  </Text>
-                                  <Text style={styles.surahPages}>
-                                    {g.startPage === g.endPage
-                                      ? `Page ${g.startPage}`
-                                      : `Pages ${g.startPage}–${g.endPage}`}
-                                  </Text>
-                                </View>
-                              </View>
-                            ))}
-                          </View>
-                        </>
-                      )}
-
-                      <View style={styles.actionRow}>
-                        <PressableScale
-                          onPress={() => moveDay(index, -1)}
-                          haptic="selection"
-                          scale={0.98}
-                          style={[
-                            styles.actionButton,
-                            index === 0 && styles.actionButtonDisabled,
-                          ]}
-                        >
-                          <GlassCard style={StyleSheet.absoluteFillObject} />
-                          <Ionicons
-                            name="arrow-up"
-                            size={16}
-                            color={
-                              index === 0 ? theme.textMuted : theme.textPrimary
-                            }
-                          />
-                          <Text
-                            style={[
-                              styles.actionButtonText,
-                              { color:
-                                  index === 0
-                                    ? theme.textMuted
-                                    : theme.textPrimary,
-                              },
-                            ]}
-                          >
-                            Up
-                          </Text>
-                        </PressableScale>
-                        <PressableScale
-                          onPress={() => moveDay(index, 1)}
-                          haptic="selection"
-                          scale={0.98}
-                          style={[
-                            styles.actionButton,
-                            index === days.length - 1 &&
-                              styles.actionButtonDisabled,
-                          ]}
-                        >
-                          <GlassCard style={StyleSheet.absoluteFillObject} />
-                          <Ionicons
-                            name="arrow-down"
-                            size={16}
-                            color={
-                              index === days.length - 1
-                                ? theme.textMuted
-                                : theme.textPrimary
-                            }
-                          />
-                          <Text
-                            style={[
-                              styles.actionButtonText,
-                              { color:
-                                  index === days.length - 1
-                                    ? theme.textMuted
-                                    : theme.textPrimary,
-                              },
-                            ]}
-                          >
-                            Down
-                          </Text>
-                        </PressableScale>
-                        {!isOff && (
-                          <PressableScale
-                            onPress={() => markDayOff(index)}
-                            haptic="medium"
-                            scale={0.98}
-                            style={styles.actionButton}
-                          >
-                            <GlassCard
-                              style={StyleSheet.absoluteFillObject}
-                              tintColor={theme.error + '1A'}
-                            />
-                            <Ionicons
-                              name="pause-outline"
-                              size={16}
-                              color={theme.error}
-                            />
-                            <Text
-                              style={[
-                                styles.actionButtonText,
-                                { color: theme.error },
-                              ]}
-                            >
-                              Mark off
-                            </Text>
-                          </PressableScale>
-                        )}
-                      </View>
-                    </View>
-                  )}
-                </View>
+                  </View>
+                </PressableScale>
               );
             })}
           </View>
         )}
-
-        {user.customPlan && (
-          <PressableScale
-            onPress={handleClearCustom}
-            haptic="light"
-            style={styles.useDefaultButton}
-          >
-            <Text style={styles.useDefaultText}>Use auto-generated schedule</Text>
-          </PressableScale>
-        )}
-
-        <PressableScale
-          onPress={resetToDefault}
-          haptic="light"
-          style={styles.resetButton}
-        >
-          <Ionicons name="refresh" size={16} color={theme.textSecondary} />
-          <Text style={styles.resetText}>Reset edits</Text>
-        </PressableScale>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <GlassCard style={StyleSheet.absoluteFillObject} />
-        <Button
-          title={isDirty ? 'Save schedule' : 'No changes'}
+      <Animated.View
+        style={[styles.savePillWrap, saveBarStyle]}
+        pointerEvents={isDirty ? 'box-none' : 'none'}
+      >
+        <PressableScale
           onPress={handleSave}
-          variant="primary"
-          disabled={!isDirty || saving || days.length === 0}
-          loading={saving}
-          style={styles.saveButton}
-        />
-      </View>
+          disabled={saving || days.length === 0}
+          haptic="medium"
+          scale={0.96}
+          accessibilityRole="button"
+          accessibilityLabel="Save schedule"
+          accessibilityState={{ disabled: saving || days.length === 0, busy: saving }}
+          style={styles.savePill}
+        >
+          <GlassCard
+            style={StyleSheet.absoluteFillObject}
+            tintColor={theme.accent}
+            elevated
+            specular
+          />
+          <View style={styles.savePillContent}>
+            {saving ? (
+              <ActivityIndicator size="small" color={theme.textInverse} />
+            ) : (
+              <Text style={styles.savePillLabel}>Save schedule</Text>
+            )}
+          </View>
+        </PressableScale>
+      </Animated.View>
 
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.sheetOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={styles.sheetCard}
+          >
+            <GlassCard
+              style={StyleSheet.absoluteFillObject}
+              elevated
+              specular
+            />
+
+            <View style={styles.sheetHandleWrap}>
+              <View style={styles.sheetHandle} />
+            </View>
+
+            <View style={styles.sheetBody}>
+              <View style={styles.sheetToggleRow}>
+                <View style={{ flex: 1, paddingRight: spacing.md }}>
+                  <Text style={styles.sheetToggleTitle}>Reverse direction</Text>
+                  <Text style={styles.sheetToggleSub}>
+                    Cycle from juz 30 to 1 instead of 1 to 30
+                  </Text>
+                </View>
+                <Switch
+                  value={direction === 'reverse'}
+                  onValueChange={(v) =>
+                    handleDirectionChange(v ? 'reverse' : 'forward')
+                  }
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+                />
+              </View>
+
+              {user.customPlan && (
+                <>
+                  <View style={styles.sheetDivider} />
+                  <PressableScale
+                    onPress={handleClearCustom}
+                    haptic="light"
+                    scale={0.99}
+                    style={styles.sheetDestructiveRow}
+                  >
+                    <Text style={styles.sheetDestructiveTitle}>
+                      Use auto-generated schedule
+                    </Text>
+                    <Text style={styles.sheetDestructiveSub}>
+                      Discard your custom edits
+                    </Text>
+                  </PressableScale>
+                </>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -508,8 +448,21 @@ const makeStyles = (theme: ThemeColors) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      height: 56,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.xs,
+      marginLeft: -spacing.xs,
+    },
+    backText: {
+      ...typography.bodySmall,
+      color: theme.textSecondary,
     },
     headerButton: {
       width: 40,
@@ -517,175 +470,174 @@ const makeStyles = (theme: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radius.full,
+      marginRight: -spacing.xs,
     },
-    headerCenter: { flex: 1, alignItems: 'center' },
-    headerTitle: { ...typography.titleLarge, color: theme.textPrimary },
 
     scroll: { flex: 1 },
     scrollContent: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.xl,
-    },
-    sectionLabel: {
-      ...typography.label,
-      color: theme.textMuted,
-      letterSpacing: 1,
-      marginBottom: spacing.xs,
-    },
-    sectionHelper: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-      marginBottom: spacing.md,
-    },
-    directionWrap: {
-      marginBottom: spacing.lg,
+      paddingHorizontal: spacing.md,
+      paddingBottom: 96,
     },
 
-    list: { gap: spacing.xs, marginBottom: spacing.md },
-    dayCard: {
-      borderRadius: radius.md,
-      overflow: 'hidden',
+    hero: {
+      paddingHorizontal: spacing.xs,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.lg,
     },
-    dayRow: {
+    heroTitle: {
+      ...typography.displaySmall,
+      color: theme.textPrimary,
+    },
+    heroSubtitle: {
+      ...typography.bodyMedium,
+      color: theme.textSecondary,
+      marginTop: 4,
+    },
+
+    list: {},
+    row: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xs,
+      borderRadius: radius.sm,
     },
-    expanded: {
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
+    rowFirst: {
+      backgroundColor: theme.accentSoft,
     },
-    expandedLabel: {
+    rowDivider: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    rowLeft: { flex: 1, minWidth: 0 },
+    rowDayLabel: {
       ...typography.label,
       color: theme.textMuted,
-      letterSpacing: 1,
-      marginBottom: spacing.xs,
+      marginBottom: 4,
     },
-    surahList: { gap: spacing.xs, marginBottom: spacing.md },
-    surahRow: {
+    rowDayLabelToday: {
+      color: theme.accent,
+    },
+    rowPrimary: {
+      ...typography.bodyMedium,
+      fontFamily: 'Inter_500Medium',
+      color: theme.textPrimary,
+    },
+    rowPrimaryOff: {
+      color: theme.textMuted,
+      fontStyle: 'italic',
+    },
+    rowSecondary: {
+      ...typography.bodySmall,
+      color: theme.textSecondary,
+      marginTop: 2,
+    },
+    rowRight: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      paddingVertical: spacing.xxs,
     },
-    surahArabic: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-      minWidth: 60,
-      textAlign: 'right',
-    },
-    surahName: {
-      ...typography.bodyMedium,
-      color: theme.textPrimary,
-      fontWeight: '500',
-    },
-    surahPages: {
+    rowCount: {
       ...typography.bodySmall,
-      color: theme.textMuted,
-      marginTop: 1,
-    },
-    offHint: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      fontStyle: 'italic',
-      marginBottom: spacing.md,
-    },
-    actionRow: {
-      flexDirection: 'row',
-      gap: spacing.xs,
-    },
-    actionButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      borderRadius: radius.sm,
-      overflow: 'hidden',
-    },
-    actionButtonDisabled: {
-      opacity: 0.45,
-    },
-    actionButtonText: {
-      ...typography.bodySmall,
-      fontWeight: '600',
-    },
-    dayIndexCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.accent + '20',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dayIndexText: {
-      ...typography.titleSmall,
-      color: theme.accent,
-      fontWeight: '700',
-    },
-    dayLabel: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      marginBottom: 2,
-    },
-    dayAssignment: {
-      ...typography.bodyMedium,
-      color: theme.textPrimary,
-      fontWeight: '600',
-    },
-    dayPageCount: {
-      ...typography.bodySmall,
+      fontFamily: 'Inter_500Medium',
       color: theme.textSecondary,
+      fontVariant: ['tabular-nums'],
     },
 
-    emptyCard: {
-      padding: spacing.lg,
-      borderRadius: radius.md,
-      marginBottom: spacing.md,
+    emptyWrap: {
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.lg,
     },
     emptyText: {
       ...typography.bodyMedium,
       color: theme.textSecondary,
-      textAlign: 'center',
+      lineHeight: 24,
     },
 
-    useDefaultButton: {
-      paddingVertical: spacing.md,
+    savePillWrap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: spacing.lg,
       alignItems: 'center',
-      marginTop: spacing.sm,
     },
-    useDefaultText: {
-      ...typography.bodyMedium,
-      color: theme.error,
-      fontWeight: '600',
-    },
-    resetButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.xs,
-      paddingVertical: spacing.sm,
-    },
-    resetText: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-      fontWeight: '600',
-    },
-
-    footer: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
+    savePill: {
+      borderRadius: radius.full,
       overflow: 'hidden',
     },
-    saveButton: { width: '100%' },
-  });
+    savePillContent: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + 2,
+      minWidth: 180,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    savePillLabel: {
+      ...typography.titleSmall,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+      color: theme.textInverse,
+    },
 
+    sheetOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'flex-end',
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.xl,
+    },
+    sheetCard: {
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+      paddingBottom: spacing.sm,
+    },
+    sheetHandleWrap: {
+      alignItems: 'center',
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xs,
+    },
+    sheetHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.border,
+    },
+    sheetBody: {
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    sheetToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+    },
+    sheetToggleTitle: {
+      ...typography.bodyLarge,
+      fontFamily: 'Inter_500Medium',
+      color: theme.textPrimary,
+    },
+    sheetToggleSub: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      marginTop: 2,
+    },
+    sheetDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.border,
+      marginVertical: spacing.xxs,
+    },
+    sheetDestructiveRow: {
+      paddingVertical: spacing.md,
+    },
+    sheetDestructiveTitle: {
+      ...typography.bodyLarge,
+      fontFamily: 'Inter_500Medium',
+      color: theme.error,
+    },
+    sheetDestructiveSub: {
+      ...typography.bodySmall,
+      color: theme.textMuted,
+      marginTop: 2,
+    },
+  });

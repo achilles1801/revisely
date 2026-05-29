@@ -14,14 +14,14 @@ import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { Stepper } from '../../components/Stepper';
+import { MemorizationBrowser } from '../../components/MemorizationBrowser';
 import {
-  JuzBrowser,
   PageStatus,
   applyPendingChanges,
   applyPendingSurahChanges,
   buildInitialPendingForJourney,
   buildInitialPendingSurahsForJourney,
-} from '../../components/JuzBrowser';
+} from '../../lib/memorizationChanges';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -125,14 +125,15 @@ export default function JuzSelectionScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <JuzBrowser
+        <MemorizationBrowser
           pages={pages}
           pendingChanges={pendingChanges}
           onChange={setPendingChanges}
           baseMemorizedSurahs={user?.memorizedSurahs ?? []}
           pendingSurahChanges={pendingSurahChanges}
           onSurahChange={setPendingSurahChanges}
-          editMode
+          markMode
+          hideMarkToggle
         />
       </ScrollView>
 

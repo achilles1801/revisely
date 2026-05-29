@@ -25,6 +25,13 @@ export function OnboardingNavigator() {
         // through and glass surfaces in onboarding screens have something to
         // refract.
         contentStyle: { backgroundColor: 'transparent' },
+        // `slide_from_right` exposes the outgoing screen through the
+        // incoming one because both are transparent, which reads as choppy
+        // ghosting. A cross-dissolve sidesteps the layering entirely; the
+        // Stepper component already conveys forward progress so we don't
+        // need a directional cue.
+        animation: 'fade',
+        animationDuration: 220,
       }}
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />

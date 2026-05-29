@@ -1,14 +1,14 @@
-# Revisley
+# Revisely
 
-A Quran revision tracker that schedules daily review using a weakness-weighted algorithm.
+A Quran revision tracker that schedules daily review by pages, juz, or a custom plan, with optional Smart Tracking insights that surface weak pages.
 
-Built with Expo SDK 54, React Native, and Firebase. AI-assisted memorization input is powered by a Cloud Function that calls Claude.
+Built with Expo SDK 54, React Native, and Firebase. Quran.com sign-in syncs streak and activity from Quran Foundation.
 
 ## Stack
 
 - **App**: Expo (new architecture), React Native 0.81, React 19, TypeScript
 - **Backend**: Firebase Auth, Firestore, App Check
-- **Functions**: Cloud Functions v2 + Anthropic SDK
+- **Functions**: Cloud Functions v2 (account deletion; legacy memorization parser is deployed but no longer wired to the client)
 - **Tests**: Jest + RNTL, `@firebase/rules-unit-testing`, `firebase-functions-test`, Maestro
 
 ## Setup

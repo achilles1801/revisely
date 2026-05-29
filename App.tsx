@@ -1,15 +1,8 @@
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
@@ -38,11 +31,11 @@ Sentry.init({
 });
 
 function App() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+  // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
+  // render — text falls back to the system Arabic face rather than blocking
+  // the app forever.
+  const [fontsLoaded, fontError] = useFonts({
+    'Amiri-Regular': require('./assets/fonts/Amiri-Regular.ttf'),
   });
 
   useEffect(() => {
@@ -50,9 +43,7 @@ function App() {
     registerForPushNotificationsAsync();
   }, []);
 
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: '#FBF8F3' }} />;
-  }
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

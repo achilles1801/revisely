@@ -29,16 +29,18 @@ import Animated, {
 import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
-import { ProgressBar } from '../../components/ProgressBar';
+import { MushafPager } from '../../components/MushafPager';
 import { PressableScale } from '../../components/PressableScale';
-import { QuranPageViewer } from '../../components/QuranPageViewer';
+import { SessionBar } from '../../components/revision/SessionBar';
+import { SessionMenuSheet } from '../../components/revision/SessionMenuSheet';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { getSurahForPage, getQuranData } from '../../lib/quranData';
+import { shadows } from '../../theme/shadows';
+import { getHizbForPage, getSurahForPage, getQuranData } from '../../lib/quranData';
 import { getQuranPageImageUrl } from '../../lib/quranImages';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
 
@@ -70,6 +72,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
   const [demoRating, setDemoRating] = useState<number | null>(null);
   const [demoMarked, setDemoMarked] = useState(false);
   const [ratingSheetOpen, setRatingSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [previewPageNumber, setPreviewPageNumber] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -87,6 +90,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
     setDemoRating(null);
     setDemoMarked(false);
     setRatingSheetOpen(false);
+    setMenuOpen(false);
     setPreviewPageNumber(null);
   };
 
@@ -133,15 +137,9 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
     onClose();
   };
 
-  const viewerPages = useMemo(
-    () => [
-      {
-        pageNumber: demoPage?.pageNumber ?? 1,
-        isCompleted: demoMarked,
-        weaknessRating: demoRating ?? 4,
-      },
-    ],
-    [demoPage?.pageNumber, demoMarked, demoRating],
+  const demoHizb = useMemo(
+    () => (demoPage ? getHizbForPage(demoPage.pageNumber) : 1),
+    [demoPage],
   );
 
   if (!demoPage || !demoSurah) {
@@ -205,45 +203,80 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
 
         {step === 'rate' && (
           <View style={styles.rateBody}>
-            <View style={styles.coachMarkWrap}>
-              <CoachMark
-                text="This is your revision session. Tap Strength below the page to rate it."
-                theme={theme}
-                styles={styles}
-              />
-            </View>
-
-            <View style={styles.revisionHeaderMimic}>
-              <View style={styles.revisionHeaderCenter}>
-                <Text style={styles.revisionTitle}>Juz {demoJuz}</Text>
-                <Text style={styles.revisionSubtitle}>Page {demoPage.pageNumber}</Text>
-              </View>
-            </View>
-
-            <View style={styles.revisionProgress}>
-              <View style={styles.revisionProgressRow}>
-                <Text style={styles.revisionProgressLabel}>
-                  {demoMarked ? 1 : 0} of 1 pages
-                </Text>
-                <Text style={styles.revisionProgressPercent}>
-                  {demoMarked ? 100 : 0}%
-                </Text>
-              </View>
-              <ProgressBar progress={demoMarked ? 100 : 0} height={6} />
-            </View>
+            <SessionBar
+              scopeLabel={`Juz ${demoJuz}`}
+              revisedCount={demoMarked ? 1 : 0}
+              totalCount={1}
+              isCurrentPageRevised={demoMarked}
+              onBack={() => {}}
+              onToggleCurrent={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setDemoMarked((v) => !v);
+              }}
+              onOverflow={() => setMenuOpen(true)}
+            />
 
             <View style={styles.viewerContainer}>
-              <QuranPageViewer
-                pages={viewerPages}
-                quranData={quranData}
-                onPageComplete={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setDemoMarked(true);
-                }}
-                onPageUncomplete={() => setDemoMarked(false)}
-                onRatePage={() => setRatingSheetOpen(true)}
+              <MushafPager
+                pages={[demoPage.pageNumber]}
+                initialPage={demoPage.pageNumber}
               />
+
+              <View style={styles.previewBreadcrumb} pointerEvents="none">
+                <Text style={styles.crumbLeft}>
+                  Juz {demoJuz} · Hizb {demoHizb}
+                </Text>
+                <View style={styles.crumbRight}>
+                  <Text style={styles.crumbSurah}>{demoSurah.name}</Text>
+                  {demoSurah.nameArabic ? (
+                    <Text style={styles.crumbArabic}>{demoSurah.nameArabic}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.previewFooter} pointerEvents="none">
+                <Text style={styles.previewPageNum}>{demoPage.pageNumber}</Text>
+              </View>
             </View>
+
+            {demoRating === null && (
+              <View style={styles.rateCoachWrap} pointerEvents="none">
+                <View style={styles.rateCoachCaret} />
+                <View style={styles.rateCoachBubble}>
+                  <Text style={styles.rateCoachText}>Tap (⋮) to rate</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {step === 'rate' && demoRating !== null && (
+          <View
+            style={[
+              styles.bottomCoachWrap,
+              { bottom: Math.max(insets.bottom, spacing.md) + 64 },
+            ]}
+            pointerEvents="none"
+          >
+            <View style={styles.bottomCoachBubble}>
+              <Text style={styles.bottomCoachText}>Save & continue</Text>
+            </View>
+            <View style={styles.bottomCoachCaret} />
+          </View>
+        )}
+
+        {step === 'insights' && (
+          <View
+            style={[
+              styles.bottomCoachWrap,
+              { bottom: Math.max(insets.bottom, spacing.md) + 64 },
+            ]}
+            pointerEvents="none"
+          >
+            <View style={styles.bottomCoachBubble}>
+              <Text style={styles.bottomCoachText}>Tap Next to continue</Text>
+            </View>
+            <View style={styles.bottomCoachCaret} />
           </View>
         )}
 
@@ -285,7 +318,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
 
           {step === 'rate' && (
             <Button
-              title={demoRating === null ? 'Tap Strength to rate' : 'Save & continue'}
+              title={demoRating === null ? 'Open the menu (⋮) to rate' : 'Save & continue'}
               onPress={() => setStep('insights')}
               variant="primary"
               disabled={demoRating === null}
@@ -330,6 +363,19 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             />
           )}
         </View>
+
+        <SessionMenuSheet
+          visible={menuOpen}
+          actions={[
+            {
+              key: 'rate',
+              label: 'Rate page strength',
+              icon: 'fitness-outline',
+              onPress: () => setRatingSheetOpen(true),
+            },
+          ]}
+          onClose={() => setMenuOpen(false)}
+        />
 
         <SandboxRatingSheet
           visible={ratingSheetOpen}
@@ -601,7 +647,7 @@ function CtaStep({
             <Ionicons name="checkmark" size={16} color={theme.accent} />
           </View>
           <Text style={styles.bulletText}>
-            Adds a strength rating after each page you mark revised.
+            Lets you rate pages from the session menu while revising.
           </Text>
         </View>
         <View style={styles.bulletRow}>
@@ -1048,45 +1094,116 @@ const makeStyles = (theme: ThemeColors) =>
     rateBody: {
       flex: 1,
     },
-    coachMarkWrap: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.xs,
+    viewerContainer: { flex: 1 },
+    // Floating tooltip pointing up at the (⋮) overflow button in the
+    // SessionBar. Tip math: SessionBar paddingHorizontal=spacing.sm puts the
+    // (⋮) iconBtn's right edge at spacing.sm from the screen edge; its
+    // center sits another 16px in (half of iconBtn width). With the wrap
+    // anchored at right=spacing.sm and the caret pushed left by 10px from
+    // flex-end, the caret tip lands ~28px from the screen edge — same as
+    // the (⋮) center.
+    rateCoachWrap: {
+      position: 'absolute',
+      top: 52,
+      right: spacing.sm,
+      zIndex: 10,
+      alignItems: 'flex-end',
     },
-    revisionHeaderMimic: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
+    rateCoachCaret: {
+      width: 0,
+      height: 0,
+      borderLeftWidth: 6,
+      borderRightWidth: 6,
+      borderBottomWidth: 7,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderBottomColor: theme.accent,
+      marginRight: 10,
+    },
+    rateCoachBubble: {
+      backgroundColor: theme.accent,
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+      ...shadows.md,
     },
-    revisionHeaderCenter: { alignItems: 'center' },
-    revisionTitle: { ...typography.titleLarge, color: theme.textPrimary },
-    revisionSubtitle: {
+    rateCoachText: {
       ...typography.bodySmall,
-      color: theme.textSecondary,
-      marginTop: 2,
-    },
-    revisionProgress: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.xs,
-      paddingBottom: spacing.md,
-    },
-    revisionProgressRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: spacing.xs,
-    },
-    revisionProgressLabel: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-    },
-    revisionProgressPercent: {
-      ...typography.titleSmall,
-      color: theme.accent,
+      color: theme.textInverse,
       fontWeight: '700',
     },
-    viewerContainer: { flex: 1 },
+    // Bottom-anchored floating tooltip pointing down at the footer button.
+    // Position's `bottom` is set inline so the safe-area inset is accounted
+    // for without re-computing styles on insets change.
+    bottomCoachWrap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: 10,
+    },
+    bottomCoachBubble: {
+      backgroundColor: theme.accent,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+      ...shadows.md,
+    },
+    bottomCoachText: {
+      ...typography.bodySmall,
+      color: theme.textInverse,
+      fontWeight: '700',
+    },
+    bottomCoachCaret: {
+      width: 0,
+      height: 0,
+      borderLeftWidth: 6,
+      borderRightWidth: 6,
+      borderTopWidth: 7,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderTopColor: theme.accent,
+      marginTop: -1,
+    },
+    previewBreadcrumb: {
+      position: 'absolute',
+      top: spacing.sm,
+      left: spacing.md,
+      right: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    crumbLeft: {
+      ...typography.caption,
+      color: theme.textPrimary,
+    },
+    crumbRight: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: spacing.xs,
+    },
+    crumbSurah: {
+      ...typography.caption,
+      color: theme.textPrimary,
+    },
+    crumbArabic: {
+      fontFamily: fonts.arabic,
+      fontSize: 14,
+      color: theme.textPrimary,
+    },
+    previewFooter: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: spacing.md,
+      alignItems: 'center',
+    },
+    previewPageNum: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.textPrimary,
+    },
 
     // Insights tab mimic — mirrors AlgorithmScreen styles exactly so the
     // sandbox feels like a true preview of what the user will see.

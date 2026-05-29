@@ -9,6 +9,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { Button } from '../../components/Button';
 import { PressableScale } from '../../components/PressableScale';
+import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { Stepper } from '../../components/Stepper';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -22,8 +23,10 @@ import {
   scheduleDailyReminder,
 } from '../../lib/notifications';
 import { DEFAULT_FAJR_METHOD } from '../../lib/fajrBoundary';
+import { getJuzForPage } from '../../lib/quranData';
 
 type DayBoundary = 'midnight' | 'fajr';
+type ScheduleMode = 'pages' | 'juz';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Schedule'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'Schedule'>;
@@ -40,8 +43,11 @@ export default function ScheduleScreen() {
   const defaultCapacity = journeyStage === 'complete' ? 20 : 10;
 
   const [dailyCapacity, setDailyCapacity] = useState(defaultCapacity);
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('pages');
+  const [dailyJuzCount, setDailyJuzCount] = useState(1);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [lastCapacityTick, setLastCapacityTick] = useState(defaultCapacity);
+  const [lastJuzTick, setLastJuzTick] = useState(1);
   const [dayBoundary, setDayBoundary] = useState<DayBoundary>('fajr');
   const [starting, setStarting] = useState(false);
 
@@ -50,13 +56,27 @@ export default function ScheduleScreen() {
     [pages],
   );
 
-  // Cycle length is derived from how many pages the user has memorized and how
-  // many they want to revise per day. No need to ask — they'd just be doing
-  // this math in their head.
+  // Count how many distinct juz the user has memorized pages in — drives the
+  // cycle math in juz mode.
+  const memorizedJuzCount = useMemo(() => {
+    const set = new Set<number>();
+    for (const p of pages) {
+      if (p.status === 'memorized') set.add(getJuzForPage(p.pageNumber));
+    }
+    return set.size;
+  }, [pages]);
+
+  // Cycle length is derived from how many pages (or juz) the user has memorized
+  // and the daily quota. No need to ask — they'd just be doing this math in
+  // their head.
   const derivedCycleDays = useMemo(() => {
+    if (scheduleMode === 'juz') {
+      if (memorizedJuzCount === 0 || dailyJuzCount === 0) return 0;
+      return Math.ceil(memorizedJuzCount / dailyJuzCount);
+    }
     if (memorizedCount === 0 || dailyCapacity === 0) return 0;
     return Math.ceil(memorizedCount / dailyCapacity);
-  }, [memorizedCount, dailyCapacity]);
+  }, [scheduleMode, memorizedCount, dailyCapacity, memorizedJuzCount, dailyJuzCount]);
 
   const handleCapacityChange = (v: number) => {
     const rounded = Math.round(v);
@@ -65,6 +85,15 @@ export default function ScheduleScreen() {
       setLastCapacityTick(rounded);
     }
     setDailyCapacity(rounded);
+  };
+
+  const handleJuzCountChange = (v: number) => {
+    const rounded = Math.round(v);
+    if (rounded !== lastJuzTick) {
+      Haptics.selectionAsync();
+      setLastJuzTick(rounded);
+    }
+    setDailyJuzCount(rounded);
   };
 
   const requestLocationOrFallback = async (): Promise<
@@ -118,6 +147,8 @@ export default function ScheduleScreen() {
     const user = createDefaultUser({
       name: firebaseUser?.displayName || undefined,
       dailyPageCapacity: dailyCapacity,
+      scheduleMode,
+      dailyJuzCount,
       notificationsEnabled: finalNotificationsEnabled,
       fajrBoundaryEnabled,
       locationCoords,
@@ -158,26 +189,65 @@ export default function ScheduleScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pages per day</Text>
-          <View style={styles.bigNumberRow}>
-            <Text style={styles.bigNumber}>{dailyCapacity}</Text>
-            <Text style={styles.bigNumberLabel}>pages</Text>
+          <Text style={styles.sectionTitle}>How much per day?</Text>
+          <View style={styles.modeToggleRow}>
+            <LiquidGlassSegmentedControl<ScheduleMode>
+              options={[
+                { value: 'pages', label: 'Pages' },
+                { value: 'juz', label: 'Juz' },
+              ]}
+              value={scheduleMode}
+              onChange={setScheduleMode}
+            />
           </View>
-          <Slider
-            style={styles.slider}
-            minimumValue={1}
-            maximumValue={60}
-            step={1}
-            value={dailyCapacity}
-            onValueChange={handleCapacityChange}
-            minimumTrackTintColor={theme.accent}
-            maximumTrackTintColor={theme.border}
-            thumbTintColor={theme.accent}
-          />
-          <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabel}>1</Text>
-            <Text style={styles.sliderLabel}>60</Text>
-          </View>
+
+          {scheduleMode === 'pages' ? (
+            <>
+              <View style={styles.bigNumberRow}>
+                <Text style={styles.bigNumber}>{dailyCapacity}</Text>
+                <Text style={styles.bigNumberLabel}>pages</Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={60}
+                step={1}
+                value={dailyCapacity}
+                onValueChange={handleCapacityChange}
+                minimumTrackTintColor={theme.accent}
+                maximumTrackTintColor={theme.border}
+                thumbTintColor={theme.accent}
+              />
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>1</Text>
+                <Text style={styles.sliderLabel}>60</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.bigNumberRow}>
+                <Text style={styles.bigNumber}>{dailyJuzCount}</Text>
+                <Text style={styles.bigNumberLabel}>
+                  {dailyJuzCount === 1 ? 'juz' : 'ajzaʼ'}
+                </Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={5}
+                step={1}
+                value={dailyJuzCount}
+                onValueChange={handleJuzCountChange}
+                minimumTrackTintColor={theme.accent}
+                maximumTrackTintColor={theme.border}
+                thumbTintColor={theme.accent}
+              />
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>1</Text>
+                <Text style={styles.sliderLabel}>5</Text>
+              </View>
+            </>
+          )}
           {derivedCycleDays > 0 && (
             <Text style={styles.helperText}>
               Full revision cycle: ~{derivedCycleDays} day{derivedCycleDays === 1 ? '' : 's'}
@@ -334,6 +404,9 @@ const makeStyles = (theme: ThemeColors) =>
     subtext: { ...typography.bodyMedium, color: theme.textSecondary },
     section: { marginBottom: spacing.xl },
     sectionTitle: { ...typography.label, color: theme.textMuted, marginBottom: spacing.md },
+    modeToggleRow: {
+      marginBottom: spacing.md,
+    },
     bigNumberRow: {
       flexDirection: 'row',
       alignItems: 'baseline',

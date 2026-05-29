@@ -10,10 +10,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
+import { GoogleGIcon } from '../../components/GoogleGIcon';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -32,7 +34,7 @@ type AuthMode = 'login' | 'signup' | 'reset';
 
 export default function AuthScreen() {
   const { signIn, signUp, signInWithGoogle, signInWithApple, sendPasswordReset, error, isLoading, clearError } = useAuth();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -361,18 +363,37 @@ export default function AuthScreen() {
 
               {isGoogleAuthAvailable && (
                 <TouchableOpacity
-                  style={styles.googleButton}
+                  style={[
+                    styles.googleButton,
+                    {
+                      backgroundColor: isDark ? '#131314' : '#FFFFFF',
+                      borderColor: isDark ? '#8E918F' : '#747775',
+                    },
+                  ]}
                   onPress={handleGoogleSignIn}
                   disabled={isLoading || googleLoading || appleLoading}
-                  activeOpacity={0.7}
+                  activeOpacity={0.85}
                   accessibilityRole="button"
                   accessibilityLabel="Continue with Google"
+                  accessibilityState={{ disabled: isLoading || googleLoading || appleLoading, busy: googleLoading }}
                 >
-                  <GlassCard style={StyleSheet.absoluteFillObject} />
-                  <Text style={[styles.googleIcon, { color: '#4285F4' }]}>G</Text>
-                  <Text style={[styles.googleButtonText, { color: theme.textPrimary }]}>
-                    {googleLoading ? 'Signing in…' : 'Continue with Google'}
-                  </Text>
+                  {googleLoading ? (
+                    <ActivityIndicator size="small" color={isDark ? '#E3E3E3' : '#1F1F1F'} />
+                  ) : (
+                    <>
+                      <View style={styles.googleIcon}>
+                        <GoogleGIcon size={18} />
+                      </View>
+                      <Text
+                        style={[
+                          styles.googleButtonText,
+                          { color: isDark ? '#E3E3E3' : '#1F1F1F' },
+                        ]}
+                      >
+                        Continue with Google
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               )}
             </>
@@ -522,20 +543,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 16,
     marginBottom: spacing.md,
-    minHeight: 48,
-    overflow: 'hidden',
+    width: '100%',
+    height: 48,
   },
   googleIcon: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: spacing.sm,
+    marginRight: 12,
   },
   googleButtonText: {
-    ...typography.bodyMedium,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '500',
+    letterSpacing: 0.25,
   },
 });

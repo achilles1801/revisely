@@ -38,6 +38,8 @@ yarn-error.*
 # Firebase service files (contain sensitive keys)
 GoogleService-Info.plist
 google-services.json
+*-firebase-adminsdk-*.json
+service-account*.json
 
 # typescript
 *.tsbuildinfo
@@ -59,4 +61,5 @@ ALGORITHM_SCREEN_IMPLEMENTATION.md
 ALGORITHM_SCREEN_VISUAL_GUIDE.md
 docs/REDESIGN_WORKBOARD.md
 docs/security-audit-2026-05-10.md
+docs/ui-redesign/
 

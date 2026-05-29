@@ -84,7 +84,10 @@ export default function DashboardScreen() {
     );
     const totalAssigned = assignment?.totalPages || 0;
     const completed = pagesRevisedToday.size;
-    if (completed >= totalAssigned && totalAssigned > 0) {
+    // If the user revised pages today and the assignment later shrank
+    // (custom-plan edit, un-memorized surah), treat that as completed
+    // rather than letting `remaining` go negative downstream.
+    if (completed > 0 && completed >= totalAssigned) {
       return { status: 'completed' as const, pagesCompleted: completed };
     }
     if (completed > 0)
@@ -191,9 +194,13 @@ export default function DashboardScreen() {
   const today = new Date();
 
   const handleEditSession = (log: RevisionLog) => {
-    const sessionPages = [...log.pagesRevised, ...log.pagesSkipped].sort(
-      (a, b) => a - b,
-    );
+    // Prefer the day's actual assignedPages so the edit modal shows the
+    // whole session, not just what the user marked. Fall back to
+    // revised+skipped for legacy logs without the assignedPages field.
+    const sessionPages =
+      log.assignedPages && log.assignedPages.length > 0
+        ? [...log.assignedPages].sort((a, b) => a - b)
+        : [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b);
     setSelectedLog(log);
     setSelectedSessionPages(sessionPages);
     setShowEditModal(true);
@@ -278,7 +285,7 @@ export default function DashboardScreen() {
       };
     }
     if (todayStatus.status === 'partial') {
-      const remaining = assignment.totalPages - todayStatus.pagesCompleted;
+      const remaining = Math.max(0, assignment.totalPages - todayStatus.pagesCompleted);
       return {
         eyebrow: 'In progress',
         title: `${remaining} page${remaining !== 1 ? 's' : ''} to go`,
@@ -290,7 +297,7 @@ export default function DashboardScreen() {
       return {
         eyebrow: 'All caught up',
         title: 'Nothing to revise yet',
-        subtitle: 'Mark pages as memorized from Progress to begin.',
+        subtitle: 'Open the Progress tab and tap "Start tracking memorization" to mark what you’ve memorized.',
         ctaTitle: '',
       };
     }
@@ -597,17 +604,27 @@ function SessionRow({
   selectionMode?: boolean;
   isSelected?: boolean;
 }) {
+  // Show the whole session, not just the part the user finished. Prefer the
+  // assignedPages field (the day's actual assignment) and fall back to
+  // revised + skipped for legacy logs that don't carry it.
+  const sessionPages = useMemo(
+    () =>
+      log.assignedPages && log.assignedPages.length > 0
+        ? log.assignedPages
+        : [...log.pagesRevised, ...log.pagesSkipped],
+    [log.assignedPages, log.pagesRevised, log.pagesSkipped],
+  );
   const juzNumbers = useMemo(
     () =>
-      Array.from(new Set(log.pagesRevised.map((p) => getJuzForPage(p)))).sort(
+      Array.from(new Set(sessionPages.map((p) => getJuzForPage(p)))).sort(
         (a, b) => a - b,
       ),
-    [log.pagesRevised],
+    [sessionPages],
   );
   const surahNames = useMemo(() => {
     const seen = new Set<number>();
     const names: string[] = [];
-    for (const pageNum of log.pagesRevised) {
+    for (const pageNum of sessionPages) {
       const surah = getSurahForPage(pageNum);
       if (!seen.has(surah.number)) {
         seen.add(surah.number);
@@ -615,7 +632,7 @@ function SessionRow({
       }
     }
     return names;
-  }, [log.pagesRevised]);
+  }, [sessionPages]);
 
   const juzLabel = formatJuzLabel(juzNumbers);
   const surahLabel = formatSurahLabel(surahNames);

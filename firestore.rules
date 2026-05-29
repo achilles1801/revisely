@@ -112,7 +112,7 @@ service cloud.firestore {
       return [
         'updatedAt', 'lastActiveAt',
         'displayName', 'photoURL', 'email',
-        'dailyPageCapacity',
+        'dailyPageCapacity', 'scheduleMode', 'dailyJuzCount',
         'smartTrackingEnabled', 'hasSeenSmartTrackingPreview',
         'theme',
         'notifications', 'notificationsEnabled', 'reminderTime',
@@ -203,6 +203,11 @@ service cloud.firestore {
                        (!hasField('dailyPageCapacity') ||
                         (incomingData().dailyPageCapacity is int &&
                          isInRange(incomingData().dailyPageCapacity, 1, 100))) &&
+                       (!hasField('scheduleMode') ||
+                        incomingData().scheduleMode in ['pages', 'juz']) &&
+                       (!hasField('dailyJuzCount') ||
+                        (incomingData().dailyJuzCount is int &&
+                         isInRange(incomingData().dailyJuzCount, 1, 30))) &&
                        (!hasField('smartTrackingEnabled') ||
                         incomingData().smartTrackingEnabled is bool) &&
                        (!hasField('hasSeenSmartTrackingPreview') ||

@@ -15,6 +15,8 @@ const baseUser: User = {
   smartTrackingEnabled: false,
   hasSeenSmartTrackingPreview: false,
   dailyPageCapacity: 5,
+  scheduleMode: 'pages',
+  dailyJuzCount: 1,
   reminderTime: '08:00',
   notificationsEnabled: true,
   currentMemorizationJuz: null,
@@ -274,6 +276,64 @@ describe('countCompletedSessions', () => {
 describe('INSIGHTS_MIN_SESSIONS', () => {
   it('is set to 3 (the agreed populated-tab threshold)', () => {
     expect(INSIGHTS_MIN_SESSIONS).toBe(3);
+  });
+});
+
+describe('getPagesScheduledForDate — juz mode', () => {
+  // Pages 1-21 = Juz 1, 22-41 = Juz 2, 42-61 = Juz 3 (per Madani layout).
+  // We give the user a handful of pages from juz 1 and juz 3 so we can prove
+  // the scheduler skips juz 2 (which has nothing memorized) and rotates only
+  // through juz the user actually owns.
+  const memorized: UserPage[] = [
+    makePage({ pageNumber: 1 }),
+    makePage({ pageNumber: 5 }),
+    makePage({ pageNumber: 21 }),
+    makePage({ pageNumber: 42 }),
+    makePage({ pageNumber: 55 }),
+  ];
+  const juzUser: User = {
+    ...baseUser,
+    scheduleMode: 'juz',
+    dailyJuzCount: 1,
+    scheduleAnchorDate: '2026-01-01T12:00:00Z',
+  };
+
+  it('day 0 returns memorized pages of the lowest-numbered memorized juz', () => {
+    const day0 = new Date('2026-01-01T12:00:00Z');
+    const result = getPagesScheduledForDate(juzUser, day0, memorized);
+    expect(result).toEqual([1, 5, 21]); // all juz-1 pages the user has
+  });
+
+  it('day 1 advances to the next memorized juz (skipping juz with no memorized pages)', () => {
+    const day1 = new Date('2026-01-02T12:00:00Z');
+    const result = getPagesScheduledForDate(juzUser, day1, memorized);
+    expect(result).toEqual([42, 55]); // juz 3 — juz 2 was skipped (nothing memorized)
+  });
+
+  it('cycles back to the first juz after one full rotation', () => {
+    const day2 = new Date('2026-01-03T12:00:00Z');
+    const result = getPagesScheduledForDate(juzUser, day2, memorized);
+    expect(result).toEqual([1, 5, 21]);
+  });
+
+  it('dailyJuzCount > 1 returns the union of multiple juz on the same day', () => {
+    const userTwoJuz = { ...juzUser, dailyJuzCount: 2 };
+    const day0 = new Date('2026-01-01T12:00:00Z');
+    const result = getPagesScheduledForDate(userTwoJuz, day0, memorized);
+    expect(result).toEqual([1, 5, 21, 42, 55]); // juz 1 + juz 3 pages
+  });
+
+  it('returns empty when no pages are memorized', () => {
+    const day0 = new Date('2026-01-01T12:00:00Z');
+    expect(getPagesScheduledForDate(juzUser, day0, [])).toEqual([]);
+  });
+
+  it('falls through to pages mode when scheduleMode is "pages"', () => {
+    const pagesUser = { ...juzUser, scheduleMode: 'pages' as const, dailyPageCapacity: 2 };
+    const day0 = new Date('2026-01-01T12:00:00Z');
+    const result = getPagesScheduledForDate(pagesUser, day0, memorized);
+    // Sliding window of 2 across [1, 5, 21, 42, 55] starting at day 0.
+    expect(result).toEqual([1, 5]);
   });
 });
 

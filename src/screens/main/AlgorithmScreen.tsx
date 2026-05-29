@@ -567,7 +567,7 @@ function HelpSheet({
     },
     {
       icon: 'pulse-outline',
-      text: 'Pages you marked as weaker rank higher.',
+      text: 'Rate a page from the (⋮) menu during revision — weaker pages rank higher here.',
     },
     {
       icon: 'sparkles-outline',

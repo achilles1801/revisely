@@ -98,14 +98,6 @@ export default {
       "expo-font",
       "expo-web-browser",
       [
-        "expo-speech-recognition",
-        {
-          microphonePermission: "Allow Revisely to use the microphone so you can describe what you've memorized.",
-          speechRecognitionPermission: "Allow Revisely to convert your speech to text so it can record what you've memorized.",
-          androidSpeechServicePackages: ["com.google.android.googlequicksearchbox"]
-        }
-      ],
-      [
         "expo-location",
         {
           locationAlwaysAndWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary.",

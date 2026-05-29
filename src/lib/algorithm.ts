@@ -1,5 +1,19 @@
 import { User, UserPage, QuranPage, DailyAssignment, RevisionLog } from '../types';
 import { getRevisionDayForUser } from './fajrBoundary';
+import { getJuzForPage, getSurahForPage } from './quranData';
+
+// Surah-aware juz key. Short surahs that straddle a juz boundary (e.g. Yusuf
+// spilling from juz 12 into juz 13) get pinned to the juz where they start —
+// otherwise a memorized surah would split across two awkward half-days. Long
+// surahs that span 3+ juz (Al-Baqarah, An-Nisa) are kept on page-juz so a "1
+// juz" day doesn't accidentally become a 48-page Baqarah marathon.
+function juzKeyForPage(pageNumber: number): number {
+  const surah = getSurahForPage(pageNumber);
+  const startJuz = getJuzForPage(surah.startPage);
+  const endJuz = getJuzForPage(surah.endPage);
+  if (endJuz - startJuz <= 1) return startJuz;
+  return getJuzForPage(pageNumber);
+}
 
 const DEFAULT_WEAKNESS_RATING = 4;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -104,7 +118,9 @@ export function getPagesScheduledForDate(
 ): number[] {
   if (memorizedPages.length === 0) return [];
 
-  // Custom plan takes precedence when present.
+  // Custom plan is an explicit user override and wins over either default
+  // mode. To get back to an auto-generated schedule, clear it via the plan
+  // editor ("Use auto-generated schedule").
   if (user.customPlan && user.customPlan.days.length > 0) {
     const cycleStart = parseLocalDateString(user.customPlan.cycleStartDate);
     const target = startOfDay(date);
@@ -117,6 +133,12 @@ export function getPagesScheduledForDate(
         user.customPlan.days.length) %
       user.customPlan.days.length;
     return [...user.customPlan.days[idx]];
+  }
+
+  // Juz mode: cycle through juz that contain memorized pages, returning the
+  // memorized subset of each selected juz.
+  if (user.scheduleMode === 'juz' && (user.dailyJuzCount ?? 0) > 0) {
+    return juzModePagesForDate(user, date, memorizedPages);
   }
 
   const sortedPageNumbers = [...memorizedPages]
@@ -138,6 +160,83 @@ export function getPagesScheduledForDate(
     result.push(sortedPageNumbers[(cycleOffset + i) % total]);
   }
   return result;
+}
+
+/**
+ * Juz-mode scheduler. Identifies the juz that contain any memorized pages,
+ * cycles through them by `dailyJuzCount` per day from the schedule anchor,
+ * and returns the memorized-page subset for the selected juz. Partial juz
+ * (e.g., user has only some pages of Juz 1 memorized) are honored — we only
+ * return what they actually memorized within the selected juz.
+ */
+function juzModePagesForDate(
+  user: User,
+  date: Date,
+  memorizedPages: UserPage[],
+): number[] {
+  const memorizedPageNumbers = memorizedPages.map((p) => p.pageNumber);
+  const juzSet = new Set<number>();
+  for (const p of memorizedPageNumbers) juzSet.add(juzKeyForPage(p));
+  const juzList = Array.from(juzSet).sort((a, b) => a - b);
+  if (juzList.length === 0) return [];
+
+  const start = startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
+  const target = startOfDay(date);
+  const daysSinceStart = Math.floor((target.getTime() - start.getTime()) / MS_PER_DAY);
+  if (daysSinceStart < 0) return [];
+
+  const juzPerDay = Math.min(user.dailyJuzCount, juzList.length);
+  const juzOffset =
+    ((daysSinceStart * juzPerDay) % juzList.length + juzList.length) %
+    juzList.length;
+
+  const result: number[] = [];
+  for (let i = 0; i < juzPerDay; i++) {
+    const juz = juzList[(juzOffset + i) % juzList.length];
+    const pagesInJuz = memorizedPageNumbers
+      .filter((p) => juzKeyForPage(p) === juz)
+      .sort((a, b) => a - b);
+    result.push(...pagesInJuz);
+  }
+  return result;
+}
+
+/**
+ * Build the juz-mode cycle for the plan-editor display, rotated so today's
+ * juz is index 0. Delegates to the live scheduler day-by-day so the editor
+ * matches exactly what active revision will show.
+ *
+ * Cycle length = juzList.length / gcd(juzList.length, juzPerDay), the
+ * smallest N where the juz pattern repeats.
+ */
+export function buildJuzCycleDays(
+  user: User,
+  memorizedPages: UserPage[],
+  today: Date = new Date(),
+): number[][] {
+  if (memorizedPages.length === 0) return [];
+  const juzSet = new Set<number>();
+  for (const p of memorizedPages) juzSet.add(juzKeyForPage(p.pageNumber));
+  const juzList = Array.from(juzSet);
+  if (juzList.length === 0) return [];
+
+  const juzPerDay = Math.max(
+    1,
+    Math.min(user.dailyJuzCount ?? 1, juzList.length),
+  );
+  const cycleLength = juzList.length / gcd(juzList.length, juzPerDay);
+
+  const days: number[][] = [];
+  for (let i = 0; i < cycleLength; i++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() + i);
+    days.push(getPagesScheduledForDate(user, date, memorizedPages));
+  }
+  return days;
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
 }
 
 /**

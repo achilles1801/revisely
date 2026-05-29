@@ -34,11 +34,17 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
+  Read: { active: 'book', inactive: 'book-outline' },
   Insights: { active: 'sparkles', inactive: 'sparkles-outline' },
   Progress: { active: 'bookmarks', inactive: 'bookmarks-outline' },
 };
 
-const FULL_SCREEN_ROUTES = new Set<string>(['ActiveRevision', 'EditJuz', 'PlanEdit']);
+const FULL_SCREEN_ROUTES = new Set<string>([
+  'ActiveRevision',
+  'Memorization',
+  'PlanEdit',
+  'QuranReader',
+]);
 
 const PILL_HEIGHT = 52;
 const BUBBLE_SIZE = 40;

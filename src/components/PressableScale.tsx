@@ -71,8 +71,15 @@ export function PressableScale({
       disabled={disabled}
       onPressIn={(e) => {
         pressed.value = withTiming(1, { duration: 90 });
-        triggerHaptic();
         onPressIn?.(e);
+      }}
+      onPress={(e) => {
+        // Fire haptics here (not onPressIn) so they only fire on a committed
+        // tap — RN's Pressable cancels the press if the finger moves into a
+        // scroll before onPress runs, which keeps a scroll through a list of
+        // PressableScale rows from buzzing once per row.
+        triggerHaptic();
+        rest.onPress?.(e);
       }}
       onPressOut={(e) => {
         pressed.value = withTiming(0, { duration: 140 });

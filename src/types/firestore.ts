@@ -22,9 +22,15 @@ import { Timestamp } from 'firebase/firestore';
 /** Status of a page in user's memorization journey */
 export type PageStatus = 'not_memorized' | 'learning' | 'memorized';
 
-/** User-edited schedule shape persisted on the user doc. */
+/** User-edited schedule shape persisted on the user doc.
+ *
+ * `days` wraps each day's page list in an object because Firestore disallows
+ * arrays-of-arrays at any depth. The local `CustomPlan` type stays as the
+ * cleaner `number[][]`; conversion happens at the persistence boundary in
+ * AppContext.
+ */
 export interface FirestoreCustomPlan {
-  days: number[][];
+  days: Array<{ pages: number[] }>;
   cycleStartDate: string;
   direction: 'forward' | 'reverse';
 }
@@ -96,8 +102,12 @@ export interface FirestoreUser {
   lastActiveAt: Timestamp;
 
   // Revision Settings
-  /** How many pages to revise per day */
+  /** How many pages to revise per day (only used when scheduleMode === 'pages') */
   dailyPageCapacity: number;
+  /** Scheduling mode — see User.scheduleMode in types/index.ts */
+  scheduleMode?: 'pages' | 'juz';
+  /** How many juz to revise per day (only used when scheduleMode === 'juz') */
+  dailyJuzCount?: number;
   /** Whether Smart Tracking (page ratings + Insights tab) is enabled */
   smartTrackingEnabled: boolean;
   /** Whether the user has finished (or dismissed) the Smart Tracking preview tour */
@@ -176,6 +186,8 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   displayName?: string | null;
   dailyPageCapacity?: number;
+  scheduleMode?: 'pages' | 'juz';
+  dailyJuzCount?: number;
   smartTrackingEnabled?: boolean;
   hasSeenSmartTrackingPreview?: boolean;
   theme?: ThemePreference;

@@ -184,6 +184,8 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
 
   if (updates.displayName !== undefined) updateData.displayName = updates.displayName;
   if (updates.dailyPageCapacity !== undefined) updateData.dailyPageCapacity = updates.dailyPageCapacity;
+  if (updates.scheduleMode !== undefined) updateData.scheduleMode = updates.scheduleMode;
+  if (updates.dailyJuzCount !== undefined) updateData.dailyJuzCount = updates.dailyJuzCount;
   if (updates.smartTrackingEnabled !== undefined) updateData.smartTrackingEnabled = updates.smartTrackingEnabled;
   if (updates.hasSeenSmartTrackingPreview !== undefined) updateData.hasSeenSmartTrackingPreview = updates.hasSeenSmartTrackingPreview;
   if (updates.theme !== undefined) updateData.theme = updates.theme;

@@ -51,12 +51,22 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     smartTrackingEnabled: fsUser.smartTrackingEnabled ?? false,
     hasSeenSmartTrackingPreview: fsUser.hasSeenSmartTrackingPreview ?? false,
     dailyPageCapacity: fsUser.dailyPageCapacity || 20,
+    scheduleMode: fsUser.scheduleMode ?? 'pages',
+    dailyJuzCount: fsUser.dailyJuzCount ?? 1,
     reminderTime: fsUser.notifications?.reminderTime || '08:00',
     notificationsEnabled: fsUser.notifications?.enabled ?? true,
     currentMemorizationJuz: fsUser.currentMemorizationJuz,
     currentMemorizationPage: fsUser.currentMemorizationPage,
     currentKhatamPage: fsUser.currentKhatamPage || 1,
-    customPlan: fsUser.customPlan ?? null,
+    // Convert Firestore's array-of-objects shape back to the local
+    // number[][] model (Firestore disallows nested arrays).
+    customPlan: fsUser.customPlan
+      ? {
+          days: fsUser.customPlan.days.map((d) => d.pages ?? []),
+          cycleStartDate: fsUser.customPlan.cycleStartDate,
+          direction: fsUser.customPlan.direction,
+        }
+      : null,
     streak: fsUser.streak || 0,
     lastRevisionDate: fsUser.lastRevisionDate,
     memorizedSurahs: fsUser.memorizedSurahs ?? [],
@@ -86,6 +96,7 @@ function firestoreSessionToLog(fsSession: FirestoreSession): RevisionLog {
   return {
     id: fsSession.id,
     date: fsSession.date,
+    assignedPages: fsSession.assignedPages,
     pagesRevised: fsSession.pagesRevised,
     pagesSkipped: fsSession.pagesSkipped,
     weaknessUpdates: fsSession.weaknessUpdates.map(wu => ({
@@ -364,6 +375,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         smartTrackingEnabled: updatedUser.smartTrackingEnabled,
         hasSeenSmartTrackingPreview: updatedUser.hasSeenSmartTrackingPreview,
         dailyPageCapacity: updatedUser.dailyPageCapacity,
+        scheduleMode: updatedUser.scheduleMode,
+        dailyJuzCount: updatedUser.dailyJuzCount,
         notifications: {
           enabled: updatedUser.notificationsEnabled,
           reminderTime: updatedUser.reminderTime,
@@ -371,7 +384,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentMemorizationJuz: updatedUser.currentMemorizationJuz,
         currentMemorizationPage: updatedUser.currentMemorizationPage,
         currentKhatamPage: updatedUser.currentKhatamPage,
-        customPlan: updatedUser.customPlan,
+        // Firestore can't store nested arrays — wrap each day's page list in
+        // an object before writing.
+        customPlan: updatedUser.customPlan
+          ? {
+              days: updatedUser.customPlan.days.map((pages) => ({ pages })),
+              cycleStartDate: updatedUser.customPlan.cycleStartDate,
+              direction: updatedUser.customPlan.direction,
+            }
+          : null,
         memorizedSurahs: updatedUser.memorizedSurahs,
         fajrBoundaryEnabled: updatedUser.fajrBoundaryEnabled,
         locationCoords: updatedUser.locationCoords,
@@ -401,6 +422,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       smartTrackingEnabled: false,
       hasSeenSmartTrackingPreview: false,
       dailyPageCapacity: 20,
+      scheduleMode: 'pages',
+      dailyJuzCount: 1,
       reminderTime: '08:00',
       notificationsEnabled: true,
       currentMemorizationJuz: null,
@@ -643,11 +666,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           completionPercentage: safePercent(mergedPagesRevised.length, totalAssigned),
         });
       } else {
-        // Create new session
-        const allPages = [...log.pagesRevised, ...log.pagesSkipped];
+        // Create new session. Prefer the caller-supplied assignedPages (the
+        // actual day's assignment) over reconstructing from revised+skipped,
+        // because intermediate Saves don't populate skipped and would
+        // otherwise create a session that "forgets" pending pages.
+        const fallbackAssigned = [...log.pagesRevised, ...log.pagesSkipped];
+        const assignedPages =
+          log.assignedPages && log.assignedPages.length > 0
+            ? log.assignedPages
+            : fallbackAssigned.length > 0
+              ? fallbackAssigned
+              : log.pagesRevised;
         await firestoreService.createSession({
           date: log.date,
-          assignedPages: allPages.length > 0 ? allPages : log.pagesRevised,
+          assignedPages,
         });
 
         // Update with progress

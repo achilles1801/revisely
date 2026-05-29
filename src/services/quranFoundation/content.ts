@@ -36,6 +36,8 @@ interface VerseRaw {
   id: number;
   verse_key: string;
   text_uthmani?: string;
+  code_v2?: string;
+  page_number?: number;
 }
 
 async function fetchVerses(pageNumber: number): Promise<VerseRaw[]> {
@@ -97,3 +99,4 @@ export async function getVersesByPage(
     translations: translations[i] ? [translations[i]] : [],
   }));
 }
+

@@ -6,22 +6,24 @@ import {
   Modal,
   Alert,
   SafeAreaView,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme/colors';
 import { useApp } from '../context/AppContext';
-import { typography } from '../theme/typography';
+import { typography, fonts } from '../theme/typography';
 import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { Button } from './Button';
-import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
-import { QuranPageViewer } from './QuranPageViewer';
+import { MushafPager } from './MushafPager';
 import { WeaknessModal } from './WeaknessRating';
+import { SessionMenuSheet, SessionMenuAction } from './revision/SessionMenuSheet';
 import { RevisionLog, QuranPage } from '../types';
-import { formatDateReadable } from '../lib/utils';
+import {
+  getHizbForPage,
+  getJuzForPage,
+  getSurahsForPage,
+} from '../lib/quranData';
 
 interface EditSessionModalProps {
   visible: boolean;
@@ -45,15 +47,17 @@ export function EditSessionModal({
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages } = useApp();
-  const gradientColors: readonly [string, string, string] = isDark
-    ? ['#0F1410', '#1F4538', '#0F1410']
-    : ['#FBF8F3', '#C6DDD3', '#FBF8F3'];
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
+
   const [revisedPages, setRevisedPages] = useState<Set<number>>(
     new Set(log.pagesRevised),
   );
   const [selectedPageForRating, setSelectedPageForRating] = useState<number | null>(null);
   const [localRatings, setLocalRatings] = useState<Map<number, number>>(new Map());
+  const [currentPageNumber, setCurrentPageNumber] = useState<number>(
+    sessionPages[0] ?? 1,
+  );
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -61,43 +65,16 @@ export function EditSessionModal({
       log.weaknessUpdates?.forEach((wu) => ratingsMap.set(wu.page, wu.rating));
       setLocalRatings(ratingsMap);
       setRevisedPages(new Set(log.pagesRevised));
+      setCurrentPageNumber(sessionPages[0] ?? 1);
     }
-  }, [visible, log.id]);
+  }, [visible, log.id, sessionPages]);
 
-  const viewerPages = useMemo(() => {
-    return sessionPages.map((pageNum) => {
-      const page = pages.find((p) => p.pageNumber === pageNum);
-      const rating = localRatings.has(pageNum)
-        ? localRatings.get(pageNum)!
-        : log.weaknessUpdates?.find((wu) => wu.page === pageNum)?.rating ??
-          page?.weaknessRating ??
-          4;
-      return {
-        pageNumber: pageNum,
-        isCompleted: revisedPages.has(pageNum),
-        weaknessRating: rating,
-      };
-    });
-  }, [sessionPages, revisedPages, localRatings, log.weaknessUpdates, pages]);
-
-  const handlePageComplete = (pageNumber: number) => {
-    setRevisedPages((prev) => new Set(prev).add(pageNumber));
-  };
-
-  const handlePageUncomplete = (pageNumber: number) => {
-    setRevisedPages((prev) => {
-      const next = new Set(prev);
-      next.delete(pageNumber);
-      return next;
-    });
-  };
-
-  const handleSave = () => {
+  // Save current edits then close — no separate Save button. Tapping X is the
+  // commit action; if the user really wants to discard, they can use the
+  // delete option in the overflow menu.
+  const handleCloseWithSave = () => {
     const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
-      ([page, rating]) => ({
-        page,
-        rating,
-      }),
+      ([page, rating]) => ({ page, rating }),
     );
     onSave({
       ...log,
@@ -105,91 +82,141 @@ export function EditSessionModal({
       pagesSkipped: sessionPages.filter((p) => !revisedPages.has(p)),
       weaknessUpdates: weaknessUpdatesArray,
     });
+    onClose();
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete session?',
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onDelete },
-      ],
-    );
+    Alert.alert('Delete session?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    ]);
   };
 
-  const sessionDate = new Date(log.date);
-  const completedCount = revisedPages.size;
-  const totalCount = sessionPages.length;
+  const isCurrentRevised = revisedPages.has(currentPageNumber);
+  const toggleCurrent = () => {
+    setRevisedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(currentPageNumber)) next.delete(currentPageNumber);
+      else next.add(currentPageNumber);
+      return next;
+    });
+  };
+
+  const juz = getJuzForPage(currentPageNumber);
+  const hizb = getHizbForPage(currentPageNumber);
+  const firstSurah = getSurahsForPage(currentPageNumber)[0];
+
+  const extraData = useMemo(
+    () => Array.from(revisedPages).sort().join(','),
+    [revisedPages],
+  );
+
+  const menuActions: SessionMenuAction[] = useMemo(() => {
+    const actions: SessionMenuAction[] = [];
+    if (smartTrackingEnabled) {
+      actions.push({
+        key: 'rate',
+        label: 'Rate strength for this page',
+        icon: 'stats-chart-outline',
+        onPress: () => setSelectedPageForRating(currentPageNumber),
+      });
+    }
+    actions.push({
+      key: 'delete',
+      label: 'Delete session',
+      icon: 'trash-outline',
+      destructive: true,
+      onPress: handleDelete,
+    });
+    return actions;
+  }, [smartTrackingEnabled, currentPageNumber]);
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="fullScreen"
-      onRequestClose={onClose}
+      onRequestClose={handleCloseWithSave}
     >
       <SafeAreaView style={styles.container}>
-        <LinearGradient
-          colors={gradientColors}
-          locations={[0, 0.5, 1]}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
-        <View style={styles.header}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+        {/* Top bar — matches SessionBar's monochrome styling, no center text. */}
+        <View style={styles.topBar}>
           <PressableScale
-            onPress={onClose}
+            onPress={handleCloseWithSave}
             haptic="light"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Close"
+            hitSlop={12}
+            style={styles.iconBtn}
+            accessibilityLabel="Close and save"
           >
-            <GlassCard style={styles.headerButton}>
-              <Ionicons name="close" size={24} color={theme.textPrimary} />
-            </GlassCard>
+            <Ionicons name="close" size={22} color={theme.textPrimary} />
           </PressableScale>
-          <View style={styles.headerCenter}>
-            <Text style={styles.title}>Edit session</Text>
-            <Text style={styles.subtitle}>{formatDateReadable(sessionDate)}</Text>
-          </View>
+
+          <View style={styles.spacer} />
+
           <PressableScale
-            onPress={handleDelete}
-            haptic="light"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Delete session"
+            onPress={toggleCurrent}
+            haptic={isCurrentRevised ? 'light' : 'medium'}
+            hitSlop={12}
+            style={[
+              styles.iconBtn,
+              isCurrentRevised && { backgroundColor: theme.textPrimary },
+            ]}
+            accessibilityLabel={
+              isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'
+            }
           >
-            <GlassCard style={styles.headerButton}>
-              <Ionicons name="trash-outline" size={22} color={theme.error} />
-            </GlassCard>
+            <Ionicons
+              name={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
+              size={18}
+              color={isCurrentRevised ? theme.textInverse : theme.textPrimary}
+            />
+          </PressableScale>
+
+          <PressableScale
+            onPress={() => setMenuOpen(true)}
+            haptic="light"
+            hitSlop={12}
+            style={styles.iconBtn}
+            accessibilityLabel="Session menu"
+          >
+            <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
           </PressableScale>
         </View>
 
-        <View style={styles.summaryBar}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <Text style={styles.summaryText}>
-            {completedCount} of {totalCount} pages marked revised
-          </Text>
-        </View>
-
-        <View style={styles.viewerContainer}>
-          <QuranPageViewer
-            pages={viewerPages}
-            quranData={quranData}
-            onPageComplete={handlePageComplete}
-            onPageUncomplete={handlePageUncomplete}
-            onRatePage={smartTrackingEnabled ? setSelectedPageForRating : undefined}
+        <View style={styles.viewerWrap}>
+          <MushafPager
+            pages={sessionPages}
             initialPage={sessionPages[0]}
+            onPageChange={setCurrentPageNumber}
+            extraData={extraData}
           />
+
+          <View style={styles.breadcrumb} pointerEvents="none">
+            <Text style={styles.crumbLeft}>
+              Juz {juz} · Hizb {hizb}
+            </Text>
+            <View style={styles.crumbRight}>
+              {firstSurah?.name ? (
+                <Text style={styles.crumbSurah}>{firstSurah.name}</Text>
+              ) : null}
+              {firstSurah?.nameArabic ? (
+                <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.footer} pointerEvents="none">
+            <Text style={styles.pageNum}>{currentPageNumber}</Text>
+          </View>
         </View>
 
-        <View style={styles.footer}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <Button
-            title="Save changes"
-            onPress={handleSave}
-            variant="primary"
-            style={{ width: '100%' }}
-          />
-        </View>
+        <SessionMenuSheet
+          visible={menuOpen}
+          actions={menuActions}
+          onClose={() => setMenuOpen(false)}
+        />
 
         {smartTrackingEnabled && selectedPageForRating && (
           <WeaknessModal
@@ -233,48 +260,61 @@ export function EditSessionModal({
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
-    header: {
+    container: { flex: 1, backgroundColor: theme.bg },
+    topBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.sm,
+      paddingVertical: spacing.xs,
+      backgroundColor: theme.bg,
+      gap: spacing.xs,
     },
-    headerButton: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.full,
-      overflow: 'hidden',
+    iconBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    headerCenter: { flex: 1, alignItems: 'center' },
-    title: { ...typography.titleMedium, color: theme.textPrimary },
-    subtitle: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-      marginTop: 2,
+    spacer: { flex: 1 },
+    viewerWrap: { flex: 1 },
+    breadcrumb: {
+      position: 'absolute',
+      top: spacing.sm,
+      left: spacing.md,
+      right: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    summaryBar: {
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
-      marginHorizontal: spacing.md,
-      borderRadius: radius.full,
-      overflow: 'hidden',
-      alignSelf: 'center',
-      marginTop: spacing.xs,
+    crumbLeft: {
+      ...typography.caption,
+      color: theme.textPrimary,
     },
-    summaryText: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-      textAlign: 'center',
+    crumbRight: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: spacing.xs,
     },
-    viewerContainer: { flex: 1 },
+    crumbSurah: {
+      ...typography.caption,
+      color: theme.textPrimary,
+    },
+    crumbArabic: {
+      fontFamily: fonts.arabic,
+      fontSize: 14,
+      color: theme.textPrimary,
+    },
     footer: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
-      overflow: 'hidden',
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: spacing.md,
+      alignItems: 'center',
+    },
+    pageNum: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.textPrimary,
     },
   });
