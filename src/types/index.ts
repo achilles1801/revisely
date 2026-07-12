@@ -36,6 +36,11 @@ export interface User {
   // on each calendar day, looping after one full cycle.
   customPlan: CustomPlan | null;
 
+  // Named schedules the user has saved to reuse later. Applying one copies its
+  // days/direction into `customPlan` (with a fresh cycleStartDate); the saved
+  // entry itself is a reusable snapshot, independent of the active plan.
+  savedPlans: SavedPlan[];
+
   // Stats
   streak: number;
   lastRevisionDate: string | null;
@@ -71,6 +76,22 @@ export interface CustomPlan {
   /** Which direction the user generated the plan from — useful for re-rendering
    *  the editor in the same orientation. */
   direction: 'forward' | 'reverse';
+}
+
+/** A reusable, named schedule the user saved to switch between later. Stores
+ *  the cycle shape only — `cycleStartDate` is assigned fresh (to "today") when
+ *  the preset is applied, so applying always starts day 0 on the current day. */
+export interface SavedPlan {
+  /** Stable client-generated id. */
+  id: string;
+  /** User-facing name, e.g. "Ramadan rotation". */
+  name: string;
+  /** Cycle days, same shape as CustomPlan.days. */
+  days: number[][];
+  /** Direction the cycle was generated in. */
+  direction: 'forward' | 'reverse';
+  /** ISO timestamp the preset was saved (for stable sorting / display). */
+  createdAt: string;
 }
 
 // User's relationship with each Quran page

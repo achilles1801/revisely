@@ -35,6 +35,17 @@ export interface FirestoreCustomPlan {
   direction: 'forward' | 'reverse';
 }
 
+/** A named, reusable schedule persisted on the user doc. Same array-of-objects
+ *  workaround for `days` as FirestoreCustomPlan (Firestore disallows nested
+ *  arrays). */
+export interface FirestoreSavedPlan {
+  id: string;
+  name: string;
+  days: Array<{ pages: number[] }>;
+  direction: 'forward' | 'reverse';
+  createdAt: string;
+}
+
 /** Theme preference for the app */
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -129,6 +140,8 @@ export interface FirestoreUser {
   /** Optional user-edited schedule (Phase 7 plan editor). Null means use the
    *  default sequential resolver. */
   customPlan: FirestoreCustomPlan | null;
+  /** Named schedules the user saved to reuse. Absent on legacy docs → []. */
+  savedPlans?: FirestoreSavedPlan[];
 
   // Aggregated Stats (denormalized for quick reads)
   /** Current revision streak in days */
@@ -196,6 +209,7 @@ export interface UpdateUserInput {
   currentMemorizationPage?: number | null;
   currentKhatamPage?: number;
   customPlan?: FirestoreCustomPlan | null;
+  savedPlans?: FirestoreSavedPlan[];
   onboardingComplete?: boolean;
   totalMemorizedPages?: number;
   streak?: number;

@@ -193,6 +193,7 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.currentMemorizationPage !== undefined) updateData.currentMemorizationPage = updates.currentMemorizationPage;
   if (updates.currentKhatamPage !== undefined) updateData.currentKhatamPage = updates.currentKhatamPage;
   if (updates.customPlan !== undefined) updateData.customPlan = updates.customPlan;
+  if (updates.savedPlans !== undefined) updateData.savedPlans = updates.savedPlans;
   if (updates.onboardingComplete !== undefined) updateData.onboardingComplete = updates.onboardingComplete;
   if (updates.totalMemorizedPages !== undefined) updateData.totalMemorizedPages = updates.totalMemorizedPages;
   if (updates.streak !== undefined) updateData.streak = updates.streak;

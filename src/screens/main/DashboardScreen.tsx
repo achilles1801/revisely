@@ -26,7 +26,11 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
-import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
+import {
+  generateDailyAssignment,
+  getCurrentRevisionDay,
+  shiftScheduleAnchor,
+} from '../../lib/algorithm';
 import {
   getQuranData,
   getJuzForPage,
@@ -46,9 +50,10 @@ export default function DashboardScreen() {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(theme, isDark), [theme, isDark]);
 
-  const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error } = useApp();
+  const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error, saveUser } = useApp();
   const { firebaseUser } = useAuth();
 
+  const [shifting, setShifting] = useState(false);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
@@ -326,6 +331,21 @@ export default function DashboardScreen() {
     }
   };
 
+  // Fell behind? Slide the whole schedule a day later so today reverts to the
+  // review you missed instead of marching on. Pure anchor nudge — no per-day
+  // edits — applied immediately so the hero updates in place.
+  const handlePushBack = async () => {
+    if (!user || shifting) return;
+    setShifting(true);
+    try {
+      await saveUser(shiftScheduleAnchor(user, 1));
+    } catch {
+      Alert.alert("Couldn't update your schedule", 'Please try again.');
+    } finally {
+      setShifting(false);
+    }
+  };
+
   const renderHeroContent = () => (
     <>
       <View style={styles.heroTopRow}>
@@ -369,6 +389,22 @@ export default function DashboardScreen() {
         >
           <Text style={styles.heroCtaText}>{heroContent.ctaTitle}</Text>
           <Ionicons name="arrow-forward" size={18} color="#fff" />
+        </PressableScale>
+      )}
+
+      {todayStatus.status !== 'completed' && assignment.totalPages > 0 && (
+        <PressableScale
+          onPress={handlePushBack}
+          disabled={shifting}
+          haptic="light"
+          scale={0.98}
+          style={styles.pushBackLink}
+          accessibilityLabel="Behind on revision? Move your schedule back a day"
+        >
+          <Ionicons name="arrow-back" size={13} color={theme.textSecondary} />
+          <Text style={styles.pushBackText}>
+            {shifting ? 'Updating…' : 'Behind? Go back a day'}
+          </Text>
         </PressableScale>
       )}
     </>
@@ -911,6 +947,26 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       fontWeight: '700',
       letterSpacing: 0.2,
       color: '#fff',
+    },
+    pushBackLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: spacing.md,
+      alignSelf: 'center',
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      minHeight: 36,
+      borderRadius: radius.full,
+      backgroundColor: theme.accentSoft,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+    },
+    pushBackText: {
+      ...typography.bodySmall,
+      color: theme.accent,
+      fontWeight: '500',
     },
 
     sessionsSection: { marginTop: spacing.sm },

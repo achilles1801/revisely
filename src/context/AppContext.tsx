@@ -13,6 +13,14 @@ import * as firestoreService from '../services/firestoreService';
 import { updateAuthDisplayName } from '../lib/firebase';
 import { generateId } from '../lib/utils';
 import { recomputePagesFromLogs } from '../lib/algorithm';
+import {
+  customPlanFromFirestore,
+  customPlanToFirestore,
+  getScheduleAnchorDateFromFirestore,
+  savedPlansFromFirestore,
+  savedPlansToFirestore,
+  timestampToISOString,
+} from '../lib/schedulePersistence';
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
 import { postActivityDayForRevision } from '../services/quranFoundation';
@@ -20,28 +28,6 @@ import { postActivityDayForRevision } from '../services/quranFoundation';
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
 // ============================================================================
-
-// Helper to safely convert Firestore Timestamp to ISO string
-function timestampToISOString(timestamp: any): string {
-  if (!timestamp) return new Date().toISOString();
-  // If it's a Firestore Timestamp with toDate method
-  if (typeof timestamp.toDate === 'function') {
-    return timestamp.toDate().toISOString();
-  }
-  // If it's already a Date
-  if (timestamp instanceof Date) {
-    return timestamp.toISOString();
-  }
-  // If it's a plain object with seconds (Firestore Timestamp serialized)
-  if (timestamp.seconds) {
-    return new Date(timestamp.seconds * 1000).toISOString();
-  }
-  // If it's a string, return as-is
-  if (typeof timestamp === 'string') {
-    return timestamp;
-  }
-  return new Date().toISOString();
-}
 
 function firestoreUserToLocal(fsUser: FirestoreUser): User {
   return {
@@ -58,15 +44,8 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     currentMemorizationJuz: fsUser.currentMemorizationJuz,
     currentMemorizationPage: fsUser.currentMemorizationPage,
     currentKhatamPage: fsUser.currentKhatamPage || 1,
-    // Convert Firestore's array-of-objects shape back to the local
-    // number[][] model (Firestore disallows nested arrays).
-    customPlan: fsUser.customPlan
-      ? {
-          days: fsUser.customPlan.days.map((d) => d.pages ?? []),
-          cycleStartDate: fsUser.customPlan.cycleStartDate,
-          direction: fsUser.customPlan.direction,
-        }
-      : null,
+    customPlan: customPlanFromFirestore(fsUser.customPlan),
+    savedPlans: savedPlansFromFirestore(fsUser.savedPlans),
     streak: fsUser.streak || 0,
     lastRevisionDate: fsUser.lastRevisionDate,
     memorizedSurahs: fsUser.memorizedSurahs ?? [],
@@ -75,8 +54,7 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     fajrCalculationMethod: fsUser.fajrCalculationMethod ?? 'NorthAmerica',
     // Legacy users predate scheduleAnchorDate — fall back to createdAt so
     // the scheduler still produces a sensible cycle for them.
-    scheduleAnchorDate:
-      fsUser.scheduleAnchorDate ?? timestampToISOString(fsUser.createdAt),
+    scheduleAnchorDate: getScheduleAnchorDateFromFirestore(fsUser),
   };
 }
 
@@ -384,15 +362,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentMemorizationJuz: updatedUser.currentMemorizationJuz,
         currentMemorizationPage: updatedUser.currentMemorizationPage,
         currentKhatamPage: updatedUser.currentKhatamPage,
-        // Firestore can't store nested arrays — wrap each day's page list in
-        // an object before writing.
-        customPlan: updatedUser.customPlan
-          ? {
-              days: updatedUser.customPlan.days.map((pages) => ({ pages })),
-              cycleStartDate: updatedUser.customPlan.cycleStartDate,
-              direction: updatedUser.customPlan.direction,
-            }
-          : null,
+        customPlan: customPlanToFirestore(updatedUser.customPlan),
+        savedPlans: savedPlansToFirestore(updatedUser.savedPlans),
         memorizedSurahs: updatedUser.memorizedSurahs,
         fajrBoundaryEnabled: updatedUser.fajrBoundaryEnabled,
         locationCoords: updatedUser.locationCoords,
@@ -430,6 +401,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentMemorizationPage: null,
       currentKhatamPage: 1,
       customPlan: null,
+      savedPlans: [],
       streak: 0,
       lastRevisionDate: null,
       memorizedSurahs: [],

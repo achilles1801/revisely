@@ -1,11 +1,15 @@
 import {
+  buildAutoBalancePlanDays,
   buildDefaultPlanDays,
+  buildOneJuzPerDayPlanDays,
+  buildWeakestFirstPlanDays,
   calculatePageUrgency,
   countCompletedSessions,
   generateDailyAssignment,
   getMissedScheduledRevisions,
   getPagesScheduledForDate,
   INSIGHTS_MIN_SESSIONS,
+  shiftScheduleAnchor,
 } from '../algorithm';
 import type { User, UserPage, QuranPage, RevisionLog, CustomPlan } from '../../types';
 
@@ -23,6 +27,7 @@ const baseUser: User = {
   currentMemorizationPage: null,
   currentKhatamPage: 1,
   customPlan: null,
+  savedPlans: [],
   streak: 0,
   lastRevisionDate: null,
   memorizedSurahs: [],
@@ -429,5 +434,160 @@ describe('getPagesScheduledForDate with customPlan', () => {
     expect(
       getPagesScheduledForDate(user, new Date('2026-01-01T12:00:00Z'), memorized),
     ).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe('buildAutoBalancePlanDays', () => {
+  const memorized: UserPage[] = Array.from({ length: 10 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+  const user = { ...baseUser, dailyPageCapacity: 4 };
+
+  it('slices into equal perDay chunks, wrapping the tail from the head', () => {
+    // 10 pages, 4/day → 3 days; last day wraps so every day is exactly 4.
+    expect(buildAutoBalancePlanDays(user, memorized)).toEqual([
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9, 10, 1, 2],
+    ]);
+  });
+
+  it('starts at the beginning regardless of the schedule anchor', () => {
+    // Unlike buildDefaultPlanDays, the preset is anchor-independent — a "fresh
+    // start" reset, not a rotation onto today.
+    const shiftedAnchor = { ...user, scheduleAnchorDate: '2025-06-01T12:00:00Z' };
+    expect(buildAutoBalancePlanDays(shiftedAnchor, memorized)[0]).toEqual([1, 2, 3, 4]);
+  });
+
+  it('reverses the order when direction is reverse', () => {
+    expect(buildAutoBalancePlanDays(user, memorized, 'reverse')).toEqual([
+      [10, 9, 8, 7],
+      [6, 5, 4, 3],
+      [2, 1, 10, 9],
+    ]);
+  });
+
+  it('returns an empty list when nothing is memorized', () => {
+    expect(buildAutoBalancePlanDays(user, [])).toEqual([]);
+  });
+});
+
+describe('buildOneJuzPerDayPlanDays', () => {
+  it('makes one day per memorized juz, holding that juz pages', () => {
+    // Pages 1,5,21 = Juz 1; 42,55 = Juz 3 (Madani layout). Juz 2 is absent.
+    const memorized: UserPage[] = [
+      makePage({ pageNumber: 1 }),
+      makePage({ pageNumber: 5 }),
+      makePage({ pageNumber: 21 }),
+      makePage({ pageNumber: 42 }),
+      makePage({ pageNumber: 55 }),
+    ];
+    expect(buildOneJuzPerDayPlanDays(memorized)).toEqual([
+      [1, 5, 21],
+      [42, 55],
+    ]);
+  });
+
+  it('returns an empty list when nothing is memorized', () => {
+    expect(buildOneJuzPerDayPlanDays([])).toEqual([]);
+  });
+});
+
+describe('buildWeakestFirstPlanDays', () => {
+  const today = new Date('2026-01-10T12:00:00Z');
+  // All three fully on schedule (last revised after "today" → 0 missed,
+  // robustly, regardless of runner timezone) and equally recent, so only the
+  // weakness multiplier separates them: rating 1 > rating 3 > rating 5.
+  const weak = makePage({
+    pageNumber: 2,
+    weaknessRating: 1,
+    dateMemorized: '2026-01-08',
+    lastRevisedDate: '2026-02-01',
+  });
+  const mid = makePage({
+    pageNumber: 3,
+    weaknessRating: 3,
+    dateMemorized: '2026-01-08',
+    lastRevisedDate: '2026-02-01',
+  });
+  const strong = makePage({
+    pageNumber: 1,
+    weaknessRating: 5,
+    dateMemorized: '2026-01-08',
+    lastRevisedDate: '2026-02-01',
+  });
+  const memorized = [strong, weak, mid];
+
+  it('orders the cycle weakest (most urgent) first', () => {
+    const user = { ...baseUser, dailyPageCapacity: 1, createdAt: '2026-01-01T12:00:00Z' };
+    expect(buildWeakestFirstPlanDays(user, memorized, [], today)).toEqual([
+      [2],
+      [3],
+      [1],
+    ]);
+  });
+
+  it('chunks by perDay with the remainder on the last day (no wrap)', () => {
+    const user = { ...baseUser, dailyPageCapacity: 2, createdAt: '2026-01-01T12:00:00Z' };
+    expect(buildWeakestFirstPlanDays(user, memorized, [], today)).toEqual([
+      [2, 3],
+      [1],
+    ]);
+  });
+
+  it('returns an empty list when nothing is memorized', () => {
+    const user = { ...baseUser, dailyPageCapacity: 5 };
+    expect(buildWeakestFirstPlanDays(user, [], [], today)).toEqual([]);
+  });
+});
+
+describe('shiftScheduleAnchor', () => {
+  const memorized: UserPage[] = Array.from({ length: 10 }, (_, i) =>
+    makePage({ pageNumber: i + 1 }),
+  );
+  const user = {
+    ...baseUser,
+    dailyPageCapacity: 5,
+    scheduleAnchorDate: '2026-01-01T12:00:00Z',
+  };
+  const D3 = new Date('2026-01-03T12:00:00Z');
+  const D2 = new Date('2026-01-02T12:00:00Z');
+  const D4 = new Date('2026-01-04T12:00:00Z');
+
+  it('+1 slides every assignment one day later (today shows yesterday’s set)', () => {
+    const shifted = shiftScheduleAnchor(user, 1);
+    // Day 3 after the shift == day 2 before it.
+    expect(getPagesScheduledForDate(shifted, D3, memorized)).toEqual(
+      getPagesScheduledForDate(user, D2, memorized),
+    );
+  });
+
+  it('-1 slides every assignment one day earlier (skip ahead)', () => {
+    const shifted = shiftScheduleAnchor(user, -1);
+    // Day 3 after the shift == day 4 before it.
+    expect(getPagesScheduledForDate(shifted, D3, memorized)).toEqual(
+      getPagesScheduledForDate(user, D4, memorized),
+    );
+  });
+
+  it('shifts the custom-plan cycle start when a custom plan is set', () => {
+    const customUser = {
+      ...user,
+      customPlan: {
+        days: [[100], [200], [300]],
+        cycleStartDate: '2026-01-01',
+        direction: 'forward' as const,
+      },
+    };
+    const shifted = shiftScheduleAnchor(customUser, 1);
+    expect(shifted.customPlan?.cycleStartDate).toBe('2026-01-02');
+    // Day 2 after the shift == day 1 before it.
+    expect(getPagesScheduledForDate(shifted, D2, memorized)).toEqual(
+      getPagesScheduledForDate(customUser, new Date('2026-01-01T12:00:00Z'), memorized),
+    );
+  });
+
+  it('is a no-op for deltaDays 0', () => {
+    expect(shiftScheduleAnchor(user, 0)).toBe(user);
   });
 });

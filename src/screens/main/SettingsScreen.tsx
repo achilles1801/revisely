@@ -17,14 +17,12 @@ import {
 import Constants from 'expo-constants';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { QuranFoundationCard } from '../../components/QuranFoundationCard';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
-import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -218,17 +216,11 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (user) setLocalUser(user);
   }, [user]);
-  const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
-  const [tempScheduleMode, setTempScheduleMode] = useState<'pages' | 'juz'>(
-    user?.scheduleMode ?? 'pages',
-  );
-  const [tempJuzCount, setTempJuzCount] = useState(user?.dailyJuzCount ?? 1);
   const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
   const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
@@ -264,15 +256,6 @@ export default function SettingsScreen() {
   const handleNotificationToggle = async (enabled: boolean) => {
     await updateUser({ notificationsEnabled: enabled });
     await scheduleDailyReminder(localUser.reminderTime, enabled);
-  };
-
-  const handleSaveCapacity = async () => {
-    await updateUser({
-      dailyPageCapacity: tempCapacity,
-      scheduleMode: tempScheduleMode,
-      dailyJuzCount: tempJuzCount,
-    });
-    setShowCapacityModal(false);
   };
 
   const handleSaveName = async () => {
@@ -473,8 +456,6 @@ export default function SettingsScreen() {
                 flexDirection: 'column',
                 alignItems: 'stretch',
                 gap: spacing.xs,
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: theme.border,
               },
             ]}
           >
@@ -504,22 +485,6 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          <Row
-            icon="layers-outline"
-            label="Daily quota"
-            value={
-              localUser.scheduleMode === 'juz'
-                ? `${localUser.dailyJuzCount} ${localUser.dailyJuzCount === 1 ? 'juz' : 'ajzaʼ'}`
-                : `${localUser.dailyPageCapacity} pages`
-            }
-            onPress={() => {
-              setTempCapacity(localUser.dailyPageCapacity);
-              setTempScheduleMode(localUser.scheduleMode ?? 'pages');
-              setTempJuzCount(localUser.dailyJuzCount ?? 1);
-              setShowCapacityModal(true);
-            }}
-            isLast
-          />
         </Section>
 
         <Section title="Notifications">
@@ -643,88 +608,6 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
-
-      {/* Daily Capacity Sheet */}
-      <BottomSheetModal visible={showCapacityModal} onClose={() => setShowCapacityModal(false)}>
-        <View style={screenStyles.sheetHeader}>
-          <PressableScale
-            onPress={() => setShowCapacityModal(false)}
-            haptic="light"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-          </PressableScale>
-          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Daily quota</Text>
-          <PressableScale
-            onPress={handleSaveCapacity}
-            haptic="medium"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
-          </PressableScale>
-        </View>
-
-        <View style={{ marginBottom: spacing.md }}>
-          <LiquidGlassSegmentedControl<'pages' | 'juz'>
-            options={[
-              { value: 'pages', label: 'Pages' },
-              { value: 'juz', label: 'Juz' },
-            ]}
-            value={tempScheduleMode}
-            onChange={setTempScheduleMode}
-          />
-        </View>
-
-        {tempScheduleMode === 'pages' ? (
-          <>
-            <View style={screenStyles.capacityDisplay}>
-              <Text style={[typography.displayLarge, { color: theme.accent }]}>{tempCapacity}</Text>
-              <Text style={[typography.bodyLarge, { color: theme.textSecondary }]}>pages</Text>
-            </View>
-            <Slider
-              key="slider-pages"
-              style={{ width: '100%', height: 40 }}
-              minimumValue={5}
-              maximumValue={60}
-              step={1}
-              value={tempCapacity}
-              onValueChange={setTempCapacity}
-              minimumTrackTintColor={theme.accent}
-              maximumTrackTintColor={theme.border}
-              thumbTintColor={theme.accent}
-            />
-            <View style={screenStyles.sliderLabels}>
-              <Text style={[typography.bodySmall, { color: theme.textMuted }]}>5</Text>
-              <Text style={[typography.bodySmall, { color: theme.textMuted }]}>60</Text>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={screenStyles.capacityDisplay}>
-              <Text style={[typography.displayLarge, { color: theme.accent }]}>{tempJuzCount}</Text>
-              <Text style={[typography.bodyLarge, { color: theme.textSecondary }]}>
-                {tempJuzCount === 1 ? 'juz' : 'ajzaʼ'}
-              </Text>
-            </View>
-            <Slider
-              key="slider-juz"
-              style={{ width: '100%', height: 40 }}
-              minimumValue={1}
-              maximumValue={5}
-              step={1}
-              value={tempJuzCount}
-              onValueChange={setTempJuzCount}
-              minimumTrackTintColor={theme.accent}
-              maximumTrackTintColor={theme.border}
-              thumbTintColor={theme.accent}
-            />
-            <View style={screenStyles.sliderLabels}>
-              <Text style={[typography.bodySmall, { color: theme.textMuted }]}>1</Text>
-              <Text style={[typography.bodySmall, { color: theme.textMuted }]}>5</Text>
-            </View>
-          </>
-        )}
-      </BottomSheetModal>
 
       {/* Time picker sheet */}
       <BottomSheetModal visible={showTimeModal} onClose={() => setShowTimeModal(false)}>

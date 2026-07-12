@@ -118,6 +118,8 @@ service cloud.firestore {
         'notifications', 'notificationsEnabled', 'reminderTime',
         'currentMemorizationJuz', 'currentMemorizationPage', 'currentKhatamPage',
         'customPlan',
+        // Named, reusable schedules the user saved to switch between.
+        'savedPlans',
         'onboardingComplete',
         // Surah-level memorization intent — separate from page status so
         // shared-page surahs (Shams/Layl/Duha) don't auto-flip together.

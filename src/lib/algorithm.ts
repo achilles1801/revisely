@@ -286,6 +286,166 @@ export function buildDefaultPlanDays(
   return days;
 }
 
+// ---------------------------------------------------------------------------
+// Preset generators (plan editor)
+//
+// Each returns one full cycle as number[][], starting at index 0 (NOT rotated
+// to today). The editor saves the cycle with `cycleStartDate = today`, so
+// days[0] always lands on today after save — these just decide the *order* and
+// *grouping* of the cycle the user is resetting to.
+// ---------------------------------------------------------------------------
+
+/**
+ * "Auto-balance" preset: the memorized set sliced into equal `perDay` chunks,
+ * the wrap day borrowing from the head so every day is exactly `perDay` pages.
+ * This is the app's historical default cycle, exposed as a one-tap reset.
+ */
+export function buildAutoBalancePlanDays(
+  user: User,
+  memorizedPages: UserPage[],
+  direction: 'forward' | 'reverse' = 'forward',
+): number[][] {
+  if (memorizedPages.length === 0) return [];
+
+  const sorted = [...memorizedPages]
+    .sort((a, b) => a.pageNumber - b.pageNumber)
+    .map((p) => p.pageNumber);
+  const ordered = direction === 'reverse' ? sorted.reverse() : sorted;
+
+  const total = ordered.length;
+  const perDay = Math.min(Math.max(1, user.dailyPageCapacity || 0), total);
+  if (perDay <= 0) return [];
+
+  const cycleLength = Math.ceil(total / perDay);
+  const days: number[][] = [];
+  for (let d = 0; d < cycleLength; d++) {
+    const slice: number[] = [];
+    for (let i = 0; i < perDay; i++) {
+      slice.push(ordered[(d * perDay + i) % total]);
+    }
+    days.push(slice);
+  }
+  return days;
+}
+
+/**
+ * "1 juz a day" preset: one cycle day per juz the user has memorized pages in,
+ * each day holding that juz's memorized pages. Uses the same surah-aware juz
+ * key as the live juz scheduler so day grouping matches revision sessions.
+ */
+export function buildOneJuzPerDayPlanDays(
+  memorizedPages: UserPage[],
+): number[][] {
+  if (memorizedPages.length === 0) return [];
+
+  const byJuz = new Map<number, number[]>();
+  for (const p of memorizedPages) {
+    const juz = juzKeyForPage(p.pageNumber);
+    const arr = byJuz.get(juz) ?? [];
+    arr.push(p.pageNumber);
+    byJuz.set(juz, arr);
+  }
+  return Array.from(byJuz.keys())
+    .sort((a, b) => a - b)
+    .map((juz) => (byJuz.get(juz) as number[]).sort((a, b) => a - b));
+}
+
+/**
+ * "Weakest-first" preset: the memorized set ranked by Insights urgency
+ * (shakier / more-overdue pages first), then chunked into `perDay`-sized days.
+ * Unlike auto-balance this does NOT wrap — the last day is just the remainder —
+ * because the order is a ranking, not a sliding window. With no session history
+ * yet, urgency is near-uniform so this degrades gracefully to page order.
+ */
+export function buildWeakestFirstPlanDays(
+  user: User,
+  memorizedPages: UserPage[],
+  sessions: RevisionLog[],
+  today: Date = new Date(),
+): number[][] {
+  if (memorizedPages.length === 0) return [];
+
+  const ordered = [...memorizedPages]
+    .map((p) => ({
+      page: p.pageNumber,
+      urgency: calculatePageUrgency(p, user, memorizedPages, sessions, today),
+    }))
+    // Highest urgency first; tie-break by page number so the order is stable.
+    .sort((a, b) => b.urgency - a.urgency || a.page - b.page)
+    .map((x) => x.page);
+
+  const total = ordered.length;
+  const perDay = Math.min(Math.max(1, user.dailyPageCapacity || 10), total);
+
+  const cycleLength = Math.ceil(total / perDay);
+  const days: number[][] = [];
+  for (let d = 0; d < cycleLength; d++) {
+    const slice = ordered.slice(d * perDay, d * perDay + perDay);
+    if (slice.length > 0) days.push(slice);
+  }
+  return days;
+}
+
+// Add whole days to a 'YYYY-MM-DD' string, returning the same format.
+function addDaysToISODay(isoDay: string, deltaDays: number): string {
+  const d = parseLocalDateString(isoDay);
+  d.setDate(d.getDate() + deltaDays);
+  return dateToISODay(d);
+}
+
+// Add whole days to an ISO timestamp, preserving the ISO-timestamp format.
+// Falls back to today for malformed anchors so a bad value can't strand the
+// schedule.
+function addDaysToISOTimestamp(iso: string, deltaDays: number): string {
+  const d = new Date(iso);
+  const base = isNaN(d.getTime()) ? startOfDay(new Date()) : d;
+  base.setDate(base.getDate() + deltaDays);
+  return base.toISOString();
+}
+
+/**
+ * Slide the whole schedule by `deltaDays` calendar days, leaving the cycle
+ * contents untouched. Because the scheduler is purely date-derived (see
+ * getPagesScheduledForDate), moving the anchor is all it takes:
+ *
+ *   deltaDays = +1  → every assignment lands one day later. "I'm behind —
+ *                     push it back" so today's revision reappears tomorrow.
+ *   deltaDays = -1  → every assignment lands one day earlier. "Skip ahead."
+ *
+ * Shifts whichever anchor is live: `customPlan.cycleStartDate` when a custom
+ * plan is set, otherwise `scheduleAnchorDate`. Returns a new User; never
+ * mutates.
+ *
+ * Trade-off: Insights recomputes "what was scheduled" live from the anchor, so
+ * shifting also reshuffles the historical scheduled-day pattern the
+ * missed-revision count reads from. Accepted for now — a fully accurate fix
+ * would snapshot per-day schedules, a much larger change.
+ */
+export function shiftScheduleAnchor(user: User, deltaDays: number): User {
+  if (deltaDays === 0) return user;
+
+  if (user.customPlan && user.customPlan.days.length > 0) {
+    return {
+      ...user,
+      customPlan: {
+        ...user.customPlan,
+        cycleStartDate: addDaysToISODay(
+          user.customPlan.cycleStartDate,
+          deltaDays,
+        ),
+      },
+    };
+  }
+
+  return {
+    ...user,
+    scheduleAnchorDate: addDaysToISOTimestamp(
+      user.scheduleAnchorDate || user.createdAt,
+      deltaDays,
+    ),
+  };
+}
+
 /**
  * Count how many times this page was scheduled and not revised since the
  * page's last successful revision (or since the user signed up, whichever
