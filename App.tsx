@@ -21,10 +21,11 @@ Sentry.init({
   // Enable Logs
   enableLogs: true,
 
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration()],
+  // Session Replay disabled: it recorded screen interactions but was not
+  // declared in the App Store privacy label. Kept off until it's declared.
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+  integrations: [],
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,

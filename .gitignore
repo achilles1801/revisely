@@ -53,6 +53,11 @@ service-account*.json
 # Personal Claude Code workspace config (skills, MCP servers, agent state)
 .claude/
 .mcp.json
+.agents/
+.codex/
+
+# Spurious empty expo config dropped into the Firebase Functions dir by tooling
+functions/app.json
 
 # Internal docs (kept locally for reference, not part of the public repo)
 SUBMISSION.md
