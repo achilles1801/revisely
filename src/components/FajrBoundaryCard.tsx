@@ -33,24 +33,9 @@ export function FajrBoundaryCard() {
     return getFajrTimeFor(new Date(), user);
   }, [user]);
 
-  // When the boundary is off (or location missing), the day rolls at local
-  // midnight. We compute and show the time either way so the user always
-  // knows when their session resets.
-  const boundaryDisplay = useMemo(() => {
-    if (todaysFajr) {
-      return {
-        label: 'Your day rolls over at',
-        value: `${todaysFajr.toLocaleTimeString([], {
-          hour: 'numeric',
-          minute: '2-digit',
-        })} (fajr)`,
-      };
-    }
-    return {
-      label: 'Your day rolls over at',
-      value: 'midnight',
-    };
-  }, [todaysFajr]);
+  const resetsAt = todaysFajr
+    ? todaysFajr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : 'midnight';
 
   if (!user) return null;
 
@@ -120,18 +105,17 @@ export function FajrBoundaryCard() {
   };
 
   return (
-    <View style={styles.container}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
-      <View style={styles.headerRow}>
-        <View style={[styles.iconBubble, { backgroundColor: theme.accent + '20' }]}>
-          <Ionicons name="moon-outline" size={18} color={theme.accent} />
+    <View>
+      <View style={[styles.row, enabled && styles.rowDivider]}>
+        <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
+          <Ionicons name="moon-outline" size={16} color={theme.accent} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[typography.bodyMedium, { color: theme.textPrimary, fontWeight: '600' }]}>
-            Roll over at fajr
+          <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
+            Start day at fajr
           </Text>
-          <Text style={[typography.bodySmall, { color: theme.textSecondary }]}>
-            On: late-night revising counts as today. Off: day ends at midnight.
+          <Text style={[typography.caption, { color: theme.textMuted }]}>
+            Resets at {resetsAt}
           </Text>
         </View>
         <Switch
@@ -143,41 +127,25 @@ export function FajrBoundaryCard() {
         />
       </View>
 
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <Text style={[typography.label, { color: theme.textMuted }]}>
-            {boundaryDisplay.label}
-          </Text>
-          <Text style={[typography.bodyMedium, { color: theme.textPrimary, fontWeight: '600' }]}>
-            {boundaryDisplay.value}
-          </Text>
-        </View>
-
-        {enabled && (
-          <>
-            <PressableScale onPress={() => setMethodOpen(true)} haptic="light">
-              <View style={styles.detailRow}>
-                <Text style={[typography.label, { color: theme.textMuted }]}>Calculation</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
-                    {currentMethodLabel}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                </View>
-              </View>
-            </PressableScale>
-
-            <PressableScale onPress={handleRefreshLocation} haptic="light">
-              <View style={styles.detailRow}>
-                <Text style={[typography.label, { color: theme.textMuted }]}>Location</Text>
-                <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
-                  {hasCoords ? 'Update location' : 'Set location'}
-                </Text>
-              </View>
-            </PressableScale>
-          </>
-        )}
-      </View>
+      {enabled && (
+        <PressableScale onPress={() => setMethodOpen(true)} haptic="light" scale={0.99}>
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
+              <Ionicons name="calculator-outline" size={16} color={theme.accent} />
+            </View>
+            <Text style={[typography.bodyMedium, { color: theme.textPrimary, flex: 1 }]}>
+              Method
+            </Text>
+            <Text
+              style={[typography.bodyMedium, { color: theme.textSecondary, flexShrink: 1 }]}
+              numberOfLines={1}
+            >
+              {currentMethodLabel}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+          </View>
+        </PressableScale>
+      )}
 
       <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setMethodOpen(false)}>
@@ -208,6 +176,19 @@ export function FajrBoundaryCard() {
                 );
               })}
             </ScrollView>
+            <PressableScale
+              onPress={() => {
+                setMethodOpen(false);
+                handleRefreshLocation();
+              }}
+              haptic="light"
+              style={styles.locationBtn}
+            >
+              <Ionicons name="location-outline" size={16} color={theme.accent} />
+              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '600' }]}>
+                {hasCoords ? 'Update location' : 'Set location'}
+              </Text>
+            </PressableScale>
           </Pressable>
         </Pressable>
       </Modal>
@@ -217,35 +198,31 @@ export function FajrBoundaryCard() {
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    container: {
-      borderRadius: radius.md,
-      padding: spacing.md,
-      overflow: 'hidden',
-      gap: spacing.sm,
-    },
-    headerRow: {
+    row: {
       flexDirection: 'row',
       alignItems: 'center',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      minHeight: 52,
       gap: spacing.sm,
     },
-    iconBubble: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.full,
+    rowDivider: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    rowIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: radius.xs,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    details: {
-      gap: spacing.xs,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
-      paddingTop: spacing.sm,
-    },
-    detailRow: {
+    locationBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.xxs,
+      justifyContent: 'center',
+      gap: spacing.xs,
+      paddingTop: spacing.md,
     },
     backdrop: {
       flex: 1,

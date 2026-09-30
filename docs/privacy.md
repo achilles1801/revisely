@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-05-28**
+**Last updated: 2026-09-29**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
 
@@ -21,11 +21,12 @@ Revisely is a mobile application that helps users track and review their Quran m
 ### Information you provide
 - **Account information** — your name, email address, and password when you create an account.
 - **Profile information** received from Apple Sign-In or Google Sign-In if you choose to authenticate that way (typically your name, email address, and profile picture URL).
-- **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; and entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes).
+- **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes); and reading sessions you time with the reading timer (start/end time, length, and the pages you assign to them).
 - **Voice input** (future feature) — when you opt to use the voice-recitation feature, your voice is processed to generate text. Audio is not stored after processing.
 
 ### Information collected automatically
 - **Device and app information** — device model, operating system version, app version, language, time zone, and anonymous device identifiers (used by Firebase to manage your session).
+- **App usage time** — the total time you spend with the app open, shown to you in Settings.
 - **Push notification tokens** — to send you the daily revision reminders you've enabled in Settings.
 - **Location** (optional) — if you enable the fajr-aligned day boundary in Settings, we request your device location to calculate accurate local fajr (dawn) prayer times, so a late-night revision session can count toward the correct day. Your coordinates are stored on your account solely to recompute fajr times; they are never used for tracking or advertising. You can decline the permission or turn the feature off at any time.
 - **Crash and error reports** — when the app encounters an error or crash, technical details (stack trace, device information, app state at the time) are sent to our error monitoring service so we can fix bugs.
@@ -33,7 +34,6 @@ Revisely is a mobile application that helps users track and review their Quran m
 
 ### Information from third parties
 - When you sign in with **Apple** or **Google**, we receive the profile information you authorize them to share (typically name and email).
-- When you choose to connect your **Quran.com (Quran Foundation)** account in Settings, we read your reading-streak information from Quran Foundation and send your Revisely revision activity (the surahs/pages you revise and time spent) back to Quran Foundation so your progress can count across the Quran.com ecosystem. This connection is optional; if you do not connect it, no data is exchanged with Quran Foundation.
 - We do not buy data from data brokers, scrape it from public sources, or import contacts from your device.
 
 ## 3. How we use information
@@ -71,14 +71,13 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **Apple Inc.** | App Store, Apple Push Notification service, Sign in with Apple, App Attest | United States |
 | **Anthropic, PBC** | The Claude AI model used by our memorization-input parser | United States |
 | **Sentry / Functional Software, Inc.** | Crash and error reporting | United States |
-| **Quran Foundation (Quran.com)** | Optional: when you connect your Quran.com account, we read your reading streak and sync your revision activity so your progress counts across the Quran.com ecosystem | Global |
 | **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
 
 We do not transfer your data to any party not listed above for any other purpose.
 
 ## 6. International data transfers
 
-Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Anthropic, Sentry, and Quran Foundation maintain comparable safeguards.
+Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Anthropic, and Sentry maintain comparable safeguards.
 
 ## 7. Data retention
 

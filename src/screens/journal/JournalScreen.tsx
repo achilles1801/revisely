@@ -19,13 +19,21 @@ import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { getCurrentRevisionDay } from '../../lib/algorithm';
 import {
+  filterJournalEntries,
   formatJournalDayRelative,
   formatMinutes,
   isJournalEntryEmpty,
+  JOURNAL_SORT_LABELS,
+  JournalFilter,
+  journalFilterLabel,
+  journalMonths,
+  JournalSort,
   journalTotalMinutes,
   recentJournalDays,
+  sortJournalEntries,
   sumJournalMinutes,
 } from '../../lib/journal';
+import { OptionSheet } from '../../components/OptionSheet';
 import { logger } from '../../lib/logger';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -51,12 +59,15 @@ export default function JournalScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [filter, setFilter] = useState<JournalFilter>('all');
+  const [sort, setSort] = useState<JournalSort>('newest');
+  const [picker, setPicker] = useState<'filter' | 'sort' | null>(null);
 
   const today = getCurrentRevisionDay(user);
 
   const load = useCallback(async () => {
     try {
-      setEntries(await firestoreService.getJournalEntries());
+      setEntries(await firestoreService.getJournalEntries(400));
       setLoadError(false);
     } catch (err) {
       logger.error('Failed to load journal', err);
@@ -90,6 +101,48 @@ export default function JournalScreen() {
   const week = useMemo(
     () => sumJournalMinutes(entries, today, RECENT_DAYS),
     [entries, today],
+  );
+
+  // The default view (all dates, newest first) keeps the "recent days with
+  // empty backfill rows" layout; any filter/sort switches to a flat list.
+  const isDefaultView = filter === 'all' && sort === 'newest';
+  const listed = useMemo(
+    () =>
+      sortJournalEntries(filterJournalEntries(entries, filter, today), sort).filter(
+        (e) => !isJournalEntryEmpty(e),
+      ),
+    [entries, filter, today, sort],
+  );
+  const listedTotals = useMemo(() => {
+    let memorization = 0;
+    let revision = 0;
+    for (const e of listed) {
+      memorization += e.memorizationMinutes ?? 0;
+      revision += e.revisionMinutes ?? 0;
+    }
+    return { memorization, revision, total: memorization + revision };
+  }, [listed]);
+  const filterSections = useMemo(
+    () => [
+      {
+        options: (['all', 'last7', 'last30'] as JournalFilter[]).map((f) => ({
+          value: f,
+          label: journalFilterLabel(f),
+        })),
+      },
+      ...(journalMonths(entries).length > 0
+        ? [
+            {
+              title: 'BY MONTH',
+              options: journalMonths(entries).map((m) => ({
+                value: m,
+                label: journalFilterLabel(m),
+              })),
+            },
+          ]
+        : []),
+    ],
+    [entries],
   );
 
   const openDay = (date: string) => navigation.navigate('JournalEntry', { date });
@@ -152,52 +205,176 @@ export default function JournalScreen() {
             </PressableScale>
           )}
 
-          <GlassCard glassStyle="clear" specular tintColor={cardTint} style={styles.summaryCard}>
-            <Text style={styles.sectionLabel}>LAST 7 DAYS</Text>
-            <View style={styles.summaryRow}>
-              <SummaryStat label="Memorize" value={week.memorization} theme={theme} />
-              <SummaryStat label="Revise" value={week.revision} theme={theme} />
-              <SummaryStat label="Total" value={week.total} theme={theme} emphasize />
-            </View>
-            <Text style={styles.summaryFoot}>
-              {week.activeDays} of {RECENT_DAYS} days logged
-            </Text>
-          </GlassCard>
-
-          <Text style={styles.sectionLabel}>RECENT</Text>
-          {recent.map(({ date, entry }) => (
-            <DayRow
-              key={date}
-              label={formatJournalDayRelative(date, today)}
-              entry={entry}
-              isToday={date === today}
-              onPress={() => openDay(date)}
+          <View style={styles.controls}>
+            <ControlChip
+              icon="calendar-outline"
+              label={journalFilterLabel(filter)}
+              active={filter !== 'all'}
+              onPress={() => setPicker('filter')}
               theme={theme}
-              tint={cardTint}
             />
-          ))}
+            <ControlChip
+              icon="swap-vertical-outline"
+              label={JOURNAL_SORT_LABELS[sort]}
+              active={sort !== 'newest'}
+              onPress={() => setPicker('sort')}
+              theme={theme}
+            />
+          </View>
 
-          {earlier.length > 0 && (
+          {isDefaultView ? (
             <>
-              <Text style={[styles.sectionLabel, { marginTop: spacing.md }]}>EARLIER</Text>
-              {earlier.map((entry) => (
+              <GlassCard glassStyle="clear" specular tintColor={cardTint} style={styles.summaryCard}>
+                <Text style={styles.sectionLabel}>LAST 7 DAYS</Text>
+                <View style={styles.summaryRow}>
+                  <SummaryStat label="Memorize" value={week.memorization} theme={theme} />
+                  <SummaryStat label="Revise" value={week.revision} theme={theme} />
+                  <SummaryStat label="Total" value={week.total} theme={theme} emphasize />
+                </View>
+                <Text style={styles.summaryFoot}>
+                  {week.activeDays} of {RECENT_DAYS} days logged
+                </Text>
+              </GlassCard>
+
+              <Text style={styles.sectionLabel}>RECENT</Text>
+              {recent.map(({ date, entry }) => (
                 <DayRow
-                  key={entry.date}
-                  label={formatJournalDayRelative(entry.date, today)}
+                  key={date}
+                  label={formatJournalDayRelative(date, today)}
                   entry={entry}
-                  isToday={false}
-                  onPress={() => openDay(entry.date)}
+                  isToday={date === today}
+                  onPress={() => openDay(date)}
                   theme={theme}
                   tint={cardTint}
                 />
               ))}
+
+              {earlier.length > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { marginTop: spacing.md }]}>EARLIER</Text>
+                  {earlier.map((entry) => (
+                    <DayRow
+                      key={entry.date}
+                      label={formatJournalDayRelative(entry.date, today)}
+                      entry={entry}
+                      isToday={false}
+                      onPress={() => openDay(entry.date)}
+                      theme={theme}
+                      tint={cardTint}
+                    />
+                  ))}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <GlassCard glassStyle="clear" specular tintColor={cardTint} style={styles.summaryCard}>
+                <Text style={styles.sectionLabel}>{journalFilterLabel(filter).toUpperCase()}</Text>
+                <View style={styles.summaryRow}>
+                  <SummaryStat label="Memorize" value={listedTotals.memorization} theme={theme} />
+                  <SummaryStat label="Revise" value={listedTotals.revision} theme={theme} />
+                  <SummaryStat label="Total" value={listedTotals.total} theme={theme} emphasize />
+                </View>
+                <Text style={styles.summaryFoot}>
+                  {listed.length} {listed.length === 1 ? 'day' : 'days'} logged
+                </Text>
+              </GlassCard>
+
+              {listed.length === 0 ? (
+                <Text style={styles.emptyText}>Nothing logged in this range.</Text>
+              ) : (
+                listed.map((entry) => (
+                  <DayRow
+                    key={entry.date}
+                    label={formatJournalDayRelative(entry.date, today)}
+                    entry={entry}
+                    isToday={entry.date === today}
+                    onPress={() => openDay(entry.date)}
+                    theme={theme}
+                    tint={cardTint}
+                  />
+                ))
+              )}
             </>
           )}
         </ScrollView>
       )}
+
+      <OptionSheet<JournalFilter>
+        visible={picker === 'filter'}
+        title="Show"
+        sections={filterSections}
+        value={filter}
+        onSelect={setFilter}
+        onClose={() => setPicker(null)}
+      />
+      <OptionSheet<JournalSort>
+        visible={picker === 'sort'}
+        title="Sort by"
+        sections={[
+          {
+            options: (Object.keys(JOURNAL_SORT_LABELS) as JournalSort[]).map((k) => ({
+              value: k,
+              label: JOURNAL_SORT_LABELS[k],
+            })),
+          },
+        ]}
+        value={sort}
+        onSelect={setSort}
+        onClose={() => setPicker(null)}
+      />
     </SafeAreaView>
   );
 }
+
+function ControlChip({
+  icon,
+  label,
+  active,
+  onPress,
+  theme,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  theme: ThemeColors;
+}) {
+  const fg = active ? theme.accent : theme.textSecondary;
+  return (
+    <PressableScale
+      onPress={onPress}
+      haptic="light"
+      style={[
+        chipStyles.chip,
+        {
+          backgroundColor: active ? theme.accent + '22' : theme.glass,
+          borderColor: active ? theme.accent + '55' : theme.border,
+        },
+      ]}
+    >
+      <Ionicons name={icon} size={14} color={fg} />
+      <Text style={[chipStyles.label, { color: fg }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <Ionicons name="chevron-down" size={12} color={fg} />
+    </PressableScale>
+  );
+}
+
+const chipStyles = StyleSheet.create({
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexShrink: 1,
+  },
+  label: { ...typography.bodySmall, fontWeight: '600', flexShrink: 1 },
+});
 
 function SummaryStat({
   label,
@@ -348,7 +525,9 @@ const makeStyles = (theme: ThemeColors) =>
       borderRadius: radius.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.bgAlt,
+      backgroundColor: theme.glass,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
     },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     scroll: { flex: 1 },
@@ -373,6 +552,17 @@ const makeStyles = (theme: ThemeColors) =>
       overflow: 'hidden',
     },
     summaryRow: { flexDirection: 'row', marginTop: spacing.xs },
+    controls: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      marginBottom: spacing.md,
+    },
+    emptyText: {
+      ...typography.bodyMedium,
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.lg,
+    },
     summaryFoot: {
       ...typography.caption,
       color: theme.textMuted,

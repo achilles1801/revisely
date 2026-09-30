@@ -19,6 +19,9 @@ import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
 import { Button } from '../../components/Button';
 import { PressableScale } from '../../components/PressableScale';
 import { EditSessionModal } from '../../components/EditSessionModal';
+import { TimerButton } from '../../components/TimerButton';
+import { ProgressSummaryCard } from '../../components/home/ProgressSummaryCard';
+import { useHomePrefs } from '../../lib/homePrefs';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -53,6 +56,7 @@ export default function DashboardScreen() {
   const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error, saveUser } = useApp();
   const { firebaseUser } = useAuth();
 
+  const homePrefs = useHomePrefs();
   const [shifting, setShifting] = useState(false);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -302,8 +306,8 @@ export default function DashboardScreen() {
       return {
         eyebrow: 'All caught up',
         title: 'Nothing to revise yet',
-        subtitle: 'Open the Progress tab and tap "Start tracking memorization" to mark what you’ve memorized.',
-        ctaTitle: '',
+        subtitle: 'Mark the surahs, juz, or pages you’ve memorized and your daily revision will appear here.',
+        ctaTitle: 'Mark memorized pages',
       };
     }
     const primaryJuz = assignment.juzBreakdown[0]?.juz;
@@ -326,6 +330,8 @@ export default function DashboardScreen() {
         (log) => log.date === getCurrentRevisionDay(user),
       );
       if (todayLog) handleEditSession(todayLog);
+    } else if (assignment.totalPages === 0) {
+      navigation.navigate('Memorization');
     } else {
       navigation.navigate('ActiveRevision');
     }
@@ -458,6 +464,17 @@ export default function DashboardScreen() {
               />
             </GlassCard>
           </PressableScale>
+          <TimerButton
+            onPress={() => navigation.navigate('ReadingTimer')}
+            color={theme.textPrimary}
+            activeColor={theme.accent}
+            activeBg={theme.accent + '22'}
+            idle={
+              <GlassCard style={styles.settingsButton}>
+                <Ionicons name="stopwatch-outline" size={20} color={theme.textPrimary} />
+              </GlassCard>
+            }
+          />
           <PressableScale
             onPress={() => navigation.navigate('Settings')}
             haptic="light"
@@ -481,6 +498,16 @@ export default function DashboardScreen() {
             {renderHeroContent()}
           </GlassCard>
         </View>
+
+        {homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized') && (
+          <View style={styles.progressCardWrap}>
+            <ProgressSummaryCard
+              pages={pages}
+              metrics={homePrefs.metrics}
+              onPress={() => navigation.navigate('Memorization')}
+            />
+          </View>
+        )}
 
         {/* Sessions — hidden entirely when the user has no sessions yet. */}
         {sessionLogs.length > 0 && (
@@ -983,6 +1010,7 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       fontWeight: '500',
     },
 
+    progressCardWrap: { marginTop: -spacing.xs, marginBottom: spacing.md },
     sessionsSection: { marginTop: spacing.sm },
     sessionsHeader: {
       flexDirection: 'row',

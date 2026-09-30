@@ -198,6 +198,40 @@ interface FirestoreJournalEntry {
 }
 ```
 
+### 5. Reading Session Document
+
+**Path:** `users/{userId}/readingSessions/{autoId}`
+
+One timed session from the reading timer. Timing is immutable once written; only `pages` (+ `updatedAt`) can be edited afterwards, so the user can assign the pages they read.
+
+```typescript
+interface FirestoreReadingSession {
+  date: string;                 // YYYY-MM-DD revision day (fajr-aware)
+  startedAt: Timestamp;
+  endedAt: Timestamp;
+  durationSeconds: number;      // int 0–86400, pauses excluded
+  mode: 'stopwatch' | 'countUp' | 'countDown';
+  targetSeconds: number | null; // int 60–86400; null for stopwatch
+  pages: number[];              // user-assigned, ≤ 604
+  pagesVisited: number[];       // opened in the reader during the session (suggestion)
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### 6. Usage Stats Document
+
+**Path:** `users/{userId}/stats/usage`
+
+Running total of foreground time in the app, written with `increment()`. Rules only allow the total to grow.
+
+```typescript
+interface FirestoreUsageStats {
+  appSeconds: number; // int ≥ 0, monotonic
+  updatedAt: Timestamp;
+}
+```
+
 **Example Document (sessions/2024-01-20):**
 ```json
 {

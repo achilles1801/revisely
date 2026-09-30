@@ -20,8 +20,8 @@ import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager } from '../../components/MushafPager';
+import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
-import { TranslationSheet } from '../../components/TranslationSheet';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
@@ -97,7 +97,6 @@ export default function ActiveRevisionScreen() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [showTranslation, setShowTranslation] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
   const [undoState, setUndoState] = useState<{
@@ -403,12 +402,6 @@ export default function ActiveRevisionScreen() {
   // ===== Menu actions =====
 
   const menuActions: SessionMenuAction[] = [
-    {
-      key: 'translation',
-      label: 'View translation',
-      icon: 'language-outline',
-      onPress: () => setShowTranslation(true),
-    },
     ...(smartTrackingEnabled
       ? [
           {
@@ -461,7 +454,7 @@ export default function ActiveRevisionScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: getReadPalette(isDark).pageBg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <SessionBar
@@ -527,12 +520,6 @@ export default function ActiveRevisionScreen() {
         visible={menuOpen}
         actions={menuActions}
         onClose={() => setMenuOpen(false)}
-      />
-
-      <TranslationSheet
-        visible={showTranslation}
-        pageNumber={displayPageNumber}
-        onClose={() => setShowTranslation(false)}
       />
 
       <BulkActionsModal
@@ -690,7 +677,7 @@ function RevisionGuideModal({
     {
       icon: 'ellipsis-horizontal-circle-outline',
       title: 'More in the menu',
-      body: 'Open (⋮) for translation, bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
+      body: 'Open (⋮) for bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
     },
     {
       icon: 'save-outline',

@@ -10,8 +10,9 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { PressableScale } from '../../components/PressableScale';
+import { TimerButton } from '../../components/TimerButton';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
+import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import {
@@ -32,17 +33,6 @@ import type { ReadStackParamList } from '../../navigation/MainNavigator';
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
 type Styles = ReturnType<typeof makeStyles>;
 
-// Hardcoded so the Read tab keeps its iOS-style neutral look regardless of
-// the app-wide Mihrab palette. If we ever want this to follow the global
-// theme, swap these back to theme.* tokens.
-const READ_PALETTE = {
-  bg: '#000000',
-  card: '#1C1C1E',
-  divider: 'rgba(84, 84, 88, 0.35)',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#AEAEB2',
-  textMuted: '#8E8E93',
-} as const;
 
 function formatRelativeTime(iso: string): string {
   const now = Date.now();
@@ -84,9 +74,10 @@ function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
 
 export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { theme } = useTheme();
+  const { isDark } = useTheme();
+  const palette = getReadPalette(isDark);
   const tabFootprint = useTabBarFootprint();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const [recent, setRecent] = useState<ReadingHistoryEntry[]>([]);
 
@@ -134,7 +125,20 @@ export default function ReadIndexScreen() {
 
   const header = (
     <View style={styles.headerWrap}>
-      <Text style={styles.displayTitle}>Surahs</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.displayTitle}>Surahs</Text>
+        <TimerButton
+          onPress={() => navigation.navigate('ReadingTimer')}
+          color={palette.textPrimary}
+          activeColor={palette.textPrimary}
+          activeBg={palette.card}
+          idle={
+            <View style={styles.timerIdle}>
+              <Ionicons name="stopwatch-outline" size={20} color={palette.textPrimary} />
+            </View>
+          }
+        />
+      </View>
 
       {recent.length > 0 && (
         <View style={styles.section}>
@@ -210,16 +214,13 @@ function RecentRow({
       <View
         style={[
           styles.row,
-          !isLast && {
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: READ_PALETTE.divider,
-          },
+          !isLast && styles.rowDivider,
         ]}
       >
         <Ionicons
           name="time-outline"
           size={15}
-          color={READ_PALETTE.textMuted}
+          color={styles.rowSub.color as string}
           style={styles.rowLeadIcon}
         />
         <View style={styles.rowMain}>
@@ -250,10 +251,7 @@ function SurahCardRow({
       <View
         style={[
           styles.row,
-          !isLast && {
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: READ_PALETTE.divider,
-          },
+          !isLast && styles.rowDivider,
         ]}
       >
         <View style={styles.rowMain}>
@@ -270,18 +268,35 @@ function SurahCardRow({
   );
 }
 
-const makeStyles = (_theme: ThemeColors) =>
+const makeStyles = (palette: ReadPalette) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: READ_PALETTE.bg },
+    rowDivider: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.divider,
+    },
+    container: { flex: 1, backgroundColor: palette.bg },
     listContent: { paddingHorizontal: spacing.md },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    timerIdle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.card,
+    },
     headerWrap: { paddingTop: spacing.xs, paddingBottom: spacing.xs },
     displayTitle: {
       fontSize: 28,
       fontWeight: '700',
       lineHeight: 34,
       letterSpacing: -0.4,
-      color: READ_PALETTE.textPrimary,
-      marginBottom: spacing.sm,
+      color: palette.textPrimary,
     },
     section: { marginBottom: spacing.md },
     sectionLabel: {
@@ -289,12 +304,12 @@ const makeStyles = (_theme: ThemeColors) =>
       fontWeight: '500',
       letterSpacing: 0.8,
       textTransform: 'uppercase',
-      color: READ_PALETTE.textMuted,
+      color: palette.textMuted,
       marginBottom: 6,
       marginLeft: spacing.sm,
     },
     card: {
-      backgroundColor: READ_PALETTE.card,
+      backgroundColor: palette.card,
       borderRadius: radius.md,
       overflow: 'hidden',
     },
@@ -313,17 +328,17 @@ const makeStyles = (_theme: ThemeColors) =>
       fontSize: 15,
       fontWeight: '500',
       lineHeight: 20,
-      color: READ_PALETTE.textPrimary,
+      color: palette.textPrimary,
     },
     rowSub: {
       fontSize: 12,
       lineHeight: 16,
-      color: READ_PALETTE.textMuted,
+      color: palette.textMuted,
       marginTop: 2,
     },
     endNumber: {
       fontSize: 14,
-      color: READ_PALETTE.textSecondary,
+      color: palette.textSecondary,
       fontWeight: '400',
       marginLeft: spacing.sm,
       minWidth: 28,

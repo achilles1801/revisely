@@ -130,6 +130,32 @@ export interface JournalEntry {
   revision: string;
   revisionMinutes: number | null;
   notes: string;
+  /** Last save time (ms since epoch); undefined for unsaved drafts. */
+  updatedAt?: number;
+}
+
+/**
+ * How the reading timer runs:
+ *  - stopwatch: counts up with no limit, ends when the user stops it
+ *  - countUp:   counts up and ends automatically at targetSeconds
+ *  - countDown: counts down from targetSeconds and ends at zero
+ */
+export type ReadingTimerMode = 'stopwatch' | 'countUp' | 'countDown';
+
+/** One timed reading session, logged from the reading timer. */
+export interface ReadingSession {
+  id: string;
+  /** Revision day (YYYY-MM-DD, fajr-aware) the session started on. */
+  date: string;
+  startedAt: number;                // ms since epoch
+  endedAt: number;                  // ms since epoch
+  durationSeconds: number;          // active time (pauses excluded)
+  mode: ReadingTimerMode;
+  targetSeconds: number | null;
+  /** Pages the user says they read — assigned/edited after the fact. */
+  pages: number[];
+  /** Mushaf pages opened in the reader while the timer ran (a suggestion). */
+  pagesVisited: number[];
 }
 
 // Static Quran reference data

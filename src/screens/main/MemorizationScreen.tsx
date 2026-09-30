@@ -573,7 +573,7 @@ function ConfirmSaveSheet({
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bg },
+    container: { flex: 1, backgroundColor: 'transparent' },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -596,7 +596,9 @@ const makeStyles = (theme: ThemeColors) =>
       borderRadius: radius.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.bgAlt,
+      backgroundColor: theme.glass,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
     },
     scroll: { flex: 1 },
     scrollContent: {
@@ -668,7 +670,9 @@ const makeConfirmStyles = (theme: ThemeColors) =>
       paddingVertical: spacing.md,
       borderRadius: radius.full,
       alignItems: 'center',
-      backgroundColor: theme.bgAlt,
+      backgroundColor: theme.glass,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
     },
     secondaryBtnText: {
       ...typography.bodyMedium,

@@ -13,6 +13,9 @@ rules_version = '2';
  * - users/{userId} - User profile and settings
  * - users/{userId}/pages/{pageNumber} - Page progress (604 documents)
  * - users/{userId}/sessions/{sessionId} - Daily revision sessions
+ * - users/{userId}/journal/{day} - Daily log entries
+ * - users/{userId}/readingSessions/{id} - Reading timer sessions
+ * - users/{userId}/stats/usage - Time spent in the app
  */
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -346,6 +349,61 @@ service cloud.firestore {
         allow read, delete: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidJournalEntry(day);
       }
+
+      // ======================================================================
+      // READING SESSION RULES (reading timer)
+      // ======================================================================
+      // Finished timed reading sessions. Only `pages` (+ updatedAt) can be
+      // edited afterwards — timing is immutable once logged.
+
+      match /readingSessions/{sessionId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidReadingSession();
+        allow update: if isOwner(userId) &&
+                         changedKeys().hasOnly(['pages', 'updatedAt']) &&
+                         isValidPageList(incomingData().pages);
+      }
+
+      // ======================================================================
+      // USAGE STATS (time spent in the app)
+      // ======================================================================
+
+      match /stats/usage {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+                                 incomingData().keys().hasOnly(['appSeconds', 'updatedAt']) &&
+                                 incomingData().appSeconds is int &&
+                                 incomingData().appSeconds >= 0 &&
+                                 (resource == null ||
+                                  incomingData().appSeconds >= resource.data.appSeconds);
+      }
+    }
+
+    function isValidPageList(pages) {
+      return pages is list && pages.size() <= 604;
+    }
+
+    function isValidReadingSession() {
+      let data = incomingData();
+      return data.keys().hasOnly([
+               'date', 'startedAt', 'endedAt', 'durationSeconds', 'mode',
+               'targetSeconds', 'pages', 'pagesVisited', 'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasAll([
+               'date', 'startedAt', 'endedAt', 'durationSeconds', 'mode',
+               'targetSeconds', 'pages', 'pagesVisited'
+             ]) &&
+             isValidDateString(data.date) &&
+             data.startedAt is timestamp &&
+             data.endedAt is timestamp &&
+             data.endedAt >= data.startedAt &&
+             data.durationSeconds is int &&
+             isInRange(data.durationSeconds, 0, 86400) &&
+             data.mode in ['stopwatch', 'countUp', 'countDown'] &&
+             (data.targetSeconds == null ||
+              (data.targetSeconds is int && isInRange(data.targetSeconds, 60, 86400))) &&
+             isValidPageList(data.pages) &&
+             isValidPageList(data.pagesVisited);
     }
 
     function isValidJournalMinutes(value) {

@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-05-28**
+**Last updated: 2026-09-29**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
@@ -64,7 +64,6 @@ The Holy Quran itself is in the public domain. Page images displayed in the app 
 
 ## 7. Third-party services
 
-Revisely uses third-party services to operate, including Firebase (Google), Apple, Anthropic, Sentry, and — if you choose to connect your Quran.com account — Quran Foundation. Your use of those services through Revisely is governed by their respective terms. We are not responsible for the practices of third parties beyond ensuring they are appropriate processors of the data we share with them as described in our Privacy Policy.
 
 ## 8. Pricing
 

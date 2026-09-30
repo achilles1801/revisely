@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,13 +15,12 @@ import {
   Pressable,
 } from 'react-native';
 import Constants from 'expo-constants';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
-import { QuranFoundationCard } from '../../components/QuranFoundationCard';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -34,6 +33,15 @@ import { ThemeColors } from '../../theme/colors';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { scheduleDailyReminder } from '../../lib/notifications';
 import * as firestoreService from '../../services/firestoreService';
+import { getTotalAppUsageSeconds } from '../../lib/appUsage';
+import { formatDuration } from '../../lib/readingTimer';
+import {
+  ALL_HOME_METRICS,
+  HOME_METRIC_LABELS,
+  setHomePrefs,
+  toggleHomeMetric,
+  useHomePrefs,
+} from '../../lib/homePrefs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -224,6 +232,29 @@ export default function SettingsScreen() {
   const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
   const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
+  const homePrefs = useHomePrefs();
+  const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
+  const [appSeconds, setAppSeconds] = useState<number | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      firestoreService
+        .getReadingSessions()
+        .then((list) => {
+          if (!cancelled) setReadingSeconds(list.reduce((sum, s) => sum + s.durationSeconds, 0));
+        })
+        .catch(() => {});
+      getTotalAppUsageSeconds()
+        .then((s) => {
+          if (!cancelled) setAppSeconds(s);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   if (!localUser) {
     return (
@@ -440,8 +471,59 @@ export default function SettingsScreen() {
           </Section>
         )}
 
-        <Section title="Quran.com">
-          <QuranFoundationCard />
+        <Section title="Activity">
+          <Row
+            icon="stopwatch-outline"
+            label="Reading sessions"
+            value={readingSeconds != null ? formatDuration(readingSeconds) : undefined}
+            onPress={() => navigation.navigate('ReadingSessions')}
+          />
+          <Row
+            icon="hourglass-outline"
+            label="Time in app"
+            value={appSeconds != null ? formatDuration(appSeconds) : '—'}
+          />
+          <Row
+            icon="book-outline"
+            label="Memorized pages"
+            onPress={() => navigation.navigate('Memorization')}
+            isLast
+          />
+        </Section>
+
+        <Section title="Home screen">
+          <Row
+            icon="stats-chart-outline"
+            label="Progress card"
+            isLast={!homePrefs.showProgressCard}
+            rightSlot={
+              <Switch
+                value={homePrefs.showProgressCard}
+                onValueChange={(v) => setHomePrefs({ showProgressCard: v })}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            }
+          />
+          {homePrefs.showProgressCard &&
+            ALL_HOME_METRICS.map((metric, i) => {
+              const selected = homePrefs.metrics.includes(metric);
+              return (
+                <Row
+                  key={metric}
+                  label={HOME_METRIC_LABELS[metric]}
+                  onPress={() => toggleHomeMetric(metric)}
+                  isLast={i === ALL_HOME_METRICS.length - 1}
+                  rightSlot={
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color={selected ? theme.accent : 'transparent'}
+                    />
+                  }
+                />
+              );
+            })}
         </Section>
 
         <Section title="Day boundary">

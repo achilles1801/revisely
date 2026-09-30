@@ -1,6 +1,11 @@
 import {
   emptyJournalEntry,
+  filterJournalEntries,
   formatJournalDay,
+  formatJournalMonth,
+  journalMonths,
+  JournalSort,
+  sortJournalEntries,
   formatJournalDayRelative,
   formatMinutes,
   isJournalEntryEmpty,
@@ -140,5 +145,37 @@ describe('summarizeRevisedPages', () => {
 
   it('dedupes pages', () => {
     expect(summarizeRevisedPages([306, 306])).toBe('1p Maryam');
+  });
+});
+
+describe('journal filtering & sorting', () => {
+  const today = '2026-09-29';
+  const entries = [
+    entry('2026-09-29', { revisionMinutes: 10, updatedAt: 100 }),
+    entry('2026-09-20', { memorizationMinutes: 45, updatedAt: 300 }),
+    entry('2026-08-31', { revisionMinutes: 5, memorizationMinutes: 5, updatedAt: 200 }),
+    entry('2026-08-01', { updatedAt: 50 }),
+  ];
+
+  it('filters by rolling windows and by month', () => {
+    const dates = (f: string) =>
+      filterJournalEntries(entries, f, today).map((e) => e.date);
+    expect(dates('all')).toHaveLength(4);
+    expect(dates('last7')).toEqual(['2026-09-29']);
+    expect(dates('last30')).toEqual(['2026-09-29', '2026-09-20', '2026-08-31']);
+    expect(dates('2026-08')).toEqual(['2026-08-31', '2026-08-01']);
+  });
+
+  it('lists months newest first', () => {
+    expect(journalMonths(entries)).toEqual(['2026-09', '2026-08']);
+    expect(formatJournalMonth('2026-09')).toBe('September 2026');
+  });
+
+  it('sorts by date, last update, and total time', () => {
+    const dates = (s: JournalSort) => sortJournalEntries(entries, s).map((e) => e.date);
+    expect(dates('newest')).toEqual(['2026-09-29', '2026-09-20', '2026-08-31', '2026-08-01']);
+    expect(dates('oldest')).toEqual(['2026-08-01', '2026-08-31', '2026-09-20', '2026-09-29']);
+    expect(dates('recentlyLogged')).toEqual(['2026-09-20', '2026-08-31', '2026-09-29', '2026-08-01']);
+    expect(dates('mostTime')).toEqual(['2026-09-20', '2026-09-29', '2026-08-31', '2026-08-01']);
   });
 });

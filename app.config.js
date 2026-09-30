@@ -124,24 +124,6 @@ export default {
       googleIosClientId: process.env.GOOGLE_IOS_CLIENT_ID,
       googleAndroidClientId: process.env.GOOGLE_ANDROID_CLIENT_ID,
       googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID,
-      qf: {
-        clientId: process.env.QF_CLIENT_ID,
-        clientSecret: process.env.QF_CLIENT_SECRET,
-        oauthBase: process.env.QF_OAUTH_BASE || "https://prelive-oauth2.quran.foundation",
-        apiBase: process.env.QF_API_BASE || "https://apis-prelive.quran.foundation",
-      },
-      qfContent: {
-        clientId: process.env.QF_CONTENT_CLIENT_ID,
-        clientSecret: process.env.QF_CONTENT_CLIENT_SECRET,
-        oauthBase: process.env.QF_CONTENT_OAUTH_BASE || "https://oauth2.quran.foundation",
-        apiBase: process.env.QF_CONTENT_API_BASE || "https://apis.quran.foundation",
-      },
-      qfUser: {
-        clientId: process.env.QF_USER_CLIENT_ID,
-        clientSecret: process.env.QF_USER_CLIENT_SECRET,
-        oauthBase: process.env.QF_USER_OAUTH_BASE || "https://prelive-oauth2.quran.foundation",
-        apiBase: process.env.QF_USER_API_BASE || "https://apis-prelive.quran.foundation",
-      },
       // Sentry crash reporting. Empty DSN → Sentry stays off (fine for dev).
       // Set SENTRY_DSN in EAS env vars + .env when you're ready to capture errors.
       sentryDsn: process.env.SENTRY_DSN,

@@ -27,6 +27,7 @@ import {
   Timestamp,
   serverTimestamp,
   deleteField,
+  increment,
   DocumentReference,
   onSnapshot,
   Unsubscribe,
@@ -36,6 +37,8 @@ import {
   FirestorePage,
   FirestoreSession,
   FirestoreJournalEntry,
+  FirestoreReadingSession,
+  FirestoreUsageStats,
   CreateUserInput,
   UpdateUserInput,
   UpdatePageInput,
@@ -46,7 +49,7 @@ import {
   DEFAULT_USER_SETTINGS,
   DEFAULT_WEAKNESS_RATING,
 } from '../types/firestore';
-import { JournalEntry } from '../types';
+import { JournalEntry, ReadingSession } from '../types';
 import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
 
@@ -399,6 +402,7 @@ function journalFromFirestore(data: FirestoreJournalEntry): JournalEntry {
     revision: data.revision ?? '',
     revisionMinutes: data.revisionMinutes ?? null,
     notes: data.notes ?? '',
+    updatedAt: data.updatedAt?.toMillis?.(),
   };
 }
 
@@ -448,6 +452,99 @@ export async function saveJournalEntry(
 
 export async function deleteJournalEntry(date: string, userId?: string): Promise<void> {
   await deleteDoc(getJournalRef(date, userId));
+}
+
+// ============================================================================
+// READING SESSIONS (reading timer)
+// ============================================================================
+
+function getReadingSessionsRef(userId?: string) {
+  return collection(db, 'users', userId || getCurrentUserId(), 'readingSessions');
+}
+
+function readingSessionFromFirestore(id: string, data: FirestoreReadingSession): ReadingSession {
+  return {
+    id,
+    date: data.date,
+    startedAt: data.startedAt?.toMillis?.() ?? 0,
+    endedAt: data.endedAt?.toMillis?.() ?? 0,
+    durationSeconds: data.durationSeconds ?? 0,
+    mode: data.mode ?? 'stopwatch',
+    targetSeconds: data.targetSeconds ?? null,
+    pages: data.pages ?? [],
+    pagesVisited: data.pagesVisited ?? [],
+  };
+}
+
+/** Most recent reading sessions, newest first. */
+export async function getReadingSessions(
+  limitCount: number = 500,
+  userId?: string,
+): Promise<ReadingSession[]> {
+  const q = query(getReadingSessionsRef(userId), orderBy('startedAt', 'desc'), limit(limitCount));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) =>
+    readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession),
+  );
+}
+
+/** Save a finished session. Returns the new document id. */
+export async function addReadingSession(
+  session: Omit<ReadingSession, 'id'>,
+  userId?: string,
+): Promise<string> {
+  const ref = await addDoc(getReadingSessionsRef(userId), {
+    date: session.date,
+    startedAt: Timestamp.fromMillis(session.startedAt),
+    endedAt: Timestamp.fromMillis(session.endedAt),
+    durationSeconds: session.durationSeconds,
+    mode: session.mode,
+    targetSeconds: session.targetSeconds,
+    pages: session.pages,
+    pagesVisited: session.pagesVisited,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+/** Only the page assignment is editable after the fact. */
+export async function updateReadingSessionPages(
+  sessionId: string,
+  pages: number[],
+  userId?: string,
+): Promise<void> {
+  await updateDoc(doc(getReadingSessionsRef(userId), sessionId), {
+    pages,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteReadingSession(sessionId: string, userId?: string): Promise<void> {
+  await deleteDoc(doc(getReadingSessionsRef(userId), sessionId));
+}
+
+// ============================================================================
+// APP USAGE (time spent in the app)
+// ============================================================================
+
+function getUsageRef(userId?: string): DocumentReference {
+  return doc(db, 'users', userId || getCurrentUserId(), 'stats', 'usage');
+}
+
+export async function getAppUsageSeconds(userId?: string): Promise<number> {
+  const snapshot = await getDoc(getUsageRef(userId));
+  return snapshot.exists() ? (snapshot.data() as FirestoreUsageStats).appSeconds ?? 0 : 0;
+}
+
+/** Atomically add foreground seconds to the running total. */
+export async function addAppUsageSeconds(seconds: number, userId?: string): Promise<void> {
+  if (seconds <= 0) return;
+  await setDoc(
+    getUsageRef(userId),
+    { appSeconds: increment(Math.round(seconds)), updatedAt: serverTimestamp() },
+    { merge: true },
+  );
 }
 
 // ============================================================================

@@ -40,6 +40,10 @@ export const colors = {
   // Borders
   border: '#E8E1D4',
   borderLight: '#F0EAE0',
+
+  // Translucent fill for small controls (chips, round buttons, steppers) that
+  // sit on the gradient — matches GlassCard's tint so they read as glass.
+  glass: 'rgba(255,255,255,0.45)',
 };
 
 export const darkColors: typeof colors = {
@@ -72,6 +76,8 @@ export const darkColors: typeof colors = {
   // Borders
   border: '#2D332E',
   borderLight: '#252A26',
+
+  glass: 'rgba(255,255,255,0.08)',
 };
 
 export type ThemeColors = typeof colors;

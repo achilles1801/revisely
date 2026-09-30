@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -40,7 +41,7 @@ interface MushafPagerProps {
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
-  isDark: boolean;
+  pageTint: string | null;
   tintColor: string;
   bg: string;
 }
@@ -48,7 +49,7 @@ interface PageItemProps {
 const PageItem = React.memo(function PageItem({
   pageNumber,
   onTap,
-  isDark,
+  pageTint,
   tintColor,
   bg,
 }: PageItemProps) {
@@ -81,7 +82,7 @@ const PageItem = React.memo(function PageItem({
           source={{ uri: url }}
           style={[
             styles.image,
-            isDark && { tintColor, opacity: 0.92 },
+            pageTint != null && { tintColor: pageTint, opacity: 0.92 },
           ]}
           // No resizeMode — width + aspectRatio on styles.image fully
           // determines layout, and `contain` here would un-do that on iOS by
@@ -112,7 +113,8 @@ export function MushafPager({
   onTap,
   extraData,
 }: MushafPagerProps) {
-  const { theme, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
   const currentIndexRef = useRef(0);
   // Only auto-scroll on first mount. After that, the user drives position by
@@ -162,12 +164,12 @@ export function MushafPager({
       <PageItem
         pageNumber={item}
         onTap={onTap}
-        isDark={isDark}
-        tintColor={theme.textPrimary}
-        bg={theme.bg}
+        pageTint={palette.pageTint}
+        tintColor={palette.textPrimary}
+        bg={palette.pageBg}
       />
     ),
-    [onTap, isDark, theme.textPrimary, theme.bg],
+    [onTap, palette],
   );
 
   return (
@@ -191,7 +193,7 @@ export function MushafPager({
       maxToRenderPerBatch={3}
       windowSize={5}
       extraData={extraData}
-      style={{ backgroundColor: theme.bg }}
+      style={{ backgroundColor: palette.pageBg }}
     />
   );
 }

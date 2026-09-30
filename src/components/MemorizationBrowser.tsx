@@ -13,6 +13,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { SegmentedToggle } from './SegmentedToggle';
 import { useTheme } from '../context/ThemeContext';
@@ -491,6 +492,7 @@ function ChapterList({
   const all = getAllSurahs();
   return (
     <View style={styles.listGroup}>
+      <GlassCard style={StyleSheet.absoluteFillObject} />
       {all.map((s) => {
         const surahPages = getPagesForSurah(s.number);
         const memorized = countMemorized(surahPages);
@@ -567,6 +569,7 @@ function JuzList({
   const juzes = Array.from({ length: 30 }, (_, i) => i + 1);
   return (
     <View style={styles.listGroup}>
+      <GlassCard style={StyleSheet.absoluteFillObject} />
       {juzes.map((juzNumber) => {
         const range = getJuzRange(juzNumber);
         const juzPages = getPagesForJuz(juzNumber);
@@ -682,6 +685,7 @@ function HizbList({
   const hizbs: HizbInfo[] = getAllHizbs();
   return (
     <View style={styles.listGroup}>
+      <GlassCard style={StyleSheet.absoluteFillObject} />
       {hizbs.map((h) => (
         <HizbRow
           key={`h-${h.number}`}
@@ -903,7 +907,6 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
         : 'rgba(0,0,0,0.04)',
     },
     listGroup: {
-      backgroundColor: theme.bgAlt,
       borderRadius: radius.md,
       overflow: 'hidden',
     },

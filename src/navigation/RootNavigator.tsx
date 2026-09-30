@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import { MainNavigator } from './MainNavigator';
+import { navigationRef } from './navigationRef';
 import AuthScreen from '../screens/auth/AuthScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
@@ -56,7 +57,7 @@ export function RootNavigator() {
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <View style={{ flex: 1 }}>{content}</View>
       </NavigationContainer>
     </View>

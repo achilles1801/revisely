@@ -247,6 +247,38 @@ export interface FirestoreJournalEntry {
 }
 
 // ============================================================================
+// READING SESSION + USAGE DOCUMENT TYPES
+// ============================================================================
+
+/**
+ * One timed reading session from the reading timer.
+ *
+ * Collection: users/{userId}/readingSessions/{sessionId}
+ */
+export interface FirestoreReadingSession {
+  date: string;
+  startedAt: Timestamp;
+  endedAt: Timestamp;
+  durationSeconds: number;
+  mode: 'stopwatch' | 'countUp' | 'countDown';
+  targetSeconds: number | null;
+  pages: number[];
+  pagesVisited: number[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/**
+ * Running total of time spent in the app (foreground only).
+ *
+ * Document: users/{userId}/stats/usage
+ */
+export interface FirestoreUsageStats {
+  appSeconds: number;
+  updatedAt: Timestamp;
+}
+
+// ============================================================================
 // PAGE DOCUMENT TYPES
 // ============================================================================
 

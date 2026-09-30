@@ -16,8 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager } from '../../components/MushafPager';
+import { TimerButton } from '../../components/TimerButton';
+import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
+import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -41,22 +44,30 @@ export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { theme, isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const palette = getReadPalette(isDark);
+  const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const initialPage = route.params.pageNumber;
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [showGuide, setShowGuide] = useState(false);
+  // The "?" only stays around until the guide has been seen once.
+  const [guideSeen, setGuideSeen] = useState(true);
 
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { timer, notePage } = useReadingTimer();
 
   useEffect(() => {
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
-      if (v !== 'true') setShowGuide(true);
+      if (v !== 'true') {
+        setGuideSeen(false);
+        setShowGuide(true);
+      }
     });
   }, []);
 
   const dismissGuideForever = async () => {
     setShowGuide(false);
+    setGuideSeen(true);
     await AsyncStorage.setItem(READER_GUIDE_DISMISSED_KEY, 'true');
   };
 
@@ -66,10 +77,19 @@ export default function QuranReaderScreen() {
       if (settleTimer.current) clearTimeout(settleTimer.current);
       settleTimer.current = setTimeout(() => {
         appendReadingHistory(pageNumber);
+        notePage(pageNumber);
       }, SETTLE_DEBOUNCE_MS);
     },
-    [],
+    [notePage],
   );
+
+  // Credit the page the reader opened on (and the current page whenever a
+  // session starts while reading).
+  const timerRunning = timer?.runningSince != null;
+  useEffect(() => {
+    if (timerRunning) notePage(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerRunning]);
 
   useEffect(() => {
     appendReadingHistory(initialPage);
@@ -98,7 +118,7 @@ export default function QuranReaderScreen() {
           hitSlop={12}
           style={styles.backBtn}
         >
-          <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
+          <Ionicons name="chevron-back" size={22} color={palette.textSecondary} />
         </Pressable>
         <Text style={styles.crumbLeft}>
           Juz {juz} · Hizb {hizb}
@@ -109,14 +129,22 @@ export default function QuranReaderScreen() {
             <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
           ) : null}
         </View>
-        <Pressable
-          onPress={() => setShowGuide(true)}
-          hitSlop={12}
-          style={styles.helpBtn}
-          accessibilityLabel="How the reader works"
-        >
-          <Ionicons name="help" size={16} color={theme.textSecondary} />
-        </Pressable>
+        <TimerButton
+          onPress={() => navigation.navigate('ReadingTimer')}
+          color={palette.textSecondary}
+          activeColor={palette.textPrimary}
+          activeBg={palette.card}
+        />
+        {!guideSeen && (
+          <Pressable
+            onPress={() => setShowGuide(true)}
+            hitSlop={12}
+            style={styles.helpBtn}
+            accessibilityLabel="How the reader works"
+          >
+            <Ionicons name="help" size={16} color={palette.textSecondary} />
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.footer} pointerEvents="none">
@@ -214,11 +242,11 @@ function ReaderGuideModal({
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
+const makeStyles = (palette: ReadPalette) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.bg,
+      backgroundColor: palette.pageBg,
     },
     topBar: {
       position: 'absolute',
@@ -251,7 +279,7 @@ const makeStyles = (theme: ThemeColors) =>
     },
     crumbLeft: {
       ...typography.caption,
-      color: theme.textPrimary,
+      color: palette.textPrimary,
       flex: 1,
     },
     crumbRight: {
@@ -261,12 +289,12 @@ const makeStyles = (theme: ThemeColors) =>
     },
     crumbSurah: {
       ...typography.caption,
-      color: theme.textPrimary,
+      color: palette.textPrimary,
     },
     crumbArabic: {
       fontFamily: fonts.arabic,
       fontSize: 14,
-      color: theme.textPrimary,
+      color: palette.textPrimary,
     },
     footer: {
       position: 'absolute',
@@ -281,7 +309,7 @@ const makeStyles = (theme: ThemeColors) =>
       // sits in the same ink color as the verse text, not muted-gray.
       fontSize: 13,
       fontWeight: '500',
-      color: theme.textPrimary,
+      color: palette.textPrimary,
     },
   });
 

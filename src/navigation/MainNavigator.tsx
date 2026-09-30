@@ -4,7 +4,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import AlgorithmScreen from '../screens/main/AlgorithmScreen';
-import ProgressScreen from '../screens/main/ProgressScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import MemorizationScreen from '../screens/main/MemorizationScreen';
 import PlanEditScreen from '../screens/main/PlanEditScreen';
@@ -14,6 +13,10 @@ import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import JournalScreen from '../screens/journal/JournalScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
+import ReadingTimerScreen from '../screens/timer/ReadingTimerScreen';
+import ReadingSessionsScreen from '../screens/timer/ReadingSessionsScreen';
+import { ReadingTimerProvider } from '../context/ReadingTimerContext';
+import { useAppUsageTracking } from '../lib/appUsage';
 import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
@@ -22,7 +25,6 @@ export type MainTabParamList = {
   Home: undefined;
   Read: undefined;
   Insights: undefined;
-  Progress: undefined;
 };
 
 export type HomeStackParamList = {
@@ -38,11 +40,14 @@ export type HomeStackParamList = {
   Journal: undefined;
   // date is YYYY-MM-DD; omitted means "today" (fajr-aware revision day).
   JournalEntry: { date?: string } | undefined;
+  ReadingTimer: undefined;
+  ReadingSessions: undefined;
 };
 
 export type ReadStackParamList = {
   ReadIndex: undefined;
   QuranReader: { pageNumber: number; source?: 'index' | 'recent' };
+  ReadingTimer: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -57,6 +62,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'ActiveRevision',
   'QuranReader',
   'JournalEntry',
+  'ReadingTimer',
 ]);
 
 function HomeStackNavigator() {
@@ -76,6 +82,8 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="Journal" component={JournalScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
+      <HomeStack.Screen name="ReadingTimer" component={ReadingTimerScreen} />
+      <HomeStack.Screen name="ReadingSessions" component={ReadingSessionsScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -91,6 +99,7 @@ function ReadStackNavigator() {
     >
       <ReadStack.Screen name="ReadIndex" component={ReadIndexScreen} />
       <ReadStack.Screen name="QuranReader" component={QuranReaderScreen} />
+      <ReadStack.Screen name="ReadingTimer" component={ReadingTimerScreen} />
     </ReadStack.Navigator>
   );
 }
@@ -104,9 +113,10 @@ export function MainNavigator() {
   const glowInsightsTab = !smartTrackingEnabled && !hasSeenPreview;
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  useAppUsageTracking();
 
   return (
-    <>
+    <ReadingTimerProvider>
       <Tab.Navigator
         tabBar={(props) => {
           // Hide the tab bar on full-screen "deep" screens — they own the
@@ -131,12 +141,11 @@ export function MainNavigator() {
         <Tab.Screen name="Home" component={HomeStackNavigator} />
         <Tab.Screen name="Read" component={ReadStackNavigator} />
         <Tab.Screen name="Insights" component={AlgorithmScreen} />
-        <Tab.Screen name="Progress" component={ProgressScreen} />
       </Tab.Navigator>
       <SmartTrackingPreviewScreen
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}
       />
-    </>
+    </ReadingTimerProvider>
   );
 }

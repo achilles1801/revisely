@@ -36,7 +36,6 @@ const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
   Read: { active: 'book', inactive: 'book-outline' },
   Insights: { active: 'sparkles', inactive: 'sparkles-outline' },
-  Progress: { active: 'bookmarks', inactive: 'bookmarks-outline' },
 };
 
 const FULL_SCREEN_ROUTES = new Set<string>([
