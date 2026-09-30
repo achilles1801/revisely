@@ -12,6 +12,8 @@ import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
+import JournalScreen from '../screens/journal/JournalScreen';
+import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
@@ -33,6 +35,9 @@ export type HomeStackParamList = {
   // through a context or store.
   PlanEdit: { editedDay?: { index: number; pages: number[] } } | undefined;
   PlanDayEdit: { dayIndex: number; initialPages: number[] };
+  Journal: undefined;
+  // date is YYYY-MM-DD; omitted means "today" (fajr-aware revision day).
+  JournalEntry: { date?: string } | undefined;
 };
 
 export type ReadStackParamList = {
@@ -51,6 +56,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'PlanDayEdit',
   'ActiveRevision',
   'QuranReader',
+  'JournalEntry',
 ]);
 
 function HomeStackNavigator() {
@@ -68,6 +74,8 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
       <HomeStack.Screen name="PlanEdit" component={PlanEditScreen} />
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
+      <HomeStack.Screen name="Journal" component={JournalScreen} />
+      <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
     </HomeStack.Navigator>
   );
 }

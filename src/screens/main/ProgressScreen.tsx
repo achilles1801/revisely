@@ -79,6 +79,34 @@ export default function ProgressScreen() {
 
   const totalMemorized = pages.filter((p) => p.status === 'memorized').length;
 
+  const journalCard = (
+    <PressableScale
+      onPress={() => navigation.navigate('Home', { screen: 'Journal' })}
+      haptic="medium"
+      scale={0.985}
+    >
+      <GlassCard
+        glassStyle="clear"
+        specular
+        tintColor={isDark ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.08)'}
+        style={styles.entryCard}
+      >
+        <View style={styles.entryIcon}>
+          <Ionicons name="journal-outline" size={22} color={theme.accent} />
+        </View>
+        <View style={styles.entryMain}>
+          <Text style={[styles.entryTitle, { color: theme.textPrimary }]}>
+            Daily log
+          </Text>
+          <Text style={[styles.entrySub, { color: theme.textSecondary }]}>
+            Record what you memorized and revised, time spent, and notes.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+      </GlassCard>
+    </PressableScale>
+  );
+
   if (pages.length > 0 && totalMemorized === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -120,6 +148,7 @@ export default function ProgressScreen() {
               />
             </GlassCard>
           </PressableScale>
+          {journalCard}
         </ScrollView>
       </SafeAreaView>
     );
@@ -255,6 +284,8 @@ export default function ProgressScreen() {
             />
           </GlassCard>
         </PressableScale>
+
+        {journalCard}
       </ScrollView>
     </SafeAreaView>
   );

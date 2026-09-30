@@ -335,6 +335,41 @@ service cloud.firestore {
         // Users can delete their own sessions (for cleanup)
         allow delete: if isOwner(userId);
       }
+
+      // ======================================================================
+      // JOURNAL DOCUMENT RULES
+      // ======================================================================
+      // Personal daily log: what was memorized/revised, minutes spent, notes.
+      // One doc per day, keyed by date. Limits mirror src/lib/journal.ts.
+
+      match /journal/{day} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidJournalEntry(day);
+      }
+    }
+
+    function isValidJournalMinutes(value) {
+      return value == null || (value is int && isInRange(value, 0, 1440));
+    }
+
+    function isValidJournalEntry(day) {
+      let data = incomingData();
+      return data.keys().hasOnly([
+               'date', 'memorization', 'memorizationMinutes',
+               'revision', 'revisionMinutes', 'notes',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasAll([
+               'date', 'memorization', 'memorizationMinutes',
+               'revision', 'revisionMinutes', 'notes'
+             ]) &&
+             isValidDateString(data.date) &&
+             data.date == day &&
+             data.memorization is string && data.memorization.size() <= 200 &&
+             data.revision is string && data.revision.size() <= 200 &&
+             data.notes is string && data.notes.size() <= 5000 &&
+             isValidJournalMinutes(data.memorizationMinutes) &&
+             isValidJournalMinutes(data.revisionMinutes);
     }
 
     // ========================================================================

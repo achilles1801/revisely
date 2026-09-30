@@ -179,6 +179,25 @@ interface WeaknessUpdate {
 }
 ```
 
+### 4. Journal Document
+
+**Path:** `users/{userId}/journal/{date}`
+
+The user's personal daily log (the "Daily log" screen). Document ID is the date string (YYYY-MM-DD), so there's at most one entry per day. Text fields are free-form shorthand ("1/2 p3", "5p Maryam + Taha").
+
+```typescript
+interface FirestoreJournalEntry {
+  date: string;                       // Same as document ID
+  memorization: string;               // ≤ 200 chars
+  memorizationMinutes: number | null; // int 0–1440, null = not recorded
+  revision: string;                   // ≤ 200 chars
+  revisionMinutes: number | null;     // int 0–1440, null = not recorded
+  notes: string;                      // ≤ 5000 chars, optional personal notes
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
 **Example Document (sessions/2024-01-20):**
 ```json
 {

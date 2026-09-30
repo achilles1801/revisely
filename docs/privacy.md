@@ -21,7 +21,7 @@ Revisely is a mobile application that helps users track and review their Quran m
 ### Information you provide
 - **Account information** — your name, email address, and password when you create an account.
 - **Profile information** received from Apple Sign-In or Google Sign-In if you choose to authenticate that way (typically your name, email address, and profile picture URL).
-- **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete.
+- **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; and entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes).
 - **Voice input** (future feature) — when you opt to use the voice-recitation feature, your voice is processed to generate text. Audio is not stored after processing.
 
 ### Information collected automatically

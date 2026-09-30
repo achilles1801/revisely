@@ -120,6 +120,18 @@ export interface RevisionLog {
   durationMinutes: number | null;
 }
 
+// One day in the user's personal memorization/revision journal. Free-form text
+// on purpose — huffaz already have their own shorthand ("1/2 p3", "4L p4",
+// "5p Maryam + Taha") and the journal should record it as written.
+export interface JournalEntry {
+  date: string;                     // YYYY-MM-DD, also the document ID
+  memorization: string;
+  memorizationMinutes: number | null;
+  revision: string;
+  revisionMinutes: number | null;
+  notes: string;
+}
+
 // Static Quran reference data
 export interface QuranPage {
   pageNumber: number;               // 1-604

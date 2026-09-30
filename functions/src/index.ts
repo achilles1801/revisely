@@ -18,9 +18,10 @@ const adminDb = getFirestore();
  * Deletes (in order):
  *  1. users/{uid}/pages/* — page progress docs
  *  2. users/{uid}/sessions/* — session docs
- *  3. users/{uid}/_quota/* — legacy rate-limit counter docs (if any)
- *  4. users/{uid} — user profile doc
- *  5. Firebase Auth user
+ *  3. users/{uid}/journal/* — daily journal entries
+ *  4. users/{uid}/_quota/* — legacy rate-limit counter docs (if any)
+ *  5. users/{uid} — user profile doc
+ *  6. Firebase Auth user
  *
  * Requires App Check to prevent abuse: an attacker with a stolen ID token
  * could otherwise use this to delete arbitrary accounts they happen to control.
@@ -47,6 +48,7 @@ export const deleteUserAccount = onCall(
 
     await deleteSubcollection('pages');
     await deleteSubcollection('sessions');
+    await deleteSubcollection('journal');
     await deleteSubcollection('_quota');
 
     await userRef.delete();

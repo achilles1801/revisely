@@ -35,6 +35,7 @@ import {
   FirestoreUser,
   FirestorePage,
   FirestoreSession,
+  FirestoreJournalEntry,
   CreateUserInput,
   UpdateUserInput,
   UpdatePageInput,
@@ -45,6 +46,7 @@ import {
   DEFAULT_USER_SETTINGS,
   DEFAULT_WEAKNESS_RATING,
 } from '../types/firestore';
+import { JournalEntry } from '../types';
 import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
 
@@ -378,6 +380,74 @@ export async function getRecentSessions(
 
 export async function deleteSession(sessionId: string, userId?: string): Promise<void> {
   await deleteDoc(getSessionRef(sessionId, userId));
+}
+
+// ============================================================================
+// JOURNAL OPERATIONS
+// ============================================================================
+
+function getJournalRef(date: string, userId?: string): DocumentReference {
+  const uid = userId || getCurrentUserId();
+  return doc(db, 'users', uid, 'journal', date);
+}
+
+function journalFromFirestore(data: FirestoreJournalEntry): JournalEntry {
+  return {
+    date: data.date,
+    memorization: data.memorization ?? '',
+    memorizationMinutes: data.memorizationMinutes ?? null,
+    revision: data.revision ?? '',
+    revisionMinutes: data.revisionMinutes ?? null,
+    notes: data.notes ?? '',
+  };
+}
+
+/** Most recent journal entries, newest first. */
+export async function getJournalEntries(
+  limitCount: number = 120,
+  userId?: string,
+): Promise<JournalEntry[]> {
+  const uid = userId || getCurrentUserId();
+  const q = query(
+    collection(db, 'users', uid, 'journal'),
+    orderBy('date', 'desc'),
+    limit(limitCount),
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => journalFromFirestore(d.data() as FirestoreJournalEntry));
+}
+
+export async function getJournalEntry(
+  date: string,
+  userId?: string,
+): Promise<JournalEntry | null> {
+  const snapshot = await getDoc(getJournalRef(date, userId));
+  return snapshot.exists()
+    ? journalFromFirestore(snapshot.data() as FirestoreJournalEntry)
+    : null;
+}
+
+/** Create or overwrite the entry for `entry.date` (one entry per day). */
+export async function saveJournalEntry(
+  entry: JournalEntry,
+  isNew: boolean,
+  userId?: string,
+): Promise<void> {
+  const data: Record<string, unknown> = {
+    date: entry.date,
+    memorization: entry.memorization,
+    memorizationMinutes: entry.memorizationMinutes,
+    revision: entry.revision,
+    revisionMinutes: entry.revisionMinutes,
+    notes: entry.notes,
+    updatedAt: serverTimestamp(),
+  };
+  if (isNew) data.createdAt = serverTimestamp();
+  await setDoc(getJournalRef(entry.date, userId), data, { merge: true });
+}
+
+export async function deleteJournalEntry(date: string, userId?: string): Promise<void> {
+  await deleteDoc(getJournalRef(date, userId));
 }
 
 // ============================================================================

@@ -445,6 +445,20 @@ export default function DashboardScreen() {
             </View>
           </View>
           <PressableScale
+            onPress={() => navigation.navigate('Journal')}
+            haptic="light"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Open daily log"
+          >
+            <GlassCard style={styles.settingsButton}>
+              <Ionicons
+                name="journal-outline"
+                size={20}
+                color={theme.textPrimary}
+              />
+            </GlassCard>
+          </PressableScale>
+          <PressableScale
             onPress={() => navigation.navigate('Settings')}
             haptic="light"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

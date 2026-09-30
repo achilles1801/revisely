@@ -222,6 +222,31 @@ export interface UpdateUserInput {
 }
 
 // ============================================================================
+// JOURNAL DOCUMENT TYPES
+// ============================================================================
+
+/**
+ * One day of the user's personal memorization/revision journal
+ *
+ * Collection: users/{userId}/journal/{date}
+ * Document ID: The date (YYYY-MM-DD), so there is at most one entry per day.
+ */
+export interface FirestoreJournalEntry {
+  /** YYYY-MM-DD — also the document ID */
+  date: string;
+  /** What was memorized, in the user's own shorthand (e.g. "1/2 p3") */
+  memorization: string;
+  memorizationMinutes: number | null;
+  /** What was revised (e.g. "5p Maryam + Taha") */
+  revision: string;
+  revisionMinutes: number | null;
+  /** Optional personal notes for the day */
+  notes: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ============================================================================
 // PAGE DOCUMENT TYPES
 // ============================================================================
 
