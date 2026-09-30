@@ -1,45 +1,53 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Modal,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { Button } from '../../components/Button';
-import { GlassCard } from '../../components/GlassCard';
-import { PressableScale } from '../../components/PressableScale';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
+import { fonts } from '../../theme/typography';
+import { getSurahForPage } from '../../lib/quranData';
 import {
-  getJuzForPage,
-  getSurahForPage,
-  JUZ_NAMES,
-} from '../../lib/quranData';
+  memorizedJuzGroups,
+  memorizedSurahGroups,
+  pageCountLabel,
+  pageRangeLabel,
+  summarizeDay,
+} from '../../lib/planDisplay';
+import {
+  applyGroupSelection,
+  isGroupFullyIncluded,
+  SelectableGroup,
+} from '../../lib/planBuilder';
+import {
+  GroupedRow,
+  GroupedSection,
+  HeaderTextButton,
+} from '../../components/plan/Grouped';
+import {
+  ListPickerSheet,
+  PickerItem,
+  PickerTab,
+} from '../../components/plan/ListPickerSheet';
+import { dayTitle } from '../../components/plan/DayRow';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
-type PickerTab = 'surah' | 'juz';
+type PickerTabKey = 'surah' | 'juz';
 
-function dayLabel(index: number): string {
-  if (index === 0) return 'Today';
-  if (index === 1) return 'Tomorrow';
-  return `In ${index} days`;
-}
-
-interface MemorizedJuz { juz: number; pages: number[]; }
-interface MemorizedSurah {
+interface SurahOnDay {
   number: number;
   name: string;
   nameArabic: string;
@@ -55,210 +63,197 @@ export default function PlanDayEditScreen() {
 
   const { dayIndex, initialPages } = route.params;
   const [pages, setPages] = useState<number[]>([...initialPages]);
+  const [editing, setEditing] = useState(false);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerTab, setPickerTab] = useState<PickerTab>('surah');
-  const [draftSurahs, setDraftSurahs] = useState<Set<number>>(new Set());
-  const [draftJuz, setDraftJuz] = useState<Set<number>>(new Set());
+  const pickerRef = useRef<BottomSheetModal>(null);
+  const [pickerTab, setPickerTab] = useState<PickerTabKey>('surah');
+  const [draft, setDraft] = useState<Set<string>>(new Set());
+  const [initialChecked, setInitialChecked] = useState<Set<string>>(new Set());
 
-  const memorizedPageNumbers = useMemo(
-    () => allPages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
+  const today = useMemo(() => new Date(), []);
+  const title = dayTitle(dayIndex, today);
+
+  const memorized = useMemo(
+    () =>
+      allPages
+        .filter((p) => p.status === 'memorized')
+        .map((p) => p.pageNumber)
+        .sort((a, b) => a - b),
     [allPages],
   );
+  const surahGroups = useMemo(() => memorizedSurahGroups(memorized), [memorized]);
+  const juzGroups = useMemo(() => memorizedJuzGroups(memorized), [memorized]);
 
-  const memorizedJuzList = useMemo<MemorizedJuz[]>(() => {
-    const map = new Map<number, number[]>();
-    for (const p of memorizedPageNumbers) {
-      const juz = getJuzForPage(p);
-      const arr = map.get(juz) ?? [];
-      arr.push(p);
-      map.set(juz, arr);
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([juz, pgs]) => ({ juz, pages: pgs.sort((a, b) => a - b) }));
-  }, [memorizedPageNumbers]);
-
-  const memorizedSurahList = useMemo<MemorizedSurah[]>(() => {
-    const map = new Map<number, number[]>();
-    for (const p of memorizedPageNumbers) {
-      const surahNum = getSurahForPage(p).number;
-      const arr = map.get(surahNum) ?? [];
-      arr.push(p);
-      map.set(surahNum, arr);
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([num, pgs]) => {
-        const info = getSurahForPage(pgs[0]);
-        return {
-          number: num,
-          name: info.name,
-          nameArabic: info.nameArabic,
-          pages: pgs.sort((a, b) => a - b),
-        };
-      });
-  }, [memorizedPageNumbers]);
-
-  const pagesSet = useMemo(() => new Set(pages), [pages]);
-
-  const fullySelectedJuz = useMemo(
-    () => memorizedJuzList.filter((j) => j.pages.every((p) => pagesSet.has(p))),
-    [memorizedJuzList, pagesSet],
+  const selectable = useMemo<SelectableGroup[]>(
+    () => [
+      ...surahGroups.map((g) => ({ key: `surah:${g.number}`, pages: g.pages })),
+      ...juzGroups.map((g) => ({ key: `juz:${g.juz}`, pages: g.pages })),
+    ],
+    [surahGroups, juzGroups],
   );
-  const fullySelectedSurahs = useMemo(() => {
-    const inSelectedJuz = new Set<number>();
-    for (const j of fullySelectedJuz) j.pages.forEach((p) => inSelectedJuz.add(p));
-    return memorizedSurahList.filter((s) => {
-      if (!s.pages.every((p) => pagesSet.has(p))) return false;
-      return !s.pages.every((p) => inSelectedJuz.has(p));
-    });
-  }, [memorizedSurahList, pagesSet, fullySelectedJuz]);
-
-  const summary = useMemo(() => {
-    if (pages.length === 0) {
-      return { primary: 'Rest day', secondary: null as string | null };
-    }
-    const surahNames = fullySelectedSurahs.map((s) => s.name);
-    const juzNumbers = fullySelectedJuz.map((j) => j.juz);
-
-    if (juzNumbers.length > 0) {
-      const primary =
-        juzNumbers.length === 1
-          ? `Juz ${juzNumbers[0]}`
-          : `Ajzaʼ ${juzNumbers.join(', ')}`;
-      const secondary =
-        surahNames.length > 0
-          ? surahNames.slice(0, 3).join(', ') +
-            (surahNames.length > 3 ? ` +${surahNames.length - 3}` : '')
-          : null;
-      return { primary, secondary };
-    }
-    if (surahNames.length > 0) {
-      return {
-        primary: surahNames[0],
-        secondary:
-          surahNames.length > 1 ? surahNames.slice(1).join(', ') : null,
-      };
-    }
-    return { primary: `${pages.length} pages`, secondary: 'Custom selection' };
-  }, [pages.length, fullySelectedSurahs, fullySelectedJuz]);
 
   const isDirty = useMemo(() => {
     if (pages.length !== initialPages.length) return true;
-    for (let i = 0; i < pages.length; i++) {
-      if (pages[i] !== initialPages[i]) return true;
-    }
-    return false;
+    return pages.some((p, i) => p !== initialPages[i]);
   }, [pages, initialPages]);
 
-  const isOff = pages.length === 0;
+  const summary = summarizeDay(pages);
 
-  const surahsOnThisDay = useMemo(() => {
-    const map = new Map<number, number[]>();
+  // Surahs on this day, in the order they're revised.
+  const surahsOnDay = useMemo<SurahOnDay[]>(() => {
+    const map = new Map<number, SurahOnDay>();
     for (const p of pages) {
-      const surahNum = getSurahForPage(p).number;
-      const arr = map.get(surahNum) ?? [];
-      arr.push(p);
-      map.set(surahNum, arr);
+      const s = getSurahForPage(p);
+      const entry = map.get(s.number);
+      if (entry) entry.pages.push(p);
+      else map.set(s.number, { number: s.number, name: s.name, nameArabic: s.nameArabic, pages: [p] });
     }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([num, pgs]) => {
-        const info = getSurahForPage(pgs[0]);
-        return { number: num, name: info.name, nameArabic: info.nameArabic, pages: pgs };
-      });
+    return Array.from(map.values());
   }, [pages]);
 
-  const openPicker = useCallback(
-    (initialTab: PickerTab) => {
-      Haptics.selectionAsync();
-      setDraftSurahs(new Set(fullySelectedSurahs.map((s) => s.number)));
-      setDraftJuz(new Set(fullySelectedJuz.map((j) => j.juz)));
-      setPickerTab(initialTab);
-      setPickerOpen(true);
-    },
-    [fullySelectedSurahs, fullySelectedJuz],
-  );
+  useEffect(() => {
+    if (surahsOnDay.length === 0) setEditing(false);
+  }, [surahsOnDay.length]);
 
-  const applyPicker = () => {
-    const newPages = new Set<number>();
-    for (const num of draftSurahs) {
-      const surah = memorizedSurahList.find((s) => s.number === num);
-      surah?.pages.forEach((p) => newPages.add(p));
-    }
-    for (const num of draftJuz) {
-      const juz = memorizedJuzList.find((j) => j.juz === num);
-      juz?.pages.forEach((p) => newPages.add(p));
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setPages(Array.from(newPages).sort((a, b) => a - b));
-    setPickerOpen(false);
-  };
-
-  const togglePickerSurah = (num: number) => {
-    Haptics.selectionAsync();
-    setDraftSurahs((prev) => {
-      const next = new Set(prev);
-      if (next.has(num)) next.delete(num);
-      else next.add(num);
-      return next;
-    });
-  };
-  const togglePickerJuz = (num: number) => {
-    Haptics.selectionAsync();
-    setDraftJuz((prev) => {
-      const next = new Set(prev);
-      if (next.has(num)) next.delete(num);
-      else next.add(num);
-      return next;
-    });
-  };
-
-  const removeSurahFromDay = (num: number) => {
-    const surahPages = new Set(
-      memorizedSurahList.find((s) => s.number === num)?.pages ?? [],
-    );
-    Haptics.selectionAsync();
-    setPages((prev) => prev.filter((p) => !surahPages.has(p)));
-  };
-  const removeJuzFromDay = (num: number) => {
-    const juzPages = new Set(
-      memorizedJuzList.find((j) => j.juz === num)?.pages ?? [],
-    );
-    Haptics.selectionAsync();
-    setPages((prev) => prev.filter((p) => !juzPages.has(p)));
-  };
-
-  const handleDone = () => {
+  // ---- Leaving: hand the edited day back to the schedule draft -------------
+  const committingRef = useRef(false);
+  const commit = useCallback(() => {
+    committingRef.current = true;
     if (isDirty) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigation.popTo(
-        'PlanEdit',
-        { editedDay: { index: dayIndex, pages } },
-        { merge: true },
-      );
+      navigation.popTo('PlanEdit', { editedDay: { index: dayIndex, pages } }, { merge: true });
     } else {
       navigation.goBack();
     }
+  }, [isDirty, navigation, dayIndex, pages]);
+
+  // Swipe-back can't be intercepted on native-stack, so disable it while there
+  // are edits; Android back / programmatic pops are routed through commit().
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: !isDirty });
+  }, [navigation, isDirty]);
+
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', (e) => {
+        if (!isDirty || committingRef.current) return;
+        e.preventDefault();
+        commit();
+      }),
+    [navigation, isDirty, commit],
+  );
+
+  // ---- Picker ---------------------------------------------------------------
+  const openPicker = () => {
+    const checked = new Set(
+      selectable.filter((g) => isGroupFullyIncluded(pages, g)).map((g) => g.key),
+    );
+    setInitialChecked(checked);
+    setDraft(new Set(checked));
+    pickerRef.current?.present();
   };
 
-  const draftCount = draftSurahs.size + draftJuz.size;
-  const canPick = memorizedSurahList.length > 0 || memorizedJuzList.length > 0;
+  const toggleDraft = useCallback((key: string) => {
+    setDraft((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const applyPicker = () => {
+    setPages((prev) => applyGroupSelection(prev, selectable, initialChecked, draft));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    pickerRef.current?.dismiss();
+  };
+
+  const pickerTabs = useMemo<PickerTab[]>(() => {
+    const pageSet = new Set(pages);
+    const onDayCount = (groupPages: number[]) =>
+      groupPages.filter((p) => pageSet.has(p)).length;
+    const surahItems: PickerItem[] = surahGroups.map((g) => {
+      const onDay = onDayCount(g.pages);
+      const partial = onDay > 0 && onDay < g.pages.length;
+      return {
+        key: `surah:${g.number}`,
+        index: String(g.number),
+        title: g.name,
+        subtitle: partial
+          ? `${onDay} of ${g.pages.length} pages already on this day`
+          : g.pages.length === g.totalPages
+            ? pageCountLabel(g.pages.length)
+            : `${g.pages.length} of ${g.totalPages} pages memorized`,
+        trailing: g.nameArabic,
+        search: String(g.number),
+        checked: draft.has(`surah:${g.number}`),
+      };
+    });
+    const juzItems: PickerItem[] = juzGroups.map((g) => {
+      const onDay = onDayCount(g.pages);
+      const partial = onDay > 0 && onDay < g.pages.length;
+      return {
+        key: `juz:${g.juz}`,
+        index: String(g.juz),
+        title: `Juz ${g.juz}`,
+        subtitle: partial
+          ? `${onDay} of ${g.pages.length} pages already on this day`
+          : `${getSurahForPage(g.pages[0]).name} · ${pageCountLabel(g.pages.length)}`,
+        trailing: g.name,
+        search: String(g.juz),
+        checked: draft.has(`juz:${g.juz}`),
+      };
+    });
+    return [
+      { key: 'surah', label: 'Surahs', items: surahItems, emptyText: 'No memorized surahs yet.' },
+      { key: 'juz', label: 'Juz', items: juzItems, emptyText: 'No memorized ajzaʼ yet.' },
+    ];
+  }, [surahGroups, juzGroups, draft, pages]);
+
+  const draftChanged =
+    draft.size !== initialChecked.size || Array.from(draft).some((k) => !initialChecked.has(k));
+
+  // ---- Direct edits -----------------------------------------------------------
+  const removeSurah = (s: SurahOnDay) => {
+    const remove = new Set(s.pages);
+    Haptics.selectionAsync();
+    setPages((prev) => prev.filter((p) => !remove.has(p)));
+  };
+
+  const makeRest = () => {
+    setPages([]);
+    setEditing(false);
+  };
+
+  const canPick = memorized.length > 0;
+  const hasContent = pages.length > 0;
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <PressableScale
-          onPress={handleDone}
-          haptic="light"
-          style={styles.backButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Back"
+      <View style={styles.navBar}>
+        <Pressable
+          onPress={commit}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.navBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back to schedule"
         >
-          <Ionicons name="chevron-back" size={20} color={theme.textSecondary} />
-          <Text style={styles.backText}>Back</Text>
-        </PressableScale>
+          {({ pressed }) => (
+            <>
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color={theme.accent}
+                style={{ opacity: pressed ? 0.5 : 1 }}
+              />
+              <Text style={[styles.navBackText, { opacity: pressed ? 0.5 : 1 }]}>Schedule</Text>
+            </>
+          )}
+        </Pressable>
+        <Text style={styles.navTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        <View style={styles.navSide} />
       </View>
 
       <ScrollView
@@ -267,506 +262,156 @@ export default function PlanDayEditScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Text style={styles.dayLabel}>{dayLabel(dayIndex)}</Text>
-          <Text style={[styles.summary, isOff && styles.summaryOff]}>
-            {summary.primary}
+          <Text style={[styles.heroTitle, summary.isRest && styles.heroTitleRest]} numberOfLines={2}>
+            {summary.title}
           </Text>
-          {summary.secondary && (
-            <Text style={styles.summarySecondary}>{summary.secondary}</Text>
-          )}
-          {!isOff && (
-            <Text style={styles.pageCount}>
-              {pages.length} page{pages.length === 1 ? '' : 's'}
-            </Text>
-          )}
+          <Text style={styles.heroSubtitle}>
+            {hasContent
+              ? `${pageCountLabel(pages.length)}${isDirty ? ' · Edited' : ''}`
+              : `Nothing to revise ${dayIndex === 0 ? 'today' : 'on this day'}`}
+          </Text>
         </View>
 
-        <View style={styles.chipRow}>
-          {fullySelectedJuz.map((j) => (
-            <PressableScale
-              key={`juz-${j.juz}`}
-              onPress={() => removeJuzFromDay(j.juz)}
-              haptic="light"
-              scale={0.96}
-              style={styles.chip}
-              accessibilityLabel={`Remove Juz ${j.juz}`}
-            >
-              <Text style={styles.chipText}>Juz {j.juz}</Text>
-              <Ionicons name="close" size={14} color={theme.textMuted} />
-            </PressableScale>
-          ))}
-          {fullySelectedSurahs.map((s) => (
-            <PressableScale
-              key={`surah-${s.number}`}
-              onPress={() => removeSurahFromDay(s.number)}
-              haptic="light"
-              scale={0.96}
-              style={styles.chip}
-              accessibilityLabel={`Remove ${s.name}`}
-            >
-              <Text style={styles.chipText}>{s.name}</Text>
-              <Ionicons name="close" size={14} color={theme.textMuted} />
-            </PressableScale>
-          ))}
-          {canPick && (
-            <PressableScale
-              onPress={() => openPicker(isOff ? 'surah' : pickerTab)}
-              haptic="light"
-              scale={0.96}
-              style={[styles.chip, styles.chipAdd]}
-            >
-              <Text style={[styles.chipText, styles.chipAddText]}>
-                {fullySelectedJuz.length === 0 && fullySelectedSurahs.length === 0
-                  ? '+ Add content'
-                  : '+ Add more'}
-              </Text>
-            </PressableScale>
-          )}
-        </View>
+        {hasContent ? (
+          <GroupedSection
+            header="On this day"
+            headerRight={
+              <HeaderTextButton
+                label={editing ? 'Done' : 'Edit'}
+                bold={editing}
+                onPress={() => setEditing((v) => !v)}
+              />
+            }
+            separatorInset={editing ? spacing.md + 28 + spacing.sm : spacing.md}
+          >
+            {surahsOnDay.map((s) => (
+              <GroupedRow
+                key={s.number}
+                title={s.name}
+                subtitle={`${pageRangeLabel(s.pages)} · ${pageCountLabel(s.pages.length)}`}
+                leading={
+                  editing ? (
+                    <Pressable
+                      onPress={() => removeSurah(s)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${s.name}`}
+                      style={styles.minusSlot}
+                    >
+                      <Ionicons name="remove-circle" size={24} color={theme.error} />
+                    </Pressable>
+                  ) : undefined
+                }
+                trailing={<Text style={styles.arabic}>{s.nameArabic}</Text>}
+              />
+            ))}
+          </GroupedSection>
+        ) : null}
 
-        {!isOff && surahsOnThisDay.length > 0 && (
-          <View style={styles.onThisDay}>
-            <Text style={styles.sectionLabel}>On this day</Text>
-            <View>
-              {surahsOnThisDay.map((s, idx) => {
-                const isLast = idx === surahsOnThisDay.length - 1;
-                return (
-                  <View
-                    key={s.number}
-                    style={[styles.surahRow, !isLast && styles.surahRowDivider]}
-                  >
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.surahName} numberOfLines={1}>
-                        {s.name}
-                      </Text>
-                      <Text style={styles.surahMeta}>
-                        {s.pages.length} page{s.pages.length === 1 ? '' : 's'}
-                      </Text>
-                    </View>
-                    <Text style={styles.surahArabic}>{s.nameArabic}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
+        <GroupedSection
+          footer={
+            !canPick
+              ? "You haven't marked any pages as memorized yet."
+              : hasContent
+                ? 'Only content you have memorized is listed.'
+                : 'This is a rest day. Add a surah or juz to revise on it.'
+          }
+        >
+          <GroupedRow
+            title={hasContent ? 'Add or Remove Content' : 'Add Surahs or Ajzaʼ'}
+            icon="add-circle"
+            tone="accent"
+            onPress={openPicker}
+            disabled={!canPick}
+          />
+          {hasContent ? (
+            <GroupedRow
+              title="Make Rest Day"
+              icon="moon-outline"
+              tone="destructive"
+              onPress={makeRest}
+            />
+          ) : null}
+        </GroupedSection>
       </ScrollView>
 
-      <Modal
-        visible={pickerOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPickerOpen(false)}
-      >
-        <Pressable
-          style={styles.pickerOverlay}
-          onPress={() => setPickerOpen(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            style={styles.pickerCard}
-          >
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>Pick content</Text>
-              <PressableScale
-                onPress={() => setPickerOpen(false)}
-                haptic="light"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.pickerClose}
-              >
-                <Ionicons name="close" size={20} color={theme.textMuted} />
-              </PressableScale>
-            </View>
-
-            <Text style={styles.pickerHelper}>
-              Pick as many surahs or ajzaʼ as you like.
-            </Text>
-
-            <View style={styles.tabSwitcher}>
-              <Pressable
-                style={[
-                  styles.tabButton,
-                  pickerTab === 'surah' && styles.tabButtonActive,
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setPickerTab('surah');
-                }}
-              >
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    pickerTab === 'surah' && styles.tabLabelActive,
-                  ]}
-                >
-                  Surahs
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.tabButton,
-                  pickerTab === 'juz' && styles.tabButtonActive,
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setPickerTab('juz');
-                }}
-              >
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    pickerTab === 'juz' && styles.tabLabelActive,
-                  ]}
-                >
-                  Ajzaʼ
-                </Text>
-              </Pressable>
-            </View>
-
-            <ScrollView style={styles.pickerScroll}>
-              {pickerTab === 'surah' &&
-                memorizedSurahList.map((s) => {
-                  const selected = draftSurahs.has(s.number);
-                  return (
-                    <PressableScale
-                      key={s.number}
-                      onPress={() => togglePickerSurah(s.number)}
-                      haptic="none"
-                      scale={0.99}
-                      style={styles.pickerRow}
-                    >
-                      <CheckBubble selected={selected} theme={theme} />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text
-                          style={[
-                            styles.pickerName,
-                            selected && styles.pickerNameSelected,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {s.name}
-                        </Text>
-                        <Text style={styles.pickerCount}>
-                          {s.pages.length} memorized page
-                          {s.pages.length === 1 ? '' : 's'}
-                        </Text>
-                      </View>
-                      <Text style={styles.pickerArabic}>{s.nameArabic}</Text>
-                    </PressableScale>
-                  );
-                })}
-              {pickerTab === 'juz' &&
-                memorizedJuzList.map(({ juz, pages: juzPages }) => {
-                  const selected = draftJuz.has(juz);
-                  return (
-                    <PressableScale
-                      key={juz}
-                      onPress={() => togglePickerJuz(juz)}
-                      haptic="none"
-                      scale={0.99}
-                      style={styles.pickerRow}
-                    >
-                      <CheckBubble selected={selected} theme={theme} />
-                      <View style={styles.pickerJuzBadge}>
-                        <Text style={styles.pickerJuzBadgeText}>{juz}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.pickerName,
-                            selected && styles.pickerNameSelected,
-                          ]}
-                        >
-                          Juz {juz}
-                        </Text>
-                        <Text style={styles.pickerCount}>
-                          {juzPages.length} memorized page
-                          {juzPages.length === 1 ? '' : 's'}
-                        </Text>
-                      </View>
-                      <Text style={styles.pickerArabic}>
-                        {JUZ_NAMES[juz - 1] ?? ''}
-                      </Text>
-                    </PressableScale>
-                  );
-                })}
-            </ScrollView>
-
-            <View style={styles.pickerFooter}>
-              <Button
-                title={draftCount === 0 ? 'Clear day' : `Done (${draftCount} selected)`}
-                onPress={applyPicker}
-                variant="primary"
-              />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ListPickerSheet
+        ref={pickerRef}
+        title={dayIndex === 0 ? "Today's Revision" : title}
+        tabs={pickerTabs}
+        activeTab={pickerTab}
+        onTabChange={(k) => setPickerTab(k as PickerTabKey)}
+        onSelect={toggleDraft}
+        onLeft={() => pickerRef.current?.dismiss()}
+        rightLabel="Done"
+        onRight={applyPicker}
+        rightDisabled={!draftChanged}
+        searchPlaceholder="Search surahs or ajzaʼ"
+        footer="Checked items are fully on this day. Unchecking one removes it."
+      />
     </SafeAreaView>
-  );
-}
-
-function CheckBubble({ selected, theme }: { selected: boolean; theme: ThemeColors }) {
-  return (
-    <View
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: selected ? 0 : 2,
-        borderColor: theme.border,
-        backgroundColor: selected ? theme.accent : 'transparent',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {selected && (
-        <Ionicons name="checkmark" size={14} color={theme.textInverse} />
-      )}
-    </View>
   );
 }
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
-
-    header: {
+    navBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      height: 56,
-    },
-    backButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 2,
+      height: 44,
       paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.xs,
-      marginLeft: -spacing.xs,
     },
-    backText: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
+    navBack: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: 110,
     },
-
+    navBackText: {
+      fontSize: 17,
+      color: theme.accent,
+      marginLeft: -2,
+    },
+    navTitle: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: 17,
+      fontWeight: '600',
+      color: theme.textPrimary,
+    },
+    navSide: { width: 110 },
     scroll: { flex: 1 },
     scrollContent: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xl,
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.huge,
     },
-
     hero: {
-      paddingTop: spacing.md,
-      paddingBottom: spacing.lg,
+      paddingHorizontal: spacing.xxs,
+      paddingTop: spacing.sm,
     },
-    dayLabel: {
-      ...typography.label,
-      color: theme.accent,
-      marginBottom: spacing.xs,
-    },
-    summary: {
-      ...typography.displaySmall,
+    heroTitle: {
+      fontSize: 34,
+      lineHeight: 41,
+      fontWeight: '700',
+      letterSpacing: 0.3,
       color: theme.textPrimary,
     },
-    summaryOff: {
+    heroTitleRest: {
       color: theme.textMuted,
-      fontStyle: 'italic',
     },
-    summarySecondary: {
-      ...typography.bodyMedium,
+    heroSubtitle: {
+      fontSize: 15,
+      lineHeight: 20,
       color: theme.textSecondary,
-      marginTop: 4,
-    },
-    pageCount: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      marginTop: spacing.xs,
-    },
-
-    chipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-      marginBottom: spacing.lg,
-    },
-    chip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      backgroundColor: theme.bgAlt,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-      borderRadius: radius.sm,
-    },
-    chipText: {
-      ...typography.bodySmall,
-      fontFamily: 'Inter_500Medium',
-      color: theme.textPrimary,
-    },
-    chipAdd: {
-      backgroundColor: theme.accentSoft,
-      borderColor: theme.accent + '33',
-    },
-    chipAddText: {
-      color: theme.accent,
-    },
-
-    onThisDay: {
-      marginTop: spacing.sm,
-    },
-    sectionLabel: {
-      ...typography.label,
-      color: theme.textMuted,
-      marginBottom: spacing.sm,
-    },
-    surahRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      paddingVertical: spacing.md,
-    },
-    surahRowDivider: {
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border,
-    },
-    surahName: {
-      ...typography.bodyMedium,
-      color: theme.textPrimary,
-    },
-    surahMeta: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
       marginTop: 2,
     },
-    surahArabic: {
-      ...typography.bodyLarge,
-      color: theme.textMuted,
-    },
-
-    pickerOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.40)',
-      justifyContent: 'center',
+    minusSlot: {
+      width: 28,
       alignItems: 'center',
-      paddingHorizontal: spacing.md,
     },
-    pickerCard: {
-      width: '100%',
-      maxWidth: 440,
-      maxHeight: '80%',
-      borderRadius: radius.lg,
-      overflow: 'hidden',
-    },
-    pickerHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.base,
-      paddingVertical: spacing.md,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border,
-    },
-    pickerTitle: {
-      fontFamily: 'Georgia',
-      fontSize: 20,
-      lineHeight: 26,
-      color: theme.textPrimary,
-    },
-    pickerClose: {
-      padding: 4,
-      marginRight: -4,
-    },
-    pickerHelper: {
-      ...typography.bodySmall,
+    arabic: {
+      fontFamily: fonts.arabic,
+      fontSize: 18,
       color: theme.textMuted,
-      paddingHorizontal: spacing.base,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.sm,
-    },
-
-    tabSwitcher: {
-      flexDirection: 'row',
-      marginHorizontal: spacing.base,
-      marginBottom: spacing.sm,
-      backgroundColor: theme.bgAlt,
-      borderRadius: radius.sm,
-      padding: 4,
-    },
-    tabButton: {
-      flex: 1,
-      paddingVertical: spacing.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.xs,
-    },
-    tabButtonActive: {
-      backgroundColor: theme.bg,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 3,
-      shadowOffset: { width: 0, height: 1 },
-      elevation: 1,
-    },
-    tabLabel: {
-      ...typography.bodySmall,
-      fontFamily: 'Inter_500Medium',
-      color: theme.textMuted,
-    },
-    tabLabelActive: {
-      color: theme.textPrimary,
-    },
-
-    pickerScroll: {
-      maxHeight: 380,
-      paddingHorizontal: spacing.xs,
-    },
-    pickerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.sm + 2,
-      borderRadius: radius.sm,
-    },
-    pickerJuzBadge: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.bgAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    pickerJuzBadgeText: {
-      ...typography.bodySmall,
-      fontFamily: 'Inter_500Medium',
-      color: theme.textPrimary,
-      fontVariant: ['tabular-nums'],
-    },
-    pickerName: {
-      ...typography.bodyMedium,
-      color: theme.textPrimary,
-    },
-    pickerNameSelected: {
-      fontFamily: 'Inter_500Medium',
-    },
-    pickerCount: {
-      ...typography.caption,
-      color: theme.textMuted,
-      marginTop: 1,
-    },
-    pickerArabic: {
-      ...typography.bodyMedium,
-      color: theme.textMuted,
-    },
-    pickerFooter: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
     },
   });
