@@ -49,15 +49,18 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <BottomSheetModalProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <AppProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppProvider>
+              {/* Sheets render into this provider's host, so it must sit
+                  inside the context providers — otherwise any sheet content
+                  calling useTheme()/useApp() throws when it opens. */}
+              <BottomSheetModalProvider>
                 <RootNavigator />
-              </AppProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </BottomSheetModalProvider>
+              </BottomSheetModalProvider>
+            </AppProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

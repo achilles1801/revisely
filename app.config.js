@@ -4,7 +4,7 @@ export default {
   expo: {
     name: "Revisely",
     slug: "revision-buddy",
-    owner: "achilles1801",
+    owner: "achilles1802",
     scheme: "revisely",
     version: "1.0.0",
     runtimeVersion: { policy: "appVersion" },
