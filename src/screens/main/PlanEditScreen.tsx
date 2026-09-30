@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomSheetModal, BottomSheetTextInput } from '@gorhom/bottom-sheet';
@@ -60,6 +61,8 @@ type QuotaMode = 'pages' | 'juz';
 const LONG_CYCLE_DAYS = 14;
 /** Days shown before "Show All". */
 const COLLAPSED_DAYS = 7;
+/** Per-device memory of whether the Cycle block is folded away. */
+const CYCLE_COLLAPSED_KEY = '@revisely_plan_cycle_collapsed';
 
 function makeId(): string {
   return `${Date.now().toString(36)}-${Math.round(Math.random() * 1e9).toString(36)}`;
@@ -124,6 +127,7 @@ export default function PlanEditScreen() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [cycleCollapsed, setCycleCollapsed] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [tempMode, setTempMode] = useState<QuotaMode>(user?.scheduleMode ?? 'pages');
   const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
@@ -133,6 +137,17 @@ export default function PlanEditScreen() {
     () => [...(user?.savedPlans ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [user?.savedPlans],
   );
+
+  useEffect(() => {
+    AsyncStorage.getItem(CYCLE_COLLAPSED_KEY)
+      .then((v) => setCycleCollapsed(v === 'true'))
+      .catch(() => {});
+  }, []);
+
+  const setCycleCollapsedPersisted = useCallback((next: boolean) => {
+    setCycleCollapsed(next);
+    AsyncStorage.setItem(CYCLE_COLLAPSED_KEY, next ? 'true' : 'false').catch(() => {});
+  }, []);
 
   // Merge an edited day coming back from PlanDayEdit.
   useEffect(() => {
@@ -422,6 +437,14 @@ export default function PlanEditScreen() {
           days.length === 1 ? 'day' : `${days.length} days`
         }`;
 
+  const perDay =
+    stats.minPerDay === stats.maxPerDay
+      ? pageCountLabel(stats.maxPerDay)
+      : `${stats.minPerDay}–${stats.maxPerDay} pages`;
+  const cycleSummary = `${days.length}-day cycle · ${perDay} a day${
+    stats.restDays > 0 ? ` · ${stats.restDays} rest day${stats.restDays === 1 ? '' : 's'}` : ''
+  }. Tap Cycle to show the days.`;
+
   const cycleFooter = editing
     ? 'Tap the red button to remove a day. Use the arrows to change the order.'
     : isLongCycle
@@ -491,11 +514,20 @@ export default function PlanEditScreen() {
         {days.length > 0 ? (
           <GroupedSection
             header="Cycle"
+            collapsed={cycleCollapsed && !editing}
+            onToggleCollapsed={
+              editing ? undefined : () => setCycleCollapsedPersisted(!cycleCollapsed)
+            }
+            collapsedFooter={cycleSummary}
             headerRight={
               <HeaderTextButton
                 label={editing ? 'Done' : 'Edit'}
                 bold={editing}
-                onPress={() => setEditing((v) => !v)}
+                onPress={() => {
+                  // Editing a folded cycle unfolds it first.
+                  if (!editing && cycleCollapsed) setCycleCollapsedPersisted(false);
+                  setEditing((v) => !v);
+                }}
               />
             }
             footer={cycleFooter}

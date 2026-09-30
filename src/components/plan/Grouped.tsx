@@ -38,16 +38,44 @@ export function useGroupedStyles() {
 export function SectionHeader({
   title,
   right,
+  collapsed,
+  onToggle,
 }: {
   title: string;
   right?: React.ReactNode;
+  /** With `onToggle`, the title becomes a tap target with a chevron. */
+  collapsed?: boolean;
+  onToggle?: () => void;
 }) {
   const styles = useGroupedStyles();
+  const { theme } = useTheme();
   return (
     <View style={styles.headerRow}>
-      <Text style={styles.headerText} accessibilityRole="header">
-        {title}
-      </Text>
+      {onToggle ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync();
+            onToggle();
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel={`${title}, ${collapsed ? 'collapsed' : 'expanded'}`}
+          accessibilityHint={collapsed ? 'Shows the section' : 'Hides the section'}
+          accessibilityState={{ expanded: !collapsed }}
+          style={({ pressed }) => [styles.headerToggle, pressed && { opacity: 0.5 }]}
+        >
+          <Text style={styles.headerText}>{title}</Text>
+          <Ionicons
+            name={collapsed ? 'chevron-forward' : 'chevron-down'}
+            size={13}
+            color={theme.textMuted}
+          />
+        </Pressable>
+      ) : (
+        <Text style={styles.headerText} accessibilityRole="header">
+          {title}
+        </Text>
+      )}
       {right}
     </View>
   );
@@ -113,10 +141,17 @@ export function GroupedSection({
   footerTone,
   separatorInset = GROUP_ROW_INSET,
   style,
+  collapsed = false,
+  onToggleCollapsed,
+  collapsedFooter,
   children,
 }: {
   header?: string;
   headerRight?: React.ReactNode;
+  /** Collapsible sections hide their rows (and swap in `collapsedFooter`). */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+  collapsedFooter?: React.ReactNode;
   footer?: React.ReactNode;
   footerTone?: 'default' | 'warning';
   separatorInset?: number;
@@ -124,10 +159,18 @@ export function GroupedSection({
   children: React.ReactNode;
 }) {
   const styles = useGroupedStyles();
-  const rows = React.Children.toArray(children).filter(Boolean);
+  const rows = collapsed ? [] : React.Children.toArray(children).filter(Boolean);
+  const shownFooter = collapsed ? collapsedFooter : footer;
   return (
     <View style={[styles.section, style]}>
-      {header ? <SectionHeader title={header} right={headerRight} /> : null}
+      {header ? (
+        <SectionHeader
+          title={header}
+          right={headerRight}
+          collapsed={collapsed}
+          onToggle={onToggleCollapsed}
+        />
+      ) : null}
       {rows.length > 0 ? (
         <View style={styles.card}>
           <GlassCard style={StyleSheet.absoluteFillObject} />
@@ -139,11 +182,11 @@ export function GroupedSection({
           ))}
         </View>
       ) : null}
-      {footer ? (
-        typeof footer === 'string' ? (
-          <SectionFooter tone={footerTone}>{footer}</SectionFooter>
+      {shownFooter ? (
+        typeof shownFooter === 'string' ? (
+          <SectionFooter tone={collapsed ? 'default' : footerTone}>{shownFooter}</SectionFooter>
         ) : (
-          footer
+          shownFooter
         )
       ) : null}
     </View>
@@ -305,6 +348,11 @@ const makeStyles = (theme: ThemeColors) =>
       paddingHorizontal: spacing.md,
       marginBottom: 6,
       minHeight: 20,
+    },
+    headerToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
     },
     headerText: {
       fontSize: 13,
