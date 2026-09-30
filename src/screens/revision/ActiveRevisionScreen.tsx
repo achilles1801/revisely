@@ -49,6 +49,7 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
+import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 
 const AUTO_SAVE_INTERVAL_MS = 5000;
 const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
@@ -57,7 +58,7 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevis
 
 export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, pages, logs, updatePages, addLog, loadData, error } = useApp();
+  const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -121,7 +122,11 @@ export default function ActiveRevisionScreen() {
 
   const silentlySavedRef = useRef<Set<number>>(new Set(alreadyRevisedToday));
   const lastSaveTimeRef = useRef<number>(sessionStartTime);
-  const commitInFlightRef = useRef(false);
+  // The save currently running, so an exit can wait for it and then save
+  // again instead of silently skipping (which used to drop late changes).
+  const commitPromiseRef = useRef<Promise<void> | null>(null);
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
 
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -133,13 +138,29 @@ export default function ActiveRevisionScreen() {
 
   const commitPendingPages = useCallback(async (): Promise<void> => {
     if (!user || !assignment) return;
-    if (commitInFlightRef.current) return;
+    const revisionDay = getCurrentRevisionDay(user);
+    const assignedPages = assignment.pages;
+    while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
       (p) => !silentlySavedRef.current.has(p),
     );
-    if (pending.length === 0) return;
-    commitInFlightRef.current = true;
+    // Saved pages that have since been unchecked.
+    const unrevised = pagesToUnrevise(completedPages, silentlySavedRef.current);
+    if (pending.length === 0 && unrevised.length === 0) return;
+    const run = (async () => {
+      if (pending.length > 0) await savePending();
+      if (unrevised.length > 0) await removeUnrevised();
+    })();
+    commitPromiseRef.current = run;
     try {
+      await run;
+    } catch (err) {
+      logger.error('Auto-save failed', err);
+    } finally {
+      commitPromiseRef.current = null;
+    }
+
+    async function savePending() {
       const durationMinutes = Math.max(
         1,
         Math.round((Date.now() - lastSaveTimeRef.current) / 60_000),
@@ -159,8 +180,8 @@ export default function ActiveRevisionScreen() {
         .filter(([page]) => pending.includes(page))
         .map(([page, rating]) => ({ page, rating }));
       await addLog({
-        date: getCurrentRevisionDay(user),
-        assignedPages: assignment.pages,
+        date: revisionDay,
+        assignedPages,
         pagesRevised: pending,
         pagesSkipped: [],
         weaknessUpdates,
@@ -168,12 +189,18 @@ export default function ActiveRevisionScreen() {
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
       lastSaveTimeRef.current = Date.now();
-    } catch (err) {
-      logger.error('Auto-save failed', err);
-    } finally {
-      commitInFlightRef.current = false;
     }
-  }, [user, assignment, completedPages, pages, localRatings, updatePages, addLog]);
+
+    // Take unchecked pages back out of today's session. updateLog also
+    // re-derives each page's last-revised date and count from the logs.
+    async function removeUnrevised() {
+      const todaysLog = logsRef.current.find(
+        (l) => l.date === revisionDay && l.pagesRevised.some((p) => unrevised.includes(p)),
+      );
+      if (todaysLog) await updateLog(removeRevisedPages(todaysLog, unrevised));
+      unrevised.forEach((p) => silentlySavedRef.current.delete(p));
+    }
+  }, [user, assignment, completedPages, pages, localRatings, updatePages, addLog, updateLog]);
 
   useEffect(() => {
     const id = setInterval(() => {
