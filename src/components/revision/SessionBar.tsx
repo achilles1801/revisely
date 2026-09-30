@@ -15,6 +15,8 @@ interface SessionBarProps {
   onBack: () => void;
   onToggleCurrent: () => void;
   onOverflow: () => void;
+  /** Optional control shown before the checkmark (the revision timer). */
+  timerSlot?: React.ReactNode;
 }
 
 export function SessionBar({
@@ -25,6 +27,7 @@ export function SessionBar({
   onBack,
   onToggleCurrent,
   onOverflow,
+  timerSlot,
 }: SessionBarProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -49,6 +52,8 @@ export function SessionBar({
           </Text>
         </Text>
       </View>
+
+      {timerSlot}
 
       <PressableScale
         onPress={onToggleCurrent}

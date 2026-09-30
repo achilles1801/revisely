@@ -16,11 +16,14 @@ import { getCurrentRevisionDay } from '../lib/algorithm';
 import {
   ActiveReadingTimer,
   completesAt,
-  elapsedMs,
   formatDuration,
   isTimerComplete,
+  MIN_SESSION_SECONDS,
   notePageVisited,
+  noteRevisedPages as addRevisedPages,
   pauseTimer,
+  ReadingTimerPurpose,
+  readingSessionFromTimer,
   resumeTimer,
   startTimer,
 } from '../lib/readingTimer';
@@ -31,12 +34,14 @@ import { ReadingTimerMode } from '../types';
 
 const STORAGE_KEY = '@revisely_reading_timer';
 const NOTIFICATION_ID = 'reading-timer-complete';
-// Anything shorter is almost certainly an accidental double-tap.
-const MIN_SAVE_SECONDS = 5;
 
 interface ReadingTimerContextValue {
   timer: ActiveReadingTimer | null;
-  start: (mode: ReadingTimerMode, targetSeconds: number | null) => void;
+  start: (
+    mode: ReadingTimerMode,
+    targetSeconds: number | null,
+    purpose?: ReadingTimerPurpose,
+  ) => void;
   pause: () => void;
   resume: () => void;
   /** Stop and save. Resolves false if saving failed (timer is kept). */
@@ -45,6 +50,8 @@ interface ReadingTimerContextValue {
   discard: () => void;
   /** Record that the reader showed `page` while the timer ran. */
   notePage: (page: number) => void;
+  /** Record pages marked revised on the revision screen while the timer ran. */
+  noteRevisedPages: (pages: number[]) => void;
 }
 
 const ReadingTimerContext = createContext<ReadingTimerContextValue | undefined>(undefined);
@@ -81,18 +88,10 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const save = useCallback(async (t: ActiveReadingTimer, now: number) => {
-    const durationSeconds = Math.round(elapsedMs(t, now) / 1000);
-    if (durationSeconds < MIN_SAVE_SECONDS) return null;
-    const write = firestoreService.addReadingSession({
-      date: t.date,
-      startedAt: t.startedAt,
-      endedAt: now,
-      durationSeconds,
-      mode: t.mode,
-      targetSeconds: t.targetSeconds,
-      pages: [],
-      pagesVisited: t.pagesVisited,
-    });
+    const session = readingSessionFromTimer(t, now);
+    const { durationSeconds } = session;
+    if (durationSeconds < MIN_SESSION_SECONDS) return null;
+    const write = firestoreService.addReadingSession(session);
     // Offline, the SDK queues the write and the promise only settles once
     // the server acks — don't hold the UI hostage to that. Real rejections
     // (e.g. rules) that arrive in time still surface.
@@ -168,8 +167,14 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
   }, [timer, complete]);
 
   const start = useCallback(
-    (mode: ReadingTimerMode, targetSeconds: number | null) => {
-      const next = startTimer(mode, targetSeconds, getCurrentRevisionDay(user), Date.now());
+    (mode: ReadingTimerMode, targetSeconds: number | null, purpose?: ReadingTimerPurpose) => {
+      const next = startTimer(
+        mode,
+        targetSeconds,
+        getCurrentRevisionDay(user),
+        Date.now(),
+        purpose,
+      );
       setTimer(next);
       scheduleCompletionNotification(next);
     },
@@ -206,9 +211,19 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     [setTimer],
   );
 
+  const noteRevisedPages = useCallback(
+    (pages: number[]) => {
+      const t = timerRef.current;
+      if (!t || t.runningSince == null) return;
+      const next = addRevisedPages(t, pages);
+      if (next !== t) setTimer(next);
+    },
+    [setTimer],
+  );
+
   return (
     <ReadingTimerContext.Provider
-      value={{ timer, start, pause, resume, finish, discard, notePage }}
+      value={{ timer, start, pause, resume, finish, discard, notePage, noteRevisedPages }}
     >
       {children}
     </ReadingTimerContext.Provider>

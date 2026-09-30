@@ -26,6 +26,15 @@ import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { RevisionTimerButton } from '../../components/revision/RevisionTimer';
+import { useReadingTimer } from '../../context/ReadingTimerContext';
+import {
+  elapsedMs,
+  formatDuration,
+  isRevisionTimer,
+  MIN_SESSION_SECONDS,
+  shouldAutoFinishRevisionTimer,
+} from '../../lib/readingTimer';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -182,6 +191,58 @@ export default function ActiveRevisionScreen() {
     return () => sub.remove();
   }, [commitPendingPages]);
 
+  // ===== Revision timer =====
+  // The shared reading timer, started from the stopwatch in the top bar.
+  const {
+    timer,
+    finish: finishTimer,
+    pause: pauseTimer,
+    noteRevisedPages,
+  } = useReadingTimer();
+  const timerRef = useRef(timer);
+  timerRef.current = timer;
+
+  const stopTimer = useCallback(
+    async (reason: 'manual' | 'done') => {
+      const t = timerRef.current;
+      if (!t) return;
+      const seconds = Math.round(elapsedMs(t, Date.now()) / 1000);
+      if (!(await finishTimer())) return;
+      if (seconds < MIN_SESSION_SECONDS) return;
+      Alert.alert(
+        reason === 'done' ? 'Revision timed' : 'Timer saved',
+        `${formatDuration(seconds)} recorded. You'll find it in Reading sessions.`,
+      );
+    },
+    [finishTimer],
+  );
+
+  // Credit pages to the timer as they're marked, and stop a revision timer
+  // once every page assigned today is revised. Only reacts to *new* marks, so
+  // reopening a finished day doesn't immediately stop a resumed timer.
+  const assignedCount = assignment?.pages.length ?? 0;
+  const prevCompletedRef = useRef(completedPages);
+  useEffect(() => {
+    const prev = prevCompletedRef.current;
+    prevCompletedRef.current = completedPages;
+    const added = Array.from(completedPages).filter((p) => !prev.has(p));
+    if (added.length === 0) return;
+    noteRevisedPages(added);
+    if (shouldAutoFinishRevisionTimer(timerRef.current, completedPages.size, assignedCount)) {
+      stopTimer('done');
+    }
+  }, [completedPages, assignedCount, noteRevisedPages, stopTimer]);
+
+  // Leaving mid-way pauses a running revision timer so it can be resumed
+  // later; the time already spent is kept.
+  useEffect(
+    () => () => {
+      const t = timerRef.current;
+      if (isRevisionTimer(t) && t?.runningSince != null) pauseTimer();
+    },
+    [pauseTimer],
+  );
+
   if (!user || !assignment) {
     return (
       <SafeAreaView style={styles.container}>
@@ -333,6 +394,7 @@ export default function ActiveRevisionScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
+    if (isRevisionTimer(timerRef.current)) await stopTimer('done');
     navigation.goBack();
   }, [
     commitPendingPages,
@@ -344,6 +406,7 @@ export default function ActiveRevisionScreen() {
     addLog,
     user,
     navigation,
+    stopTimer,
   ]);
 
   const handleEndSession = () => {
@@ -465,6 +528,7 @@ export default function ActiveRevisionScreen() {
         onBack={handleSaveAndBack}
         onToggleCurrent={handleToggleCurrent}
         onOverflow={() => setMenuOpen(true)}
+        timerSlot={<RevisionTimerButton onStop={() => stopTimer('manual')} />}
       />
 
       <View style={styles.viewerWrap}>
@@ -678,6 +742,11 @@ function RevisionGuideModal({
       icon: 'ellipsis-horizontal-circle-outline',
       title: 'More in the menu',
       body: 'Open (⋮) for bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
+    },
+    {
+      icon: 'stopwatch-outline',
+      title: 'Time your revision',
+      body: 'Tap the stopwatch at the top to start a timer. Tap the time to pause or stop it. It pauses if you leave and stops by itself when today’s pages are done, saving to Reading sessions.',
     },
     {
       icon: 'save-outline',

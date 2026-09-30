@@ -1,4 +1,8 @@
-import { ReadingTimerMode } from '../types';
+import { ReadingSession, ReadingTimerMode } from '../types';
+
+/** What a timer is attached to. Revision timers follow the revision screen:
+ *  they pause when you leave it and stop when today's pages are done. */
+export type ReadingTimerPurpose = 'reading' | 'revision';
 
 /**
  * State of an in-progress reading timer. Wall-clock based (not tick-counted)
@@ -19,15 +23,23 @@ export interface ActiveReadingTimer {
   runningSince: number | null;
   /** Reader pages opened during the session, in first-seen order. */
   pagesVisited: number[];
+  /** Absent on timers persisted before revision timing existed → 'reading'. */
+  purpose?: ReadingTimerPurpose;
+  /** Pages marked revised on the revision screen while this timer ran. */
+  pagesRevised?: number[];
 }
 
 export const TIMER_PRESET_MINUTES = [10, 15, 20, 30, 45, 60, 90, 120];
+
+/** Sessions shorter than this aren't saved — almost certainly a mis-tap. */
+export const MIN_SESSION_SECONDS = 5;
 
 export function startTimer(
   mode: ReadingTimerMode,
   targetSeconds: number | null,
   date: string,
   now: number,
+  purpose: ReadingTimerPurpose = 'reading',
 ): ActiveReadingTimer {
   return {
     mode,
@@ -37,7 +49,13 @@ export function startTimer(
     accumulatedMs: 0,
     runningSince: now,
     pagesVisited: [],
+    purpose,
+    pagesRevised: [],
   };
+}
+
+export function isRevisionTimer(timer: ActiveReadingTimer | null | undefined): boolean {
+  return timer?.purpose === 'revision';
 }
 
 export function elapsedMs(timer: ActiveReadingTimer, now: number): number {
@@ -84,6 +102,48 @@ export function displayMs(timer: ActiveReadingTimer, now: number): number {
 export function notePageVisited(timer: ActiveReadingTimer, page: number): ActiveReadingTimer {
   if (timer.pagesVisited.includes(page)) return timer;
   return { ...timer, pagesVisited: [...timer.pagesVisited, page] };
+}
+
+/** Merge newly revised pages in (sorted, deduped). Same object if unchanged. */
+export function noteRevisedPages(timer: ActiveReadingTimer, pages: number[]): ActiveReadingTimer {
+  const current = timer.pagesRevised ?? [];
+  const added = pages.filter((p) => !current.includes(p));
+  if (added.length === 0) return timer;
+  return {
+    ...timer,
+    pagesRevised: [...new Set([...current, ...added])].sort((a, b) => a - b),
+  };
+}
+
+/**
+ * A revision timer stops by itself once every page assigned today is revised.
+ * Reading timers started from the Home timer are never stopped by revision.
+ */
+export function shouldAutoFinishRevisionTimer(
+  timer: ActiveReadingTimer | null | undefined,
+  revisedCount: number,
+  assignedCount: number,
+): boolean {
+  return isRevisionTimer(timer) && assignedCount > 0 && revisedCount >= assignedCount;
+}
+
+/** The session record to save when a timer ends. */
+export function readingSessionFromTimer(
+  timer: ActiveReadingTimer,
+  now: number,
+): Omit<ReadingSession, 'id'> {
+  return {
+    date: timer.date,
+    startedAt: timer.startedAt,
+    endedAt: now,
+    durationSeconds: Math.round(elapsedMs(timer, now) / 1000),
+    mode: timer.mode,
+    targetSeconds: timer.targetSeconds,
+    // Revision timers already know what was revised; reading timers get their
+    // pages assigned afterwards from Reading sessions.
+    pages: timer.pagesRevised ?? [],
+    pagesVisited: timer.pagesVisited,
+  };
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');

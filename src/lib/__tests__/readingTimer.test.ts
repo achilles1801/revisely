@@ -6,8 +6,12 @@ import {
   formatDuration,
   formatPageRanges,
   formatStopwatch,
+  isRevisionTimer,
   isTimerComplete,
   notePageVisited,
+  noteRevisedPages,
+  readingSessionFromTimer,
+  shouldAutoFinishRevisionTimer,
   parsePageRanges,
   pauseTimer,
   remainingMs,
@@ -95,5 +99,64 @@ describe('page ranges', () => {
   it('formats pages back into ranges', () => {
     expect(formatPageRanges([60, 45, 46, 47, 46])).toBe('45–47, 60');
     expect(formatPageRanges([])).toBe('');
+  });
+});
+
+describe('revision timer', () => {
+  it('defaults to a reading timer; revision is opt-in', () => {
+    expect(isRevisionTimer(startTimer('stopwatch', null, '2026-09-30', T0))).toBe(false);
+    expect(
+      isRevisionTimer(startTimer('stopwatch', null, '2026-09-30', T0, 'revision')),
+    ).toBe(true);
+    // Timers persisted before the purpose field existed read as reading timers.
+    const legacy = { ...startTimer('stopwatch', null, '2026-09-30', T0) };
+    delete legacy.purpose;
+    expect(isRevisionTimer(legacy)).toBe(false);
+  });
+
+  it('pausing and resuming across a break keeps only active time', () => {
+    let t = startTimer('stopwatch', null, '2026-09-30', T0, 'revision');
+    t = pauseTimer(t, T0 + 10 * 60_000); // 10 min, then leave the session
+    t = resumeTimer(t, T0 + 3 * 3600_000); // back 3 hours later
+    expect(elapsedMs(t, T0 + 3 * 3600_000 + 5 * 60_000)).toBe(15 * 60_000);
+  });
+
+  it('collects revised pages sorted and deduped', () => {
+    let t = startTimer('stopwatch', null, '2026-09-30', T0, 'revision');
+    t = noteRevisedPages(t, [570, 568]);
+    t = noteRevisedPages(t, [569, 568]);
+    expect(t.pagesRevised).toEqual([568, 569, 570]);
+    expect(noteRevisedPages(t, [569])).toBe(t);
+  });
+
+  it('auto-finishes only a revision timer, only once every page is revised', () => {
+    const revision = startTimer('stopwatch', null, '2026-09-30', T0, 'revision');
+    const reading = startTimer('stopwatch', null, '2026-09-30', T0);
+    expect(shouldAutoFinishRevisionTimer(revision, 9, 10)).toBe(false);
+    expect(shouldAutoFinishRevisionTimer(revision, 10, 10)).toBe(true);
+    expect(shouldAutoFinishRevisionTimer(reading, 10, 10)).toBe(false);
+    expect(shouldAutoFinishRevisionTimer(null, 10, 10)).toBe(false);
+    expect(shouldAutoFinishRevisionTimer(revision, 0, 0)).toBe(false);
+  });
+
+  it('saves revised pages and active time with the session', () => {
+    let t = startTimer('stopwatch', null, '2026-09-30', T0, 'revision');
+    t = noteRevisedPages(t, [568, 569]);
+    t = pauseTimer(t, T0 + 20 * 60_000);
+    expect(readingSessionFromTimer(t, T0 + 60 * 60_000)).toEqual({
+      date: '2026-09-30',
+      startedAt: T0,
+      endedAt: T0 + 60 * 60_000,
+      durationSeconds: 20 * 60,
+      mode: 'stopwatch',
+      targetSeconds: null,
+      pages: [568, 569],
+      pagesVisited: [],
+    });
+  });
+
+  it('leaves pages empty for reading timers', () => {
+    const t = startTimer('countDown', 600, '2026-09-30', T0);
+    expect(readingSessionFromTimer(t, T0 + 1000).pages).toEqual([]);
   });
 });
