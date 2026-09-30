@@ -482,6 +482,13 @@ export default function ActiveRevisionScreen() {
       onPress: () => setShowBulkActions(true),
     },
     {
+      // Pushed on top, so this session (and a running timer) stays as it is.
+      key: 'sessions',
+      label: 'Reading sessions',
+      icon: 'stopwatch-outline',
+      onPress: () => navigation.navigate('ReadingSessions'),
+    },
+    {
       key: 'guide',
       label: 'How revision works',
       icon: 'help-circle-outline',
