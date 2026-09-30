@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Platform,
+  KeyboardAvoidingView,
   Linking,
   Share,
   TextInput,
@@ -232,6 +233,7 @@ export default function SettingsScreen() {
   const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
   const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
+  const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
@@ -785,7 +787,12 @@ export default function SettingsScreen() {
       </BottomSheetModal>
 
       {/* Display name sheet */}
-      <BottomSheetModal visible={showNameModal} onClose={() => setShowNameModal(false)}>
+      <BottomSheetModal
+        visible={showNameModal}
+        onClose={() => setShowNameModal(false)}
+        // Focus once the sheet is up, so the keyboard lifts a visible sheet.
+        onShow={() => nameInputRef.current?.focus()}
+      >
         <View style={screenStyles.sheetHeader}>
           <PressableScale
             onPress={() => setShowNameModal(false)}
@@ -809,11 +816,11 @@ export default function SettingsScreen() {
             How you'd like to be addressed in the app.
           </Text>
           <TextInput
+            ref={nameInputRef}
             value={tempName}
             onChangeText={setTempName}
             placeholder="Your name"
             placeholderTextColor={theme.textMuted}
-            autoFocus
             maxLength={40}
             returnKeyType="done"
             onSubmitEditing={handleSaveName}
@@ -905,27 +912,42 @@ export default function SettingsScreen() {
   );
 }
 
-// Polished modal-as-sheet. Phase 6 will swap these for @gorhom/bottom-sheet.
+// Polished modal-as-sheet. The KeyboardAvoidingView lifts the sheet above
+// the keyboard: without it, the auto-focused name field's keyboard covers the
+// whole (short) sheet the instant it opens, so it looks like nothing happened.
 function BottomSheetModal({
   visible,
   onClose,
+  onShow,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
+  onShow?: () => void;
   children: React.ReactNode;
 }) {
   const { theme } = useTheme();
   const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={sheetStyles.overlay} onPress={onClose}>
-        <Pressable style={sheetStyles.sheet} onPress={() => {}}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <View style={sheetStyles.dragHandle} />
-          {children}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      onShow={onShow}
+    >
+      <KeyboardAvoidingView
+        style={sheetStyles.fill}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={sheetStyles.overlay} onPress={onClose}>
+          <Pressable style={sheetStyles.sheet} onPress={() => {}}>
+            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <View style={sheetStyles.dragHandle} />
+            {children}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1045,6 +1067,7 @@ const makeStyles = (theme: ThemeColors) =>
 
 const makeSheetStyles = (theme: ThemeColors) =>
   StyleSheet.create({
+    fill: { flex: 1 },
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
     sheet: {
       borderTopLeftRadius: radius.lg,
