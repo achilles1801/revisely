@@ -1,0 +1,53 @@
+name: EAS Build
+
+# A native build, started by hand from the Actions tab. Rarely needed: EAS Update starts one by itself
+# when a push to main changes native code. Builds run on EAS and read the `production` environment.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile (eas.json)
+        type: choice
+        options: [production, preview]
+        default: production
+      submit:
+        description: Submit to TestFlight once built (production only)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.profile }} (ios)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require an Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an EXPO_TOKEN repository secret (expo.dev > Account settings > Access tokens)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: eas build
+        env:
+          PROFILE: ${{ inputs.profile }}
+          SUBMIT: ${{ inputs.submit && inputs.profile == 'production' && '--auto-submit' || '' }}
+        run: eas build --profile "$PROFILE" --platform ios $SUBMIT --non-interactive --no-wait

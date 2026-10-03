@@ -7,7 +7,10 @@ export default {
     owner: "achilles1802",
     scheme: "revisely",
     version: "1.0.0",
-    runtimeVersion: { policy: "appVersion" },
+    // A hash of the native side (see fingerprint.config.js). An update reaches only
+    // binaries with the same one, so JS that needs new native code never lands on a
+    // build that lacks it.
+    runtimeVersion: { policy: "fingerprint" },
     updates: {
       url: "https://u.expo.dev/32c71b6d-0a13-454c-916d-11d27f168fa8"
     },
@@ -23,7 +26,10 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.revisionbuddy.app",
-      googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST ?? "./GoogleService-Info.plist",
+      // A fixed path: EAS copies its GOOGLE_SERVICES_INFO_PLIST file here before
+      // install (eas-build-pre-install), so the path, and with it the fingerprint,
+      // is the same on every machine.
+      googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         // Apple requires these strings whenever the binary contains photo

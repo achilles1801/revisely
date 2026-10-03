@@ -1,0 +1,92 @@
+name: EAS Update
+
+# Every push to main is a release: its JavaScript and assets go out as an over-the-air update on the
+# `production` channel, plus a new TestFlight build whenever the push changed native code. Work
+# happens on develop and reaches main through a PR, once CI is green.
+#
+# The runtime version is a fingerprint of the native side (app.config.js, fingerprint.config.js), and
+# an update reaches only binaries with the same one. So before publishing, the fingerprint is looked
+# up among the production builds; one with no build gets a build, submitted to TestFlight.
+#
+# Config values (Firebase keys, client ids, Sentry) come from the `production` environment on EAS,
+# the same one production builds read, so an update carries the config its binary was built with.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'tests/**'
+      - 'functions/**'
+      - '.maestro/**'
+      - '**/*.md'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: eas-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    name: Build if needed, publish update
+    runs-on: ubuntu-latest
+    env:
+      # First line only: EAS caps an update's message at 1024 characters.
+      MESSAGE: ${{ github.event.head_commit.message || format('Manual update from {0}', github.ref_name) }}
+    steps:
+      - name: Require an Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an EXPO_TOKEN repository secret (expo.dev > Account settings > Access tokens)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # A build that is new, queued, running or finished counts, so two quick merges with the same
+      # native change start one build, not two. The build runs on EAS (`--no-wait`).
+      - name: Build if native code changed
+        run: |
+          HASH=$(eas env:exec production 'npx expo-updates fingerprint:generate --platform ios' --non-interactive | grep '^{' | jq -r .hash)
+          if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
+            echo "::error::Could not compute the fingerprint."
+            exit 1
+          fi
+          FOUND=$(eas build:list --platform ios --buildProfile production --runtimeVersion "$HASH" \
+            --limit 5 --json --non-interactive \
+            | jq '[.[] | select(.status == "NEW" or .status == "IN_QUEUE" or .status == "IN_PROGRESS" or .status == "FINISHED")] | length')
+          if [ "$FOUND" != "0" ]; then
+            echo "A production build exists for $HASH, publishing an update only."
+            exit 0
+          fi
+          echo "::notice title=New iOS build::Native code changed (fingerprint $HASH). Started a production build, submitted to TestFlight when done."
+          eas build --profile production --platform ios --non-interactive --no-wait --auto-submit
+
+      # Published even when starting a build failed: an update for a fingerprint with no build reaches
+      # nobody, and does no harm.
+      - name: eas update
+        if: ${{ !cancelled() }}
+        run: |
+          SUBJECT=$(echo "$MESSAGE" | head -n 1)
+          eas update --channel production --environment production --platform ios \
+            --message "$SUBJECT" --non-interactive
