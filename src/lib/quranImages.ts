@@ -1,7 +1,8 @@
-// Quran page images from GitHub CDN
-// Source: https://github.com/GovarJabbar/Quran-PNG
+// Quran page images (Madani Mushaf, rendered by github.com/quran/quran.com-images),
+// mirrored to the project's own Storage bucket as public, immutable objects at
+// mushaf/001.png ... mushaf/604.png. Mirrored from github.com/GovarJabbar/Quran-PNG.
 
-const BASE_URL = 'https://raw.githubusercontent.com/GovarJabbar/Quran-PNG/master';
+const BASE_URL = 'https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf';
 
 /**
  * Get the URL for a specific Quran page image
