@@ -15,6 +15,8 @@ function validUser(uid: string) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     dailyPageCapacity: 20,
+    smartTrackingEnabled: false,
+    hasSeenSmartTrackingPreview: false,
     dangerThresholdDays: 10,
     revisionMode: 'weighted',
     theme: 'dark',
@@ -87,8 +89,8 @@ describe('users/{userId}', () => {
 
     it('rejects creates missing required fields', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
-      const { revisionMode, ...incomplete } = validUser(ALICE);
-      void revisionMode;
+      const { smartTrackingEnabled, ...incomplete } = validUser(ALICE);
+      void smartTrackingEnabled;
       await assertFails(setDoc(doc(alice, `users/${ALICE}`), incomplete));
     });
 

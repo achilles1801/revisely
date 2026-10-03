@@ -60,12 +60,12 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       await assertFails(setDoc(doc(alice, `users/${ALICE}/sessions/05/10/2026`), bad));
     });
 
-    it('rejects assignedPages above 100 entries', async () => {
+    it('rejects assignedPages above 604 entries (a full mushaf)', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       const date = '2026-05-10';
       const oversized = {
         ...validSession(date),
-        assignedPages: Array.from({ length: 101 }, (_, i) => i + 1),
+        assignedPages: Array.from({ length: 605 }, (_, i) => i + 1),
       };
       await assertFails(setDoc(doc(alice, `users/${ALICE}/sessions/${date}`), oversized));
     });
