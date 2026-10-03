@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-09-29**
+**Last updated: 2026-10-03**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
 
@@ -22,7 +22,6 @@ Revisely is a mobile application that helps users track and review their Quran m
 - **Account information** — your name, email address, and password when you create an account.
 - **Profile information** received from Apple Sign-In or Google Sign-In if you choose to authenticate that way (typically your name, email address, and profile picture URL).
 - **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes); and reading sessions you time with the reading timer (start/end time, length, and the pages you assign to them).
-- **Voice input** (future feature) — when you opt to use the voice-recitation feature, your voice is processed to generate text. Audio is not stored after processing.
 
 ### Information collected automatically
 - **Device and app information** — device model, operating system version, app version, language, time zone, and anonymous device identifiers (used by Firebase to manage your session).
@@ -44,20 +43,20 @@ We use the information described above to:
 - Send you the revision reminders you've enabled.
 - Respond to support requests you send us.
 - Detect and fix bugs and crashes.
-- Prevent abuse — rate-limit AI-assisted features to protect against automated misuse.
+- Prevent abuse — verify that requests come from a genuine install of the app.
 - Comply with legal obligations.
 
 We do **not**:
 - Sell your personal information.
 - Share your personal information with advertisers.
-- Use your data to train any AI model. Voice and text inputs you send to our AI parser are used only to return a result to you and are not retained for model training.
+- Use your data to train any AI model.
 
 ## 4. Legal bases (GDPR / UK GDPR)
 
 If you are in the European Economic Area, the United Kingdom, or Switzerland, we process your information on the following bases:
 
 - **Performance of a contract** — to create and operate your account, sync your data, and provide the core memorization-tracking service.
-- **Consent** — for push notifications, microphone access (when you enable voice features), and Apple/Google sign-in (you consent through the system permission prompts).
+- **Consent** — for push notifications, location (when you enable the fajr-aligned day boundary), and Apple/Google sign-in (you consent through the system permission prompts).
 - **Legitimate interests** — to detect crashes, prevent abuse, and improve the app. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
@@ -69,7 +68,6 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 |---|---|---|
 | **Google LLC / Firebase** | Authentication, cloud database (Firestore), push notifications | United States |
 | **Apple Inc.** | App Store, Apple Push Notification service, Sign in with Apple, App Attest | United States |
-| **Anthropic, PBC** | The Claude AI model used by our memorization-input parser | United States |
 | **Sentry / Functional Software, Inc.** | Crash and error reporting | United States |
 | **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
 
@@ -77,7 +75,7 @@ We do not transfer your data to any party not listed above for any other purpose
 
 ## 6. International data transfers
 
-Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Anthropic, and Sentry maintain comparable safeguards.
+Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, and Expo maintain comparable safeguards.
 
 ## 7. Data retention
 
@@ -98,7 +96,7 @@ Depending on where you live, you have some or all of the following rights:
 - **Correct** information that's inaccurate or incomplete.
 - **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `privacy@revisely.app`.
 - **Export** your data in a portable format.
-- **Withdraw consent** for processing based on consent (e.g., push notifications, microphone access).
+- **Withdraw consent** for processing based on consent (e.g., push notifications, location).
 - **Object** to processing based on legitimate interests.
 - **Lodge a complaint** with your local data-protection authority.
 
@@ -112,7 +110,7 @@ You have the right to access, correct, and request deletion of your personal inf
 
 ## 9. Children
 
-Revisely is intended for users 18 years and older. We do not knowingly collect personal information from children. If we learn that we have collected personal information from a child under the applicable age of digital consent in their jurisdiction (13 in the US, 16 in most of the EU), we will delete that information promptly. If you believe a child has provided us with personal data, please contact us at `privacy@revisely.app`.
+Revisely is not directed to children. It is intended for users 13 and older, or older where the age of digital consent in your country is higher (16 in some EU countries). We do not knowingly collect personal information from children under 13. If we learn that we have, we will delete that information and the associated account promptly. If you believe a child has provided us with personal data, please contact us at `privacy@revisely.app`.
 
 ## 10. Security
 
