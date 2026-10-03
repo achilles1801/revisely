@@ -50,26 +50,31 @@ npx expo export --platform ios  # bundle check
 | Everything above | `npm run test:all` | — |
 | E2E (Maestro) | `npm run test:e2e:ios` | needs Maestro + simulator + dev client |
 
-CI runs all of the above on every PR via [.github/workflows/ci.yml](.github/workflows/ci.yml).
+CI runs all of the above except Maestro on every PR and on every push to `develop` and `main`, via [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-## Workflow
+## Branches and releases
 
-The three commands you'll actually use day-to-day:
+| Branch | What happens on push |
+|---|---|
+| `develop` | CI only. Day-to-day work lands here. |
+| `main` | CI, then a release: [EAS Update](.github/workflows/update.yml) publishes the JS to the `production` channel, and starts a TestFlight build first if native code changed. |
+
+To release, open a PR from `develop` to `main` and merge it once CI is green.
+
+The runtime version is a fingerprint of the native side, so an update only ever reaches a binary
+built from the same native code. A new library with native code, a plugin, a permission or the icon
+changes the fingerprint; the next push to `main` then builds and submits a new binary, and the update
+reaches phones once that build is installed from TestFlight. What the fingerprint counts is in
+[fingerprint.config.js](fingerprint.config.js).
+
+To build by hand, run [EAS Build](.github/workflows/build.yml) from the Actions tab. Both workflows
+need an `EXPO_TOKEN` repository secret, and read config from the `production` environment on EAS.
+
+Local development:
 
 ```bash
-# 1. Local dev — runs on iOS simulator with hot reload
-npx expo run:ios
-
-# 2. Rebuild for iPhone (~15 min, EAS) — needed for any native change
-#    (new npm packages with native code, app.config.js plugins/ios.*)
-eas build --profile preview --platform ios
-
-# 3. Push JS-only changes to existing iPhone build (~30 sec)
-eas update --branch preview --message "what you changed"
+npx expo run:ios                # simulator with hot reload
 ```
-
-Quit + reopen the app on iPhone after `eas update` to pick up the new code
-(takes one launch to download, applies on the next).
 
 ## Deploy backend (Firebase)
 

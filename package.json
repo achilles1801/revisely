@@ -14,7 +14,8 @@
     "test:functions": "npm --prefix functions test",
     "test:all": "npm test && npm run test:functions && npm run test:rules",
     "test:e2e:ios": "maestro test .maestro/flows",
-    "test:e2e:android": "maestro test .maestro/flows"
+    "test:e2e:android": "maestro test .maestro/flows",
+    "eas-build-pre-install": "[ -z \"$GOOGLE_SERVICES_INFO_PLIST\" ] || cp \"$GOOGLE_SERVICES_INFO_PLIST\" ./GoogleService-Info.plist"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
