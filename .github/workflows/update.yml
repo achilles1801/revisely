@@ -63,6 +63,13 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # `eas build` reads the native config here before sending the build; that needs the plist, which
+      # is gitignored. EAS has its own copy for the build itself (eas-build-pre-install).
+      - name: Write the Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
       # A build that is new, queued, running or finished counts, so two quick merges with the same
       # native change start one build, not two. The build runs on EAS (`--no-wait`).
       - name: Build if native code changed
