@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["node_modules", "docs", "dist"]
+  "exclude": ["node_modules", "docs", "dist", "functions", "tests/firestore-rules"]
 }

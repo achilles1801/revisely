@@ -11,7 +11,8 @@ concurrency:
 
 jobs:
   # -----------------------------------------------------------------------
-  # Type-check + lint the app code.
+  # Type-check the app code. functions/ and tests/firestore-rules/ have their
+  # own dependencies and are checked by their own jobs.
   # -----------------------------------------------------------------------
   typecheck:
     name: Typecheck (app)
@@ -85,35 +86,8 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - run: npm ci
       - run: npm test
-
-  # -----------------------------------------------------------------------
-  # Maestro E2E flows on iOS simulator.
-  # Slow + macOS-only; runs on main branch pushes only.
-  # -----------------------------------------------------------------------
-  e2e-ios:
-    name: Maestro E2E (iOS)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: macos-14
-    needs: [unit]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-      - run: npm ci --legacy-peer-deps
-      - name: Install Maestro
-        run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-      # NOTE: building the iOS app + booting a simulator is project-specific.
-      # The simplest path with Expo is `eas build --local` or a managed
-      # `expo prebuild && xcodebuild` step. Wire those up before enabling
-      # this job in CI for real PRs.
-      - name: Run Maestro flows
-        run: maestro test .maestro/flows
