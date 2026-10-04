@@ -4,7 +4,7 @@ title: Revisely
 
 # Revisely
 
-A Quran revision tracker that schedules daily review using a weakness-weighted algorithm.
+A Quran revision tracker that schedules your daily review on a cycle through everything you have memorized.
 
 ## Legal
 
