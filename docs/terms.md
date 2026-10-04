@@ -107,4 +107,3 @@ If you are a consumer in the European Union, you may also bring proceedings in t
 For questions about these Terms, contact:
 
 - **Email:** `privacy@revisely.app`
-- **Mail:** `Majd Khawaldeh`, `2670 SAW Grimes Blvd #2405, Round Rock, TX 78664`

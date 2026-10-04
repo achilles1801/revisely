@@ -10,7 +10,7 @@ permalink: /privacy/
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
 
-Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `privacy@revisely.app` or by mail at `2670 SAW Grimes Blvd #2405, Round Rock, TX 78664`.
+Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `privacy@revisely.app`.
 
 ## 1. What this app does
 
@@ -141,6 +141,5 @@ We may update this Privacy Policy from time to time. The updated version will be
 For privacy questions, data requests, or to report a concern, contact:
 
 - **Email:** `privacy@revisely.app`
-- **Mail:** `Majd Khawaldeh`, `2670 SAW Grimes Blvd #2405, Round Rock, TX 78664`
 
 If you are in the EU or UK and we have not designated a local representative, you may contact us directly at the email above. We will respond to your request within 30 days.
