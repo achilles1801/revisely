@@ -18,6 +18,8 @@ on:
       - 'tests/**'
       - 'functions/**'
       - '.maestro/**'
+      - 'store/**'
+      - 'scripts/**'
       - '**/*.md'
       - 'firestore.rules'
       - 'firestore.indexes.json'
