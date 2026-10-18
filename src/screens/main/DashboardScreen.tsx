@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,7 +31,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import {
   generateDailyAssignment,
-  getCurrentRevisionDay,
   shiftScheduleAnchor,
 } from '../../lib/algorithm';
 import {
@@ -43,6 +42,9 @@ import {
 import { formatDateReadable } from '../../lib/utils';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { RevisionLog } from '../../types';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { prefetchPages } from '../../lib/pageCache';
+import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
@@ -55,9 +57,12 @@ export default function DashboardScreen() {
 
   const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error, saveUser } = useApp();
   const { firebaseUser } = useAuth();
+  const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
   const homePrefs = useHomePrefs();
   const [shifting, setShifting] = useState(false);
+  const [carrying, setCarrying] = useState(false);
+  const carryingRef = useRef(false);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
@@ -78,12 +83,16 @@ export default function DashboardScreen() {
 
   const assignment = useMemo(() => {
     if (!user) return null;
-    return generateDailyAssignment(pages, quranData, user);
-  }, [user, pages]);
+    return generateDailyAssignment(pages, quranData, user, revisionDate);
+  }, [user, pages, revisionDate]);
+
+  // Download today's pages ahead of time so the session opens on cached pages.
+  useEffect(() => {
+    if (assignment && assignment.pages.length > 0) prefetchPages(assignment.pages);
+  }, [assignment]);
 
   const todayStatus = useMemo(() => {
-    const today = getCurrentRevisionDay(user);
-    const todayLogs = logs.filter((log) => log.date === today);
+    const todayLogs = logs.filter((log) => log.date === revisionDay);
     if (todayLogs.length === 0)
       return { status: 'not_started' as const, pagesCompleted: 0 };
 
@@ -102,7 +111,18 @@ export default function DashboardScreen() {
     if (completed > 0)
       return { status: 'partial' as const, pagesCompleted: completed };
     return { status: 'not_started' as const, pagesCompleted: 0 };
-  }, [logs, assignment]);
+  }, [logs, assignment, revisionDay]);
+
+  // Pages from yesterday's session that were never revised, offered as
+  // "Add to today". Empty once they are in today's assignment.
+  const leftovers = useMemo(() => {
+    // Once a day: after carrying over, today's leftovers are part of today.
+    if (!assignment || hasCarriedOver(user, revisionDay)) return [];
+    const memorized = new Set(
+      pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
+    );
+    return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
+  }, [logs, revisionDay, assignment, pages, user]);
 
   useEffect(() => {
     registerForPushNotificationsAsync();
@@ -123,25 +143,26 @@ export default function DashboardScreen() {
 
   const calculatedStreak = useMemo(() => {
     if (logs.length === 0) return 0;
-    const sortedLogs = [...logs].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    );
+    // Log dates are revision days ('YYYY-MM-DD'), so count back from the
+    // revision day, parsing them as local dates: `new Date('YYYY-MM-DD')` is
+    // UTC midnight, the previous evening west of Greenwich.
+    const localDay = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d).getTime();
+    };
+    const sortedDays = logs.map((l) => localDay(l.date)).sort((a, b) => b - a);
     let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let i = 0; i < sortedLogs.length; i++) {
-      const logDate = new Date(sortedLogs[i].date);
-      logDate.setHours(0, 0, 0, 0);
-      const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - streak);
-      if (logDate.getTime() === expectedDate.getTime()) {
+    for (const logDay of sortedDays) {
+      const expectedDate = new Date(revisionDate);
+      expectedDate.setDate(revisionDate.getDate() - streak);
+      if (logDay === expectedDate.getTime()) {
         streak++;
-      } else if (logDate.getTime() < expectedDate.getTime()) {
+      } else if (logDay < expectedDate.getTime()) {
         break;
       }
     }
     return streak;
-  }, [logs]);
+  }, [logs, revisionDate]);
 
   // Sessions
   const sessionLogs = useMemo(
@@ -200,7 +221,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const today = new Date();
+  const today = revisionDate;
 
   const handleEditSession = (log: RevisionLog) => {
     // Prefer the day's actual assignedPages so the edit modal shows the
@@ -327,13 +348,29 @@ export default function DashboardScreen() {
   const handleCtaPress = () => {
     if (todayStatus.status === 'completed') {
       const todayLog = logs.find(
-        (log) => log.date === getCurrentRevisionDay(user),
+        (log) => log.date === revisionDay,
       );
       if (todayLog) handleEditSession(todayLog);
     } else if (assignment.totalPages === 0) {
       navigation.navigate('Memorization');
     } else {
       navigation.navigate('ActiveRevision');
+    }
+  };
+
+  const handleCarryOver = async () => {
+    // The ref stops a double tap before the state update re-renders.
+    if (!user || carryingRef.current || leftovers.length === 0) return;
+    carryingRef.current = true;
+    setCarrying(true);
+    try {
+      const memorized = pages.filter((p) => p.status === 'memorized');
+      await saveUser(applyCarryOver(user, memorized, leftovers, revisionDate));
+    } catch {
+      Alert.alert("Couldn't update today's session", 'Please try again.');
+    } finally {
+      carryingRef.current = false;
+      setCarrying(false);
     }
   };
 
@@ -395,6 +432,24 @@ export default function DashboardScreen() {
         >
           <Text style={styles.heroCtaText}>{heroContent.ctaTitle}</Text>
           <Ionicons name="arrow-forward" size={18} color="#fff" />
+        </PressableScale>
+      )}
+
+      {leftovers.length > 0 && (
+        <PressableScale
+          onPress={handleCarryOver}
+          disabled={carrying}
+          haptic="light"
+          scale={0.98}
+          style={styles.pushBackLink}
+          accessibilityLabel={`Add ${leftovers.length} unrevised pages from yesterday to today`}
+        >
+          <Ionicons name="add" size={14} color={theme.accent} />
+          <Text style={styles.pushBackText}>
+            {carrying
+              ? 'Updating…'
+              : `Add ${leftovers.length} left from yesterday`}
+          </Text>
         </PressableScale>
       )}
 

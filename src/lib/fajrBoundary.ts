@@ -50,7 +50,9 @@ export function getFajrTimeFor(date: Date, user: User): Date | null {
   );
   const params = paramsFor(user.fajrCalculationMethod || DEFAULT_FAJR_METHOD);
   const prayerTimes = new PrayerTimes(coords, date, params);
-  return prayerTimes.fajr;
+  // adhan returns an Invalid Date when there is no fajr (polar summer).
+  const fajr = prayerTimes.fajr;
+  return fajr && !isNaN(fajr.getTime()) ? fajr : null;
 }
 
 function formatLocalDay(date: Date): string {
@@ -82,4 +84,35 @@ export function getRevisionDayForUser(
     return formatLocalDay(yesterday);
   }
   return formatLocalDay(now);
+}
+
+/**
+ * The revision day as a Date at local midnight. Scheduling looks days up by
+ * date, so it must be given this rather than `new Date()`: between midnight
+ * and fajr the calendar has moved on but the revision day has not.
+ */
+export function getRevisionDateForUser(
+  user: User | null | undefined,
+  now: Date = new Date(),
+): Date {
+  const [y, m, d] = getRevisionDayForUser(user, now).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * When the revision day next changes: the next fajr when the boundary is on,
+ * otherwise the next local midnight.
+ */
+export function getNextRevisionDayStart(
+  user: User | null | undefined,
+  now: Date = new Date(),
+): Date {
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (!user || !user.fajrBoundaryEnabled || !user.locationCoords) return midnight;
+  const todaysFajr = getFajrTimeFor(now, user);
+  if (todaysFajr && todaysFajr.getTime() > now.getTime()) return todaysFajr;
+  const tomorrowsFajr = getFajrTimeFor(midnight, user);
+  // Past already when the device's time zone is far from the saved location;
+  // the day then turns at midnight.
+  return tomorrowsFajr && tomorrowsFajr.getTime() > now.getTime() ? tomorrowsFajr : midnight;
 }

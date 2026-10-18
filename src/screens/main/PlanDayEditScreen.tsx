@@ -42,6 +42,7 @@ import {
   PickerTab,
 } from '../../components/plan/ListPickerSheet';
 import { dayTitle } from '../../components/plan/DayRow';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -59,7 +60,8 @@ export default function PlanDayEditScreen() {
   const route = useRoute<RouteProps>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { pages: allPages } = useApp();
+  const { pages: allPages, user } = useApp();
+  const { date: today } = useRevisionDay(user);
 
   const { dayIndex, initialPages } = route.params;
   const [pages, setPages] = useState<number[]>([...initialPages]);
@@ -70,7 +72,6 @@ export default function PlanDayEditScreen() {
   const [draft, setDraft] = useState<Set<string>>(new Set());
   const [initialChecked, setInitialChecked] = useState<Set<string>>(new Set());
 
-  const today = useMemo(() => new Date(), []);
   const title = dayTitle(dayIndex, today);
 
   const memorized = useMemo(

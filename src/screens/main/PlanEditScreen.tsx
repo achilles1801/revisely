@@ -24,11 +24,13 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import {
   buildDefaultPlanDays,
+  scheduledDaysFrom,
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
   shiftScheduleAnchor,
 } from '../../lib/algorithm';
-import { createCustomPlanFromDraft } from '../../lib/schedulePlans';
+import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
+import { settleCarryOverForNewPlan } from '../../lib/carryOver';
 import {
   defaultStartPage,
   effectiveDailyPages,
@@ -52,6 +54,7 @@ import {
   PlanBuilderSheet,
 } from '../../components/plan/PlanBuilderSheet';
 import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
+import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -83,6 +86,10 @@ export default function PlanEditScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages, logs, saveUser } = useApp();
+  // "Today" in the editor is the revision day (it starts at fajr when that is
+  // on), fixed when the editor opens: the draft is rotated to that day, so it
+  // must not move while the editor is open.
+  const [revisionDate] = useState(() => getRevisionDateForUser(user));
 
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);
@@ -108,19 +115,26 @@ export default function PlanEditScreen() {
   // the cycle to today on save).
   const initialState = useMemo(() => {
     if (user?.customPlan && user.customPlan.days.length > 0) {
+      const plan = user.customPlan;
+      // With a carry-over shift, show the days as they are now scheduled.
+      const shifted =
+        (user.scheduleShiftPages ?? 0) > 0 &&
+        plan.cycleStartDate <= dateToLocalISODay(revisionDate);
       return {
-        days: rotateCustomPlanToToday(user.customPlan),
-        direction: user.customPlan.direction as PlanDirection,
+        days: shifted
+          ? scheduledDaysFrom(user, memorizedPages, revisionDate, plan.days.length)
+          : rotateCustomPlanToToday(plan, revisionDate),
+        direction: plan.direction as PlanDirection,
       };
     }
     if (isJuzMode && user) {
-      return { days: buildJuzCycleDays(user, memorizedPages), direction: 'forward' as PlanDirection };
+      return { days: buildJuzCycleDays(user, memorizedPages, revisionDate), direction: 'forward' as PlanDirection };
     }
     return {
-      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward') : [],
+      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward', revisionDate) : [],
       direction: 'forward' as PlanDirection,
     };
-  }, [user, memorizedPages, isJuzMode]);
+  }, [user, memorizedPages, isJuzMode, revisionDate]);
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
@@ -199,13 +213,16 @@ export default function PlanEditScreen() {
     if (!user || saving || !isDirty || days.length === 0) return;
     setSaving(true);
     try {
-      const plan: CustomPlan = createCustomPlanFromDraft(days, direction);
+      const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
       // After "push back a day" the live anchor sits in the future and the
       // draft wasn't rotated (see rotateCustomPlanToToday) — keep that anchor
       // so saving an edit doesn't silently undo the push-back.
       const liveStart = user.customPlan?.cycleStartDate;
       if (liveStart && liveStart > plan.cycleStartDate) plan.cycleStartDate = liveStart;
-      await saveUser({ ...user, customPlan: plan });
+      await saveUser({
+        ...settleCarryOverForNewPlan(user, dateToLocalISODay(revisionDate)),
+        customPlan: plan,
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       leave();
     } catch {
@@ -238,9 +255,9 @@ export default function PlanEditScreen() {
   const buildWeakest = useCallback(
     (pagesPerDay: number) =>
       user
-        ? buildWeakestFirstPlanDays({ ...user, dailyPageCapacity: pagesPerDay }, memorizedPages, logs)
+        ? buildWeakestFirstPlanDays({ ...user, dailyPageCapacity: pagesPerDay }, memorizedPages, logs, revisionDate)
         : [],
-    [user, memorizedPages, logs],
+    [user, memorizedPages, logs, revisionDate],
   );
 
   const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => {
@@ -364,9 +381,9 @@ export default function PlanEditScreen() {
       if (!user.customPlan && !isDirty) {
         if (tempMode === 'juz') {
           setDirection('forward');
-          setDays(buildJuzCycleDays(updatedUser, memorizedPages));
+          setDays(buildJuzCycleDays(updatedUser, memorizedPages, revisionDate));
         } else {
-          setDays(buildDefaultPlanDays(updatedUser, memorizedPages, direction));
+          setDays(buildDefaultPlanDays(updatedUser, memorizedPages, direction, revisionDate));
         }
       }
       quotaSheetRef.current?.dismiss();
@@ -391,7 +408,10 @@ export default function PlanEditScreen() {
           onPress: async () => {
             setSaving(true);
             try {
-              await saveUser({ ...user, customPlan: null });
+              await saveUser({
+                ...settleCarryOverForNewPlan(user, dateToLocalISODay(revisionDate)),
+                customPlan: null,
+              });
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               leave();
             } catch {
@@ -405,7 +425,7 @@ export default function PlanEditScreen() {
   };
 
   // ---- Render -----------------------------------------------------------------------------
-  const today = useMemo(() => new Date(), []);
+  const today = revisionDate;
 
   if (!user) {
     return (

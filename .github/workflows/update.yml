@@ -6,7 +6,12 @@ name: EAS Update
 #
 # The runtime version is a fingerprint of the native side (app.config.js, fingerprint.config.js), and
 # an update reaches only binaries with the same one. So before publishing, the fingerprint is looked
-# up among the production builds; one with no build gets a build, submitted to TestFlight.
+# up; one with no build gets a build on a GitHub macOS runner (ios-build.yml, no EAS build credits),
+# submitted to TestFlight.
+#
+# Raising `version` in app.config.js changes the fingerprint. That is how a release goes through
+# TestFlight first: the update published here reaches only the new binary, so App Store users get
+# nothing until that version is approved, while TestFlight testers can try it straight away.
 #
 # Config values (Firebase keys, client ids, Sentry) come from the `production` environment on EAS,
 # the same one production builds read, so an update carries the config its binary was built with.
@@ -35,12 +40,12 @@ permissions:
   contents: read
 
 jobs:
-  update:
-    name: Build if needed, publish update
+  fingerprint:
+    name: Fingerprint
     runs-on: ubuntu-latest
-    env:
-      # First line only: EAS caps an update's message at 1024 characters.
-      MESSAGE: ${{ github.event.head_commit.message || format('Manual update from {0}', github.ref_name) }}
+    outputs:
+      hash: ${{ steps.fp.outputs.hash }}
+      needs_build: ${{ steps.fp.outputs.needs_build }}
     steps:
       - name: Require an Expo token
         env:
@@ -65,37 +70,94 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # `eas build` reads the native config here before sending the build; that needs the plist, which
-      # is gitignored. EAS has its own copy for the build itself (eas-build-pre-install).
+      # Resolving the native config needs the plist, which is gitignored.
       - name: Write the Firebase plist
         env:
           PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
 
-      # A build that is new, queued, running or finished counts, so two quick merges with the same
-      # native change start one build, not two. The build runs on EAS (`--no-wait`).
-      - name: Build if native code changed
+      # A fingerprint has a build if a runner build tagged it (ios-fp/<hash>), or if EAS built it
+      # (build 11 and earlier; new, queued and running builds count too).
+      - name: Look for a build
+        id: fp
         run: |
           HASH=$(eas env:exec production 'npx expo-updates fingerprint:generate --platform ios' --non-interactive | grep '^{' | jq -r .hash)
           if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
             echo "::error::Could not compute the fingerprint."
             exit 1
           fi
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/ios-fp/$HASH")" ]; then
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+            echo "A runner build exists for $HASH, publishing an update only."
+            exit 0
+          fi
           FOUND=$(eas build:list --platform ios --buildProfile production --runtimeVersion "$HASH" \
             --limit 5 --json --non-interactive \
             | jq '[.[] | select(.status == "NEW" or .status == "IN_QUEUE" or .status == "IN_PROGRESS" or .status == "FINISHED")] | length')
           if [ "$FOUND" != "0" ]; then
-            echo "A production build exists for $HASH, publishing an update only."
-            exit 0
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+            echo "An EAS build exists for $HASH, publishing an update only."
+          else
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=New iOS build::Native code changed (fingerprint $HASH). Building on the runner and submitting to TestFlight."
           fi
-          echo "::notice title=New iOS build::Native code changed (fingerprint $HASH). Started a production build, submitted to TestFlight when done."
-          eas build --profile production --platform ios --non-interactive --no-wait --auto-submit
 
-      # Published even when starting a build failed: an update for a fingerprint with no build reaches
-      # nobody, and does no harm.
+  build:
+    name: Build
+    needs: fingerprint
+    if: ${{ needs.fingerprint.outputs.needs_build == 'true' }}
+    permissions:
+      contents: write # pushes the ios-fp/<hash> tag
+    uses: ./.github/workflows/ios-build.yml
+    with:
+      submit: true
+      fingerprint: ${{ needs.fingerprint.outputs.hash }}
+    secrets: inherit
+
+  # Published even when the build failed: an update for a fingerprint with no build reaches nobody,
+  # and does no harm.
+  update:
+    name: Publish update
+    needs: [fingerprint, build]
+    if: ${{ !cancelled() && needs.fingerprint.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # First line only: EAS caps an update's message at 1024 characters.
+      MESSAGE: ${{ github.event.head_commit.message || format('Manual update from {0}', github.ref_name) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write the Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
       - name: eas update
-        if: ${{ !cancelled() }}
         run: |
           SUBJECT=$(echo "$MESSAGE" | head -n 1)
           eas update --channel production --environment production --platform ios \
             --message "$SUBJECT" --non-interactive
+
+      # Source maps for the bundle just published (left in dist/ by eas update), so Sentry shows
+      # crashes from updates with file names and line numbers. Skipped without the secret.
+      - name: Upload source maps to Sentry
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        continue-on-error: true
+        env:
+          SENTRY_ORG: revisely
+          SENTRY_PROJECT: react-native
+        run: npx sentry-expo-upload-sourcemaps dist

@@ -132,6 +132,8 @@ service cloud.firestore {
         // Schedule cycle anchor — reset on onboarding (incl. replays) so
         // Day 1 of the cycle aligns with the latest setup.
         'scheduleAnchorDate',
+        // Carrying yesterday's unrevised pages into today (lib/carryOver).
+        'carryOverMode', 'carryOver', 'scheduleShiftPages',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -156,6 +158,8 @@ service cloud.firestore {
         'state',
         'pagesRevised', 'pagesSkipped', 'weaknessUpdates',
         'completedAt', 'durationMinutes', 'completionPercentage',
+        // Grow-only: pages carried into the day after the session started.
+        'assignedPages', 'totalAssignedPages',
         'updatedAt'
       ];
     }
@@ -219,6 +223,20 @@ service cloud.firestore {
                         incomingData().hasSeenSmartTrackingPreview is bool) &&
                        (!hasField('theme') ||
                         isValidTheme(incomingData().theme)) &&
+                       (!hasField('carryOverMode') ||
+                        incomingData().carryOverMode in ['shift', 'add']) &&
+                       (!hasField('carryOver') || incomingData().carryOver == null ||
+                        (incomingData().carryOver is map &&
+                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip']) &&
+                         incomingData().carryOver.day is string &&
+                         incomingData().carryOver.pages is list &&
+                         incomingData().carryOver.pages.size() <= 604 &&
+                         (!('skip' in incomingData().carryOver) ||
+                          (incomingData().carryOver.skip is int &&
+                           isInRange(incomingData().carryOver.skip, 0, 604))))) &&
+                       (!hasField('scheduleShiftPages') ||
+                        (incomingData().scheduleShiftPages is int &&
+                         isInRange(incomingData().scheduleShiftPages, 0, 1000000))) &&
                        // Streak cannot be negative
                        (!hasField('streak') || incomingData().streak >= 0) &&
                        // Page counts cannot be negative or exceed 604
@@ -314,9 +332,15 @@ service cloud.firestore {
                          // Cannot change id or date
                          (!hasField('id') || incomingData().id == currentData().id) &&
                          (!hasField('date') || incomingData().date == currentData().date) &&
-                         // Cannot change assigned pages after creation
+                         // Assigned pages can only grow (carry-over adds pages
+                         // to a day after its session started)
                          (!hasField('assignedPages') ||
-                          incomingData().assignedPages == currentData().assignedPages) &&
+                          (incomingData().assignedPages is list &&
+                           incomingData().assignedPages.size() <= 604 &&
+                           incomingData().assignedPages.hasAll(currentData().assignedPages))) &&
+                         (!hasField('totalAssignedPages') ||
+                          (incomingData().totalAssignedPages is int &&
+                           isInRange(incomingData().totalAssignedPages, 0, 604))) &&
                          // Validate state if present
                          (!hasField('state') ||
                           isValidSessionState(incomingData().state)) &&

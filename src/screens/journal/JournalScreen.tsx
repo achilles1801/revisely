@@ -17,7 +17,7 @@ import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
-import { getCurrentRevisionDay } from '../../lib/algorithm';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
 import {
   filterJournalEntries,
   formatJournalDayRelative,
@@ -63,7 +63,7 @@ export default function JournalScreen() {
   const [sort, setSort] = useState<JournalSort>('newest');
   const [picker, setPicker] = useState<'filter' | 'sort' | null>(null);
 
-  const today = getCurrentRevisionDay(user);
+  const { day: today } = useRevisionDay(user);
 
   const load = useCallback(async () => {
     try {

@@ -1,0 +1,101 @@
+name: iOS build
+
+# Builds the production iOS app on a GitHub macOS runner (`eas build --local`) and
+# uploads it to TestFlight (`eas submit`). Local builds use no EAS build credits,
+# and macOS runners cost nothing on a public repository. Called by EAS Update
+# (native code changed) and by EAS Build (by hand).
+#
+# Signing credentials and the App Store Connect API key stay on EAS and are
+# fetched with EXPO_TOKEN. EAS variables with Secret visibility cannot be read
+# here, so the Firebase plist comes from a repository secret, and Sentry source
+# maps upload only if a SENTRY_AUTH_TOKEN repository secret exists.
+on:
+  workflow_call:
+    inputs:
+      submit:
+        description: Upload the build to TestFlight
+        type: boolean
+        default: true
+      fingerprint:
+        description: iOS fingerprint of this commit; tagged ios-fp/<hash> once submitted
+        type: string
+        default: ''
+    secrets:
+      EXPO_TOKEN:
+        required: true
+      GOOGLE_SERVICE_INFO_PLIST:
+        required: true
+      SENTRY_AUTH_TOKEN:
+        required: false
+
+jobs:
+  build:
+    name: Build and submit (ios)
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Pinned so a runner image update cannot change the toolchain under us.
+      # Apple requires the iOS 26 SDK (Xcode 26) for uploads.
+      - name: Select Xcode
+        run: |
+          if [ -d /Applications/Xcode_26.6.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app
+          else
+            echo "::warning::Xcode 26.6 is not on this image; using the default $(xcodebuild -version | head -1)."
+          fi
+          xcodebuild -version
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Twice: at the fixed path for resolving the native config here, and outside
+      # the repo for the build itself. The local build works on a copy of the
+      # repository without gitignored files; eas-build-pre-install copies the
+      # plist from $GOOGLE_SERVICES_INFO_PLIST into it.
+      - name: Write the Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: |
+          echo "$PLIST" | base64 -d > GoogleService-Info.plist
+          cp GoogleService-Info.plist "$RUNNER_TEMP/GoogleService-Info.plist"
+
+      - name: eas build --local
+        env:
+          GOOGLE_SERVICES_INFO_PLIST: ${{ runner.temp }}/GoogleService-Info.plist
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: revisely
+          SENTRY_PROJECT: react-native
+          SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
+          # A failed upload costs readable stack traces, not the release.
+          SENTRY_ALLOW_FAILURE: 'true'
+        run: eas build --local --profile production --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
+
+      - name: eas submit (TestFlight)
+        if: ${{ inputs.submit }}
+        run: eas submit --platform ios --profile production --path "$RUNNER_TEMP/revisely.ipa" --non-interactive
+
+      # The marker EAS Update looks for: local builds are not listed by
+      # `eas build:list`, so this tag is how it knows the fingerprint has a build.
+      - name: Tag the fingerprint
+        if: ${{ inputs.submit && inputs.fingerprint != '' }}
+        env:
+          FP: ${{ inputs.fingerprint }}
+        run: |
+          if [ -z "$(git ls-remote --tags origin "refs/tags/ios-fp/$FP")" ]; then
+            git tag "ios-fp/$FP"
+            git push origin "refs/tags/ios-fp/$FP"
+          fi
+          echo "::notice title=TestFlight::Build uploaded for fingerprint $FP. Add it to the Team (Expo) group in App Store Connect."

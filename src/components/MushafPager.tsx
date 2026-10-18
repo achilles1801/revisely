@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  GestureResponderEvent,
   Image,
   Pressable,
   StyleSheet,
@@ -13,15 +14,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
+import {
+  cachePage,
+  evictCachedPage,
+  getCachedPageUri,
+  pagesAround,
+  prefetchPages,
+} from '../lib/pageCache';
+import {
+  AyahRef,
+  ayahAt,
+  ayahRects,
+  BOUNDS_WIDTH,
+  PAGE_IMAGE_ASPECT,
+} from '../lib/ayahBounds';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Madinah Mushaf PNG aspect (width/height). GovarJabbar/Quran-PNG ships pages
-// at ~1290×2048 (≈0.63). Sizing the Image with `width: '100%'` + this aspect
-// ratio makes pages fill the screen edge-to-edge horizontally, matching the
-// reference quran.com layout — instead of `contain`-fitting which letterboxes
-// a tall page on a phone with a wider relative aspect.
-const PAGE_ASPECT_RATIO = 1290 / 2048;
+// Pages fill the screen width at the images' own aspect (2600×4206), so the
+// verse coordinates in ayahBounds map onto the rendered page by one scale factor.
+const PAGE_WIDTH = SCREEN_WIDTH;
+const PAGE_HEIGHT = SCREEN_WIDTH / PAGE_IMAGE_ASPECT;
+const BOUNDS_SCALE = PAGE_WIDTH / BOUNDS_WIDTH;
 
 interface MushafPagerProps {
   pages: number[];
@@ -33,6 +47,10 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
+  /** Press and hold on a verse. Receives the verse under the finger. */
+  onLongPressAyah?: (ayah: AyahRef) => void;
+  /** Verse to highlight (e.g. while its translation is open). */
+  highlightedAyah?: AyahRef | null;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
@@ -41,6 +59,10 @@ interface MushafPagerProps {
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
+  onLongPressAyah?: (ayah: AyahRef) => void;
+  /** Only set on the page that holds the verse, so other pages don't re-render. */
+  highlight: AyahRef | null;
+  highlightColor: string;
   pageTint: string | null;
   tintColor: string;
   bg: string;
@@ -49,20 +71,48 @@ interface PageItemProps {
 const PageItem = React.memo(function PageItem({
   pageNumber,
   onTap,
+  onLongPressAyah,
+  highlight,
+  highlightColor,
   pageTint,
   tintColor,
   bg,
 }: PageItemProps) {
-  const [loading, setLoading] = useState(true);
+  // A cached page renders from disk on the first frame. Otherwise it is
+  // downloaded into the cache first; if that fails, the image loads straight
+  // from Storage as it used to.
+  const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber));
+  const [attempt, setAttempt] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const url = getQuranPageImageUrl(pageNumber);
+  const isRemote = uri != null && uri.startsWith('http');
+
+  useEffect(() => {
+    if (uri) return;
+    let live = true;
+    cachePage(pageNumber).then((local) => {
+      if (live) setUri(local ?? getQuranPageImageUrl(pageNumber));
+    });
+    return () => {
+      live = false;
+    };
+  }, [pageNumber, uri, attempt]);
+
+  const handleLongPress = (e: GestureResponderEvent) => {
+    if (!onLongPressAyah) return;
+    const { locationX, locationY } = e.nativeEvent;
+    const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
+    if (ayah) onLongPressAyah(ayah);
+  };
+
+  const highlightRects = useMemo(
+    () => (highlight ? ayahRects(pageNumber, highlight.sura, highlight.ayah) : []),
+    [highlight, pageNumber],
+  );
 
   return (
-    <Pressable
-      style={[styles.page, { backgroundColor: bg }]}
-      onPress={onTap}
-    >
-      {loading && (
+    <Pressable style={[styles.page, { backgroundColor: bg }]} onPress={onTap}>
+      {(uri == null || (isRemote && loading)) && !error && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={tintColor} />
         </View>
@@ -71,30 +121,60 @@ const PageItem = React.memo(function PageItem({
         <Pressable
           onPress={() => {
             setError(false);
-            setLoading(true);
+            setUri(getCachedPageUri(pageNumber));
+            setAttempt((a) => a + 1);
           }}
           style={styles.errorBox}
         >
           <Ionicons name="refresh-outline" size={32} color={tintColor} />
         </Pressable>
-      ) : (
-        <Image
-          source={{ uri: url }}
-          style={[
-            styles.image,
-            pageTint != null && { tintColor: pageTint, opacity: 0.92 },
-          ]}
-          // No resizeMode — width + aspectRatio on styles.image fully
-          // determines layout, and `contain` here would un-do that on iOS by
-          // re-fitting the rendered content inside the box.
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          onError={() => {
-            setLoading(false);
-            setError(true);
-          }}
-        />
-      )}
+      ) : uri != null ? (
+        // The pressable is exactly the image, so touch locations are page
+        // coordinates.
+        <Pressable
+          style={styles.imageBox}
+          onPress={onTap}
+          onLongPress={onLongPressAyah ? handleLongPress : undefined}
+          delayLongPress={350}
+        >
+          {highlightRects.map((r, i) => (
+            <View
+              key={i}
+              pointerEvents="none"
+              style={[
+                styles.highlight,
+                {
+                  backgroundColor: highlightColor,
+                  left: r.x0 * BOUNDS_SCALE,
+                  top: r.y0 * BOUNDS_SCALE,
+                  width: (r.x1 - r.x0) * BOUNDS_SCALE,
+                  height: (r.y1 - r.y0) * BOUNDS_SCALE,
+                },
+              ]}
+            />
+          ))}
+          <Image
+            source={{ uri }}
+            style={[
+              styles.image,
+              pageTint != null && { tintColor: pageTint, opacity: 0.92 },
+            ]}
+            fadeDuration={0}
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+            onError={() => {
+              setLoading(false);
+              if (!isRemote) {
+                // Purged or unreadable cache file: drop it and load from Storage.
+                evictCachedPage(pageNumber);
+                setUri(getQuranPageImageUrl(pageNumber));
+              } else {
+                setError(true);
+              }
+            }}
+          />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 });
@@ -111,9 +191,11 @@ export function MushafPager({
   onPageChange,
   onAdvance,
   onTap,
+  onLongPressAyah,
+  highlightedAyah,
   extraData,
 }: MushafPagerProps) {
-  const { isDark } = useTheme();
+  const { isDark, theme } = useTheme();
   const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
   const currentIndexRef = useRef(0);
@@ -122,6 +204,12 @@ export function MushafPager({
   // back whenever a parent prop bump occurs (e.g. context re-renders from
   // auto-save).
   const hasAutoScrolledRef = useRef(false);
+
+  // Download the pages around the starting one before they are swiped to.
+  useEffect(() => {
+    const idx = initialPage == null ? 0 : Math.max(0, pages.indexOf(initialPage));
+    prefetchPages(pagesAround(pages, idx));
+  }, [initialPage, pages]);
 
   useEffect(() => {
     if (hasAutoScrolledRef.current) return;
@@ -152,6 +240,7 @@ export function MushafPager({
         }
       }
       currentIndexRef.current = newIndex;
+      prefetchPages(pagesAround(pages, newIndex));
       if (newPage != null) onPageChange?.(newPage, newIndex);
     },
     [pages, onAdvance, onPageChange],
@@ -164,12 +253,15 @@ export function MushafPager({
       <PageItem
         pageNumber={item}
         onTap={onTap}
+        onLongPressAyah={onLongPressAyah}
+        highlight={highlightedAyah && highlightedAyah.page === item ? highlightedAyah : null}
+        highlightColor={theme.accent + '40'}
         pageTint={palette.pageTint}
         tintColor={palette.textPrimary}
         bg={palette.pageBg}
       />
     ),
-    [onTap, palette],
+    [onTap, onLongPressAyah, highlightedAyah, theme.accent, palette],
   );
 
   return (
@@ -192,7 +284,7 @@ export function MushafPager({
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
-      extraData={extraData}
+      extraData={`${extraData ?? ''}|${highlightedAyah ? `${highlightedAyah.page}:${highlightedAyah.sura}:${highlightedAyah.ayah}` : ''}`}
       style={{ backgroundColor: palette.pageBg }}
     />
   );
@@ -205,9 +297,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  imageBox: {
+    width: PAGE_WIDTH,
+    height: PAGE_HEIGHT,
+  },
   image: {
-    width: '100%',
-    aspectRatio: PAGE_ASPECT_RATIO,
+    width: PAGE_WIDTH,
+    height: PAGE_HEIGHT,
+  },
+  highlight: {
+    position: 'absolute',
+    borderRadius: 4,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

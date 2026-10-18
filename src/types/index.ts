@@ -64,6 +64,18 @@ export interface User {
   // up with whatever they just configured. Falls back to `createdAt` for
   // legacy users who don't have the field yet.
   scheduleAnchorDate: string;
+
+  // How "Add to today" makes room for yesterday's unrevised pages (Settings →
+  // "Keep daily amount"): 'shift' (default) slides the plan back by that many
+  // pages, 'add' puts them on top of today's. See lib/carryOver.
+  carryOverMode?: 'shift' | 'add';
+  // Pages carried into one revision day. They go first that day and replace its
+  // first `skip` scheduled pages (the ones the shift moved back). Only applies
+  // while `day` is the revision day.
+  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  // Pages the whole schedule has been moved back by carry-overs; every day reads
+  // its pages this many earlier in the cycle. Reset when a plan is saved.
+  scheduleShiftPages?: number;
 }
 
 /** A user-edited schedule that overrides the default sequential plan. */

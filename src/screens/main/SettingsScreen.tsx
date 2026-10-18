@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
+import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -568,6 +569,11 @@ export default function SettingsScreen() {
               </Text>
             )}
           </View>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />
+          <CarryOverSetting
+            mode={localUser.carryOverMode}
+            onChange={(carryOverMode) => updateUser({ carryOverMode })}
+          />
 
         </Section>
 

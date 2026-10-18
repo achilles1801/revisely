@@ -129,6 +129,41 @@ describe('users/{userId}', () => {
       );
     });
 
+    it('owner can set the carry-over mode and today’s carried pages', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}`), {
+          carryOverMode: 'shift',
+          carryOver: { day: '2026-10-17', pages: [21, 22], skip: 2 },
+          scheduleShiftPages: 2,
+        }),
+      );
+    });
+
+    it('owner can clear carryOver', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { carryOver: null }));
+    });
+
+    it('rejects a negative schedule shift', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { scheduleShiftPages: -1 }));
+    });
+
+    it('rejects an unknown carry-over mode', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { carryOverMode: 'double' }));
+    });
+
+    it('rejects extra keys in carryOver', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(
+        updateDoc(doc(alice, `users/${ALICE}`), {
+          carryOver: { day: '2026-10-17', pages: [1], isAdmin: true },
+        } as any),
+      );
+    });
+
     it('rejects updates by a different user', async () => {
       const bob = env.authenticatedContext(BOB).firestore();
       await assertFails(updateDoc(doc(bob, `users/${ALICE}`), { theme: 'light' }));
