@@ -1,6 +1,8 @@
-// English translation (Saheeh International) of a mushaf page, from the public
-// alquran.cloud API, which numbers pages the same way as the Madani mushaf
-// images. Each page is fetched once, then read from the caches directory.
+// English translation (Saheeh International) from the public alquran.cloud API,
+// which numbers pages the same way as the Madani mushaf images. A verse is
+// looked up in its page's translation, fetched once per page and then read from
+// the caches directory; a verse carried over from the previous page is listed
+// under that page by the API, so it is fetched on its own.
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { logger } from './logger';
@@ -76,4 +78,32 @@ export async function getPageTranslation(pageNumber: number): Promise<Translated
     logger.warn('Could not cache translation', err);
   }
   return ayahs;
+}
+
+const singleAyahs = new Map<string, TranslatedAyah>();
+
+/** The translation of one verse shown on `page`. */
+export async function getAyahTranslation(
+  page: number,
+  sura: number,
+  ayah: number,
+): Promise<TranslatedAyah> {
+  const key = `${sura}:${ayah}`;
+  const single = singleAyahs.get(key);
+  if (single) return single;
+  try {
+    const onPage = (await getPageTranslation(page)).find(
+      (a) => a.surahNumber === sura && a.ayahNumber === ayah,
+    );
+    if (onPage) return onPage;
+  } catch {
+    // Fall through to the single-verse request.
+  }
+  const res = await fetch(`https://api.alquran.cloud/v1/ayah/${key}/${EDITION}`);
+  if (!res.ok) throw new Error(`Translation request failed (${res.status})`);
+  const json = (await res.json()) as { data?: ApiAyah };
+  if (!json.data?.surah) throw new Error('Unexpected translation response');
+  const result = parsePageResponse({ data: { ayahs: [json.data] } })[0];
+  singleAyahs.set(key, result);
+  return result;
 }

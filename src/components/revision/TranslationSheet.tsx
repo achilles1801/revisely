@@ -18,48 +18,56 @@ import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import {
-  getPageTranslation,
+  getAyahTranslation,
   TranslatedAyah,
   TRANSLATION_NAME,
 } from '../../lib/translation';
+import { AyahRef } from '../../lib/ayahBounds';
 
 interface TranslationSheetProps {
-  /** Page to translate; null hides the sheet. */
-  pageNumber: number | null;
+  /** Verse to translate; null hides the sheet. */
+  ayah: AyahRef | null;
   onClose: () => void;
 }
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; ayahs: TranslatedAyah[] }
+  | { status: 'ready'; ayah: TranslatedAyah }
   | { status: 'error' };
 
 /**
- * The English translation of one mushaf page, opened by pressing and holding the
- * page during revision. A plain Modal rather than a gorhom sheet, like the
- * other revision overlays.
+ * The English translation of one verse, opened by pressing and holding the verse
+ * on the page during revision; the verse stays highlighted on the page above.
+ * A plain Modal rather than a gorhom sheet, like the other revision overlays.
  */
-export function TranslationSheet({ pageNumber, onClose }: TranslationSheetProps) {
+export function TranslationSheet({ ayah, onClose }: TranslationSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (pageNumber == null) return;
+    if (ayah == null) return;
     let live = true;
     setState({ status: 'loading' });
-    getPageTranslation(pageNumber)
-      .then((ayahs) => live && setState({ status: 'ready', ayahs }))
+    getAyahTranslation(ayah.page, ayah.sura, ayah.ayah)
+      .then((t) => live && setState({ status: 'ready', ayah: t }))
       .catch(() => live && setState({ status: 'error' }));
     return () => {
       live = false;
     };
-  }, [pageNumber, attempt]);
+  }, [ayah, attempt]);
+
+  const title =
+    state.status === 'ready'
+      ? `${state.ayah.surahName} · ${ayah?.sura}:${ayah?.ayah}`
+      : ayah
+        ? `${ayah.sura}:${ayah.ayah}`
+        : '';
 
   return (
     <Modal
-      visible={pageNumber != null}
+      visible={ayah != null}
       transparent
       animationType="slide"
       onRequestClose={onClose}
@@ -73,7 +81,7 @@ export function TranslationSheet({ pageNumber, onClose }: TranslationSheetProps)
           <SafeAreaView style={styles.safe}>
             <View style={styles.headerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.title}>Page {pageNumber}</Text>
+                <Text style={styles.title}>{title}</Text>
                 <Text style={styles.subtitle}>{TRANSLATION_NAME}</Text>
               </View>
               <PressableScale
@@ -112,20 +120,7 @@ export function TranslationSheet({ pageNumber, onClose }: TranslationSheetProps)
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator
               >
-                {state.ayahs.map((a, i) => {
-                  const newSurah = i === 0 || state.ayahs[i - 1].surahNumber !== a.surahNumber;
-                  return (
-                    <View key={`${a.surahNumber}:${a.ayahNumber}`}>
-                      {newSurah && <Text style={styles.surah}>{a.surahName}</Text>}
-                      <View style={styles.ayah}>
-                        <Text style={styles.ayahNumber}>
-                          {a.surahNumber}:{a.ayahNumber}
-                        </Text>
-                        <Text style={styles.ayahText}>{a.text}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
+                <Text style={styles.ayahText}>{state.ayah.text}</Text>
               </ScrollView>
             )}
           </SafeAreaView>
@@ -139,12 +134,13 @@ const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      // Light, so the highlighted verse stays readable above the sheet.
+      backgroundColor: 'rgba(0,0,0,0.12)',
       justifyContent: 'flex-end',
     },
     sheet: {
-      maxHeight: '75%',
-      minHeight: 220,
+      maxHeight: '50%',
+      minHeight: 160,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
       paddingTop: spacing.lg,
@@ -185,22 +181,5 @@ const makeStyles = (theme: ThemeColors) =>
     retryText: { ...typography.bodySmall, color: '#fff', fontWeight: '700' },
     scroll: { flexGrow: 0 },
     scrollContent: { paddingBottom: spacing.md },
-    surah: {
-      ...typography.titleSmall,
-      color: theme.accent,
-      marginTop: spacing.md,
-      marginBottom: spacing.xs,
-    },
-    ayah: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      paddingVertical: spacing.xs,
-    },
-    ayahNumber: {
-      ...typography.caption,
-      color: theme.textMuted,
-      minWidth: 44,
-      paddingTop: 2,
-    },
-    ayahText: { ...typography.bodyMedium, color: theme.textPrimary, flex: 1 },
+    ayahText: { ...typography.bodyLarge, color: theme.textPrimary },
   });

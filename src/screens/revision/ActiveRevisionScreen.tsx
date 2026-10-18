@@ -28,6 +28,7 @@ import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/S
 import { UndoToast } from '../../components/revision/UndoToast';
 import { RevisionTimerButton } from '../../components/revision/RevisionTimer';
 import { TranslationSheet } from '../../components/revision/TranslationSheet';
+import { AyahRef } from '../../lib/ayahBounds';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import {
   elapsedMs,
@@ -118,12 +119,12 @@ export default function ActiveRevisionScreen() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
-  const [translationPage, setTranslationPage] = useState<number | null>(null);
+  const [translationAyah, setTranslationAyah] = useState<AyahRef | null>(null);
 
-  // Press and hold a page for its translation.
-  const handleLongPressPage = useCallback((pageNumber: number) => {
+  // Press and hold a verse for its translation; it stays highlighted meanwhile.
+  const handleLongPressAyah = useCallback((ayah: AyahRef) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setTranslationPage(pageNumber);
+    setTranslationAyah(ayah);
   }, []);
   const [undoState, setUndoState] = useState<{
     page: number;
@@ -587,7 +588,8 @@ export default function ActiveRevisionScreen() {
           initialPage={resumePage}
           onPageChange={setCurrentPageNumber}
           onAdvance={handleAdvance}
-          onLongPress={handleLongPressPage}
+          onLongPressAyah={handleLongPressAyah}
+          highlightedAyah={translationAyah}
           extraData={extraData}
         />
 
@@ -653,8 +655,8 @@ export default function ActiveRevisionScreen() {
       />
 
       <TranslationSheet
-        pageNumber={translationPage}
-        onClose={() => setTranslationPage(null)}
+        ayah={translationAyah}
+        onClose={() => setTranslationAyah(null)}
       />
 
       <RevisionGuideModal
@@ -796,8 +798,8 @@ function RevisionGuideModal({
     },
     {
       icon: 'language-outline',
-      title: 'Hold for the translation',
-      body: 'Press and hold a page to read its English translation.',
+      title: 'Hold a verse for its translation',
+      body: 'Press and hold any verse to highlight it and read its English translation.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',
