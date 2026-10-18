@@ -129,6 +129,30 @@ describe('users/{userId}', () => {
       );
     });
 
+    it('owner can set the carry-over mode and today’s carried pages', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}`), {
+          carryOverMode: 'add',
+          carryOver: { day: '2026-10-17', pages: [21, 22] },
+        }),
+      );
+    });
+
+    it('rejects an unknown carry-over mode', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { carryOverMode: 'double' }));
+    });
+
+    it('rejects extra keys in carryOver', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(
+        updateDoc(doc(alice, `users/${ALICE}`), {
+          carryOver: { day: '2026-10-17', pages: [1], isAdmin: true },
+        } as any),
+      );
+    });
+
     it('rejects updates by a different user', async () => {
       const bob = env.authenticatedContext(BOB).firestore();
       await assertFails(updateDoc(doc(bob, `users/${ALICE}`), { theme: 'light' }));

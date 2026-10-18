@@ -44,6 +44,7 @@ import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { prefetchPages } from '../../lib/pageCache';
+import { applyCarryOver, findLeftoverPages } from '../../lib/carryOver';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
@@ -60,6 +61,7 @@ export default function DashboardScreen() {
 
   const homePrefs = useHomePrefs();
   const [shifting, setShifting] = useState(false);
+  const [carrying, setCarrying] = useState(false);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
@@ -109,6 +111,16 @@ export default function DashboardScreen() {
       return { status: 'partial' as const, pagesCompleted: completed };
     return { status: 'not_started' as const, pagesCompleted: 0 };
   }, [logs, assignment, revisionDay]);
+
+  // Pages from yesterday's session that were never revised, offered as
+  // "Add to today". Empty once they are in today's assignment.
+  const leftovers = useMemo(() => {
+    if (!assignment) return [];
+    const memorized = new Set(
+      pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
+    );
+    return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
+  }, [logs, revisionDay, assignment, pages]);
 
   useEffect(() => {
     registerForPushNotificationsAsync();
@@ -344,6 +356,19 @@ export default function DashboardScreen() {
     }
   };
 
+  const handleCarryOver = async () => {
+    if (!user || carrying || leftovers.length === 0) return;
+    setCarrying(true);
+    try {
+      const memorized = pages.filter((p) => p.status === 'memorized');
+      await saveUser(applyCarryOver(user, memorized, leftovers, revisionDate));
+    } catch {
+      Alert.alert("Couldn't update today's session", 'Please try again.');
+    } finally {
+      setCarrying(false);
+    }
+  };
+
   // Fell behind? Slide the whole schedule a day later so today reverts to the
   // review you missed instead of marching on. Pure anchor nudge — no per-day
   // edits — applied immediately so the hero updates in place.
@@ -402,6 +427,24 @@ export default function DashboardScreen() {
         >
           <Text style={styles.heroCtaText}>{heroContent.ctaTitle}</Text>
           <Ionicons name="arrow-forward" size={18} color="#fff" />
+        </PressableScale>
+      )}
+
+      {leftovers.length > 0 && (
+        <PressableScale
+          onPress={handleCarryOver}
+          disabled={carrying}
+          haptic="light"
+          scale={0.98}
+          style={styles.pushBackLink}
+          accessibilityLabel={`Add ${leftovers.length} unrevised pages from yesterday to today`}
+        >
+          <Ionicons name="add" size={14} color={theme.accent} />
+          <Text style={styles.pushBackText}>
+            {carrying
+              ? 'Updating…'
+              : `Add ${leftovers.length} left from yesterday`}
+          </Text>
         </PressableScale>
       )}
 

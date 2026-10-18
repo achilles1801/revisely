@@ -132,6 +132,8 @@ service cloud.firestore {
         // Schedule cycle anchor — reset on onboarding (incl. replays) so
         // Day 1 of the cycle aligns with the latest setup.
         'scheduleAnchorDate',
+        // Carrying yesterday's unrevised pages into today (lib/carryOver).
+        'carryOverMode', 'carryOver',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -219,6 +221,14 @@ service cloud.firestore {
                         incomingData().hasSeenSmartTrackingPreview is bool) &&
                        (!hasField('theme') ||
                         isValidTheme(incomingData().theme)) &&
+                       (!hasField('carryOverMode') ||
+                        incomingData().carryOverMode in ['shift', 'add']) &&
+                       (!hasField('carryOver') || incomingData().carryOver == null ||
+                        (incomingData().carryOver is map &&
+                         incomingData().carryOver.keys().hasOnly(['day', 'pages']) &&
+                         incomingData().carryOver.day is string &&
+                         incomingData().carryOver.pages is list &&
+                         incomingData().carryOver.pages.size() <= 604)) &&
                        // Streak cannot be negative
                        (!hasField('streak') || incomingData().streak >= 0) &&
                        // Page counts cannot be negative or exceed 604

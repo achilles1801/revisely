@@ -548,7 +548,13 @@ export function generateDailyAssignment(
   // Slice order preserved on purpose — on wrap days the user sees the
   // tail of the previous cycle before the start of the new one, which
   // matches the scheduler's "you crossed the cycle boundary today" model.
-  const selectedPages = getPagesScheduledForDate(user, today, memorized);
+  const scheduled = getPagesScheduledForDate(user, today, memorized);
+  // Pages carried over into this day on top of its plan go first.
+  const extras =
+    user.carryOver && user.carryOver.day === dateToISODay(today)
+      ? user.carryOver.pages.filter((p) => !scheduled.includes(p))
+      : [];
+  const selectedPages = [...extras, ...scheduled];
 
   // juzBreakdown collapses by juz (insertion order) for display.
   const juzMap = new Map<number, number[]>();

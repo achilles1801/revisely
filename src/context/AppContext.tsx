@@ -54,6 +54,8 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     // Legacy users predate scheduleAnchorDate — fall back to createdAt so
     // the scheduler still produces a sensible cycle for them.
     scheduleAnchorDate: getScheduleAnchorDateFromFirestore(fsUser),
+    carryOverMode: fsUser.carryOverMode,
+    carryOver: fsUser.carryOver ?? null,
   };
 }
 
@@ -368,6 +370,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         locationCoords: updatedUser.locationCoords,
         fajrCalculationMethod: updatedUser.fajrCalculationMethod,
         scheduleAnchorDate: updatedUser.scheduleAnchorDate,
+        // Sent only once set, so saving a user who never touched carry-over
+        // doesn't write fields an older rules deploy would reject.
+        ...(updatedUser.carryOverMode !== undefined && { carryOverMode: updatedUser.carryOverMode }),
+        ...(updatedUser.carryOver != null && { carryOver: updatedUser.carryOver }),
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore

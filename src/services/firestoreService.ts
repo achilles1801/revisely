@@ -208,6 +208,8 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.locationCoords !== undefined) updateData.locationCoords = updates.locationCoords;
   if (updates.fajrCalculationMethod !== undefined) updateData.fajrCalculationMethod = updates.fajrCalculationMethod;
   if (updates.scheduleAnchorDate !== undefined) updateData.scheduleAnchorDate = updates.scheduleAnchorDate;
+  if (updates.carryOverMode !== undefined) updateData.carryOverMode = updates.carryOverMode;
+  if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
 
   if (updates.notifications) {
     if (updates.notifications.enabled !== undefined) {

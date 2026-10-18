@@ -176,6 +176,10 @@ export interface FirestoreUser {
   /** ISO timestamp the user's current schedule cycle started. Reset when the
    *  user finishes onboarding so Day 1 aligns to their latest setup. */
   scheduleAnchorDate?: string;
+  /** How carrying over yesterday's unrevised pages makes room (lib/carryOver). */
+  carryOverMode?: 'shift' | 'add';
+  /** Pages carried into one revision day on top of its plan. */
+  carryOver?: { day: string; pages: number[] } | null;
 }
 
 /**
@@ -219,6 +223,8 @@ export interface UpdateUserInput {
   locationCoords?: { latitude: number; longitude: number } | null;
   fajrCalculationMethod?: string;
   scheduleAnchorDate?: string;
+  carryOverMode?: 'shift' | 'add';
+  carryOver?: { day: string; pages: number[] } | null;
 }
 
 // ============================================================================
