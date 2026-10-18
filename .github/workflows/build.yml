@@ -1,17 +1,13 @@
 name: EAS Build
 
-# A native build, started by hand from the Actions tab. Rarely needed: EAS Update starts one by itself
-# when a push to main changes native code. Builds run on EAS and read the `production` environment.
+# A native build, started by hand from the Actions tab, e.g. to replace a TestFlight build before it
+# expires (90 days). Rarely needed otherwise: EAS Update starts one by itself when a push to main
+# changes native code. Runs on a GitHub macOS runner (ios-build.yml), so it uses no EAS build credits.
 on:
   workflow_dispatch:
     inputs:
-      profile:
-        description: Build profile (eas.json)
-        type: choice
-        options: [production, preview]
-        default: production
       submit:
-        description: Submit to TestFlight once built (production only)
+        description: Submit to TestFlight once built
         type: boolean
         default: true
 
@@ -20,41 +16,8 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ inputs.profile }} (ios)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require an Expo token
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::Add an EXPO_TOKEN repository secret (expo.dev > Account settings > Access tokens)."
-            exit 1
-          fi
-
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-
-      - run: npm ci --legacy-peer-deps
-
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      # `eas build` reads the native config here before sending the build; that needs the plist, which
-      # is gitignored. EAS has its own copy for the build itself (eas-build-pre-install).
-      - name: Write the Firebase plist
-        env:
-          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
-        run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
-
-      - name: eas build
-        env:
-          PROFILE: ${{ inputs.profile }}
-          SUBMIT: ${{ inputs.submit && inputs.profile == 'production' && '--auto-submit' || '' }}
-        run: eas build --profile "$PROFILE" --platform ios $SUBMIT --non-interactive --no-wait
+    name: Build production (ios)
+    uses: ./.github/workflows/ios-build.yml
+    with:
+      submit: ${{ inputs.submit }}
+    secrets: inherit

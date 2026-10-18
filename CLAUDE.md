@@ -8,7 +8,11 @@ file is the release mechanics and the traps behind them.
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
 - **A push to `main` is a release.** Merge `develop` into `main` through a PR, only once CI is green.
   `EAS Update` (`.github/workflows/update.yml`) then publishes the JS to the `production` channel, and
-  starts a TestFlight build first if native code changed.
+  builds and submits to TestFlight first if native code changed.
+- Native builds run on a GitHub macOS runner (`ios-build.yml`: `eas build --local`, then
+  `eas submit --path`), which uses no EAS build credits; the repo is public, so runner minutes are free.
+  Local builds are not listed by `eas build:list`, so a submitted build pushes a tag `ios-fp/<fingerprint>`,
+  and `update.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `main`.
 - Pushes that touch only docs, tests, `functions/`, Firestore rules or `.md` files do not release
@@ -61,6 +65,10 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - The rules tests need Java 21 (firebase-tools). When `firestore.rules` changes, update the tests in
   `tests/firestore-rules/` in the same change. They had drifted before.
 - The release workflows use Node 22, which current eas-cli requires. CI jobs use Node 20.
+- The runner build pins Xcode (`xcode-select` in `ios-build.yml`, image `macos-26`). Apple requires
+  a current SDK for uploads; move the pin when the image or Apple's minimum changes.
+- Secret EAS variables are unreadable on the runner: the plist comes from `GOOGLE_SERVICE_INFO_PLIST`,
+  and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
 - There is no Maestro job. The flows run locally (`npm run test:e2e:ios`) against a dev client.
 
 ## TestFlight
@@ -68,8 +76,13 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - App Store Connect app id `6767990248`, team `CH8N5V9MA6`, bundle id `com.revisionbuddy.app`, Expo
   project `achilles1802/revision-buddy`.
 - **TestFlight builds expire 90 days after upload.** If native code has not changed in a while, run
-  `EAS Build` from the Actions tab before the installed build expires. The new build has the same
-  fingerprint, so current updates reach it.
+  `EAS Build` from the Actions tab before the installed build expires (it builds on the runner too).
+  The new build has the same fingerprint, so current updates reach it.
+- **Every release goes through TestFlight first by raising `version`** in the release PR (1.0.1, 1.0.2,
+  ...). That changes the fingerprint, so the merge builds a new binary for TestFlight, and the update
+  published with it reaches only that binary: App Store users get nothing until the version is approved.
+  A merge without a version bump goes straight to App Store users as an update; keep that for urgent
+  JS fixes.
 - A failed submission does not need a rebuild:
   `eas submit -p ios --id <build id>`. `eas submit:list --platform ios --json` shows the error.
 - Apple refuses uploads while an agreement is unaccepted ("A required agreement is missing or has
@@ -138,6 +151,15 @@ policy and terms give email (`privacy@revisely.app`) as the only contact. Do not
 address. `docs/privacy/index.html` and `docs/terms/index.html` are edited by hand alongside the `.md`
 files; change both. When the app gains or loses something that collects data, update the policy and
 the App Privacy answers in App Store Connect (no API; done by hand) together.
+
+**Verse positions and translations:** press-and-hold on a verse uses `src/data/ayahBounds.json`, built
+by `scripts/build-ayah-bounds.py` from Quran Android's `ayahinfo_1024.db`, the glyph bounds that
+quran.com-images records while drawing the same page images (coordinates are 1024-wide; the images are
+2600×4206, so one scale factor maps them). Translations are Saheeh International from api.alquran.cloud,
+disclosed in the privacy policy.
+
+**Firestore rules before features:** the user document has a field allowlist. A release that writes a
+new user field needs `firebase deploy --only firestore:rules` first, or those writes are refused.
 
 **Third-party content:** Qur'an page images are renderings of the Madani Mushaf made with the King
 Fahd Complex fonts (open-source quran.com-images). They are served from the Storage bucket at
