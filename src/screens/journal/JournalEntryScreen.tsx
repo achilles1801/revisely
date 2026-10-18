@@ -22,7 +22,7 @@ import { PressableScale } from '../../components/PressableScale';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
-import { getCurrentRevisionDay } from '../../lib/algorithm';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
 import {
   JOURNAL_NOTES_MAX,
   JOURNAL_TEXT_MAX,
@@ -84,7 +84,7 @@ export default function JournalEntryScreen() {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(theme, isDark), [theme, isDark]);
 
-  const today = getCurrentRevisionDay(user);
+  const { day: today } = useRevisionDay(user);
   const date = route.params?.date ?? today;
 
   const [initial, setInitial] = useState<FormState>(toForm(emptyJournalEntry(date)));

@@ -22,7 +22,7 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import * as firestoreService from '../../services/firestoreService';
-import { getCurrentRevisionDay } from '../../lib/algorithm';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { formatJournalDayRelative, shiftDay, summarizeRevisedPages } from '../../lib/journal';
 import {
   formatDuration,
@@ -52,7 +52,7 @@ export default function ReadingSessionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState<ReadingSession | null>(null);
 
-  const today = getCurrentRevisionDay(user);
+  const { day: today } = useRevisionDay(user);
 
   const load = useCallback(async () => {
     try {

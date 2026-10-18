@@ -27,6 +27,7 @@ import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { RevisionTimerButton } from '../../components/revision/RevisionTimer';
+import { TranslationSheet } from '../../components/revision/TranslationSheet';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import {
   elapsedMs,
@@ -64,36 +65,44 @@ export default function ActiveRevisionScreen() {
 
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
 
+  // The revision day is fixed when the session opens. A session still open when
+  // fajr (or midnight) passes keeps its assignment and logs to the day it began
+  // on, instead of switching pages underneath the reader.
+  const sessionDayRef = useRef<string | null>(null);
+  if (sessionDayRef.current == null && user) {
+    sessionDayRef.current = getCurrentRevisionDay(user);
+  }
+  const sessionDay = sessionDayRef.current;
+
   const assignment = useMemo(() => {
-    if (!user) return null;
+    if (!user || !sessionDay) return null;
     const quranData = getQuranData();
-    return generateDailyAssignment(pages, quranData, user);
-  }, [user, pages]);
+    const [y, m, d] = sessionDay.split('-').map(Number);
+    return generateDailyAssignment(pages, quranData, user, new Date(y, m - 1, d));
+  }, [user, pages, sessionDay]);
 
   const alreadyRevisedToday = useMemo(() => {
     if (!assignment) return new Set<number>();
-    const today = getCurrentRevisionDay(user);
     const assignmentSet = new Set(assignment.pages);
     const revised = new Set<number>();
     for (const log of logs) {
-      if (log.date !== today) continue;
+      if (log.date !== sessionDay) continue;
       for (const p of log.pagesRevised) {
         if (assignmentSet.has(p)) revised.add(p);
       }
     }
     return revised;
-  }, [logs, assignment, user]);
+  }, [logs, assignment, sessionDay]);
 
   const ratingsFromTodaysLogs = useMemo(() => {
     const map = new Map<number, number>();
     if (!smartTrackingEnabled) return map;
-    const today = getCurrentRevisionDay(user);
     for (const log of logs) {
-      if (log.date !== today) continue;
+      if (log.date !== sessionDay) continue;
       for (const wu of log.weaknessUpdates) map.set(wu.page, wu.rating);
     }
     return map;
-  }, [logs, smartTrackingEnabled, user]);
+  }, [logs, smartTrackingEnabled, sessionDay]);
 
   const [completedPages, setCompletedPages] = useState<Set<number>>(
     () => new Set(alreadyRevisedToday),
@@ -109,6 +118,13 @@ export default function ActiveRevisionScreen() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
+  const [translationPage, setTranslationPage] = useState<number | null>(null);
+
+  // Press and hold a page for its translation.
+  const handleLongPressPage = useCallback((pageNumber: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTranslationPage(pageNumber);
+  }, []);
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -137,8 +153,8 @@ export default function ActiveRevisionScreen() {
   }, []);
 
   const commitPendingPages = useCallback(async (): Promise<void> => {
-    if (!user || !assignment) return;
-    const revisionDay = getCurrentRevisionDay(user);
+    if (!user || !assignment || !sessionDay) return;
+    const revisionDay = sessionDay;
     const assignedPages = assignment.pages;
     while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
@@ -200,7 +216,7 @@ export default function ActiveRevisionScreen() {
       if (todaysLog) await updateLog(removeRevisedPages(todaysLog, unrevised));
       unrevised.forEach((p) => silentlySavedRef.current.delete(p));
     }
-  }, [user, assignment, completedPages, pages, localRatings, updatePages, addLog, updateLog]);
+  }, [user, assignment, sessionDay, completedPages, pages, localRatings, updatePages, addLog, updateLog]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -409,7 +425,7 @@ export default function ActiveRevisionScreen() {
         ([page, rating]) => ({ page, rating }),
       );
       await addLog({
-        date: getCurrentRevisionDay(user),
+        date: sessionDay ?? getCurrentRevisionDay(user),
         assignedPages: assignment.pages,
         pagesRevised,
         pagesSkipped,
@@ -571,6 +587,7 @@ export default function ActiveRevisionScreen() {
           initialPage={resumePage}
           onPageChange={setCurrentPageNumber}
           onAdvance={handleAdvance}
+          onLongPress={handleLongPressPage}
           extraData={extraData}
         />
 
@@ -633,6 +650,11 @@ export default function ActiveRevisionScreen() {
         onMarkAllIncomplete={handleMarkAllIncomplete}
         onMarkJuzComplete={handleMarkJuzComplete}
         onTogglePage={handleTogglePage}
+      />
+
+      <TranslationSheet
+        pageNumber={translationPage}
+        onClose={() => setTranslationPage(null)}
       />
 
       <RevisionGuideModal
@@ -771,6 +793,11 @@ function RevisionGuideModal({
       icon: 'arrow-forward-circle-outline',
       title: 'Swipe = done',
       body: 'Swiping forward auto-credits the page you just left as revised. You can undo from the toast that appears, or tap the checkmark in the top bar to toggle the current page by hand.',
+    },
+    {
+      icon: 'language-outline',
+      title: 'Hold for the translation',
+      body: 'Press and hold a page to read its English translation.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',

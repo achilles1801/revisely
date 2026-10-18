@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
+import { cachePage, getCachedPageUri, pagesAround, prefetchPages } from '../lib/pageCache';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -33,6 +34,8 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
+  /** Press and hold on a page. Receives that page's number. */
+  onLongPress?: (pageNumber: number) => void;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
@@ -41,6 +44,7 @@ interface MushafPagerProps {
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
+  onLongPress?: (pageNumber: number) => void;
   pageTint: string | null;
   tintColor: string;
   bg: string;
@@ -49,20 +53,39 @@ interface PageItemProps {
 const PageItem = React.memo(function PageItem({
   pageNumber,
   onTap,
+  onLongPress,
   pageTint,
   tintColor,
   bg,
 }: PageItemProps) {
-  const [loading, setLoading] = useState(true);
+  // A cached page renders from disk on the first frame. Otherwise it is
+  // downloaded into the cache first; if that fails, the image loads straight
+  // from Storage as it used to.
+  const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber));
+  const [attempt, setAttempt] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const url = getQuranPageImageUrl(pageNumber);
+  const isRemote = uri != null && uri.startsWith('http');
+
+  useEffect(() => {
+    if (uri) return;
+    let live = true;
+    cachePage(pageNumber).then((local) => {
+      if (live) setUri(local ?? getQuranPageImageUrl(pageNumber));
+    });
+    return () => {
+      live = false;
+    };
+  }, [pageNumber, uri, attempt]);
 
   return (
     <Pressable
       style={[styles.page, { backgroundColor: bg }]}
       onPress={onTap}
+      onLongPress={onLongPress ? () => onLongPress(pageNumber) : undefined}
+      delayLongPress={350}
     >
-      {loading && (
+      {(uri == null || (isRemote && loading)) && !error && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={tintColor} />
         </View>
@@ -71,15 +94,17 @@ const PageItem = React.memo(function PageItem({
         <Pressable
           onPress={() => {
             setError(false);
-            setLoading(true);
+            // A local file that failed to load is retried from Storage.
+            setUri(isRemote ? getCachedPageUri(pageNumber) : getQuranPageImageUrl(pageNumber));
+            setAttempt((a) => a + 1);
           }}
           style={styles.errorBox}
         >
           <Ionicons name="refresh-outline" size={32} color={tintColor} />
         </Pressable>
-      ) : (
+      ) : uri != null ? (
         <Image
-          source={{ uri: url }}
+          source={{ uri }}
           style={[
             styles.image,
             pageTint != null && { tintColor: pageTint, opacity: 0.92 },
@@ -87,6 +112,7 @@ const PageItem = React.memo(function PageItem({
           // No resizeMode — width + aspectRatio on styles.image fully
           // determines layout, and `contain` here would un-do that on iOS by
           // re-fitting the rendered content inside the box.
+          fadeDuration={0}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={() => setLoading(false)}
           onError={() => {
@@ -94,7 +120,7 @@ const PageItem = React.memo(function PageItem({
             setError(true);
           }}
         />
-      )}
+      ) : null}
     </Pressable>
   );
 });
@@ -111,6 +137,7 @@ export function MushafPager({
   onPageChange,
   onAdvance,
   onTap,
+  onLongPress,
   extraData,
 }: MushafPagerProps) {
   const { isDark } = useTheme();
@@ -122,6 +149,12 @@ export function MushafPager({
   // back whenever a parent prop bump occurs (e.g. context re-renders from
   // auto-save).
   const hasAutoScrolledRef = useRef(false);
+
+  // Download the pages around the starting one before they are swiped to.
+  useEffect(() => {
+    const idx = initialPage == null ? 0 : Math.max(0, pages.indexOf(initialPage));
+    prefetchPages(pagesAround(pages, idx));
+  }, [initialPage, pages]);
 
   useEffect(() => {
     if (hasAutoScrolledRef.current) return;
@@ -152,6 +185,7 @@ export function MushafPager({
         }
       }
       currentIndexRef.current = newIndex;
+      prefetchPages(pagesAround(pages, newIndex));
       if (newPage != null) onPageChange?.(newPage, newIndex);
     },
     [pages, onAdvance, onPageChange],
@@ -164,12 +198,13 @@ export function MushafPager({
       <PageItem
         pageNumber={item}
         onTap={onTap}
+        onLongPress={onLongPress}
         pageTint={palette.pageTint}
         tintColor={palette.textPrimary}
         bg={palette.pageBg}
       />
     ),
-    [onTap, palette],
+    [onTap, onLongPress, palette],
   );
 
   return (

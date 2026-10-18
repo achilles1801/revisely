@@ -33,6 +33,8 @@ import {
   pageCountLabel,
 } from '../../lib/planDisplay';
 import { getJuzForPage, getSurahForPage } from '../../lib/quranData';
+import { useApp } from '../../context/AppContext';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
 
 export type BuilderMode = 'balanced' | 'juz' | 'weakest';
 
@@ -172,7 +174,8 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
   ]);
 
   const stats = planStats(preview);
-  const today = useMemo(() => new Date(), []);
+  const { user } = useApp();
+  const { date: today } = useRevisionDay(user);
 
   const apply = () => {
     if (preview.length === 0) return;

@@ -52,6 +52,7 @@ import {
   PlanBuilderSheet,
 } from '../../components/plan/PlanBuilderSheet';
 import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -83,6 +84,8 @@ export default function PlanEditScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages, logs, saveUser } = useApp();
+  // "Today" in the editor is the revision day (it starts at fajr when that is on).
+  const { date: revisionDate } = useRevisionDay(user);
 
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);
@@ -109,18 +112,18 @@ export default function PlanEditScreen() {
   const initialState = useMemo(() => {
     if (user?.customPlan && user.customPlan.days.length > 0) {
       return {
-        days: rotateCustomPlanToToday(user.customPlan),
+        days: rotateCustomPlanToToday(user.customPlan, revisionDate),
         direction: user.customPlan.direction as PlanDirection,
       };
     }
     if (isJuzMode && user) {
-      return { days: buildJuzCycleDays(user, memorizedPages), direction: 'forward' as PlanDirection };
+      return { days: buildJuzCycleDays(user, memorizedPages, revisionDate), direction: 'forward' as PlanDirection };
     }
     return {
-      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward') : [],
+      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward', revisionDate) : [],
       direction: 'forward' as PlanDirection,
     };
-  }, [user, memorizedPages, isJuzMode]);
+  }, [user, memorizedPages, isJuzMode, revisionDate]);
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
@@ -199,7 +202,7 @@ export default function PlanEditScreen() {
     if (!user || saving || !isDirty || days.length === 0) return;
     setSaving(true);
     try {
-      const plan: CustomPlan = createCustomPlanFromDraft(days, direction);
+      const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
       // After "push back a day" the live anchor sits in the future and the
       // draft wasn't rotated (see rotateCustomPlanToToday) — keep that anchor
       // so saving an edit doesn't silently undo the push-back.
@@ -238,9 +241,9 @@ export default function PlanEditScreen() {
   const buildWeakest = useCallback(
     (pagesPerDay: number) =>
       user
-        ? buildWeakestFirstPlanDays({ ...user, dailyPageCapacity: pagesPerDay }, memorizedPages, logs)
+        ? buildWeakestFirstPlanDays({ ...user, dailyPageCapacity: pagesPerDay }, memorizedPages, logs, revisionDate)
         : [],
-    [user, memorizedPages, logs],
+    [user, memorizedPages, logs, revisionDate],
   );
 
   const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => {
@@ -364,9 +367,9 @@ export default function PlanEditScreen() {
       if (!user.customPlan && !isDirty) {
         if (tempMode === 'juz') {
           setDirection('forward');
-          setDays(buildJuzCycleDays(updatedUser, memorizedPages));
+          setDays(buildJuzCycleDays(updatedUser, memorizedPages, revisionDate));
         } else {
-          setDays(buildDefaultPlanDays(updatedUser, memorizedPages, direction));
+          setDays(buildDefaultPlanDays(updatedUser, memorizedPages, direction, revisionDate));
         }
       }
       quotaSheetRef.current?.dismiss();
@@ -405,7 +408,7 @@ export default function PlanEditScreen() {
   };
 
   // ---- Render -----------------------------------------------------------------------------
-  const today = useMemo(() => new Date(), []);
+  const today = revisionDate;
 
   if (!user) {
     return (
