@@ -14,11 +14,19 @@ const MAX_CONCURRENT_DOWNLOADS = 3;
 
 let dir: Directory | null = null;
 function cacheDir(): Directory {
-  if (!dir) {
-    dir = new Directory(Paths.cache, 'mushaf');
-    if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-  }
+  if (!dir) dir = new Directory(Paths.cache, 'mushaf');
   return dir;
+}
+
+// Checked before every download: iOS may empty the caches directory while the
+// app is running.
+function ensureCacheDir(): Directory {
+  const d = cacheDir();
+  if (!d.exists) {
+    d.create({ intermediates: true, idempotent: true });
+    onDisk.clear();
+  }
+  return d;
 }
 
 function fileName(pageNumber: number): string {
@@ -57,10 +65,11 @@ export function cachePage(pageNumber: number): Promise<string | null> {
 
   const run = (async () => {
     try {
-      const target = new File(cacheDir(), fileName(pageNumber));
+      const d = ensureCacheDir();
+      const target = new File(d, fileName(pageNumber));
       // Download beside the target and move it in, so an interrupted download
       // never leaves a truncated page that looks cached.
-      const partial = new File(cacheDir(), `${fileName(pageNumber)}.part`);
+      const partial = new File(d, `${fileName(pageNumber)}.part`);
       if (partial.exists) partial.delete();
       await File.downloadFileAsync(getQuranPageImageUrl(pageNumber), partial, {
         idempotent: true,
@@ -94,6 +103,17 @@ function pump() {
       active--;
       pump();
     });
+  }
+}
+
+/** Forget a cached page that failed to load (purged or unreadable) and delete it. */
+export function evictCachedPage(pageNumber: number): void {
+  onDisk.delete(pageNumber);
+  try {
+    const file = new File(cacheDir(), fileName(pageNumber));
+    if (file.exists) file.delete();
+  } catch (err) {
+    logger.warn('Page cache eviction failed', err);
   }
 }
 

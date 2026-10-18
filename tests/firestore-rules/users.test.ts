@@ -133,10 +133,21 @@ describe('users/{userId}', () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertSucceeds(
         updateDoc(doc(alice, `users/${ALICE}`), {
-          carryOverMode: 'add',
-          carryOver: { day: '2026-10-17', pages: [21, 22] },
+          carryOverMode: 'shift',
+          carryOver: { day: '2026-10-17', pages: [21, 22], skip: 2 },
+          scheduleShiftPages: 2,
         }),
       );
+    });
+
+    it('owner can clear carryOver', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { carryOver: null }));
+    });
+
+    it('rejects a negative schedule shift', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { scheduleShiftPages: -1 }));
     });
 
     it('rejects an unknown carry-over mode', async () => {

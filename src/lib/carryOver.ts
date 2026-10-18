@@ -1,18 +1,17 @@
 // Carrying unrevised pages from yesterday's session into today's.
 //
 // Two ways to make room, chosen in Settings ("Keep daily amount"):
-//   'shift' (default) — today keeps its usual size: the leftovers go first, the
-//       end of today's pages moves to tomorrow, and the rest of the plan slides
-//       back by as many pages as were carried over.
+//   'shift' (default) — the leftovers go first and today keeps its usual size:
+//       the end of today's pages moves to tomorrow, and the rest of the plan
+//       slides back by the same number of pages. Stored as a page offset on the
+//       schedule (User.scheduleShiftPages) plus today's carried pages, so the
+//       plan itself, its start date and the schedule type stay as they are.
 //   'add' — the leftovers are added on top of today's pages; nothing else moves.
 //
-// 'shift' rewrites the cycle as a custom plan starting today, because only a
-// custom plan can express a schedule moved by a number of pages rather than
-// whole days. 'add' records the extra pages for today on the user.
+// Carrying over happens at most once per revision day.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { buildDefaultPlanDays, buildJuzCycleDays } from './algorithm';
-import { rotateCustomPlanToToday } from './planBuilder';
+import { getPagesScheduledForDate } from './algorithm';
 import { dateToLocalISODay } from './schedulePlans';
 
 export type CarryOverMode = 'shift' | 'add';
@@ -70,72 +69,52 @@ export function findLeftoverPages(
   return out;
 }
 
+/** Whether pages were already carried into the revision day `today`. */
+export function hasCarriedOver(user: User | null | undefined, today: string): boolean {
+  return user?.carryOver?.day === today;
+}
+
 /**
- * The 'shift' rewrite of a cycle whose index 0 is today: the leftovers move to
- * the front and every day keeps its size, so pages flow onward by
- * `leftovers.length`. Each leftover is taken out of the cycle at its last
- * occurrence, which is yesterday's day, at the end of a cycle rotated to today.
+ * The user after carrying `leftovers` into the revision day `revisionDate`.
+ *
+ * 'shift': the schedule moves back by `skip` pages, so today's scheduled pages
+ * start with the `skip` pages before them in the plan (yesterday's tail, which
+ * was revised or is among the leftovers); those are replaced by the leftovers.
+ * `skip` is capped at today's size: with more leftovers than that, today holds
+ * all of them and the whole of today's plan moves to tomorrow. On an off day
+ * nothing shifts and the leftovers are simply today's pages.
  */
-export function shiftDaysForCarryOver(days: number[][], leftovers: number[]): number[][] {
-  const sizes = days.map((d) => d.length);
-  const seq = days.flat();
-  for (const p of leftovers) {
-    const i = seq.lastIndexOf(p);
-    if (i >= 0) seq.splice(i, 1);
-  }
-  const flow = [...leftovers, ...seq];
-  const out: number[][] = [];
-  let at = 0;
-  for (const size of sizes) {
-    out.push(flow.slice(at, at + size));
-    at += size;
-  }
-  // Only possible if a leftover was not in the cycle; callers filter those out.
-  if (at < flow.length && out.length > 0) out[out.length - 1].push(...flow.slice(at));
-  return out;
-}
-
-function withExtras(user: User, today: string, pages: number[]): User {
-  const existing = user.carryOver?.day === today ? user.carryOver.pages : [];
-  const merged = [...existing, ...pages.filter((p) => !existing.includes(p))];
-  return { ...user, carryOver: { day: today, pages: merged } };
-}
-
-/** The user after carrying `leftovers` into the revision day `revisionDate`. */
 export function applyCarryOver(
   user: User,
   memorizedPages: UserPage[],
   leftovers: number[],
   revisionDate: Date,
 ): User {
-  if (leftovers.length === 0) return user;
   const today = dateToLocalISODay(revisionDate);
+  if (leftovers.length === 0 || hasCarriedOver(user, today)) return user;
   const mode = user.carryOverMode ?? DEFAULT_CARRY_OVER_MODE;
-  if (mode === 'add') return withExtras(user, today, leftovers);
-
-  const plan = user.customPlan && user.customPlan.days.length > 0 ? user.customPlan : null;
-  // A plan pushed back past today has no slot for today to make room in.
-  if (plan && plan.cycleStartDate > today) return withExtras(user, today, leftovers);
-
-  const days = plan
-    ? rotateCustomPlanToToday(plan, revisionDate)
-    : user.scheduleMode === 'juz' && (user.dailyJuzCount ?? 0) > 0
-      ? buildJuzCycleDays(user, memorizedPages, revisionDate)
-      : buildDefaultPlanDays(user, memorizedPages, 'forward', revisionDate);
-  if (days.length === 0) return withExtras(user, today, leftovers);
-
-  const inCycle = new Set(days.flat());
-  const shifted = leftovers.filter((p) => inCycle.has(p));
-  const outside = leftovers.filter((p) => !inCycle.has(p));
-
-  let next: User = {
+  if (mode === 'add') {
+    return { ...user, carryOver: { day: today, pages: [...leftovers], skip: 0 } };
+  }
+  const scheduled = getPagesScheduledForDate(user, revisionDate, memorizedPages);
+  const skip = Math.min(leftovers.length, scheduled.length);
+  return {
     ...user,
-    customPlan: {
-      days: shiftDaysForCarryOver(days, shifted),
-      cycleStartDate: today,
-      direction: plan?.direction ?? 'forward',
-    },
+    scheduleShiftPages: (user.scheduleShiftPages ?? 0) + skip,
+    carryOver: { day: today, pages: [...leftovers], skip },
   };
-  if (outside.length > 0) next = withExtras(next, today, outside);
-  return next;
+}
+
+/**
+ * The user after saving a new plan in the editor. The editor showed the shifted
+ * schedule, so the shift is now part of the plan; pages carried into today stay
+ * today, on top of the new plan's first day.
+ */
+export function settleCarryOverForNewPlan(user: User, today: string): User {
+  const carry = user.carryOver;
+  return {
+    ...user,
+    ...(user.scheduleShiftPages ? { scheduleShiftPages: 0 } : {}),
+    ...(carry && carry.day === today && carry.skip ? { carryOver: { ...carry, skip: 0 } } : {}),
+  };
 }

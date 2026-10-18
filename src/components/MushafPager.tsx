@@ -14,7 +14,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
-import { cachePage, getCachedPageUri, pagesAround, prefetchPages } from '../lib/pageCache';
+import {
+  cachePage,
+  evictCachedPage,
+  getCachedPageUri,
+  pagesAround,
+  prefetchPages,
+} from '../lib/pageCache';
 import {
   AyahRef,
   ayahAt,
@@ -115,8 +121,7 @@ const PageItem = React.memo(function PageItem({
         <Pressable
           onPress={() => {
             setError(false);
-            // A local file that failed to load is retried from Storage.
-            setUri(isRemote ? getCachedPageUri(pageNumber) : getQuranPageImageUrl(pageNumber));
+            setUri(getCachedPageUri(pageNumber));
             setAttempt((a) => a + 1);
           }}
           style={styles.errorBox}
@@ -159,7 +164,13 @@ const PageItem = React.memo(function PageItem({
             onLoadEnd={() => setLoading(false)}
             onError={() => {
               setLoading(false);
-              setError(true);
+              if (!isRemote) {
+                // Purged or unreadable cache file: drop it and load from Storage.
+                evictCachedPage(pageNumber);
+                setUri(getQuranPageImageUrl(pageNumber));
+              } else {
+                setError(true);
+              }
             }}
           />
         </Pressable>

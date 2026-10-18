@@ -50,7 +50,9 @@ export function getFajrTimeFor(date: Date, user: User): Date | null {
   );
   const params = paramsFor(user.fajrCalculationMethod || DEFAULT_FAJR_METHOD);
   const prayerTimes = new PrayerTimes(coords, date, params);
-  return prayerTimes.fajr;
+  // adhan returns an Invalid Date when there is no fajr (polar summer).
+  const fajr = prayerTimes.fajr;
+  return fajr && !isNaN(fajr.getTime()) ? fajr : null;
 }
 
 function formatLocalDay(date: Date): string {
@@ -110,5 +112,7 @@ export function getNextRevisionDayStart(
   const todaysFajr = getFajrTimeFor(now, user);
   if (todaysFajr && todaysFajr.getTime() > now.getTime()) return todaysFajr;
   const tomorrowsFajr = getFajrTimeFor(midnight, user);
-  return tomorrowsFajr ?? midnight;
+  // Past already when the device's time zone is far from the saved location;
+  // the day then turns at midnight.
+  return tomorrowsFajr && tomorrowsFajr.getTime() > now.getTime() ? tomorrowsFajr : midnight;
 }

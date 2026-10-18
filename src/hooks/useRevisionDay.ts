@@ -31,13 +31,15 @@ export function useRevisionDay(user: User | null | undefined): { day: string; da
     const schedule = () => {
       if (timer) clearTimeout(timer);
       const now = new Date();
-      const wait = getNextRevisionDayStart(boundaryUser, now).getTime() - now.getTime();
+      let wait = getNextRevisionDayStart(boundaryUser, now).getTime() - now.getTime();
+      // Never spin: anything odd waits for the next hourly check instead.
+      if (!Number.isFinite(wait) || wait <= 0) wait = 60 * 60 * 1000;
       timer = setTimeout(
         () => {
           refresh();
           schedule();
         },
-        Math.min(Math.max(wait + 1000, 1000), MAX_TIMER_MS),
+        Math.min(wait + 1000, MAX_TIMER_MS),
       );
     };
     schedule();

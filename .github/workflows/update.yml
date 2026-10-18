@@ -123,6 +123,7 @@ jobs:
     if: ${{ !cancelled() && needs.fingerprint.result == 'success' }}
     runs-on: ubuntu-latest
     env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       # First line only: EAS caps an update's message at 1024 characters.
       MESSAGE: ${{ github.event.head_commit.message || format('Manual update from {0}', github.ref_name) }}
     steps:
@@ -150,3 +151,13 @@ jobs:
           SUBJECT=$(echo "$MESSAGE" | head -n 1)
           eas update --channel production --environment production --platform ios \
             --message "$SUBJECT" --non-interactive
+
+      # Source maps for the bundle just published (left in dist/ by eas update), so Sentry shows
+      # crashes from updates with file names and line numbers. Skipped without the secret.
+      - name: Upload source maps to Sentry
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        continue-on-error: true
+        env:
+          SENTRY_ORG: revisely
+          SENTRY_PROJECT: react-native
+        run: npx sentry-expo-upload-sourcemaps dist

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,7 @@ import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { prefetchPages } from '../../lib/pageCache';
-import { applyCarryOver, findLeftoverPages } from '../../lib/carryOver';
+import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
@@ -62,6 +62,7 @@ export default function DashboardScreen() {
   const homePrefs = useHomePrefs();
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+  const carryingRef = useRef(false);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
@@ -115,12 +116,13 @@ export default function DashboardScreen() {
   // Pages from yesterday's session that were never revised, offered as
   // "Add to today". Empty once they are in today's assignment.
   const leftovers = useMemo(() => {
-    if (!assignment) return [];
+    // Once a day: after carrying over, today's leftovers are part of today.
+    if (!assignment || hasCarriedOver(user, revisionDay)) return [];
     const memorized = new Set(
       pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
     );
     return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
-  }, [logs, revisionDay, assignment, pages]);
+  }, [logs, revisionDay, assignment, pages, user]);
 
   useEffect(() => {
     registerForPushNotificationsAsync();
@@ -357,7 +359,9 @@ export default function DashboardScreen() {
   };
 
   const handleCarryOver = async () => {
-    if (!user || carrying || leftovers.length === 0) return;
+    // The ref stops a double tap before the state update re-renders.
+    if (!user || carryingRef.current || leftovers.length === 0) return;
+    carryingRef.current = true;
     setCarrying(true);
     try {
       const memorized = pages.filter((p) => p.status === 'memorized');
@@ -365,6 +369,7 @@ export default function DashboardScreen() {
     } catch {
       Alert.alert("Couldn't update today's session", 'Please try again.');
     } finally {
+      carryingRef.current = false;
       setCarrying(false);
     }
   };

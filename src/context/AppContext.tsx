@@ -55,7 +55,8 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     // the scheduler still produces a sensible cycle for them.
     scheduleAnchorDate: getScheduleAnchorDateFromFirestore(fsUser),
     carryOverMode: fsUser.carryOverMode,
-    carryOver: fsUser.carryOver ?? null,
+    carryOver: fsUser.carryOver,
+    scheduleShiftPages: fsUser.scheduleShiftPages,
   };
 }
 
@@ -370,10 +371,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         locationCoords: updatedUser.locationCoords,
         fajrCalculationMethod: updatedUser.fajrCalculationMethod,
         scheduleAnchorDate: updatedUser.scheduleAnchorDate,
-        // Sent only once set, so saving a user who never touched carry-over
-        // doesn't write fields an older rules deploy would reject.
+        // Sent only once set (null clears carryOver), so saving a user who never
+        // used carry-over writes nothing new.
         ...(updatedUser.carryOverMode !== undefined && { carryOverMode: updatedUser.carryOverMode }),
-        ...(updatedUser.carryOver != null && { carryOver: updatedUser.carryOver }),
+        ...(updatedUser.carryOver !== undefined && { carryOver: updatedUser.carryOver }),
+        ...(updatedUser.scheduleShiftPages !== undefined && {
+          scheduleShiftPages: updatedUser.scheduleShiftPages,
+        }),
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore
@@ -414,6 +418,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       locationCoords: null,
       fajrCalculationMethod: 'NorthAmerica',
       scheduleAnchorDate: new Date().toISOString(),
+      // A fresh setup starts without carry-over shifts.
+      scheduleShiftPages: 0,
+      carryOver: null,
       ...overrides,
     };
   }, []);
@@ -632,14 +639,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
           changedAt: Timestamp.now(),
         }));
 
-        const totalAssigned = existingSession.totalAssignedPages || mergedPagesRevised.length;
+        // Pages carried into the day after the session started join its
+        // assignment, so tomorrow's carry-over and completion see them.
+        const existingAssigned = existingSession.assignedPages ?? [];
+        const addedAssigned = (log.assignedPages ?? []).filter(
+          (p) => !existingAssigned.includes(p),
+        );
+        const mergedAssigned = [...existingAssigned, ...addedAssigned];
+        const totalAssigned =
+          (addedAssigned.length > 0 ? mergedAssigned.length : existingSession.totalAssignedPages) ||
+          mergedPagesRevised.length;
+        const wasCompleted = existingSession.state === 'COMPLETED';
 
         await firestoreService.updateSession(existingSession.id, {
+          ...(addedAssigned.length > 0 && {
+            assignedPages: mergedAssigned,
+            totalAssignedPages: mergedAssigned.length,
+          }),
           pagesRevised: mergedPagesRevised,
           pagesSkipped: mergedPagesSkipped,
           durationMinutes: Math.max(1, (existingSession.durationMinutes || 0) + (log.durationMinutes || 0)),
           weaknessUpdates: [...existingSession.weaknessUpdates, ...newWeaknessUpdates],
-          state: mergedPagesRevised.length >= totalAssigned ? 'COMPLETED' : 'IN_PROGRESS',
+          // A completed session stays completed (the rules forbid going back).
+          state: wasCompleted || mergedPagesRevised.length >= totalAssigned ? 'COMPLETED' : 'IN_PROGRESS',
           completionPercentage: safePercent(mergedPagesRevised.length, totalAssigned),
         });
       } else {

@@ -1,9 +1,10 @@
 import {
   applyCarryOver,
   findLeftoverPages,
-  shiftDaysForCarryOver,
+  hasCarriedOver,
+  settleCarryOverForNewPlan,
 } from '../carryOver';
-import { generateDailyAssignment } from '../algorithm';
+import { generateDailyAssignment, scheduledDaysFrom } from '../algorithm';
 import type { RevisionLog, User, UserPage } from '../../types';
 
 const baseUser: User = {
@@ -84,16 +85,8 @@ describe('findLeftoverPages', () => {
   });
 });
 
-describe('shiftDaysForCarryOver', () => {
-  it('moves leftovers to the front and keeps every day’s size', () => {
-    const days = [[4, 5, 6], [7, 8, 9], [1, 2, 3]]; // index 0 = today, last = yesterday
-    expect(shiftDaysForCarryOver(days, [2, 3])).toEqual([[2, 3, 4], [5, 6, 7], [8, 9, 1]]);
-  });
-
-  it('fills today with leftovers when there are more than fit', () => {
-    expect(shiftDaysForCarryOver([[3], [1, 2]], [1, 2])).toEqual([[1], [2, 3]]);
-  });
-});
+const day = (d: number) => new Date(2026, 9, d);
+const pagesOn = (user: User, d: number) => generateDailyAssignment(memorized, [], user, day(d)).pages;
 
 describe('applyCarryOver', () => {
   const plan = {
@@ -102,36 +95,87 @@ describe('applyCarryOver', () => {
     direction: 'forward' as const,
   };
 
-  it('keep daily amount: today starts with the leftovers and the plan shifts', () => {
+  it('keep daily amount: leftovers first, the end of today moves to tomorrow, the plan flows on', () => {
     const user = { ...baseUser, customPlan: plan };
     const next = applyCarryOver(user, memorized, [5, 6], today);
-    expect(next.customPlan?.cycleStartDate).toBe(TODAY);
-    expect(generateDailyAssignment(memorized, [], next, today).pages).toEqual([5, 6, 7]);
-    const tomorrow = new Date(2026, 9, 18);
-    expect(generateDailyAssignment(memorized, [], next, tomorrow).pages).toEqual([8, 9, 1]);
-    expect(next.carryOver ?? null).toBeNull();
+    expect(pagesOn(next, 17)).toEqual([5, 6, 7]);
+    expect(pagesOn(next, 18)).toEqual([8, 9, 1]);
+    expect(pagesOn(next, 19)).toEqual([2, 3, 4]);
+    // The plan itself is untouched: same days, same start.
+    expect(next.customPlan).toBe(plan);
+    expect(next.scheduleShiftPages).toBe(2);
+  });
+
+  it('keeps an automatic schedule automatic', () => {
+    const user = { ...baseUser, scheduleAnchorDate: new Date(2026, 9, 16, 12).toISOString() }; // Oct 16 = [1,2,3]
+    expect(pagesOn(user, 17)).toEqual([4, 5, 6]);
+    const next = applyCarryOver(user, memorized, [2, 3], today);
+    expect(next.customPlan).toBeNull();
+    expect(pagesOn(next, 17)).toEqual([2, 3, 4]);
+    expect(pagesOn(next, 18)).toEqual([5, 6, 7]);
+  });
+
+  it('drops pages revised yesterday when the leftovers are scattered', () => {
+    const user = { ...baseUser, customPlan: plan };
+    // Oct 16 = [4,5,6] and only 5 was revised.
+    const next = applyCarryOver(user, memorized, [4, 6], today);
+    expect(pagesOn(next, 17)).toEqual([4, 6, 7]);
+    expect(pagesOn(next, 18)).toEqual([8, 9, 1]);
+  });
+
+  it('with more leftovers than today holds, today is all leftovers and today’s plan moves whole', () => {
+    const big = { days: [[1, 2, 3, 4, 5], [6, 7], [8, 9]], cycleStartDate: '2026-10-16', direction: 'forward' as const };
+    const user = { ...baseUser, customPlan: big };
+    const next = applyCarryOver(user, memorized, [2, 3, 4, 5], today);
+    expect(pagesOn(next, 17)).toEqual([2, 3, 4, 5]);
+    expect(pagesOn(next, 18)).toEqual([6, 7]);
+    // Carried once: the button's leftovers are gone and a second apply is a no-op.
+    expect(hasCarriedOver(next, TODAY)).toBe(true);
+    expect(applyCarryOver(next, memorized, [2, 3], today)).toBe(next);
+  });
+
+  it('on an off day the leftovers become today and nothing shifts', () => {
+    const withOff = { days: [[1, 2, 3], [], [4, 5, 6]], cycleStartDate: '2026-10-16', direction: 'forward' as const };
+    const user = { ...baseUser, customPlan: withOff };
+    const next = applyCarryOver(user, memorized, [2, 3], today);
+    expect(pagesOn(next, 17)).toEqual([2, 3]);
+    expect(pagesOn(next, 18)).toEqual([4, 5, 6]);
+    expect(next.scheduleShiftPages ?? 0).toBe(0);
   });
 
   it('add on top: today gets the leftovers plus its own pages, nothing else moves', () => {
     const user: User = { ...baseUser, customPlan: plan, carryOverMode: 'add' };
     const next = applyCarryOver(user, memorized, [5, 6], today);
-    expect(next.customPlan).toBe(plan);
-    expect(generateDailyAssignment(memorized, [], next, today).pages).toEqual([5, 6, 7, 8, 9]);
-    const tomorrow = new Date(2026, 9, 18);
-    expect(generateDailyAssignment(memorized, [], next, tomorrow).pages).toEqual([1, 2, 3]);
+    expect(pagesOn(next, 17)).toEqual([5, 6, 7, 8, 9]);
+    expect(pagesOn(next, 18)).toEqual([1, 2, 3]);
   });
 
-  it('turns the automatic schedule into a shifted custom plan', () => {
-    const user = { ...baseUser, scheduleAnchorDate: '2026-10-16T12:00:00Z' };
-    // Oct 16 = [1,2,3], Oct 17 = [4,5,6]
-    expect(generateDailyAssignment(memorized, [], user, today).pages).toEqual([4, 5, 6]);
-    const next = applyCarryOver(user, memorized, [3], today);
-    expect(generateDailyAssignment(memorized, [], next, today).pages).toEqual([3, 4, 5]);
+  it('does not show a carried page that is no longer memorized', () => {
+    const user: User = { ...baseUser, customPlan: plan, carryOverMode: 'add' };
+    const next = applyCarryOver(user, memorized, [5, 6], today);
+    const without5 = memorized.filter((p) => p.pageNumber !== 5);
+    expect(generateDailyAssignment(without5, [], next, today).pages).toEqual([6, 7, 8, 9]);
   });
 
-  it('adds on top when the plan was pushed back past today', () => {
-    const user = { ...baseUser, customPlan: { ...plan, cycleStartDate: '2026-10-20' } };
-    const next = applyCarryOver(user, memorized, [5], today);
-    expect(next.carryOver).toEqual({ day: TODAY, pages: [5] });
+  it('keeps "Go back a day" working after a shift (plan start is untouched)', () => {
+    const user = { ...baseUser, customPlan: plan };
+    const next = applyCarryOver(user, memorized, [5, 6], today);
+    // Tomorrow, going back a day repeats tomorrow's slot the day after.
+    expect(pagesOn(next, 18)).toEqual([8, 9, 1]);
+    expect(next.customPlan?.cycleStartDate).toBe('2026-10-15');
+  });
+
+  it('saving the plan in the editor keeps today as it is and folds the shift into the plan', () => {
+    const user = { ...baseUser, customPlan: plan };
+    const shifted = applyCarryOver(user, memorized, [5, 6], today);
+    const shown = scheduledDaysFrom(shifted, memorized, today, 3);
+    expect(shown).toEqual([[5, 6, 7], [8, 9, 1], [2, 3, 4]]);
+    const saved: User = {
+      ...settleCarryOverForNewPlan(shifted, TODAY),
+      customPlan: { days: shown, cycleStartDate: TODAY, direction: 'forward' },
+    };
+    expect(saved.scheduleShiftPages).toBe(0);
+    expect(pagesOn(saved, 17)).toEqual([5, 6, 7]);
+    expect(pagesOn(saved, 18)).toEqual([8, 9, 1]);
   });
 });

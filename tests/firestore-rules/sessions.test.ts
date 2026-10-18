@@ -117,11 +117,21 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       );
     });
 
-    it('rejects changing assignedPages after creation', async () => {
+    it('rejects replacing assignedPages', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertFails(
         updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
           assignedPages: [99, 100],
+        }),
+      );
+    });
+
+    it('allows assignedPages to grow (pages carried into the day)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1, 2, 3, 40, 41],
+          totalAssignedPages: 5,
         }),
       );
     });

@@ -4,7 +4,7 @@ import {
   getRevisionDateForUser,
   getRevisionDayForUser,
 } from '../fajrBoundary';
-import { generateDailyAssignment } from '../algorithm';
+import { calendarDaysBetween, generateDailyAssignment } from '../algorithm';
 import type { User, UserPage } from '../../types';
 
 const user: User = {
@@ -104,5 +104,33 @@ describe('revision day with the fajr boundary', () => {
     );
     expect(assignment.date).toBe('2026-10-16');
     expect(assignment.pages).toEqual([1, 2]);
+  });
+});
+
+describe('edge cases', () => {
+  it('has no fajr in the polar summer, and then turns the day at midnight', () => {
+    const tromso = { ...user, locationCoords: { latitude: 69.65, longitude: 18.96 } };
+    const june = new Date(2026, 5, 21, 12);
+    expect(getFajrTimeFor(june, tromso)).toBeNull();
+    expect(getRevisionDayForUser(tromso, june)).toBe('2026-06-21');
+    expect(getNextRevisionDayStart(tromso, june).getTime()).toBe(new Date(2026, 5, 22).getTime());
+  });
+
+  it('never returns a turnover in the past', () => {
+    // Coordinates on the other side of the world from the device.
+    const far = {
+      ...user,
+      locationCoords: { latitude: 0, longitude: user.locationCoords!.longitude + 180 },
+    };
+    for (let h = 0; h < 24; h++) {
+      const now = new Date(2026, 9, 17, h, 30);
+      expect(getNextRevisionDayStart(far, now).getTime()).toBeGreaterThan(now.getTime());
+    }
+  });
+
+  it('counts calendar days across daylight-saving changes', () => {
+    expect(calendarDaysBetween(new Date(2026, 2, 1), new Date(2026, 9, 17))).toBe(230);
+    expect(calendarDaysBetween(new Date(2026, 9, 17), new Date(2026, 11, 1))).toBe(45);
+    expect(calendarDaysBetween(new Date(2026, 9, 17, 23, 59), new Date(2026, 9, 18, 0, 1))).toBe(1);
   });
 });

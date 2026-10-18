@@ -178,8 +178,10 @@ export interface FirestoreUser {
   scheduleAnchorDate?: string;
   /** How carrying over yesterday's unrevised pages makes room (lib/carryOver). */
   carryOverMode?: 'shift' | 'add';
-  /** Pages carried into one revision day on top of its plan. */
-  carryOver?: { day: string; pages: number[] } | null;
+  /** Pages carried into one revision day (see User.carryOver). */
+  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /** Pages the schedule has been moved back by carry-overs. */
+  scheduleShiftPages?: number;
 }
 
 /**
@@ -224,7 +226,8 @@ export interface UpdateUserInput {
   fajrCalculationMethod?: string;
   scheduleAnchorDate?: string;
   carryOverMode?: 'shift' | 'add';
-  carryOver?: { day: string; pages: number[] } | null;
+  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  scheduleShiftPages?: number;
 }
 
 // ============================================================================
@@ -423,6 +426,9 @@ export interface UpdateSessionInput {
   completedAt?: Timestamp | null;
   durationMinutes?: number | null;
   completionPercentage?: number;
+  /** May only grow: pages carried into the day after the session started. */
+  assignedPages?: number[];
+  totalAssignedPages?: number;
 }
 
 // ============================================================================

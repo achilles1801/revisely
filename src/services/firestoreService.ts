@@ -210,6 +210,7 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.scheduleAnchorDate !== undefined) updateData.scheduleAnchorDate = updates.scheduleAnchorDate;
   if (updates.carryOverMode !== undefined) updateData.carryOverMode = updates.carryOverMode;
   if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
+  if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
 
   if (updates.notifications) {
     if (updates.notifications.enabled !== undefined) {
@@ -366,6 +367,8 @@ export async function updateSession(
   if (updates.completedAt !== undefined) updateData.completedAt = updates.completedAt;
   if (updates.durationMinutes !== undefined) updateData.durationMinutes = updates.durationMinutes;
   if (updates.completionPercentage !== undefined) updateData.completionPercentage = updates.completionPercentage;
+  if (updates.assignedPages !== undefined) updateData.assignedPages = updates.assignedPages;
+  if (updates.totalAssignedPages !== undefined) updateData.totalAssignedPages = updates.totalAssignedPages;
 
   await updateDoc(getSessionRef(sessionId, userId), updateData);
 }

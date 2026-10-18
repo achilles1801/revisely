@@ -69,6 +69,34 @@ export function recomputePagesFromLogs(
   });
 }
 
+/**
+ * Whole calendar days from `a` to `b`, by local date. Counted from the dates,
+ * not elapsed time: a day with a daylight-saving change lasts 23 or 25 hours,
+ * and dividing milliseconds by 24 h repeated or skipped a day of the schedule.
+ */
+export function calendarDaysBetween(a: Date, b: Date): number {
+  const ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((ub - ua) / MS_PER_DAY);
+}
+
+/**
+ * Day `dayIndex` of a repeating cycle, read `shift` pages earlier in the cycle's
+ * page sequence. Carrying pages over with "Keep daily amount" adds to the shift:
+ * every day keeps its size and the pages flow back by that many. Off days stay
+ * off.
+ */
+function shiftedCycleDay(days: number[][], dayIndex: number, shift: number): number[] {
+  const size = days[dayIndex].length;
+  if (!shift || size === 0) return [...days[dayIndex]];
+  const flat = days.flat();
+  const total = flat.length;
+  let pos = 0;
+  for (let i = 0; i < dayIndex; i++) pos += days[i].length;
+  const start = (((pos - shift) % total) + total) % total;
+  return Array.from({ length: size }, (_, i) => flat[(start + i) % total]);
+}
+
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -123,16 +151,13 @@ export function getPagesScheduledForDate(
   // editor ("Use auto-generated schedule").
   if (user.customPlan && user.customPlan.days.length > 0) {
     const cycleStart = parseLocalDateString(user.customPlan.cycleStartDate);
-    const target = startOfDay(date);
-    const daysSinceStart = Math.floor(
-      (target.getTime() - cycleStart.getTime()) / MS_PER_DAY,
-    );
+    const daysSinceStart = calendarDaysBetween(cycleStart, date);
     if (daysSinceStart < 0) return [];
     const idx =
       ((daysSinceStart % user.customPlan.days.length) +
         user.customPlan.days.length) %
       user.customPlan.days.length;
-    return [...user.customPlan.days[idx]];
+    return shiftedCycleDay(user.customPlan.days, idx, user.scheduleShiftPages ?? 0);
   }
 
   // Juz mode: cycle through juz that contain memorized pages, returning the
@@ -149,12 +174,12 @@ export function getPagesScheduledForDate(
   const perDay = Math.min(user.dailyPageCapacity, total);
   if (perDay <= 0) return [];
 
-  const start = startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
-  const target = startOfDay(date);
-  const daysSinceStart = Math.floor((target.getTime() - start.getTime()) / MS_PER_DAY);
+  const start = new Date(user.scheduleAnchorDate || user.createdAt);
+  const daysSinceStart = calendarDaysBetween(start, date);
   if (daysSinceStart < 0) return [];
 
-  const cycleOffset = ((daysSinceStart * perDay) % total + total) % total;
+  const shift = user.scheduleShiftPages ?? 0;
+  const cycleOffset = ((daysSinceStart * perDay - shift) % total + total) % total;
   const result: number[] = [];
   for (let i = 0; i < perDay; i++) {
     result.push(sortedPageNumbers[(cycleOffset + i) % total]);
@@ -180,25 +205,31 @@ function juzModePagesForDate(
   const juzList = Array.from(juzSet).sort((a, b) => a - b);
   if (juzList.length === 0) return [];
 
-  const start = startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
-  const target = startOfDay(date);
-  const daysSinceStart = Math.floor((target.getTime() - start.getTime()) / MS_PER_DAY);
+  const start = new Date(user.scheduleAnchorDate || user.createdAt);
+  const daysSinceStart = calendarDaysBetween(start, date);
   if (daysSinceStart < 0) return [];
 
   const juzPerDay = Math.min(user.dailyJuzCount, juzList.length);
-  const juzOffset =
-    ((daysSinceStart * juzPerDay) % juzList.length + juzList.length) %
-    juzList.length;
+  const pagesForDay = (dayNumber: number): number[] => {
+    const juzOffset =
+      ((dayNumber * juzPerDay) % juzList.length + juzList.length) % juzList.length;
+    const result: number[] = [];
+    for (let i = 0; i < juzPerDay; i++) {
+      const juz = juzList[(juzOffset + i) % juzList.length];
+      const pagesInJuz = memorizedPageNumbers
+        .filter((p) => juzKeyForPage(p) === juz)
+        .sort((a, b) => a - b);
+      result.push(...pagesInJuz);
+    }
+    return result;
+  };
 
-  const result: number[] = [];
-  for (let i = 0; i < juzPerDay; i++) {
-    const juz = juzList[(juzOffset + i) % juzList.length];
-    const pagesInJuz = memorizedPageNumbers
-      .filter((p) => juzKeyForPage(p) === juz)
-      .sort((a, b) => a - b);
-    result.push(...pagesInJuz);
-  }
-  return result;
+  const shift = user.scheduleShiftPages ?? 0;
+  if (!shift) return pagesForDay(daysSinceStart);
+  // The juz pattern repeats every cycleLength days; shift within that cycle.
+  const cycleLength = juzList.length / gcd(juzList.length, juzPerDay);
+  const cycle = Array.from({ length: cycleLength }, (_, i) => pagesForDay(i));
+  return shiftedCycleDay(cycle, daysSinceStart % cycleLength, shift);
 }
 
 /**
@@ -266,13 +297,10 @@ export function buildDefaultPlanDays(
   const cycleLength = Math.ceil(total / perDay);
 
   // Today's offset matches the live scheduler exactly.
-  const start = startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
-  const todayStart = startOfDay(today);
-  const daysSinceStart = Math.max(
-    0,
-    Math.floor((todayStart.getTime() - start.getTime()) / MS_PER_DAY),
-  );
-  const startOffset = ((daysSinceStart * perDay) % total + total) % total;
+  const start = new Date(user.scheduleAnchorDate || user.createdAt);
+  const daysSinceStart = Math.max(0, calendarDaysBetween(start, today));
+  const shift = direction === 'forward' ? user.scheduleShiftPages ?? 0 : 0;
+  const startOffset = ((daysSinceStart * perDay - shift) % total + total) % total;
 
   const days: number[][] = [];
   for (let d = 0; d < cycleLength; d++) {
@@ -534,6 +562,45 @@ export function calculatePageUrgency(
 }
 
 /**
+ * `length` consecutive days of the live schedule starting at `from`, as the plan
+ * editor shows them (carry-over shift included, pages carried into a day not).
+ */
+export function scheduledDaysFrom(
+  user: User,
+  memorizedPages: UserPage[],
+  from: Date,
+  length: number,
+): number[][] {
+  return Array.from({ length }, (_, i) =>
+    getPagesScheduledForDate(
+      user,
+      new Date(from.getFullYear(), from.getMonth(), from.getDate() + i),
+      memorizedPages,
+    ),
+  );
+}
+
+/**
+ * The pages for a day: its scheduled pages, plus any carried into it from the
+ * day before. Carried pages go first; with "Keep daily amount" they take the
+ * place of the first `skip` scheduled pages, which the shift moved back from
+ * the previous day (see lib/carryOver).
+ */
+export function getPagesForDay(
+  user: User,
+  date: Date,
+  memorizedPages: UserPage[],
+): number[] {
+  const scheduled = getPagesScheduledForDate(user, date, memorizedPages);
+  const carry = user.carryOver;
+  if (!carry || carry.day !== dateToISODay(date)) return scheduled;
+  const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
+  const carried = carry.pages.filter((p) => memorized.has(p));
+  const rest = scheduled.slice(carry.skip ?? 0).filter((p) => !carried.includes(p));
+  return [...carried, ...rest];
+}
+
+/**
  * Today's revision assignment. Driven directly by the schedule — the
  * algorithm picks no pages of its own. Smart Tracking influences only
  * the insights/ranking layer, not what's due to revise today.
@@ -548,13 +615,7 @@ export function generateDailyAssignment(
   // Slice order preserved on purpose — on wrap days the user sees the
   // tail of the previous cycle before the start of the new one, which
   // matches the scheduler's "you crossed the cycle boundary today" model.
-  const scheduled = getPagesScheduledForDate(user, today, memorized);
-  // Pages carried over into this day on top of its plan go first.
-  const extras =
-    user.carryOver && user.carryOver.day === dateToISODay(today)
-      ? user.carryOver.pages.filter((p) => !scheduled.includes(p))
-      : [];
-  const selectedPages = [...extras, ...scheduled];
+  const selectedPages = getPagesForDay(user, today, memorized);
 
   // juzBreakdown collapses by juz (insertion order) for display.
   const juzMap = new Map<number, number[]>();
