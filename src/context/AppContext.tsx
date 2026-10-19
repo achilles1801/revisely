@@ -23,6 +23,7 @@ import {
 } from '../lib/schedulePersistence';
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
+import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -746,6 +747,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await firestoreService.deleteSession(logId);
+      // A session's id is its revision day; its recordings go with it.
+      deleteRecordings(isRevisionRecordingOf(logId)).catch((err) =>
+        logger.warn('Could not delete session recordings', err),
+      );
 
       // Refresh logs
       const sessions = await firestoreService.getRecentSessions(100);
@@ -764,6 +769,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await Promise.all(logIds.map((id) => firestoreService.deleteSession(id)));
+      deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch((err) =>
+        logger.warn('Could not delete session recordings', err),
+      );
 
       // Refresh logs once after all deletions
       const sessions = await firestoreService.getRecentSessions(100);

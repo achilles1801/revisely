@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions } from 'react-native';
+import { Alert, Dimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
 import { nextVerseInJuz, pageOfVerse, toAyahRef, VerseKey } from '../../lib/verses';
 import { logger } from '../../lib/logger';
+import { isRecordingActive } from '../../lib/recordings';
 import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
 import { NowPlayingBar } from './NowPlayingBar';
@@ -81,6 +82,13 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
 
   const play = useCallback(() => {
     if (!selected) return;
+    if (isRecordingActive()) {
+      // It would play into the microphone.
+      setMenuPoint(null);
+      setSelected(null);
+      Alert.alert('Recording in progress', 'Stop the recording to play the recitation.');
+      return;
+    }
     const advance = (v: VerseKey) => {
       const next = nextVerseInJuz(v);
       return next && allowed.has(pageOfVerse(next)) ? next : null;
