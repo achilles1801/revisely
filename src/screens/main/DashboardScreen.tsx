@@ -169,7 +169,7 @@ export default function DashboardScreen() {
     () =>
       logs
         .filter((l) => l.pagesRevised.length > 0)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [logs],
   );
 
@@ -768,7 +768,9 @@ function SessionRow({
 
   const juzLabel = formatJuzLabel(juzNumbers);
   const surahLabel = formatSurahLabel(surahNames);
-  const logDate = new Date(log.date);
+  // 'YYYY-MM-DD' parsed as a local date; new Date(log.date) is UTC midnight,
+  // which shows the previous day west of Greenwich.
+  const logDate = parseLocalDay(log.date);
   const monthDay = logDate.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -807,6 +809,11 @@ function SessionRow({
       </View>
     </PressableScale>
   );
+}
+
+function parseLocalDay(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function formatJuzLabel(juzNumbers: number[]): string {
