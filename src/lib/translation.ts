@@ -50,9 +50,6 @@ export function resolveTranslation(id: string | null | undefined): TranslationIn
   return chosen ?? (TRANSLATIONS.find((t) => t.id === DEFAULT_TRANSLATION_ID) as TranslationInfo);
 }
 
-/** Kept for the existing callers: the default translation's display name. */
-export const TRANSLATION_NAME = 'Saheeh International';
-
 export interface TranslatedAyah {
   surahNumber: number;
   surahName: string;

@@ -19,7 +19,7 @@ import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
-import { MushafPager } from '../../components/MushafPager';
+import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
@@ -27,8 +27,7 @@ import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { RevisionTimerButton } from '../../components/revision/RevisionTimer';
-import { TranslationSheet } from '../../components/revision/TranslationSheet';
-import { AyahRef } from '../../lib/ayahBounds';
+import { useVerseActions } from '../../components/verse/useVerseActions';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import {
   elapsedMs,
@@ -119,13 +118,17 @@ export default function ActiveRevisionScreen() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
-  const [translationAyah, setTranslationAyah] = useState<AyahRef | null>(null);
 
-  // Press and hold a verse for its translation; it stays highlighted meanwhile.
-  const handleLongPressAyah = useCallback((ayah: AyahRef) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setTranslationAyah(ayah);
-  }, []);
+  // Hold a verse: highlight, Play (Husary), Translation. Playback stays within
+  // this session's pages, and the pages it turns are not marked revised
+  // (scrollToPage never reports an advance).
+  const pagerRef = useRef<MushafPagerHandle>(null);
+  const sessionPages = useMemo(() => assignment?.pages ?? [], [assignment]);
+  const verseActions = useVerseActions({
+    pages: sessionPages,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    playerBottom: 110,
+  });
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -584,12 +587,13 @@ export default function ActiveRevisionScreen() {
 
       <View style={styles.viewerWrap}>
         <MushafPager
+          ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}
           onPageChange={setCurrentPageNumber}
           onAdvance={handleAdvance}
-          onLongPressAyah={handleLongPressAyah}
-          highlightedAyah={translationAyah}
+          onLongPressAyah={verseActions.onLongPressAyah}
+          highlightedAyah={verseActions.highlightedAyah}
           extraData={extraData}
         />
 
@@ -654,10 +658,7 @@ export default function ActiveRevisionScreen() {
         onTogglePage={handleTogglePage}
       />
 
-      <TranslationSheet
-        ayah={translationAyah}
-        onClose={() => setTranslationAyah(null)}
-      />
+      {verseActions.overlay}
 
       <RevisionGuideModal
         visible={showGuide}
@@ -798,8 +799,8 @@ function RevisionGuideModal({
     },
     {
       icon: 'language-outline',
-      title: 'Hold a verse for its translation',
-      body: 'Press and hold any verse to highlight it and read its English translation.',
+      title: 'Hold a verse',
+      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',

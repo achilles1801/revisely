@@ -105,4 +105,17 @@ describe('recitation', () => {
     mockPlayers[0].emit({ didJustFinish: true });
     expect(r.getState()).toEqual({ status: 'idle', verse: null });
   });
+
+  it('belongs to the screen that started it', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 }, undefined, 'reader');
+    mockPlayers[0].emit({ playing: true });
+    expect(r.getState().owner).toBe('reader');
+    r.stop('revision'); // another screen leaving does not stop it
+    expect(r.getState().status).toBe('playing');
+    mockPlayers[0].emit({ didJustFinish: true }); // follows on, same owner
+    expect(r.getState().owner).toBe('reader');
+    r.stop('reader');
+    expect(r.getState().status).toBe('idle');
+  });
 });

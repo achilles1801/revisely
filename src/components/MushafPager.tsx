@@ -57,8 +57,9 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
-  /** Press and hold on a verse. Receives the verse under the finger. */
-  onLongPressAyah?: (ayah: AyahRef) => void;
+  /** Press and hold on a verse. Receives the verse under the finger and the
+   *  screen point pressed (to place a menu beside it). */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
   /** Verse to highlight (e.g. while its translation is open). */
   highlightedAyah?: AyahRef | null;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
@@ -77,8 +78,9 @@ export interface MushafPagerHandle {
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
-  onLongPressAyah?: (ayah: AyahRef) => void;
-  /** Only set on the page that holds the verse, so other pages don't re-render. */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
+  /** The highlighted verse, drawn on every page it has lines on (a verse can
+   *  run onto the next page). */
   highlight: AyahRef | null;
   highlightColor: string;
   pageTint: string | null;
@@ -118,9 +120,9 @@ const PageItem = React.memo(function PageItem({
 
   const handleLongPress = (e: GestureResponderEvent) => {
     if (!onLongPressAyah) return;
-    const { locationX, locationY } = e.nativeEvent;
+    const { locationX, locationY, pageX, pageY } = e.nativeEvent;
     const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
-    if (ayah) onLongPressAyah(ayah);
+    if (ayah) onLongPressAyah(ayah, { x: pageX, y: pageY });
   };
 
   const highlightRects = useMemo(
@@ -307,7 +309,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         pageNumber={item}
         onTap={onTap}
         onLongPressAyah={onLongPressAyah}
-        highlight={highlightedAyah && highlightedAyah.page === item ? highlightedAyah : null}
+        highlight={highlightedAyah ?? null}
         highlightColor={theme.accent + '40'}
         pageTint={palette.pageTint}
         tintColor={palette.textPrimary}

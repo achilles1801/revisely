@@ -37,6 +37,9 @@ export type RecitationStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'erro
 export interface RecitationState {
   status: RecitationStatus;
   verse: VerseKey | null;
+  /** Which screen started it: screens stay mounted under other tabs, and each
+   *  reacts only to its own recitation. */
+  owner?: string;
 }
 
 export const LOAD_TIMEOUT_MS = 15_000;
@@ -50,6 +53,7 @@ export class Recitation {
   private advance: (v: VerseKey) => VerseKey | null = nextVerseInJuz;
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
   private audioModeSet = false;
+  private owner: string | undefined;
 
   constructor(private reciterId: string = DEFAULT_RECITER_ID) {
     AppState.addEventListener('change', (s) => {
@@ -69,7 +73,7 @@ export class Recitation {
   }
 
   private set(state: RecitationState) {
-    this.state = state;
+    this.state = state.status === 'idle' ? state : { ...state, owner: this.owner };
     this.listeners.forEach((l) => l(state));
   }
 
@@ -95,8 +99,13 @@ export class Recitation {
   }
 
   /** Play `verse`, then (by default) the following verses to the end of its juz. */
-  play(verse: VerseKey, advance: (v: VerseKey) => VerseKey | null = nextVerseInJuz) {
+  play(
+    verse: VerseKey,
+    advance: (v: VerseKey) => VerseKey | null = nextVerseInJuz,
+    owner: string | undefined = this.owner,
+  ) {
     this.advance = advance;
+    this.owner = owner;
     const player = this.ensurePlayer();
     this.clearLoadTimer();
     this.set({ status: 'loading', verse });
@@ -132,7 +141,9 @@ export class Recitation {
     this.set({ status: 'playing', verse });
   }
 
-  stop() {
+  /** Stop playback; with `owner`, only if that screen started it. */
+  stop(owner?: string) {
+    if (owner !== undefined && this.state.owner !== owner) return;
     this.clearLoadTimer();
     this.player?.pause();
     if (this.state.status !== 'idle') this.set({ status: 'idle', verse: null });

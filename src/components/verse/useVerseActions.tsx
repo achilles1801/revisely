@@ -33,17 +33,19 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24 }: Option
   const [menuPoint, setMenuPoint] = useState<{ x: number; y: number } | null>(null);
   const [sheetVerse, setSheetVerse] = useState<AyahRef | null>(null);
   const allowed = useMemo(() => new Set(pages), [pages]);
+  const [owner] = useState(() => `verse-actions-${Math.random().toString(36).slice(2)}`);
   const onShowPageRef = useRef(onShowPage);
   onShowPageRef.current = onShowPage;
 
   useEffect(() => recitation.subscribe(setPlayback), [recitation]);
-  // Leaving the screen stops the recitation.
-  useEffect(() => () => recitation.stop(), [recitation]);
+  // Leaving the screen stops the recitation it started.
+  useEffect(() => () => recitation.stop(owner), [recitation, owner]);
+  const mine = playback.owner === owner;
 
   // While playing, the highlight follows the recited verse onto its page.
   const playingRef = useMemo(
-    () => (playback.status !== 'idle' && playback.verse ? toAyahRef(playback.verse) : null),
-    [playback],
+    () => (mine && playback.status !== 'idle' && playback.verse ? toAyahRef(playback.verse) : null),
+    [playback, mine],
   );
   useEffect(() => {
     if (playingRef && allowed.has(playingRef.page)) onShowPageRef.current?.(playingRef.page);
@@ -67,10 +69,10 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24 }: Option
       const next = nextVerseInJuz(v);
       return next && allowed.has(pageOfVerse(next)) ? next : null;
     };
-    recitation.play(selected, advance);
+    recitation.play(selected, advance, owner);
     setMenuPoint(null);
     setSelected(null);
-  }, [selected, allowed, recitation]);
+  }, [selected, allowed, recitation, owner]);
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
@@ -90,8 +92,8 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24 }: Option
   const closeSheet = useCallback(() => {
     setSheetVerse(null);
     setSelected(null);
-    recitation.stop();
-  }, [recitation]);
+    recitation.stop(owner);
+  }, [recitation, owner]);
 
   const changeTranslation = useCallback(
     (translationId: string) => {
@@ -114,10 +116,10 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24 }: Option
         onClose={closeSheet}
       />
       <NowPlayingBar
-        state={playback}
+        state={mine ? playback : { status: 'idle', verse: null }}
         onPause={() => recitation.pause()}
         onResume={() => recitation.resume()}
-        onStop={() => recitation.stop()}
+        onStop={() => recitation.stop(owner)}
         bottom={playerBottom}
       />
     </>

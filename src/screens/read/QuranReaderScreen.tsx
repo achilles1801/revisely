@@ -17,6 +17,7 @@ import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
+import { useVerseActions } from '../../components/verse/useVerseActions';
 import { TimerButton } from '../../components/TimerButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -57,6 +58,12 @@ export default function QuranReaderScreen() {
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pagerRef = useRef<MushafPagerHandle>(null);
   const { timer, notePage } = useReadingTimer();
+  // Hold a verse: highlight, Play (Husary), Translation. Recitation turns pages.
+  const verseActions = useVerseActions({
+    pages: ALL_PAGES,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    playerBottom: 96,
+  });
 
   useEffect(() => {
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
@@ -119,6 +126,8 @@ export default function QuranReaderScreen() {
         pages={ALL_PAGES}
         initialPage={initialPage}
         onPageChange={handlePageChange}
+        onLongPressAyah={verseActions.onLongPressAyah}
+        highlightedAyah={verseActions.highlightedAyah}
       />
 
       <View style={styles.topBar} pointerEvents="box-none">
@@ -163,6 +172,8 @@ export default function QuranReaderScreen() {
         </Text>
       </View>
 
+      {verseActions.overlay}
+
       <ReaderGuideModal
         visible={showGuide}
         onClose={dismissGuideForever}
@@ -191,6 +202,11 @@ function ReaderGuideModal({
       icon: 'book-outline',
       title: 'Swipe to turn pages',
       body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book. Drag the bar at the bottom to jump anywhere — page 1 is at the right.',
+    },
+    {
+      icon: 'hand-left-outline',
+      title: 'Hold a verse',
+      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
     },
     {
       icon: 'time-outline',
