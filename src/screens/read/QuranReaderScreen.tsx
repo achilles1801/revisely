@@ -15,7 +15,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
-import { MushafPager } from '../../components/MushafPager';
+import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
+import { MushafScrubber } from '../../components/MushafScrubber';
 import { TimerButton } from '../../components/TimerButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -54,6 +55,7 @@ export default function QuranReaderScreen() {
   const [guideSeen, setGuideSeen] = useState(true);
 
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pagerRef = useRef<MushafPagerHandle>(null);
   const { timer, notePage } = useReadingTimer();
 
   useEffect(() => {
@@ -83,6 +85,12 @@ export default function QuranReaderScreen() {
     [notePage],
   );
 
+  // The pager reports the jump through onPageChange, so history and the
+  // timer's page credit work exactly as they do for a swipe.
+  const handleJump = useCallback((pageNumber: number) => {
+    pagerRef.current?.scrollToPage(pageNumber);
+  }, []);
+
   // Credit the page the reader opened on (and the current page whenever a
   // session starts while reading).
   const timerRunning = timer?.runningSince != null;
@@ -107,6 +115,7 @@ export default function QuranReaderScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <MushafPager
+        ref={pagerRef}
         pages={ALL_PAGES}
         initialPage={initialPage}
         onPageChange={handlePageChange}
@@ -147,8 +156,11 @@ export default function QuranReaderScreen() {
         )}
       </View>
 
-      <View style={styles.footer} pointerEvents="none">
-        <Text style={styles.pageNum}>{currentPage}</Text>
+      <View style={styles.footer} pointerEvents="box-none">
+        <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
+        <Text style={styles.pageNum} pointerEvents="none">
+          {currentPage}
+        </Text>
       </View>
 
       <ReaderGuideModal
@@ -178,7 +190,7 @@ function ReaderGuideModal({
     {
       icon: 'book-outline',
       title: 'Swipe to turn pages',
-      body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book.',
+      body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book. Drag the bar at the bottom to jump anywhere — page 1 is at the right.',
     },
     {
       icon: 'time-outline',
@@ -302,6 +314,7 @@ const makeStyles = (palette: ReadPalette) =>
       right: 0,
       bottom: 0,
       paddingBottom: spacing.xl,
+      paddingHorizontal: spacing.lg,
       alignItems: 'center',
     },
     pageNum: {

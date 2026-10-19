@@ -163,6 +163,10 @@ export default function ReadIndexScreen() {
     <SafeAreaView style={styles.container}>
       <FlatList
         data={juzGroups}
+        // Long list: keep the scroll indicator visible, in a colour that
+        // reads on both the black and white Read palettes.
+        showsVerticalScrollIndicator
+        indicatorStyle={isDark ? 'white' : 'black'}
         keyExtractor={(item) => `juz-group-${item.juz}`}
         ListHeaderComponent={header}
         contentContainerStyle={[
