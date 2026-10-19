@@ -213,6 +213,7 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
   if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
   if (updates.translationId !== undefined) updateData.translationId = updates.translationId;
+  if (updates.reciter !== undefined) updateData.reciter = updates.reciter;
 
   if (updates.notifications) {
     if (updates.notifications.enabled !== undefined) {

@@ -14,6 +14,8 @@ interface VerseMenuProps {
   /** Screen point of the press; null hides the menu. */
   point: { x: number; y: number } | null;
   onPlay: () => void;
+  /** Under "Play": who recites, and how far. */
+  playSubtitle?: string;
   onTranslation: () => void;
   onClose: () => void;
 }
@@ -23,7 +25,7 @@ interface VerseMenuProps {
  * the screen, not a Modal: opening the verse sheet (a Modal) while a Modal is
  * still dismissing fails on iOS. Render it last in a full-screen container.
  */
-export function VerseMenu({ point, onPlay, onTranslation, onClose }: VerseMenuProps) {
+export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose }: VerseMenuProps) {
   const { theme } = useTheme();
   const pos = point ? menuPosition(point, Dimensions.get('window')) : { left: 0, top: 0 };
 
@@ -59,7 +61,7 @@ export function VerseMenu({ point, onPlay, onTranslation, onClose }: VerseMenuPr
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
       <View style={[styles.menu, { left: pos.left, top: pos.top }]}>
         <GlassCard elevated style={StyleSheet.absoluteFillObject} />
-        <Row icon="play" title="Play" subtitle="to the end of the juz" onPress={onPlay} />
+        <Row icon="play" title="Play" subtitle={playSubtitle ?? 'to the end of the juz'} onPress={onPlay} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Row icon="language-outline" title="Translation" onPress={onTranslation} />
       </View>

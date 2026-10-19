@@ -7,7 +7,7 @@ import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { getSurahDisplay } from '../../lib/quranData';
-import { RECITERS, RecitationState } from '../../lib/recitation';
+import { RecitationState } from '../../lib/recitation';
 
 interface NowPlayingBarProps {
   state: RecitationState;
@@ -15,10 +15,22 @@ interface NowPlayingBarProps {
   onResume: () => void;
   onStop: () => void;
   bottom: number;
+  /** Who is reciting (reciter and style). */
+  voiceName: string;
+  /** Tap on the reciter's name: choose another. */
+  onPickReciter: () => void;
 }
 
 /** Floating controls while a verse recitation is playing, paused or failed. */
-export function NowPlayingBar({ state, onPause, onResume, onStop, bottom }: NowPlayingBarProps) {
+export function NowPlayingBar({
+  state,
+  onPause,
+  onResume,
+  onStop,
+  bottom,
+  voiceName,
+  onPickReciter,
+}: NowPlayingBarProps) {
   const { theme } = useTheme();
   if (state.status === 'idle' || !state.verse) return null;
   const surah = getSurahDisplay(state.verse.sura)?.nameDisplay ?? '';
@@ -44,14 +56,25 @@ export function NowPlayingBar({ state, onPause, onResume, onStop, bottom }: NowP
             />
           )}
         </Pressable>
-        <View style={{ flex: 1 }}>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={onPickReciter}
+          accessibilityRole="button"
+          accessibilityLabel={`${voiceName}. Choose reciter`}
+        >
           <Text style={[typography.bodyMedium, { color: theme.textPrimary }]} numberOfLines={1}>
             {surah} {state.verse.sura}:{state.verse.ayah}
           </Text>
-          <Text style={[typography.caption, { color: failed ? theme.error : theme.textMuted }]} numberOfLines={1}>
-            {failed ? "Couldn't play. Check your connection." : RECITERS[0].name}
-          </Text>
-        </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Text
+              style={[typography.caption, { color: failed ? theme.error : theme.textMuted, flexShrink: 1 }]}
+              numberOfLines={1}
+            >
+              {failed ? "Couldn't play. Check your connection." : voiceName}
+            </Text>
+            {!failed && <Ionicons name="chevron-down" size={12} color={theme.textMuted} />}
+          </View>
+        </Pressable>
         <Pressable onPress={onStop} hitSlop={10} accessibilityLabel="Stop">
           <Ionicons name="close" size={22} color={theme.textSecondary} />
         </Pressable>

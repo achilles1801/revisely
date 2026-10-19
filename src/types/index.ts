@@ -78,6 +78,8 @@ export interface User {
   scheduleShiftPages?: number;
   // Translation shown when holding a verse (an id from lib/translation TRANSLATIONS).
   translationId?: string;
+  // Reciter and style for Play on a held verse: '<reciter>:<style>' (lib/recitation).
+  reciter?: string;
 }
 
 /** A user-edited schedule that overrides the default sequential plan. */

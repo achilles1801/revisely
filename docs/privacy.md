@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-10-19**
+**Last updated: 2026-10-20**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
 
@@ -71,9 +71,10 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **Apple Inc.** | App Store, Apple Push Notification service, Sign in with Apple, App Attest | United States |
 | **Sentry / Functional Software, Inc.** | Crash and error reporting | United States |
 | **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
-| **AlQuran Cloud (Islamic Network)** | Verse text, English translations and recitation audio | Not specified |
+| **AlQuran Cloud (Islamic Network)** | Verse text and English translations | Not specified |
+| **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
 
-When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio from AlQuran Cloud's audio service (cdn.islamic.network). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
+When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
 
 We do not transfer your data to any party not listed above for any other purpose.
 

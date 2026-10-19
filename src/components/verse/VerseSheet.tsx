@@ -20,6 +20,8 @@ import { radius } from '../../theme/radius';
 import { getSurahDisplay } from '../../lib/quranData';
 import { getVerseText, resolveTranslation, TRANSLATIONS, VerseText } from '../../lib/translation';
 import { nextVerse, previousVerse } from '../../lib/verses';
+import { resolveVoice, voiceLabel } from '../../lib/recitation';
+import { ReciterList } from './ReciterList';
 import { AyahRef } from '../../lib/ayahBounds';
 
 interface VerseSheetProps {
@@ -27,6 +29,9 @@ interface VerseSheetProps {
   verse: AyahRef | null;
   translationId: string | undefined;
   onChangeTranslation: (id: string) => void;
+  /** Reciter and style for Play ('<reciter>:<style>'). */
+  reciter: string | undefined;
+  onChangeReciter: (choice: string) => void;
   /** Previous / next verse. */
   onNavigate: (verse: { sura: number; ayah: number }) => void;
   onClose: () => void;
@@ -46,6 +51,8 @@ export function VerseSheet({
   verse,
   translationId,
   onChangeTranslation,
+  reciter,
+  onChangeReciter,
   onNavigate,
   onClose,
 }: VerseSheetProps) {
@@ -53,7 +60,7 @@ export function VerseSheet({
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [menu, setMenu] = useState<'closed' | 'root' | 'translations'>('closed');
+  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
   const translation = resolveTranslation(translationId);
 
   useEffect(() => {
@@ -129,12 +136,31 @@ export function VerseSheet({
               <View style={styles.dropdown}>
                 <GlassCard elevated style={StyleSheet.absoluteFillObject} />
                 {menu === 'root' ? (
-                  <Pressable style={styles.dropRow} onPress={() => setMenu('translations')}>
-                    <Text style={[typography.bodyMedium, { color: theme.textPrimary, flex: 1 }]}>
-                      Select translation
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                  </Pressable>
+                  <>
+                    <Pressable style={styles.dropRow} onPress={() => setMenu('translations')}>
+                      <Text style={[typography.bodyMedium, { color: theme.textPrimary, flex: 1 }]}>
+                        Select translation
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                    </Pressable>
+                    <Pressable style={styles.dropRow} onPress={() => setMenu('reciters')}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Select reciter</Text>
+                        <Text style={[typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
+                          {voiceLabel(resolveVoice(reciter))}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+                    </Pressable>
+                  </>
+                ) : menu === 'reciters' ? (
+                  <ReciterList
+                    value={reciter}
+                    onChange={(choice) => {
+                      onChangeReciter(choice);
+                    }}
+                    maxHeight={320}
+                  />
                 ) : (
                   TRANSLATIONS.map((t) => (
                     <Pressable

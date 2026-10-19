@@ -59,6 +59,7 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     carryOver: fsUser.carryOver,
     scheduleShiftPages: fsUser.scheduleShiftPages,
     translationId: fsUser.translationId,
+    reciter: fsUser.reciter,
   };
 }
 
@@ -381,6 +382,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           scheduleShiftPages: updatedUser.scheduleShiftPages,
         }),
         ...(updatedUser.translationId !== undefined && { translationId: updatedUser.translationId }),
+        ...(updatedUser.reciter !== undefined && { reciter: updatedUser.reciter }),
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore

@@ -140,6 +140,12 @@ describe('users/{userId}', () => {
       );
     });
 
+    it('owner can choose a reciter', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { reciter: 'minshawi:mujawwad' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { reciter: 'x'.repeat(61) }));
+    });
+
     it('owner can choose a translation', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { translationId: 'en.sahih' }));

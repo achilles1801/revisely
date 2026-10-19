@@ -134,8 +134,8 @@ service cloud.firestore {
         'scheduleAnchorDate',
         // Carrying yesterday's unrevised pages into today (lib/carryOver).
         'carryOverMode', 'carryOver', 'scheduleShiftPages',
-        // Translation shown when holding a verse.
-        'translationId',
+        // Translation and reciter for a held verse.
+        'translationId', 'reciter',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -236,6 +236,9 @@ service cloud.firestore {
                          (!('skip' in incomingData().carryOver) ||
                           (incomingData().carryOver.skip is int &&
                            isInRange(incomingData().carryOver.skip, 0, 604))))) &&
+                       (!hasField('reciter') ||
+                        (incomingData().reciter is string &&
+                         incomingData().reciter.size() <= 60)) &&
                        (!hasField('translationId') ||
                         (incomingData().translationId is string &&
                          incomingData().translationId.size() <= 40)) &&
