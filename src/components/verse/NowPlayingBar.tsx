@@ -9,25 +9,35 @@ import { radius } from '../../theme/radius';
 import { getSurahDisplay } from '../../lib/quranData';
 import { RecitationState } from '../../lib/recitation';
 
+/** Height of the bar; screens reserve this much under the page for it. */
+export const NOW_PLAYING_HEIGHT = 52;
+
 interface NowPlayingBarProps {
   state: RecitationState;
   onPause: () => void;
   onResume: () => void;
   onStop: () => void;
-  bottom: number;
+  /** Previous / next verse; omitted when there is none (start or end of range). */
+  onPrevious?: () => void;
+  onNext?: () => void;
   /** Who is reciting (reciter and style). */
   voiceName: string;
   /** Tap on the reciter's name: choose another. */
   onPickReciter: () => void;
 }
 
-/** Floating controls while a verse recitation is playing, paused or failed. */
+/**
+ * Recitation controls, laid out in the screen's bottom bar (never over the
+ * page): stop, the verse and reciter (tap to change reciter), previous,
+ * play/pause, next.
+ */
 export function NowPlayingBar({
   state,
   onPause,
   onResume,
   onStop,
-  bottom,
+  onPrevious,
+  onNext,
   voiceName,
   onPickReciter,
 }: NowPlayingBarProps) {
@@ -35,64 +45,77 @@ export function NowPlayingBar({
   if (state.status === 'idle' || !state.verse) return null;
   const surah = getSurahDisplay(state.verse.sura)?.nameDisplay ?? '';
   const failed = state.status === 'error';
+  const playing = state.status === 'playing';
+
+  const skip = (icon: 'play-skip-back' | 'play-skip-forward', label: string, onPress?: () => void) => (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      hitSlop={6}
+      style={styles.iconBtn}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !onPress }}
+    >
+      <Ionicons name={icon} size={18} color={onPress ? theme.textPrimary : theme.textMuted} />
+    </Pressable>
+  );
 
   return (
-    <View style={[styles.bar, { bottom }]} pointerEvents="box-none">
-      <View style={styles.inner}>
-        <GlassCard elevated style={StyleSheet.absoluteFillObject} />
-        <Pressable
-          onPress={state.status === 'playing' ? onPause : onResume}
-          hitSlop={8}
-          style={[styles.btn, { backgroundColor: theme.accent }]}
-          accessibilityLabel={state.status === 'playing' ? 'Pause' : failed ? 'Retry' : 'Play'}
-        >
-          {state.status === 'loading' ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons
-              name={state.status === 'playing' ? 'pause' : failed ? 'refresh' : 'play'}
-              size={18}
-              color="#fff"
-            />
-          )}
-        </Pressable>
-        <Pressable
-          style={{ flex: 1 }}
-          onPress={onPickReciter}
-          accessibilityRole="button"
-          accessibilityLabel={`${voiceName}. Choose reciter`}
-        >
-          <Text style={[typography.bodyMedium, { color: theme.textPrimary }]} numberOfLines={1}>
-            {surah} {state.verse.sura}:{state.verse.ayah}
+    <View style={styles.inner}>
+      <GlassCard elevated style={StyleSheet.absoluteFillObject} />
+      <Pressable onPress={onStop} hitSlop={8} style={styles.iconBtn} accessibilityLabel="Stop">
+        <Ionicons name="stop" size={16} color={theme.textSecondary} />
+      </Pressable>
+      <Pressable
+        style={styles.text}
+        onPress={onPickReciter}
+        accessibilityRole="button"
+        accessibilityLabel={`${surah} ${state.verse.sura}:${state.verse.ayah}, ${voiceName}. Choose reciter`}
+      >
+        <Text style={[typography.bodySmall, { color: theme.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
+          {surah} {state.verse.sura}:{state.verse.ayah}
+        </Text>
+        <View style={styles.voiceRow}>
+          <Text
+            style={[typography.caption, { color: failed ? theme.error : theme.textMuted, flexShrink: 1 }]}
+            numberOfLines={1}
+          >
+            {failed ? "Couldn't play. Check your connection." : voiceName}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Text
-              style={[typography.caption, { color: failed ? theme.error : theme.textMuted, flexShrink: 1 }]}
-              numberOfLines={1}
-            >
-              {failed ? "Couldn't play. Check your connection." : voiceName}
-            </Text>
-            {!failed && <Ionicons name="chevron-down" size={12} color={theme.textMuted} />}
-          </View>
-        </Pressable>
-        <Pressable onPress={onStop} hitSlop={10} accessibilityLabel="Stop">
-          <Ionicons name="close" size={22} color={theme.textSecondary} />
-        </Pressable>
-      </View>
+          {!failed && <Ionicons name="chevron-down" size={12} color={theme.textMuted} />}
+        </View>
+      </Pressable>
+      {skip('play-skip-back', 'Previous verse', onPrevious)}
+      <Pressable
+        onPress={playing ? onPause : onResume}
+        hitSlop={8}
+        style={[styles.playBtn, { backgroundColor: theme.accent }]}
+        accessibilityLabel={playing ? 'Pause' : failed ? 'Retry' : 'Play'}
+      >
+        {state.status === 'loading' ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Ionicons name={playing ? 'pause' : failed ? 'refresh' : 'play'} size={18} color="#fff" />
+        )}
+      </Pressable>
+      {skip('play-skip-forward', 'Next verse', onNext)}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { position: 'absolute', left: spacing.md, right: spacing.md },
   inner: {
+    height: NOW_PLAYING_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
     borderRadius: radius.full,
     overflow: 'hidden',
   },
-  btn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  text: { flex: 1, paddingHorizontal: spacing.xs },
+  voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  iconBtn: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
+  playBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 });

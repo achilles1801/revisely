@@ -93,8 +93,10 @@ export function FloatingTimer() {
   const now = useNow(running && !open, 1000);
 
   const name = route?.name;
-  const hidden = keyboardOpen || (name != null && FLOATING_TIMER_HIDDEN_ON.has(name));
-  const custom = route ? offsets?.[route.key] : undefined;
+  const placement = route ? offsets?.[route.key] : undefined;
+  const hidden =
+    keyboardOpen || placement === 'hidden' || (name != null && FLOATING_TIMER_HIDDEN_ON.has(name));
+  const custom = typeof placement === 'number' ? placement : undefined;
   const bottom =
     custom ??
     (name != null && NO_TAB_BAR.has(name) ? insets.bottom + spacing.md : tabFootprint + spacing.sm);

@@ -31,7 +31,10 @@ import { useVerseActions } from '../../components/verse/useVerseActions';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
-import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
+import {
+  FLOATING_TIMER_SIZE,
+  useFloatingTimerOffset,
+} from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -52,7 +55,11 @@ import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 const AUTO_SAVE_INTERVAL_MS = 5000;
 // Where the now-playing bar sits, and roughly how tall the "Submit session"
 // bar is: the floating timer is raised above whichever is showing.
-const PLAYER_BOTTOM = 110;
+// The bottom bar: tall enough for the player (otherwise the page number).
+const FOOTER_CONTENT_HEIGHT = 56;
+const FOOTER_PADDING_BOTTOM = spacing.xs;
+const TIMER_SLOT_IDLE = FLOATING_TIMER_SIZE + spacing.md * 2;
+const TIMER_SLOT_RUNNING = 136;
 const SUBMIT_BAR_HEIGHT = 74;
 const UNDO_TOAST_TOP = spacing.xl + spacing.md + 56;
 const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
@@ -144,9 +151,15 @@ export default function ActiveRevisionScreen() {
   const verseActions = useVerseActions({
     pages: sessionPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
-    playerBottom: PLAYER_BOTTOM,
     currentPage: currentPageNumber ?? undefined,
   });
+  // The player sits in the bottom bar, under the page (never over it).
+  // Tapping the page hides or shows it; a new recitation shows it again.
+  const [playerShown, setPlayerShown] = useState(true);
+  useEffect(() => {
+    if (verseActions.playerVisible) setPlayerShown(true);
+  }, [verseActions.playerVisible]);
+  const togglePlayer = useCallback(() => setPlayerShown((v) => !v), []);
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -261,7 +274,7 @@ export default function ActiveRevisionScreen() {
   // runs are credited to it. It is general, so unlike the old in-bar revision
   // stopwatch, leaving this screen does not pause it and finishing today's
   // pages does not stop it; the user ends it from the timer itself.
-  const { noteRevisedPages } = useReadingTimer();
+  const { noteRevisedPages, timer } = useReadingTimer();
   const insets = useSafeAreaInsets();
   const prevCompletedRef = useRef(completedPages);
   useEffect(() => {
@@ -271,16 +284,16 @@ export default function ActiveRevisionScreen() {
     if (added.length > 0) noteRevisedPages(added);
   }, [completedPages, noteRevisedPages]);
 
-  // Keep the floating timer clear of whatever is at the bottom: the
-  // now-playing bar, the undo toast and the submit bar.
+  // The floating timer docks in the bottom bar's right-hand slot (above the
+  // submit bar when it shows), and moves above the undo toast while it shows.
   const submitVisible =
     !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
-  const timerClearance = Math.max(
-    verseActions.playerVisible ? PLAYER_BOTTOM + 64 : 0,
-    undoState ? UNDO_TOAST_TOP : 0,
-    submitVisible ? insets.bottom + SUBMIT_BAR_HEIGHT + spacing.sm : 0,
-  );
-  useFloatingTimerOffset(timerClearance > 0 ? timerClearance : null);
+  const docked =
+    insets.bottom +
+    (submitVisible ? SUBMIT_BAR_HEIGHT : 0) +
+    FOOTER_PADDING_BOTTOM +
+    (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2;
+  useFloatingTimerOffset(Math.max(docked, undoState ? UNDO_TOAST_TOP : 0));
 
   if (!user || !assignment) {
     return (
@@ -575,6 +588,23 @@ export default function ActiveRevisionScreen() {
         }
       />
 
+      <View style={styles.breadcrumb} pointerEvents="none">
+        <Text style={styles.crumbLeft} numberOfLines={1}>
+          Juz {currentJuz} · Hizb {currentHizb}
+        </Text>
+        <View style={styles.crumbRight}>
+          {firstSurahOnPage?.name ? (
+            <Text style={styles.crumbSurah} numberOfLines={1}>
+              {firstSurahOnPage.name}
+            </Text>
+          ) : null}
+          {firstSurahOnPage?.nameArabic ? (
+            <Text style={styles.crumbArabic}>{firstSurahOnPage.nameArabic}</Text>
+          ) : null}
+        </View>
+      </View>
+
+      {/* The page fits between the breadcrumb and the bottom bar. */}
       <View style={styles.viewerWrap}>
         <MushafPager
           ref={pagerRef}
@@ -584,26 +614,21 @@ export default function ActiveRevisionScreen() {
           onAdvance={handleAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
+          onTap={togglePlayer}
           extraData={extraData}
         />
+      </View>
 
-        <View style={styles.breadcrumb} pointerEvents="none">
-          <Text style={styles.crumbLeft}>
-            Juz {currentJuz} · Hizb {currentHizb}
-          </Text>
-          <View style={styles.crumbRight}>
-            {firstSurahOnPage?.name ? (
-              <Text style={styles.crumbSurah}>{firstSurahOnPage.name}</Text>
-            ) : null}
-            {firstSurahOnPage?.nameArabic ? (
-              <Text style={styles.crumbArabic}>{firstSurahOnPage.nameArabic}</Text>
-            ) : null}
-          </View>
+      <View style={styles.footer}>
+        <View style={styles.footerContent}>
+          {verseActions.player && playerShown ? (
+            verseActions.player
+          ) : (
+            <Text style={styles.pageNum}>{displayPageNumber}</Text>
+          )}
         </View>
-
-        <View style={styles.footer} pointerEvents="none">
-          <Text style={styles.pageNum}>{displayPageNumber}</Text>
-        </View>
+        {/* The floating timer docks here (wider while it shows a clock). */}
+        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
       </View>
 
       {/* All revised → submit button slides up */}
@@ -716,10 +741,9 @@ const makeStyles = (theme: ThemeColors) =>
     retryButton: { minWidth: 160 },
     viewerWrap: { flex: 1 },
     breadcrumb: {
-      position: 'absolute',
-      top: spacing.sm,
-      left: spacing.md,
-      right: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      gap: spacing.sm,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -743,13 +767,20 @@ const makeStyles = (theme: ThemeColors) =>
       color: theme.textPrimary,
     },
     footer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: spacing.md,
+      flexDirection: 'row',
       alignItems: 'center',
+      paddingLeft: spacing.md,
+      paddingBottom: FOOTER_PADDING_BOTTOM,
+      gap: spacing.xs,
+    },
+    footerContent: {
+      flex: 1,
+      height: FOOTER_CONTENT_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'stretch',
     },
     pageNum: {
+      textAlign: 'center',
       fontSize: 13,
       fontWeight: '500',
       color: theme.textPrimary,

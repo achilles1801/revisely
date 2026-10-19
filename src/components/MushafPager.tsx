@@ -29,21 +29,15 @@ import {
   pagesAround,
   prefetchPages,
 } from '../lib/pageCache';
-import {
-  AyahRef,
-  ayahAt,
-  ayahRects,
-  BOUNDS_WIDTH,
-  PAGE_IMAGE_ASPECT,
-} from '../lib/ayahBounds';
+import { AyahRef, ayahAt, ayahRects } from '../lib/ayahBounds';
+import { fitPage, PageSize } from '../lib/pageFit';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Pages fill the screen width at the images' own aspect (2600×4206), so the
 // verse coordinates in ayahBounds map onto the rendered page by one scale factor.
-const PAGE_WIDTH = SCREEN_WIDTH;
-const PAGE_HEIGHT = SCREEN_WIDTH / PAGE_IMAGE_ASPECT;
-const BOUNDS_SCALE = PAGE_WIDTH / BOUNDS_WIDTH;
+// Until the pager has measured itself: full width (the old behaviour).
+const DEFAULT_SIZE = fitPage(SCREEN_WIDTH, 0);
 // How long after scrollToPage a report of another page is taken as stale.
 const JUMP_SETTLE_MS = 500;
 
@@ -86,6 +80,8 @@ interface PageItemProps {
   pageTint: string | null;
   tintColor: string;
   bg: string;
+  /** The page as drawn: fits the pager, so controls never cover it. */
+  size: PageSize;
 }
 
 const PageItem = React.memo(function PageItem({
@@ -97,7 +93,9 @@ const PageItem = React.memo(function PageItem({
   pageTint,
   tintColor,
   bg,
+  size,
 }: PageItemProps) {
+  const BOUNDS_SCALE = size.scale;
   // A cached page renders from disk on the first frame. Otherwise it is
   // downloaded into the cache first; if that fails, the image loads straight
   // from Storage as it used to.
@@ -152,7 +150,7 @@ const PageItem = React.memo(function PageItem({
         // The pressable is exactly the image, so touch locations are page
         // coordinates.
         <Pressable
-          style={styles.imageBox}
+          style={{ width: size.width, height: size.height }}
           onPress={onTap}
           onLongPress={onLongPressAyah ? handleLongPress : undefined}
           delayLongPress={350}
@@ -176,7 +174,7 @@ const PageItem = React.memo(function PageItem({
           <Image
             source={{ uri }}
             style={[
-              styles.image,
+              { width: size.width, height: size.height },
               pageTint != null && { tintColor: pageTint, opacity: 0.92 },
             ]}
             fadeDuration={0}
@@ -221,6 +219,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   const { isDark, theme } = useTheme();
   const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
+  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_SIZE);
   const currentIndexRef = useRef(0);
   // Only auto-scroll on first mount. After that, the user drives position by
   // swiping; re-scrolling on every `pages` reference change would yank them
@@ -319,9 +318,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         pageTint={palette.pageTint}
         tintColor={palette.textPrimary}
         bg={palette.pageBg}
+        size={pageSize}
       />
     ),
-    [onTap, onLongPressAyah, highlightedAyah, theme.accent, palette],
+    [onTap, onLongPressAyah, highlightedAyah, theme.accent, palette, pageSize],
   );
 
   return (
@@ -347,7 +347,12 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
-      extraData={`${extraData ?? ''}|${highlightedAyah ? `${highlightedAyah.page}:${highlightedAyah.sura}:${highlightedAyah.ayah}` : ''}`}
+      extraData={`${extraData ?? ''}|${highlightedAyah ? `${highlightedAyah.page}:${highlightedAyah.sura}:${highlightedAyah.ayah}` : ''}|${pageSize.width}`}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        const next = fitPage(width, height);
+        setPageSize((prev) => (prev.width === next.width ? prev : next));
+      }}
       style={{ backgroundColor: palette.pageBg }}
     />
   );
@@ -360,14 +365,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageBox: {
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
-  },
-  image: {
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
-  },
+
   highlight: {
     position: 'absolute',
     borderRadius: 4,

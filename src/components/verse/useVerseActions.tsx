@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
-import { nextVerseInJuz, pageOfVerse, toAyahRef, VerseKey } from '../../lib/verses';
+import { nextVerse, nextVerseInJuz, pageOfVerse, previousVerse, toAyahRef, VerseKey } from '../../lib/verses';
 import { logger } from '../../lib/logger';
 import { isRecordingActive } from '../../lib/recordings';
 import { VerseMenu } from './VerseMenu';
@@ -23,8 +23,6 @@ interface Options {
   pages: number[];
   /** Bring a page into view (playback or the sheet moved to a verse on it). */
   onShowPage?: (page: number) => void;
-  /** Distance of the now-playing bar from the bottom of the screen. */
-  playerBottom?: number;
   /** The page on screen; recitation only turns the page when its verse has no
    *  lines here. */
   currentPage?: number;
@@ -36,7 +34,7 @@ interface Options {
  * by the Quran tab and revision sessions. Returns the props for MushafPager and
  * the overlay to render on top of it.
  */
-export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentPage }: Options) {
+export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   const { user, saveUser } = useApp();
   const { theme } = useTheme();
   const recitation = getRecitation();
@@ -152,6 +150,33 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
     [user, saveUser],
   );
 
+  // Previous / next verse while playing, within this screen's pages.
+  const playingVerse = playerVisibleState(mine, playback) ? playback.verse : null;
+  const stepTo = (v: VerseKey | null) =>
+    v && allowed.has(pageOfVerse(v))
+      ? () => {
+          const advance = (cur: VerseKey) => {
+            const next = nextVerseInJuz(cur);
+            return next && allowed.has(pageOfVerse(next)) ? next : null;
+          };
+          recitation.play(v, advance, owner);
+        }
+      : undefined;
+
+  /** The recitation controls, for the screen's bottom bar. Null when nothing plays. */
+  const player = playingVerse ? (
+    <NowPlayingBar
+      state={playback}
+      onPause={() => recitation.pause()}
+      onResume={() => recitation.resume()}
+      onStop={() => recitation.stop(owner)}
+      onPrevious={stepTo(previousVerse(playingVerse))}
+      onNext={stepTo(nextVerse(playingVerse))}
+      voiceName={voiceLabel(resolveVoice(user?.reciter))}
+      onPickReciter={() => setReciterPickerOpen(true)}
+    />
+  ) : null;
+
   const overlay = (
     <>
       <VerseMenu
@@ -169,15 +194,6 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
         onChangeReciter={changeReciter}
         onNavigate={navigateSheet}
         onClose={closeSheet}
-      />
-      <NowPlayingBar
-        state={mine ? playback : { status: 'idle', verse: null }}
-        onPause={() => recitation.pause()}
-        onResume={() => recitation.resume()}
-        onStop={() => recitation.stop(owner)}
-        bottom={playerBottom}
-        voiceName={voiceLabel(resolveVoice(user?.reciter))}
-        onPickReciter={() => setReciterPickerOpen(true)}
       />
       <Modal
         visible={reciterPickerOpen}
@@ -209,9 +225,14 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
     highlightedAyah: selected ?? playingRef,
     onLongPressAyah,
     overlay,
-    /** The now-playing bar is on screen (at `playerBottom`). */
-    playerVisible: mine && playback.status !== 'idle' && playback.verse != null,
+    player,
+    /** Something is playing (the screen shows `player` in its bottom bar). */
+    playerVisible: player != null,
   };
+}
+
+function playerVisibleState(mine: boolean, playback: RecitationState): boolean {
+  return mine && playback.status !== 'idle' && playback.verse != null;
 }
 
 const pickerStyles = StyleSheet.create({
