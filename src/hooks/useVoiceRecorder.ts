@@ -21,7 +21,7 @@ import {
   releaseRecording,
   setCapturing,
 } from '../lib/recordings';
-import { claimAudio, setAudioMode } from '../lib/audioFocus';
+import { claimAudio, releaseAudioSession, setAudioMode } from '../lib/audioFocus';
 import { logger } from '../lib/logger';
 
 // Close to Voice Memos: AAC at 48 kHz, mono (the phone's main microphone),
@@ -53,6 +53,9 @@ interface Options {
   currentPage: number | null;
   /** Called after something is saved (each paused stretch, and at the end). */
   onSaved?: () => void;
+  /** Called when the user ends a recording that was saved (not when the
+   *  screen closes), e.g. to offer "View". */
+  onFinished?: (info: { day: string; recordingId: string }) => void;
 }
 
 /**
@@ -67,7 +70,7 @@ interface Options {
  * so nothing is lost if the app is closed. A call, an alarm or Siri, and going
  * to the background, pause it; the user resumes when ready.
  */
-export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
+export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }: Options) {
   const [phase, setPhase] = useState<RecorderPhase>('idle');
   /** Time recorded before the current stretch (and before this visit). */
   const [baseMs, setBaseMs] = useState(0);
@@ -89,6 +92,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   const [owner] = useState(() => `recorder-${Math.random().toString(36).slice(2)}`);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
   const pageRef = useRef(currentPage);
   pageRef.current = currentPage;
 
@@ -317,8 +322,13 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       if (p === 'recording') endSegment();
       await saveChainRef.current;
       setAudioMode(false);
+      // The recorder kept the session active; let other apps' audio resume.
+      releaseAudioSession(owner);
       if (savedAnyRef.current) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const id = recordingIdRef.current;
+        const savedDay = dayRef.current;
+        if (id && savedDay && !unmountedRef.current) onFinishedRef.current?.({ day: savedDay, recordingId: id });
       }
     } catch (err) {
       logger.error('Could not finish recording', err);

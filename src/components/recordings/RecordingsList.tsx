@@ -3,7 +3,12 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
-import { claimAudio, onAudioClaimed, setAudioMode } from '../../lib/audioFocus';
+import {
+  claimAudio,
+  onAudioClaimed,
+  releaseAudioSession,
+  setAudioMode,
+} from '../../lib/audioFocus';
 import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -32,6 +37,8 @@ interface RecordingsListProps {
   header?: React.ReactNode;
   /** Bump to reload (e.g. after the screen deleted a session's recordings). */
   reloadKey?: number;
+  /** A recording to highlight (just saved). */
+  highlightId?: string;
 }
 
 const KIND_LABEL: Record<RecordingKind, string> = {
@@ -43,12 +50,24 @@ const KIND_LABEL: Record<RecordingKind, string> = {
  * A day's recordings: play / pause, a progress bar, the pages it covers (tap
  * one to play from there) and delete. Renders nothing when there are none.
  */
-export function RecordingsList({ day, kind, onChanged, header, reloadKey }: RecordingsListProps) {
+export function RecordingsList({
+  day,
+  kind,
+  onChanged,
+  header,
+  reloadKey,
+  highlightId,
+}: RecordingsListProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [items, setItems] = useState<RecordingMeta[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  const pausedRef = useRef(false);
+  const setPaused = useCallback((v: boolean) => {
+    pausedRef.current = v;
+    setPausedState(v);
+  }, []);
   const [position, setPosition] = useState(0);
   const playerRef = useRef<AudioPlayer | null>(null);
 
@@ -79,12 +98,21 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
   // segments played back to back on one timeline.
   const currentRef = useRef<{ rec: RecordingMeta; index: number } | null>(null);
 
-  const stopPlayback = useCallback(() => {
+  // Whether the loaded segment has been heard playing yet.
+  const seenPlayingRef = useRef(false);
+  // A seek asked for before the segment has loaded (iOS ignores those).
+  const pendingSeekRef = useRef<number | null>(null);
+
+  /** Stop; release the audio session unless another activity is taking it. */
+  const stopPlayback = useCallback((release = true) => {
+    const wasPlaying = currentRef.current != null;
     playerRef.current?.pause();
     currentRef.current = null;
+    pendingSeekRef.current = null;
     setPlayingId(null);
     setPaused(false);
     setPosition(0);
+    if (release && wasPlaying) releaseAudioSession(listId);
   }, []);
 
   // Recitation or recording starting elsewhere stops this playback.
@@ -92,7 +120,7 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
   useEffect(
     () =>
       onAudioClaimed((_activity, owner) => {
-        if (owner !== listId) stopPlayback();
+        if (owner !== listId) stopPlayback(false);
       }),
     [listId, stopPlayback],
   );
@@ -100,6 +128,8 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
   // Unmounting stops playback and frees the player.
   useEffect(
     () => () => {
+      if (currentRef.current) releaseAudioSession(listId);
+      currentRef.current = null;
       playerRef.current?.remove();
       playerRef.current = null;
     },
@@ -108,8 +138,10 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
 
   const loadSegment = (player: AudioPlayer, rec: RecordingMeta, index: number, offsetMs: number) => {
     currentRef.current = { rec, index };
+    seenPlayingRef.current = false;
     player.replace({ uri: rec.segments[index].uri });
-    if (offsetMs > 0) player.seekTo(offsetMs / 1000).catch(() => undefined);
+    // Seek once the file has loaded (see the status listener).
+    pendingSeekRef.current = offsetMs > 0 ? offsetMs : null;
     player.play();
   };
 
@@ -122,10 +154,38 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
     setAudioMode(false);
     let player = playerRef.current;
     if (!player) {
-      const p = createAudioPlayer(null, { updateInterval: 250 });
+      // keepAudioSessionActive: see lib/audioFocus (otherwise iOS audio is
+      // switched off under a segment that is still loading).
+      const p = createAudioPlayer(null, { updateInterval: 250, keepAudioSessionActive: true });
       p.addListener('playbackStatusUpdate', (st) => {
         const cur = currentRef.current;
         if (!cur) return;
+        // An event still describing the previous file (queued before the
+        // replace) is ignored: its duration doesn't match this segment's.
+        const expectedMs = cur.rec.segments[cur.index].durationMs;
+        const isThisItem =
+          st.isLoaded && st.duration > 0 && Math.abs(st.duration * 1000 - expectedMs) < 750;
+        if (pendingSeekRef.current != null) {
+          if (!isThisItem) return;
+          const ms = pendingSeekRef.current;
+          pendingSeekRef.current = null;
+          p.seekTo(ms / 1000).catch(() => undefined);
+          return;
+        }
+        if (st.isLoaded && !isThisItem && !st.didJustFinish) return;
+        if (st.playing) seenPlayingRef.current = true;
+        // Paused from outside (a call, headphones unplugged) once it had been
+        // playing (not the moment between play() and the sound starting).
+        if (
+          seenPlayingRef.current &&
+          !st.playing &&
+          !st.isBuffering &&
+          !st.didJustFinish &&
+          !pausedRef.current
+        ) {
+          pausedRef.current = true;
+          setPaused(true);
+        }
         setPosition(segmentStart(cur.rec.segments, cur.index) + st.currentTime * 1000);
         if (st.didJustFinish) {
           if (cur.index + 1 < cur.rec.segments.length) {
@@ -135,6 +195,7 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
             setPlayingId(null);
             setPaused(false);
             setPosition(0);
+            releaseAudioSession(listId);
           }
         }
       });
@@ -145,8 +206,11 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
     const cur = currentRef.current;
     if (!cur || cur.rec.id !== r.id || cur.index !== index) {
       loadSegment(player, r, index, offsetMs);
-    } else {
+    } else if (player.isLoaded) {
       player.seekTo(offsetMs / 1000).catch(() => undefined);
+      player.play();
+    } else {
+      pendingSeekRef.current = offsetMs > 0 ? offsetMs : null;
       player.play();
     }
     setPosition(fromMs);
@@ -157,6 +221,7 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
   const togglePause = (r: RecordingMeta) => {
     if (playingId !== r.id) return play(r);
     if (paused) {
+      seenPlayingRef.current = false;
       playerRef.current?.play();
       setPaused(false);
     } else {
@@ -212,7 +277,9 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
                   borderTopWidth: StyleSheet.hairlineWidth,
                   borderTopColor: theme.border,
                 },
+                r.id === highlightId && { backgroundColor: theme.accent + '22' },
               ]}
+              testID={r.id === highlightId ? 'highlighted-recording' : undefined}
             >
               <View style={styles.rowTop}>
                 <Pressable

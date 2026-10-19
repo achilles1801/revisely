@@ -12,7 +12,7 @@
 
 import { AppState } from 'react-native';
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
-import { claimAudio, onAudioClaimed, setAudioMode } from './audioFocus';
+import { claimAudio, onAudioClaimed, releaseAudioSession, setAudioMode } from './audioFocus';
 import { nextVerseInJuz, VerseKey } from './verses';
 import { logger } from './logger';
 
@@ -199,8 +199,9 @@ export class Recitation {
       if (s !== 'active') this.pause();
     });
     // A recording starting or playing takes over the audio.
+    // Without releasing the session: the new activity is about to use it.
     onAudioClaimed((activity) => {
-      if (activity !== 'recitation') this.stop();
+      if (activity !== 'recitation') this.stop(undefined, false);
     });
   }
 
@@ -238,7 +239,8 @@ export class Recitation {
 
   private ensurePlayer(): AudioPlayer {
     if (!this.player) {
-      this.player = createAudioPlayer(null);
+      // The app decides when the session is released (lib/audioFocus).
+      this.player = createAudioPlayer(null, { keepAudioSessionActive: true });
       this.player.addListener('playbackStatusUpdate', (s) => this.onStatus(s));
     }
     return this.player;
@@ -297,12 +299,17 @@ export class Recitation {
     this.set({ status: 'playing', verse });
   }
 
-  /** Stop playback; with `owner`, only if that screen started it. */
-  stop(owner?: string) {
+  /**
+   * Stop playback; with `owner`, only if that screen started it. Releases the
+   * audio session unless something else is taking it over.
+   */
+  stop(owner?: string, release = true) {
     if (owner !== undefined && this.state.owner !== owner) return;
+    if (this.state.status === 'idle') return;
     this.clearLoadTimer();
     this.player?.pause();
-    if (this.state.status !== 'idle') this.set({ status: 'idle', verse: null });
+    this.set({ status: 'idle', verse: null });
+    if (release) releaseAudioSession(this.owner ?? 'recitation');
   }
 
   private onStatus(s: AudioStatus) {

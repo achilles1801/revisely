@@ -50,8 +50,10 @@ jest.mock('../../lib/recordings', () => {
   };
 });
 const mockClaim = jest.fn();
+const mockRelease = jest.fn();
 jest.mock('../../lib/audioFocus', () => ({
   claimAudio: (...a: any[]) => mockClaim(...a),
+  releaseAudioSession: () => mockRelease(),
   setAudioMode: (recording: boolean) => {
     mockSetAudioMode(recording);
     return Promise.resolve();
@@ -120,6 +122,7 @@ describe('useVoiceRecorder sessions', () => {
     expect(uri2).toBe('cache/seg-2.m4a');
     expect(info2.pageMarks.map((m: any) => m.page)).toEqual([12, 13]);
     expect(onSaved).toHaveBeenCalledTimes(2); // after each saved stretch
+    expect(mockRelease).toHaveBeenCalled(); // other apps' audio can resume
     expect(result.current.phase).toBe('idle');
   });
 
@@ -230,6 +233,22 @@ describe('useVoiceRecorder sessions', () => {
     expect(result.current.phase).toBe('paused');
     expect(result.current.interrupted).toBe(true);
     await act(() => result.current.finish());
+  });
+
+  it('tells the screen the recording was saved when the user ends it (to offer "View")', async () => {
+    const onFinished = jest.fn();
+    const { result } = setup({ onFinished });
+    await act(() => result.current.start());
+    await act(() => result.current.finish());
+    expect(onFinished).toHaveBeenCalledWith({ day: '2026-10-20', recordingId: 'rec-1' });
+  });
+
+  it('does not offer "View" when the screen closes (no one to show it)', async () => {
+    const onFinished = jest.fn();
+    const { result, unmount } = setup({ onFinished });
+    await act(() => result.current.start());
+    await act(async () => unmount());
+    expect(onFinished).not.toHaveBeenCalled();
   });
 
   it('a revision session carries on that day’s recording', async () => {

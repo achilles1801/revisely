@@ -28,6 +28,7 @@ import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
+import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
@@ -134,6 +135,10 @@ export default function ActiveRevisionScreen() {
   const pagerRef = useRef<MushafPagerHandle>(null);
   const sessionPages = useMemo(() => assignment?.pages ?? [], [assignment]);
   // Record yourself reciting; page marks follow the page on screen.
+  // After ending a recording: "Recording saved · View" (opens it in Activity).
+  const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
+    null,
+  );
   const recorder = useVoiceRecorder({
     kind: 'revision',
     day: sessionDay,
@@ -142,6 +147,7 @@ export default function ActiveRevisionScreen() {
       assignment?.pages.find((p) => !alreadyRevisedToday.has(p)) ??
       assignment?.pages[0] ??
       null,
+    onFinished: setSavedRecording,
   });
 
   // Reading or revising without touching the screen: don't let it lock.
@@ -645,6 +651,20 @@ export default function ActiveRevisionScreen() {
       )}
 
       <UndoToast
+        visible={!!savedRecording}
+        message="Recording saved"
+        actionLabel="View"
+        duration={6000}
+        onUndo={() => {
+          const saved = savedRecording;
+          setSavedRecording(null);
+          if (saved) navigateToActivityDay(saved.day, saved.recordingId);
+        }}
+        onDismiss={() => setSavedRecording(null)}
+        bottomInset={spacing.xl}
+      />
+
+      <UndoToast
         visible={!!undoState}
         message={undoState?.message ?? ''}
         onUndo={handleUndo}
@@ -826,7 +846,7 @@ function RevisionGuideModal({
     {
       icon: 'mic-outline',
       title: 'Record yourself',
-      body: 'Tap the mic in the top bar to record your recitation and listen back later. Recordings stay on this phone; find them in Activity.',
+      body: 'Tap the mic in the top bar to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',

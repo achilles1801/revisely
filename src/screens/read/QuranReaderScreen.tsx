@@ -18,6 +18,8 @@ import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
+import { navigateToActivityDay } from '../../navigation/navigationRef';
+import { UndoToast } from '../../components/revision/UndoToast';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
@@ -77,7 +79,16 @@ export default function QuranReaderScreen() {
   // Record yourself reading; saved under today's (revision day's) reading.
   const { user } = useApp();
   const { day: today } = useRevisionDay(user);
-  const recorder = useVoiceRecorder({ kind: 'reading', day: today, currentPage });
+  // After ending a recording: "Recording saved · View" (opens it in Activity).
+  const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
+    null,
+  );
+  const recorder = useVoiceRecorder({
+    kind: 'reading',
+    day: today,
+    currentPage,
+    onFinished: setSavedRecording,
+  });
 
   // Opened again with another page while already open (e.g. the Friday
   // Al-Kahf card): the stack updates this screen's params instead of pushing.
@@ -243,6 +254,20 @@ export default function QuranReaderScreen() {
         <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
       </View>
 
+      <UndoToast
+        visible={!!savedRecording}
+        message="Recording saved"
+        actionLabel="View"
+        duration={6000}
+        onUndo={() => {
+          const saved = savedRecording;
+          setSavedRecording(null);
+          if (saved) navigateToActivityDay(saved.day, saved.recordingId);
+        }}
+        onDismiss={() => setSavedRecording(null)}
+        bottomInset={FOOTER_CONTENT_HEIGHT + FOOTER_PADDING_BOTTOM + spacing.sm}
+      />
+
       {verseActions.overlay}
 
       <ReaderGuideModal
@@ -282,7 +307,7 @@ function ReaderGuideModal({
     {
       icon: 'mic-outline',
       title: 'Record yourself',
-      body: 'Tap the mic to record your recitation. Recordings stay on this phone; find them in Activity.',
+      body: 'Tap the mic to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'time-outline',
