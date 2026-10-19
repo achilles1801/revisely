@@ -60,8 +60,11 @@ jest.mock('expo-file-system', () => {
 });
 
 import {
+  rebaseMarks,
   acquireRecording,
+  hasRecordingSession,
   isRecordingActive,
+  setCapturing,
   releaseRecording,
   deleteAllRecordings,
   deleteRecording,
@@ -71,9 +74,27 @@ import {
   listRecordings,
   normalizePageMarks,
   pageAt,
-  saveRecording,
+  appendSegment,
+  findRevisionRecording,
+  locateInSegments,
+  segmentStart,
 } from '../recordings';
 import { formatBytes, formatRecordingTime } from '../recordingFormat';
+
+// A one-segment recording, as a finished session used to be saved.
+async function saveRecording(
+  uri: string,
+  info: { kind: 'revision' | 'reading'; day: string; durationMs: number; pageMarks: any[]; createdAt?: number },
+) {
+  const { id } = await appendSegment(null, uri, {
+    kind: info.kind,
+    day: info.day,
+    segmentMs: info.durationMs,
+    pageMarks: info.pageMarks,
+    createdAt: info.createdAt,
+  });
+  return id ? ((await listRecordings()).find((r) => r.id === id) ?? null) : null;
+}
 
 const temp = (name: string, bytes = 'audio-bytes') => {
   const uri = `cache/${name}.m4a`;
@@ -96,7 +117,7 @@ describe('recordings store', () => {
       pageMarks: [{ atMs: 0, page: 12 }, { atMs: 30_000, page: 13 }],
       createdAt: 1000,
     });
-    expect(saved?.uri).toMatch(/^doc\/recordings\/alice\/1000-.*\.m4a$/);
+    expect(saved?.uri).toMatch(/^doc\/recordings\/alice\/1000-.*-0\.m4a$/);
     expect(mockFs.has(uri)).toBe(false);
     const list = await listRecordings();
     expect(list).toHaveLength(1);
@@ -197,8 +218,13 @@ describe('one recording at a time', () => {
     expect(acquireRecording('revision')).toBe(true);
     expect(acquireRecording('reader')).toBe(false);
     releaseRecording('reader');
+    expect(hasRecordingSession()).toBe(true);
+    // Capturing (recitation refuses) is separate from having a session (paused).
+    expect(isRecordingActive()).toBe(false);
+    setCapturing(true);
     expect(isRecordingActive()).toBe(true);
     releaseRecording('revision');
+    expect(hasRecordingSession()).toBe(false);
     expect(isRecordingActive()).toBe(false);
     expect(acquireRecording('reader')).toBe(true);
     releaseRecording('reader');
@@ -216,5 +242,132 @@ describe('one recording at a time', () => {
     ).rejects.toThrow('ENOSPC');
     spy.mockRestore();
     expect([...mockFs.keys()].filter((k) => k.endsWith('.m4a'))).toEqual([]);
+  });
+});
+
+describe('recording sessions (pause and resume)', () => {
+  const info = (segmentMs: number, extra: object = {}) => ({
+    kind: 'revision' as const,
+    day: '2026-10-20',
+    segmentMs,
+    pageMarks: [{ atMs: 0, page: 5 }],
+    createdAt: 500,
+    ...extra,
+  });
+
+  it('adds each paused stretch to the same recording', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    const { id: id2 } = await appendSegment(id, temp('s2'), info(4_000, { pageMarks: [{ atMs: 0, page: 5 }, { atMs: 12_000, page: 6 }] }));
+    expect(id2).toBe(id);
+    const [rec] = await listRecordings();
+    expect(rec.durationMs).toBe(14_000);
+    expect(rec.segments.map((sg) => sg.durationMs)).toEqual([10_000, 4_000]);
+    expect(rec.segments[1].uri).toMatch(/-1\.m4a$/);
+    expect(rec.pageMarks.map((m) => m.page)).toEqual([5, 6]);
+    expect(rec.sizeBytes).toBe(22);
+  });
+
+  it('drops a too-short stretch but keeps the recording', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    const uri = temp('tap');
+    expect(await appendSegment(id, uri, info(100))).toEqual({ id, kept: false, restarted: false });
+    expect(mockFs.has(uri)).toBe(false);
+    expect((await listRecordings())[0].segments).toHaveLength(1);
+  });
+
+  it('a first stretch under a second is an accidental tap: nothing kept', async () => {
+    expect(await appendSegment(null, temp('s1'), info(600))).toMatchObject({ id: null, kept: false });
+    expect(await listRecordings()).toEqual([]);
+  });
+
+  it('starts a new recording when the one to continue was deleted, with its own timeline', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    await deleteRecording(id!);
+    const result = await appendSegment(
+      id,
+      temp('s2'),
+      info(5_000, {
+        segmentStartMs: 10_000,
+        pageMarks: [{ atMs: 0, page: 5 }, { atMs: 8_000, page: 6 }, { atMs: 12_000, page: 7 }],
+      }),
+    );
+    expect(result).toMatchObject({ kept: true, restarted: true });
+    const [rec] = await listRecordings();
+    expect(rec.durationMs).toBe(5_000);
+    expect(rec.pageMarks).toEqual([
+      { atMs: 0, page: 6 },
+      { atMs: 2_000, page: 7 },
+    ]);
+  });
+
+  it('carries on from the duration of the files that still exist', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    await appendSegment(id, temp('s2'), info(4_000));
+    const [rec] = await listRecordings();
+    mockFs.delete(rec.segments[0].uri);
+    expect(await findRevisionRecording('2026-10-20')).toMatchObject({ durationMs: 4_000 });
+  });
+
+  it('finds the day’s revision recording to carry on', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    await appendSegment(null, temp('r1'), info(10_000, { kind: 'reading' }));
+    expect(await findRevisionRecording('2026-10-20')).toMatchObject({ id, durationMs: 10_000 });
+    expect(await findRevisionRecording('2026-10-21')).toBeNull();
+  });
+
+  it('deletes every segment file', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    await appendSegment(id, temp('s2'), info(4_000));
+    await deleteRecording(id!);
+    expect([...mockFs.keys()].filter((k) => k.endsWith('.m4a'))).toEqual([]);
+  });
+
+  it('skips a segment whose file is gone, and keeps the rest playable', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000));
+    await appendSegment(id, temp('s2'), info(4_000));
+    const [rec] = await listRecordings();
+    mockFs.delete(rec.segments[0].uri);
+    const [after] = await listRecordings();
+    expect(after.segments).toHaveLength(1);
+    expect(after.durationMs).toBe(4_000);
+  });
+
+  it('reads recordings saved before pause/resume as one segment', async () => {
+    mockFs.set('doc/recordings/alice/', '');
+    mockFs.set('doc/recordings/alice/old.m4a', 'xyz');
+    mockFs.set(
+      'doc/recordings/alice/index.json',
+      JSON.stringify([
+        { id: 'old', kind: 'reading', day: '2026-10-19', createdAt: 1, durationMs: 9000, fileName: 'old.m4a', pageMarks: [], storage: 'device' },
+      ]),
+    );
+    const [rec] = await listRecordings();
+    expect(rec.segments).toEqual([{ uri: 'doc/recordings/alice/old.m4a', durationMs: 9000 }]);
+    await deleteRecording('old');
+    expect(mockFs.has('doc/recordings/alice/old.m4a')).toBe(false);
+  });
+});
+
+describe('segment timeline', () => {
+  const segs = [{ durationMs: 10_000 }, { durationMs: 4_000 }, { durationMs: 6_000 }];
+  it('locates a moment in the right segment', () => {
+    expect(locateInSegments(segs, 0)).toEqual({ index: 0, offsetMs: 0 });
+    expect(locateInSegments(segs, 9_999)).toEqual({ index: 0, offsetMs: 9_999 });
+    expect(locateInSegments(segs, 10_000)).toEqual({ index: 1, offsetMs: 0 });
+    expect(locateInSegments(segs, 15_000)).toEqual({ index: 2, offsetMs: 1_000 });
+    expect(locateInSegments(segs, 99_000)).toEqual({ index: 2, offsetMs: 6_000 });
+    expect(locateInSegments([], 5)).toEqual({ index: 0, offsetMs: 0 });
+  });
+  it('gives where each segment starts', () => {
+    expect([0, 1, 2].map((i) => segmentStart(segs, i))).toEqual([0, 10_000, 14_000]);
+  });
+});
+
+describe('rebaseMarks', () => {
+  it('starts the timeline at a point, keeping the page on screen then at 0', () => {
+    const marks = [{ atMs: 0, page: 1 }, { atMs: 5_000, page: 2 }, { atMs: 9_000, page: 3 }];
+    expect(rebaseMarks(marks, 6_000)).toEqual([{ atMs: 0, page: 2 }, { atMs: 3_000, page: 3 }]);
+    expect(rebaseMarks(marks, 0)).toBe(marks);
+    expect(rebaseMarks([], 100)).toEqual([]);
   });
 });

@@ -14,12 +14,15 @@ import {
   deleteRecording,
   isRecordingActive,
   listRecordings,
+  locateInSegments,
+  segmentStart,
   pageAt,
   RecordingKind,
   RecordingMeta,
 } from '../../lib/recordings';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
+import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 
 interface RecordingsListProps {
   day: string;
@@ -72,8 +75,13 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
     if (reloadKey != null) load();
   }, [reloadKey, load]);
 
+  // The recording and segment loaded in the player. A recording is its
+  // segments played back to back on one timeline.
+  const currentRef = useRef<{ rec: RecordingMeta; index: number } | null>(null);
+
   const stopPlayback = useCallback(() => {
     playerRef.current?.pause();
+    currentRef.current = null;
     setPlayingId(null);
     setPaused(false);
     setPosition(0);
@@ -98,29 +106,50 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
     [],
   );
 
+  const loadSegment = (player: AudioPlayer, rec: RecordingMeta, index: number, offsetMs: number) => {
+    currentRef.current = { rec, index };
+    player.replace({ uri: rec.segments[index].uri });
+    if (offsetMs > 0) player.seekTo(offsetMs / 1000).catch(() => undefined);
+    player.play();
+  };
+
   const play = (r: RecordingMeta, fromMs = 0) => {
     if (isRecordingActive()) {
-      Alert.alert('Recording in progress', 'Stop the recording to play this one.');
+      Alert.alert('Recording in progress', 'Pause the recording to play this one.');
       return;
     }
     claimAudio('recording-playback', listId);
     setAudioMode(false);
     let player = playerRef.current;
     if (!player) {
-      player = createAudioPlayer(null, { updateInterval: 250 });
-      player.addListener('playbackStatusUpdate', (s) => {
-        setPosition(s.currentTime * 1000);
-        if (s.didJustFinish) {
-          setPlayingId(null);
-          setPaused(false);
-          setPosition(0);
+      const p = createAudioPlayer(null, { updateInterval: 250 });
+      p.addListener('playbackStatusUpdate', (st) => {
+        const cur = currentRef.current;
+        if (!cur) return;
+        setPosition(segmentStart(cur.rec.segments, cur.index) + st.currentTime * 1000);
+        if (st.didJustFinish) {
+          if (cur.index + 1 < cur.rec.segments.length) {
+            loadSegment(p, cur.rec, cur.index + 1, 0);
+          } else {
+            currentRef.current = null;
+            setPlayingId(null);
+            setPaused(false);
+            setPosition(0);
+          }
         }
       });
-      playerRef.current = player;
+      playerRef.current = p;
+      player = p;
     }
-    if (playingId !== r.id) player.replace({ uri: r.uri });
-    if (fromMs > 0 || playingId !== r.id) player.seekTo(fromMs / 1000).catch(() => undefined);
-    player.play();
+    const { index, offsetMs } = locateInSegments(r.segments, fromMs);
+    const cur = currentRef.current;
+    if (!cur || cur.rec.id !== r.id || cur.index !== index) {
+      loadSegment(player, r, index, offsetMs);
+    } else {
+      player.seekTo(offsetMs / 1000).catch(() => undefined);
+      player.play();
+    }
+    setPosition(fromMs);
     setPlayingId(r.id);
     setPaused(false);
   };
@@ -155,6 +184,9 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
       ],
     );
   };
+
+  // Listening back without touching the screen: don't let it lock.
+  useKeepScreenOn(playingId != null && !paused);
 
   if (items.length === 0) return null;
 

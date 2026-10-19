@@ -4,33 +4,167 @@
 // Playback continues verse by verse to the end of the juz (the default `advance`),
 // pauses when the app leaves the foreground or iOS interrupts audio (a call,
 // another app), and gives up on a verse that does not start within
-// LOAD_TIMEOUT_MS (offline). Audio comes from the alquran.cloud CDN, one file per
-// verse, named by the verse's position in the whole Qur'an.
+// LOAD_TIMEOUT_MS (offline).
+//
+// Audio comes from EveryAyah (everyayah.com), one file per verse named
+// SSSAAA.mp3, in a folder per reciter and style. Every folder listed was checked
+// to have the first and last verse of all 114 surahs plus a random sample.
 
 import { AppState } from 'react-native';
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
 import { claimAudio, onAudioClaimed, setAudioMode } from './audioFocus';
-import { globalVerseNumber, nextVerseInJuz, VerseKey } from './verses';
+import { nextVerseInJuz, VerseKey } from './verses';
 import { logger } from './logger';
+
+/**
+ * How a reciter recites. Per-verse audio is organised by these styles, not by
+ * maqam (a reciter moves between maqamat within one recitation).
+ */
+export type RecitationStyle = 'murattal' | 'mujawwad' | 'muallim';
+
+export const STYLE_INFO: Record<RecitationStyle, { label: string; description: string }> = {
+  murattal: { label: 'Murattal', description: 'Measured, at a steady pace' },
+  mujawwad: { label: 'Mujawwad', description: 'Melodic, slower, with longer pauses' },
+  muallim: { label: "Mu'allim", description: 'Teaching: each verse with a pause to repeat' },
+};
 
 export interface ReciterInfo {
   id: string;
   name: string;
-  url: (globalVerse: number) => string;
+  /** For tight spaces, e.g. "Al-Husary". */
+  short: string;
+  styles: { style: RecitationStyle; folder: string }[];
 }
 
 export const RECITERS: ReciterInfo[] = [
   {
     id: 'husary',
     name: 'Mahmoud Khalil Al-Husary',
-    url: (n) => `https://cdn.islamic.network/quran/audio/64/ar.husary/${n}.mp3`,
+    short: 'Al-Husary',
+    styles: [
+      { style: 'murattal', folder: 'Husary_64kbps' },
+      { style: 'mujawwad', folder: 'Husary_Mujawwad_64kbps' },
+      { style: 'muallim', folder: 'Husary_Muallim_128kbps' },
+    ],
+  },
+  {
+    id: 'minshawi',
+    name: 'Muhammad Siddiq Al-Minshawi',
+    short: 'Al-Minshawi',
+    styles: [
+      { style: 'murattal', folder: 'Minshawy_Murattal_128kbps' },
+      // The 64 kbps folder is missing surahs 44-46.
+      { style: 'mujawwad', folder: 'Minshawy_Mujawwad_192kbps' },
+    ],
+  },
+  {
+    id: 'abdulbasit',
+    name: 'Abdul Basit Abdul Samad',
+    short: 'Abdul Basit',
+    styles: [
+      { style: 'murattal', folder: 'Abdul_Basit_Murattal_64kbps' },
+      { style: 'mujawwad', folder: 'Abdul_Basit_Mujawwad_128kbps' },
+    ],
+  },
+  {
+    id: 'alafasy',
+    name: 'Mishary Rashid Alafasy',
+    short: 'Alafasy',
+    styles: [{ style: 'murattal', folder: 'Alafasy_64kbps' }],
+  },
+  {
+    id: 'sudais',
+    name: 'Abdur-Rahman As-Sudais',
+    short: 'As-Sudais',
+    styles: [{ style: 'murattal', folder: 'Abdurrahmaan_As-Sudais_64kbps' }],
+  },
+  {
+    id: 'shuraim',
+    name: "Sa'ud Ash-Shuraim",
+    short: 'Ash-Shuraim',
+    styles: [{ style: 'murattal', folder: 'Saood_ash-Shuraym_64kbps' }],
+  },
+  {
+    id: 'muaiqly',
+    name: 'Maher Al-Muaiqly',
+    short: 'Al-Muaiqly',
+    styles: [{ style: 'murattal', folder: 'MaherAlMuaiqly128kbps' }],
+  },
+  {
+    id: 'ghamdi',
+    name: "Sa'ad Al-Ghamdi",
+    short: 'Al-Ghamdi',
+    styles: [{ style: 'murattal', folder: 'Ghamadi_40kbps' }],
+  },
+  {
+    id: 'ajamy',
+    name: 'Ahmed ibn Ali Al-Ajamy',
+    short: 'Al-Ajamy',
+    styles: [{ style: 'murattal', folder: 'ahmed_ibn_ali_al_ajamy_128kbps' }],
+  },
+  {
+    id: 'shatri',
+    name: 'Abu Bakr Ash-Shatri',
+    short: 'Ash-Shatri',
+    styles: [{ style: 'murattal', folder: 'Abu_Bakr_Ash-Shaatree_64kbps' }],
+  },
+  {
+    id: 'hudhaify',
+    name: 'Ali Al-Hudhaify',
+    short: 'Al-Hudhaify',
+    styles: [{ style: 'murattal', folder: 'Hudhaify_128kbps' }],
+  },
+  {
+    id: 'ayyub',
+    name: 'Muhammad Ayyub',
+    short: 'Muhammad Ayyub',
+    styles: [{ style: 'murattal', folder: 'Muhammad_Ayyoub_64kbps' }],
+  },
+  {
+    id: 'tablawi',
+    name: 'Mohammad Al-Tablawi',
+    short: 'Al-Tablawi',
+    styles: [{ style: 'murattal', folder: 'Mohammad_al_Tablaway_64kbps' }],
+  },
+  {
+    id: 'dossari',
+    name: 'Yasser Ad-Dossari',
+    short: 'Ad-Dossari',
+    styles: [{ style: 'murattal', folder: 'Yasser_Ad-Dussary_128kbps' }],
   },
 ];
-export const DEFAULT_RECITER_ID = 'husary';
 
-export function recitationUrl(v: VerseKey, reciterId: string = DEFAULT_RECITER_ID): string {
+/** A saved choice: `<reciter id>:<style>`, e.g. 'husary:mujawwad'. */
+export const DEFAULT_VOICE = 'husary:murattal';
+
+export interface Voice {
+  reciter: ReciterInfo;
+  style: RecitationStyle;
+  folder: string;
+  /** The choice as saved. */
+  id: string;
+}
+
+/** The voice for a saved choice; unknown reciters or styles fall back sensibly. */
+export function resolveVoice(choice: string | null | undefined): Voice {
+  const [reciterId, style] = (choice ?? '').split(':');
   const reciter = RECITERS.find((r) => r.id === reciterId) ?? RECITERS[0];
-  return reciter.url(globalVerseNumber(v));
+  const entry = reciter.styles.find((s) => s.style === style) ?? reciter.styles[0];
+  return { reciter, style: entry.style, folder: entry.folder, id: `${reciter.id}:${entry.style}` };
+}
+
+export function voiceLabel(voice: Voice): string {
+  return voice.reciter.styles.length > 1
+    ? `${voice.reciter.name} · ${STYLE_INFO[voice.style].label}`
+    : voice.reciter.name;
+}
+
+export function recitationUrl(
+  v: VerseKey,
+  choice: string | null | undefined = DEFAULT_VOICE,
+): string {
+  const pad = (n: number) => String(n).padStart(3, '0');
+  return `https://everyayah.com/data/${resolveVoice(choice).folder}/${pad(v.sura)}${pad(v.ayah)}.mp3`;
 }
 
 export type RecitationStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
@@ -58,7 +192,9 @@ export class Recitation {
   // backgrounded while loading) resumes by loading it again.
   private started = false;
 
-  constructor(private reciterId: string = DEFAULT_RECITER_ID) {
+  private voice: string = DEFAULT_VOICE;
+
+  constructor() {
     AppState.addEventListener('change', (s) => {
       if (s !== 'active') this.pause();
     });
@@ -66,6 +202,21 @@ export class Recitation {
     onAudioClaimed((activity) => {
       if (activity !== 'recitation') this.stop();
     });
+  }
+
+  getVoice(): string {
+    return this.voice;
+  }
+
+  /** Choose the reciter and style; a verse in progress restarts in the new voice. */
+  setVoice(choice: string | null | undefined) {
+    const next = resolveVoice(choice).id;
+    if (next === this.voice) return;
+    this.voice = next;
+    const { status, verse } = this.state;
+    if (verse && (status === 'playing' || status === 'loading')) this.play(verse, this.advance);
+    // A paused verse resumes in the new voice (resume reloads it).
+    else if (status === 'paused') this.started = false;
   }
 
   getState(): RecitationState {
@@ -114,7 +265,7 @@ export class Recitation {
     this.started = false;
     this.set({ status: 'loading', verse });
     try {
-      player.replace({ uri: recitationUrl(verse, this.reciterId) });
+      player.replace({ uri: recitationUrl(verse, this.voice) });
       player.play();
     } catch (err) {
       logger.warn('Recitation failed to start', err);

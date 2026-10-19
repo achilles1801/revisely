@@ -24,7 +24,14 @@ jest.mock('react-native', () => ({
 
 jest.mock('../logger', () => ({ logger: { warn: jest.fn(), error: jest.fn(), log: jest.fn() } }));
 
-import { LOAD_TIMEOUT_MS, Recitation, recitationUrl } from '../recitation';
+import {
+  LOAD_TIMEOUT_MS,
+  RECITERS,
+  Recitation,
+  recitationUrl,
+  resolveVoice,
+  voiceLabel,
+} from '../recitation';
 
 beforeEach(() => {
   mockPlayers.length = 0;
@@ -34,9 +41,13 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe('recitation', () => {
-  it('builds Husary’s file URL from the verse’s global number', () => {
-    expect(recitationUrl({ sura: 2, ayah: 255 })).toBe(
-      'https://cdn.islamic.network/quran/audio/64/ar.husary/262.mp3',
+  it('builds the EveryAyah file URL for the chosen reciter and style', () => {
+    expect(recitationUrl({ sura: 2, ayah: 255 })).toBe('https://everyayah.com/data/Husary_64kbps/002255.mp3');
+    expect(recitationUrl({ sura: 18, ayah: 1 }, 'minshawi:mujawwad')).toBe(
+      'https://everyayah.com/data/Minshawy_Mujawwad_192kbps/018001.mp3',
+    );
+    expect(recitationUrl({ sura: 114, ayah: 6 }, 'husary:muallim')).toBe(
+      'https://everyayah.com/data/Husary_Muallim_128kbps/114006.mp3',
     );
   });
 
@@ -49,7 +60,7 @@ describe('recitation', () => {
     expect(r.getState()).toEqual({ status: 'playing', verse: { sura: 2, ayah: 140 } });
     p.emit({ didJustFinish: true });
     expect(r.getState().verse).toEqual({ sura: 2, ayah: 141 });
-    expect(p.source.uri).toMatch(/\/148\.mp3$/);
+    expect(p.source.uri).toMatch(/\/002141\.mp3$/);
     p.emit({ playing: true });
     p.emit({ didJustFinish: true }); // 2:141 is the last verse of juz 1
     expect(r.getState()).toEqual({ status: 'idle', verse: null });
@@ -155,5 +166,57 @@ describe('recitation', () => {
     mockPlayers[0].emit({ playing: true });
     claimAudio('recorder', 'revision-screen');
     expect(r.getState().status).toBe('idle');
+  });
+
+  it('changing the reciter restarts the verse in progress in the new voice', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockPlayers[0].emit({ playing: true });
+    r.setVoice('abdulbasit:mujawwad');
+    expect(mockPlayers[0].source.uri).toBe('https://everyayah.com/data/Abdul_Basit_Mujawwad_128kbps/001001.mp3');
+    expect(r.getState().status).toBe('loading');
+  });
+
+  it('a verse paused when the reciter changes resumes in the new voice', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockPlayers[0].emit({ playing: true });
+    r.pause();
+    r.setVoice('minshawi:murattal');
+    r.resume();
+    expect(mockPlayers[0].source.uri).toBe('https://everyayah.com/data/Minshawy_Murattal_128kbps/001001.mp3');
+  });
+
+  it('changing the reciter while idle or paused just remembers it', () => {
+    const r = new Recitation();
+    r.setVoice('alafasy:murattal');
+    expect(r.getVoice()).toBe('alafasy:murattal');
+    expect(mockPlayers).toHaveLength(0);
+  });
+});
+
+describe('reciters', () => {
+  it('fall back to Husary (murattal) for unknown choices, and to a reciter’s first style', () => {
+    expect(resolveVoice(undefined).id).toBe('husary:murattal');
+    expect(resolveVoice('nobody:murattal').id).toBe('husary:murattal');
+    expect(resolveVoice('alafasy:mujawwad').id).toBe('alafasy:murattal'); // Alafasy has one style
+    expect(resolveVoice('minshawi:mujawwad').id).toBe('minshawi:mujawwad');
+  });
+
+  it('are listed once each, every style with its own folder', () => {
+    const ids = RECITERS.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const folders = RECITERS.flatMap((r) => r.styles.map((s) => s.folder));
+    expect(new Set(folders).size).toBe(folders.length);
+    for (const r of RECITERS) {
+      expect(r.styles.length).toBeGreaterThan(0);
+      expect(new Set(r.styles.map((s) => s.style)).size).toBe(r.styles.length);
+      expect(r.short.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('labels the style only when a reciter has more than one', () => {
+    expect(voiceLabel(resolveVoice('husary:mujawwad'))).toBe('Mahmoud Khalil Al-Husary · Mujawwad');
+    expect(voiceLabel(resolveVoice('alafasy:murattal'))).toBe('Mishary Rashid Alafasy');
   });
 });

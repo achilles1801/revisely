@@ -589,6 +589,23 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <Section title="Reading">
+          <Row
+            icon="sunny-outline"
+            label="Keep screen on while reading"
+            isLast
+            rightSlot={
+              <Switch
+                value={homePrefs.keepScreenOn}
+                onValueChange={(v) => setHomePrefs({ keepScreenOn: v })}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+                accessibilityLabel="Keep screen on while reading, revising or listening"
+              />
+            }
+          />
+        </Section>
+
         <Section title="Day boundary">
           <FajrBoundaryCard />
         </Section>

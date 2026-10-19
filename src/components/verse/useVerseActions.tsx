@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions } from 'react-native';
+import { Alert, Dimensions, Modal, Pressable, SafeAreaView, StyleSheet, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
@@ -10,6 +10,13 @@ import { isRecordingActive } from '../../lib/recordings';
 import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
 import { NowPlayingBar } from './NowPlayingBar';
+import { ReciterList } from './ReciterList';
+import { GlassCard } from '../GlassCard';
+import { useTheme } from '../../context/ThemeContext';
+import { resolveVoice, voiceLabel } from '../../lib/recitation';
+import { typography } from '../../theme/typography';
+import { spacing } from '../../theme/spacing';
+import { radius } from '../../theme/radius';
 
 interface Options {
   /** Pages this screen shows. Playback and verse navigation stay within them. */
@@ -31,6 +38,7 @@ interface Options {
  */
 export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentPage }: Options) {
   const { user, saveUser } = useApp();
+  const { theme } = useTheme();
   const recitation = getRecitation();
   const [playback, setPlayback] = useState<RecitationState>(recitation.getState());
   const [selected, setSelected] = useState<AyahRef | null>(null);
@@ -86,7 +94,7 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
       // It would play into the microphone.
       setMenuPoint(null);
       setSelected(null);
-      Alert.alert('Recording in progress', 'Stop the recording to play the recitation.');
+      Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
       return;
     }
     const advance = (v: VerseKey) => {
@@ -119,6 +127,21 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
     setSelected(null);
   }, []);
 
+  // The saved reciter drives the shared player.
+  useEffect(() => {
+    recitation.setVoice(user?.reciter);
+  }, [recitation, user?.reciter]);
+  const [reciterPickerOpen, setReciterPickerOpen] = useState(false);
+
+  const changeReciter = useCallback(
+    (reciter: string) => {
+      recitation.setVoice(reciter);
+      if (!user) return;
+      saveUser({ ...user, reciter }).catch((err) => logger.warn('Could not save reciter', err));
+    },
+    [user, saveUser, recitation],
+  );
+
   const changeTranslation = useCallback(
     (translationId: string) => {
       if (!user) return;
@@ -131,11 +154,19 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
 
   const overlay = (
     <>
-      <VerseMenu point={menuPoint} onPlay={play} onTranslation={openTranslation} onClose={closeMenu} />
+      <VerseMenu
+        point={menuPoint}
+        playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · to the end of the juz`}
+        onPlay={play}
+        onTranslation={openTranslation}
+        onClose={closeMenu}
+      />
       <VerseSheet
         verse={sheetVerse}
         translationId={user?.translationId}
         onChangeTranslation={changeTranslation}
+        reciter={user?.reciter}
+        onChangeReciter={changeReciter}
         onNavigate={navigateSheet}
         onClose={closeSheet}
       />
@@ -145,7 +176,32 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
         onResume={() => recitation.resume()}
         onStop={() => recitation.stop(owner)}
         bottom={playerBottom}
+        voiceName={voiceLabel(resolveVoice(user?.reciter))}
+        onPickReciter={() => setReciterPickerOpen(true)}
       />
+      <Modal
+        visible={reciterPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReciterPickerOpen(false)}
+      >
+        <Pressable style={pickerStyles.overlay} onPress={() => setReciterPickerOpen(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} style={pickerStyles.sheet}>
+            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <SafeAreaView>
+              <Text style={[pickerStyles.title, { color: theme.textPrimary }]}>Reciter</Text>
+              <ReciterList
+                value={user?.reciter}
+                onChange={(choice) => {
+                  changeReciter(choice);
+                  setReciterPickerOpen(false);
+                }}
+                maxHeight={460}
+              />
+            </SafeAreaView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 
@@ -157,3 +213,15 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
     playerVisible: mine && playback.status !== 'idle' && playback.verse != null,
   };
 }
+
+const pickerStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    overflow: 'hidden',
+  },
+  title: { ...typography.titleLarge, paddingHorizontal: spacing.md, marginBottom: spacing.xs },
+});

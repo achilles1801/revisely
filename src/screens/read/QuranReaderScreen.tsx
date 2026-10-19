@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../../components/GlassCard';
@@ -20,6 +20,7 @@ import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useApp } from '../../context/AppContext';
 import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
@@ -79,6 +80,10 @@ export default function QuranReaderScreen() {
     lastRequestedRef.current = requestedPage;
     pagerRef.current?.scrollToPage(requestedPage);
   }, [requestedPage]);
+
+  // Reading or revising without touching the screen: don't let it lock.
+  const isScreenFocused = useIsFocused();
+  useKeepScreenOn(isScreenFocused);
 
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
@@ -163,25 +168,30 @@ export default function QuranReaderScreen() {
         >
           <Ionicons name="chevron-back" size={22} color={palette.textSecondary} />
         </Pressable>
-        <Text style={styles.crumbLeft}>
+        <Text style={styles.crumbLeft} numberOfLines={1}>
           Juz {juz} · Hizb {hizb}
         </Text>
-        <View style={styles.crumbRight}>
-          <Text style={styles.crumbSurah}>{firstSurah?.name ?? ''}</Text>
-          {firstSurah?.nameArabic ? (
-            <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
-          ) : null}
-        </View>
+        {/* While recording, the recording controls take the surah's place
+            (narrow phones have no room for both). */}
+        {recorder.phase === 'idle' && (
+          <View style={styles.crumbRight}>
+            <Text style={styles.crumbSurah} numberOfLines={1}>
+              {firstSurah?.name ?? ''}
+            </Text>
+            {firstSurah?.nameArabic ? (
+              <Text style={styles.crumbArabic} numberOfLines={1}>
+                {firstSurah.nameArabic}
+              </Text>
+            ) : null}
+          </View>
+        )}
         <RecordButton
-          phase={recorder.phase}
-          startedAt={recorder.startedAt}
-          onStart={recorder.start}
-          onStop={recorder.stop}
+          recorder={recorder}
           color={palette.textSecondary}
           background={palette.card}
           border={palette.divider}
         />
-        {!guideSeen && (
+        {!guideSeen && recorder.phase === 'idle' && (
           <Pressable
             onPress={() => setShowGuide(true)}
             hitSlop={12}
@@ -342,11 +352,13 @@ const makeStyles = (palette: ReadPalette) =>
       ...typography.caption,
       color: palette.textPrimary,
       flex: 1,
+      minWidth: 60,
     },
     crumbRight: {
       flexDirection: 'row',
       alignItems: 'baseline',
       gap: spacing.xs,
+      flexShrink: 1,
     },
     crumbSurah: {
       ...typography.caption,

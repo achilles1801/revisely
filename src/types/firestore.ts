@@ -184,6 +184,8 @@ export interface FirestoreUser {
   scheduleShiftPages?: number;
   /** Translation shown when holding a verse. */
   translationId?: string;
+  /** Reciter and style for Play: '<reciter>:<style>'. */
+  reciter?: string;
 }
 
 /**
@@ -231,6 +233,7 @@ export interface UpdateUserInput {
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   scheduleShiftPages?: number;
   translationId?: string;
+  reciter?: string;
 }
 
 // ============================================================================
