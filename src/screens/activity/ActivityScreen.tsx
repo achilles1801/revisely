@@ -341,7 +341,12 @@ function SummaryCard({
       <Text style={[summaryStyles.title, { color: theme.textMuted }]}>{title}</Text>
       <View style={summaryStyles.row}>
         <SummaryStat label="Pages revised" value={`${totals.revisedPages}`} theme={theme} />
-        <SummaryStat label="Timed" value={formatDuration(totals.readingSeconds)} theme={theme} emphasize />
+        <SummaryStat
+          label="Timed"
+          value={totals.readingSeconds > 0 ? formatDuration(totals.readingSeconds) : '0m'}
+          theme={theme}
+          emphasize
+        />
         <SummaryStat label="Daily log" value={formatMinutes(totals.journalMinutes)} theme={theme} />
       </View>
       <Text style={[summaryStyles.foot, { color: theme.textMuted }]}>{foot}</Text>

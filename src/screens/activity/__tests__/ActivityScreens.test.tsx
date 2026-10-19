@@ -143,7 +143,7 @@ describe('<ActivityScreen />', () => {
     expect(screen.getByText(/^Revised 3p/)).toBeTruthy();
     expect(screen.getAllByText('Timed session')).toHaveLength(2);
     expect(screen.getByText('20m')).toBeTruthy();
-    expect(screen.getByText('32m')).toBeTruthy(); // today's total: 12m revision + 20m timed
+    expect(screen.getByText('12m')).toBeTruthy(); // the revision session's own time
     expect(screen.getByText('Yesterday')).toBeTruthy();
     expect(screen.getByText('1/2 p3')).toBeTruthy();
     // Week summary: 3 pages, 35 min timed, 3 of 7 days active.

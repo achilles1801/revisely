@@ -98,7 +98,7 @@ export default function ActivityDayScreen() {
     if (r.status === 'fulfilled') {
       setReadings(
         r.value
-          .map((s) => normalizeReadingSession(s, user))
+          .map((s) => normalizeReadingSession(s))
           .filter((s): s is ReadingSession => s != null)
           .sort((a, b) => a.startedAt - b.startedAt),
       );
@@ -107,7 +107,7 @@ export default function ActivityDayScreen() {
     else logger.error('Failed to load journal entry', j.reason);
     setLoadError(r.status === 'rejected' || j.status === 'rejected');
     setLoading(false);
-  }, [date, user]);
+  }, [date]);
 
   useActivityReload(load);
 

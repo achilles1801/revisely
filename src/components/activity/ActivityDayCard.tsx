@@ -63,10 +63,9 @@ export function ActivityDayCard({
     <PressableScale onPress={onPress} haptic="light" scale={0.985} accessibilityLabel={`Open ${label}`}>
       <GlassCard glassStyle="clear" tintColor={tint} style={styles.card}>
         <View style={styles.topRow}>
+          {/* No combined total: a daily-log time often describes the same
+              revision the app timed, so a sum would count it twice. */}
           <Text style={styles.day}>{label}</Text>
-          {summary.totalMinutes > 0 && (
-            <Text style={styles.total}>{formatMinutes(summary.totalMinutes)}</Text>
-          )}
           <Ionicons name="chevron-forward" size={14} color={theme.textMuted} />
         </View>
 
@@ -169,7 +168,6 @@ const makeStyles = (theme: ThemeColors) =>
       marginBottom: spacing.xxs,
     },
     day: { ...typography.titleSmall, color: theme.textPrimary, flex: 1 },
-    total: { ...typography.titleSmall, color: theme.accent, fontVariant: ['tabular-nums'] },
     notesRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
