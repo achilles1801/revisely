@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { claimAudio, onAudioClaimed, setAudioMode } from '../../lib/audioFocus';
 import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -18,7 +19,6 @@ import {
   RecordingMeta,
 } from '../../lib/recordings';
 import { formatRecordingTime } from '../../lib/recordingFormat';
-import { getRecitation } from '../../lib/recitation';
 import { logger } from '../../lib/logger';
 
 interface RecordingsListProps {
@@ -55,9 +55,17 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
       .catch((err) => logger.warn('Could not list recordings', err));
   }, [day, kind]);
 
+  // Load on focus; leaving the screen (another tab, the screen pushed under)
+  // pauses playback, since the screen stays mounted.
   useFocusEffect(
     useCallback(() => {
       load();
+      return () => {
+        if (playerRef.current) {
+          playerRef.current.pause();
+          setPaused(true);
+        }
+      };
     }, [load]),
   );
   useEffect(() => {
@@ -71,7 +79,17 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
     setPosition(0);
   }, []);
 
-  // Leaving the screen stops playback and frees the player.
+  // Recitation or recording starting elsewhere stops this playback.
+  const [listId] = useState(() => `recordings-${Math.random().toString(36).slice(2)}`);
+  useEffect(
+    () =>
+      onAudioClaimed((_activity, owner) => {
+        if (owner !== listId) stopPlayback();
+      }),
+    [listId, stopPlayback],
+  );
+
+  // Unmounting stops playback and frees the player.
   useEffect(
     () => () => {
       playerRef.current?.remove();
@@ -85,11 +103,8 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
       Alert.alert('Recording in progress', 'Stop the recording to play this one.');
       return;
     }
-    getRecitation().stop();
-    setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-    }).catch(() => undefined);
+    claimAudio('recording-playback', listId);
+    setAudioMode(false);
     let player = playerRef.current;
     if (!player) {
       player = createAudioPlayer(null, { updateInterval: 250 });

@@ -5,7 +5,6 @@ import {
   IOSOutputFormat,
   getRecordingPermissionsAsync,
   requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioRecorder,
   type RecordingOptions,
   type RecordingStatus,
@@ -13,11 +12,13 @@ import {
 import * as Haptics from 'expo-haptics';
 import { getRecitation } from '../lib/recitation';
 import {
+  acquireRecording,
   PageMark,
   RecordingKind,
+  releaseRecording,
   saveRecording,
-  setRecordingActive,
 } from '../lib/recordings';
+import { claimAudio, setAudioMode } from '../lib/audioFocus';
 import { logger } from '../lib/logger';
 
 // Speech, mono: about 15 MB an hour.
@@ -63,15 +64,27 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   const marksRef = useRef<PageMark[]>([]);
   const startRef = useRef(0);
   const dayRef = useRef(day);
+  const uriRef = useRef<string | null>(null);
+  const [owner] = useState(() => `recorder-${Math.random().toString(36).slice(2)}`);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
+  const finishRef = useRef<() => Promise<void>>(async () => {});
 
   const setPhaseBoth = (p: RecorderPhase) => {
     phaseRef.current = p;
     setPhase(p);
   };
 
-  const finishRef = useRef<() => Promise<void>>(async () => {});
+  // Leaving the screen saves the recording. Declared before useAudioRecorder:
+  // cleanups run in order, so this stops the recorder before the library
+  // releases it (the file location is already in uriRef).
+  useEffect(
+    () => () => {
+      finishRef.current();
+    },
+    [],
+  );
+
   const recorder = useAudioRecorder(VOICE_PRESET, (status: RecordingStatus) => {
     // Interrupted or failed (a call, another app taking the microphone): keep
     // what was recorded.
@@ -84,25 +97,32 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   const finish = useCallback(async () => {
     if (phaseRef.current !== 'recording') return;
     setPhaseBoth('saving');
+    // Everything the save needs is read now, before any await: on unmount the
+    // native recorder is released right after this returns.
     const durationMs = Date.now() - startRef.current;
+    const uri = uriRef.current;
+    const saveDay = dayRef.current;
+    const marks = marksRef.current;
+    const createdAt = startRef.current;
+    let stopped: Promise<void> = Promise.resolve();
     try {
-      await recorder.stop();
+      stopped = recorder.stop();
     } catch (err) {
       logger.warn('Recorder stop failed', err);
     }
-    setRecordingActive(false);
-    // Back to playback routing (with recording allowed, iOS plays through the
-    // earpiece).
-    setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => undefined);
-    const uri = recorder.uri;
     try {
-      if (uri && dayRef.current) {
+      await stopped.catch((err) => logger.warn('Recorder stop failed', err));
+      releaseRecording(owner);
+      // Back to playback routing (while recording is allowed, iOS plays
+      // through the earpiece).
+      setAudioMode(false);
+      if (uri && saveDay) {
         const saved = await saveRecording(uri, {
           kind,
-          day: dayRef.current,
+          day: saveDay,
           durationMs,
-          pageMarks: marksRef.current,
-          createdAt: startRef.current,
+          pageMarks: marks,
+          createdAt,
         });
         if (saved) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -113,19 +133,27 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       logger.error('Could not save recording', err);
       Alert.alert("Couldn't save the recording", 'Your device may be out of storage.');
     } finally {
+      releaseRecording(owner);
+      uriRef.current = null;
       setStartedAt(null);
       setPhaseBoth('idle');
     }
-  }, [recorder, kind]);
+  }, [recorder, kind, owner]);
   finishRef.current = finish;
 
   const start = useCallback(async () => {
     if (phaseRef.current !== 'idle' || !day) return;
+    // One recording at a time across screens (tabs stay mounted).
+    if (!acquireRecording(owner)) {
+      Alert.alert('Already recording', 'Stop the other recording first.');
+      return;
+    }
     setPhaseBoth('starting');
     try {
       let perm = await getRecordingPermissionsAsync();
       if (!perm.granted && perm.canAskAgain) perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) {
+        releaseRecording(owner);
         setPhaseBoth('idle');
         Alert.alert(
           'Microphone access is off',
@@ -137,25 +165,27 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
         );
         return;
       }
+      claimAudio('recorder', owner);
       getRecitation().stop();
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await setAudioMode(true);
       await recorder.prepareToRecordAsync();
+      uriRef.current = recorder.uri;
       recorder.record();
       dayRef.current = day;
       startRef.current = Date.now();
       marksRef.current = currentPage != null ? [{ atMs: 0, page: currentPage }] : [];
-      setRecordingActive(true);
       setStartedAt(startRef.current);
       setPhaseBoth('recording');
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err) {
       logger.error('Could not start recording', err);
-      setRecordingActive(false);
-      setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => undefined);
+      releaseRecording(owner);
+      uriRef.current = null;
+      setAudioMode(false);
       setPhaseBoth('idle');
       Alert.alert("Couldn't start recording", 'Please try again.');
     }
-  }, [day, currentPage, recorder]);
+  }, [day, currentPage, recorder, owner]);
 
   // Page marks while recording.
   useEffect(() => {
@@ -166,17 +196,29 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
     }
   }, [currentPage, phase]);
 
-  // No background recording: leaving the app saves it.
+  // An interruption that leaves the app active (an alarm, Siri) pauses the
+  // recorder without an event: notice it and keep what was recorded.
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    let misses = 0;
+    const id = setInterval(() => {
+      try {
+        misses = recorder.getStatus().isRecording ? 0 : misses + 1;
+      } catch {
+        misses += 1;
+      }
+      if (misses >= 2) finishRef.current();
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, recorder]);
+
+  // No background recording: going to the background saves it. ('inactive' is
+  // Control Center or a notification banner; recording goes on.)
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
-      if (s !== 'active') finishRef.current();
+      if (s === 'background') finishRef.current();
     });
     return () => sub.remove();
-  }, []);
-
-  // Leaving the screen saves it.
-  useEffect(() => () => {
-    finishRef.current();
   }, []);
 
   return {

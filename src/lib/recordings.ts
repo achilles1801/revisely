@@ -110,7 +110,14 @@ export function saveRecording(
       pageMarks: normalizePageMarks(info.pageMarks),
       storage: 'device',
     };
-    writeIndex(dir, [...(await readIndex(dir)), entry]);
+    try {
+      writeIndex(dir, [...(await readIndex(dir)), entry]);
+    } catch (err) {
+      // Not in the index (e.g. disk full): remove the file too, so nothing is
+      // left that the app can't show or delete.
+      if (target.exists) target.delete();
+      throw err;
+    }
     return toMeta(dir, entry);
   });
 }
@@ -181,10 +188,18 @@ export function pageAt(marks: PageMark[], ms: number): number | null {
   return page;
 }
 
-// Whether a recording is in progress, so recitation playback can refuse to
-// start (it would play into the microphone).
-let recordingActive = false;
-export const isRecordingActive = () => recordingActive;
-export const setRecordingActive = (active: boolean) => {
-  recordingActive = active;
-};
+// Which screen is recording, if any: one recording at a time (tab screens stay
+// mounted), and recitation refuses to start meanwhile (it would play into the
+// microphone).
+let recordingOwner: string | null = null;
+export const isRecordingActive = () => recordingOwner != null;
+/** Take the microphone for `owner`; false if another screen is recording. */
+export function acquireRecording(owner: string): boolean {
+  if (recordingOwner != null && recordingOwner !== owner) return false;
+  recordingOwner = owner;
+  return true;
+}
+/** Give the microphone back (only its owner can). */
+export function releaseRecording(owner: string): void {
+  if (recordingOwner === owner) recordingOwner = null;
+}

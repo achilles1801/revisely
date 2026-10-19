@@ -8,7 +8,8 @@
 // verse, named by the verse's position in the whole Qur'an.
 
 import { AppState } from 'react-native';
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioStatus } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
+import { claimAudio, onAudioClaimed, setAudioMode } from './audioFocus';
 import { globalVerseNumber, nextVerseInJuz, VerseKey } from './verses';
 import { logger } from './logger';
 
@@ -52,7 +53,6 @@ export class Recitation {
   private listeners = new Set<Listener>();
   private advance: (v: VerseKey) => VerseKey | null = nextVerseInJuz;
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
-  private audioModeSet = false;
   private owner: string | undefined;
   // Whether the current verse has started playing; a pause before that (e.g.
   // backgrounded while loading) resumes by loading it again.
@@ -61,6 +61,10 @@ export class Recitation {
   constructor(private reciterId: string = DEFAULT_RECITER_ID) {
     AppState.addEventListener('change', (s) => {
       if (s !== 'active') this.pause();
+    });
+    // A recording starting or playing takes over the audio.
+    onAudioClaimed((activity) => {
+      if (activity !== 'recitation') this.stop();
     });
   }
 
@@ -82,14 +86,6 @@ export class Recitation {
   }
 
   private ensurePlayer(): AudioPlayer {
-    if (!this.audioModeSet) {
-      this.audioModeSet = true;
-      setAudioModeAsync({
-        playsInSilentMode: true,
-        interruptionMode: 'doNotMix',
-        shouldPlayInBackground: false,
-      }).catch((err) => logger.warn('Audio mode failed', err));
-    }
     if (!this.player) {
       this.player = createAudioPlayer(null);
       this.player.addListener('playbackStatusUpdate', (s) => this.onStatus(s));
@@ -110,6 +106,9 @@ export class Recitation {
   ) {
     this.advance = advance;
     this.owner = owner;
+    // Every time: recording or playing a recording may have changed the mode.
+    setAudioMode(false);
+    claimAudio('recitation', owner ?? 'recitation');
     const player = this.ensurePlayer();
     this.clearLoadTimer();
     this.started = false;

@@ -162,7 +162,8 @@ describe('<FloatingTimer />', () => {
     renderTimer();
     fireEvent.press(await screen.findByLabelText(/Open timer controls/));
     fireEvent.press(screen.getByText('Open the Quran'));
-    expect(mockNavigate).toHaveBeenCalledWith('Read', { screen: 'ReadIndex' });
+    // The Read tab as it is, so an open reader isn't covered by a second index.
+    expect(mockNavigate).toHaveBeenCalledWith('Read');
   });
 
   it('has no "Open the Quran" in the reader', async () => {

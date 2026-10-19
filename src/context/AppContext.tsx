@@ -747,8 +747,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await firestoreService.deleteSession(logId);
-      // A session's id is its revision day; its recordings go with it.
-      deleteRecordings(isRevisionRecordingOf(logId)).catch((err) =>
+      // A session's id is its revision day; its recordings go with it. Awaited
+      // so a recordings list refreshed afterwards no longer shows them.
+      await deleteRecordings(isRevisionRecordingOf(logId)).catch((err) =>
         logger.warn('Could not delete session recordings', err),
       );
 
@@ -769,8 +770,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await Promise.all(logIds.map((id) => firestoreService.deleteSession(id)));
-      deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch((err) =>
-        logger.warn('Could not delete session recordings', err),
+      await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch(
+        (err) => logger.warn('Could not delete session recordings', err),
       );
 
       // Refresh logs once after all deletions

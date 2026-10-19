@@ -144,7 +144,9 @@ export default function ActivityDayScreen() {
             await firestoreService.deleteReadingSession(session.id);
             // Recordings made while it ran go with it (a failure here must not
             // bring the deleted session back).
-            if (session.startedAt > 0) {
+            // Only sessions timed in the reader: "Mark as read" sessions (e.g.
+            // Al-Kahf) have a made-up time window that may cover other recordings.
+            if (session.startedAt > 0 && session.pagesVisited.length > 0) {
               deleteRecordings(isReadingRecordingDuring(session.startedAt, session.endedAt))
                 .then(() => setRecordingsKey((k) => k + 1))
                 .catch((err) => logger.warn('Could not delete session recordings', err));
@@ -363,6 +365,7 @@ export default function ActivityDayScreen() {
           }}
           onDelete={async () => {
             await deleteLog(editingLog.id);
+            setRecordingsKey((k) => k + 1);
             setEditingLog(null);
           }}
         />

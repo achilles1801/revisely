@@ -6,6 +6,7 @@ const mockRecorder = {
   prepareToRecordAsync: jest.fn(() => Promise.resolve()),
   record: jest.fn(),
   stop: jest.fn(() => Promise.resolve()),
+  getStatus: jest.fn(() => ({ isRecording: true })),
 };
 let mockStatusListener: ((s: any) => void) | undefined;
 const mockPerms = { get: jest.fn(), request: jest.fn() };
@@ -31,9 +32,19 @@ jest.mock('expo-haptics', () => ({
 const mockStopRecitation = jest.fn();
 jest.mock('../../lib/recitation', () => ({ getRecitation: () => ({ stop: mockStopRecitation }) }));
 const mockSave = jest.fn((_uri: string, _info: any) => Promise.resolve({ id: 'x' }));
-jest.mock('../../lib/recordings', () => ({
-  saveRecording: (uri: string, info: any) => mockSave(uri, info),
-  setRecordingActive: jest.fn(),
+jest.mock('../../lib/recordings', () => {
+  const actual = jest.requireActual('../../lib/recordings');
+  return {
+    saveRecording: (uri: string, info: any) => mockSave(uri, info),
+    acquireRecording: actual.acquireRecording,
+    releaseRecording: actual.releaseRecording,
+    isRecordingActive: actual.isRecordingActive,
+  };
+});
+const mockClaim = jest.fn();
+jest.mock('../../lib/audioFocus', () => ({
+  claimAudio: (...a: any[]) => mockClaim(...a),
+  setAudioMode: (recording: boolean) => mockSetAudioMode({ allowsRecording: recording }),
 }));
 jest.mock('../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
 
@@ -51,6 +62,7 @@ beforeEach(() => {
   mockPerms.get.mockResolvedValue({ granted: true, canAskAgain: true });
   mockPerms.request.mockResolvedValue({ granted: true });
   mockRecorder.uri = 'cache/rec.m4a';
+  mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true }));
 });
 
 const setup = (props: Partial<Parameters<typeof useVoiceRecorder>[0]> = {}) =>
@@ -100,9 +112,64 @@ describe('useVoiceRecorder', () => {
   it('saves when the app leaves the foreground', async () => {
     const { result } = setup();
     await act(() => result.current.start());
+    await act(async () => appStateListeners.forEach((l) => l('inactive'))); // Control Center
+    expect(mockSave).not.toHaveBeenCalled();
     await act(async () => appStateListeners.forEach((l) => l('background')));
     expect(mockSave).toHaveBeenCalledTimes(1);
     expect(result.current.phase).toBe('idle');
+  });
+
+  it('allows one recording at a time across screens', async () => {
+    const a = setup();
+    const b = setup();
+    await act(() => a.result.current.start());
+    await act(() => b.result.current.start());
+    expect(b.result.current.phase).toBe('idle');
+    expect(Alert.alert).toHaveBeenCalledWith('Already recording', expect.any(String));
+    await act(() => a.result.current.stop());
+    await act(() => b.result.current.start()); // free again
+    expect(b.result.current.phase).toBe('recording');
+    await act(() => b.result.current.stop());
+  });
+
+  it('keeps what was recorded when an alarm or Siri pauses it silently', async () => {
+    jest.useFakeTimers();
+    try {
+      const { result } = setup();
+      await act(() => result.current.start());
+      mockRecorder.getStatus.mockImplementation(() => ({ isRecording: false }));
+      await act(async () => {
+        jest.advanceTimersByTime(2100);
+      });
+      expect(mockSave).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('saves on close even when the native recorder is already released', async () => {
+    const { result, unmount } = setup();
+    await act(() => result.current.start());
+    // After release, reading the recorder throws; the hook kept the location.
+    Object.defineProperty(mockRecorder, 'uri', {
+      configurable: true,
+      get: () => {
+        throw new Error('NativeSharedObjectNotFoundException');
+      },
+    });
+    mockRecorder.stop.mockImplementationOnce(() => {
+      throw new Error('released');
+    });
+    await act(async () => unmount());
+    expect(mockSave).toHaveBeenCalledWith('cache/rec.m4a', expect.any(Object));
+    Object.defineProperty(mockRecorder, 'uri', { configurable: true, writable: true, value: 'cache/rec.m4a' });
+  });
+
+  it('takes the audio from recitation and recording playback', async () => {
+    const { result } = setup();
+    await act(() => result.current.start());
+    expect(mockClaim).toHaveBeenCalledWith('recorder', expect.any(String));
+    await act(() => result.current.stop());
   });
 
   it('saves what was recorded when iOS interrupts it (a call)', async () => {

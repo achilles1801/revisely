@@ -105,7 +105,9 @@ export function FloatingTimer() {
       ? undefined
       : () => {
           close();
-          if (navigationRef.isReady()) navigationRef.navigate('Read', { screen: 'ReadIndex' });
+          // Just the Read tab as it is: a reader already open there stays open
+          // (naming ReadIndex would push a second index on top of it).
+          if (navigationRef.isReady()) navigationRef.navigate('Read');
         };
 
   const clock = timer ? formatClock(displayMs(timer, now)) : '';

@@ -70,6 +70,16 @@ export default function QuranReaderScreen() {
   const { day: today } = useRevisionDay(user);
   const recorder = useVoiceRecorder({ kind: 'reading', day: today, currentPage });
 
+  // Opened again with another page while already open (e.g. the Friday
+  // Al-Kahf card): the stack updates this screen's params instead of pushing.
+  const requestedPage = route.params.pageNumber;
+  const lastRequestedRef = useRef(requestedPage);
+  useEffect(() => {
+    if (requestedPage === lastRequestedRef.current) return;
+    lastRequestedRef.current = requestedPage;
+    pagerRef.current?.scrollToPage(requestedPage);
+  }, [requestedPage]);
+
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),

@@ -38,7 +38,7 @@ import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
 import { avatarInitial } from '../../lib/displayName';
-import { deleteRecordings, listRecordings } from '../../lib/recordings';
+import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
 import { formatBytes } from '../../lib/recordingFormat';
 import {
   ALL_HOME_METRICS,
@@ -520,7 +520,8 @@ export default function SettingsScreen() {
                           text: 'Delete all',
                           style: 'destructive',
                           onPress: async () => {
-                            await deleteRecordings(() => true);
+                            // The whole folder, including any file not in the index.
+                            await deleteAllRecordings();
                             loadRecordings();
                           },
                         },

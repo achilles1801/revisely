@@ -147,4 +147,13 @@ describe('recitation', () => {
     jest.advanceTimersByTime(LOAD_TIMEOUT_MS + 1);
     expect(r.getState().status).toBe('error');
   });
+
+  it('stops when a recording starts or plays', () => {
+    const { claimAudio } = require('../audioFocus');
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockPlayers[0].emit({ playing: true });
+    claimAudio('recorder', 'revision-screen');
+    expect(r.getState().status).toBe('idle');
+  });
 });

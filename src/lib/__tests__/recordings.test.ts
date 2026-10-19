@@ -60,6 +60,9 @@ jest.mock('expo-file-system', () => {
 });
 
 import {
+  acquireRecording,
+  isRecordingActive,
+  releaseRecording,
   deleteAllRecordings,
   deleteRecording,
   deleteRecordings,
@@ -186,5 +189,32 @@ describe('formatting', () => {
     expect(formatBytes(400_000)).toBe('0.4 MB');
     expect(formatBytes(12 * 1024 * 1024)).toBe('12 MB');
     expect(formatBytes(1.5 * 1024 * 1024 * 1024)).toBe('1.5 GB');
+  });
+});
+
+describe('one recording at a time', () => {
+  it('only the screen that took the microphone can give it back', () => {
+    expect(acquireRecording('revision')).toBe(true);
+    expect(acquireRecording('reader')).toBe(false);
+    releaseRecording('reader');
+    expect(isRecordingActive()).toBe(true);
+    releaseRecording('revision');
+    expect(isRecordingActive()).toBe(false);
+    expect(acquireRecording('reader')).toBe(true);
+    releaseRecording('reader');
+  });
+
+  it('removes the moved file when the index cannot be written', async () => {
+    const uri = temp('a');
+    const realSet = mockFs.set.bind(mockFs);
+    const spy = jest.spyOn(mockFs, 'set').mockImplementation((k: string, v: string) => {
+      if (k.endsWith('index.json') && v.startsWith('[')) throw new Error('ENOSPC');
+      return realSet(k, v);
+    });
+    await expect(
+      saveRecording(uri, { kind: 'reading', day: 'd', durationMs: 5000, pageMarks: [], createdAt: 7 }),
+    ).rejects.toThrow('ENOSPC');
+    spy.mockRestore();
+    expect([...mockFs.keys()].filter((k) => k.endsWith('.m4a'))).toEqual([]);
   });
 });
