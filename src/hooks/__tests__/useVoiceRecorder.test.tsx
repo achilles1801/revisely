@@ -42,6 +42,7 @@ jest.mock('../../lib/recordings', () => {
   return {
     appendSegment: (...a: any[]) => mockAppend(...a),
     findRevisionRecording: (...a: any[]) => mockFind(...a),
+    rebaseMarks: actual.rebaseMarks,
     acquireRecording: actual.acquireRecording,
     releaseRecording: actual.releaseRecording,
     setCapturing: actual.setCapturing,
@@ -74,7 +75,9 @@ beforeEach(() => {
   mockPerms.get.mockResolvedValue({ granted: true, canAskAgain: true });
   mockPerms.request.mockResolvedValue({ granted: true });
   mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true }));
-  mockAppend.mockImplementation((id: string | null) => Promise.resolve(id ?? 'rec-1'));
+  mockAppend.mockImplementation((id: string | null) =>
+    Promise.resolve({ id: id ?? 'rec-1', kept: true, restarted: false }),
+  );
   mockFind.mockResolvedValue(null);
 });
 
@@ -116,8 +119,117 @@ describe('useVoiceRecorder sessions', () => {
     expect(id2).toBe('rec-1'); // same recording
     expect(uri2).toBe('cache/seg-2.m4a');
     expect(info2.pageMarks.map((m: any) => m.page)).toEqual([12, 13]);
-    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledTimes(2); // after each saved stretch
     expect(result.current.phase).toBe('idle');
+  });
+
+  it('records each stretch to a new file (prepare gets the options)', async () => {
+    const { result } = setup();
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    await act(() => result.current.resume());
+    expect(mockRecorder.prepareToRecordAsync).toHaveBeenCalledTimes(2);
+    for (const call of mockRecorder.prepareToRecordAsync.mock.calls) {
+      expect(call[0]).toBe(VOICE_PRESET);
+    }
+    await act(() => result.current.finish());
+  });
+
+  it('a resume waits for the previous stretch to be saved', async () => {
+    let resolveFirst: () => void = () => undefined;
+    mockAppend.mockImplementationOnce(
+      () => new Promise((r) => (resolveFirst = () => r({ id: 'rec-1', kept: true, restarted: false }))),
+    );
+    const { result } = setup();
+    await act(() => result.current.start());
+    act(() => {
+      result.current.pause();
+    });
+    let resumed = false;
+    act(() => {
+      result.current.resume().then(() => (resumed = true));
+    });
+    await act(async () => undefined);
+    expect(mockRecorder.prepareToRecordAsync).toHaveBeenCalledTimes(1);
+    await act(async () => resolveFirst());
+    await act(async () => undefined);
+    expect(resumed).toBe(true);
+    expect(mockRecorder.prepareToRecordAsync).toHaveBeenCalledTimes(2);
+    await act(() => result.current.finish());
+  });
+
+  it('takes a dropped stretch back off the timeline', async () => {
+    mockAppend.mockImplementationOnce(() => Promise.resolve({ id: null, kept: false, restarted: false }));
+    const { result } = setup();
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    expect(result.current.baseMs).toBe(0);
+    await act(() => result.current.finish());
+  });
+
+  it('restarts the timeline when the recording being continued was deleted', async () => {
+    mockFind.mockResolvedValue({ id: 'old', durationMs: 60_000, pageMarks: [{ atMs: 0, page: 3 }] });
+    mockAppend.mockImplementationOnce(() => Promise.resolve({ id: 'new', kept: true, restarted: true }));
+    const { result } = setup({ kind: 'revision' });
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    expect(result.current.baseMs).toBeLessThan(1_000); // just this stretch
+    await act(() => result.current.resume());
+    await act(() => result.current.finish());
+    const [id, , info] = mockAppend.mock.calls[1];
+    expect(id).toBe('new');
+    expect(info.pageMarks[0]).toEqual({ atMs: 0, page: 12 });
+  });
+
+  it('leaving the screen while resuming ends the session (the microphone is free again)', async () => {
+    const a = setup();
+    await act(() => a.result.current.start());
+    await act(() => a.result.current.pause());
+    mockRecorder.prepareToRecordAsync.mockImplementationOnce(() => Promise.reject(new Error('released')));
+    const resuming = a.result.current.resume();
+    a.unmount();
+    await act(() => resuming);
+    expect(mockSetAudioMode).toHaveBeenLastCalledWith(false);
+    const b = setup();
+    await act(() => b.result.current.start());
+    expect(b.result.current.phase).toBe('recording');
+    await act(() => b.result.current.finish());
+  });
+
+  it('a failed resume goes back to playback mode', async () => {
+    const { result } = setup();
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    mockRecorder.prepareToRecordAsync.mockImplementationOnce(() => Promise.reject(new Error('busy')));
+    await act(() => result.current.resume());
+    expect(result.current.phase).toBe('paused');
+    expect(mockSetAudioMode).toHaveBeenLastCalledWith(false);
+    expect(isRecordingActive()).toBe(false);
+    await act(() => result.current.finish());
+  });
+
+  it('going to the background while starting pauses once started', async () => {
+    let release: () => void = () => undefined;
+    mockRecorder.prepareToRecordAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>((r) => {
+          mockUri += 1;
+          mockRecorder.uri = `cache/seg-${mockUri}.m4a`;
+          release = r;
+        }),
+    );
+    const { result } = setup();
+    let started: Promise<void> = Promise.resolve();
+    act(() => {
+      started = result.current.start();
+    });
+    await act(async () => undefined);
+    await act(async () => appStateListeners.forEach((l) => l('background')));
+    await act(async () => release());
+    await act(() => started);
+    expect(result.current.phase).toBe('paused');
+    expect(result.current.interrupted).toBe(true);
+    await act(() => result.current.finish());
   });
 
   it('a revision session carries on that day’s recording', async () => {
@@ -204,16 +316,24 @@ describe('useVoiceRecorder sessions', () => {
 
   it('quick pause, resume, pause saves both stretches to one recording', async () => {
     let resolveFirst: (v: string) => void = () => undefined;
-    mockAppend.mockImplementationOnce(() => new Promise<string>((r) => (resolveFirst = r)));
+    mockAppend.mockImplementationOnce(
+      () => new Promise((r) => (resolveFirst = (id: string) => r({ id, kept: true, restarted: false }))),
+    );
     const { result } = setup();
     await act(() => result.current.start());
     act(() => {
       result.current.pause();
     });
-    await act(() => result.current.resume());
-    const second = result.current.pause();
+    // Resume waits for the first stretch to be saved before recording again.
+    let resuming: Promise<void> = Promise.resolve();
+    act(() => {
+      resuming = result.current.resume();
+    });
+    await act(async () => undefined); // let the first save start
+    expect(mockRecorder.prepareToRecordAsync).toHaveBeenCalledTimes(1); // still waiting
     await act(async () => resolveFirst('rec-9'));
-    await act(() => second);
+    await act(() => resuming);
+    await act(() => result.current.pause());
     expect(mockAppend.mock.calls[1][0]).toBe('rec-9');
     await act(() => result.current.finish());
   });

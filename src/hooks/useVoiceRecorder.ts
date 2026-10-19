@@ -17,6 +17,7 @@ import {
   findRevisionRecording,
   PageMark,
   RecordingKind,
+  rebaseMarks,
   releaseRecording,
   setCapturing,
 } from '../lib/recordings';
@@ -50,7 +51,7 @@ interface Options {
   day: string | null;
   /** The page on screen; changes are recorded as page marks. */
   currentPage: number | null;
-  /** Called after the recording session finishes with something saved. */
+  /** Called after something is saved (each paused stretch, and at the end). */
   onSaved?: () => void;
 }
 
@@ -102,12 +103,17 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   // Leaving the screen finishes the session. Declared before useAudioRecorder:
   // cleanups run in order, so this stops the recorder before the library
   // releases it (the file location is already in uriRef).
+  const unmountedRef = useRef(false);
   useEffect(
     () => () => {
+      unmountedRef.current = true;
       finishRef.current();
     },
     [],
   );
+  // Asked to pause (e.g. the app went to the background) while a stretch was
+  // still starting: honoured once it has started.
+  const pendingPauseRef = useRef(false);
 
   const recorder = useAudioRecorder(VOICE_PRESET, (status: RecordingStatus) => {
     // Interrupted or failed (a call, another app taking the microphone): keep
@@ -122,11 +128,13 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   const endSegment = useCallback((): Promise<void> => {
     const uri = uriRef.current;
     const segmentMs = Date.now() - segStartRef.current;
+    const segmentStartMs = baseRef.current;
     const info = {
       kind,
       day: dayRef.current ?? '',
       segmentMs,
       pageMarks: [...marksRef.current],
+      segmentStartMs,
       createdAt: createdAtRef.current,
     };
     uriRef.current = null;
@@ -142,10 +150,25 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       await stopped.catch((err) => logger.warn('Recorder stop failed', err));
       if (!uri || !info.day) return;
       try {
-        const id = await appendSegment(recordingIdRef.current, uri, info);
-        if (id) {
-          recordingIdRef.current = id;
+        const result = await appendSegment(recordingIdRef.current, uri, info);
+        if (result.id) recordingIdRef.current = result.id;
+        if (!result.kept) {
+          // Dropped (too short): take its time back off the timeline.
+          baseRef.current -= segmentMs;
+          marksRef.current = marksRef.current.map((m) =>
+            m.atMs > segmentStartMs ? { ...m, atMs: Math.max(segmentStartMs, m.atMs - segmentMs) } : m,
+          );
+          setBaseMs(baseRef.current);
+        } else {
+          if (result.restarted) {
+            // The recording being continued was deleted meanwhile: this
+            // stretch began a new one, whose timeline starts here.
+            baseRef.current -= segmentStartMs;
+            marksRef.current = rebaseMarks(marksRef.current, segmentStartMs);
+            setBaseMs(baseRef.current);
+          }
           savedAnyRef.current = true;
+          onSavedRef.current?.();
         }
       } catch (err) {
         logger.error('Could not save recording', err);
@@ -158,10 +181,14 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
 
   /** Start a new stretch (first one or a resume). */
   const startSegment = useCallback(async () => {
+    // The previous stretch's file must be moved away before anything else.
+    await saveChainRef.current;
     claimAudio('recorder', owner);
     getRecitation().stop();
     await setAudioMode(true);
-    await recorder.prepareToRecordAsync();
+    // With options, each prepare records to a new file (without them the
+    // recorder reuses one path, and preparing would overwrite the last stretch).
+    await recorder.prepareToRecordAsync(VOICE_PRESET);
     uriRef.current = recorder.uri;
     recorder.record();
     segStartRef.current = Date.now();
@@ -175,7 +202,26 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
     setSegmentStartedAt(segStartRef.current);
     setInterrupted(false);
     setPhaseBoth('recording');
+    // The screen closed, or the app left the foreground, while this was starting.
+    if (unmountedRef.current) {
+      await finishRef.current();
+    } else if (pendingPauseRef.current) {
+      pendingPauseRef.current = false;
+      await pauseRef.current(true);
+    }
   }, [recorder, owner]);
+
+  /** After a failed start or resume: back to playback, nothing capturing. */
+  const abandonStart = useCallback(() => {
+    setCapturing(false);
+    uriRef.current = null;
+    try {
+      recorder.stop().catch(() => undefined);
+    } catch {
+      // Not prepared, or already released.
+    }
+    setAudioMode(false);
+  }, [recorder]);
 
   const start = useCallback(async () => {
     if (phaseRef.current !== 'idle' || !day) return;
@@ -213,16 +259,19 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err) {
       logger.error('Could not start recording', err);
+      abandonStart();
       releaseRecording(owner);
-      uriRef.current = null;
-      setAudioMode(false);
       setPhaseBoth('idle');
-      Alert.alert("Couldn't start recording", 'Please try again.');
+      if (!unmountedRef.current) Alert.alert("Couldn't start recording", 'Please try again.');
     }
-  }, [day, kind, owner, startSegment]);
+  }, [day, kind, owner, startSegment, abandonStart]);
 
   const pause = useCallback(
     async (interruption = false) => {
+      if (phaseRef.current === 'starting' && interruption) {
+        pendingPauseRef.current = true;
+        return;
+      }
       if (phaseRef.current !== 'recording') return;
       setPhaseBoth('paused');
       setInterrupted(interruption);
@@ -246,13 +295,22 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (err) {
       logger.error('Could not resume recording', err);
+      abandonStart();
+      if (unmountedRef.current) {
+        // Left the screen while resuming: end the session properly.
+        setPhaseBoth('paused');
+        await finishRef.current();
+        return;
+      }
       setPhaseBoth('paused');
       Alert.alert("Couldn't resume recording", 'Please try again.');
     }
-  }, [startSegment]);
+  }, [startSegment, abandonStart]);
 
   const finish = useCallback(async () => {
     const p = phaseRef.current;
+    // While starting, the start itself finishes once it completes (it checks
+    // unmountedRef); a Done tap then is ignored.
     if (p !== 'recording' && p !== 'paused') return;
     setPhaseBoth('finishing');
     try {
@@ -261,7 +319,6 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       setAudioMode(false);
       if (savedAnyRef.current) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onSavedRef.current?.();
       }
     } catch (err) {
       logger.error('Could not finish recording', err);

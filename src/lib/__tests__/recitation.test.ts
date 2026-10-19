@@ -177,6 +177,16 @@ describe('recitation', () => {
     expect(r.getState().status).toBe('loading');
   });
 
+  it('a verse paused when the reciter changes resumes in the new voice', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockPlayers[0].emit({ playing: true });
+    r.pause();
+    r.setVoice('minshawi:murattal');
+    r.resume();
+    expect(mockPlayers[0].source.uri).toBe('https://everyayah.com/data/Minshawy_Murattal_128kbps/001001.mp3');
+  });
+
   it('changing the reciter while idle or paused just remembers it', () => {
     const r = new Recitation();
     r.setVoice('alafasy:murattal');

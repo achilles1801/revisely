@@ -112,7 +112,29 @@ export interface SegmentInfo {
   segmentMs: number;
   /** All page marks so far, on the recording's whole timeline. */
   pageMarks: PageMark[];
+  /** Where this segment begins on that timeline. */
+  segmentStartMs?: number;
   createdAt?: number;
+}
+
+export interface AppendResult {
+  /** The recording's id, or null when nothing was kept. */
+  id: string | null;
+  /** Whether this segment was kept (too-short stretches are dropped). */
+  kept: boolean;
+  /** The recording to continue was gone, so a new one began with this segment:
+   *  its timeline starts at segmentStartMs. */
+  restarted: boolean;
+}
+
+/** Marks rebased to a timeline that starts at `startMs`: the page on screen
+ *  then is at 0, earlier marks go. */
+export function rebaseMarks(marks: PageMark[], startMs: number): PageMark[] {
+  if (startMs <= 0) return marks;
+  const before = marks.filter((m) => m.atMs <= startMs);
+  const after = marks.filter((m) => m.atMs > startMs).map((m) => ({ ...m, atMs: m.atMs - startMs }));
+  const atStart = before.length > 0 ? [{ atMs: 0, page: before[before.length - 1].page }] : [];
+  return normalizePageMarks([...atStart, ...after]);
 }
 
 /**
@@ -125,7 +147,7 @@ export function appendSegment(
   recordingId: string | null,
   tempUri: string,
   info: SegmentInfo,
-): Promise<string | null> {
+): Promise<AppendResult> {
   return serial(async () => {
     const temp = new File(tempUri);
     const dir = accountDir();
@@ -134,8 +156,9 @@ export function appendSegment(
     const minimum = existing ? MIN_SEGMENT_MS : MIN_RECORDING_MS;
     if (info.segmentMs < minimum || !temp.exists) {
       if (temp.exists) temp.delete();
-      return existing ? existing.id : null;
+      return { id: existing ? existing.id : null, kept: false, restarted: false };
     }
+    const restarted = recordingId != null && !existing;
     const createdAt = existing?.createdAt ?? info.createdAt ?? Date.now();
     const id = existing?.id ?? `${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
     const ext = tempUri.match(/\.[a-z0-9]+$/i)?.[0] ?? '.m4a';
@@ -151,7 +174,9 @@ export function appendSegment(
       createdAt,
       durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),
       segments,
-      pageMarks: normalizePageMarks(info.pageMarks),
+      pageMarks: restarted
+        ? rebaseMarks(normalizePageMarks(info.pageMarks), info.segmentStartMs ?? 0)
+        : normalizePageMarks(info.pageMarks),
       storage: 'device',
     };
     try {
@@ -162,7 +187,7 @@ export function appendSegment(
       if (target.exists) target.delete();
       throw err;
     }
-    return id;
+    return { id, kept: true, restarted };
   });
 }
 
@@ -173,8 +198,11 @@ export function findRevisionRecording(
   return serial(async () => {
     const dir = accountDir();
     const match = (await readIndex(dir))
-      .filter((e) => e.kind === 'revision' && e.day === day && toMeta(dir, e) != null)
+      .filter((e) => e.kind === 'revision' && e.day === day)
+      .map((e) => toMeta(dir, e))
+      .filter((m): m is RecordingMeta => m != null)
       .sort((a, b) => b.createdAt - a.createdAt)[0];
+    // The duration of the files that exist, so the timeline matches the audio.
     return match ? { id: match.id, durationMs: match.durationMs, pageMarks: match.pageMarks } : null;
   });
 }

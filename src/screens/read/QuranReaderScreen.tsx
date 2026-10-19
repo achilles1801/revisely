@@ -168,22 +168,30 @@ export default function QuranReaderScreen() {
         >
           <Ionicons name="chevron-back" size={22} color={palette.textSecondary} />
         </Pressable>
-        <Text style={styles.crumbLeft}>
+        <Text style={styles.crumbLeft} numberOfLines={1}>
           Juz {juz} · Hizb {hizb}
         </Text>
-        <View style={styles.crumbRight}>
-          <Text style={styles.crumbSurah}>{firstSurah?.name ?? ''}</Text>
-          {firstSurah?.nameArabic ? (
-            <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
-          ) : null}
-        </View>
+        {/* While recording, the recording controls take the surah's place
+            (narrow phones have no room for both). */}
+        {recorder.phase === 'idle' && (
+          <View style={styles.crumbRight}>
+            <Text style={styles.crumbSurah} numberOfLines={1}>
+              {firstSurah?.name ?? ''}
+            </Text>
+            {firstSurah?.nameArabic ? (
+              <Text style={styles.crumbArabic} numberOfLines={1}>
+                {firstSurah.nameArabic}
+              </Text>
+            ) : null}
+          </View>
+        )}
         <RecordButton
           recorder={recorder}
           color={palette.textSecondary}
           background={palette.card}
           border={palette.divider}
         />
-        {!guideSeen && (
+        {!guideSeen && recorder.phase === 'idle' && (
           <Pressable
             onPress={() => setShowGuide(true)}
             hitSlop={12}
@@ -344,11 +352,13 @@ const makeStyles = (palette: ReadPalette) =>
       ...typography.caption,
       color: palette.textPrimary,
       flex: 1,
+      minWidth: 60,
     },
     crumbRight: {
       flexDirection: 'row',
       alignItems: 'baseline',
       gap: spacing.xs,
+      flexShrink: 1,
     },
     crumbSurah: {
       ...typography.caption,

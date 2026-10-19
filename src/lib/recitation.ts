@@ -215,6 +215,8 @@ export class Recitation {
     this.voice = next;
     const { status, verse } = this.state;
     if (verse && (status === 'playing' || status === 'loading')) this.play(verse, this.advance);
+    // A paused verse resumes in the new voice (resume reloads it).
+    else if (status === 'paused') this.started = false;
   }
 
   getState(): RecitationState {

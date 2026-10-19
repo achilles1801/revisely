@@ -70,7 +70,9 @@ export function RecordButton({ recorder, color, background, border }: RecordButt
         ]}
         accessibilityRole="button"
         accessibilityLabel={
-          recording ? `Pause recording, ${time} recorded` : `Resume recording, ${time} recorded`
+          recording
+            ? `Pause recording, ${time} recorded`
+            : `${interrupted ? 'Recording was paused by an interruption. ' : ''}Resume recording, ${time} recorded`
         }
       >
         {recording ? <View style={styles.dot} /> : <Ionicons name="pause" size={12} color={RED} />}
@@ -80,7 +82,7 @@ export function RecordButton({ recorder, color, background, border }: RecordButt
         ) : recording ? (
           <Ionicons name="pause" size={14} color="#fff" />
         ) : (
-          <Text style={[styles.pausedLabel, { color: RED }]}>{interrupted ? 'Paused · Resume' : 'Resume'}</Text>
+          <Text style={[styles.pausedLabel, { color: RED }]}>Resume</Text>
         )}
       </Pressable>
       <Pressable

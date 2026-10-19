@@ -13,7 +13,7 @@ beforeEach(() => {
 
 describe('useKeepScreenOn', () => {
   it('keeps the screen on while active, and lets it lock again when not', () => {
-    const { rerender } = renderHook(({ active }) => useKeepScreenOn(active), {
+    const { rerender } = renderHook(({ active }: { active: boolean }) => useKeepScreenOn(active), {
       initialProps: { active: true },
     });
     expect(activate).toHaveBeenCalledTimes(1);
