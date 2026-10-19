@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +30,7 @@ import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
@@ -135,6 +136,10 @@ export default function ActiveRevisionScreen() {
       assignment?.pages[0] ??
       null,
   });
+
+  // Reading or revising without touching the screen: don't let it lock.
+  const isScreenFocused = useIsFocused();
+  useKeepScreenOn(isScreenFocused);
 
   const verseActions = useVerseActions({
     pages: sessionPages,

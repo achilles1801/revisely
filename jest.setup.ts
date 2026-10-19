@@ -83,3 +83,9 @@ jest.mock('expo-audio', () => ({
     addListener: jest.fn(() => ({ remove: jest.fn() })),
   })),
 }));
+
+// expo-keep-awake is a native module.
+jest.mock('expo-keep-awake', () => ({
+  activateKeepAwakeAsync: jest.fn(() => Promise.resolve()),
+  deactivateKeepAwake: jest.fn(() => Promise.resolve()),
+}));

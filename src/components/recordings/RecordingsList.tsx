@@ -22,6 +22,7 @@ import {
 } from '../../lib/recordings';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
+import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 
 interface RecordingsListProps {
   day: string;
@@ -183,6 +184,9 @@ export function RecordingsList({ day, kind, onChanged, header, reloadKey }: Reco
       ],
     );
   };
+
+  // Listening back without touching the screen: don't let it lock.
+  useKeepScreenOn(playingId != null && !paused);
 
   if (items.length === 0) return null;
 

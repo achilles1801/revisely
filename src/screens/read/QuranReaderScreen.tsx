@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../../components/GlassCard';
@@ -20,6 +20,7 @@ import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useApp } from '../../context/AppContext';
 import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
@@ -79,6 +80,10 @@ export default function QuranReaderScreen() {
     lastRequestedRef.current = requestedPage;
     pagerRef.current?.scrollToPage(requestedPage);
   }, [requestedPage]);
+
+  // Reading or revising without touching the screen: don't let it lock.
+  const isScreenFocused = useIsFocused();
+  useKeepScreenOn(isScreenFocused);
 
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
