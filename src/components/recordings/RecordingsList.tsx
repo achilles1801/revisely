@@ -3,12 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
-import {
-  claimAudio,
-  onAudioClaimed,
-  releaseAudioSession,
-  setAudioMode,
-} from '../../lib/audioFocus';
+import { claimAudio, onAudioClaimed, setAudioMode } from '../../lib/audioFocus';
 import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -103,16 +98,13 @@ export function RecordingsList({
   // A seek asked for before the segment has loaded (iOS ignores those).
   const pendingSeekRef = useRef<number | null>(null);
 
-  /** Stop; release the audio session unless another activity is taking it. */
-  const stopPlayback = useCallback((release = true) => {
-    const wasPlaying = currentRef.current != null;
+  const stopPlayback = useCallback(() => {
     playerRef.current?.pause();
     currentRef.current = null;
     pendingSeekRef.current = null;
     setPlayingId(null);
     setPaused(false);
     setPosition(0);
-    if (release && wasPlaying) releaseAudioSession(listId);
   }, []);
 
   // Recitation or recording starting elsewhere stops this playback.
@@ -120,7 +112,7 @@ export function RecordingsList({
   useEffect(
     () =>
       onAudioClaimed((_activity, owner) => {
-        if (owner !== listId) stopPlayback(false);
+        if (owner !== listId) stopPlayback();
       }),
     [listId, stopPlayback],
   );
@@ -128,7 +120,6 @@ export function RecordingsList({
   // Unmounting stops playback and frees the player.
   useEffect(
     () => () => {
-      if (currentRef.current) releaseAudioSession(listId);
       currentRef.current = null;
       playerRef.current?.remove();
       playerRef.current = null;
@@ -195,7 +186,6 @@ export function RecordingsList({
             setPlayingId(null);
             setPaused(false);
             setPosition(0);
-            releaseAudioSession(listId);
           }
         }
       });

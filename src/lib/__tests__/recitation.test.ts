@@ -196,25 +196,16 @@ describe('recitation', () => {
     expect(r.getVoice()).toBe('alafasy:murattal');
     expect(mockPlayers).toHaveLength(0);
   });
-  it('keeps the audio session for the app to release (no silent stall)', () => {
-    const r = new Recitation();
-    r.play({ sura: 1, ayah: 1 });
-    expect(mockPlayers[0].opts).toMatchObject({ keepAudioSessionActive: true });
-    mockSetActive.mockClear();
-    r.stop();
-    expect(mockSetActive).toHaveBeenCalledWith(false);
-  });
-
-  it('does not release the session when a recording takes over, or when already stopped', () => {
+  it('keeps the audio session active and never deactivates it (deactivating broke the next recording)', () => {
     const { claimAudio } = require('../audioFocus');
     const r = new Recitation();
     r.play({ sura: 1, ayah: 1 });
-    mockSetActive.mockClear();
-    claimAudio('recording-playback', 'list');
-    expect(r.getState().status).toBe('idle');
-    expect(mockSetActive).not.toHaveBeenCalled();
+    expect(mockPlayers[0].opts).toMatchObject({ keepAudioSessionActive: true });
     r.stop();
-    expect(mockSetActive).not.toHaveBeenCalled();
+    r.play({ sura: 1, ayah: 2 });
+    claimAudio('recorder', 'revision');
+    expect(r.getState().status).toBe('idle');
+    expect(mockSetActive).not.toHaveBeenCalledWith(false);
   });
 });
 
