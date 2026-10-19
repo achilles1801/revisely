@@ -21,7 +21,16 @@ import {
   releaseRecording,
   setCapturing,
 } from '../lib/recordings';
-import { claimAudio, releaseAudioSession, setAudioMode } from '../lib/audioFocus';
+import {
+  claimAudio,
+  enterRecordingMode,
+  isAudioSessionError,
+  setAudioMode,
+} from '../lib/audioFocus';
+
+/** Before the one retry when the audio session refuses to activate. */
+export const SESSION_RETRY_DELAY_MS = 400;
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 import { logger } from '../lib/logger';
 
 // Close to Voice Memos: AAC at 48 kHz, mono (the phone's main microphone),
@@ -188,12 +197,24 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   const startSegment = useCallback(async () => {
     // The previous stretch's file must be moved away before anything else.
     await saveChainRef.current;
+    // Recitation and recording playback stop (claimAudio tells them).
     claimAudio('recorder', owner);
     getRecitation().stop();
-    await setAudioMode(true);
+    // Recording mode, then the session active, then prepare (lib/audioFocus).
     // With options, each prepare records to a new file (without them the
     // recorder reuses one path, and preparing would overwrite the last stretch).
-    await recorder.prepareToRecordAsync(VOICE_PRESET);
+    await enterRecordingMode();
+    try {
+      await recorder.prepareToRecordAsync(VOICE_PRESET);
+    } catch (err) {
+      // iOS can refuse to activate the session for a moment (another app
+      // handing back the audio): wait, set it up again, try once more.
+      if (!isAudioSessionError(err)) throw err;
+      logger.warn('Audio session busy, retrying', err);
+      await wait(SESSION_RETRY_DELAY_MS);
+      await enterRecordingMode();
+      await recorder.prepareToRecordAsync(VOICE_PRESET);
+    }
     uriRef.current = recorder.uri;
     recorder.record();
     segStartRef.current = Date.now();
@@ -267,7 +288,14 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       abandonStart();
       releaseRecording(owner);
       setPhaseBoth('idle');
-      if (!unmountedRef.current) Alert.alert("Couldn't start recording", 'Please try again.');
+      if (!unmountedRef.current) {
+        Alert.alert(
+          "Couldn't start recording",
+          isAudioSessionError(err)
+            ? 'The microphone is busy, maybe with a call or another app. Close it and try again.'
+            : 'Please try again.',
+        );
+      }
     }
   }, [day, kind, owner, startSegment, abandonStart]);
 
@@ -322,8 +350,6 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       if (p === 'recording') endSegment();
       await saveChainRef.current;
       setAudioMode(false);
-      // The recorder kept the session active; let other apps' audio resume.
-      releaseAudioSession(owner);
       if (savedAnyRef.current) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const id = recordingIdRef.current;

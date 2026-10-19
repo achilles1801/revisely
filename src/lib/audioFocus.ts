@@ -10,12 +10,8 @@ export type AudioActivity = 'recitation' | 'recording-playback' | 'recorder';
 type Listener = (claimedBy: AudioActivity, owner: string) => void;
 const listeners = new Set<Listener>();
 
-// Who has the audio now: only they may release the session.
-let currentOwner: string | null = null;
-
 /** Announce that `activity` (started by `owner`) is taking the audio. */
 export function claimAudio(activity: AudioActivity, owner: string): void {
-  currentOwner = owner;
   listeners.forEach((l) => l(activity, owner));
 }
 
@@ -30,17 +26,30 @@ export function onAudioClaimed(listener: Listener): () => void {
 /**
  * Players are created with keepAudioSessionActive: by default expo-audio
  * deactivates the audio session 0.1 s after any player pauses or finishes
- * unless a player is already *playing* — and one that was just told to play is
- * still loading then, so it fell silent (a recording right after a recitation
- * was stopped, and every segment after the first). The app releases the
- * session itself, here, when playback really ends, so other apps can resume.
+ * unless a player is already *playing*, and one that was just told to play is
+ * still loading then, so it fell silent. The app does not deactivate the
+ * session itself either: deactivating (which notifies other apps, so they can
+ * take the audio back) and then activating it again to record made the next
+ * recording fail to start ("Session activation failed"). The session simply
+ * stays active while the app is open; iOS releases it in the background.
  */
-export function releaseAudioSession(owner: string): void {
-  // Deactivating pauses every player, so only whoever has the audio may: a
-  // screen that has since lost it must not stop the new playback.
-  if (owner !== currentOwner) return;
-  currentOwner = null;
-  setIsAudioActiveAsync(false).catch(() => undefined);
+
+/**
+ * Before a recorder prepares: recording mode first (awaited), then the session
+ * active. expo-audio's prepare activates the session too; doing it here, in
+ * order, means prepare finds it already active.
+ */
+export async function enterRecordingMode(): Promise<void> {
+  await setAudioMode(true);
+  await setIsAudioActiveAsync(true).catch(() => undefined);
+}
+
+/** Whether an error is the audio session refusing to activate. */
+export function isAudioSessionError(err: unknown): boolean {
+  const text = [err, (err as { cause?: unknown })?.cause]
+    .map((e) => (e instanceof Error ? e.message : String(e ?? '')))
+    .join(' ');
+  return /audio session|session activation/i.test(text);
 }
 
 /**

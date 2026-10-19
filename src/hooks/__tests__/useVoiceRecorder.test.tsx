@@ -50,10 +50,13 @@ jest.mock('../../lib/recordings', () => {
   };
 });
 const mockClaim = jest.fn();
-const mockRelease = jest.fn();
 jest.mock('../../lib/audioFocus', () => ({
   claimAudio: (...a: any[]) => mockClaim(...a),
-  releaseAudioSession: () => mockRelease(),
+  isAudioSessionError: jest.requireActual('../../lib/audioFocus').isAudioSessionError,
+  enterRecordingMode: () => {
+    mockSetAudioMode(true);
+    return Promise.resolve();
+  },
   setAudioMode: (recording: boolean) => {
     mockSetAudioMode(recording);
     return Promise.resolve();
@@ -122,7 +125,6 @@ describe('useVoiceRecorder sessions', () => {
     expect(uri2).toBe('cache/seg-2.m4a');
     expect(info2.pageMarks.map((m: any) => m.page)).toEqual([12, 13]);
     expect(onSaved).toHaveBeenCalledTimes(2); // after each saved stretch
-    expect(mockRelease).toHaveBeenCalled(); // other apps' audio can resume
     expect(result.current.phase).toBe('idle');
   });
 
@@ -420,5 +422,32 @@ describe('useVoiceRecorder sessions', () => {
     const { result } = setup({ day: null });
     await act(() => result.current.start());
     expect(mockRecorder.record).not.toHaveBeenCalled();
+  });
+
+  it('retries once when iOS refuses to activate the audio session', async () => {
+    const sessionError = Object.assign(new Error("Calling the 'prepareToRecordAsync' function has failed"), {
+      cause: new Error('Audio recording error: Failed to configure audio session: Session activation failed'),
+    });
+    mockRecorder.prepareToRecordAsync.mockImplementationOnce(() => Promise.reject(sessionError));
+    const { result } = setup();
+    await act(() => result.current.start());
+    expect(mockRecorder.prepareToRecordAsync).toHaveBeenCalledTimes(2);
+    expect(result.current.phase).toBe('recording');
+    await act(() => result.current.finish());
+  });
+
+  it('explains a busy microphone when activation keeps failing', async () => {
+    const sessionError = new Error('Failed to configure audio session: Session activation failed');
+    mockRecorder.prepareToRecordAsync.mockImplementation(() => Promise.reject(sessionError));
+    const { result } = setup();
+    await act(() => result.current.start());
+    expect(result.current.phase).toBe('idle');
+    expect(Alert.alert).toHaveBeenCalledWith("Couldn't start recording", expect.stringMatching(/microphone is busy/));
+    mockRecorder.prepareToRecordAsync.mockReset();
+    mockRecorder.prepareToRecordAsync.mockImplementation(() => {
+      mockUri += 1;
+      mockRecorder.uri = `cache/seg-${mockUri}.m4a`;
+      return Promise.resolve();
+    });
   });
 });

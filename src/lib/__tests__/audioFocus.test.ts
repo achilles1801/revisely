@@ -1,12 +1,18 @@
-const mockSetActive = jest.fn((_a: boolean) => Promise.resolve());
+const mockCalls: string[] = [];
 jest.mock('expo-audio', () => ({
-  setAudioModeAsync: jest.fn(() => Promise.resolve()),
-  setIsAudioActiveAsync: (a: boolean) => mockSetActive(a),
+  setAudioModeAsync: (m: any) => {
+    mockCalls.push(`mode:${m.allowsRecording ? 'record' : 'play'}`);
+    return Promise.resolve();
+  },
+  setIsAudioActiveAsync: (a: boolean) => {
+    mockCalls.push(`active:${a}`);
+    return Promise.resolve();
+  },
 }));
 
-import { claimAudio, onAudioClaimed, releaseAudioSession } from '../audioFocus';
+import { claimAudio, enterRecordingMode, isAudioSessionError, onAudioClaimed } from '../audioFocus';
 
-beforeEach(() => mockSetActive.mockClear());
+beforeEach(() => (mockCalls.length = 0));
 
 describe('audio focus', () => {
   it('tells everyone else who has taken the audio', () => {
@@ -18,15 +24,18 @@ describe('audio focus', () => {
     expect(heard).toEqual(['recorder:revision']);
   });
 
-  it('only whoever has the audio can release the session (which pauses every player)', () => {
-    claimAudio('recorder', 'revision');
-    claimAudio('recording-playback', 'activity-list'); // paused recording, now playing one back
-    releaseAudioSession('revision'); // the paused recording ends: must not stop the playback
-    expect(mockSetActive).not.toHaveBeenCalled();
-    releaseAudioSession('activity-list');
-    expect(mockSetActive).toHaveBeenCalledWith(false);
-    mockSetActive.mockClear();
-    releaseAudioSession('activity-list'); // already released
-    expect(mockSetActive).not.toHaveBeenCalled();
+  it('enters recording mode before activating, and never deactivates', async () => {
+    await enterRecordingMode();
+    expect(mockCalls).toEqual(['mode:record', 'active:true']);
+  });
+
+  it('recognises the session refusing to activate', () => {
+    const native = new Error("Calling the 'prepareToRecordAsync' function has failed");
+    (native as any).cause = new Error(
+      'Audio recording error: Failed to configure audio session: Session activation failed',
+    );
+    expect(isAudioSessionError(native)).toBe(true);
+    expect(isAudioSessionError(new Error('Failed to prepare recorder'))).toBe(false);
+    expect(isAudioSessionError(undefined)).toBe(false);
   });
 });

@@ -76,7 +76,7 @@ beforeEach(() => {
 });
 
 describe('<RecordingsList /> playback', () => {
-  it('plays the segments back to back, keeping the audio session until the end', async () => {
+  it('plays the segments back to back, keeping the audio session active', async () => {
     fireEvent.press(await renderList());
     const p = mockPlayers[0];
     // Without this, iOS deactivated the session under the loading file (no sound).
@@ -88,10 +88,10 @@ describe('<RecordingsList /> playback', () => {
     act(() => p.emit({ didJustFinish: true, currentTime: 10, duration: 10 }));
     expect(p.replace).toHaveBeenLastCalledWith({ uri: 'file:///doc/r1-1.m4a' });
     expect(p.play).toHaveBeenCalledTimes(2);
-    expect(mockSetActive).not.toHaveBeenCalled();
 
     act(() => p.emit({ didJustFinish: true, currentTime: 4 }));
-    expect(mockSetActive).toHaveBeenCalledWith(false); // released only at the very end
+    // Never deactivated: deactivating made the next recording fail to start.
+    expect(mockSetActive).not.toHaveBeenCalledWith(false);
   });
 
   it('a page chip plays from that moment, seeking once the file has loaded', async () => {
@@ -107,7 +107,7 @@ describe('<RecordingsList /> playback', () => {
     expect(p.seekTo).toHaveBeenCalledWith(1); // 11 s on the timeline = 1 s into segment 2
   });
 
-  it('a recitation starting stops playback without releasing the session it needs', async () => {
+  it('a recitation starting stops playback, leaving the session active', async () => {
     fireEvent.press(await renderList());
     const { claimAudio } = require('../../../lib/audioFocus');
     act(() => claimAudio('recitation', 'reader'));
