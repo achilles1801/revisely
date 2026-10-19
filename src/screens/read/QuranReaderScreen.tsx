@@ -23,7 +23,11 @@ import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useApp } from '../../context/AppContext';
-import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
+import {
+  FLOATING_TIMER_SIZE,
+  useFloatingTimerOffset,
+} from '../../components/timer/floatingTimerOffset';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -46,7 +50,11 @@ type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
 const ALL_PAGES: number[] = Array.from({ length: 604 }, (_, i) => i + 1);
 const SETTLE_DEBOUNCE_MS = 1500;
 // Just above the scrubber and page number at the bottom.
-const PLAYER_BOTTOM = 96;
+// The bottom bar: tall enough for the player, or the scrubber and page number.
+const FOOTER_CONTENT_HEIGHT = 56;
+const FOOTER_PADDING_BOTTOM = spacing.sm;
+const TIMER_SLOT_IDLE = FLOATING_TIMER_SIZE + spacing.md * 2;
+const TIMER_SLOT_RUNNING = 136;
 const READER_GUIDE_DISMISSED_KEY = '@revisley_reader_guide_dismissed';
 
 export default function QuranReaderScreen() {
@@ -88,12 +96,22 @@ export default function QuranReaderScreen() {
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
-    playerBottom: PLAYER_BOTTOM,
     currentPage,
   });
-  // The floating timer sits above the page scrubber, and above the
-  // now-playing bar while a recitation is on.
-  useFloatingTimerOffset(verseActions.playerVisible ? PLAYER_BOTTOM + 64 : PLAYER_BOTTOM);
+
+  // The top bar and the bottom bar (player while reciting, otherwise the
+  // scrubber) have their own space; the page fits between them, so nothing
+  // covers a verse. Tapping the page hides or shows them (the page doesn't move).
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const toggleChrome = useCallback(() => setChromeVisible((v) => !v), []);
+  const insets = useSafeAreaInsets();
+  // The floating timer docks in the bottom bar's right-hand slot; hidden with
+  // the controls.
+  useFloatingTimerOffset(
+    chromeVisible
+      ? insets.bottom + FOOTER_PADDING_BOTTOM + (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2
+      : 'hidden',
+  );
 
   useEffect(() => {
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
@@ -151,16 +169,10 @@ export default function QuranReaderScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <MushafPager
-        ref={pagerRef}
-        pages={ALL_PAGES}
-        initialPage={initialPage}
-        onPageChange={handlePageChange}
-        onLongPressAyah={verseActions.onLongPressAyah}
-        highlightedAyah={verseActions.highlightedAyah}
-      />
-
-      <View style={styles.topBar} pointerEvents="box-none">
+      <View
+        style={[styles.topBar, !chromeVisible && styles.hidden]}
+        pointerEvents={chromeVisible ? 'box-none' : 'none'}
+      >
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={12}
@@ -203,11 +215,32 @@ export default function QuranReaderScreen() {
         )}
       </View>
 
-      <View style={styles.footer} pointerEvents="box-none">
-        <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
-        <Text style={styles.pageNum} pointerEvents="none">
-          {currentPage}
-        </Text>
+      <View style={styles.pageArea}>
+        <MushafPager
+          ref={pagerRef}
+          pages={ALL_PAGES}
+          initialPage={initialPage}
+          onPageChange={handlePageChange}
+          onLongPressAyah={verseActions.onLongPressAyah}
+          highlightedAyah={verseActions.highlightedAyah}
+          onTap={toggleChrome}
+        />
+      </View>
+
+      <View style={styles.footer}>
+        <View style={styles.footerContent} pointerEvents={chromeVisible ? 'box-none' : 'none'}>
+          {chromeVisible &&
+            (verseActions.player ?? (
+              <>
+                <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
+                <Text style={styles.pageNum} pointerEvents="none">
+                  {currentPage}
+                </Text>
+              </>
+            ))}
+        </View>
+        {/* The floating timer docks here (wider while it shows a clock). */}
+        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
       </View>
 
       {verseActions.overlay}
@@ -320,17 +353,10 @@ const makeStyles = (palette: ReadPalette) =>
       backgroundColor: palette.pageBg,
     },
     topBar: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
       flexDirection: 'row',
       alignItems: 'center',
-      // Extra top padding pushes the chrome below the notch / Dynamic Island
-      // instead of crowding the status bar. SafeAreaView already insets a
-      // bit, but on phones with bigger top safe areas the chrome still felt
-      // squished against the time/battery row.
-      paddingTop: spacing.xxl + spacing.md,
+      // SafeAreaView keeps it below the notch / Dynamic Island.
+      paddingTop: spacing.sm,
       paddingHorizontal: spacing.md,
       paddingBottom: spacing.sm,
       gap: spacing.sm,
@@ -369,16 +395,24 @@ const makeStyles = (palette: ReadPalette) =>
       fontSize: 14,
       color: palette.textPrimary,
     },
+    hidden: { opacity: 0 },
+    pageArea: { flex: 1 },
     footer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      paddingBottom: spacing.xl,
-      paddingHorizontal: spacing.lg,
+      flexDirection: 'row',
       alignItems: 'center',
+      paddingLeft: spacing.md,
+      paddingBottom: FOOTER_PADDING_BOTTOM,
+      gap: spacing.xs,
     },
+    footerContent: {
+      flex: 1,
+      height: FOOTER_CONTENT_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'stretch',
+    },
+
     pageNum: {
+      textAlign: 'center',
       // Smaller and brighter — matches the goal Mushaf page number which
       // sits in the same ink color as the verse text, not muted-gray.
       fontSize: 13,

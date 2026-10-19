@@ -59,7 +59,7 @@ jest.mock('../../context/ReadingTimerContext', () => ({
   useNow: () => 1_000_000 + 12 * 60_000 + 5_000,
 }));
 
-function Offset({ bottom }: { bottom: number | null }) {
+function Offset({ bottom }: { bottom: number | 'hidden' | null }) {
   useFloatingTimerOffset(bottom);
   return null;
 }
@@ -236,6 +236,26 @@ describe('<FloatingTimer />', () => {
     expect(bottomOf()).toBe(160);
     rerender(tree(null));
     expect(bottomOf()).toBe(spacing.md);
+  });
+
+  it('hides when the reader hides its controls (so nothing covers the page)', async () => {
+    mockRoute.key = 'QuranReader-1';
+    mockRoute.name = 'QuranReader';
+    mockScreenRoute.key = 'QuranReader-1';
+    const tree = (bottom: number | 'hidden') => (
+      <ThemeProvider>
+        <FloatingTimerProvider>
+          <Offset bottom={bottom} />
+          <FloatingTimer />
+        </FloatingTimerProvider>
+      </ThemeProvider>
+    );
+    const { rerender } = render(tree(40));
+    await screen.findByTestId('floating-timer');
+    rerender(tree('hidden'));
+    expect(screen.queryByTestId('floating-timer')).toBeNull();
+    rerender(tree(40));
+    expect(await screen.findByTestId('floating-timer')).toBeTruthy();
   });
 
   it("ignores an offset from a screen that isn't focused", async () => {
