@@ -21,6 +21,8 @@ import { PressableScale } from '../../components/PressableScale';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { TimerButton } from '../../components/TimerButton';
 import { ProgressSummaryCard } from '../../components/home/ProgressSummaryCard';
+import { Greeting } from '../../components/home/Greeting';
+import { greetingName } from '../../lib/displayName';
 import { useHomePrefs } from '../../lib/homePrefs';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -196,7 +198,7 @@ export default function DashboardScreen() {
     return Array.from(set).sort((a, b) => a - b);
   }, [sessionLogs]);
 
-  const userName = user?.name || firebaseUser?.displayName || '';
+  const userName = greetingName(user?.name, firebaseUser?.displayName);
 
   if (!user || !assignment) {
     return (
@@ -492,18 +494,7 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.date}>{formatDateReadable(today)}</Text>
-            <View style={styles.greetingRow}>
-              {userName ? (
-                <Text
-                  style={styles.greetingName}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {userName}
-                </Text>
-              ) : null}
-              <Text style={styles.greetingArabic}>السلام عليكم</Text>
-            </View>
+            <Greeting name={userName} />
           </View>
           <PressableScale
             onPress={() => navigation.navigate('Journal')}
@@ -943,31 +934,14 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       marginBottom: spacing.xl,
       gap: spacing.sm,
     },
-    headerText: { flex: 1, alignItems: 'flex-start' },
+    // minWidth 0 lets the text column shrink beside the fixed-size buttons
+    // instead of pushing them off screen.
+    headerText: { flex: 1, minWidth: 0, alignItems: 'stretch' },
     date: {
       ...typography.label,
       color: theme.textMuted,
       marginBottom: spacing.xxs,
       textAlign: 'left',
-    },
-    greetingRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: spacing.sm,
-    },
-    greetingArabic: {
-      ...typography.displaySmall,
-      color: theme.textPrimary,
-      textAlign: 'left',
-      writingDirection: 'ltr',
-      // Arabic salam stays at full size; the name (left) shrinks first.
-      flexShrink: 0,
-    },
-    greetingName: {
-      ...typography.displaySmall,
-      color: theme.textPrimary,
-      textAlign: 'left',
-      flexShrink: 1,
     },
     settingsButton: {
       width: 36,
