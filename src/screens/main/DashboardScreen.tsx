@@ -215,6 +215,7 @@ export default function DashboardScreen() {
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
   const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
   const [kahfSaving, setKahfSaving] = useState(false);
+  const kahfSavingRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
       if (!kahfDay || !kahfEnabled) return;
@@ -418,18 +419,28 @@ export default function DashboardScreen() {
   };
 
   const markKahfRead = async (minutes: number) => {
-    if (kahfSaving) return;
+    // The ref stops a second tap before the state update re-renders.
+    if (kahfSavingRef.current) return;
+    kahfSavingRef.current = true;
     setKahfSaving(true);
     const session = kahfReadingSession(revisionDay, minutes, Date.now());
+    const write = firestoreService.addReadingSession(session);
     try {
-      const id = await firestoreService.addReadingSession(session);
+      // Offline, the write is queued and only settles when the server acks
+      // (as with the reading timer): show it as read after a few seconds.
+      const id = await Promise.race([
+        write,
+        new Promise<string>((resolve) => setTimeout(() => resolve(`pending-${session.startedAt}`), 6000)),
+      ]);
       setReadingSessions((prev) => [{ ...session, id }, ...prev]);
     } catch (err) {
       logger.error('Failed to save Al-Kahf reading session', err);
       Alert.alert("Couldn't save", 'Please try again.');
     } finally {
+      kahfSavingRef.current = false;
       setKahfSaving(false);
     }
+    write.catch((err) => logger.error('Al-Kahf reading session write failed', err));
   };
 
   const handleCarryOver = async () => {

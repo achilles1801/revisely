@@ -40,7 +40,9 @@ function setup(initialPage?: number) {
         changed: [],
       });
     });
-  return { ref, onPageChange, onAdvance, report };
+  // The user starting to drag the pages.
+  const drag = () => act(() => list.props.onScrollBeginDrag());
+  return { ref, onPageChange, onAdvance, report, drag };
 }
 
 describe('<MushafPager /> scrollToPage', () => {
@@ -70,18 +72,20 @@ describe('<MushafPager /> scrollToPage', () => {
   });
 
   it('still credits a normal swipe forward after a jump', () => {
-    const { ref, onAdvance, onPageChange, report } = setup();
+    const { ref, onAdvance, onPageChange, report, drag } = setup();
     act(() => {
       ref.current!.scrollToPage(10);
     });
     report(9);
+    drag();
     report(10); // swiped from page 10 to 11
     expect(onAdvance).toHaveBeenCalledWith(10, 11);
     expect(onPageChange).toHaveBeenLastCalledWith(11, 10);
   });
 
   it('swiping forward without a jump still fires onAdvance (unchanged)', () => {
-    const { onAdvance, report } = setup();
+    const { onAdvance, report, drag } = setup();
+    drag();
     report(1);
     expect(onAdvance).toHaveBeenCalledWith(1, 2);
     report(0); // back: no advance
@@ -104,5 +108,34 @@ describe('<MushafPager /> scrollToPage', () => {
       ref.current!.scrollToPage(1);
     });
     expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('never credits pages turned by scrollToPage, however late the reports come', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report } = setup(20);
+      act(() => {
+        ref.current!.scrollToPage(5); // back from page 20 (recitation, scrubber)
+      });
+      jest.advanceTimersByTime(2000);
+      report(19); // the old page reported long after the jump
+      act(() => {
+        ref.current!.scrollToPage(6); // recitation turning forward
+      });
+      report(5);
+      expect(onAdvance).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('accepts where the user swiped to right after a jump', () => {
+    const { ref, onPageChange, report, drag } = setup();
+    act(() => {
+      ref.current!.scrollToPage(10);
+    });
+    drag();
+    report(11); // the user swiped on to page 12 before the jump settled
+    expect(onPageChange).toHaveBeenLastCalledWith(12, 11);
   });
 });

@@ -128,6 +128,7 @@ export default function ActiveRevisionScreen() {
     pages: sessionPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     playerBottom: 110,
+    currentPage: currentPageNumber ?? undefined,
   });
   const [undoState, setUndoState] = useState<{
     page: number;

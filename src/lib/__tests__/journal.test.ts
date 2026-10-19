@@ -188,6 +188,20 @@ describe('journalFirstDay', () => {
     expect(journalFirstDay({ ...user, createdAt: atNoon })).toBe('2026-10-14');
   });
 
+  it('never starts after the oldest entry (a missing createdAt reads as now)', () => {
+    const created = new Date(2026, 9, 14, 12).toISOString();
+    const entry = (date: string) => ({
+      date,
+      memorization: 'x',
+      memorizationMinutes: null,
+      revision: '',
+      revisionMinutes: null,
+      notes: '',
+    });
+    expect(journalFirstDay({ ...base, createdAt: created }, [entry('2026-09-01')])).toBe('2026-09-01');
+    expect(journalFirstDay({ ...base, createdAt: created }, [entry('2026-10-16')])).toBe('2026-10-14');
+  });
+
   it('is null when createdAt is missing or invalid', () => {
     expect(journalFirstDay(null)).toBeNull();
     expect(journalFirstDay({ ...base, createdAt: '' })).toBeNull();

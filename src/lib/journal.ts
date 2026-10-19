@@ -121,11 +121,19 @@ export function recentJournalDays(
  */
 export function journalFirstDay(
   user: Pick<User, 'createdAt' | 'fajrBoundaryEnabled' | 'locationCoords' | 'fajrCalculationMethod'> | null | undefined,
+  entries: JournalEntry[] = [],
 ): string | null {
   if (!user?.createdAt) return null;
   const created = new Date(user.createdAt);
   if (isNaN(created.getTime())) return null;
-  return getRevisionDayForUser(user as User, created);
+  const signUpDay = getRevisionDayForUser(user as User, created);
+  // A missing createdAt reads as "now" (timestampToISOString), so never start
+  // after the oldest entry: those days are clearly part of the account.
+  const oldest = entries.reduce<string | null>(
+    (min, e) => (min == null || e.date < min ? e.date : min),
+    null,
+  );
+  return oldest != null && oldest < signUpDay ? oldest : signUpDay;
 }
 
 /** True when the log has no entry with any content in it. */

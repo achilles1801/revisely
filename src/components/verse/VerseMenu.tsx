@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
@@ -18,7 +18,11 @@ interface VerseMenuProps {
   onClose: () => void;
 }
 
-/** The menu that opens on a held verse: Play and Translation. */
+/**
+ * The menu that opens on a held verse: Play and Translation. A plain overlay on
+ * the screen, not a Modal: opening the verse sheet (a Modal) while a Modal is
+ * still dismissing fails on iOS. Render it last in a full-screen container.
+ */
 export function VerseMenu({ point, onPlay, onTranslation, onClose }: VerseMenuProps) {
   const { theme } = useTheme();
   const pos = point ? menuPosition(point, Dimensions.get('window')) : { left: 0, top: 0 };
@@ -49,8 +53,9 @@ export function VerseMenu({ point, onPlay, onTranslation, onClose }: VerseMenuPr
     </Pressable>
   );
 
+  if (!point) return null;
   return (
-    <Modal visible={point != null} transparent animationType="fade" onRequestClose={onClose}>
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
       <View style={[styles.menu, { left: pos.left, top: pos.top }]}>
         <GlassCard elevated style={StyleSheet.absoluteFillObject} />
@@ -58,7 +63,7 @@ export function VerseMenu({ point, onPlay, onTranslation, onClose }: VerseMenuPr
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Row icon="language-outline" title="Translation" onPress={onTranslation} />
       </View>
-    </Modal>
+    </View>
   );
 }
 

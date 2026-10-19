@@ -63,6 +63,7 @@ export default function QuranReaderScreen() {
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     playerBottom: 96,
+    currentPage,
   });
 
   useEffect(() => {

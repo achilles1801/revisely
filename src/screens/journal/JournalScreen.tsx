@@ -95,7 +95,7 @@ export default function JournalScreen() {
   }, [load]);
 
   // No backfill rows for days before the account existed.
-  const firstDay = useMemo(() => journalFirstDay(user), [user]);
+  const firstDay = useMemo(() => journalFirstDay(user, entries), [user, entries]);
   const recent = useMemo(
     () => recentJournalDays(entries, today, RECENT_DAYS, firstDay),
     [entries, today, firstDay],

@@ -227,7 +227,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   // back whenever a parent prop bump occurs (e.g. context re-renders from
   // auto-save).
   const hasAutoScrolledRef = useRef(false);
-  const jumpRef = useRef<{ index: number; until: number } | null>(null);
+  const jumpRef = useRef<{ from: number; to: number; until: number } | null>(null);
+  // Set when the user drags the pages, cleared by scrollToPage. Only a move the
+  // user made by swiping counts as advancing (and credits the page left), so a
+  // jump or a recitation turning pages can never mark a page revised.
+  const draggedRef = useRef(false);
 
   // Download the pages around the starting one before they are swiped to.
   useEffect(() => {
@@ -256,9 +260,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         if (idx < 0) return false;
         // Move the index first, so the viewability callback that follows
         // sees no change and cannot mistake the jump for advancing.
-        const changed = idx !== currentIndexRef.current;
+        const from = currentIndexRef.current;
+        const changed = idx !== from;
         currentIndexRef.current = idx;
-        if (changed) jumpRef.current = { index: idx, until: Date.now() + JUMP_SETTLE_MS };
+        draggedRef.current = false;
+        if (changed) jumpRef.current = { from, to: idx, until: Date.now() + JUMP_SETTLE_MS };
         hasAutoScrolledRef.current = true;
         listRef.current?.scrollToIndex({ index: idx, animated: false });
         if (changed) {
@@ -277,18 +283,17 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       const first = viewableItems[0];
       if (first.index == null) return;
       const newIndex = first.index;
-      // Right after a jump, ignore a stale report of the page we left: taking
-      // it as the current page would make the jump look like advancing.
+      // Right after a jump, ignore a stale report of the page we left. Any
+      // other page is where the list really is (e.g. the user swiped meanwhile).
       const jump = jumpRef.current;
       if (jump) {
-        if (newIndex === jump.index) jumpRef.current = null;
-        else if (Date.now() < jump.until) return;
-        else jumpRef.current = null;
+        if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) return;
+        jumpRef.current = null;
       }
       const prevIndex = currentIndexRef.current;
       if (newIndex === prevIndex) return;
       const newPage = pages[newIndex];
-      if (newIndex > prevIndex && onAdvance) {
+      if (newIndex > prevIndex && onAdvance && draggedRef.current) {
         const leftPage = pages[prevIndex];
         if (leftPage != null && newPage != null) {
           onAdvance(leftPage, newPage);
@@ -330,6 +335,9 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       inverted
       showsHorizontalScrollIndicator={false}
       onViewableItemsChanged={handleViewableItemsChanged}
+      onScrollBeginDrag={() => {
+        draggedRef.current = true;
+      }}
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(_, index) => ({
         length: SCREEN_WIDTH,

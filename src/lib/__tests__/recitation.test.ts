@@ -118,4 +118,33 @@ describe('recitation', () => {
     r.stop('reader');
     expect(r.getState().status).toBe('idle');
   });
+
+  it('tells subscribers which screen owns the recitation', () => {
+    const r = new Recitation();
+    const seen: any[] = [];
+    r.subscribe((s) => seen.push(s));
+    r.play({ sura: 1, ayah: 1 }, undefined, 'reader');
+    mockPlayers[0].emit({ playing: true });
+    expect(seen.map((s) => s.owner)).toEqual(['reader', 'reader']);
+  });
+
+  it('a pause just before the end does not move on to the next verse', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockPlayers[0].emit({ playing: true });
+    r.pause();
+    mockPlayers[0].emit({ didJustFinish: true });
+    expect(r.getState()).toMatchObject({ status: 'paused', verse: { sura: 1, ayah: 1 } });
+  });
+
+  it('a verse paused while loading loads again on resume (and can still time out)', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockAppState.forEach((l) => l('background'));
+    expect(r.getState().status).toBe('paused');
+    r.resume();
+    expect(r.getState().status).toBe('loading');
+    jest.advanceTimersByTime(LOAD_TIMEOUT_MS + 1);
+    expect(r.getState().status).toBe('error');
+  });
 });

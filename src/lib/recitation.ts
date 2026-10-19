@@ -54,6 +54,9 @@ export class Recitation {
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
   private audioModeSet = false;
   private owner: string | undefined;
+  // Whether the current verse has started playing; a pause before that (e.g.
+  // backgrounded while loading) resumes by loading it again.
+  private started = false;
 
   constructor(private reciterId: string = DEFAULT_RECITER_ID) {
     AppState.addEventListener('change', (s) => {
@@ -74,7 +77,8 @@ export class Recitation {
 
   private set(state: RecitationState) {
     this.state = state.status === 'idle' ? state : { ...state, owner: this.owner };
-    this.listeners.forEach((l) => l(state));
+    const current = this.state;
+    this.listeners.forEach((l) => l(current));
   }
 
   private ensurePlayer(): AudioPlayer {
@@ -108,6 +112,7 @@ export class Recitation {
     this.owner = owner;
     const player = this.ensurePlayer();
     this.clearLoadTimer();
+    this.started = false;
     this.set({ status: 'loading', verse });
     try {
       player.replace({ uri: recitationUrl(verse, this.reciterId) });
@@ -137,6 +142,7 @@ export class Recitation {
     if (!verse) return;
     if (status === 'error') return this.play(verse, this.advance);
     if (status !== 'paused') return;
+    if (!this.started) return this.play(verse, this.advance);
     this.player?.play();
     this.set({ status: 'playing', verse });
   }
@@ -153,6 +159,9 @@ export class Recitation {
     const { status, verse } = this.state;
     if (!verse || status === 'idle' || status === 'error') return;
     if (s.didJustFinish) {
+      // Only a verse that is playing moves on: a pause just before the end
+      // stays paused.
+      if (status !== 'playing') return;
       const next = this.advance(verse);
       if (next) this.play(next, this.advance);
       else this.stop();
@@ -163,7 +172,8 @@ export class Recitation {
       this.set({ status: 'error', verse });
       return;
     }
-    if (s.playing && status !== 'playing') {
+    if (s.playing && status === 'loading') {
+      this.started = true;
       this.clearLoadTimer();
       this.set({ status: 'playing', verse });
     } else if (!s.playing && status === 'playing' && !s.isBuffering) {
