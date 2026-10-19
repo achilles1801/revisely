@@ -18,7 +18,7 @@ import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
-import { TimerButton } from '../../components/TimerButton';
+import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -40,6 +40,8 @@ type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
 
 const ALL_PAGES: number[] = Array.from({ length: 604 }, (_, i) => i + 1);
 const SETTLE_DEBOUNCE_MS = 1500;
+// Just above the scrubber and page number at the bottom.
+const PLAYER_BOTTOM = 96;
 const READER_GUIDE_DISMISSED_KEY = '@revisley_reader_guide_dismissed';
 
 export default function QuranReaderScreen() {
@@ -62,9 +64,12 @@ export default function QuranReaderScreen() {
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
-    playerBottom: 96,
+    playerBottom: PLAYER_BOTTOM,
     currentPage,
   });
+  // The floating timer sits above the page scrubber, and above the
+  // now-playing bar while a recitation is on.
+  useFloatingTimerOffset(verseActions.playerVisible ? PLAYER_BOTTOM + 64 : PLAYER_BOTTOM);
 
   useEffect(() => {
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
@@ -148,12 +153,6 @@ export default function QuranReaderScreen() {
             <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
           ) : null}
         </View>
-        <TimerButton
-          onPress={() => navigation.navigate('ReadingTimer')}
-          color={palette.textSecondary}
-          activeColor={palette.textPrimary}
-          activeBg={palette.card}
-        />
         {!guideSeen && (
           <Pressable
             onPress={() => setShowGuide(true)}

@@ -23,6 +23,7 @@ import {
   query,
   orderBy,
   limit,
+  where,
   writeBatch,
   Timestamp,
   serverTimestamp,
@@ -488,6 +489,18 @@ export async function getReadingSessions(
   userId?: string,
 ): Promise<ReadingSession[]> {
   const q = query(getReadingSessionsRef(userId), orderBy('startedAt', 'desc'), limit(limitCount));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) =>
+    readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession),
+  );
+}
+
+/** Sessions on one revision day (no ordering: sorted by the caller). */
+export async function getReadingSessionsForDay(
+  date: string,
+  userId?: string,
+): Promise<ReadingSession[]> {
+  const q = query(getReadingSessionsRef(userId), where('date', '==', date));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) =>
     readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession),

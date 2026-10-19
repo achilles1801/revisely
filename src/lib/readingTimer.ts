@@ -1,7 +1,8 @@
 import { ReadingSession, ReadingTimerMode } from '../types';
 
-/** What a timer is attached to. Revision timers follow the revision screen:
- *  they pause when you leave it and stop when today's pages are done. */
+/** What a timer was started for. Kept on the persisted timer for
+ *  compatibility; since there is one floating timer, both behave the same
+ *  (revision timers used to pause on leaving the revision screen). */
 export type ReadingTimerPurpose = 'reading' | 'revision';
 
 /**
@@ -52,10 +53,6 @@ export function startTimer(
     purpose,
     pagesRevised: [],
   };
-}
-
-export function isRevisionTimer(timer: ActiveReadingTimer | null | undefined): boolean {
-  return timer?.purpose === 'revision';
 }
 
 export function elapsedMs(timer: ActiveReadingTimer, now: number): number {
@@ -115,18 +112,6 @@ export function noteRevisedPages(timer: ActiveReadingTimer, pages: number[]): Ac
   };
 }
 
-/**
- * A revision timer stops by itself once every page assigned today is revised.
- * Reading timers started from the Home timer are never stopped by revision.
- */
-export function shouldAutoFinishRevisionTimer(
-  timer: ActiveReadingTimer | null | undefined,
-  revisedCount: number,
-  assignedCount: number,
-): boolean {
-  return isRevisionTimer(timer) && assignedCount > 0 && revisedCount >= assignedCount;
-}
-
 /** The session record to save when a timer ends. */
 export function readingSessionFromTimer(
   timer: ActiveReadingTimer,
@@ -139,8 +124,8 @@ export function readingSessionFromTimer(
     durationSeconds: Math.round(elapsedMs(timer, now) / 1000),
     mode: timer.mode,
     targetSeconds: timer.targetSeconds,
-    // Revision timers already know what was revised; reading timers get their
-    // pages assigned afterwards from Reading sessions.
+    // Pages marked revised while it ran are known; reading pages are
+    // assigned afterwards from the day in Activity.
     pages: timer.pagesRevised ?? [],
     pagesVisited: timer.pagesVisited,
   };

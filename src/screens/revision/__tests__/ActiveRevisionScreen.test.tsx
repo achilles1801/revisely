@@ -23,7 +23,13 @@ jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('../../../components/MushafPager', () => ({ MushafPager: () => null }));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
-jest.mock('@react-navigation/native', () => ({ useNavigation: () => mockNavigation }));
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => mockNavigation,
+  useRoute: () => ({ key: 'ActiveRevision-1', name: 'ActiveRevision' }),
+}));
+jest.mock('react-native-safe-area-context', () =>
+  require('react-native-safe-area-context/jest/mock').default,
+);
 
 jest.mock('../../../context/ReadingTimerContext', () => ({
   useReadingTimer: () => ({

@@ -39,6 +39,7 @@ import {
 } from '../../lib/quranData';
 import { getQuranPageImageUrl } from '../../lib/quranImages';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
+import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_OUTER_MARGIN = spacing.lg * 2;
@@ -1168,8 +1169,9 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    // Clearance for the floating tab bar (~76px pill+gap).
-    paddingBottom: 96,
+    // Clearance for the floating tab bar (~76px pill+gap) and the floating
+    // timer above it.
+    paddingBottom: 96 + FLOATING_TIMER_SIZE + spacing.sm,
   },
   loadingContainer: {
     flex: 1,
