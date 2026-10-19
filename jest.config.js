@@ -9,6 +9,8 @@ module.exports = {
     '/functions/',
     '/tests/firestore-rules/',
     '/.maestro/',
+    // Agent worktrees (.claude/worktrees) hold whole copies of the repo.
+    '/.claude/',
   ],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@react-native-firebase/.*|@sentry/react-native|native-base|react-native-svg|firebase|@firebase/.*))',

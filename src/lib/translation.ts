@@ -1,13 +1,56 @@
-// English translation (Saheeh International) from the public alquran.cloud API,
-// which numbers pages the same way as the Madani mushaf images. A verse is
-// looked up in its page's translation, fetched once per page and then read from
+// Verse text for the verse sheet: the Arabic (Uthmani) and a chosen translation.
+//
+// Sources: the public alquran.cloud API, which numbers pages the same way as the
+// Madani mushaf images. Each edition is fetched once per page and then read from
 // the caches directory; a verse carried over from the previous page is listed
 // under that page by the API, so it is fetched on its own.
+//
+// Translations are listed in TRANSLATIONS. One that is not `available` is shown
+// in the picker as unavailable: The Clear Quran (Dr. Mustafa Khattab) is licensed
+// content that the Quran Foundation API serves only to approved clients.
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { logger } from './logger';
 
-const EDITION = 'en.sahih';
+export interface TranslationInfo {
+  id: string;
+  name: string;
+  author: string;
+  language: string;
+  /** alquran.cloud edition identifier. */
+  edition: string | null;
+  available: boolean;
+}
+
+export const TRANSLATIONS: TranslationInfo[] = [
+  {
+    id: 'en.sahih',
+    name: 'Saheeh International',
+    author: 'Saheeh International',
+    language: 'English',
+    edition: 'en.sahih',
+    available: true,
+  },
+  {
+    id: 'en.khattab',
+    name: 'The Clear Quran',
+    author: 'Dr. Mustafa Khattab',
+    language: 'English',
+    edition: null,
+    available: false,
+  },
+];
+
+export const DEFAULT_TRANSLATION_ID = 'en.sahih';
+const ARABIC_EDITION = 'quran-uthmani';
+
+/** The translation to use for a saved choice, falling back to the default. */
+export function resolveTranslation(id: string | null | undefined): TranslationInfo {
+  const chosen = TRANSLATIONS.find((t) => t.id === id && t.available);
+  return chosen ?? (TRANSLATIONS.find((t) => t.id === DEFAULT_TRANSLATION_ID) as TranslationInfo);
+}
+
+/** Kept for the existing callers: the default translation's display name. */
 export const TRANSLATION_NAME = 'Saheeh International';
 
 export interface TranslatedAyah {
@@ -17,11 +60,11 @@ export interface TranslatedAyah {
   text: string;
 }
 
-const memory = new Map<number, TranslatedAyah[]>();
+const memory = new Map<string, TranslatedAyah[]>();
 
-function cacheFile(pageNumber: number): File | null {
+function cacheFile(edition: string, pageNumber: number): File | null {
   try {
-    const dir = new Directory(Paths.cache, 'translation', EDITION);
+    const dir = new Directory(Paths.cache, 'translation', edition);
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
     return new File(dir, `${pageNumber}.json`);
   } catch (err) {
@@ -50,25 +93,30 @@ export function parsePageResponse(json: unknown): TranslatedAyah[] {
   }));
 }
 
-export async function getPageTranslation(pageNumber: number): Promise<TranslatedAyah[]> {
-  const known = memory.get(pageNumber);
+/** Every verse that starts on `pageNumber`, in one edition. */
+export async function getPageEdition(
+  pageNumber: number,
+  edition: string = 'en.sahih',
+): Promise<TranslatedAyah[]> {
+  const key = `${edition}/${pageNumber}`;
+  const known = memory.get(key);
   if (known) return known;
 
-  const file = cacheFile(pageNumber);
+  const file = cacheFile(edition, pageNumber);
   if (file?.exists) {
     try {
       const cached = JSON.parse(await file.text()) as TranslatedAyah[];
-      memory.set(pageNumber, cached);
+      memory.set(key, cached);
       return cached;
     } catch {
       // Unreadable cache: fetch again below.
     }
   }
 
-  const res = await fetch(`https://api.alquran.cloud/v1/page/${pageNumber}/${EDITION}`);
+  const res = await fetch(`https://api.alquran.cloud/v1/page/${pageNumber}/${edition}`);
   if (!res.ok) throw new Error(`Translation request failed (${res.status})`);
   const ayahs = parsePageResponse(await res.json());
-  memory.set(pageNumber, ayahs);
+  memory.set(key, ayahs);
   try {
     if (file) {
       if (!file.exists) file.create();
@@ -80,30 +128,82 @@ export async function getPageTranslation(pageNumber: number): Promise<Translated
   return ayahs;
 }
 
+/** Kept for the existing callers. */
+export function getPageTranslation(pageNumber: number): Promise<TranslatedAyah[]> {
+  return getPageEdition(pageNumber, 'en.sahih');
+}
+
 const singleAyahs = new Map<string, TranslatedAyah>();
 
-/** The translation of one verse shown on `page`. */
-export async function getAyahTranslation(
+/** One verse shown on `page`, in one edition. */
+export async function getAyahEdition(
   page: number,
   sura: number,
   ayah: number,
+  edition: string,
 ): Promise<TranslatedAyah> {
   const key = `${sura}:${ayah}`;
-  const single = singleAyahs.get(key);
+  const single = singleAyahs.get(`${edition}/${key}`);
   if (single) return single;
   try {
-    const onPage = (await getPageTranslation(page)).find(
+    const onPage = (await getPageEdition(page, edition)).find(
       (a) => a.surahNumber === sura && a.ayahNumber === ayah,
     );
     if (onPage) return onPage;
   } catch {
     // Fall through to the single-verse request.
   }
-  const res = await fetch(`https://api.alquran.cloud/v1/ayah/${key}/${EDITION}`);
+  const res = await fetch(`https://api.alquran.cloud/v1/ayah/${key}/${edition}`);
   if (!res.ok) throw new Error(`Translation request failed (${res.status})`);
   const json = (await res.json()) as { data?: ApiAyah };
   if (!json.data?.surah) throw new Error('Unexpected translation response');
   const result = parsePageResponse({ data: { ayahs: [json.data] } })[0];
-  singleAyahs.set(key, result);
+  singleAyahs.set(`${edition}/${key}`, result);
   return result;
+}
+
+/** Kept for the existing callers: one verse in Saheeh International. */
+export function getAyahTranslation(page: number, sura: number, ayah: number) {
+  return getAyahEdition(page, sura, ayah, 'en.sahih');
+}
+
+export interface VerseText {
+  sura: number;
+  ayah: number;
+  surahName: string;
+  arabic: string;
+  translation: string;
+  translationName: string;
+}
+
+/** The Arabic and the chosen translation of one verse. */
+export async function getVerseText(
+  page: number,
+  sura: number,
+  ayah: number,
+  translationId?: string | null,
+): Promise<VerseText> {
+  const t = resolveTranslation(translationId);
+  const [arabic, translated] = await Promise.all([
+    getAyahEdition(page, sura, ayah, ARABIC_EDITION),
+    getAyahEdition(page, sura, ayah, t.edition as string),
+  ]);
+  return {
+    sura,
+    ayah,
+    surahName: translated.surahName,
+    arabic: stripBismillah(arabic.text, sura, ayah),
+    translation: translated.text,
+    translationName: t.name,
+  };
+}
+
+// alquran.cloud prefixes the first verse of every surah (except Al-Fatihah,
+// where it is verse 1, and At-Tawbah, which has none) with the basmala.
+export function stripBismillah(text: string, sura: number, ayah: number): string {
+  if (ayah !== 1 || sura === 1 || sura === 9) return text;
+  const words = text.trim().split(/\s+/);
+  // The basmala is four words; its first is "bismi" (بِسْمِ).
+  if (words.length > 4 && words[0].startsWith('بِسْمِ')) return words.slice(4).join(' ');
+  return text;
 }

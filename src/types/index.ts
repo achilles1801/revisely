@@ -76,6 +76,8 @@ export interface User {
   // Pages the whole schedule has been moved back by carry-overs; every day reads
   // its pages this many earlier in the cycle. Reset when a plan is saved.
   scheduleShiftPages?: number;
+  // Translation shown when holding a verse (an id from lib/translation TRANSLATIONS).
+  translationId?: string;
 }
 
 /** A user-edited schedule that overrides the default sequential plan. */
