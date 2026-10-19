@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useScrollToTop } from '@react-navigation/native';
 import { GlassCard } from '../../components/GlassCard';
 import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { PressableScale } from '../../components/PressableScale';
@@ -93,6 +94,9 @@ export default function AlgorithmScreen() {
     juz: false,
   });
   const focusListRef = useRef<FlatList>(null);
+  // Tapping the Insights tab while on it scrolls back to the top.
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
 
   const toggleListExpansion = (mode: BrowseMode) => {
     setExpandedLists((prev) => ({ ...prev, [mode]: !prev[mode] }));
@@ -307,6 +311,7 @@ export default function AlgorithmScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         refreshControl={

@@ -12,6 +12,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../../components/GlassCard';
+import { EmptyState } from '../../components/EmptyState';
 import { PressableScale } from '../../components/PressableScale';
 import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
 import { useApp } from '../../context/AppContext';
@@ -22,7 +23,9 @@ import {
   filterJournalEntries,
   formatJournalDayRelative,
   formatMinutes,
+  hasNoJournalContent,
   isJournalEntryEmpty,
+  journalFirstDay,
   JOURNAL_SORT_LABELS,
   JournalFilter,
   journalFilterLabel,
@@ -30,6 +33,7 @@ import {
   JournalSort,
   journalTotalMinutes,
   recentJournalDays,
+  shiftDay,
   sortJournalEntries,
   sumJournalMinutes,
 } from '../../lib/journal';
@@ -90,14 +94,21 @@ export default function JournalScreen() {
     setRefreshing(false);
   }, [load]);
 
+  // No backfill rows for days before the account existed.
+  const firstDay = useMemo(() => journalFirstDay(user), [user]);
   const recent = useMemo(
-    () => recentJournalDays(entries, today, RECENT_DAYS),
-    [entries, today],
+    () => recentJournalDays(entries, today, RECENT_DAYS, firstDay),
+    [entries, today, firstDay],
   );
+  // Nothing logged yet: a welcome with one clear action instead of blank rows.
+  // A failed load is not "empty" (the error banner covers that).
+  const isEmptyLog = !loadError && hasNoJournalContent(entries);
+  // Measured from the window, not the last row: rows before sign-up are
+  // skipped, so the last row can be newer than the window's start.
   const earlier = useMemo(() => {
-    const oldestRecent = recent[recent.length - 1].date;
-    return entries.filter((e) => e.date < oldestRecent);
-  }, [entries, recent]);
+    const windowStart = shiftDay(today, -(RECENT_DAYS - 1));
+    return entries.filter((e) => e.date < windowStart);
+  }, [entries, today]);
   const week = useMemo(
     () => sumJournalMinutes(entries, today, RECENT_DAYS),
     [entries, today],
@@ -205,6 +216,26 @@ export default function JournalScreen() {
             </PressableScale>
           )}
 
+          {isEmptyLog ? (
+            <EmptyState
+              icon="journal-outline"
+              title="Start your daily log"
+              message="Note what you memorized and revised each day, with the time it took. Your entries will show up here."
+              action={
+                <PressableScale
+                  onPress={() => openDay(today)}
+                  haptic="medium"
+                  scale={0.97}
+                  style={styles.emptyCta}
+                  accessibilityLabel="Log today"
+                >
+                  <Ionicons name="add" size={18} color={theme.accent} />
+                  <Text style={styles.emptyCtaText}>Log today</Text>
+                </PressableScale>
+              }
+            />
+          ) : (
+          <>
           <View style={styles.controls}>
             <ControlChip
               icon="calendar-outline"
@@ -232,7 +263,7 @@ export default function JournalScreen() {
                   <SummaryStat label="Total" value={week.total} theme={theme} emphasize />
                 </View>
                 <Text style={styles.summaryFoot}>
-                  {week.activeDays} of {RECENT_DAYS} days logged
+                  {week.activeDays} of {recent.length} {recent.length === 1 ? 'day' : 'days'} logged
                 </Text>
               </GlassCard>
 
@@ -296,6 +327,8 @@ export default function JournalScreen() {
                 ))
               )}
             </>
+          )}
+          </>
           )}
         </ScrollView>
       )}
@@ -563,6 +596,18 @@ const makeStyles = (theme: ThemeColors) =>
       textAlign: 'center',
       marginTop: spacing.lg,
     },
+    emptyCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.full,
+      backgroundColor: theme.accent + '22',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.accent + '55',
+    },
+    emptyCtaText: { ...typography.titleSmall, color: theme.accent, fontWeight: '600' },
     summaryFoot: {
       ...typography.caption,
       color: theme.textMuted,

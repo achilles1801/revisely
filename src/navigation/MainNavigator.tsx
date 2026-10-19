@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import AlgorithmScreen from '../screens/main/AlgorithmScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
@@ -23,7 +23,8 @@ import { useApp } from '../context/AppContext';
 
 export type MainTabParamList = {
   Home: undefined;
-  Read: undefined;
+  // Home opens the reader directly for the Friday Al-Kahf card.
+  Read: NavigatorScreenParams<ReadStackParamList> | undefined;
   Insights: undefined;
 };
 

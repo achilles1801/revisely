@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -36,6 +44,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGE_WIDTH = SCREEN_WIDTH;
 const PAGE_HEIGHT = SCREEN_WIDTH / PAGE_IMAGE_ASPECT;
 const BOUNDS_SCALE = PAGE_WIDTH / BOUNDS_WIDTH;
+// How long after scrollToPage a report of another page is taken as stale.
+const JUMP_SETTLE_MS = 500;
 
 interface MushafPagerProps {
   pages: number[];
@@ -54,6 +64,14 @@ interface MushafPagerProps {
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
+}
+
+export interface MushafPagerHandle {
+  /** Jump straight to a page (no animation). It counts as a page change,
+   *  never as advancing: onPageChange fires, onAdvance does not, since the
+   *  pages in between were skipped, not read. False if the page isn't in
+   *  `pages`. */
+  scrollToPage: (pageNumber: number) => boolean;
 }
 
 interface PageItemProps {
@@ -185,16 +203,19 @@ const PageItem = React.memo(function PageItem({
  *
  * RTL: page 1 sits on the right; swipe left to advance to page 2.
  */
-export function MushafPager({
-  pages,
-  initialPage,
-  onPageChange,
-  onAdvance,
-  onTap,
-  onLongPressAyah,
-  highlightedAyah,
-  extraData,
-}: MushafPagerProps) {
+export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(function MushafPager(
+  {
+    pages,
+    initialPage,
+    onPageChange,
+    onAdvance,
+    onTap,
+    onLongPressAyah,
+    highlightedAyah,
+    extraData,
+  },
+  ref,
+) {
   const { isDark, theme } = useTheme();
   const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
@@ -204,6 +225,7 @@ export function MushafPager({
   // back whenever a parent prop bump occurs (e.g. context re-renders from
   // auto-save).
   const hasAutoScrolledRef = useRef(false);
+  const jumpRef = useRef<{ index: number; until: number } | null>(null);
 
   // Download the pages around the starting one before they are swiped to.
   useEffect(() => {
@@ -224,12 +246,43 @@ export function MushafPager({
     }, 50);
   }, [initialPage, pages]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToPage: (pageNumber: number) => {
+        const idx = pages.indexOf(pageNumber);
+        if (idx < 0) return false;
+        // Move the index first, so the viewability callback that follows
+        // sees no change and cannot mistake the jump for advancing.
+        const changed = idx !== currentIndexRef.current;
+        currentIndexRef.current = idx;
+        if (changed) jumpRef.current = { index: idx, until: Date.now() + JUMP_SETTLE_MS };
+        hasAutoScrolledRef.current = true;
+        listRef.current?.scrollToIndex({ index: idx, animated: false });
+        if (changed) {
+          prefetchPages(pagesAround(pages, idx));
+          onPageChange?.(pageNumber, idx);
+        }
+        return true;
+      },
+    }),
+    [pages, onPageChange],
+  );
+
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length === 0) return;
       const first = viewableItems[0];
       if (first.index == null) return;
       const newIndex = first.index;
+      // Right after a jump, ignore a stale report of the page we left: taking
+      // it as the current page would make the jump look like advancing.
+      const jump = jumpRef.current;
+      if (jump) {
+        if (newIndex === jump.index) jumpRef.current = null;
+        else if (Date.now() < jump.until) return;
+        else jumpRef.current = null;
+      }
       const prevIndex = currentIndexRef.current;
       if (newIndex === prevIndex) return;
       const newPage = pages[newIndex];
@@ -288,7 +341,7 @@ export function MushafPager({
       style={{ backgroundColor: palette.pageBg }}
     />
   );
-}
+});
 
 const styles = StyleSheet.create({
   page: {

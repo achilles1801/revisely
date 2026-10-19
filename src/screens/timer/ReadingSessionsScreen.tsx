@@ -172,11 +172,15 @@ export default function ReadingSessionsScreen() {
             />
           }
         >
-          <GlassCard glassStyle="clear" specular tintColor={tint} style={styles.summary}>
-            <Stat label="This week" value={formatDuration(totals.week)} theme={theme} />
-            <Stat label="All time" value={formatDuration(totals.all)} theme={theme} emphasize />
-            <Stat label="Sessions" value={`${sessions.length}`} theme={theme} />
-          </GlassCard>
+          {/* Totals only once there is something to total: a row of zeros
+              above the empty state reads as a broken screen. */}
+          {sessions.length > 0 && (
+            <GlassCard glassStyle="clear" specular tintColor={tint} style={styles.summary}>
+              <Stat label="This week" value={formatDuration(totals.week)} theme={theme} />
+              <Stat label="All time" value={formatDuration(totals.all)} theme={theme} emphasize />
+              <Stat label="Sessions" value={`${sessions.length}`} theme={theme} />
+            </GlassCard>
+          )}
 
           {sessions.length === 0 ? (
             <View style={styles.empty}>
