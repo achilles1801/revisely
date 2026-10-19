@@ -121,7 +121,7 @@ export function recentJournalDays(
  */
 export function journalFirstDay(
   user: Pick<User, 'createdAt' | 'fajrBoundaryEnabled' | 'locationCoords' | 'fajrCalculationMethod'> | null | undefined,
-  entries: JournalEntry[] = [],
+  entries: { date: string }[] = [],
 ): string | null {
   if (!user?.createdAt) return null;
   const created = new Date(user.createdAt);

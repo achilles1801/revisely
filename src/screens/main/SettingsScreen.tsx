@@ -483,10 +483,10 @@ export default function SettingsScreen() {
 
         <Section title="Activity">
           <Row
-            icon="stopwatch-outline"
-            label="Reading sessions"
-            value={readingSeconds != null ? formatDuration(readingSeconds) : undefined}
-            onPress={() => navigation.navigate('ReadingSessions')}
+            icon="pulse-outline"
+            label="Activity"
+            value={readingSeconds != null ? `${formatDuration(readingSeconds)} timed` : undefined}
+            onPress={() => navigation.navigate('Activity')}
           />
           <Row
             icon="hourglass-outline"

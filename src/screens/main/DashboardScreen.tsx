@@ -19,7 +19,7 @@ import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
 import { Button } from '../../components/Button';
 import { PressableScale } from '../../components/PressableScale';
 import { EditSessionModal } from '../../components/EditSessionModal';
-import { TimerButton } from '../../components/TimerButton';
+import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { ProgressSummaryCard } from '../../components/home/ProgressSummaryCard';
 import { Greeting } from '../../components/home/Greeting';
 import { KahfCard } from '../../components/home/KahfCard';
@@ -190,12 +190,15 @@ export default function DashboardScreen() {
     );
   }, [sessionLogs, juzFilter]);
 
+  // Only a juz filter or bulk selection expands in place; otherwise "See all"
+  // opens Activity.
+  const expandInPlace = sessionsExpanded && (juzFilter !== null || selectionMode);
   const visibleSessions = useMemo(
     () =>
-      sessionsExpanded
+      expandInPlace
         ? filteredSessions
         : filteredSessions.slice(0, COMPACT_SESSION_LIMIT),
-    [filteredSessions, sessionsExpanded],
+    [filteredSessions, expandInPlace],
   );
 
   const availableJuz = useMemo(() => {
@@ -581,30 +584,19 @@ export default function DashboardScreen() {
             <Greeting name={userName} />
           </View>
           <PressableScale
-            onPress={() => navigation.navigate('Journal')}
+            onPress={() => navigation.navigate('Activity')}
             haptic="light"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Open daily log"
+            accessibilityLabel="Open activity"
           >
             <GlassCard style={styles.settingsButton}>
               <Ionicons
-                name="journal-outline"
+                name="pulse-outline"
                 size={20}
                 color={theme.textPrimary}
               />
             </GlassCard>
           </PressableScale>
-          <TimerButton
-            onPress={() => navigation.navigate('ReadingTimer')}
-            color={theme.textPrimary}
-            activeColor={theme.accent}
-            activeBg={theme.accent + '22'}
-            idle={
-              <GlassCard style={styles.settingsButton}>
-                <Ionicons name="stopwatch-outline" size={20} color={theme.textPrimary} />
-              </GlassCard>
-            }
-          />
           <PressableScale
             onPress={() => navigation.navigate('Settings')}
             haptic="light"
@@ -710,25 +702,38 @@ export default function DashboardScreen() {
               </GlassCard>
             )}
 
-            {showSeeAllToggle && (
-              <PressableScale
-                onPress={() => setSessionsExpanded((v) => !v)}
-                haptic="light"
-                scale={0.99}
-                style={styles.seeAllBtn}
-              >
-                <Text style={styles.seeAllText}>
-                  {sessionsExpanded
-                    ? 'Show less'
-                    : `See all ${filteredSessions.length}`}
-                </Text>
-                <Ionicons
-                  name={sessionsExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={theme.accent}
-                />
-              </PressableScale>
-            )}
+            {/* The full history lives in Activity. A juz filter or bulk
+                selection still expands in place, since Activity has neither. */}
+            {showSeeAllToggle &&
+              (juzFilter === null && !selectionMode ? (
+                <PressableScale
+                  onPress={() => navigation.navigate('Activity')}
+                  haptic="light"
+                  scale={0.99}
+                  style={styles.seeAllBtn}
+                >
+                  <Text style={styles.seeAllText}>See all in Activity</Text>
+                  <Ionicons name="chevron-forward" size={16} color={theme.accent} />
+                </PressableScale>
+              ) : (
+                <PressableScale
+                  onPress={() => setSessionsExpanded((v) => !v)}
+                  haptic="light"
+                  scale={0.99}
+                  style={styles.seeAllBtn}
+                >
+                  <Text style={styles.seeAllText}>
+                    {expandInPlace
+                      ? 'Show less'
+                      : `See all ${filteredSessions.length}`}
+                  </Text>
+                  <Ionicons
+                    name={expandInPlace ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={theme.accent}
+                  />
+                </PressableScale>
+              ))}
           </View>
         )}
       </ScrollView>
@@ -996,9 +1001,10 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       flexGrow: 1,
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
-      // Clearance for the floating tab bar (~76px pill+gap) so content
-      // scrolls behind it without being permanently hidden.
-      paddingBottom: 96,
+      // Clearance for the floating tab bar (~76px pill+gap) and the floating
+      // timer above it, so content scrolls behind them without being
+      // permanently hidden.
+      paddingBottom: 96 + FLOATING_TIMER_SIZE + spacing.sm,
     },
     loadingContainer: {
       flex: 1,

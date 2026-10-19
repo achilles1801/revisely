@@ -9,8 +9,8 @@ import {
 import { useNavigation, useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { PressableScale } from '../../components/PressableScale';
-import { TimerButton } from '../../components/TimerButton';
 import { useTheme } from '../../context/ThemeContext';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
@@ -130,17 +130,6 @@ export default function ReadIndexScreen() {
     <View style={styles.headerWrap}>
       <View style={styles.titleRow}>
         <Text style={styles.displayTitle}>Surahs</Text>
-        <TimerButton
-          onPress={() => navigation.navigate('ReadingTimer')}
-          color={palette.textPrimary}
-          activeColor={palette.textPrimary}
-          activeBg={palette.card}
-          idle={
-            <View style={styles.timerIdle}>
-              <Ionicons name="stopwatch-outline" size={20} color={palette.textPrimary} />
-            </View>
-          }
-        />
       </View>
 
       {recent.length > 0 && (
@@ -175,7 +164,8 @@ export default function ReadIndexScreen() {
         ListHeaderComponent={header}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: tabFootprint + spacing.xl },
+          // Room for the floating timer above the tab bar.
+          { paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + spacing.xl },
         ]}
         renderItem={({ item }) => (
           <View style={styles.section}>
@@ -289,14 +279,6 @@ const makeStyles = (palette: ReadPalette) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: spacing.sm,
-    },
-    timerIdle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: palette.card,
     },
     headerWrap: { paddingTop: spacing.xs, paddingBottom: spacing.xs },
     displayTitle: {

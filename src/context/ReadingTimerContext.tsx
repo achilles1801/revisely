@@ -28,7 +28,7 @@ import {
   startTimer,
 } from '../lib/readingTimer';
 import * as firestoreService from '../services/firestoreService';
-import { navigationRef } from '../navigation/navigationRef';
+import { alertSessionSaved } from '../components/timer/sessionSavedAlert';
 import { logger } from '../lib/logger';
 import { ReadingTimerMode } from '../types';
 
@@ -121,19 +121,13 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     }
   }, [save, setTimer]);
 
-  // A timed session reached its target: save it and bring the user home.
+  // A timed session reached its target: save it and offer its day in Activity.
   const complete = useCallback(async () => {
     const t = timerRef.current;
     if (!t || finishingRef.current) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (!(await finish())) return;
-    if (navigationRef.isReady()) {
-      navigationRef.navigate('Home', { screen: 'Dashboard' } as never);
-    }
-    Alert.alert(
-      'Session complete',
-      `${formatDuration(t.targetSeconds ?? 0)} of reading logged. You can add the pages you read from Reading sessions.`,
-    );
+    alertSessionSaved(t.date, t.targetSeconds ?? 0, 'Session complete');
   }, [finish]);
 
   // Restore a timer that was running when the app was closed.

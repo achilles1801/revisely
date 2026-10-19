@@ -145,5 +145,7 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
     highlightedAyah: selected ?? playingRef,
     onLongPressAyah,
     overlay,
+    /** The now-playing bar is on screen (at `playerBottom`). */
+    playerVisible: mine && playback.status !== 'idle' && playback.verse != null,
   };
 }
