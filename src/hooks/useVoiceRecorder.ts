@@ -13,32 +13,36 @@ import * as Haptics from 'expo-haptics';
 import { getRecitation } from '../lib/recitation';
 import {
   acquireRecording,
+  appendSegment,
+  findRevisionRecording,
   PageMark,
   RecordingKind,
   releaseRecording,
-  saveRecording,
+  setCapturing,
 } from '../lib/recordings';
 import { claimAudio, setAudioMode } from '../lib/audioFocus';
 import { logger } from '../lib/logger';
 
-// Speech, mono: about 15 MB an hour.
-const VOICE_PRESET: RecordingOptions = {
+// Close to Voice Memos: AAC at 48 kHz, mono (the phone's main microphone),
+// 96 kbps at the encoder's highest quality. About 43 MB an hour. (The first
+// version recorded 22 kHz at 32 kbps, which sounded thin and muffled.)
+export const VOICE_PRESET: RecordingOptions = {
   extension: '.m4a',
-  sampleRate: 22050,
+  sampleRate: 48000,
   numberOfChannels: 1,
-  bitRate: 32000,
+  bitRate: 96000,
   android: { outputFormat: 'mpeg4', audioEncoder: 'aac' },
   ios: {
     outputFormat: IOSOutputFormat.MPEG4AAC,
-    audioQuality: AudioQuality.LOW,
+    audioQuality: AudioQuality.MAX,
     linearPCMBitDepth: 16,
     linearPCMIsBigEndian: false,
     linearPCMIsFloat: false,
   },
-  web: { mimeType: 'audio/webm', bitsPerSecond: 32000 },
+  web: { mimeType: 'audio/webm', bitsPerSecond: 96000 },
 };
 
-export type RecorderPhase = 'idle' | 'starting' | 'recording' | 'saving';
+export type RecorderPhase = 'idle' | 'starting' | 'recording' | 'paused' | 'finishing';
 
 interface Options {
   kind: RecordingKind;
@@ -46,36 +50,56 @@ interface Options {
   day: string | null;
   /** The page on screen; changes are recorded as page marks. */
   currentPage: number | null;
-  /** Called after a recording is saved. */
+  /** Called after the recording session finishes with something saved. */
   onSaved?: () => void;
 }
 
 /**
- * Record yourself reciting. Asks for the microphone the first time (and points
- * to Settings when it was refused), stops any recitation playing, notes which
- * page is on screen as the recording goes, and saves on Stop, when the app
- * leaves the foreground, when iOS interrupts the recording (a call), or when
- * the screen closes. Recording in the background is not supported.
+ * One recording per session, with pause and resume. Record starts it (asking
+ * for the microphone the first time, pointing to Settings when it was refused);
+ * Pause and Resume add to it; Done, or leaving the screen, finishes it. A
+ * revision session's recording carries on across visits on the same day, so a
+ * day's revision has one recording; a reading recording lasts while the reader
+ * is open.
+ *
+ * Each Pause finishes the current stretch as its own file and saves it at once,
+ * so nothing is lost if the app is closed. A call, an alarm or Siri, and going
+ * to the background, pause it; the user resumes when ready.
  */
 export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   const [phase, setPhase] = useState<RecorderPhase>('idle');
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+  /** Time recorded before the current stretch (and before this visit). */
+  const [baseMs, setBaseMs] = useState(0);
+  const [segmentStartedAt, setSegmentStartedAt] = useState<number | null>(null);
+  const [interrupted, setInterrupted] = useState(false);
+
   const phaseRef = useRef<RecorderPhase>('idle');
-  const marksRef = useRef<PageMark[]>([]);
-  const startRef = useRef(0);
-  const dayRef = useRef(day);
+  const baseRef = useRef(0);
+  const segStartRef = useRef(0);
   const uriRef = useRef<string | null>(null);
+  const marksRef = useRef<PageMark[]>([]);
+  const dayRef = useRef(day);
+  const recordingIdRef = useRef<string | null>(null);
+  const createdAtRef = useRef(0);
+  const savedAnyRef = useRef(false);
+  // Segment saves run in order, so the second never starts a new recording
+  // before the first has created it.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const [owner] = useState(() => `recorder-${Math.random().toString(36).slice(2)}`);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
-  const finishRef = useRef<() => Promise<void>>(async () => {});
+  const pageRef = useRef(currentPage);
+  pageRef.current = currentPage;
 
   const setPhaseBoth = (p: RecorderPhase) => {
     phaseRef.current = p;
     setPhase(p);
   };
 
-  // Leaving the screen saves the recording. Declared before useAudioRecorder:
+  const finishRef = useRef<() => Promise<void>>(async () => {});
+  const pauseRef = useRef<(interruption?: boolean) => Promise<void>>(async () => {});
+
+  // Leaving the screen finishes the session. Declared before useAudioRecorder:
   // cleanups run in order, so this stops the recorder before the library
   // releases it (the file location is already in uriRef).
   useEffect(
@@ -87,65 +111,77 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
 
   const recorder = useAudioRecorder(VOICE_PRESET, (status: RecordingStatus) => {
     // Interrupted or failed (a call, another app taking the microphone): keep
-    // what was recorded.
+    // what was recorded and pause.
     if ((status.hasError || status.isFinished) && phaseRef.current === 'recording') {
       if (status.hasError) logger.warn('Recording interrupted', status.error);
-      finishRef.current();
+      pauseRef.current(true);
     }
   });
 
-  const finish = useCallback(async () => {
-    if (phaseRef.current !== 'recording') return;
-    setPhaseBoth('saving');
-    // Everything the save needs is read now, before any await: on unmount the
-    // native recorder is released right after this returns.
-    const durationMs = Date.now() - startRef.current;
+  /** Stop the current stretch and queue its save. Reads everything synchronously. */
+  const endSegment = useCallback((): Promise<void> => {
     const uri = uriRef.current;
-    const saveDay = dayRef.current;
-    const marks = marksRef.current;
-    const createdAt = startRef.current;
+    const segmentMs = Date.now() - segStartRef.current;
+    const info = {
+      kind,
+      day: dayRef.current ?? '',
+      segmentMs,
+      pageMarks: [...marksRef.current],
+      createdAt: createdAtRef.current,
+    };
+    uriRef.current = null;
+    baseRef.current += segmentMs;
+    setCapturing(false);
     let stopped: Promise<void> = Promise.resolve();
     try {
       stopped = recorder.stop();
     } catch (err) {
       logger.warn('Recorder stop failed', err);
     }
-    try {
+    const run = saveChainRef.current.then(async () => {
       await stopped.catch((err) => logger.warn('Recorder stop failed', err));
-      releaseRecording(owner);
-      // Back to playback routing (while recording is allowed, iOS plays
-      // through the earpiece).
-      setAudioMode(false);
-      if (uri && saveDay) {
-        const saved = await saveRecording(uri, {
-          kind,
-          day: saveDay,
-          durationMs,
-          pageMarks: marks,
-          createdAt,
-        });
-        if (saved) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onSavedRef.current?.();
+      if (!uri || !info.day) return;
+      try {
+        const id = await appendSegment(recordingIdRef.current, uri, info);
+        if (id) {
+          recordingIdRef.current = id;
+          savedAnyRef.current = true;
         }
+      } catch (err) {
+        logger.error('Could not save recording', err);
+        Alert.alert("Couldn't save the recording", 'Your device may be out of storage.');
       }
-    } catch (err) {
-      logger.error('Could not save recording', err);
-      Alert.alert("Couldn't save the recording", 'Your device may be out of storage.');
-    } finally {
-      releaseRecording(owner);
-      uriRef.current = null;
-      setStartedAt(null);
-      setPhaseBoth('idle');
+    });
+    saveChainRef.current = run;
+    return run;
+  }, [recorder, kind]);
+
+  /** Start a new stretch (first one or a resume). */
+  const startSegment = useCallback(async () => {
+    claimAudio('recorder', owner);
+    getRecitation().stop();
+    await setAudioMode(true);
+    await recorder.prepareToRecordAsync();
+    uriRef.current = recorder.uri;
+    recorder.record();
+    segStartRef.current = Date.now();
+    setCapturing(true);
+    const page = pageRef.current;
+    const marks = marksRef.current;
+    if (page != null && (marks.length === 0 || marks[marks.length - 1].page !== page)) {
+      marks.push({ atMs: baseRef.current, page });
     }
-  }, [recorder, kind, owner]);
-  finishRef.current = finish;
+    setBaseMs(baseRef.current);
+    setSegmentStartedAt(segStartRef.current);
+    setInterrupted(false);
+    setPhaseBoth('recording');
+  }, [recorder, owner]);
 
   const start = useCallback(async () => {
     if (phaseRef.current !== 'idle' || !day) return;
-    // One recording at a time across screens (tabs stay mounted).
+    // One recording session at a time across screens (tabs stay mounted).
     if (!acquireRecording(owner)) {
-      Alert.alert('Already recording', 'Stop the other recording first.');
+      Alert.alert('Already recording', 'Finish the other recording first.');
       return;
     }
     setPhaseBoth('starting');
@@ -165,17 +201,15 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
         );
         return;
       }
-      claimAudio('recorder', owner);
-      getRecitation().stop();
-      await setAudioMode(true);
-      await recorder.prepareToRecordAsync();
-      uriRef.current = recorder.uri;
-      recorder.record();
       dayRef.current = day;
-      startRef.current = Date.now();
-      marksRef.current = currentPage != null ? [{ atMs: 0, page: currentPage }] : [];
-      setStartedAt(startRef.current);
-      setPhaseBoth('recording');
+      savedAnyRef.current = false;
+      createdAtRef.current = Date.now();
+      // A day's revision is one session: carry on its recording.
+      const existing = kind === 'revision' ? await findRevisionRecording(day) : null;
+      recordingIdRef.current = existing?.id ?? null;
+      baseRef.current = existing?.durationMs ?? 0;
+      marksRef.current = existing ? [...existing.pageMarks] : [];
+      await startSegment();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err) {
       logger.error('Could not start recording', err);
@@ -185,19 +219,76 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       setPhaseBoth('idle');
       Alert.alert("Couldn't start recording", 'Please try again.');
     }
-  }, [day, currentPage, recorder, owner]);
+  }, [day, kind, owner, startSegment]);
 
-  // Page marks while recording.
+  const pause = useCallback(
+    async (interruption = false) => {
+      if (phaseRef.current !== 'recording') return;
+      setPhaseBoth('paused');
+      setInterrupted(interruption);
+      const saved = endSegment();
+      setBaseMs(baseRef.current);
+      setSegmentStartedAt(null);
+      // Playback (recitation, a recording) through the speaker while paused.
+      setAudioMode(false);
+      if (!interruption) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await saved;
+    },
+    [endSegment],
+  );
+  pauseRef.current = pause;
+
+  const resume = useCallback(async () => {
+    if (phaseRef.current !== 'paused') return;
+    setPhaseBoth('starting');
+    try {
+      await startSegment();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      logger.error('Could not resume recording', err);
+      setPhaseBoth('paused');
+      Alert.alert("Couldn't resume recording", 'Please try again.');
+    }
+  }, [startSegment]);
+
+  const finish = useCallback(async () => {
+    const p = phaseRef.current;
+    if (p !== 'recording' && p !== 'paused') return;
+    setPhaseBoth('finishing');
+    try {
+      if (p === 'recording') endSegment();
+      await saveChainRef.current;
+      setAudioMode(false);
+      if (savedAnyRef.current) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onSavedRef.current?.();
+      }
+    } catch (err) {
+      logger.error('Could not finish recording', err);
+    } finally {
+      releaseRecording(owner);
+      recordingIdRef.current = null;
+      baseRef.current = 0;
+      marksRef.current = [];
+      setBaseMs(0);
+      setSegmentStartedAt(null);
+      setInterrupted(false);
+      setPhaseBoth('idle');
+    }
+  }, [endSegment, owner]);
+  finishRef.current = finish;
+
+  // Page marks while recording, on the session's timeline.
   useEffect(() => {
     if (phase !== 'recording' || currentPage == null) return;
     const marks = marksRef.current;
     if (marks.length === 0 || marks[marks.length - 1].page !== currentPage) {
-      marks.push({ atMs: Date.now() - startRef.current, page: currentPage });
+      marks.push({ atMs: baseRef.current + (Date.now() - segStartRef.current), page: currentPage });
     }
   }, [currentPage, phase]);
 
   // An interruption that leaves the app active (an alarm, Siri) pauses the
-  // recorder without an event: notice it and keep what was recorded.
+  // recorder without an event: notice it and pause the session too.
   useEffect(() => {
     if (phase !== 'recording') return;
     let misses = 0;
@@ -207,16 +298,16 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
       } catch {
         misses += 1;
       }
-      if (misses >= 2) finishRef.current();
+      if (misses >= 2) pauseRef.current(true);
     }, 1000);
     return () => clearInterval(id);
   }, [phase, recorder]);
 
-  // No background recording: going to the background saves it. ('inactive' is
+  // No background recording: going to the background pauses it. ('inactive' is
   // Control Center or a notification banner; recording goes on.)
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'background') finishRef.current();
+      if (s === 'background') pauseRef.current(true);
     });
     return () => sub.remove();
   }, []);
@@ -224,8 +315,15 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved }: Options) {
   return {
     phase,
     recording: phase === 'recording',
-    startedAt,
+    paused: phase === 'paused',
+    /** Paused by a call, an alarm, Siri or leaving the app (not by the user). */
+    interrupted,
+    /** Recorded time = baseMs + (now - segmentStartedAt) while recording. */
+    baseMs,
+    segmentStartedAt,
     start,
-    stop: finish,
+    pause: () => pause(false),
+    resume,
+    finish,
   };
 }

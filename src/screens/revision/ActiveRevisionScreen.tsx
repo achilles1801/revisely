@@ -562,10 +562,7 @@ export default function ActiveRevisionScreen() {
         onOverflow={() => setMenuOpen(true)}
         recordSlot={
           <RecordButton
-            phase={recorder.phase}
-            startedAt={recorder.startedAt}
-            onStart={recorder.start}
-            onStop={recorder.stop}
+            recorder={recorder}
             color={theme.textPrimary}
             background={theme.glass}
             border={theme.border}

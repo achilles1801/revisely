@@ -173,10 +173,7 @@ export default function QuranReaderScreen() {
           ) : null}
         </View>
         <RecordButton
-          phase={recorder.phase}
-          startedAt={recorder.startedAt}
-          onStart={recorder.start}
-          onStop={recorder.stop}
+          recorder={recorder}
           color={palette.textSecondary}
           background={palette.card}
           border={palette.divider}

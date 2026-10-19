@@ -2,7 +2,8 @@
 //
 // Kept on this device only, in the documents directory (they are the user's
 // own data, so unlike cached pages they belong there), one folder per account:
-// recordings/<uid>/<id>.m4a plus an index.json describing them. Nothing is
+// recordings/<uid>/<id>-<n>.m4a (one file per segment: each Pause finishes one,
+// so a recording survives the app being closed) plus an index.json. Nothing is
 // uploaded. `storage: 'device'` on each entry leaves room for a cloud copy later.
 
 import { Directory, File, Paths } from 'expo-file-system';
@@ -17,21 +18,40 @@ export interface PageMark {
   page: number;
 }
 
+/** One stretch between Record and Pause: a finished audio file. */
+export interface StoredSegment {
+  fileName: string;
+  durationMs: number;
+}
+
 export interface StoredRecording {
   id: string;
   kind: RecordingKind;
   /** Revision day (YYYY-MM-DD, fajr-aware) it was made on. */
   day: string;
   createdAt: number;
+  /** Total of the segments. */
   durationMs: number;
-  fileName: string;
+  /** Played back to back as one recording. */
+  segments?: StoredSegment[];
+  /** Recordings from before pause/resume: a single file. */
+  fileName?: string;
+  /** Page on screen over the recording's timeline (all segments). */
   pageMarks: PageMark[];
   storage: 'device';
 }
 
-export interface RecordingMeta extends Omit<StoredRecording, 'fileName' | 'storage'> {
+export interface RecordingMeta extends Omit<StoredRecording, 'fileName' | 'storage' | 'segments'> {
+  /** The first segment, for callers that only need one file. */
   uri: string;
+  segments: { uri: string; durationMs: number }[];
   sizeBytes: number;
+}
+
+/** A recording's segments, including the single file of an older recording. */
+export function segmentsOf(e: StoredRecording): StoredSegment[] {
+  if (e.segments && e.segments.length > 0) return e.segments;
+  return e.fileName ? [{ fileName: e.fileName, durationMs: e.durationMs }] : [];
 }
 
 /** Recordings shorter than this are taken as accidental taps and not kept. */
@@ -83,50 +103,97 @@ export function normalizePageMarks(marks: PageMark[]): PageMark[] {
   return out;
 }
 
-/** Keep a finished recording: moves the recorder's file into the store. */
-export function saveRecording(
+/** A segment shorter than this (a tap on Record then Pause) is not kept. */
+export const MIN_SEGMENT_MS = 300;
+
+export interface SegmentInfo {
+  kind: RecordingKind;
+  day: string;
+  segmentMs: number;
+  /** All page marks so far, on the recording's whole timeline. */
+  pageMarks: PageMark[];
+  createdAt?: number;
+}
+
+/**
+ * Add a finished segment (the recorder's file) to recording `recordingId`, or
+ * start a new recording when it is null or no longer exists. Resolves to the
+ * recording's id, or null when nothing was kept (a new recording shorter than
+ * MIN_RECORDING_MS, or a too-short segment).
+ */
+export function appendSegment(
+  recordingId: string | null,
   tempUri: string,
-  info: { kind: RecordingKind; day: string; durationMs: number; pageMarks: PageMark[]; createdAt?: number },
-): Promise<RecordingMeta | null> {
+  info: SegmentInfo,
+): Promise<string | null> {
   return serial(async () => {
     const temp = new File(tempUri);
-    if (info.durationMs < MIN_RECORDING_MS || !temp.exists) {
-      if (temp.exists) temp.delete();
-      return null;
-    }
     const dir = accountDir();
-    const createdAt = info.createdAt ?? Date.now();
-    const id = `${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
+    const entries = await readIndex(dir);
+    const existing = recordingId ? entries.find((e) => e.id === recordingId) : undefined;
+    const minimum = existing ? MIN_SEGMENT_MS : MIN_RECORDING_MS;
+    if (info.segmentMs < minimum || !temp.exists) {
+      if (temp.exists) temp.delete();
+      return existing ? existing.id : null;
+    }
+    const createdAt = existing?.createdAt ?? info.createdAt ?? Date.now();
+    const id = existing?.id ?? `${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
     const ext = tempUri.match(/\.[a-z0-9]+$/i)?.[0] ?? '.m4a';
-    const target = new File(dir, `${id}${ext}`);
+    const n = existing ? segmentsOf(existing).length : 0;
+    const target = new File(dir, `${id}-${n}${ext}`);
     temp.move(target);
+    const segment: StoredSegment = { fileName: target.name, durationMs: Math.round(info.segmentMs) };
+    const segments = existing ? [...segmentsOf(existing), segment] : [segment];
     const entry: StoredRecording = {
       id,
-      kind: info.kind,
-      day: info.day,
+      kind: existing?.kind ?? info.kind,
+      day: existing?.day ?? info.day,
       createdAt,
-      durationMs: Math.round(info.durationMs),
-      fileName: target.name,
+      durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),
+      segments,
       pageMarks: normalizePageMarks(info.pageMarks),
       storage: 'device',
     };
     try {
-      writeIndex(dir, [...(await readIndex(dir)), entry]);
+      writeIndex(dir, existing ? entries.map((e) => (e.id === id ? entry : e)) : [...entries, entry]);
     } catch (err) {
       // Not in the index (e.g. disk full): remove the file too, so nothing is
       // left that the app can't show or delete.
       if (target.exists) target.delete();
       throw err;
     }
-    return toMeta(dir, entry);
+    return id;
+  });
+}
+
+/** Where a revision session's recording continues: the latest one for that day. */
+export function findRevisionRecording(
+  day: string,
+): Promise<{ id: string; durationMs: number; pageMarks: PageMark[] } | null> {
+  return serial(async () => {
+    const dir = accountDir();
+    const match = (await readIndex(dir))
+      .filter((e) => e.kind === 'revision' && e.day === day && toMeta(dir, e) != null)
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+    return match ? { id: match.id, durationMs: match.durationMs, pageMarks: match.pageMarks } : null;
   });
 }
 
 function toMeta(dir: Directory, e: StoredRecording): RecordingMeta | null {
-  const file = new File(dir, e.fileName);
-  if (!file.exists) return null;
-  const { fileName: _f, storage: _s, ...rest } = e;
-  return { ...rest, uri: file.uri, sizeBytes: file.size ?? 0 };
+  // Segments whose file is gone are skipped; with none left, the entry is gone.
+  const files = segmentsOf(e)
+    .map((sg) => ({ sg, file: new File(dir, sg.fileName) }))
+    .filter(({ file }) => file.exists);
+  if (files.length === 0) return null;
+  const { fileName: _f, storage: _s, segments: _g, ...rest } = e;
+  const segments = files.map(({ sg, file }) => ({ uri: file.uri, durationMs: sg.durationMs }));
+  return {
+    ...rest,
+    durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),
+    uri: segments[0].uri,
+    segments,
+    sizeBytes: files.reduce((sum, { file }) => sum + (file.size ?? 0), 0),
+  };
 }
 
 /** This account's recordings, newest first. Entries whose file is gone are dropped. */
@@ -148,11 +215,13 @@ export function deleteRecordings(match: (r: StoredRecording) => boolean): Promis
     const entries = await readIndex(dir);
     const gone = entries.filter(match);
     for (const e of gone) {
-      try {
-        const file = new File(dir, e.fileName);
-        if (file.exists) file.delete();
-      } catch (err) {
-        logger.warn('Could not delete recording file', err);
+      for (const sg of segmentsOf(e)) {
+        try {
+          const file = new File(dir, sg.fileName);
+          if (file.exists) file.delete();
+        } catch (err) {
+          logger.warn('Could not delete recording file', err);
+        }
       }
     }
     if (gone.length > 0) writeIndex(dir, entries.filter((e) => !match(e)));
@@ -178,6 +247,27 @@ export function deleteAllRecordings(uid?: string): Promise<void> {
   });
 }
 
+/** Which segment holds `ms` of a recording's timeline, and how far into it. */
+export function locateInSegments(
+  segments: { durationMs: number }[],
+  ms: number,
+): { index: number; offsetMs: number } {
+  let start = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const end = start + segments[i].durationMs;
+    if (ms < end || i === segments.length - 1) {
+      return { index: i, offsetMs: Math.max(0, Math.min(ms - start, segments[i].durationMs)) };
+    }
+    start = end;
+  }
+  return { index: 0, offsetMs: 0 };
+}
+
+/** Where segment `index` starts on the recording's timeline. */
+export function segmentStart(segments: { durationMs: number }[], index: number): number {
+  return segments.slice(0, index).reduce((sum, sg) => sum + sg.durationMs, 0);
+}
+
 /** The page playing at `ms` into a recording, from its page marks. */
 export function pageAt(marks: PageMark[], ms: number): number | null {
   let page: number | null = null;
@@ -188,11 +278,17 @@ export function pageAt(marks: PageMark[], ms: number): number | null {
   return page;
 }
 
-// Which screen is recording, if any: one recording at a time (tab screens stay
-// mounted), and recitation refuses to start meanwhile (it would play into the
-// microphone).
+// Which screen has a recording session (recording or paused), if any: one at a
+// time (tab screens stay mounted). Separately, whether the microphone is
+// capturing right now: recitation and playback refuse to start then (they
+// would play into the recording), but may play while the session is paused.
 let recordingOwner: string | null = null;
-export const isRecordingActive = () => recordingOwner != null;
+let capturing = false;
+export const hasRecordingSession = () => recordingOwner != null;
+export const isRecordingActive = () => capturing;
+export const setCapturing = (on: boolean) => {
+  capturing = on;
+};
 /** Take the microphone for `owner`; false if another screen is recording. */
 export function acquireRecording(owner: string): boolean {
   if (recordingOwner != null && recordingOwner !== owner) return false;
@@ -201,5 +297,8 @@ export function acquireRecording(owner: string): boolean {
 }
 /** Give the microphone back (only its owner can). */
 export function releaseRecording(owner: string): void {
-  if (recordingOwner === owner) recordingOwner = null;
+  if (recordingOwner === owner) {
+    recordingOwner = null;
+    capturing = false;
+  }
 }

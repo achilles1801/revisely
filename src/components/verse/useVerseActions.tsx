@@ -86,7 +86,7 @@ export function useVerseActions({ pages, onShowPage, playerBottom = 24, currentP
       // It would play into the microphone.
       setMenuPoint(null);
       setSelected(null);
-      Alert.alert('Recording in progress', 'Stop the recording to play the recitation.');
+      Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
       return;
     }
     const advance = (v: VerseKey) => {
