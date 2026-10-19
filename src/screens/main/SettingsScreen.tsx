@@ -505,7 +505,6 @@ export default function SettingsScreen() {
           <Row
             icon="stats-chart-outline"
             label="Progress card"
-            isLast={!homePrefs.showProgressCard}
             rightSlot={
               <Switch
                 value={homePrefs.showProgressCard}
@@ -523,7 +522,6 @@ export default function SettingsScreen() {
                   key={metric}
                   label={HOME_METRIC_LABELS[metric]}
                   onPress={() => toggleHomeMetric(metric)}
-                  isLast={i === ALL_HOME_METRICS.length - 1}
                   rightSlot={
                     <Ionicons
                       name="checkmark"
@@ -534,6 +532,19 @@ export default function SettingsScreen() {
                 />
               );
             })}
+          <Row
+            icon="book-outline"
+            label="Friday Al-Kahf reminder"
+            isLast
+            rightSlot={
+              <Switch
+                value={homePrefs.fridayKahfReminder}
+                onValueChange={(v) => setHomePrefs({ fridayKahfReminder: v })}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            }
+          />
         </Section>
 
         <Section title="Day boundary">

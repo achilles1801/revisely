@@ -7,6 +7,10 @@ export type HomeMetric = 'juz' | 'pages' | 'surahs';
 export interface HomePrefs {
   showProgressCard: boolean;
   metrics: HomeMetric[];
+  /** Friday card suggesting Surah Al-Kahf. */
+  fridayKahfReminder: boolean;
+  /** Revision day on which the Al-Kahf card was dismissed ("Not today"). */
+  kahfDismissedDay: string | null;
 }
 
 export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
@@ -18,7 +22,35 @@ export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
 export const ALL_HOME_METRICS: HomeMetric[] = ['juz', 'pages', 'surahs'];
 
 const STORAGE_KEY = '@revisely_home_prefs';
-const DEFAULT_PREFS: HomePrefs = { showProgressCard: true, metrics: ['juz', 'pages'] };
+const DEFAULT_PREFS: HomePrefs = {
+  showProgressCard: true,
+  metrics: ['juz', 'pages'],
+  fridayKahfReminder: true,
+  kahfDismissedDay: null,
+};
+
+/** Saved prefs over the defaults; fields added later default for old installs. */
+export function parseHomePrefs(raw: string | null): HomePrefs {
+  if (!raw) return DEFAULT_PREFS;
+  let saved: Partial<HomePrefs>;
+  try {
+    saved = JSON.parse(raw) ?? {};
+  } catch {
+    return DEFAULT_PREFS;
+  }
+  return {
+    showProgressCard: saved.showProgressCard ?? DEFAULT_PREFS.showProgressCard,
+    metrics: (Array.isArray(saved.metrics) ? saved.metrics : DEFAULT_PREFS.metrics).filter(
+      (m) => ALL_HOME_METRICS.includes(m),
+    ),
+    fridayKahfReminder:
+      typeof saved.fridayKahfReminder === 'boolean'
+        ? saved.fridayKahfReminder
+        : DEFAULT_PREFS.fridayKahfReminder,
+    kahfDismissedDay:
+      typeof saved.kahfDismissedDay === 'string' ? saved.kahfDismissedDay : null,
+  };
+}
 
 let prefs: HomePrefs = DEFAULT_PREFS;
 const listeners = new Set<() => void>();
@@ -26,13 +58,7 @@ const listeners = new Set<() => void>();
 AsyncStorage.getItem(STORAGE_KEY)
   .then((raw) => {
     if (!raw) return;
-    const saved = JSON.parse(raw) as Partial<HomePrefs>;
-    prefs = {
-      showProgressCard: saved.showProgressCard ?? DEFAULT_PREFS.showProgressCard,
-      metrics: (saved.metrics ?? DEFAULT_PREFS.metrics).filter((m) =>
-        ALL_HOME_METRICS.includes(m),
-      ),
-    };
+    prefs = parseHomePrefs(raw);
     listeners.forEach((l) => l());
   })
   .catch(() => {});
