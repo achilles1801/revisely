@@ -87,8 +87,14 @@ export function ActivityDayCard({
             theme={theme}
           />
         )}
-        {/* RECORDINGS: a "N recordings" line goes here once src/lib/recordings.ts lands
-            (count listRecordings() by `day`). */}
+        {(day.recordings ?? 0) > 0 && (
+          <Line
+            icon="mic-outline"
+            text={day.recordings === 1 ? '1 recording' : `${day.recordings} recordings`}
+            value={null}
+            theme={theme}
+          />
+        )}
         {journal && (journal.memorization.trim() !== '' || journal.memorizationMinutes != null) && (
           <Line
             icon="book-outline"

@@ -40,6 +40,8 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, ReadingSession, RevisionLog } from '../../types';
+import { RecordingsList } from '../../components/recordings/RecordingsList';
+import { deleteRecordings, isReadingRecordingDuring } from '../../lib/recordings';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'ActivityDay'>;
@@ -88,6 +90,7 @@ export default function ActivityDayScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [editingReading, setEditingReading] = useState<ReadingSession | null>(null);
+  const [recordingsKey, setRecordingsKey] = useState(0);
   const [editingLog, setEditingLog] = useState<RevisionLog | null>(null);
 
   const load = useCallback(async () => {
@@ -129,7 +132,7 @@ export default function ActivityDayScreen() {
   };
 
   const removeReading = (session: ReadingSession) => {
-    Alert.alert('Delete session?', `${formatDuration(session.durationSeconds)} of reading will be removed.`, [
+    Alert.alert('Delete session?', `${formatDuration(session.durationSeconds)} of reading will be removed, with any recordings made during it.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -139,6 +142,13 @@ export default function ActivityDayScreen() {
           setReadings((prev) => prev.filter((s) => s.id !== session.id));
           try {
             await firestoreService.deleteReadingSession(session.id);
+            // Recordings made while it ran go with it (a failure here must not
+            // bring the deleted session back).
+            if (session.startedAt > 0) {
+              deleteRecordings(isReadingRecordingDuring(session.startedAt, session.endedAt))
+                .then(() => setRecordingsKey((k) => k + 1))
+                .catch((err) => logger.warn('Could not delete session recordings', err));
+            }
           } catch (err) {
             logger.error('Failed to delete reading session', err);
             load();
@@ -277,7 +287,11 @@ export default function ActivityDayScreen() {
             )}
           </View>
 
-          {/* RECORDINGS: <RecordingsList day={date} /> */}
+          <RecordingsList
+            day={date}
+            reloadKey={recordingsKey}
+            header={<Text style={styles.sectionLabel}>RECORDINGS</Text>}
+          />
 
           {/* Daily log */}
           <Text style={styles.sectionLabel}>DAILY LOG</Text>

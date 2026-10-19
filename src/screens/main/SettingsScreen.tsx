@@ -38,6 +38,8 @@ import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
 import { avatarInitial } from '../../lib/displayName';
+import { deleteRecordings, listRecordings } from '../../lib/recordings';
+import { formatBytes } from '../../lib/recordingFormat';
 import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
@@ -244,6 +246,15 @@ export default function SettingsScreen() {
   const homePrefs = useHomePrefs();
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
+  const [recordings, setRecordings] = useState<{ count: number; bytes: number } | null>(null);
+
+  const loadRecordings = useCallback(() => {
+    listRecordings()
+      .then((list) =>
+        setRecordings({ count: list.length, bytes: list.reduce((sum, r) => sum + r.sizeBytes, 0) }),
+      )
+      .catch(() => setRecordings(null));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -259,10 +270,11 @@ export default function SettingsScreen() {
           if (!cancelled) setAppSeconds(s);
         })
         .catch(() => {});
+      loadRecordings();
       return () => {
         cancelled = true;
       };
-    }, []),
+    }, [loadRecordings]),
   );
 
   if (!localUser) {
@@ -487,6 +499,35 @@ export default function SettingsScreen() {
             label="Activity"
             value={readingSeconds != null ? `${formatDuration(readingSeconds)} timed` : undefined}
             onPress={() => navigation.navigate('Activity')}
+          />
+          <Row
+            icon="mic-outline"
+            label="Recordings"
+            value={
+              recordings && recordings.count > 0
+                ? `${recordings.count} · ${formatBytes(recordings.bytes)}`
+                : 'None'
+            }
+            onPress={
+              recordings && recordings.count > 0
+                ? () =>
+                    Alert.alert(
+                      'Delete all recordings?',
+                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}) stored on this phone will be deleted. This can't be undone.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete all',
+                          style: 'destructive',
+                          onPress: async () => {
+                            await deleteRecordings(() => true);
+                            loadRecordings();
+                          },
+                        },
+                      ],
+                    )
+                : undefined
+            }
           />
           <Row
             icon="hourglass-outline"

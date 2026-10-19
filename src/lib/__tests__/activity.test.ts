@@ -324,3 +324,19 @@ describe('filter, sort and totals', () => {
     expect(sumActivity([])).toEqual({ revisedPages: 0, readingSeconds: 0, journalMinutes: 0, activeDays: 0 });
   });
 });
+
+describe('recordings in Activity', () => {
+  it('counts recordings per day and shows a day that only has a recording', () => {
+    const days = buildActivityDays({
+      logs: [],
+      readings: [],
+      journal: [],
+      recordingDays: ['2026-10-19', '2026-10-19', '2026-10-18', 'garbage'],
+    });
+    expect(days.map((d) => [d.date, d.recordings])).toEqual([
+      ['2026-10-19', 2],
+      ['2026-10-18', 1],
+    ]);
+    expect(isActivityDayEmpty(days[0])).toBe(false);
+  });
+});

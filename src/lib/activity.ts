@@ -22,12 +22,16 @@ export interface ActivityDay {
   readings: ReadingSession[];
   /** The daily-log entry, when it has any content. */
   journal: JournalEntry | null;
+  /** Voice recordings made that day (stored on this device). */
+  recordings?: number;
 }
 
 export interface ActivitySources {
   logs: RevisionLog[];
   readings: ReadingSession[];
   journal: JournalEntry[];
+  /** Revision day of each recording on this device. */
+  recordingDays?: string[];
 }
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -74,7 +78,7 @@ export function isRevisionActivity(log: RevisionLog): boolean {
 
 /** Merge the three sources into one entry per day, newest day first. */
 export function buildActivityDays(
-  { logs, readings, journal }: ActivitySources,
+  { logs, readings, journal, recordingDays = [] }: ActivitySources,
   user?: User | null,
 ): ActivityDay[] {
   const days = new Map<string, ActivityDay>();
@@ -99,6 +103,12 @@ export function buildActivityDays(
     if (!DAY_RE.test(entry.date) || isJournalEntryEmpty(entry)) continue;
     dayFor(entry.date).journal = entry;
   }
+  // A day with only a recording (e.g. recorded while reading, no timer) still shows.
+  for (const date of recordingDays) {
+    if (!DAY_RE.test(date)) continue;
+    const d = dayFor(date);
+    d.recordings = (d.recordings ?? 0) + 1;
+  }
 
   for (const d of days.values()) d.readings.sort((a, b) => a.startedAt - b.startedAt);
   return [...days.values()].sort(byDateDesc);
@@ -113,7 +123,9 @@ export function emptyActivityDay(date: string): ActivityDay {
 }
 
 export function isActivityDayEmpty(day: ActivityDay): boolean {
-  return day.revisions.length === 0 && day.readings.length === 0 && !day.journal;
+  return (
+    day.revisions.length === 0 && day.readings.length === 0 && !day.journal && !day.recordings
+  );
 }
 
 export interface ActivityDaySummary {

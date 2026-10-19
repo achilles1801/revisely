@@ -15,6 +15,8 @@ interface SessionBarProps {
   onBack: () => void;
   onToggleCurrent: () => void;
   onOverflow: () => void;
+  /** The record button. */
+  recordSlot?: React.ReactNode;
 }
 
 export function SessionBar({
@@ -25,6 +27,7 @@ export function SessionBar({
   onBack,
   onToggleCurrent,
   onOverflow,
+  recordSlot,
 }: SessionBarProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -49,6 +52,8 @@ export function SessionBar({
           </Text>
         </Text>
       </View>
+
+      {recordSlot}
 
       <PressableScale
         onPress={onToggleCurrent}

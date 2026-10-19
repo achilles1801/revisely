@@ -18,6 +18,7 @@ import { OptionSheet } from '../../components/OptionSheet';
 import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
 import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { ActivityDayCard } from '../../components/activity/ActivityDayCard';
+import { listRecordings } from '../../lib/recordings';
 import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -78,6 +79,7 @@ export default function ActivityScreen() {
   const [picker, setPicker] = useState<'filter' | 'sort' | null>(null);
 
   const { day: today } = useRevisionDay(user);
+  const [recordingDays, setRecordingDays] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     // Each source on its own, so one failing still shows the others.
@@ -85,6 +87,9 @@ export default function ActivityScreen() {
       firestoreService.getReadingSessions(),
       firestoreService.getJournalEntries(400),
     ]);
+    listRecordings()
+      .then((all) => setRecordingDays(all.map((rec) => rec.day)))
+      .catch((err) => logger.warn('Could not list recordings', err));
     if (r.status === 'fulfilled') setReadings(r.value);
     else logger.error('Failed to load reading sessions', r.reason);
     if (j.status === 'fulfilled') setJournal(j.value);
@@ -102,8 +107,8 @@ export default function ActivityScreen() {
   }, [load]);
 
   const days = useMemo(
-    () => buildActivityDays({ logs, readings, journal }, user),
-    [logs, readings, journal, user],
+    () => buildActivityDays({ logs, readings, journal, recordingDays }, user),
+    [logs, readings, journal, recordingDays, user],
   );
   // No backfill rows for days before the account existed.
   const firstDay = useMemo(() => journalFirstDay(user, days), [user, days]);

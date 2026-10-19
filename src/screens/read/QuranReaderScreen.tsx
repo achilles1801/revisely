@@ -18,6 +18,10 @@ import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
+import { RecordButton } from '../../components/recordings/RecordButton';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { useApp } from '../../context/AppContext';
 import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -61,6 +65,11 @@ export default function QuranReaderScreen() {
   const pagerRef = useRef<MushafPagerHandle>(null);
   const { timer, notePage } = useReadingTimer();
   // Hold a verse: highlight, Play (Husary), Translation. Recitation turns pages.
+  // Record yourself reading; saved under today's (revision day's) reading.
+  const { user } = useApp();
+  const { day: today } = useRevisionDay(user);
+  const recorder = useVoiceRecorder({ kind: 'reading', day: today, currentPage });
+
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
@@ -153,6 +162,15 @@ export default function QuranReaderScreen() {
             <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
           ) : null}
         </View>
+        <RecordButton
+          phase={recorder.phase}
+          startedAt={recorder.startedAt}
+          onStart={recorder.start}
+          onStop={recorder.stop}
+          color={palette.textSecondary}
+          background={palette.card}
+          border={palette.divider}
+        />
         {!guideSeen && (
           <Pressable
             onPress={() => setShowGuide(true)}
@@ -207,6 +225,11 @@ function ReaderGuideModal({
       icon: 'hand-left-outline',
       title: 'Hold a verse',
       body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
+    },
+    {
+      icon: 'mic-outline',
+      title: 'Record yourself',
+      body: 'Tap the mic to record your recitation. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'time-outline',

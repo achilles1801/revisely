@@ -28,6 +28,8 @@ import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
+import { RecordButton } from '../../components/recordings/RecordButton';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
@@ -123,6 +125,17 @@ export default function ActiveRevisionScreen() {
   // (scrollToPage never reports an advance).
   const pagerRef = useRef<MushafPagerHandle>(null);
   const sessionPages = useMemo(() => assignment?.pages ?? [], [assignment]);
+  // Record yourself reciting; page marks follow the page on screen.
+  const recorder = useVoiceRecorder({
+    kind: 'revision',
+    day: sessionDay,
+    currentPage:
+      currentPageNumber ??
+      assignment?.pages.find((p) => !alreadyRevisedToday.has(p)) ??
+      assignment?.pages[0] ??
+      null,
+  });
+
   const verseActions = useVerseActions({
     pages: sessionPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
@@ -547,6 +560,17 @@ export default function ActiveRevisionScreen() {
         onBack={handleSaveAndBack}
         onToggleCurrent={handleToggleCurrent}
         onOverflow={() => setMenuOpen(true)}
+        recordSlot={
+          <RecordButton
+            phase={recorder.phase}
+            startedAt={recorder.startedAt}
+            onStart={recorder.start}
+            onStop={recorder.stop}
+            color={theme.textPrimary}
+            background={theme.glass}
+            border={theme.border}
+          />
+        }
       />
 
       <View style={styles.viewerWrap}>
@@ -765,6 +789,11 @@ function RevisionGuideModal({
       icon: 'language-outline',
       title: 'Hold a verse',
       body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
+    },
+    {
+      icon: 'mic-outline',
+      title: 'Record yourself',
+      body: 'Tap the mic in the top bar to record your recitation and listen back later. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',
