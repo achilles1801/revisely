@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useScrollToTop } from '@react-navigation/native';
 import { GlassCard } from '../../components/GlassCard';
 import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { PressableScale } from '../../components/PressableScale';
@@ -38,6 +39,7 @@ import {
 } from '../../lib/quranData';
 import { getQuranPageImageUrl } from '../../lib/quranImages';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
+import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_OUTER_MARGIN = spacing.lg * 2;
@@ -93,6 +95,9 @@ export default function AlgorithmScreen() {
     juz: false,
   });
   const focusListRef = useRef<FlatList>(null);
+  // Tapping the Insights tab while on it scrolls back to the top.
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
 
   const toggleListExpansion = (mode: BrowseMode) => {
     setExpandedLists((prev) => ({ ...prev, [mode]: !prev[mode] }));
@@ -307,6 +312,7 @@ export default function AlgorithmScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         refreshControl={
@@ -1163,8 +1169,9 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    // Clearance for the floating tab bar (~76px pill+gap).
-    paddingBottom: 96,
+    // Clearance for the floating tab bar (~76px pill+gap) and the floating
+    // timer above it.
+    paddingBottom: 96 + FLOATING_TIMER_SIZE + spacing.sm,
   },
   loadingContainer: {
     flex: 1,

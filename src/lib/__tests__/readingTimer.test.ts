@@ -6,12 +6,10 @@ import {
   formatDuration,
   formatPageRanges,
   formatStopwatch,
-  isRevisionTimer,
   isTimerComplete,
   notePageVisited,
   noteRevisedPages,
   readingSessionFromTimer,
-  shouldAutoFinishRevisionTimer,
   parsePageRanges,
   pauseTimer,
   remainingMs,
@@ -103,15 +101,17 @@ describe('page ranges', () => {
 });
 
 describe('revision timer', () => {
-  it('defaults to a reading timer; revision is opt-in', () => {
-    expect(isRevisionTimer(startTimer('stopwatch', null, '2026-09-30', T0))).toBe(false);
-    expect(
-      isRevisionTimer(startTimer('stopwatch', null, '2026-09-30', T0, 'revision')),
-    ).toBe(true);
-    // Timers persisted before the purpose field existed read as reading timers.
+  it('defaults to a reading timer', () => {
+    expect(startTimer('stopwatch', null, '2026-09-30', T0).purpose).toBe('reading');
+  });
+
+  it('still saves a timer persisted before revision timing existed', () => {
+    // No purpose / pagesRevised fields: the shape stored by older versions.
     const legacy = { ...startTimer('stopwatch', null, '2026-09-30', T0) };
     delete legacy.purpose;
-    expect(isRevisionTimer(legacy)).toBe(false);
+    delete legacy.pagesRevised;
+    expect(readingSessionFromTimer(legacy, T0 + 60_000).pages).toEqual([]);
+    expect(noteRevisedPages(legacy, [5]).pagesRevised).toEqual([5]);
   });
 
   it('pausing and resuming across a break keeps only active time', () => {
@@ -127,16 +127,6 @@ describe('revision timer', () => {
     t = noteRevisedPages(t, [569, 568]);
     expect(t.pagesRevised).toEqual([568, 569, 570]);
     expect(noteRevisedPages(t, [569])).toBe(t);
-  });
-
-  it('auto-finishes only a revision timer, only once every page is revised', () => {
-    const revision = startTimer('stopwatch', null, '2026-09-30', T0, 'revision');
-    const reading = startTimer('stopwatch', null, '2026-09-30', T0);
-    expect(shouldAutoFinishRevisionTimer(revision, 9, 10)).toBe(false);
-    expect(shouldAutoFinishRevisionTimer(revision, 10, 10)).toBe(true);
-    expect(shouldAutoFinishRevisionTimer(reading, 10, 10)).toBe(false);
-    expect(shouldAutoFinishRevisionTimer(null, 10, 10)).toBe(false);
-    expect(shouldAutoFinishRevisionTimer(revision, 0, 0)).toBe(false);
   });
 
   it('saves revised pages and active time with the session', () => {

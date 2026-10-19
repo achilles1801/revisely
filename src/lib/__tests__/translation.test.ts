@@ -1,6 +1,6 @@
 jest.mock('expo-file-system', () => ({}));
 
-import { parsePageResponse } from '../translation';
+import { parsePageResponse, resolveTranslation, stripBismillah } from '../translation';
 
 describe('parsePageResponse', () => {
   it('maps the alquran.cloud page response', () => {
@@ -48,5 +48,20 @@ describe('getAyahTranslation', () => {
       'https://api.alquran.cloud/v1/page/51/en.sahih',
       'https://api.alquran.cloud/v1/ayah/3:9/en.sahih',
     ]);
+  });
+});
+
+describe('translations', () => {
+  it('falls back to Saheeh International for unknown or unavailable choices', () => {
+    expect(resolveTranslation(undefined).id).toBe('en.sahih');
+    expect(resolveTranslation('nope').id).toBe('en.sahih');
+    expect(resolveTranslation('en.khattab').id).toBe('en.sahih'); // not licensed yet
+  });
+
+  it('strips the basmala the API prefixes to first verses', () => {
+    const baqarah1 = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ الٓمٓ';
+    expect(stripBismillah(baqarah1, 2, 1)).toBe('الٓمٓ');
+    expect(stripBismillah(baqarah1, 1, 1)).toBe(baqarah1); // it is Al-Fatihah 1
+    expect(stripBismillah('ذَٰلِكَ ٱلْكِتَٰبُ', 2, 2)).toBe('ذَٰلِكَ ٱلْكِتَٰبُ');
   });
 });

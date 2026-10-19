@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   SafeAreaView,
@@ -6,11 +6,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { PressableScale } from '../../components/PressableScale';
-import { TimerButton } from '../../components/TimerButton';
 import { useTheme } from '../../context/ThemeContext';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
@@ -80,6 +80,9 @@ export default function ReadIndexScreen() {
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const [recent, setRecent] = useState<ReadingHistoryEntry[]>([]);
+  // Tapping the Read tab while on it scrolls the index back to the top.
+  const listRef = useRef<FlatList<JuzGroup>>(null);
+  useScrollToTop(listRef);
 
   const refreshRecent = useCallback(async () => {
     const entries = await getRecentReadingPages(3);
@@ -127,17 +130,6 @@ export default function ReadIndexScreen() {
     <View style={styles.headerWrap}>
       <View style={styles.titleRow}>
         <Text style={styles.displayTitle}>Surahs</Text>
-        <TimerButton
-          onPress={() => navigation.navigate('ReadingTimer')}
-          color={palette.textPrimary}
-          activeColor={palette.textPrimary}
-          activeBg={palette.card}
-          idle={
-            <View style={styles.timerIdle}>
-              <Ionicons name="stopwatch-outline" size={20} color={palette.textPrimary} />
-            </View>
-          }
-        />
       </View>
 
       {recent.length > 0 && (
@@ -162,12 +154,18 @@ export default function ReadIndexScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        ref={listRef}
         data={juzGroups}
+        // Long list: keep the scroll indicator visible, in a colour that
+        // reads on both the black and white Read palettes.
+        showsVerticalScrollIndicator
+        indicatorStyle={isDark ? 'white' : 'black'}
         keyExtractor={(item) => `juz-group-${item.juz}`}
         ListHeaderComponent={header}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: tabFootprint + spacing.xl },
+          // Room for the floating timer above the tab bar.
+          { paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + spacing.xl },
         ]}
         renderItem={({ item }) => (
           <View style={styles.section}>
@@ -281,14 +279,6 @@ const makeStyles = (palette: ReadPalette) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: spacing.sm,
-    },
-    timerIdle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: palette.card,
     },
     headerWrap: { paddingTop: spacing.xs, paddingBottom: spacing.xs },
     displayTitle: {

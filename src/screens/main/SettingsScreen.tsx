@@ -37,6 +37,9 @@ import { scheduleDailyReminder } from '../../lib/notifications';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
+import { avatarInitial } from '../../lib/displayName';
+import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
+import { formatBytes } from '../../lib/recordingFormat';
 import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
@@ -124,7 +127,12 @@ function Row({
         <Text style={[typography.bodyMedium, { color: labelColor }]}>{label}</Text>
       </View>
       {value !== undefined && (
-        <Text style={[typography.bodyMedium, { color: theme.textSecondary }]} numberOfLines={1}>
+        // Shrinks (with an ellipsis) before the label does, and never takes
+        // more than about half the row, so a long name can't hide the label.
+        <Text
+          style={[typography.bodyMedium, styles.rowValue, { color: theme.textSecondary }]}
+          numberOfLines={1}
+        >
           {value}
         </Text>
       )}
@@ -238,6 +246,15 @@ export default function SettingsScreen() {
   const homePrefs = useHomePrefs();
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
+  const [recordings, setRecordings] = useState<{ count: number; bytes: number } | null>(null);
+
+  const loadRecordings = useCallback(() => {
+    listRecordings()
+      .then((list) =>
+        setRecordings({ count: list.length, bytes: list.reduce((sum, r) => sum + r.sizeBytes, 0) }),
+      )
+      .catch(() => setRecordings(null));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -253,10 +270,11 @@ export default function SettingsScreen() {
           if (!cancelled) setAppSeconds(s);
         })
         .catch(() => {});
+      loadRecordings();
       return () => {
         cancelled = true;
       };
-    }, []),
+    }, [loadRecordings]),
   );
 
   if (!localUser) {
@@ -438,24 +456,25 @@ export default function SettingsScreen() {
             >
               <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
                 <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
-                  {(localUser.name ?? firebaseUser.email ?? '?')
-                    .trim()
-                    .charAt(0)
-                    .toUpperCase()}
+                  {avatarInitial(localUser.name, firebaseUser.email)}
                 </Text>
               </View>
-              <View style={{ flex: 1, marginLeft: spacing.md }}>
-                {localUser.name && (
+              <View style={{ flex: 1, minWidth: 0, marginLeft: spacing.md }}>
+                {/* Long names wrap to a second line before shrinking or cutting. */}
+                {localUser.name?.trim() ? (
                   <Text
                     style={[typography.titleMedium, { color: theme.textPrimary }]}
-                    numberOfLines={1}
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
                   >
-                    {localUser.name}
+                    {localUser.name.trim()}
                   </Text>
-                )}
+                ) : null}
                 <Text
                   style={[typography.bodySmall, { color: theme.textSecondary }]}
                   numberOfLines={1}
+                  ellipsizeMode="middle"
                 >
                   {firebaseUser.email}
                 </Text>
@@ -476,10 +495,40 @@ export default function SettingsScreen() {
 
         <Section title="Activity">
           <Row
-            icon="stopwatch-outline"
-            label="Reading sessions"
-            value={readingSeconds != null ? formatDuration(readingSeconds) : undefined}
-            onPress={() => navigation.navigate('ReadingSessions')}
+            icon="pulse-outline"
+            label="Activity"
+            value={readingSeconds != null ? `${formatDuration(readingSeconds)} timed` : undefined}
+            onPress={() => navigation.navigate('Activity')}
+          />
+          <Row
+            icon="mic-outline"
+            label="Recordings"
+            value={
+              recordings && recordings.count > 0
+                ? `${recordings.count} · ${formatBytes(recordings.bytes)}`
+                : 'None'
+            }
+            onPress={
+              recordings && recordings.count > 0
+                ? () =>
+                    Alert.alert(
+                      'Delete all recordings?',
+                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}) stored on this phone will be deleted. This can't be undone.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete all',
+                          style: 'destructive',
+                          onPress: async () => {
+                            // The whole folder, including any file not in the index.
+                            await deleteAllRecordings();
+                            loadRecordings();
+                          },
+                        },
+                      ],
+                    )
+                : undefined
+            }
           />
           <Row
             icon="hourglass-outline"
@@ -498,7 +547,6 @@ export default function SettingsScreen() {
           <Row
             icon="stats-chart-outline"
             label="Progress card"
-            isLast={!homePrefs.showProgressCard}
             rightSlot={
               <Switch
                 value={homePrefs.showProgressCard}
@@ -516,7 +564,6 @@ export default function SettingsScreen() {
                   key={metric}
                   label={HOME_METRIC_LABELS[metric]}
                   onPress={() => toggleHomeMetric(metric)}
-                  isLast={i === ALL_HOME_METRICS.length - 1}
                   rightSlot={
                     <Ionicons
                       name="checkmark"
@@ -527,6 +574,19 @@ export default function SettingsScreen() {
                 />
               );
             })}
+          <Row
+            icon="book-outline"
+            label="Friday Al-Kahf reminder"
+            isLast
+            rightSlot={
+              <Switch
+                value={homePrefs.fridayKahfReminder}
+                onValueChange={(v) => setHomePrefs({ fridayKahfReminder: v })}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            }
+          />
         </Section>
 
         <Section title="Day boundary">
@@ -980,6 +1040,11 @@ const styles = StyleSheet.create({
   },
   rowText: {
     flex: 1,
+  },
+  rowValue: {
+    flexShrink: 1,
+    maxWidth: '55%',
+    textAlign: 'right',
   },
   segmented: {
     flexDirection: 'row',

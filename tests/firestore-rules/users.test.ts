@@ -140,6 +140,12 @@ describe('users/{userId}', () => {
       );
     });
 
+    it('owner can choose a translation', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { translationId: 'en.sahih' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { translationId: 7 } as any));
+    });
+
     it('owner can clear carryOver', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { carryOver: null }));

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import AlgorithmScreen from '../screens/main/AlgorithmScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
@@ -11,19 +12,22 @@ import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
-import JournalScreen from '../screens/journal/JournalScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
-import ReadingTimerScreen from '../screens/timer/ReadingTimerScreen';
-import ReadingSessionsScreen from '../screens/timer/ReadingSessionsScreen';
+import ActivityScreen from '../screens/activity/ActivityScreen';
+import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
+import { FloatingTimer } from '../components/timer/FloatingTimer';
+import { FloatingTimerProvider } from '../components/timer/floatingTimerOffset';
 import { useAppUsageTracking } from '../lib/appUsage';
 import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
 export type MainTabParamList = {
-  Home: undefined;
-  Read: undefined;
+  // Non-screen code (the timer) opens a day of Activity on the Home stack.
+  Home: NavigatorScreenParams<HomeStackParamList> | undefined;
+  // Home opens the reader directly for the Friday Al-Kahf card.
+  Read: NavigatorScreenParams<ReadStackParamList> | undefined;
   Insights: undefined;
 };
 
@@ -37,17 +41,18 @@ export type HomeStackParamList = {
   // through a context or store.
   PlanEdit: { editedDay?: { index: number; pages: number[] } } | undefined;
   PlanDayEdit: { dayIndex: number; initialPages: number[] };
-  Journal: undefined;
-  // date is YYYY-MM-DD; omitted means "today" (fajr-aware revision day).
+  // Revision sessions, timed sessions and the daily log, day by day.
+  Activity: undefined;
+  // date is a revision day, YYYY-MM-DD.
+  ActivityDay: { date: string };
+  // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
+  // revision day).
   JournalEntry: { date?: string } | undefined;
-  ReadingTimer: undefined;
-  ReadingSessions: undefined;
 };
 
 export type ReadStackParamList = {
   ReadIndex: undefined;
   QuranReader: { pageNumber: number; source?: 'index' | 'recent' };
-  ReadingTimer: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -62,7 +67,6 @@ const HIDE_TAB_BAR_ON = new Set([
   'ActiveRevision',
   'QuranReader',
   'JournalEntry',
-  'ReadingTimer',
 ]);
 
 function HomeStackNavigator() {
@@ -80,10 +84,9 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
       <HomeStack.Screen name="PlanEdit" component={PlanEditScreen} />
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
-      <HomeStack.Screen name="Journal" component={JournalScreen} />
+      <HomeStack.Screen name="Activity" component={ActivityScreen} />
+      <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
-      <HomeStack.Screen name="ReadingTimer" component={ReadingTimerScreen} />
-      <HomeStack.Screen name="ReadingSessions" component={ReadingSessionsScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -99,7 +102,6 @@ function ReadStackNavigator() {
     >
       <ReadStack.Screen name="ReadIndex" component={ReadIndexScreen} />
       <ReadStack.Screen name="QuranReader" component={QuranReaderScreen} />
-      <ReadStack.Screen name="ReadingTimer" component={ReadingTimerScreen} />
     </ReadStack.Navigator>
   );
 }
@@ -117,31 +119,37 @@ export function MainNavigator() {
 
   return (
     <ReadingTimerProvider>
-      <Tab.Navigator
-        tabBar={(props) => {
-          // Hide the tab bar on full-screen "deep" screens — they own the
-          // bottom edge (Done buttons, save bars, FABs) and would otherwise
-          // collide with the floating glass bar.
-          const tabRoute = props.state.routes[props.state.index];
-          const focused = getFocusedRouteNameFromRoute(tabRoute);
-          if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
-          return (
-            <LiquidGlassTabBar
-              {...props}
-              showInsightsTab={showInsightsTab}
-              glowInsightsTab={glowInsightsTab}
-              onInsightsTabPress={
-                glowInsightsTab ? () => setPreviewOpen(true) : undefined
-              }
-            />
-          );
-        }}
-        screenOptions={{ headerShown: false }}
-      >
-        <Tab.Screen name="Home" component={HomeStackNavigator} />
-        <Tab.Screen name="Read" component={ReadStackNavigator} />
-        <Tab.Screen name="Insights" component={AlgorithmScreen} />
-      </Tab.Navigator>
+      <FloatingTimerProvider>
+        <View style={{ flex: 1 }}>
+          <Tab.Navigator
+            tabBar={(props) => {
+              // Hide the tab bar on full-screen "deep" screens — they own the
+              // bottom edge (Done buttons, save bars, FABs) and would otherwise
+              // collide with the floating glass bar.
+              const tabRoute = props.state.routes[props.state.index];
+              const focused = getFocusedRouteNameFromRoute(tabRoute);
+              if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
+              return (
+                <LiquidGlassTabBar
+                  {...props}
+                  showInsightsTab={showInsightsTab}
+                  glowInsightsTab={glowInsightsTab}
+                  onInsightsTabPress={
+                    glowInsightsTab ? () => setPreviewOpen(true) : undefined
+                  }
+                />
+              );
+            }}
+            screenOptions={{ headerShown: false }}
+          >
+            <Tab.Screen name="Home" component={HomeStackNavigator} />
+            <Tab.Screen name="Read" component={ReadStackNavigator} />
+            <Tab.Screen name="Insights" component={AlgorithmScreen} />
+          </Tab.Navigator>
+          {/* The one timer entry point, over every tab (same state everywhere). */}
+          <FloatingTimer />
+        </View>
+      </FloatingTimerProvider>
       <SmartTrackingPreviewScreen
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}

@@ -61,3 +61,25 @@ jest.mock('expo-notifications', () => ({
   cancelAllScheduledNotificationsAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
 }));
+
+// expo-audio is a native module; tests that exercise playback mock it themselves.
+jest.mock('expo-audio', () => ({
+  AudioQuality: { MIN: 0, LOW: 32, MEDIUM: 64, HIGH: 96, MAX: 127 },
+  IOSOutputFormat: { MPEG4AAC: 'aac ' },
+  useAudioRecorder: jest.fn(() => ({
+    uri: null,
+    prepareToRecordAsync: jest.fn(() => Promise.resolve()),
+    record: jest.fn(),
+    stop: jest.fn(() => Promise.resolve()),
+  })),
+  getRecordingPermissionsAsync: jest.fn(() => Promise.resolve({ granted: false, canAskAgain: true })),
+  requestRecordingPermissionsAsync: jest.fn(() => Promise.resolve({ granted: false })),
+  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+  createAudioPlayer: jest.fn(() => ({
+    replace: jest.fn(),
+    play: jest.fn(),
+    pause: jest.fn(),
+    remove: jest.fn(),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+  })),
+}));

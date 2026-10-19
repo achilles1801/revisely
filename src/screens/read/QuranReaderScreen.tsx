@@ -15,8 +15,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
-import { MushafPager } from '../../components/MushafPager';
-import { TimerButton } from '../../components/TimerButton';
+import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
+import { MushafScrubber } from '../../components/MushafScrubber';
+import { useVerseActions } from '../../components/verse/useVerseActions';
+import { RecordButton } from '../../components/recordings/RecordButton';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { useApp } from '../../context/AppContext';
+import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
@@ -38,6 +44,8 @@ type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
 
 const ALL_PAGES: number[] = Array.from({ length: 604 }, (_, i) => i + 1);
 const SETTLE_DEBOUNCE_MS = 1500;
+// Just above the scrubber and page number at the bottom.
+const PLAYER_BOTTOM = 96;
 const READER_GUIDE_DISMISSED_KEY = '@revisley_reader_guide_dismissed';
 
 export default function QuranReaderScreen() {
@@ -54,7 +62,33 @@ export default function QuranReaderScreen() {
   const [guideSeen, setGuideSeen] = useState(true);
 
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pagerRef = useRef<MushafPagerHandle>(null);
   const { timer, notePage } = useReadingTimer();
+  // Hold a verse: highlight, Play (Husary), Translation. Recitation turns pages.
+  // Record yourself reading; saved under today's (revision day's) reading.
+  const { user } = useApp();
+  const { day: today } = useRevisionDay(user);
+  const recorder = useVoiceRecorder({ kind: 'reading', day: today, currentPage });
+
+  // Opened again with another page while already open (e.g. the Friday
+  // Al-Kahf card): the stack updates this screen's params instead of pushing.
+  const requestedPage = route.params.pageNumber;
+  const lastRequestedRef = useRef(requestedPage);
+  useEffect(() => {
+    if (requestedPage === lastRequestedRef.current) return;
+    lastRequestedRef.current = requestedPage;
+    pagerRef.current?.scrollToPage(requestedPage);
+  }, [requestedPage]);
+
+  const verseActions = useVerseActions({
+    pages: ALL_PAGES,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    playerBottom: PLAYER_BOTTOM,
+    currentPage,
+  });
+  // The floating timer sits above the page scrubber, and above the
+  // now-playing bar while a recitation is on.
+  useFloatingTimerOffset(verseActions.playerVisible ? PLAYER_BOTTOM + 64 : PLAYER_BOTTOM);
 
   useEffect(() => {
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
@@ -83,6 +117,12 @@ export default function QuranReaderScreen() {
     [notePage],
   );
 
+  // The pager reports the jump through onPageChange, so history and the
+  // timer's page credit work exactly as they do for a swipe.
+  const handleJump = useCallback((pageNumber: number) => {
+    pagerRef.current?.scrollToPage(pageNumber);
+  }, []);
+
   // Credit the page the reader opened on (and the current page whenever a
   // session starts while reading).
   const timerRunning = timer?.runningSince != null;
@@ -107,9 +147,12 @@ export default function QuranReaderScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <MushafPager
+        ref={pagerRef}
         pages={ALL_PAGES}
         initialPage={initialPage}
         onPageChange={handlePageChange}
+        onLongPressAyah={verseActions.onLongPressAyah}
+        highlightedAyah={verseActions.highlightedAyah}
       />
 
       <View style={styles.topBar} pointerEvents="box-none">
@@ -129,11 +172,14 @@ export default function QuranReaderScreen() {
             <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
           ) : null}
         </View>
-        <TimerButton
-          onPress={() => navigation.navigate('ReadingTimer')}
+        <RecordButton
+          phase={recorder.phase}
+          startedAt={recorder.startedAt}
+          onStart={recorder.start}
+          onStop={recorder.stop}
           color={palette.textSecondary}
-          activeColor={palette.textPrimary}
-          activeBg={palette.card}
+          background={palette.card}
+          border={palette.divider}
         />
         {!guideSeen && (
           <Pressable
@@ -147,9 +193,14 @@ export default function QuranReaderScreen() {
         )}
       </View>
 
-      <View style={styles.footer} pointerEvents="none">
-        <Text style={styles.pageNum}>{currentPage}</Text>
+      <View style={styles.footer} pointerEvents="box-none">
+        <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
+        <Text style={styles.pageNum} pointerEvents="none">
+          {currentPage}
+        </Text>
       </View>
+
+      {verseActions.overlay}
 
       <ReaderGuideModal
         visible={showGuide}
@@ -178,7 +229,17 @@ function ReaderGuideModal({
     {
       icon: 'book-outline',
       title: 'Swipe to turn pages',
-      body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book.',
+      body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book. Drag the bar at the bottom to jump anywhere — page 1 is at the right.',
+    },
+    {
+      icon: 'hand-left-outline',
+      title: 'Hold a verse',
+      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
+    },
+    {
+      icon: 'mic-outline',
+      title: 'Record yourself',
+      body: 'Tap the mic to record your recitation. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'time-outline',
@@ -302,6 +363,7 @@ const makeStyles = (palette: ReadPalette) =>
       right: 0,
       bottom: 0,
       paddingBottom: spacing.xl,
+      paddingHorizontal: spacing.lg,
       alignItems: 'center',
     },
     pageNum: {

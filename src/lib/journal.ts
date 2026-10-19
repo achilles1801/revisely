@@ -1,5 +1,6 @@
-import { JournalEntry } from '../types';
+import { JournalEntry, User } from '../types';
 import { getSurahsForPage } from './quranData';
+import { getRevisionDayForUser } from './fajrBoundary';
 
 // Limits mirrored in firestore.rules — keep them in sync.
 export const JOURNAL_TEXT_MAX = 200;
@@ -90,17 +91,54 @@ export function formatJournalDayRelative(date: string, today: string): string {
  * The last `count` days ending at `today`, newest first, each paired with its
  * entry if one exists. Used so recent days without an entry still show up as
  * rows the user can tap to backfill.
+ *
+ * Days before `firstDay` (the revision day the account was created) are left
+ * out unless they somehow have an entry: a new user should not be shown blank
+ * rows for days before they signed up. Today is always included.
  */
 export function recentJournalDays(
   entries: JournalEntry[],
   today: string,
   count: number,
+  firstDay?: string | null,
 ): { date: string; entry: JournalEntry | null }[] {
   const byDate = new Map(entries.map((e) => [e.date, e]));
-  return Array.from({ length: count }, (_, i) => {
+  const days: { date: string; entry: JournalEntry | null }[] = [];
+  for (let i = 0; i < count; i++) {
     const date = shiftDay(today, -i);
-    return { date, entry: byDate.get(date) ?? null };
-  });
+    const entry = byDate.get(date) ?? null;
+    if (i > 0 && firstDay && date < firstDay && !entry) continue;
+    days.push({ date, entry });
+  }
+  return days;
+}
+
+/**
+ * The revision day ('YYYY-MM-DD') the user's account was created on, or null
+ * when `createdAt` is missing or unparseable (then nothing is hidden). Uses
+ * the same fajr boundary as "today", so signing up at 2am before fajr counts
+ * as the previous day, exactly like a log written at that moment would.
+ */
+export function journalFirstDay(
+  user: Pick<User, 'createdAt' | 'fajrBoundaryEnabled' | 'locationCoords' | 'fajrCalculationMethod'> | null | undefined,
+  entries: { date: string }[] = [],
+): string | null {
+  if (!user?.createdAt) return null;
+  const created = new Date(user.createdAt);
+  if (isNaN(created.getTime())) return null;
+  const signUpDay = getRevisionDayForUser(user as User, created);
+  // A missing createdAt reads as "now" (timestampToISOString), so never start
+  // after the oldest entry: those days are clearly part of the account.
+  const oldest = entries.reduce<string | null>(
+    (min, e) => (min == null || e.date < min ? e.date : min),
+    null,
+  );
+  return oldest != null && oldest < signUpDay ? oldest : signUpDay;
+}
+
+/** True when the log has no entry with any content in it. */
+export function hasNoJournalContent(entries: JournalEntry[]): boolean {
+  return entries.every(isJournalEntryEmpty);
 }
 
 /** Totals over entries dated within the `days`-day window ending at `today`. */

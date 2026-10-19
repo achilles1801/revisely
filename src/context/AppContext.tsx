@@ -23,6 +23,7 @@ import {
 } from '../lib/schedulePersistence';
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
+import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -57,6 +58,7 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     carryOverMode: fsUser.carryOverMode,
     carryOver: fsUser.carryOver,
     scheduleShiftPages: fsUser.scheduleShiftPages,
+    translationId: fsUser.translationId,
   };
 }
 
@@ -378,6 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...(updatedUser.scheduleShiftPages !== undefined && {
           scheduleShiftPages: updatedUser.scheduleShiftPages,
         }),
+        ...(updatedUser.translationId !== undefined && { translationId: updatedUser.translationId }),
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore
@@ -744,6 +747,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await firestoreService.deleteSession(logId);
+      // A session's id is its revision day; its recordings go with it. Awaited
+      // so a recordings list refreshed afterwards no longer shows them.
+      await deleteRecordings(isRevisionRecordingOf(logId)).catch((err) =>
+        logger.warn('Could not delete session recordings', err),
+      );
 
       // Refresh logs
       const sessions = await firestoreService.getRecentSessions(100);
@@ -762,6 +770,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await Promise.all(logIds.map((id) => firestoreService.deleteSession(id)));
+      await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch(
+        (err) => logger.warn('Could not delete session recordings', err),
+      );
 
       // Refresh logs once after all deletions
       const sessions = await firestoreService.getRecentSessions(100);

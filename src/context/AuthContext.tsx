@@ -9,10 +9,12 @@ import {
   signInWithGoogleCredential,
   signInWithAppleCredential,
 } from '../lib/firebase';
+import { getAuth } from 'firebase/auth';
 import * as firestoreService from '../services/firestoreService';
 import { signOutGoogle } from '../lib/googleAuth';
 import { identifyUser } from '../lib/sentry';
 import { logger } from '../lib/logger';
+import { deleteAllRecordings } from '../lib/recordings';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -176,8 +178,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deleteAccount = async () => {
     setIsLoading(true);
     setError(null);
+    const uid = getAuth().currentUser?.uid;
     try {
       await firestoreService.deleteAccount();
+      // Recordings live only on this phone; they go with the account.
+      if (uid) {
+        deleteAllRecordings(uid).catch((err) => logger.warn('Could not delete recordings', err));
+      }
       // signOutUser is implicit — Firebase Auth user is gone, onAuthStateChanged
       // fires with null. We sign out locally to be sure.
       try {

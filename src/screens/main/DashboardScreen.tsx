@@ -10,7 +10,7 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
@@ -19,9 +19,15 @@ import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
 import { Button } from '../../components/Button';
 import { PressableScale } from '../../components/PressableScale';
 import { EditSessionModal } from '../../components/EditSessionModal';
-import { TimerButton } from '../../components/TimerButton';
+import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { ProgressSummaryCard } from '../../components/home/ProgressSummaryCard';
-import { useHomePrefs } from '../../lib/homePrefs';
+import { Greeting } from '../../components/home/Greeting';
+import { KahfCard } from '../../components/home/KahfCard';
+import { greetingName } from '../../lib/displayName';
+import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
+import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
+import * as firestoreService from '../../services/firestoreService';
+import { logger } from '../../lib/logger';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -41,7 +47,7 @@ import {
 } from '../../lib/quranData';
 import { formatDateReadable } from '../../lib/utils';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
-import { RevisionLog } from '../../types';
+import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
@@ -63,6 +69,10 @@ export default function DashboardScreen() {
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
   const carryingRef = useRef(false);
+  // Tapping the Home tab while on Home scrolls back to the top (and from a
+  // pushed screen, the stack pops back here first).
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
@@ -169,7 +179,7 @@ export default function DashboardScreen() {
     () =>
       logs
         .filter((l) => l.pagesRevised.length > 0)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [logs],
   );
 
@@ -180,12 +190,15 @@ export default function DashboardScreen() {
     );
   }, [sessionLogs, juzFilter]);
 
+  // Only a juz filter or bulk selection expands in place; otherwise "See all"
+  // opens Activity.
+  const expandInPlace = sessionsExpanded && (juzFilter !== null || selectionMode);
   const visibleSessions = useMemo(
     () =>
-      sessionsExpanded
+      expandInPlace
         ? filteredSessions
         : filteredSessions.slice(0, COMPACT_SESSION_LIMIT),
-    [filteredSessions, sessionsExpanded],
+    [filteredSessions, expandInPlace],
   );
 
   const availableJuz = useMemo(() => {
@@ -196,7 +209,48 @@ export default function DashboardScreen() {
     return Array.from(set).sort((a, b) => a - b);
   }, [sessionLogs]);
 
-  const userName = user?.name || firebaseUser?.displayName || '';
+  const userName = greetingName(user?.name, firebaseUser?.displayName);
+
+  // Friday: suggest Surah Al-Kahf. Today's reading sessions tell whether it
+  // was already read; they are only fetched on Fridays with the card on.
+  const kahfDay = isKahfDay(revisionDay);
+  const kahfEnabled = homePrefs.fridayKahfReminder;
+  const [readingSessions, setReadingSessions] = useState<ReadingSession[]>([]);
+  const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
+  const [kahfSaving, setKahfSaving] = useState(false);
+  const kahfSavingRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!kahfDay || !kahfEnabled) return;
+      let live = true;
+      firestoreService
+        .getReadingSessions(20)
+        .then((s) => {
+          if (live) setReadingSessions(s);
+        })
+        .catch((err) => logger.warn('Failed to load reading sessions for Al-Kahf', err))
+        .finally(() => {
+          if (live) setSessionsLoadedFor(revisionDay);
+        });
+      return () => {
+        live = false;
+      };
+    }, [kahfDay, kahfEnabled, revisionDay]),
+  );
+  const kahfDone = useMemo(
+    () => kahfReadOn(revisionDay, readingSessions, logs),
+    [revisionDay, readingSessions, logs],
+  );
+  const kahfState = kahfCardState({
+    enabled: kahfEnabled,
+    today: revisionDay,
+    dismissedDay: homePrefs.kahfDismissedDay,
+    done: kahfDone,
+  });
+  // Until today's sessions are in, a prompt might be about to turn into
+  // "Read ✓"; wait rather than flash it.
+  const showKahfCard =
+    kahfState === 'done' || (kahfState === 'prompt' && sessionsLoadedFor === revisionDay);
 
   if (!user || !assignment) {
     return (
@@ -358,6 +412,40 @@ export default function DashboardScreen() {
     }
   };
 
+  const openKahf = () => {
+    navigation.getParent()?.navigate('Read', {
+      screen: 'QuranReader',
+      params: { pageNumber: kahfPages()[0] },
+      // Keep the surah index beneath it, so back lands on the Read tab's root.
+      initial: false,
+    });
+  };
+
+  const markKahfRead = async (minutes: number) => {
+    // The ref stops a second tap before the state update re-renders.
+    if (kahfSavingRef.current) return;
+    kahfSavingRef.current = true;
+    setKahfSaving(true);
+    const session = kahfReadingSession(revisionDay, minutes, Date.now());
+    const write = firestoreService.addReadingSession(session);
+    try {
+      // Offline, the write is queued and only settles when the server acks
+      // (as with the reading timer): show it as read after a few seconds.
+      const id = await Promise.race([
+        write,
+        new Promise<string>((resolve) => setTimeout(() => resolve(`pending-${session.startedAt}`), 6000)),
+      ]);
+      setReadingSessions((prev) => [{ ...session, id }, ...prev]);
+    } catch (err) {
+      logger.error('Failed to save Al-Kahf reading session', err);
+      Alert.alert("Couldn't save", 'Please try again.');
+    } finally {
+      kahfSavingRef.current = false;
+      setKahfSaving(false);
+    }
+    write.catch((err) => logger.error('Al-Kahf reading session write failed', err));
+  };
+
   const handleCarryOver = async () => {
     // The ref stops a double tap before the state update re-renders.
     if (!user || carryingRef.current || leftovers.length === 0) return;
@@ -479,6 +567,7 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         refreshControl={
@@ -492,44 +581,22 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.date}>{formatDateReadable(today)}</Text>
-            <View style={styles.greetingRow}>
-              {userName ? (
-                <Text
-                  style={styles.greetingName}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {userName}
-                </Text>
-              ) : null}
-              <Text style={styles.greetingArabic}>السلام عليكم</Text>
-            </View>
+            <Greeting name={userName} />
           </View>
           <PressableScale
-            onPress={() => navigation.navigate('Journal')}
+            onPress={() => navigation.navigate('Activity')}
             haptic="light"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Open daily log"
+            accessibilityLabel="Open activity"
           >
             <GlassCard style={styles.settingsButton}>
               <Ionicons
-                name="journal-outline"
+                name="pulse-outline"
                 size={20}
                 color={theme.textPrimary}
               />
             </GlassCard>
           </PressableScale>
-          <TimerButton
-            onPress={() => navigation.navigate('ReadingTimer')}
-            color={theme.textPrimary}
-            activeColor={theme.accent}
-            activeBg={theme.accent + '22'}
-            idle={
-              <GlassCard style={styles.settingsButton}>
-                <Ionicons name="stopwatch-outline" size={20} color={theme.textPrimary} />
-              </GlassCard>
-            }
-          />
           <PressableScale
             onPress={() => navigation.navigate('Settings')}
             haptic="light"
@@ -553,6 +620,16 @@ export default function DashboardScreen() {
             {renderHeroContent()}
           </GlassCard>
         </View>
+
+        {showKahfCard && (
+          <KahfCard
+            state={kahfState === 'done' ? 'done' : 'prompt'}
+            saving={kahfSaving}
+            onRead={openKahf}
+            onMarkRead={markKahfRead}
+            onDismiss={() => setHomePrefs({ kahfDismissedDay: revisionDay })}
+          />
+        )}
 
         {homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized') && (
           <View style={styles.progressCardWrap}>
@@ -625,25 +702,38 @@ export default function DashboardScreen() {
               </GlassCard>
             )}
 
-            {showSeeAllToggle && (
-              <PressableScale
-                onPress={() => setSessionsExpanded((v) => !v)}
-                haptic="light"
-                scale={0.99}
-                style={styles.seeAllBtn}
-              >
-                <Text style={styles.seeAllText}>
-                  {sessionsExpanded
-                    ? 'Show less'
-                    : `See all ${filteredSessions.length}`}
-                </Text>
-                <Ionicons
-                  name={sessionsExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                  color={theme.accent}
-                />
-              </PressableScale>
-            )}
+            {/* The full history lives in Activity. A juz filter or bulk
+                selection still expands in place, since Activity has neither. */}
+            {showSeeAllToggle &&
+              (juzFilter === null && !selectionMode ? (
+                <PressableScale
+                  onPress={() => navigation.navigate('Activity')}
+                  haptic="light"
+                  scale={0.99}
+                  style={styles.seeAllBtn}
+                >
+                  <Text style={styles.seeAllText}>See all in Activity</Text>
+                  <Ionicons name="chevron-forward" size={16} color={theme.accent} />
+                </PressableScale>
+              ) : (
+                <PressableScale
+                  onPress={() => setSessionsExpanded((v) => !v)}
+                  haptic="light"
+                  scale={0.99}
+                  style={styles.seeAllBtn}
+                >
+                  <Text style={styles.seeAllText}>
+                    {expandInPlace
+                      ? 'Show less'
+                      : `See all ${filteredSessions.length}`}
+                  </Text>
+                  <Ionicons
+                    name={expandInPlace ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={theme.accent}
+                  />
+                </PressableScale>
+              ))}
           </View>
         )}
       </ScrollView>
@@ -768,7 +858,9 @@ function SessionRow({
 
   const juzLabel = formatJuzLabel(juzNumbers);
   const surahLabel = formatSurahLabel(surahNames);
-  const logDate = new Date(log.date);
+  // 'YYYY-MM-DD' parsed as a local date; new Date(log.date) is UTC midnight,
+  // which shows the previous day west of Greenwich.
+  const logDate = parseLocalDay(log.date);
   const monthDay = logDate.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -807,6 +899,11 @@ function SessionRow({
       </View>
     </PressableScale>
   );
+}
+
+function parseLocalDay(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function formatJuzLabel(juzNumbers: number[]): string {
@@ -904,9 +1001,10 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       flexGrow: 1,
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
-      // Clearance for the floating tab bar (~76px pill+gap) so content
-      // scrolls behind it without being permanently hidden.
-      paddingBottom: 96,
+      // Clearance for the floating tab bar (~76px pill+gap) and the floating
+      // timer above it, so content scrolls behind them without being
+      // permanently hidden.
+      paddingBottom: 96 + FLOATING_TIMER_SIZE + spacing.sm,
     },
     loadingContainer: {
       flex: 1,
@@ -936,31 +1034,14 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       marginBottom: spacing.xl,
       gap: spacing.sm,
     },
-    headerText: { flex: 1, alignItems: 'flex-start' },
+    // minWidth 0 lets the text column shrink beside the fixed-size buttons
+    // instead of pushing them off screen.
+    headerText: { flex: 1, minWidth: 0, alignItems: 'stretch' },
     date: {
       ...typography.label,
       color: theme.textMuted,
       marginBottom: spacing.xxs,
       textAlign: 'left',
-    },
-    greetingRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: spacing.sm,
-    },
-    greetingArabic: {
-      ...typography.displaySmall,
-      color: theme.textPrimary,
-      textAlign: 'left',
-      writingDirection: 'ltr',
-      // Arabic salam stays at full size; the name (left) shrinks first.
-      flexShrink: 0,
-    },
-    greetingName: {
-      ...typography.displaySmall,
-      color: theme.textPrimary,
-      textAlign: 'left',
-      flexShrink: 1,
     },
     settingsButton: {
       width: 36,

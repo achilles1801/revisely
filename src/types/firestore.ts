@@ -182,6 +182,8 @@ export interface FirestoreUser {
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   /** Pages the schedule has been moved back by carry-overs. */
   scheduleShiftPages?: number;
+  /** Translation shown when holding a verse. */
+  translationId?: string;
 }
 
 /**
@@ -228,6 +230,7 @@ export interface UpdateUserInput {
   carryOverMode?: 'shift' | 'add';
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   scheduleShiftPages?: number;
+  translationId?: string;
 }
 
 // ============================================================================

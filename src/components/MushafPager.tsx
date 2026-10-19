@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -36,6 +44,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGE_WIDTH = SCREEN_WIDTH;
 const PAGE_HEIGHT = SCREEN_WIDTH / PAGE_IMAGE_ASPECT;
 const BOUNDS_SCALE = PAGE_WIDTH / BOUNDS_WIDTH;
+// How long after scrollToPage a report of another page is taken as stale.
+const JUMP_SETTLE_MS = 500;
 
 interface MushafPagerProps {
   pages: number[];
@@ -47,8 +57,9 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
-  /** Press and hold on a verse. Receives the verse under the finger. */
-  onLongPressAyah?: (ayah: AyahRef) => void;
+  /** Press and hold on a verse. Receives the verse under the finger and the
+   *  screen point pressed (to place a menu beside it). */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
   /** Verse to highlight (e.g. while its translation is open). */
   highlightedAyah?: AyahRef | null;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
@@ -56,11 +67,20 @@ interface MushafPagerProps {
   extraData?: string;
 }
 
+export interface MushafPagerHandle {
+  /** Jump straight to a page (no animation). It counts as a page change,
+   *  never as advancing: onPageChange fires, onAdvance does not, since the
+   *  pages in between were skipped, not read. False if the page isn't in
+   *  `pages`. */
+  scrollToPage: (pageNumber: number) => boolean;
+}
+
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
-  onLongPressAyah?: (ayah: AyahRef) => void;
-  /** Only set on the page that holds the verse, so other pages don't re-render. */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
+  /** The highlighted verse, drawn on every page it has lines on (a verse can
+   *  run onto the next page). */
   highlight: AyahRef | null;
   highlightColor: string;
   pageTint: string | null;
@@ -100,9 +120,9 @@ const PageItem = React.memo(function PageItem({
 
   const handleLongPress = (e: GestureResponderEvent) => {
     if (!onLongPressAyah) return;
-    const { locationX, locationY } = e.nativeEvent;
+    const { locationX, locationY, pageX, pageY } = e.nativeEvent;
     const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
-    if (ayah) onLongPressAyah(ayah);
+    if (ayah) onLongPressAyah(ayah, { x: pageX, y: pageY });
   };
 
   const highlightRects = useMemo(
@@ -185,16 +205,19 @@ const PageItem = React.memo(function PageItem({
  *
  * RTL: page 1 sits on the right; swipe left to advance to page 2.
  */
-export function MushafPager({
-  pages,
-  initialPage,
-  onPageChange,
-  onAdvance,
-  onTap,
-  onLongPressAyah,
-  highlightedAyah,
-  extraData,
-}: MushafPagerProps) {
+export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(function MushafPager(
+  {
+    pages,
+    initialPage,
+    onPageChange,
+    onAdvance,
+    onTap,
+    onLongPressAyah,
+    highlightedAyah,
+    extraData,
+  },
+  ref,
+) {
   const { isDark, theme } = useTheme();
   const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
@@ -204,6 +227,11 @@ export function MushafPager({
   // back whenever a parent prop bump occurs (e.g. context re-renders from
   // auto-save).
   const hasAutoScrolledRef = useRef(false);
+  const jumpRef = useRef<{ from: number; to: number; until: number } | null>(null);
+  // Set when the user drags the pages, cleared by scrollToPage. Only a move the
+  // user made by swiping counts as advancing (and credits the page left), so a
+  // jump or a recitation turning pages can never mark a page revised.
+  const draggedRef = useRef(false);
 
   // Download the pages around the starting one before they are swiped to.
   useEffect(() => {
@@ -224,16 +252,48 @@ export function MushafPager({
     }, 50);
   }, [initialPage, pages]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToPage: (pageNumber: number) => {
+        const idx = pages.indexOf(pageNumber);
+        if (idx < 0) return false;
+        // Move the index first, so the viewability callback that follows
+        // sees no change and cannot mistake the jump for advancing.
+        const from = currentIndexRef.current;
+        const changed = idx !== from;
+        currentIndexRef.current = idx;
+        draggedRef.current = false;
+        if (changed) jumpRef.current = { from, to: idx, until: Date.now() + JUMP_SETTLE_MS };
+        hasAutoScrolledRef.current = true;
+        listRef.current?.scrollToIndex({ index: idx, animated: false });
+        if (changed) {
+          prefetchPages(pagesAround(pages, idx));
+          onPageChange?.(pageNumber, idx);
+        }
+        return true;
+      },
+    }),
+    [pages, onPageChange],
+  );
+
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length === 0) return;
       const first = viewableItems[0];
       if (first.index == null) return;
       const newIndex = first.index;
+      // Right after a jump, ignore a stale report of the page we left. Any
+      // other page is where the list really is (e.g. the user swiped meanwhile).
+      const jump = jumpRef.current;
+      if (jump) {
+        if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) return;
+        jumpRef.current = null;
+      }
       const prevIndex = currentIndexRef.current;
       if (newIndex === prevIndex) return;
       const newPage = pages[newIndex];
-      if (newIndex > prevIndex && onAdvance) {
+      if (newIndex > prevIndex && onAdvance && draggedRef.current) {
         const leftPage = pages[prevIndex];
         if (leftPage != null && newPage != null) {
           onAdvance(leftPage, newPage);
@@ -254,7 +314,7 @@ export function MushafPager({
         pageNumber={item}
         onTap={onTap}
         onLongPressAyah={onLongPressAyah}
-        highlight={highlightedAyah && highlightedAyah.page === item ? highlightedAyah : null}
+        highlight={highlightedAyah ?? null}
         highlightColor={theme.accent + '40'}
         pageTint={palette.pageTint}
         tintColor={palette.textPrimary}
@@ -275,6 +335,9 @@ export function MushafPager({
       inverted
       showsHorizontalScrollIndicator={false}
       onViewableItemsChanged={handleViewableItemsChanged}
+      onScrollBeginDrag={() => {
+        draggedRef.current = true;
+      }}
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(_, index) => ({
         length: SCREEN_WIDTH,
@@ -288,7 +351,7 @@ export function MushafPager({
       style={{ backgroundColor: palette.pageBg }}
     />
   );
-}
+});
 
 const styles = StyleSheet.create({
   page: {

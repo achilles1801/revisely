@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -19,24 +20,18 @@ import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
-import { MushafPager } from '../../components/MushafPager';
+import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
-import { RevisionTimerButton } from '../../components/revision/RevisionTimer';
-import { TranslationSheet } from '../../components/revision/TranslationSheet';
-import { AyahRef } from '../../lib/ayahBounds';
+import { useVerseActions } from '../../components/verse/useVerseActions';
+import { RecordButton } from '../../components/recordings/RecordButton';
+import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
-import {
-  elapsedMs,
-  formatDuration,
-  isRevisionTimer,
-  MIN_SESSION_SECONDS,
-  shouldAutoFinishRevisionTimer,
-} from '../../lib/readingTimer';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -54,6 +49,11 @@ import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 
 const AUTO_SAVE_INTERVAL_MS = 5000;
+// Where the now-playing bar sits, and roughly how tall the "Submit session"
+// bar is: the floating timer is raised above whichever is showing.
+const PLAYER_BOTTOM = 110;
+const SUBMIT_BAR_HEIGHT = 74;
+const UNDO_TOAST_TOP = spacing.xl + spacing.md + 56;
 const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
@@ -119,13 +119,29 @@ export default function ActiveRevisionScreen() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
-  const [translationAyah, setTranslationAyah] = useState<AyahRef | null>(null);
 
-  // Press and hold a verse for its translation; it stays highlighted meanwhile.
-  const handleLongPressAyah = useCallback((ayah: AyahRef) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setTranslationAyah(ayah);
-  }, []);
+  // Hold a verse: highlight, Play (Husary), Translation. Playback stays within
+  // this session's pages, and the pages it turns are not marked revised
+  // (scrollToPage never reports an advance).
+  const pagerRef = useRef<MushafPagerHandle>(null);
+  const sessionPages = useMemo(() => assignment?.pages ?? [], [assignment]);
+  // Record yourself reciting; page marks follow the page on screen.
+  const recorder = useVoiceRecorder({
+    kind: 'revision',
+    day: sessionDay,
+    currentPage:
+      currentPageNumber ??
+      assignment?.pages.find((p) => !alreadyRevisedToday.has(p)) ??
+      assignment?.pages[0] ??
+      null,
+  });
+
+  const verseActions = useVerseActions({
+    pages: sessionPages,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    playerBottom: PLAYER_BOTTOM,
+    currentPage: currentPageNumber ?? undefined,
+  });
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -235,57 +251,31 @@ export default function ActiveRevisionScreen() {
     return () => sub.remove();
   }, [commitPendingPages]);
 
-  // ===== Revision timer =====
-  // The shared reading timer, started from the stopwatch in the top bar.
-  const {
-    timer,
-    finish: finishTimer,
-    pause: pauseTimer,
-    noteRevisedPages,
-  } = useReadingTimer();
-  const timerRef = useRef(timer);
-  timerRef.current = timer;
-
-  const stopTimer = useCallback(
-    async (reason: 'manual' | 'done') => {
-      const t = timerRef.current;
-      if (!t) return;
-      const seconds = Math.round(elapsedMs(t, Date.now()) / 1000);
-      if (!(await finishTimer())) return;
-      if (seconds < MIN_SESSION_SECONDS) return;
-      Alert.alert(
-        reason === 'done' ? 'Revision timed' : 'Timer saved',
-        `${formatDuration(seconds)} recorded. You'll find it in Reading sessions.`,
-      );
-    },
-    [finishTimer],
-  );
-
-  // Credit pages to the timer as they're marked, and stop a revision timer
-  // once every page assigned today is revised. Only reacts to *new* marks, so
-  // reopening a finished day doesn't immediately stop a resumed timer.
-  const assignedCount = assignment?.pages.length ?? 0;
+  // ===== Timer =====
+  // The floating timer is the app's one timer: pages marked revised while it
+  // runs are credited to it. It is general, so unlike the old in-bar revision
+  // stopwatch, leaving this screen does not pause it and finishing today's
+  // pages does not stop it; the user ends it from the timer itself.
+  const { noteRevisedPages } = useReadingTimer();
+  const insets = useSafeAreaInsets();
   const prevCompletedRef = useRef(completedPages);
   useEffect(() => {
     const prev = prevCompletedRef.current;
     prevCompletedRef.current = completedPages;
     const added = Array.from(completedPages).filter((p) => !prev.has(p));
-    if (added.length === 0) return;
-    noteRevisedPages(added);
-    if (shouldAutoFinishRevisionTimer(timerRef.current, completedPages.size, assignedCount)) {
-      stopTimer('done');
-    }
-  }, [completedPages, assignedCount, noteRevisedPages, stopTimer]);
+    if (added.length > 0) noteRevisedPages(added);
+  }, [completedPages, noteRevisedPages]);
 
-  // Leaving mid-way pauses a running revision timer so it can be resumed
-  // later; the time already spent is kept.
-  useEffect(
-    () => () => {
-      const t = timerRef.current;
-      if (isRevisionTimer(t) && t?.runningSince != null) pauseTimer();
-    },
-    [pauseTimer],
+  // Keep the floating timer clear of whatever is at the bottom: the
+  // now-playing bar, the undo toast and the submit bar.
+  const submitVisible =
+    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
+  const timerClearance = Math.max(
+    verseActions.playerVisible ? PLAYER_BOTTOM + 64 : 0,
+    undoState ? UNDO_TOAST_TOP : 0,
+    submitVisible ? insets.bottom + SUBMIT_BAR_HEIGHT + spacing.sm : 0,
   );
+  useFloatingTimerOffset(timerClearance > 0 ? timerClearance : null);
 
   if (!user || !assignment) {
     return (
@@ -438,7 +428,6 @@ export default function ActiveRevisionScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    if (isRevisionTimer(timerRef.current)) await stopTimer('done');
     navigation.goBack();
   }, [
     commitPendingPages,
@@ -450,7 +439,6 @@ export default function ActiveRevisionScreen() {
     addLog,
     user,
     navigation,
-    stopTimer,
   ]);
 
   const handleEndSession = () => {
@@ -526,13 +514,6 @@ export default function ActiveRevisionScreen() {
       onPress: () => setShowBulkActions(true),
     },
     {
-      // Pushed on top, so this session (and a running timer) stays as it is.
-      key: 'sessions',
-      label: 'Reading sessions',
-      icon: 'stopwatch-outline',
-      onPress: () => navigation.navigate('ReadingSessions'),
-    },
-    {
       key: 'guide',
       label: 'How revision works',
       icon: 'help-circle-outline',
@@ -579,17 +560,28 @@ export default function ActiveRevisionScreen() {
         onBack={handleSaveAndBack}
         onToggleCurrent={handleToggleCurrent}
         onOverflow={() => setMenuOpen(true)}
-        timerSlot={<RevisionTimerButton onStop={() => stopTimer('manual')} />}
+        recordSlot={
+          <RecordButton
+            phase={recorder.phase}
+            startedAt={recorder.startedAt}
+            onStart={recorder.start}
+            onStop={recorder.stop}
+            color={theme.textPrimary}
+            background={theme.glass}
+            border={theme.border}
+          />
+        }
       />
 
       <View style={styles.viewerWrap}>
         <MushafPager
+          ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}
           onPageChange={setCurrentPageNumber}
           onAdvance={handleAdvance}
-          onLongPressAyah={handleLongPressAyah}
-          highlightedAyah={translationAyah}
+          onLongPressAyah={verseActions.onLongPressAyah}
+          highlightedAyah={verseActions.highlightedAyah}
           extraData={extraData}
         />
 
@@ -654,10 +646,7 @@ export default function ActiveRevisionScreen() {
         onTogglePage={handleTogglePage}
       />
 
-      <TranslationSheet
-        ayah={translationAyah}
-        onClose={() => setTranslationAyah(null)}
-      />
+      {verseActions.overlay}
 
       <RevisionGuideModal
         visible={showGuide}
@@ -798,8 +787,13 @@ function RevisionGuideModal({
     },
     {
       icon: 'language-outline',
-      title: 'Hold a verse for its translation',
-      body: 'Press and hold any verse to highlight it and read its English translation.',
+      title: 'Hold a verse',
+      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
+    },
+    {
+      icon: 'mic-outline',
+      title: 'Record yourself',
+      body: 'Tap the mic in the top bar to record your recitation and listen back later. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',
@@ -809,7 +803,7 @@ function RevisionGuideModal({
     {
       icon: 'stopwatch-outline',
       title: 'Time your revision',
-      body: 'Tap the stopwatch at the top to start a timer. Tap the time to pause or stop it. It pauses if you leave and stops by itself when today’s pages are done, saving to Reading sessions.',
+      body: 'Tap the stopwatch button in the corner to start the timer, and tap the time to pause or stop it. Pages you mark revised while it runs are saved with the session, in Activity.',
     },
     {
       icon: 'save-outline',

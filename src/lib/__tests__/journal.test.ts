@@ -8,7 +8,9 @@ import {
   sortJournalEntries,
   formatJournalDayRelative,
   formatMinutes,
+  hasNoJournalContent,
   isJournalEntryEmpty,
+  journalFirstDay,
   journalTotalMinutes,
   parseMinutesInput,
   recentJournalDays,
@@ -104,6 +106,119 @@ describe('recentJournalDays', () => {
     ]);
     expect(days[0].entry).toBeNull();
     expect(days[1].entry?.revision).toBe('1p anbiya');
+  });
+});
+
+describe('recentJournalDays with a first day (account creation)', () => {
+  it('shows only today for a user created today', () => {
+    const days = recentJournalDays([], '2026-10-17', 7, '2026-10-17');
+    expect(days).toEqual([{ date: '2026-10-17', entry: null }]);
+  });
+
+  it('shows at most the days since sign-up for a user created 3 days ago', () => {
+    const days = recentJournalDays([], '2026-10-17', 7, '2026-10-14');
+    expect(days.map((d) => d.date)).toEqual([
+      '2026-10-17',
+      '2026-10-16',
+      '2026-10-15',
+      '2026-10-14',
+    ]);
+  });
+
+  it('keeps today even if the first day is in the future (clock skew)', () => {
+    const days = recentJournalDays([], '2026-10-17', 7, '2026-10-18');
+    expect(days.map((d) => d.date)).toEqual(['2026-10-17']);
+  });
+
+  it('still shows a day with an entry dated before the first day', () => {
+    const days = recentJournalDays(
+      [entry('2026-10-12', { revision: '2p' })],
+      '2026-10-17',
+      7,
+      '2026-10-15',
+    );
+    expect(days.map((d) => d.date)).toEqual([
+      '2026-10-17',
+      '2026-10-16',
+      '2026-10-15',
+      '2026-10-12',
+    ]);
+  });
+
+  it('is unchanged for a long-standing user', () => {
+    const entries = [entry('2026-10-16', { revision: '1p' })];
+    expect(recentJournalDays(entries, '2026-10-17', 7, '2025-01-01')).toEqual(
+      recentJournalDays(entries, '2026-10-17', 7),
+    );
+    expect(recentJournalDays(entries, '2026-10-17', 7, null)).toHaveLength(7);
+  });
+
+  it('crosses month boundaries', () => {
+    const days = recentJournalDays([], '2026-11-01', 7, '2026-10-30');
+    expect(days.map((d) => d.date)).toEqual(['2026-11-01', '2026-10-31', '2026-10-30']);
+  });
+});
+
+describe('journalFirstDay', () => {
+  const base = {
+    fajrBoundaryEnabled: false,
+    locationCoords: null,
+    fajrCalculationMethod: 'MuslimWorldLeague',
+  };
+
+  it('is the local calendar day of createdAt without the fajr boundary', () => {
+    // Built from local parts so it is the same day in every time zone.
+    const created = new Date(2026, 9, 14, 23, 30).toISOString();
+    expect(journalFirstDay({ ...base, createdAt: created })).toBe('2026-10-14');
+    const early = new Date(2026, 9, 14, 0, 5).toISOString();
+    expect(journalFirstDay({ ...base, createdAt: early })).toBe('2026-10-14');
+  });
+
+  it('rolls a pre-fajr sign-up back a day when the boundary is on', () => {
+    // Coordinates whose solar time matches the device's zone, so fajr is early morning.
+    const lng = Math.max(-165, Math.min(165, -new Date(2026, 9, 14, 12).getTimezoneOffset() / 4));
+    const user = {
+      ...base,
+      fajrBoundaryEnabled: true,
+      locationCoords: { latitude: 30, longitude: lng },
+    };
+    const atOne = new Date(2026, 9, 14, 1, 0).toISOString();
+    expect(journalFirstDay({ ...user, createdAt: atOne })).toBe('2026-10-13');
+    const atNoon = new Date(2026, 9, 14, 12, 0).toISOString();
+    expect(journalFirstDay({ ...user, createdAt: atNoon })).toBe('2026-10-14');
+  });
+
+  it('never starts after the oldest entry (a missing createdAt reads as now)', () => {
+    const created = new Date(2026, 9, 14, 12).toISOString();
+    const entry = (date: string) => ({
+      date,
+      memorization: 'x',
+      memorizationMinutes: null,
+      revision: '',
+      revisionMinutes: null,
+      notes: '',
+    });
+    expect(journalFirstDay({ ...base, createdAt: created }, [entry('2026-09-01')])).toBe('2026-09-01');
+    expect(journalFirstDay({ ...base, createdAt: created }, [entry('2026-10-16')])).toBe('2026-10-14');
+  });
+
+  it('is null when createdAt is missing or invalid', () => {
+    expect(journalFirstDay(null)).toBeNull();
+    expect(journalFirstDay({ ...base, createdAt: '' })).toBeNull();
+    expect(journalFirstDay({ ...base, createdAt: 'not a date' })).toBeNull();
+  });
+});
+
+describe('hasNoJournalContent', () => {
+  it('is true with no entries or only blank ones', () => {
+    expect(hasNoJournalContent([])).toBe(true);
+    expect(hasNoJournalContent([entry('2026-10-17', { notes: '  ' })])).toBe(true);
+  });
+
+  it('is false once anything is logged', () => {
+    expect(
+      hasNoJournalContent([entry('2026-10-17'), entry('2026-10-16', { revisionMinutes: 5 })]),
+    ).toBe(false);
   });
 });
 
