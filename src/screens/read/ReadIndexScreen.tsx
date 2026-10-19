@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   SafeAreaView,
@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { PressableScale } from '../../components/PressableScale';
@@ -80,6 +80,9 @@ export default function ReadIndexScreen() {
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const [recent, setRecent] = useState<ReadingHistoryEntry[]>([]);
+  // Tapping the Read tab while on it scrolls the index back to the top.
+  const listRef = useRef<FlatList<JuzGroup>>(null);
+  useScrollToTop(listRef);
 
   const refreshRecent = useCallback(async () => {
     const entries = await getRecentReadingPages(3);
@@ -162,6 +165,7 @@ export default function ReadIndexScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        ref={listRef}
         data={juzGroups}
         // Long list: keep the scroll indicator visible, in a colour that
         // reads on both the black and white Read palettes.
