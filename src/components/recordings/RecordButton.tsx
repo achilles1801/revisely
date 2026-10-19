@@ -21,8 +21,8 @@ export function recordedMs(baseMs: number, segmentStartedAt: number | null, now:
 }
 
 /**
- * The session's recording control. Idle: a mic. Recording: a red pill with the
- * time (tap to pause) and Done. Paused: a "Paused" pill (tap to resume) and Done.
+ * The session's recording control. Idle: a mic. Then one pill: the time (tap to
+ * pause or resume) and a stop square that ends the recording.
  */
 export function RecordButton({ recorder, color, background, border }: RecordButtonProps) {
   const { phase, baseMs, segmentStartedAt, interrupted } = recorder;
@@ -55,19 +55,22 @@ export function RecordButton({ recorder, color, background, border }: RecordButt
   const time = formatRecordingTime(recordedMs(baseMs, segmentStartedAt, now));
   const recording = phase === 'recording';
   const busy = phase === 'starting' || phase === 'finishing';
+  const fg = recording ? '#fff' : RED;
 
+  // One pill, visibly a recording control (red, a timer, a stop square) and
+  // never a check mark, so it can't be mistaken for the session's ✓.
   return (
-    <View style={styles.group}>
+    <View
+      style={[
+        styles.pill,
+        recording ? { backgroundColor: RED } : { backgroundColor: background, borderColor: RED, borderWidth: 1 },
+      ]}
+    >
       <Pressable
         onPress={recording ? recorder.pause : recorder.resume}
         disabled={busy}
-        hitSlop={6}
-        style={[
-          styles.pill,
-          recording
-            ? { backgroundColor: RED }
-            : { backgroundColor: background, borderColor: RED, borderWidth: 1 },
-        ]}
+        hitSlop={{ top: 6, bottom: 6, left: 6 }}
+        style={styles.segment}
         accessibilityRole="button"
         accessibilityLabel={
           recording
@@ -75,32 +78,32 @@ export function RecordButton({ recorder, color, background, border }: RecordButt
             : `${interrupted ? 'Recording was paused by an interruption. ' : ''}Resume recording, ${time} recorded`
         }
       >
-        {recording ? <View style={styles.dot} /> : <Ionicons name="pause" size={12} color={RED} />}
-        <Text style={[styles.time, { color: recording ? '#fff' : RED }]}>{time}</Text>
         {busy ? (
-          <ActivityIndicator size="small" color={recording ? '#fff' : RED} />
+          <ActivityIndicator size="small" color={fg} />
         ) : recording ? (
-          <Ionicons name="pause" size={14} color="#fff" />
+          <View style={styles.dot} />
         ) : (
-          <Text style={[styles.pausedLabel, { color: RED }]}>Resume</Text>
+          <Ionicons name="play" size={12} color={RED} />
         )}
+        <Text style={[styles.time, { color: fg }]}>{time}</Text>
+        {recording && <Ionicons name="pause" size={13} color="#fff" />}
       </Pressable>
+      <View style={[styles.divider, { backgroundColor: recording ? 'rgba(255,255,255,0.45)' : RED + '55' }]} />
       <Pressable
         onPress={recorder.finish}
         disabled={busy}
-        hitSlop={6}
-        style={[styles.round, { backgroundColor: background, borderColor: border }]}
+        hitSlop={{ top: 6, bottom: 6, right: 6 }}
+        style={styles.stopBtn}
         accessibilityRole="button"
-        accessibilityLabel="Finish recording"
+        accessibilityLabel="Stop recording"
       >
-        <Ionicons name="checkmark" size={18} color={color} />
+        <View style={[styles.stopSquare, { backgroundColor: fg }]} />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  group: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   round: {
     width: 34,
     height: 34,
@@ -112,12 +115,14 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     height: 34,
-    paddingHorizontal: 12,
     borderRadius: 17,
+    overflow: 'hidden',
   },
+  segment: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingLeft: 12, paddingRight: 8 },
+  divider: { width: StyleSheet.hairlineWidth * 2, height: 18 },
+  stopBtn: { height: 34, paddingLeft: 9, paddingRight: 12, justifyContent: 'center' },
+  stopSquare: { width: 11, height: 11, borderRadius: 2 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   time: { fontWeight: '700', fontVariant: ['tabular-nums'], fontSize: 14 },
-  pausedLabel: { fontWeight: '600', fontSize: 13 },
 });

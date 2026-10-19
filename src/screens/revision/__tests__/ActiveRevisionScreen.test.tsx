@@ -28,6 +28,7 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => ({ key: 'ActiveRevision-1', name: 'ActiveRevision' }),
   useIsFocused: () => true,
 }));
+jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,
 );

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -77,6 +77,9 @@ export default function ActivityDayScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
   const date = route.params.date;
+  const focusRecordingId = route.params.focusRecordingId;
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledToRecordingRef = useRef(false);
   const { user, logs, updateLog, deleteLog } = useApp();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -188,6 +191,7 @@ export default function ActivityDayScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.content,
             { paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + spacing.xl },
@@ -289,11 +293,23 @@ export default function ActivityDayScreen() {
             )}
           </View>
 
-          <RecordingsList
-            day={date}
-            reloadKey={recordingsKey}
-            header={<Text style={styles.sectionLabel}>RECORDINGS</Text>}
-          />
+          {/* Opened from "Recording saved · View": scroll here once it has loaded. */}
+          <View
+            onLayout={(e) => {
+              const { y, height } = e.nativeEvent.layout;
+              if (focusRecordingId && height > 0 && !scrolledToRecordingRef.current) {
+                scrolledToRecordingRef.current = true;
+                scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true });
+              }
+            }}
+          >
+            <RecordingsList
+              day={date}
+              reloadKey={recordingsKey}
+              highlightId={focusRecordingId}
+              header={<Text style={styles.sectionLabel}>RECORDINGS</Text>}
+            />
+          </View>
 
           {/* Daily log */}
           <Text style={styles.sectionLabel}>DAILY LOG</Text>

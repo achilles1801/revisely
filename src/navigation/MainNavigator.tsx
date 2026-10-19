@@ -44,7 +44,8 @@ export type HomeStackParamList = {
   // Revision sessions, timed sessions and the daily log, day by day.
   Activity: undefined;
   // date is a revision day, YYYY-MM-DD.
-  ActivityDay: { date: string };
+  /** focusRecordingId: scroll to that recording and highlight it. */
+  ActivityDay: { date: string; focusRecordingId?: string };
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string } | undefined;

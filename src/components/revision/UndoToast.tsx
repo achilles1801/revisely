@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -21,6 +21,8 @@ interface UndoToastProps {
   duration?: number;
   /** Distance to inset from bottom (e.g. tab bar footprint). */
   bottomInset?: number;
+  /** The action's label (default "Undo"); onUndo runs it. */
+  actionLabel?: string;
 }
 
 export function UndoToast({
@@ -30,25 +32,31 @@ export function UndoToast({
   onDismiss,
   duration = 3000,
   bottomInset = 0,
+  actionLabel = 'Undo',
 }: UndoToastProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
 
+  // Through a ref: an inline onDismiss from the parent would otherwise restart
+  // the timer (and the entry animation) on every parent render.
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
   useEffect(() => {
     if (visible) {
       opacity.value = withTiming(1, { duration: 180 });
       translateY.value = withTiming(0, { duration: 220 });
       const timer = setTimeout(() => {
-        onDismiss();
+        onDismissRef.current();
       }, duration);
       return () => clearTimeout(timer);
     } else {
       opacity.value = withTiming(0, { duration: 160 });
       translateY.value = withTiming(20, { duration: 200 });
     }
-  }, [visible, duration, onDismiss, opacity, translateY]);
+  }, [visible, duration, opacity, translateY]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -70,8 +78,8 @@ export function UndoToast({
         <Text style={styles.message} numberOfLines={1}>
           {message}
         </Text>
-        <Pressable onPress={onUndo} hitSlop={10} style={styles.undoBtn}>
-          <Text style={styles.undoText}>Undo</Text>
+        <Pressable onPress={onUndo} hitSlop={10} style={styles.undoBtn} accessibilityRole="button">
+          <Text style={styles.undoText}>{actionLabel}</Text>
         </Pressable>
       </View>
     </Animated.View>

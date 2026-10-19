@@ -1,7 +1,9 @@
 const mockPlayers: any[] = [];
+const mockSetActive = jest.fn((_active: boolean) => Promise.resolve());
 jest.mock('expo-audio', () => ({
   setAudioModeAsync: jest.fn(() => Promise.resolve()),
-  createAudioPlayer: jest.fn(() => {
+  setIsAudioActiveAsync: (active: boolean) => mockSetActive(active),
+  createAudioPlayer: jest.fn((_src: any, mockOpts: any) => {
     const listeners: Array<(s: any) => void> = [];
     const p: any = {
       source: null as any,
@@ -10,6 +12,7 @@ jest.mock('expo-audio', () => ({
       pause: jest.fn(),
       remove: jest.fn(),
       addListener: jest.fn((_: string, l: (s: any) => void) => listeners.push(l)),
+      opts: mockOpts,
       emit: (s: any) => listeners.forEach((l) => l({ playing: false, didJustFinish: false, isBuffering: false, playbackState: '', ...s })),
     };
     mockPlayers.push(p);
@@ -192,6 +195,26 @@ describe('recitation', () => {
     r.setVoice('alafasy:murattal');
     expect(r.getVoice()).toBe('alafasy:murattal');
     expect(mockPlayers).toHaveLength(0);
+  });
+  it('keeps the audio session for the app to release (no silent stall)', () => {
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    expect(mockPlayers[0].opts).toMatchObject({ keepAudioSessionActive: true });
+    mockSetActive.mockClear();
+    r.stop();
+    expect(mockSetActive).toHaveBeenCalledWith(false);
+  });
+
+  it('does not release the session when a recording takes over, or when already stopped', () => {
+    const { claimAudio } = require('../audioFocus');
+    const r = new Recitation();
+    r.play({ sura: 1, ayah: 1 });
+    mockSetActive.mockClear();
+    claimAudio('recording-playback', 'list');
+    expect(r.getState().status).toBe('idle');
+    expect(mockSetActive).not.toHaveBeenCalled();
+    r.stop();
+    expect(mockSetActive).not.toHaveBeenCalled();
   });
 });
 

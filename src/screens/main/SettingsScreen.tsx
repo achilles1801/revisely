@@ -512,19 +512,28 @@ export default function SettingsScreen() {
               recordings && recordings.count > 0
                 ? () =>
                     Alert.alert(
-                      'Delete all recordings?',
-                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}) stored on this phone will be deleted. This can't be undone.`,
+                      'Recordings',
+                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}), stored only on this phone. They're listed by day in Activity.`,
                       [
-                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Activity', onPress: () => navigation.navigate('Activity') },
                         {
                           text: 'Delete all',
                           style: 'destructive',
-                          onPress: async () => {
-                            // The whole folder, including any file not in the index.
-                            await deleteAllRecordings();
-                            loadRecordings();
-                          },
+                          onPress: () =>
+                            Alert.alert('Delete all recordings?', "This can't be undone.", [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Delete all',
+                                style: 'destructive',
+                                onPress: async () => {
+                                  // The whole folder, including any file not in the index.
+                                  await deleteAllRecordings();
+                                  loadRecordings();
+                                },
+                              },
+                            ]),
                         },
+                        { text: 'Cancel', style: 'cancel' },
                       ],
                     )
                 : undefined
