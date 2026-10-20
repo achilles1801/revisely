@@ -56,21 +56,35 @@ export function normalizeText(text: string): string[] {
 }
 
 /**
- * Recognised text as words, in step: normalised (`keys`), without hamzas
- * (`loose`) and as written (`raw`).
+ * How else a heard word may be written: recognition writes a final long ā as ى
+ * (السفهى) where the mushaf has ا (السفهاء), and the two sound the same. Null
+ * when there is no other way.
  */
-export function splitWords(text: string): { keys: string[]; loose: string[]; raw: string[] } {
+export function soundAlike(word: string): string | null {
+  const bare = word.replace(MARKS, '');
+  if (!bare.endsWith('ى') || bare.length < 3) return null;
+  return normalizeWord(bare.slice(0, -1) + 'ا');
+}
+
+/**
+ * Recognised text as words, in step: normalised (`keys`), without hamzas
+ * (`loose`), another way of writing it (`alike`, see soundAlike) and as written
+ * (`raw`).
+ */
+export function splitWords(text: string): { keys: string[]; loose: string[]; alike: (string | null)[]; raw: string[] } {
   const keys: string[] = [];
   const loose: string[] = [];
+  const alike: (string | null)[] = [];
   const raw: string[] = [];
   for (const word of text.split(WORD_BREAK)) {
     const key = normalizeWord(word);
     if (!key) continue;
     keys.push(key);
     loose.push(looseWord(word));
+    alike.push(soundAlike(word));
     raw.push(word);
   }
-  return { keys, loose, raw };
+  return { keys, loose, alike, raw };
 }
 
 /** Levenshtein distance, with an early exit once it exceeds `max`. */

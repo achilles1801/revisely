@@ -1,4 +1,4 @@
-import { editDistance, normalizeText, normalizeWord, similarity } from '../arabic';
+import { editDistance, normalizeText, normalizeWord, similarity, soundAlike } from '../arabic';
 
 describe('normalizeWord', () => {
   it('drops diacritics and Qur’anic signs', () => {
@@ -41,5 +41,18 @@ describe('similarity', () => {
     expect(similarity('الله', 'الله')).toBe(1);
     expect(similarity('يعملون', 'تعملون')).toBeCloseTo(5 / 6);
     expect(similarity('', '')).toBe(1);
+  });
+});
+
+describe('soundAlike', () => {
+  it('reads a final ى as the long ā it sounds like', () => {
+    expect(soundAlike('السُّفَهَى')).toBe(normalizeWord('السفهاء'));
+    expect(soundAlike('هُدَى')).toBe('هدا');
+  });
+
+  it('has nothing else for other words', () => {
+    expect(soundAlike('السُّفَهَاءُ')).toBeNull();
+    expect(soundAlike('فِي')).toBeNull();
+    expect(soundAlike('لى')).toBeNull(); // too short to tell
   });
 });

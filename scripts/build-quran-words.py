@@ -54,10 +54,21 @@ HARAKAT = {chr(c) for c in range(0x064B, 0x0660)} | {chr(c) for c in range(0x061
 
 FIELDS = "text_uthmani,text_imlaei,line_number,page_number"
 
-# The app's first two pages are laid out higher than in the glyph data's own
-# rendering (x matches; every line sits 58 units higher, measured from the ink of
-# mushaf/001.png and 002.png). Shared with build-ayah-bounds.py.
-PAGE_Y_SHIFT = {1: -58, 2: -58}
+# A few page images are laid out differently from the glyph data's own rendering;
+# their coordinates are mapped onto the image: x -> ax*x + bx, y -> ay*y + by
+# (ax, bx, ay, by), measured by fitting the data's lines and words to the ink of
+# each mushaf/NNN.png (all 604 pages were checked; the rest match within a few
+# units). Pages 1 and 2 sit 58 units higher; page 3's text is drawn larger, about
+# 7% wider and 3% taller. Shared with build-ayah-bounds.py.
+PAGE_FIX = {1: (1, 0, 1, -58), 2: (1, 0, 1, -58), 3: (1.070, -41, 1.032, -9)}
+
+
+def fix(page, x0, x1, y0, y1):
+    """The glyph box on the page image (x0 <= x1, y0 <= y1)."""
+    ax, bx, ay, by = PAGE_FIX.get(page, (1, 0, 1, 0))
+    x0, x1 = sorted((x0, x1))
+    y0, y1 = sorted((y0, y1))
+    return round(ax * x0 + bx), round(ax * x1 + bx), round(ay * y0 + by), round(ay * y1 + by)
 
 
 def fetch_chapter(cache: Path, ch: int):
@@ -146,8 +157,7 @@ def main():
         "select page_number, line_number, sura_number, ayah_number, position, min_x, max_x, min_y, max_y"
         " from glyphs order by sura_number, ayah_number, position"
     ):
-        x0, x1 = sorted((x0, x1))
-        y0, y1 = (v + PAGE_Y_SHIFT.get(page, 0) for v in sorted((y0, y1)))
+        x0, x1, y0, y1 = fix(page, x0, x1, y0, y1)
         glyphs[(s, a)].append((page, line, x0, x1))
         b = line_band.get((page, line))
         line_band[(page, line)] = (min(b[0], y0), max(b[1], y1)) if b else (y0, y1)

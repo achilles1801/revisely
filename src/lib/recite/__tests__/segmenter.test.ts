@@ -50,9 +50,15 @@ describe('UtteranceSegmenter', () => {
     const finals = events.filter((e) => e.type === 'final') as { audio: Int16Array; id: number }[];
     expect(finals).toHaveLength(2);
     expect(finals.map((f) => f.id)).toEqual([1, 2]);
-    // About 2 s of speech, plus up to 0.3 s before and 0.2 s after.
-    expect(ms(finals[0].audio.length)).toBeGreaterThan(2000);
-    expect(ms(finals[0].audio.length)).toBeLessThan(2600);
+    // About 2 s of speech, plus up to 0.3 s before and 0.5 s after.
+    expect(ms(finals[0].audio.length)).toBeGreaterThan(2300);
+    expect(ms(finals[0].audio.length)).toBeLessThan(2900);
+    // Half a second of quiet after the last of the speech: Whisper tends to drop
+    // the last word of a clip that ends right after it.
+    const audio = finals[0].audio;
+    let lastLoud = audio.length - 1;
+    while (lastLoud > 0 && Math.abs(audio[lastLoud]) < 1000) lastLoud--;
+    expect(ms(audio.length - 1 - lastLoud)).toBeGreaterThanOrEqual(450);
     expect(events.filter((e) => e.type === 'start')).toHaveLength(2);
   });
 
@@ -98,6 +104,23 @@ describe('UtteranceSegmenter', () => {
     // Loud steady noise: no speech in it; then speech above it.
     const events = feed(seg, concat(noise(3000, 400), tone(1500, 8000), noise(1500, 400)));
     expect(events.filter((e) => e.type === 'final')).toHaveLength(1);
+  });
+
+  it('keeps hearing long recitation in a room that echoes (no truly quiet gaps)', () => {
+    const seg = new UtteranceSegmenter();
+    // 40 s of words (about -18 dBFS) whose gaps only fall to about -30 (the
+    // echo), and to about -41 only every 5 s. The floor used to creep up 3 dB a
+    // second from each quiet moment until the voice itself counted as silence,
+    // so utterances ended mid-verse and the words after went unheard.
+    const parts: Int16Array[] = [noise(500)];
+    for (let t = 0; t < 40_000; t += 500) parts.push(tone(400), tone(100, t % 5000 === 0 ? 400 : 1500));
+    parts.push(noise(1500));
+    const events = feed(seg, concat(...parts));
+    const finals = events.filter((e) => e.type === 'final') as { audio: Int16Array; cut?: boolean }[];
+    // One long utterance, cut only by the length limit: never ended as if paused.
+    expect(finals.slice(0, -1).every((f) => f.cut)).toBe(true);
+    expect(finals.length).toBeGreaterThanOrEqual(3);
+    expect(events.filter((e) => e.type === 'discard')).toHaveLength(0);
   });
 
   it('flushes the utterance in progress', () => {

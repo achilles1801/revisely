@@ -36,19 +36,22 @@ export interface SegmenterOptions {
   speechAboveNoiseDb: number;
   /** Quieter than this is never speech (dBFS). */
   minSpeechDb: number;
+  /** The noise floor is never above the quietest moment of this much recent audio. */
+  floorWindowMs: number;
 }
 
 export const DEFAULT_SEGMENTER: SegmenterOptions = {
   frameMs: 30,
   preRollMs: 300,
   endSilenceMs: 700,
-  tailMs: 200,
+  tailMs: 500,
   maxUtteranceMs: 14_000,
   minSpeechMs: 250,
   cutOverlapMs: 1000,
   partialEveryMs: 1000,
   speechAboveNoiseDb: 12,
   minSpeechDb: -55,
+  floorWindowMs: 6000,
 };
 
 export type SegmenterEvent =
@@ -114,6 +117,10 @@ export class UtteranceSegmenter {
   private sinceDecode = 0;
   private noiseDb = -70;
   private framesSeen = 0;
+  /** Quietest frame of each recent half second, newest last (the floor's cap). */
+  private quietBlocks: number[] = [];
+  private blockMin = Infinity;
+  private blockFrames = 0;
   /** Loudness of the latest frame (dBFS), for a level meter. */
   levelDb = -100;
 
@@ -161,12 +168,16 @@ export class UtteranceSegmenter {
     this.levelDb = db;
     this.framesSeen++;
     // The noise floor drops at once to anything quieter and creeps up slowly
-    // (3 dB a second), so speech never becomes the floor but a noisier room does.
-    // It starts from the first sound, kept within a usual room's range, so
-    // speaking straight away still counts as speech.
+    // (3 dB a second), so a noisier room becomes the floor. It starts from the
+    // first sound, kept within a usual room's range, so speaking straight away
+    // still counts as speech. It never rises above the quietest moment of the
+    // last few seconds: recitation in a room that echoes has no truly quiet
+    // gaps for a long while, and without the cap the floor crept up to the
+    // voice itself, so whole phrases went unheard.
     if (this.framesSeen === 1) this.noiseDb = Math.min(-50, Math.max(-75, db));
     else if (db < this.noiseDb) this.noiseDb = db;
     else this.noiseDb += (3 * this.o.frameMs) / 1000;
+    this.noiseDb = Math.min(this.noiseDb, this.recentQuietest(db));
 
     const speech = this.isSpeech(db);
     if (!this.inUtterance) {
@@ -217,6 +228,21 @@ export class UtteranceSegmenter {
       this.sinceDecode = 0;
       events.push({ type: 'partial', id: this.id, audio: this.utterance.slice() });
     }
+  }
+
+  /** The quietest frame of the last floorWindowMs (including this one). */
+  private recentQuietest(db: number): number {
+    this.blockMin = Math.min(this.blockMin, db);
+    this.blockFrames++;
+    let quietest = this.blockMin;
+    for (const q of this.quietBlocks) if (q < quietest) quietest = q;
+    if (this.blockFrames * this.o.frameMs >= 500) {
+      this.quietBlocks.push(this.blockMin);
+      if (this.quietBlocks.length * 500 > this.o.floorWindowMs) this.quietBlocks.shift();
+      this.blockMin = Infinity;
+      this.blockFrames = 0;
+    }
+    return quietest;
   }
 
   private finish(end: number, events: SegmenterEvent[]) {

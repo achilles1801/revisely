@@ -204,22 +204,28 @@ export default function QuranReaderScreen() {
         >
           <Ionicons name="chevron-back" size={22} color={palette.textSecondary} />
         </Pressable>
-        <Text style={styles.crumbLeft} numberOfLines={1}>
-          Juz {juz} · Hizb {hizb}
-        </Text>
-        {/* While recording, the recording controls take the surah's place
-            (narrow phones have no room for both). */}
-        {recorder.phase === 'idle' && (
-          <View style={styles.crumbRight}>
-            <Text style={styles.crumbSurah} numberOfLines={1}>
-              {firstSurah?.name ?? ''}
+        {/* While checking recitation, where the reciter is takes the
+            breadcrumb's place (the page doesn't move). */}
+        {recite.status ?? (
+          <>
+            <Text style={styles.crumbLeft} numberOfLines={1}>
+              Juz {juz} · Hizb {hizb}
             </Text>
-            {firstSurah?.nameArabic ? (
-              <Text style={styles.crumbArabic} numberOfLines={1}>
-                {firstSurah.nameArabic}
-              </Text>
-            ) : null}
-          </View>
+            {/* While recording, the recording controls take the surah's place
+                (narrow phones have no room for both). */}
+            {recorder.phase === 'idle' && (
+              <View style={styles.crumbRight}>
+                <Text style={styles.crumbSurah} numberOfLines={1}>
+                  {firstSurah?.name ?? ''}
+                </Text>
+                {firstSurah?.nameArabic ? (
+                  <Text style={styles.crumbArabic} numberOfLines={1}>
+                    {firstSurah.nameArabic}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </>
         )}
         <RecordButton
           recorder={recorder}

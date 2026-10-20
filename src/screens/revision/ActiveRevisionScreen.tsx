@@ -30,6 +30,7 @@ import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/S
 import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { useRecitationCheck } from '../../components/recite/useRecitationCheck';
+import { RECITE_STATUS_HEIGHT } from '../../components/recite/ReciteBar';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
@@ -634,19 +635,25 @@ export default function ActiveRevisionScreen() {
       />
 
       <View style={styles.breadcrumb} pointerEvents="none">
-        <Text style={styles.crumbLeft} numberOfLines={1}>
-          Juz {currentJuz} · Hizb {currentHizb}
-        </Text>
-        <View style={styles.crumbRight}>
-          {firstSurahOnPage?.name ? (
-            <Text style={styles.crumbSurah} numberOfLines={1}>
-              {firstSurahOnPage.name}
+        {/* While checking recitation, where the reciter is takes the
+            breadcrumb's place (the page doesn't move). */}
+        {recite.status ?? (
+          <>
+            <Text style={styles.crumbLeft} numberOfLines={1}>
+              Juz {currentJuz} · Hizb {currentHizb}
             </Text>
-          ) : null}
-          {firstSurahOnPage?.nameArabic ? (
-            <Text style={styles.crumbArabic}>{firstSurahOnPage.nameArabic}</Text>
-          ) : null}
-        </View>
+            <View style={styles.crumbRight}>
+              {firstSurahOnPage?.name ? (
+                <Text style={styles.crumbSurah} numberOfLines={1}>
+                  {firstSurahOnPage.name}
+                </Text>
+              ) : null}
+              {firstSurahOnPage?.nameArabic ? (
+                <Text style={styles.crumbArabic}>{firstSurahOnPage.nameArabic}</Text>
+              ) : null}
+            </View>
+          </>
+        )}
       </View>
 
       {/* The page fits between the breadcrumb and the bottom bar. */}
@@ -809,6 +816,8 @@ const makeStyles = (theme: ThemeColors) =>
     breadcrumb: {
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
+      // Room for the recitation status in its place, so the page never moves.
+      minHeight: RECITE_STATUS_HEIGHT + spacing.xs * 2,
       gap: spacing.sm,
       flexDirection: 'row',
       alignItems: 'center',

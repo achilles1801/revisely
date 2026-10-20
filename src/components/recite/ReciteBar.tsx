@@ -15,6 +15,61 @@ import { RECITE_COLORS } from './wordLayers';
 
 /** Height of the bar (the same as the verse player's). */
 export const RECITE_BAR_HEIGHT = 52;
+/** Height of the status line (in the screen's breadcrumb row). */
+export const RECITE_STATUS_HEIGHT = 26;
+
+interface ReciteStatusProps {
+  phase: RecitePhase;
+  /** Listening, but the reciter's place hasn't been found yet. */
+  finding: boolean;
+  /** Where the reciter is. */
+  verse: WordRef | null;
+  mistakes: number;
+}
+
+/** What the status line says, by phase. */
+export function reciteStatusText(phase: RecitePhase, finding: boolean, verse: WordRef | null): string {
+  if (phase === 'starting') return 'Getting ready…';
+  if (phase === 'finishing') return 'Finishing…';
+  if (finding || !verse) return 'Listening · start reciting';
+  const surah = getSurahDisplay(verse.sura)?.nameDisplay ?? `Surah ${verse.sura}`;
+  return `${surah} · Verse ${verse.ayah}`;
+}
+
+/**
+ * Where the reciter is and the mistakes so far, in place of the screen's
+ * breadcrumb (Juz · Hizb, surah) while checking: a row of its own, so a surah's
+ * name is never cut short, nothing crowds the controls or the timer in the
+ * bottom bar, and the page keeps its size.
+ */
+export function ReciteStatus({ phase, finding, verse, mistakes }: ReciteStatusProps) {
+  const { theme } = useTheme();
+  const placed = phase === 'listening' && !finding && !!verse;
+  return (
+    <View style={styles.status} accessibilityLiveRegion="polite">
+      <Text
+        style={[typography.bodySmall, { color: theme.textPrimary, fontWeight: '600', flexShrink: 1 }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {reciteStatusText(phase, finding, verse)}
+      </Text>
+      {placed && (
+        <View
+          style={[
+            styles.badge,
+            mistakes > 0 ? { backgroundColor: RECITE_COLORS.wrong } : { backgroundColor: theme.textMuted + '26' },
+          ]}
+        >
+          <Text style={[styles.badgeText, mistakes === 0 && { color: theme.textMuted }]}>
+            {mistakes === 0 ? 'No mistakes' : `${mistakes} ${mistakes === 1 ? 'mistake' : 'mistakes'}`}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 interface ReciteBarProps {
   phase: RecitePhase;
@@ -23,9 +78,6 @@ interface ReciteBarProps {
   /** Read on every frame for the level ring (no re-render). */
   levelDb: () => number;
   speaking: () => boolean;
-  /** Where the reciter is. */
-  verse: WordRef | null;
-  mistakes: number;
   hidden: boolean;
   onToggleHide: () => void;
   onHint: () => void;
@@ -35,16 +87,15 @@ interface ReciteBarProps {
 
 /**
  * The controls while checking recitation, in the screen's bottom bar: a mic that
- * moves with the voice, where the reciter is and the mistakes so far, hide words,
- * a hint (while hidden), and stop.
+ * moves with the voice, then a hint (while words are hidden), hide or show the
+ * words, and stop. Where the reciter is goes on the status line above
+ * (ReciteStatus), so the bar fits beside the timer on any phone.
  */
 export function ReciteBar({
   phase,
   finding,
   levelDb,
   speaking,
-  verse,
-  mistakes,
   hidden,
   onToggleHide,
   onHint,
@@ -69,17 +120,7 @@ export function ReciteBar({
     opacity: 0.25 + level.value * 0.5,
   }));
 
-  const surah = verse ? getSurahDisplay(verse.sura)?.nameDisplay ?? '' : '';
-  const placed = phase === 'listening' && !finding && !!verse;
-  const title =
-    phase === 'starting'
-      ? 'Getting ready…'
-      : phase === 'finishing'
-        ? 'Finishing…'
-        : placed
-          ? surah
-          : 'Start reciting';
-  const subtitle = phase !== 'listening' ? ' ' : placed ? `Verse ${verse.ayah}` : 'Listening…';
+  const placed = phase === 'listening' && !finding;
 
   const icon = (name: keyof typeof Ionicons.glyphMap, label: string, onPress: () => void, active = false) => (
     <Pressable
@@ -108,27 +149,7 @@ export function ReciteBar({
           )}
         </View>
       </View>
-      <View style={styles.text} accessibilityLiveRegion="polite">
-        <View style={styles.titleRow}>
-          <Text
-            style={[typography.bodySmall, { color: theme.textPrimary, fontWeight: '600', flexShrink: 1 }]}
-            numberOfLines={1}
-          >
-            {title}
-          </Text>
-          {placed && mistakes > 0 && (
-            <View
-              style={[styles.badge, { backgroundColor: RECITE_COLORS.wrong }]}
-              accessibilityLabel={`${mistakes} ${mistakes === 1 ? 'mistake' : 'mistakes'}`}
-            >
-              <Text style={styles.badgeText}>{mistakes}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={[typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
+      <View style={styles.spacer} />
       {/* A hint needs a place: the next word. */}
       {hidden && placed && icon('bulb-outline', 'Show the next word', onHint)}
       {icon(hidden ? 'eye-off' : 'eye-outline', hidden ? 'Show the words' : 'Hide the words', onToggleHide, hidden)}
@@ -160,10 +181,17 @@ const styles = StyleSheet.create({
   mic: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 40, height: 40, borderRadius: 20 },
   micDisc: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  text: { flex: 1, paddingHorizontal: spacing.xs },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  badge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  spacer: { flex: 1 },
+  status: {
+    flex: 1,
+    height: RECITE_STATUS_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   stopBtn: {
     width: 36,

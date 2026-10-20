@@ -20,7 +20,7 @@ import { getReadPalette } from '../../theme/readPalette';
 import type { PageLayers } from '../MushafPager';
 import { wordLayers } from './wordLayers';
 import { countMistakes } from '../../lib/recite/checkSummary';
-import { ReciteBar } from './ReciteBar';
+import { ReciteBar, ReciteStatus } from './ReciteBar';
 import { ReciteButton } from './ReciteButton';
 import { SpeechModelSheet } from './SpeechModelSheet';
 import { CheckSummarySheet } from './CheckSummarySheet';
@@ -357,13 +357,20 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
       finding={!!session && session.position == null}
       levelDb={() => sessionRef.current?.levelDb ?? -100}
       speaking={() => sessionRef.current?.speaking ?? false}
-      verse={session?.position != null && words ? words.ref(Math.min(session.position, words.count - 1)) : null}
-      mistakes={mistakeCount}
       hidden={prefs.hideWords}
       onToggleHide={toggleHide}
       onHint={hint}
       onStop={() => finish('user')}
       palette={palette}
+    />
+  ) : null;
+
+  const status = active ? (
+    <ReciteStatus
+      phase={phase}
+      finding={!!session && session.position == null}
+      verse={session?.position != null && words ? words.ref(Math.min(session.position, words.count - 1)) : null}
+      mistakes={mistakeCount}
     />
   ) : null;
 
@@ -402,6 +409,9 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
     button,
     /** The controls while checking (null otherwise). */
     bar,
+    /** Where the reciter is and the mistakes so far, for the breadcrumb row
+     *  (null while not checking). */
+    status,
     overlay,
     pageLayers,
     /** Changes whenever the layers do (for the pager's extraData). */

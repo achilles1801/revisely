@@ -94,6 +94,14 @@ const MAX_MERGE = 5;
  */
 const DANGLING_SIMILARITY = 0.5;
 
+/**
+ * A heard word as a word of a free phrase: close enough, or exactly it when short
+ * (آمن, believed, is three letters of the four in امين and must not pass as it).
+ */
+function phraseWord(heard: string, word: string): boolean {
+  return heard === word || (word.length >= 5 && similarity(heard, word) >= 0.75);
+}
+
 type OpKind = 'match' | 'sub' | 'ins' | 'del' | 'free';
 interface Op {
   kind: OpKind;
@@ -150,6 +158,7 @@ export interface Preview {
 interface Heard {
   keys: string[];
   loose: string[];
+  alike: (string | null)[];
   raw: string[];
 }
 
@@ -166,6 +175,12 @@ export class RecitationTracker {
   private misses = 0;
   /** While searching: the last utterance too short to place (الم, then a pause). */
   private unplaced: Heard | null = null;
+  /** The previous utterance's partial results, past where its final ended:
+   *  recognition sometimes drops the last words of an utterance that a partial
+   *  of it had heard, and the next one then starts after them. Only that tail
+   *  counts (from `from`), so a phrase that recurs earlier (الرحمن الرحيم) can't
+   *  excuse a word really left out. */
+  private previousEvidence: { heard: Heard; from: number }[] = [];
   /** Lowest and highest word touched, for the session record. */
   private first: number | null = null;
   private last: number | null = null;
@@ -205,6 +220,7 @@ export class RecitationTracker {
     this.pos = Math.max(0, Math.min(this.words.count - 1, word));
     this.misses = 0;
     this.unplaced = null;
+    this.previousEvidence = [];
     this.version++;
   }
 
@@ -214,6 +230,7 @@ export class RecitationTracker {
     this.region = this.pageRegion(page);
     this.misses = 0;
     this.unplaced = null;
+    this.previousEvidence = [];
     this.version++;
   }
 
@@ -283,13 +300,6 @@ export class RecitationTracker {
     options: { lastWordUnsure?: boolean } = {},
   ): CommitResult {
     const heard = toHeard(text);
-    // Cut off by the length limit: the last word may be half a word. The next
-    // utterance starts a little before the cut and hears it whole.
-    if (options.lastWordUnsure && heard.keys.length > 1) {
-      heard.keys.pop();
-      heard.loose.pop();
-      heard.raw.pop();
-    }
     const none: CommitResult = {
       placed: false,
       mistakes: [],
@@ -320,10 +330,21 @@ export class RecitationTracker {
     }
     if (!wasAnchored) anchored = true;
     this.misses = 0;
+    // Cut off by the length limit: the last word may be half a word. Kept when
+    // it is the word written there (dropping it lost it whenever the next
+    // utterance began after it); otherwise it marks nothing, since the next
+    // utterance starts a little before the cut and may hear it whole.
+    if (options.lastWordUnsure && heard.keys.length > 1) this.forgiveLastWord(a, heard.keys.length);
     const held = anchored ? this.unplaced : null;
     this.unplaced = null;
 
-    const evidence = partials.map(toHeard);
+    const evidence = [...partials.map((p) => ({ heard: toHeard(p), from: 0 })), ...this.previousEvidence];
+    // The word before the tail is its neighbour, so the tail starts one before.
+    const tailFrom = Math.max(1, heard.keys.length);
+    this.previousEvidence = partials
+      .map(toHeard)
+      .filter((p) => p.keys.length > tailFrom)
+      .map((p) => ({ heard: p, from: tailFrom }));
     const mistakes: Mistake[] = [];
     const correct: number[] = [];
     const pos = anchored ? a.start : (this.pos as number);
@@ -383,6 +404,22 @@ export class RecitationTracker {
     if (end >= 0) this.pos = anchored ? end + 1 : Math.max(this.pos as number, end + 1);
     this.version++;
     return { placed: true, mistakes, correct, position: this.pos, anchored, start };
+  }
+
+  /** The op covering the last heard word becomes an extra word unless it matched;
+   *  written words skipped after the last match are left for the next utterance. */
+  private forgiveLastWord(a: Alignment, heardCount: number) {
+    const ops = a.ops;
+    for (let k = ops.length - 1; k >= 0; k--) {
+      const op = ops[k];
+      if (op.kind === 'match') break;
+      if (op.kind === 'del') {
+        ops.splice(k, 1);
+        continue;
+      }
+      if (op.kind === 'sub' && op.heardTo === heardCount) ops[k] = { ...op, kind: 'ins' };
+      if (op.heardTo < heardCount) break;
+    }
   }
 
   /** Where `heard` would end just before `at`, word for word; else null. */
@@ -477,7 +514,7 @@ export class RecitationTracker {
       if (this.textContains(phrase, lo, hi)) continue;
       for (let i = 0; i + phrase.length <= heard.length; i++) {
         let ok = true;
-        for (let k = 0; k < phrase.length && ok; k++) ok = similarity(heard[i + k], phrase[k]) >= 0.75;
+        for (let k = 0; k < phrase.length && ok; k++) ok = phraseWord(heard[i + k], phrase[k]);
         if (ok) for (let k = 0; k < phrase.length; k++) free[i + k] = true;
       }
     }
@@ -497,8 +534,8 @@ export class RecitationTracker {
    * Whether heard text (one or more words joined) is the written word: the same
    * letters, or the same apart from how a hamza is seated (with `loose`).
    */
-  private matches(heardJoined: string, w: number, looseJoined?: string): boolean {
-    for (const key of this.words.keys(w)) if (heardJoined === key) return true;
+  private matches(heardJoined: string, w: number, looseJoined?: string, alike?: string | null): boolean {
+    for (const key of this.words.keys(w)) if (heardJoined === key || (alike != null && alike === key)) return true;
     if (looseJoined != null && looseJoined.length >= 3 && looseJoined === this.words.looseKey(w)) return true;
     const key = this.words.keys(w)[0];
     if (MUQATTAAT.has(key)) {
@@ -560,7 +597,7 @@ export class RecitationTracker {
         // A phrase word is passed over, never matched or taken for a wrong word.
         if (i < m && j < n && !free[i]) {
           const w = lo + j;
-          if (this.matches(keys[i], w, heard.loose[i])) {
+          if (this.matches(keys[i], w, heard.loose[i], heard.alike[i])) {
             relax(cell, cell + W + 1, here + MATCH, 0, 1);
           } else {
             relax(cell, cell + W + 1, here + SUB + 0.5 * this.bestSimilarity(keys[i], w), 1, 1);
@@ -576,11 +613,16 @@ export class RecitationTracker {
               relax(cell, cell + k * W + 1, here + MATCH * (1 + 0.1 * (k - 1)), 0, k);
             }
           }
-          // One heard word covering two written words.
+          // One heard word covering two written words; or two heard words that
+          // are two written words with the break in another place (انومن كما
+          // heard as انومنك ما).
           if (j + 1 < n) {
             const w2 = w + 1;
             const pair = this.words.keys(w)[0] + this.words.keys(w2)[0];
             if (keys[i] === pair) relax(cell, cell + W + 2, here + MATCH * 2, MATCH2, 1);
+            if (i + 1 < m && !free[i + 1] && keys[i] + keys[i + 1] === pair) {
+              relax(cell, cell + 2 * W + 2, here + MATCH * 2, MATCH2, 2);
+            }
           }
         }
       }
@@ -610,7 +652,7 @@ export class RecitationTracker {
       const kind = opKind[cell];
       const word = lo + fj;
       if (kind === MATCH2) {
-        ops.push({ kind: 'match', word, word2: word + 1, heardFrom: i - 1, heardTo: i });
+        ops.push({ kind: 'match', word, word2: word + 1, heardFrom: i - span, heardTo: i });
         matches += 2;
       } else {
         ops.push({ kind: KIND[kind], word, heardFrom: i - span, heardTo: i });
@@ -660,12 +702,14 @@ export class RecitationTracker {
    * Whether a partial result heard the word between its neighbours: the word
    * itself plus the word before or after it, adjacent.
    */
-  private heardInPartials(w: number, partials: Heard[]): boolean {
-    for (const { keys, loose } of partials) {
-      for (let i = 0; i < keys.length; i++) {
-        if (!this.matches(keys[i], w, loose[i])) continue;
-        const before = w > 0 && i > 0 && this.matches(keys[i - 1], w - 1, loose[i - 1]);
-        const after = w + 1 < this.words.count && i + 1 < keys.length && this.matches(keys[i + 1], w + 1, loose[i + 1]);
+  private heardInPartials(w: number, partials: { heard: Heard; from: number }[]): boolean {
+    for (const { heard, from } of partials) {
+      const { keys, loose, alike } = heard;
+      for (let i = from; i < keys.length; i++) {
+        if (!this.matches(keys[i], w, loose[i], alike[i])) continue;
+        const before = w > 0 && i > 0 && this.matches(keys[i - 1], w - 1, loose[i - 1], alike[i - 1]);
+        const after =
+          w + 1 < this.words.count && i + 1 < keys.length && this.matches(keys[i + 1], w + 1, loose[i + 1], alike[i + 1]);
         if (before || after) return true;
       }
     }

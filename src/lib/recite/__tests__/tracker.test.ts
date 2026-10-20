@@ -260,6 +260,83 @@ describe('what recognition gets wrong', () => {
   });
 });
 
+describe('how recognition writes what was said', () => {
+  it('does not take آمن (believed) for آمين', () => {
+    const t = trackerFrom(2, 13);
+    expect(t.commit(verse(2, 13)).mistakes).toEqual([]);
+    expect(t.statusOf(first(2, 13) + 5)).toBe('correct');
+  });
+
+  it('still lets آمين pass after al-Fatiha', () => {
+    const t = trackerFrom(1, 7);
+    expect(t.commit([...verse(1, 7), 'آمين']).mistakes).toEqual([]);
+  });
+
+  it('accepts two words heard with the break in another place (انومنك ما)', () => {
+    const t = trackerFrom(2, 13);
+    const v = verse(2, 13);
+    const i = v.indexOf('أنؤمن');
+    expect(i).toBeGreaterThan(0);
+    const heard = [...v.slice(0, i), 'أنؤمنك', 'ما', ...v.slice(i + 2)];
+    expect(t.commit(heard).mistakes).toEqual([]);
+    expect(t.position).toBe(first(2, 14));
+  });
+
+  it('still catches a real slip where the letters do not add up', () => {
+    const t = trackerFrom(2, 13);
+    const v = verse(2, 13);
+    const i = v.indexOf('أنؤمن');
+    const heard = [...v.slice(0, i), 'أنؤمنك', 'لا', ...v.slice(i + 2)];
+    expect(t.commit(heard).mistakes.length).toBeGreaterThan(0);
+  });
+
+  it('accepts a final long ā written as ى (السفهى)', () => {
+    const t = trackerFrom(2, 13);
+    const heard = verse(2, 13).map((w) => (w === 'السفهاء' ? 'السفهى' : w));
+    expect(heard).toContain('السفهى');
+    expect(t.commit(heard).mistakes).toEqual([]);
+  });
+
+  it('keeps the last word of a cut utterance when it is the word written there', () => {
+    const t = trackerFrom(2, 255);
+    const v = verse(2, 255);
+    t.commit(v.slice(0, 12), [], { lastWordUnsure: true });
+    expect(t.position).toBe(first(2, 255) + 12);
+    // The next utterance starts after it: nothing is missed.
+    t.commit(v.slice(12));
+    expect(t.mistakes()).toEqual([]);
+  });
+
+  it('takes a word the previous utterance\'s partial results heard', () => {
+    const t = trackerFrom(2, 10);
+    const v = verse(2, 10);
+    // The final dropped its last two words; a partial result had them.
+    t.commit(v.slice(0, -2), [v.join(' ')]);
+    // The next utterance carries on after them.
+    t.commit(verse(2, 11));
+    expect(t.mistakes()).toEqual([]);
+  });
+
+  it('does not let a phrase heard earlier excuse a word left out (الرحمن الرحيم)', () => {
+    const t = trackerFrom(1, 1);
+    const all = say(verse(1, 1), verse(1, 2));
+    t.commit(all, [all]);
+    // 1:3 without its الرحيم: the previous utterance had الرحمن الرحيم (1:1).
+    const r = t.commit(['الرحمن', ...verse(1, 4)]);
+    expect(r.mistakes.map((m) => [m.word, m.kind])).toEqual([[first(1, 3) + 1, 'missed']]);
+  });
+
+  it('does not take them from an utterance before a jump', () => {
+    const t = trackerFrom(2, 10);
+    const v = verse(2, 10);
+    t.commit(v.slice(0, -2), [v.join(' ')]);
+    t.startAt(first(2, 10) + v.length - 2);
+    t.commit(verse(2, 11));
+    const missed = t.mistakes().map((m) => m.kind);
+    expect(missed).toEqual(['missed', 'missed']);
+  });
+});
+
 describe('preview', () => {
   it('moves the position with a partial result without committing', () => {
     const t = trackerFrom(1, 1);
