@@ -14,6 +14,7 @@ import { getRecitation } from '../lib/recitation';
 import {
   acquireRecording,
   appendSegment,
+  closeRecording,
   findRevisionRecording,
   PageMark,
   RecordingKind,
@@ -70,10 +71,11 @@ interface Options {
 /**
  * One recording per session, with pause and resume. Record starts it (asking
  * for the microphone the first time, pointing to Settings when it was refused);
- * Pause and Resume add to it; Done, or leaving the screen, finishes it. A
- * revision session's recording carries on across visits on the same day, so a
- * day's revision has one recording; a reading recording lasts while the reader
- * is open.
+ * Pause and Resume add to it; Stop finishes it. A revision session's recording
+ * is the day's one recording: leaving the screen or the app pauses it, and it
+ * is still there, paused, when the screen is opened again that day (even after
+ * the app was closed), until Stop. A reading recording lasts while the reader
+ * is open; leaving the reader finishes it.
  *
  * Each Pause finishes the current stretch as its own file and saves it at once,
  * so nothing is lost if the app is closed. A call, an alarm or Siri, and going
@@ -112,22 +114,29 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   };
 
   const finishRef = useRef<() => Promise<void>>(async () => {});
+  const leaveRef = useRef<() => Promise<void>>(async () => {});
   const pauseRef = useRef<(interruption?: boolean) => Promise<void>>(async () => {});
+  // A revision recording outlives the screen (paused); a reading one doesn't.
+  const keepsOpen = kind === 'revision';
 
-  // Leaving the screen finishes the session. Declared before useAudioRecorder:
-  // cleanups run in order, so this stops the recorder before the library
-  // releases it (the file location is already in uriRef).
+  // Leaving the screen pauses a revision session (it stays open) and finishes
+  // a reading one. Declared before useAudioRecorder: cleanups run in order, so
+  // this stops the recorder before the library releases it (the file location
+  // is already in uriRef).
   const unmountedRef = useRef(false);
   useEffect(
     () => () => {
       unmountedRef.current = true;
-      finishRef.current();
+      leaveRef.current();
     },
     [],
   );
   // Asked to pause (e.g. the app went to the background) while a stretch was
   // still starting: honoured once it has started.
   const pendingPauseRef = useRef(false);
+  // Stop asked for while there was nothing to stop yet (a start in progress,
+  // or the reopened session not restored yet): honoured once there is.
+  const stopRequestedRef = useRef(false);
 
   const recorder = useAudioRecorder(VOICE_PRESET, (status: RecordingStatus) => {
     // Interrupted or failed (a call, another app taking the microphone): keep
@@ -150,6 +159,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       pageMarks: [...marksRef.current],
       segmentStartMs,
       createdAt: createdAtRef.current,
+      open: keepsOpen,
     };
     uriRef.current = null;
     baseRef.current += segmentMs;
@@ -191,7 +201,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     });
     saveChainRef.current = run;
     return run;
-  }, [recorder, kind]);
+  }, [recorder, kind, keepsOpen]);
 
   /** Start a new stretch (first one or a resume). */
   const startSegment = useCallback(async () => {
@@ -229,8 +239,10 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     setInterrupted(false);
     setPhaseBoth('recording');
     // The screen closed, or the app left the foreground, while this was starting.
-    if (unmountedRef.current) {
+    if (stopRequestedRef.current) {
       await finishRef.current();
+    } else if (unmountedRef.current) {
+      await leaveRef.current();
     } else if (pendingPauseRef.current) {
       pendingPauseRef.current = false;
       await pauseRef.current(true);
@@ -251,6 +263,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
 
   const start = useCallback(async () => {
     if (phaseRef.current !== 'idle' || !day) return;
+    stopRequestedRef.current = false;
     // One recording session at a time across screens (tabs stay mounted).
     if (!acquireRecording(owner)) {
       Alert.alert('Already recording', 'Finish the other recording first.');
@@ -322,6 +335,11 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
 
   const resume = useCallback(async () => {
     if (phaseRef.current !== 'paused') return;
+    // A session restored on reopening: take the microphone again.
+    if (!acquireRecording(owner)) {
+      Alert.alert('Already recording', 'Finish the other recording first.');
+      return;
+    }
     setPhaseBoth('starting');
     try {
       await startSegment();
@@ -330,25 +348,32 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       logger.error('Could not resume recording', err);
       abandonStart();
       if (unmountedRef.current) {
-        // Left the screen while resuming: end the session properly.
+        // Left the screen while resuming.
         setPhaseBoth('paused');
-        await finishRef.current();
+        await leaveRef.current();
         return;
       }
       setPhaseBoth('paused');
       Alert.alert("Couldn't resume recording", 'Please try again.');
     }
-  }, [startSegment, abandonStart]);
+  }, [startSegment, abandonStart, owner]);
 
   const finish = useCallback(async () => {
     const p = phaseRef.current;
-    // While starting, the start itself finishes once it completes (it checks
-    // unmountedRef); a Done tap then is ignored.
+    // While starting (or before a reopened session is restored), finished as
+    // soon as it has started (or restored).
+    if (p === 'starting' || p === 'idle') stopRequestedRef.current = true;
     if (p !== 'recording' && p !== 'paused') return;
+    stopRequestedRef.current = false;
     setPhaseBoth('finishing');
     try {
       if (p === 'recording') endSegment();
       await saveChainRef.current;
+      if (recordingIdRef.current) {
+        await closeRecording(recordingIdRef.current).catch((err) =>
+          logger.warn('Could not close recording', err),
+        );
+      }
       setAudioMode(false);
       if (savedAnyRef.current) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -370,6 +395,61 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     }
   }, [endSegment, owner]);
   finishRef.current = finish;
+
+  /** The screen is closing: a revision session is paused and kept (saved as
+   *  open, so reopening restores it); a reading one is finished. */
+  const leave = useCallback(async () => {
+    if (!keepsOpen) return finish();
+    const p = phaseRef.current;
+    // While starting, the start checks unmountedRef and calls this when done.
+    if (p !== 'recording' && p !== 'paused') return;
+    if (p === 'recording') {
+      setPhaseBoth('paused');
+      endSegment();
+    }
+    try {
+      await saveChainRef.current;
+    } finally {
+      setAudioMode(false);
+      releaseRecording(owner);
+    }
+  }, [keepsOpen, finish, endSegment, owner]);
+  leaveRef.current = leave;
+
+  // Reopening the revision screen: a session left paused (still open) comes
+  // back paused, with its time, until Stop.
+  useEffect(() => {
+    if (!keepsOpen || !day) return;
+    let cancelled = false;
+    findRevisionRecording(day)
+      .then((existing) => {
+        if (!existing?.open) return;
+        // Stopped (e.g. the session ended) before this came back: close it,
+        // even if the screen has closed since.
+        if (stopRequestedRef.current && phaseRef.current === 'idle') {
+          stopRequestedRef.current = false;
+          closeRecording(existing.id).catch((err) => logger.warn('Could not close recording', err));
+          return;
+        }
+        if (cancelled || unmountedRef.current || phaseRef.current !== 'idle') return;
+        // Taken back only if no other screen is recording; Resume asks again.
+        acquireRecording(owner);
+        dayRef.current = day;
+        recordingIdRef.current = existing.id;
+        createdAtRef.current = existing.createdAt;
+        baseRef.current = existing.durationMs;
+        marksRef.current = [...existing.pageMarks];
+        savedAnyRef.current = true;
+        setBaseMs(existing.durationMs);
+        setSegmentStartedAt(null);
+        setInterrupted(false);
+        setPhaseBoth('paused');
+      })
+      .catch((err) => logger.warn('Could not restore recording', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [keepsOpen, day, owner]);
 
   // Page marks while recording, on the session's timeline.
   useEffect(() => {

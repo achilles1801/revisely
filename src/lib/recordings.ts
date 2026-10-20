@@ -38,6 +38,9 @@ export interface StoredRecording {
   fileName?: string;
   /** Page on screen over the recording's timeline (all segments). */
   pageMarks: PageMark[];
+  /** A revision recording paused and not yet stopped: the revision screen
+   *  shows it paused again when reopened (after leaving it, or the app). */
+  open?: boolean;
   storage: 'device';
 }
 
@@ -115,6 +118,8 @@ export interface SegmentInfo {
   /** Where this segment begins on that timeline. */
   segmentStartMs?: number;
   createdAt?: number;
+  /** The session goes on after this segment (see StoredRecording.open). */
+  open?: boolean;
 }
 
 export interface AppendResult {
@@ -177,6 +182,7 @@ export function appendSegment(
       pageMarks: restarted
         ? rebaseMarks(normalizePageMarks(info.pageMarks), info.segmentStartMs ?? 0)
         : normalizePageMarks(info.pageMarks),
+      ...(info.open ? { open: true } : {}),
       storage: 'device',
     };
     try {
@@ -194,7 +200,7 @@ export function appendSegment(
 /** Where a revision session's recording continues: the latest one for that day. */
 export function findRevisionRecording(
   day: string,
-): Promise<{ id: string; durationMs: number; pageMarks: PageMark[] } | null> {
+): Promise<{ id: string; durationMs: number; pageMarks: PageMark[]; createdAt: number; open: boolean } | null> {
   return serial(async () => {
     const dir = accountDir();
     const match = (await readIndex(dir))
@@ -203,7 +209,32 @@ export function findRevisionRecording(
       .filter((m): m is RecordingMeta => m != null)
       .sort((a, b) => b.createdAt - a.createdAt)[0];
     // The duration of the files that exist, so the timeline matches the audio.
-    return match ? { id: match.id, durationMs: match.durationMs, pageMarks: match.pageMarks } : null;
+    return match
+      ? {
+          id: match.id,
+          durationMs: match.durationMs,
+          pageMarks: match.pageMarks,
+          createdAt: match.createdAt,
+          open: match.open === true,
+        }
+      : null;
+  });
+}
+
+/** The recording was stopped: it no longer reopens paused. */
+export function closeRecording(id: string): Promise<void> {
+  return serial(async () => {
+    const dir = accountDir();
+    const entries = await readIndex(dir);
+    if (!entries.some((e) => e.id === id && e.open)) return;
+    writeIndex(
+      dir,
+      entries.map((e) => {
+        if (e.id !== id) return e;
+        const { open: _o, ...rest } = e;
+        return rest;
+      }),
+    );
   });
 }
 

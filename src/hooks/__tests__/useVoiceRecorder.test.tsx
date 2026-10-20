@@ -37,16 +37,19 @@ const mockStopRecitation = jest.fn();
 jest.mock('../../lib/recitation', () => ({ getRecitation: () => ({ stop: mockStopRecitation }) }));
 const mockAppend = jest.fn();
 const mockFind = jest.fn();
+const mockClose = jest.fn(() => Promise.resolve());
 jest.mock('../../lib/recordings', () => {
   const actual = jest.requireActual('../../lib/recordings');
   return {
     appendSegment: (...a: any[]) => mockAppend(...a),
     findRevisionRecording: (...a: any[]) => mockFind(...a),
+    closeRecording: (...a: any[]) => (mockClose as any)(...a),
     rebaseMarks: actual.rebaseMarks,
     acquireRecording: actual.acquireRecording,
     releaseRecording: actual.releaseRecording,
     setCapturing: actual.setCapturing,
     isRecordingActive: actual.isRecordingActive,
+    hasRecordingSession: actual.hasRecordingSession,
   };
 });
 const mockClaim = jest.fn();
@@ -65,7 +68,7 @@ jest.mock('../../lib/audioFocus', () => ({
 jest.mock('../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
 
 import { useVoiceRecorder, VOICE_PRESET } from '../useVoiceRecorder';
-import { isRecordingActive } from '../../lib/recordings';
+import { hasRecordingSession, isRecordingActive } from '../../lib/recordings';
 
 let appStateListeners: Array<(s: string) => void> = [];
 beforeEach(() => {
@@ -449,5 +452,197 @@ describe('useVoiceRecorder sessions', () => {
       mockRecorder.uri = `cache/seg-${mockUri}.m4a`;
       return Promise.resolve();
     });
+  });
+});
+
+describe('a revision recording stays open until Stop', () => {
+  const OPEN = { id: 'open-1', durationMs: 42_000, pageMarks: [{ atMs: 0, page: 5 }], createdAt: 111, open: true };
+  const revision = (props: any = {}) => setup({ kind: 'revision', ...props });
+  const settle = () => act(async () => undefined);
+
+  it('each saved stretch is marked open; Stop closes it', async () => {
+    const { result } = revision();
+    await settle();
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    expect(mockAppend.mock.calls[0][2]).toMatchObject({ open: true });
+    expect(mockClose).not.toHaveBeenCalled();
+    await act(() => result.current.finish());
+    expect(mockClose).toHaveBeenCalledWith('rec-1');
+  });
+
+  it('a reading recording is never marked open', async () => {
+    const { result } = setup({ kind: 'reading' });
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    expect(mockAppend.mock.calls[0][2]).toMatchObject({ open: false });
+  });
+
+  it('leaving the screen while paused keeps the session (no finish, no "View")', async () => {
+    const onFinished = jest.fn();
+    const { result, unmount } = revision({ onFinished });
+    await settle();
+    await act(() => result.current.start());
+    await act(() => result.current.pause());
+    await act(async () => unmount());
+    expect(mockClose).not.toHaveBeenCalled();
+    expect(onFinished).not.toHaveBeenCalled();
+    expect(mockAppend).toHaveBeenCalledTimes(1);
+    expect(hasRecordingSession()).toBe(false); // other screens may record meanwhile
+  });
+
+  it('leaving while recording saves the stretch as open', async () => {
+    const { result, unmount } = revision();
+    await settle();
+    await act(() => result.current.start());
+    await act(async () => unmount());
+    expect(mockRecorder.stop).toHaveBeenCalled();
+    expect(mockAppend).toHaveBeenCalledTimes(1);
+    expect(mockAppend.mock.calls[0][2]).toMatchObject({ open: true });
+    expect(mockClose).not.toHaveBeenCalled();
+    expect(isRecordingActive()).toBe(false);
+    expect(hasRecordingSession()).toBe(false);
+  });
+
+  it('reopening the screen shows the open session paused, with its time', async () => {
+    mockFind.mockResolvedValue(OPEN);
+    const { result } = revision();
+    await settle();
+    expect(result.current.phase).toBe('paused');
+    expect(result.current.baseMs).toBe(42_000);
+    expect(result.current.interrupted).toBe(false);
+    expect(mockRecorder.prepareToRecordAsync).not.toHaveBeenCalled(); // not recording by itself
+  });
+
+  it('resuming a reopened session adds to the same recording and timeline', async () => {
+    mockFind.mockResolvedValue(OPEN);
+    const onFinished = jest.fn();
+    const { result } = revision({ onFinished });
+    await settle();
+    await act(() => result.current.resume());
+    expect(result.current.phase).toBe('recording');
+    await act(() => result.current.finish());
+    const [id, , info] = mockAppend.mock.calls[0];
+    expect(id).toBe('open-1');
+    expect(info).toMatchObject({ segmentStartMs: 42_000, createdAt: 111 });
+    expect(info.pageMarks).toEqual([
+      { atMs: 0, page: 5 },
+      { atMs: 42_000, page: 12 },
+    ]);
+    expect(mockClose).toHaveBeenCalledWith('open-1');
+    expect(onFinished).toHaveBeenCalledWith({ day: '2026-10-20', recordingId: 'open-1' });
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('Stop on a reopened session closes it without recording', async () => {
+    mockFind.mockResolvedValue(OPEN);
+    const { result } = revision();
+    await settle();
+    await act(() => result.current.finish());
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockClose).toHaveBeenCalledWith('open-1');
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('a stopped recording is not restored (the mic shows; Record continues the day)', async () => {
+    mockFind.mockResolvedValue({ ...OPEN, open: false });
+    const { result } = revision();
+    await settle();
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('a reading recording is not restored, and leaving the reader finishes it', async () => {
+    mockFind.mockResolvedValue(OPEN);
+    const { result, unmount } = setup({ kind: 'reading' });
+    await settle();
+    expect(result.current.phase).toBe('idle');
+    await act(() => result.current.start());
+    await act(async () => unmount());
+    expect(mockAppend.mock.calls[0][2]).toMatchObject({ open: false });
+  });
+
+  it('only restores the session of the screen’s day', async () => {
+    mockFind.mockImplementation((day: string) => Promise.resolve(day === '2026-10-19' ? OPEN : null));
+    const { result } = revision({ day: '2026-10-20' });
+    await settle();
+    expect(mockFind).toHaveBeenCalledWith('2026-10-20');
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('a session restored while another screen records waits to resume', async () => {
+    const other = setup({ kind: 'reading' });
+    await act(() => other.result.current.start());
+    mockFind.mockResolvedValue(OPEN);
+    const { result } = revision();
+    await settle();
+    expect(result.current.phase).toBe('paused');
+    await act(() => result.current.resume());
+    expect(Alert.alert).toHaveBeenCalledWith('Already recording', expect.any(String));
+    expect(result.current.phase).toBe('paused');
+    await act(() => other.result.current.finish());
+    await act(() => result.current.resume());
+    expect(result.current.phase).toBe('recording');
+    await act(() => result.current.finish());
+  });
+
+  it('a tap on Record before the restore finishes does not start twice', async () => {
+    let resolveFind: (v: any) => void = () => undefined;
+    mockFind.mockImplementationOnce(() => new Promise((r) => (resolveFind = r)));
+    mockFind.mockResolvedValue(OPEN);
+    const { result } = revision();
+    await act(() => result.current.start()); // continues the open recording
+    await act(async () => resolveFind(OPEN));
+    expect(result.current.phase).toBe('recording');
+    expect(mockRecorder.prepareToRecordAsync).toHaveBeenCalledTimes(1);
+    await act(() => result.current.finish());
+    expect(mockAppend.mock.calls[0][0]).toBe('open-1');
+  });
+
+  it('going to the background pauses and keeps it open; it is still paused after', async () => {
+    const { result } = revision();
+    await settle();
+    await act(() => result.current.start());
+    await act(async () => appStateListeners.forEach((l) => l('background')));
+    expect(result.current.phase).toBe('paused');
+    expect(mockAppend.mock.calls[0][2]).toMatchObject({ open: true });
+    await act(async () => appStateListeners.forEach((l) => l('active')));
+    expect(result.current.phase).toBe('paused');
+    expect(mockClose).not.toHaveBeenCalled();
+    await act(() => result.current.finish());
+  });
+
+  it('Stop while the start is in progress finishes it (and closes it) once started', async () => {
+    let release: () => void = () => undefined;
+    mockRecorder.prepareToRecordAsync.mockImplementationOnce(() => {
+      mockUri += 1;
+      mockRecorder.uri = `cache/seg-${mockUri}.m4a`;
+      return new Promise<void>((r) => (release = r));
+    });
+    const { result, unmount } = revision();
+    await settle();
+    let started: Promise<void> = Promise.resolve();
+    act(() => {
+      started = result.current.start();
+    });
+    await settle();
+    expect(result.current.phase).toBe('starting');
+    await act(() => result.current.finish()); // the session was ended
+    await act(async () => unmount());
+    await act(async () => {
+      release();
+      await started;
+    });
+    expect(mockClose).toHaveBeenCalledWith('rec-1');
+    expect(hasRecordingSession()).toBe(false);
+  });
+
+  it('Stop before the reopened session is restored closes it instead', async () => {
+    let resolveFind: (v: any) => void = () => undefined;
+    mockFind.mockImplementationOnce(() => new Promise((r) => (resolveFind = r)));
+    const { result, unmount } = revision();
+    await act(() => result.current.finish());
+    await act(async () => unmount());
+    await act(async () => resolveFind(OPEN));
+    expect(mockClose).toHaveBeenCalledWith('open-1');
   });
 });
