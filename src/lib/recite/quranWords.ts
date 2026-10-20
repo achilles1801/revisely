@@ -182,6 +182,16 @@ export class QuranWords {
     return this.sura[a] === this.sura[b] && this.ayah[a] === this.ayah[b];
   }
 
+  /** The line of its page the word is on (1-15). */
+  lineOf(i: number): number {
+    return this.line[i];
+  }
+
+  /** A line's band on a page (top and bottom of its glyphs, 1024-wide space). */
+  lineBand(page: number, line: number): [number, number] | null {
+    return this.lineBands.get(page)?.get(line) ?? null;
+  }
+
   /** The word's box on its page (1024-wide space), the full height of its line. */
   rect(i: number): Rect {
     const band = this.lineBands.get(this.page[i])?.get(this.line[i]) ?? [0, 0];

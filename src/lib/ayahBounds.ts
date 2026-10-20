@@ -31,6 +31,16 @@ function pageData(page: number): number[] {
   return bounds[String(page)] ?? [];
 }
 
+/** Every verse's rectangles on a page (one per verse per line), in data order. */
+export function pageAyahRects(page: number): (AyahRef & Rect)[] {
+  const d = pageData(page);
+  const out: (AyahRef & Rect)[] = [];
+  for (let i = 0; i < d.length; i += 6) {
+    out.push({ page, sura: d[i], ayah: d[i + 1], x0: d[i + 2], y0: d[i + 3], x1: d[i + 4], y1: d[i + 5] });
+  }
+  return out;
+}
+
 /** The rectangles (bounds space) covering one verse on a page. */
 export function ayahRects(page: number, sura: number, ayah: number): Rect[] {
   const d = pageData(page);

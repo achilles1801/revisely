@@ -146,13 +146,20 @@ describe('useRecitationCheck', () => {
     expect(result.current.phase).toBe('listening');
     expect(mockClaim).toHaveBeenCalledWith('recitation-check', expect.any(String));
     expect(isCheckListening()).toBe(true);
-    expect(result.current.bar).not.toBeNull();
+    expect(result.current.panel).not.toBeNull();
     expect(result.current.button).toBeNull();
 
     // Partial results arrive as well; the script answers in order.
     mockHeard = [1, 2, 3, 4, 5].flatMap((a) => [say(verse(2, a)), say(verse(2, a))]);
     await speak(5);
-    await act(async () => press({ props: { onPress: result.current.bar!.props.onStop } }));
+    // The panel's figures: no mistakes, all right, and the last words heard.
+    const panel = result.current.panel!.props;
+    expect(panel.mistakes).toBe(0);
+    expect(panel.accuracy).toBe(100);
+    expect(panel.perPage).toBe(0);
+    expect(panel.lastHeard.length).toBeGreaterThan(0);
+    expect(result.current.status).not.toBeNull();
+    await act(async () => press({ props: { onPress: result.current.panel!.props.onStop } }));
 
     expect(result.current.phase).toBe('idle');
     expect(isCheckListening()).toBe(false);

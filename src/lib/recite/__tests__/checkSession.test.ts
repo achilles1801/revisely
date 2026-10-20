@@ -73,6 +73,31 @@ describe('CheckSession', () => {
     expect(record.recited).toBe(first(2, 6) - first(2, 1));
   });
 
+  it('shows the last words heard, and how long it has listened', async () => {
+    const heard = [say(verse(2, 1)), say(verse(2, 2))];
+    const { session, play } = setup(heard, { pages: [2], page: 2 });
+    expect(session.lastHeard()).toBe('');
+    await session.start();
+    await play();
+    await session.stop();
+    const v = verse(2, 2);
+    expect(session.lastHeard(3)).toBe(v.slice(-3).join(' '));
+    expect(session.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('going back to a verse on the page before turns the page there', async () => {
+    const heard = [6, 7].map((a) => say(verse(2, a)));
+    const { session, events, play } = setup(heard, { pages: [2, 3], page: 3 });
+    session.startFrom(first(2, 6));
+    await session.start();
+    await play();
+    events.reach.length = 0;
+    session.rewindTo(first(2, 5));
+    expect(events.reach).toEqual([2]);
+    expect(session.tracker.isStale(first(2, 6))).toBe(true);
+    await session.stop();
+  });
+
   it('turns to the next page when the reciter reaches it', async () => {
     const heard = [5, 6, 7].map((a) => say(verse(2, a)));
     const { session, events, play } = setup(heard, { pages: [2, 3, 4], page: 2 });

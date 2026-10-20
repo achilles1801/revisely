@@ -169,6 +169,9 @@ function toHeard(text: string | string[]): Heard {
 export class RecitationTracker {
   private readonly words: QuranWords;
   private readonly status: Uint8Array;
+  /** Words gone back over to recite again: shown as not yet recited until heard
+   *  again (their results stand, for the summary). */
+  private readonly stale: Uint8Array;
   private readonly heard = new Map<number, string>();
   private pos: number | null = null;
   private region: [number, number];
@@ -190,6 +193,7 @@ export class RecitationTracker {
   constructor(words: QuranWords, startPage = 1) {
     this.words = words;
     this.status = new Uint8Array(words.count);
+    this.stale = new Uint8Array(words.count);
     this.region = this.pageRegion(startPage);
   }
 
@@ -222,6 +226,22 @@ export class RecitationTracker {
     this.unplaced = null;
     this.previousEvidence = [];
     this.version++;
+  }
+
+  /**
+   * Go back to recite again from `word` (e.g. the start of the verse): the words
+   * from there to where the reciter was count as not yet recited on the page
+   * until they are heard again.
+   */
+  rewind(word: number): void {
+    const to = Math.min(this.pos ?? word, this.words.count);
+    for (let w = word; w < to; w++) if (this.status[w] !== PENDING) this.stale[w] = 1;
+    this.startAt(word);
+  }
+
+  /** Gone back over and not heard again yet (see rewind). */
+  isStale(word: number): boolean {
+    return this.stale[word] === 1;
   }
 
   /** Look for the reciter on a page (and the pages either side). */
@@ -350,6 +370,7 @@ export class RecitationTracker {
     const pos = anchored ? a.start : (this.pos as number);
 
     const markCorrect = (w: number) => {
+      this.stale[w] = 0;
       const s = this.status[w];
       if (s === WRONG || s === MISSED) this.status[w] = CORRECTED;
       else if (s !== CORRECTED) this.status[w] = CORRECT;
@@ -358,8 +379,10 @@ export class RecitationTracker {
     };
     const markMistake = (w: number, kind: 'wrong' | 'missed', said?: string) => {
       // Only words not recited before: a repeat that goes wrong where it went
-      // right the first time is more likely recognition than the reciter.
+      // right the first time is more likely recognition than the reciter. A word
+      // gone back over stays covered then (it wasn't heard again).
       if (this.status[w] !== PENDING) return;
+      this.stale[w] = 0;
       if (this.heardInPartials(w, evidence)) {
         markCorrect(w);
         return;

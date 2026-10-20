@@ -1,4 +1,4 @@
-import { checkStats, groupMistakes, rangeLabel } from '../checkSummary';
+import { accuracyOf, checkStats, groupMistakes, rangeLabel } from '../checkSummary';
 import type { CheckRecord } from '../checkHistory';
 import { quranWords } from '../__fixtures__/quranWords';
 
@@ -35,6 +35,14 @@ describe('checkStats', () => {
 
   it('is 100% with no mistakes', () => {
     expect(checkStats(record({})).accuracy).toBe(100);
+  });
+
+  it('is 1 − mistaken words ÷ words recited; a corrected word counts as right', () => {
+    expect(accuracyOf(3, 60)).toBe(95);
+    expect(accuracyOf(0, 0)).toBe(100);
+    expect(accuracyOf(10, 5)).toBe(0);
+    const s = checkStats(record({ recited: 50, mistakes: [{ w: 1, k: 'wrong' }, { w: 3, k: 'wrong', c: true }] }));
+    expect(s.accuracy).toBe(98);
   });
 });
 

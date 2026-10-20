@@ -64,6 +64,7 @@ export class CheckSession {
   private stopped = false;
   private lastPage: number | null = null;
   private errors = 0;
+  private heardText = '';
 
   constructor(options: CheckSessionOptions) {
     this.o = options;
@@ -103,6 +104,17 @@ export class CheckSession {
   /** Where the reciter is, counting the utterance still being spoken. */
   get position(): number | null {
     return this.preview?.position ?? this.tracker.position;
+  }
+
+  /** Time spent listening so far (ms). */
+  get elapsedMs(): number {
+    return this.listenedMs + this.runningMs();
+  }
+
+  /** The last words heard (the utterance in progress, or the last one), as recognised. */
+  lastHeard(maxWords = 5): string {
+    const heard = this.heardText.trim().split(/\s+/).filter(Boolean);
+    return heard.slice(-maxWords).join(' ');
   }
 
   /** Heard correctly in the utterance still being spoken (not committed yet). */
@@ -156,6 +168,17 @@ export class CheckSession {
     this.tracker.startAt(word);
     this.preview = null;
     this.previewCorrect.clear();
+    this.followPage();
+    this.o.onChange();
+  }
+
+  /** Back to recite again from `word`: what was recited from there is covered
+   *  again (with the words hidden) until it is heard again. */
+  rewindTo(word: number): void {
+    this.tracker.rewind(word);
+    this.preview = null;
+    this.previewCorrect.clear();
+    this.followPage();
     this.o.onChange();
   }
 
@@ -199,6 +222,7 @@ export class CheckSession {
   private onPartial(text: string) {
     this.errors = 0;
     logger.log('[recite] partial:', text);
+    this.heardText = text;
     this.preview = this.tracker.preview(text);
     this.previewCorrect = new Set(this.preview.correct);
     this.followPage();
@@ -208,6 +232,7 @@ export class CheckSession {
   private onFinal(text: string, partials: string[], cut = false) {
     this.errors = 0;
     const before = this.tracker.position;
+    if (text.trim()) this.heardText = text;
     const result = this.tracker.commit(text, partials, { lastWordUnsure: cut });
     logger.log('[recite] final:', text, '| placed', result.placed, 'at', result.start, '→', result.position, 'mistakes', result.mistakes.length);
     this.preview = null;

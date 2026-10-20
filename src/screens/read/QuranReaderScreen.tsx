@@ -19,6 +19,7 @@ import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { useRecitationCheck } from '../../components/recite/useRecitationCheck';
+import { RECITE_PANEL_HEIGHT } from '../../components/recite/ReciteBar';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { RecordButton } from '../../components/recordings/RecordButton';
@@ -131,8 +132,10 @@ export default function QuranReaderScreen() {
   const insets = useSafeAreaInsets();
   // The floating timer docks in the bottom bar's right-hand slot; hidden with
   // the controls.
+  // While checking recitation the timer steps aside (the panel shows its own
+  // clock and needs the room); it keeps running.
   useFloatingTimerOffset(
-    chromeVisible
+    chromeVisible && !recite.active
       ? insets.bottom + FOOTER_PADDING_BOTTOM + (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2
       : 'hidden',
   );
@@ -259,11 +262,12 @@ export default function QuranReaderScreen() {
         />
       </View>
 
-      <View style={styles.footer}>
-        <View style={styles.footerContent} pointerEvents={chromeVisible ? 'box-none' : 'none'}>
-          {chromeVisible &&
-            (recite.bar ??
-              verseActions.player ?? (
+      {/* While checking recitation its panel takes the whole bottom. */}
+      {recite.panel ?? (
+        <View style={styles.footer}>
+          <View style={styles.footerContent} pointerEvents={chromeVisible ? 'box-none' : 'none'}>
+            {chromeVisible &&
+              (verseActions.player ?? (
                 <View style={styles.footerRow} pointerEvents="box-none">
                   {recite.button}
                   <View style={styles.scrubberCol} pointerEvents="box-none">
@@ -274,10 +278,11 @@ export default function QuranReaderScreen() {
                   </View>
                 </View>
               ))}
+          </View>
+          {/* The floating timer docks here (wider while it shows a clock). */}
+          <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
         </View>
-        {/* The floating timer docks here (wider while it shows a clock). */}
-        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
-      </View>
+      )}
 
       <UndoToast
         visible={!!savedRecording}
@@ -290,7 +295,9 @@ export default function QuranReaderScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={FOOTER_CONTENT_HEIGHT + FOOTER_PADDING_BOTTOM + spacing.sm}
+        bottomInset={
+          recite.active ? RECITE_PANEL_HEIGHT + spacing.sm : FOOTER_CONTENT_HEIGHT + FOOTER_PADDING_BOTTOM + spacing.sm
+        }
       />
 
       {verseActions.overlay}

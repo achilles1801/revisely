@@ -30,7 +30,7 @@ import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/S
 import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { useRecitationCheck } from '../../components/recite/useRecitationCheck';
-import { RECITE_STATUS_HEIGHT } from '../../components/recite/ReciteBar';
+import { RECITE_PANEL_HEIGHT, RECITE_STATUS_HEIGHT } from '../../components/recite/ReciteBar';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
@@ -319,7 +319,9 @@ export default function ActiveRevisionScreen() {
     (submitVisible ? SUBMIT_BAR_HEIGHT : 0) +
     FOOTER_PADDING_BOTTOM +
     (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2;
-  useFloatingTimerOffset(Math.max(docked, undoState ? UNDO_TOAST_TOP : 0));
+  // While checking recitation the timer steps aside (the panel shows its own
+  // clock and needs the room); it keeps running.
+  useFloatingTimerOffset(recite.active ? 'hidden' : Math.max(docked, undoState ? UNDO_TOAST_TOP : 0));
 
   if (!user || !assignment) {
     return (
@@ -672,10 +674,11 @@ export default function ActiveRevisionScreen() {
         />
       </View>
 
-      <View style={styles.footer}>
-        <View style={styles.footerContent}>
-          {recite.bar ??
-            (verseActions.player && playerShown ? (
+      {/* While checking recitation its panel takes the whole bottom. */}
+      {recite.panel ?? (
+        <View style={styles.footer}>
+          <View style={styles.footerContent}>
+            {verseActions.player && playerShown ? (
               verseActions.player
             ) : (
               <View style={styles.footerRow}>
@@ -683,11 +686,12 @@ export default function ActiveRevisionScreen() {
                 <Text style={styles.pageNum}>{displayPageNumber}</Text>
                 <View style={styles.footerSide} />
               </View>
-            ))}
+            )}
+          </View>
+          {/* The floating timer docks here (wider while it shows a clock). */}
+          <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
         </View>
-        {/* The floating timer docks here (wider while it shows a clock). */}
-        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
-      </View>
+      )}
 
       {/* All revised → submit button slides up */}
       {completedCount === totalPages && totalPages > 0 && (
@@ -713,7 +717,11 @@ export default function ActiveRevisionScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={spacing.xl}
+        bottomInset={
+          recite.active
+            ? RECITE_PANEL_HEIGHT + (submitVisible ? SUBMIT_BAR_HEIGHT : 0) + spacing.sm
+            : spacing.xl
+        }
       />
 
       <UndoToast
@@ -721,7 +729,11 @@ export default function ActiveRevisionScreen() {
         message={undoState?.message ?? ''}
         onUndo={handleUndo}
         onDismiss={() => setUndoState(null)}
-        bottomInset={spacing.xl}
+        bottomInset={
+          recite.active
+            ? RECITE_PANEL_HEIGHT + (submitVisible ? SUBMIT_BAR_HEIGHT : 0) + spacing.sm
+            : spacing.xl
+        }
       />
 
       <SessionMenuSheet

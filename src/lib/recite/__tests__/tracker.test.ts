@@ -337,6 +337,47 @@ describe('how recognition writes what was said', () => {
   });
 });
 
+describe('going back to recite again', () => {
+  it('covers the verse again until it is heard again, keeping its results', () => {
+    const t = trackerFrom(2, 2);
+    const v = verse(2, 2);
+    const bad = [...v];
+    bad[4] = 'فيها';
+    t.commit(bad);
+    const start = first(2, 2);
+    t.rewind(start);
+    expect(t.position).toBe(start);
+    expect(t.isStale(start)).toBe(true);
+    expect(t.isStale(start + 4)).toBe(true);
+    // The mistake still counts until it is put right.
+    expect(t.mistakes().map((m) => m.word)).toEqual([start + 4]);
+    t.commit(v.slice(0, 3));
+    expect(t.isStale(start)).toBe(false);
+    expect(t.isStale(start + 4)).toBe(true);
+    t.commit(v.slice(3));
+    expect(t.isStale(start + 4)).toBe(false);
+    expect(t.statusOf(start + 4)).toBe('corrected');
+  });
+
+  it('keeps a word covered that was skipped on the second time round', () => {
+    const t = trackerFrom(2, 2);
+    const v = verse(2, 2);
+    t.commit(v);
+    const start = first(2, 2);
+    t.rewind(start);
+    // Said again without its fifth word.
+    t.commit([...v.slice(0, 4), ...v.slice(5)]);
+    expect(t.isStale(start + 4)).toBe(true);
+    expect(t.isStale(start + 5)).toBe(false);
+  });
+
+  it('marks nothing stale that was never recited', () => {
+    const t = trackerFrom(2, 2);
+    t.rewind(first(2, 1));
+    expect(t.isStale(first(2, 1))).toBe(false);
+  });
+});
+
 describe('preview', () => {
   it('moves the position with a partial result without committing', () => {
     const t = trackerFrom(1, 1);

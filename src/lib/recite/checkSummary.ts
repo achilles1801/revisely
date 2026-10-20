@@ -6,24 +6,28 @@ import type { CheckMistake, CheckRecord } from './checkHistory';
 import type { QuranWords } from './quranWords';
 
 export interface CheckStats {
-  /** Mistakes not corrected afterwards. */
+  /** Mistakes not corrected afterwards (words missed in a row count once). */
   mistakes: number;
   corrected: number;
-  /** Share of recited words that were right (corrected ones count as slips). */
+  /** Per cent of the words recited that were right: 1 − mistaken words ÷ words
+   *  recited (a word corrected afterwards counts as right). */
   accuracy: number;
 }
 
-export function checkStats(record: CheckRecord): CheckStats {
+export function checkStats(record: Pick<CheckRecord, 'recited' | 'mistakes'>): CheckStats {
   const corrected = record.mistakes.filter((m) => m.c);
   const open = record.mistakes.filter((m) => !m.c);
-  const recited = Math.max(record.recited, 1);
-  // Accuracy is per word; a corrected slip counts half.
-  const accuracy = Math.max(0, Math.round((100 * (recited - open.length - corrected.length * 0.5)) / recited));
   return {
     mistakes: countMistakes(open),
     corrected: countMistakes(corrected),
-    accuracy: record.recited === 0 ? 0 : accuracy,
+    accuracy: accuracyOf(open.length, record.recited),
   };
+}
+
+/** Accuracy (per cent) with `mistaken` of `recited` words wrong or missed; 100 before any. */
+export function accuracyOf(mistaken: number, recited: number): number {
+  if (recited <= 0) return 100;
+  return Math.max(0, Math.round(100 * (1 - mistaken / recited)));
 }
 
 /**

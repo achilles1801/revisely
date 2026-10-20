@@ -19,8 +19,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { getReadPalette } from '../../theme/readPalette';
 import type { PageLayers } from '../MushafPager';
 import { wordLayers } from './wordLayers';
-import { countMistakes } from '../../lib/recite/checkSummary';
-import { ReciteBar, ReciteStatus } from './ReciteBar';
+import { accuracyOf, countMistakes } from '../../lib/recite/checkSummary';
+import { RecitePanel, ReciteStatus } from './ReciteBar';
 import { ReciteButton } from './ReciteButton';
 import { SpeechModelSheet } from './SpeechModelSheet';
 import { CheckSummarySheet } from './CheckSummarySheet';
@@ -258,6 +258,21 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
     setRecitePrefs({ hideWords: !optsRef.current.prefs.hideWords });
   }, []);
 
+  /** Back to the start of the verse being recited, or the verse before when
+   *  already at a verse's start (to recite it again). */
+  const back = useCallback(() => {
+    const s = sessionRef.current;
+    const w = words;
+    const pos = s?.position;
+    if (!s || !w || pos == null) return;
+    const at = Math.min(pos, w.count - 1);
+    const ref = w.ref(at);
+    const [verseStart] = w.verseRange(ref.sura, ref.ayah);
+    const target = at > verseStart || at === 0 ? verseStart : w.verseRange(w.ref(at - 1).sura, w.ref(at - 1).ayah)[0];
+    Haptics.selectionAsync();
+    s.rewindTo(target);
+  }, [words]);
+
   /** Show the next word while words are hidden. */
   const hint = useCallback(() => {
     const pos = sessionRef.current?.position;
@@ -292,14 +307,15 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
           words,
           page,
           scale,
-          status: (w) => session.tracker.statusOf(w),
+          // Words gone back over show as not yet recited until heard again.
+          status: (w) => (session.tracker.isStale(w) ? 'pending' : session.tracker.statusOf(w)),
           position: session.position,
           hide: prefs.hideWords,
           revealed: (w) => session.isPreviewCorrect(w) || hints.has(w),
           past: prefs.showPastMistakes ? past : null,
           pageColor: palette.pageBg,
           inkColor: palette.textPrimary,
-          trail: true,
+          hinted: (w) => hints.has(w),
         });
       }
       if (summaryStatus) {
@@ -337,31 +353,40 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
     [words, session, version, prefs, past, summaryStatus, hints, palette],
   );
 
-  const mistakeCount = session
-    ? countMistakes(
-        session.tracker
-          .mistakes()
-          .filter((m) => !m.corrected)
-          .map((m) => ({ w: m.word, k: m.kind })),
-      )
-    : 0;
+  const openMistakes = session
+    ? session.tracker
+        .mistakes()
+        .filter((m) => !m.corrected)
+        .map((m) => ({ w: m.word, k: m.kind }))
+    : [];
+  const mistakeCount = countMistakes(openMistakes);
+  const recited = session ? session.tracker.recitedCount() : 0;
+  const span = session?.tracker.span ?? null;
+  // Pages the recitation has covered so far (at least one).
+  const pagesCovered = span && words ? words.pageOf(span[1]) - words.pageOf(span[0]) + 1 : 1;
   const active = phase !== 'idle';
+  const position = session?.position != null && words ? Math.min(session.position, words.count - 1) : null;
 
   const button = !active ? (
     <ReciteButton onPress={() => begin()} busy={false} palette={palette} />
   ) : null;
 
-  const bar = active ? (
-    <ReciteBar
+  const panel = active ? (
+    <RecitePanel
       phase={phase}
       finding={!!session && session.position == null}
       levelDb={() => sessionRef.current?.levelDb ?? -100}
       speaking={() => sessionRef.current?.speaking ?? false}
+      elapsedMs={() => sessionRef.current?.elapsedMs ?? 0}
+      lastHeard={session?.lastHeard() ?? ''}
+      mistakes={mistakeCount}
+      perPage={Math.round((mistakeCount / pagesCovered) * 10) / 10}
+      accuracy={accuracyOf(openMistakes.length, recited)}
       hidden={prefs.hideWords}
       onToggleHide={toggleHide}
       onHint={hint}
+      onBack={back}
       onStop={() => finish('user')}
-      palette={palette}
     />
   ) : null;
 
@@ -369,8 +394,8 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
     <ReciteStatus
       phase={phase}
       finding={!!session && session.position == null}
-      verse={session?.position != null && words ? words.ref(Math.min(session.position, words.count - 1)) : null}
-      mistakes={mistakeCount}
+      verse={position != null && words ? words.ref(position) : null}
+      page={currentPage}
     />
   ) : null;
 
@@ -407,8 +432,9 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
     active,
     /** The Recite button (null while checking). */
     button,
-    /** The controls while checking (null otherwise). */
-    bar,
+    /** The controls while checking, for the whole bottom of the screen (null
+     *  otherwise); the screen's own bar and the floating timer step aside. */
+    panel,
     /** Where the reciter is and the mistakes so far, for the breadcrumb row
      *  (null while not checking). */
     status,
