@@ -160,4 +160,7 @@ jobs:
         env:
           SENTRY_ORG: revisely
           SENTRY_PROJECT: react-native
+          # Required with org/project, or the script looks for the Sentry plugin's
+          # config in app.config.js (deliberately not set there) and gives up.
+          SENTRY_URL: https://sentry.io/
         run: npx sentry-expo-upload-sourcemaps dist
