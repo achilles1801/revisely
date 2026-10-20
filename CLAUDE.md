@@ -88,8 +88,9 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - Apple refuses uploads while an agreement is unaccepted ("A required agreement is missing or has
   expired"); retries can then fail with no message at all. Check App Store Connect > Business: the
   Free Apps Agreement must be Active. The Paid Apps Agreement does not block a free app.
-- Auto-submit cannot add builds to the `Team (Expo)` TestFlight group (Apple 403); add a new build to
-  the group by hand in App Store Connect.
+- `Team (Expo)` is an internal TestFlight group with access to all builds, so a new build reaches it
+  once Apple has processed it. The external `Test Users` group gets builds only by hand (Beta App
+  Review).
 
 ## App Store
 
