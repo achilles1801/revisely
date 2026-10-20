@@ -241,6 +241,9 @@ export function useRecitationCheck({ kind, day, pages, currentPage, onShowPage, 
 
   // No listening in the background; leaving the screen ends the check.
   useEffect(() => {
+    // Set here, not only initially: effects can be torn down and set up again
+    // while the screen stays (Fast Refresh, strict mode).
+    unmountedRef.current = false;
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'background' && sessionRef.current) finishRef.current('interrupted');
     });

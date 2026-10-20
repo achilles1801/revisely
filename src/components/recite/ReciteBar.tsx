@@ -79,8 +79,7 @@ export function ReciteBar({
         : placed
           ? surah
           : 'Start reciting';
-  const subtitle =
-    phase !== 'listening' ? ' ' : placed ? `Verse ${verse.ayah}` : 'Listening for where you are';
+  const subtitle = phase !== 'listening' ? ' ' : placed ? `Verse ${verse.ayah}` : 'Listening…';
 
   const icon = (name: keyof typeof Ionicons.glyphMap, label: string, onPress: () => void, active = false) => (
     <Pressable
@@ -130,7 +129,8 @@ export function ReciteBar({
           {subtitle}
         </Text>
       </View>
-      {hidden && icon('bulb-outline', 'Show the next word', onHint)}
+      {/* A hint needs a place: the next word. */}
+      {hidden && placed && icon('bulb-outline', 'Show the next word', onHint)}
       {icon(hidden ? 'eye-off' : 'eye-outline', hidden ? 'Show the words' : 'Hide the words', onToggleHide, hidden)}
       <Pressable
         onPress={onStop}

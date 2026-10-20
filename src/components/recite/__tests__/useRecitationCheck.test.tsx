@@ -1,3 +1,4 @@
+import React from 'react';
 import { act, renderHook } from '@testing-library/react-native';
 import { Alert, AppState } from 'react-native';
 import { quranWords, say, verse } from '../../../lib/recite/__fixtures__/quranWords';
@@ -165,6 +166,17 @@ describe('useRecitationCheck', () => {
     // Page 2 (2:1-2:5) was recited through.
     expect(onPageRecited).toHaveBeenCalledWith(2);
     expect(overlayPart(result, 1).props.record).toBe(saved);
+  });
+
+  it('keeps listening when effects are set up twice (strict mode, Fast Refresh)', async () => {
+    const { result } = renderHook(
+      () =>
+        useRecitationCheck({ kind: 'reading', day: '2026-10-20', pages: [2], currentPage: 2, onShowPage: jest.fn() }),
+      { wrapper: React.StrictMode },
+    );
+    await act(async () => press(result.current.button));
+    expect(result.current.phase).toBe('listening');
+    expect(mockSourceStop).not.toHaveBeenCalled();
   });
 
   it('stops when something else takes the audio', async () => {
