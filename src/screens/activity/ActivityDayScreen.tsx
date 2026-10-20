@@ -41,6 +41,7 @@ import { radius } from '../../theme/radius';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, ReadingSession, RevisionLog } from '../../types';
 import { RecordingsList } from '../../components/recordings/RecordingsList';
+import { CheckList } from '../../components/recite/CheckList';
 import { deleteRecordings, isReadingRecordingDuring } from '../../lib/recordings';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
@@ -310,6 +311,8 @@ export default function ActivityDayScreen() {
               header={<Text style={styles.sectionLabel}>RECORDINGS</Text>}
             />
           </View>
+
+          <CheckList day={date} header={<Text style={styles.sectionLabel}>RECITATION CHECKS</Text>} />
 
           {/* Daily log */}
           <Text style={styles.sectionLabel}>DAILY LOG</Text>

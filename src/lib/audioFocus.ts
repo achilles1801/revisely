@@ -1,11 +1,12 @@
-// One audio activity at a time: recitation, playing a recording, or recording.
+// One audio activity at a time: recitation, playing a recording, recording, or
+// listening to check a recitation.
 // Starting one tells the others to stop (screens stay mounted under other
 // tabs, so they can't rely on unmounting). Also the one place the app's audio
 // mode is set, so every switch keeps the same settings.
 
 import { setAudioModeAsync, setIsAudioActiveAsync } from 'expo-audio';
 
-export type AudioActivity = 'recitation' | 'recording-playback' | 'recorder';
+export type AudioActivity = 'recitation' | 'recording-playback' | 'recorder' | 'recitation-check';
 
 type Listener = (claimedBy: AudioActivity, owner: string) => void;
 const listeners = new Set<Listener>();

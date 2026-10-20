@@ -6,7 +6,7 @@ export default {
     slug: "revision-buddy",
     owner: "achilles1802",
     scheme: "revisely",
-    version: "1.0.1",
+    version: "1.0.2",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
     // build that lacks it.
@@ -103,14 +103,13 @@ export default {
       "@sentry/react-native",
       "expo-font",
       "expo-web-browser",
-      // Verse recitation (and, later, recording yourself reciting). The pod
-      // ships recording APIs, so Apple's upload check requires a microphone
-      // purpose string even before the app records.
+      // Verse recitation, recording yourself, and checking recitation for
+      // mistakes (on the device: modules/recitation-audio and whisper.rn).
       [
         "expo-audio",
         {
           microphonePermission:
-            "Revisely uses the microphone to record your recitation so you can listen back to it.",
+            "Revisely uses the microphone to record your recitation and to check it for mistakes. Your voice is processed on this iPhone.",
           recordAudioAndroid: false,
         },
       ],

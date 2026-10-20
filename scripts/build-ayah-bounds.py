@@ -26,11 +26,16 @@ rows = db.execute(
     "select page_number, line_number, sura_number, ayah_number, min_x, max_x, min_y, max_y from glyphs"
 ).fetchall()
 
+# The app's first two pages are laid out higher than in the glyph data's own
+# rendering (x matches; every line sits 58 units higher, measured from the ink of
+# mushaf/001.png and 002.png). Shared with build-quran-words.py.
+PAGE_Y_SHIFT = {1: -58, 2: -58}
+
 line_band = {}  # (page, line) -> (y0, y1)
 ayah_line = defaultdict(lambda: [10**9, -1])  # (page, line, sura, ayah) -> [x0, x1]
 for page, line, sura, ayah, x0, x1, y0, y1 in rows:
     x0, x1 = sorted((x0, x1))
-    y0, y1 = sorted((y0, y1))
+    y0, y1 = (v + PAGE_Y_SHIFT.get(page, 0) for v in sorted((y0, y1)))
     b = line_band.get((page, line))
     line_band[(page, line)] = (min(b[0], y0), max(b[1], y1)) if b else (y0, y1)
     r = ayah_line[(page, line, sura, ayah)]

@@ -18,6 +18,7 @@ import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
+import { useRecitationCheck } from '../../components/recite/useRecitationCheck';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { RecordButton } from '../../components/recordings/RecordButton';
@@ -104,17 +105,29 @@ export default function QuranReaderScreen() {
   const isScreenFocused = useIsFocused();
   useKeepScreenOn(isScreenFocused);
 
+  // Recite: listens, follows along and marks mistakes on the page.
+  const recite = useRecitationCheck({
+    kind: 'reading',
+    day: today,
+    pages: ALL_PAGES,
+    currentPage,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+  });
+
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage,
+    onReciteFrom: (v) => recite.startFromVerse(v.sura, v.ayah),
   });
 
   // The top bar and the bottom bar (player while reciting, otherwise the
   // scrubber) have their own space; the page fits between them, so nothing
   // covers a verse. Tapping the page hides or shows them (the page doesn't move).
-  const [chromeVisible, setChromeVisible] = useState(true);
-  const toggleChrome = useCallback(() => setChromeVisible((v) => !v), []);
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const toggleChrome = useCallback(() => setChromeHidden((v) => !v), []);
+  // The recitation controls stay while listening.
+  const chromeVisible = !chromeHidden || recite.active;
   const insets = useSafeAreaInsets();
   // The floating timer docks in the bottom bar's right-hand slot; hidden with
   // the controls.
@@ -235,20 +248,26 @@ export default function QuranReaderScreen() {
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
           onTap={toggleChrome}
+          pageLayers={recite.pageLayers}
+          extraData={recite.layersKey}
         />
       </View>
 
       <View style={styles.footer}>
         <View style={styles.footerContent} pointerEvents={chromeVisible ? 'box-none' : 'none'}>
           {chromeVisible &&
-            (verseActions.player ?? (
-              <>
-                <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
-                <Text style={styles.pageNum} pointerEvents="none">
-                  {currentPage}
-                </Text>
-              </>
-            ))}
+            (recite.bar ??
+              verseActions.player ?? (
+                <View style={styles.footerRow} pointerEvents="box-none">
+                  {recite.button}
+                  <View style={styles.scrubberCol} pointerEvents="box-none">
+                    <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
+                    <Text style={styles.pageNum} pointerEvents="none">
+                      {currentPage}
+                    </Text>
+                  </View>
+                </View>
+              ))}
         </View>
         {/* The floating timer docks here (wider while it shows a clock). */}
         <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
@@ -269,6 +288,7 @@ export default function QuranReaderScreen() {
       />
 
       {verseActions.overlay}
+      {recite.overlay}
 
       <ReaderGuideModal
         visible={showGuide}
@@ -305,9 +325,14 @@ function ReaderGuideModal({
       body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
     },
     {
-      icon: 'mic-outline',
+      icon: 'mic',
+      title: 'Recite to check yourself',
+      body: 'Tap Recite and recite from memory. Revisely follows along word by word, turns the page and marks missed or wrong words. Tap the eye to hide the words until you say them. It all runs on this phone.',
+    },
+    {
+      icon: 'radio-button-on',
       title: 'Record yourself',
-      body: 'Tap the mic to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
+      body: 'Tap the record button at the top to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'time-outline',
@@ -435,6 +460,8 @@ const makeStyles = (palette: ReadPalette) =>
       justifyContent: 'center',
       alignItems: 'stretch',
     },
+    footerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    scrubberCol: { flex: 1 },
 
     pageNum: {
       textAlign: 'center',

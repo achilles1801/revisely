@@ -15,6 +15,7 @@ import { signOutGoogle } from '../lib/googleAuth';
 import { identifyUser } from '../lib/sentry';
 import { logger } from '../lib/logger';
 import { deleteAllRecordings } from '../lib/recordings';
+import { deleteAllChecks } from '../lib/recite/checkHistory';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -181,9 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const uid = getAuth().currentUser?.uid;
     try {
       await firestoreService.deleteAccount();
-      // Recordings live only on this phone; they go with the account.
+      // Recordings and recitation checks live only on this phone; they go with the account.
       if (uid) {
         deleteAllRecordings(uid).catch((err) => logger.warn('Could not delete recordings', err));
+        deleteAllChecks(uid).catch((err) => logger.warn('Could not delete recitation checks', err));
       }
       // signOutUser is implicit — Firebase Auth user is gone, onAuthStateChanged
       // fires with null. We sign out locally to be sure.

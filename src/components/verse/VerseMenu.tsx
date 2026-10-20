@@ -8,7 +8,7 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
 
-import { MENU_HEIGHT, MENU_WIDTH, menuPosition } from '../../lib/verseMenu';
+import { MENU_ROW_HEIGHT, MENU_WIDTH, menuPosition } from '../../lib/verseMenu';
 
 interface VerseMenuProps {
   /** Screen point of the press; null hides the menu. */
@@ -17,17 +17,20 @@ interface VerseMenuProps {
   /** Under "Play": who recites, and how far. */
   playSubtitle?: string;
   onTranslation: () => void;
+  /** Check recitation from this verse (omitted where there is none). */
+  onReciteFrom?: () => void;
   onClose: () => void;
 }
 
 /**
- * The menu that opens on a held verse: Play and Translation. A plain overlay on
+ * The menu that opens on a held verse: Play, Translation, and Recite from here. A plain overlay on
  * the screen, not a Modal: opening the verse sheet (a Modal) while a Modal is
  * still dismissing fails on iOS. Render it last in a full-screen container.
  */
-export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose }: VerseMenuProps) {
+export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onReciteFrom, onClose }: VerseMenuProps) {
   const { theme } = useTheme();
-  const pos = point ? menuPosition(point, Dimensions.get('window')) : { left: 0, top: 0 };
+  const height = MENU_ROW_HEIGHT * (onReciteFrom ? 3 : 2);
+  const pos = point ? menuPosition(point, Dimensions.get('window'), height) : { left: 0, top: 0 };
 
   const Row = ({
     icon,
@@ -59,11 +62,17 @@ export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
-      <View style={[styles.menu, { left: pos.left, top: pos.top }]}>
+      <View style={[styles.menu, { left: pos.left, top: pos.top, minHeight: height }]}>
         <GlassCard elevated style={StyleSheet.absoluteFillObject} />
         <Row icon="play" title="Play" subtitle={playSubtitle ?? 'to the end of the juz'} onPress={onPlay} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Row icon="language-outline" title="Translation" onPress={onTranslation} />
+        {onReciteFrom && (
+          <>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            <Row icon="mic-outline" title="Recite from here" subtitle="Check your recitation" onPress={onReciteFrom} />
+          </>
+        )}
       </View>
     </View>
   );
@@ -73,7 +82,6 @@ const styles = StyleSheet.create({
   menu: {
     position: 'absolute',
     width: MENU_WIDTH,
-    minHeight: MENU_HEIGHT,
     borderRadius: radius.md,
     overflow: 'hidden',
     ...shadows.lg,

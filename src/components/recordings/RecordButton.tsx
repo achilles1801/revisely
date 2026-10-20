@@ -46,7 +46,7 @@ export function RecordButton({ recorder, color, background, border }: RecordButt
         {phase === 'starting' ? (
           <ActivityIndicator size="small" color={color} />
         ) : (
-          <Ionicons name="mic-outline" size={18} color={color} />
+          <Ionicons name="radio-button-on" size={18} color={RED} />
         )}
       </Pressable>
     );

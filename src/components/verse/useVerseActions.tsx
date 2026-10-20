@@ -7,6 +7,7 @@ import { getRecitation, RecitationState } from '../../lib/recitation';
 import { nextVerse, nextVerseInJuz, pageOfVerse, previousVerse, toAyahRef, VerseKey } from '../../lib/verses';
 import { logger } from '../../lib/logger';
 import { isRecordingActive } from '../../lib/recordings';
+import { isCheckListening } from '../../lib/recite/checkState';
 import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
 import { NowPlayingBar } from './NowPlayingBar';
@@ -26,6 +27,8 @@ interface Options {
   /** The page on screen; recitation only turns the page when its verse has no
    *  lines here. */
   currentPage?: number;
+  /** "Recite from here": check recitation starting at the held verse. */
+  onReciteFrom?: (verse: AyahRef) => void;
 }
 
 /**
@@ -34,7 +37,7 @@ interface Options {
  * by the Quran tab and revision sessions. Returns the props for MushafPager and
  * the overlay to render on top of it.
  */
-export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
+export function useVerseActions({ pages, onShowPage, currentPage, onReciteFrom }: Options) {
   const { user, saveUser } = useApp();
   const { theme } = useTheme();
   const recitation = getRecitation();
@@ -95,6 +98,13 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
       Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
       return;
     }
+    if (isCheckListening()) {
+      // It would be heard as the reciter.
+      setMenuPoint(null);
+      setSelected(null);
+      Alert.alert('Listening to your recitation', 'Stop checking to play the recitation.');
+      return;
+    }
     const advance = (v: VerseKey) => {
       const next = nextVerseInJuz(v);
       return next && allowed.has(pageOfVerse(next)) ? next : null;
@@ -103,6 +113,13 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     setMenuPoint(null);
     setSelected(null);
   }, [selected, allowed, recitation, owner]);
+
+  const reciteFrom = useCallback(() => {
+    if (!selected || !onReciteFrom) return;
+    onReciteFrom(selected);
+    setMenuPoint(null);
+    setSelected(null);
+  }, [selected, onReciteFrom]);
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
@@ -184,6 +201,7 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · to the end of the juz`}
         onPlay={play}
         onTranslation={openTranslation}
+        onReciteFrom={onReciteFrom ? reciteFrom : undefined}
         onClose={closeMenu}
       />
       <VerseSheet

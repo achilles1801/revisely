@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -28,6 +29,7 @@ import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
+import { useRecitationCheck } from '../../components/recite/useRecitationCheck';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
@@ -154,10 +156,27 @@ export default function ActiveRevisionScreen() {
   const isScreenFocused = useIsFocused();
   useKeepScreenOn(isScreenFocused);
 
+  // Recite: listens, follows along (turning pages) and marks mistakes. A page
+  // recited through is marked revised, as a swipe past it would be.
+  const onPageRecitedRef = useRef<(page: number) => void>(() => undefined);
+  const recite = useRecitationCheck({
+    kind: 'revision',
+    day: sessionDay,
+    pages: sessionPages,
+    currentPage:
+      currentPageNumber ??
+      assignment?.pages.find((p) => !alreadyRevisedToday.has(p)) ??
+      assignment?.pages[0] ??
+      1,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    onPageRecited: (page) => onPageRecitedRef.current(page),
+  });
+
   const verseActions = useVerseActions({
     pages: sessionPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
+    onReciteFrom: (v) => recite.startFromVerse(v.sura, v.ayah),
   });
   // The player sits in the bottom bar, under the page (never over it).
   // Tapping the page hides or shows it; a new recitation shows it again.
@@ -394,6 +413,13 @@ export default function ActiveRevisionScreen() {
     [assignment.pages, completedPages, markRevised],
   );
 
+  onPageRecitedRef.current = (page: number) => {
+    if (!assignment.pages.includes(page) || completedPages.has(page)) return;
+    markRevised(page);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setUndoState({ page, message: `Page ${page} marked as revised` });
+  };
+
   const handleUndo = () => {
     if (!undoState) return;
     unmarkRevised(undoState.page);
@@ -621,17 +647,23 @@ export default function ActiveRevisionScreen() {
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
           onTap={togglePlayer}
-          extraData={extraData}
+          extraData={`${extraData}|${recite.layersKey}`}
+          pageLayers={recite.pageLayers}
         />
       </View>
 
       <View style={styles.footer}>
         <View style={styles.footerContent}>
-          {verseActions.player && playerShown ? (
-            verseActions.player
-          ) : (
-            <Text style={styles.pageNum}>{displayPageNumber}</Text>
-          )}
+          {recite.bar ??
+            (verseActions.player && playerShown ? (
+              verseActions.player
+            ) : (
+              <View style={styles.footerRow}>
+                <View style={styles.footerSide}>{recite.button}</View>
+                <Text style={styles.pageNum}>{displayPageNumber}</Text>
+                <View style={styles.footerSide} />
+              </View>
+            ))}
         </View>
         {/* The floating timer docks here (wider while it shows a clock). */}
         <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
@@ -694,6 +726,7 @@ export default function ActiveRevisionScreen() {
       />
 
       {verseActions.overlay}
+      {recite.overlay}
 
       <RevisionGuideModal
         visible={showGuide}
@@ -805,6 +838,9 @@ const makeStyles = (theme: ThemeColors) =>
       fontWeight: '500',
       color: theme.textPrimary,
     },
+    footerRow: { flexDirection: 'row', alignItems: 'center' },
+    // Equal sides keep the page number centred.
+    footerSide: { flex: 1, alignItems: 'flex-start' },
     submitWrap: {
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.sm,
@@ -844,9 +880,14 @@ function RevisionGuideModal({
       body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
     },
     {
-      icon: 'mic-outline',
+      icon: 'mic',
+      title: 'Recite to check yourself',
+      body: 'Tap Recite and recite from memory. Revisely follows along, turns the page and marks missed or wrong words; pages you recite through are marked revised. Tap the eye to hide the words until you say them.',
+    },
+    {
+      icon: 'radio-button-on',
       title: 'Record yourself',
-      body: 'Tap the mic in the top bar to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
+      body: 'Tap the record button in the top bar to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',
@@ -883,19 +924,21 @@ function RevisionGuideModal({
             </PressableScale>
           </View>
 
-          <View style={styles.steps}>
-            {steps.map((s, i) => (
-              <View key={i} style={styles.step}>
-                <View style={styles.stepIcon}>
-                  <Ionicons name={s.icon} size={18} color={theme.accent} />
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.steps}>
+              {steps.map((s, i) => (
+                <View key={i} style={styles.step}>
+                  <View style={styles.stepIcon}>
+                    <Ionicons name={s.icon} size={18} color={theme.accent} />
+                  </View>
+                  <View style={styles.stepText}>
+                    <Text style={styles.stepTitle}>{s.title}</Text>
+                    <Text style={styles.stepBody}>{s.body}</Text>
+                  </View>
                 </View>
-                <View style={styles.stepText}>
-                  <Text style={styles.stepTitle}>{s.title}</Text>
-                  <Text style={styles.stepBody}>{s.body}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </ScrollView>
 
           <View style={styles.actions}>
             <PressableScale
@@ -925,6 +968,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     card: {
       width: '100%',
       maxWidth: 420,
+      maxHeight: '85%',
       borderRadius: radius.lg,
       padding: spacing.lg,
       overflow: 'hidden',
@@ -944,7 +988,8 @@ const makeGuideStyles = (theme: ThemeColors) =>
       justifyContent: 'center',
       borderRadius: radius.full,
     },
-    steps: { gap: spacing.md, marginBottom: spacing.lg },
+    scroll: { marginBottom: spacing.lg },
+    steps: { gap: spacing.md },
     step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     stepIcon: {
       width: 32,

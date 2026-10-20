@@ -40,6 +40,9 @@ import { formatDuration } from '../../lib/readingTimer';
 import { avatarInitial } from '../../lib/displayName';
 import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
 import { formatBytes } from '../../lib/recordingFormat';
+import { setRecitePrefs, useRecitePrefs } from '../../lib/recite/recitePrefs';
+import { deleteModel, downloadedModelPath, formatModelSize } from '../../lib/recite/speechModel';
+import { checkCount, deleteAllChecks } from '../../lib/recite/checkHistory';
 import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
@@ -247,6 +250,9 @@ export default function SettingsScreen() {
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
   const [recordings, setRecordings] = useState<{ count: number; bytes: number } | null>(null);
+  const recitePrefs = useRecitePrefs();
+  const [modelOnDevice, setModelOnDevice] = useState(false);
+  const [checks, setChecks] = useState(0);
 
   const loadRecordings = useCallback(() => {
     listRecordings()
@@ -271,6 +277,10 @@ export default function SettingsScreen() {
         })
         .catch(() => {});
       loadRecordings();
+      setModelOnDevice(downloadedModelPath() != null);
+      checkCount()
+        .then((n) => !cancelled && setChecks(n))
+        .catch(() => {});
       return () => {
         cancelled = true;
       };
@@ -611,6 +621,103 @@ export default function SettingsScreen() {
                 thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
                 accessibilityLabel="Keep screen on while reading, revising or listening"
               />
+            }
+          />
+        </Section>
+
+        <Section title="Recitation checking">
+          <Row
+            icon="eye-off-outline"
+            label="Hide words while reciting"
+            rightSlot={
+              <Switch
+                value={recitePrefs.hideWords}
+                onValueChange={(v) => {
+                  setRecitePrefs({ hideWords: v });
+                }}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            }
+          />
+          <Row
+            icon="pulse-outline"
+            label="Vibrate on a mistake"
+            rightSlot={
+              <Switch
+                value={recitePrefs.vibrate}
+                onValueChange={(v) => {
+                  setRecitePrefs({ vibrate: v });
+                }}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            }
+          />
+          <Row
+            icon="alert-circle-outline"
+            label="Mark past mistakes on the page"
+            rightSlot={
+              <Switch
+                value={recitePrefs.showPastMistakes}
+                onValueChange={(v) => {
+                  setRecitePrefs({ showPastMistakes: v });
+                }}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+              />
+            }
+          />
+          <Row
+            icon="hardware-chip-outline"
+            label="Speech model"
+            value={modelOnDevice ? formatModelSize() : 'Not downloaded'}
+            onPress={() =>
+              Alert.alert(
+                'Speech model',
+                modelOnDevice
+                  ? `Recitation is checked on this iPhone with Tarteel's open Qur'an model (${formatModelSize()}). Delete it to free space; it downloads again the next time you tap Recite.`
+                  : 'Downloaded the first time you tap Recite. Recitation is then checked on this iPhone; your voice never leaves it.',
+                modelOnDevice
+                  ? [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => {
+                          deleteModel();
+                          setModelOnDevice(false);
+                        },
+                      },
+                    ]
+                  : [{ text: 'OK' }],
+              )
+            }
+          />
+          <Row
+            icon="trash-outline"
+            label="Clear mistake history"
+            value={checks > 0 ? `${checks} ${checks === 1 ? 'check' : 'checks'}` : 'None'}
+            isLast
+            onPress={
+              checks > 0
+                ? () =>
+                    Alert.alert(
+                      'Clear mistake history?',
+                      'Past mistakes will no longer be marked on the page. This can’t be undone.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Clear',
+                          style: 'destructive',
+                          onPress: async () => {
+                            await deleteAllChecks();
+                            setChecks(0);
+                          },
+                        },
+                      ],
+                    )
+                : undefined
             }
           />
         </Section>

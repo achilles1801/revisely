@@ -155,8 +155,25 @@ the App Privacy answers in App Store Connect (no API; done by hand) together.
 **Verse positions and translations:** press-and-hold on a verse uses `src/data/ayahBounds.json`, built
 by `scripts/build-ayah-bounds.py` from Quran Android's `ayahinfo_1024.db`, the glyph bounds that
 quran.com-images records while drawing the same page images (coordinates are 1024-wide; the images are
-2600×4206, so one scale factor maps them). Translations are Saheeh International from api.alquran.cloud,
-disclosed in the privacy policy.
+2600×4206, so one scale factor maps them). Pages 1 and 2 are the exception: their lines sit 58 units
+higher in our images, which both build scripts correct (`PAGE_Y_SHIFT`). Translations are Saheeh
+International from api.alquran.cloud, disclosed in the privacy policy.
+
+**Recitation checking (Recite):** mistake detection runs entirely on the phone.
+- Speech recognition is Tarteel's open Whisper model (`tarteel-ai/whisper-base-ar-quran`, Apache-2.0),
+  converted and quantised by `scripts/convert-speech-model.sh`, run by whisper.rn (whisper.cpp, Metal).
+  The app downloads it once from the Storage bucket, `models/ggml-tarteel-whisper-base-q5_1.bin`
+  (public, like `mushaf/`; 59,707,625 bytes, checked by size in `src/lib/recite/speechModel.ts`). A new
+  model needs a new file name. Don't prompt the model: prompts make it drop or invent words.
+- `modules/recitation-audio` is a local Expo module (Swift) that streams the microphone as 16 kHz PCM;
+  the audio session is still set by `lib/audioFocus`. iOS only; on Android Recite says it's unavailable.
+- whisper.rn's podspec copies its xcframework's headers twice under `use_frameworks`; `patches/`
+  (patch-package, run by `postinstall`) fixes that. Re-check the patch when upgrading whisper.rn.
+- Word text and positions are `src/data/quranWords.dat`, built by `scripts/build-quran-words.py` from
+  the same `ayahinfo_1024.db` plus quran.com's word text. It is a Metro asset (`.dat` in
+  `metro.config.js`), so OTA updates don't download its 3 MB again.
+- The tracker (`src/lib/recite/tracker.ts`) aligns each utterance with the mushaf; it is tuned against
+  real model output. Checks and mistakes are stored only on the device, like recordings.
 
 **Firestore rules before features:** the user document has a field allowlist. A release that writes a
 new user field needs `firebase deploy --only firestore:rules` first, or those writes are refused.

@@ -59,6 +59,14 @@ interface MushafPagerProps {
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
+  /** Drawn on each page (bounds scale given): `under` beneath the page image's
+   *  ink, `over` on top of it. Recitation checking marks words this way. */
+  pageLayers?: (page: number, scale: number) => PageLayers | null;
+}
+
+export interface PageLayers {
+  under?: React.ReactNode;
+  over?: React.ReactNode;
 }
 
 export interface MushafPagerHandle {
@@ -82,6 +90,7 @@ interface PageItemProps {
   bg: string;
   /** The page as drawn: fits the pager, so controls never cover it. */
   size: PageSize;
+  layers: PageLayers | null;
 }
 
 const PageItem = React.memo(function PageItem({
@@ -94,6 +103,7 @@ const PageItem = React.memo(function PageItem({
   tintColor,
   bg,
   size,
+  layers,
 }: PageItemProps) {
   const BOUNDS_SCALE = size.scale;
   // A cached page renders from disk on the first frame. Otherwise it is
@@ -171,6 +181,7 @@ const PageItem = React.memo(function PageItem({
               ]}
             />
           ))}
+          {layers?.under}
           <Image
             source={{ uri }}
             style={[
@@ -191,6 +202,7 @@ const PageItem = React.memo(function PageItem({
               }
             }}
           />
+          {layers?.over}
         </Pressable>
       ) : null}
     </Pressable>
@@ -213,6 +225,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     onLongPressAyah,
     highlightedAyah,
     extraData,
+    pageLayers,
   },
   ref,
 ) {
@@ -319,9 +332,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         tintColor={palette.textPrimary}
         bg={palette.pageBg}
         size={pageSize}
+        layers={pageLayers?.(item, pageSize.scale) ?? null}
       />
     ),
-    [onTap, onLongPressAyah, highlightedAyah, theme.accent, palette, pageSize],
+    [onTap, onLongPressAyah, highlightedAyah, theme.accent, palette, pageSize, pageLayers],
   );
 
   return (

@@ -69,3 +69,6 @@ docs/security-audit-2026-05-10.md
 docs/ui-redesign/
 
 firestore-debug.log
+
+# Cache of quran.com word text for scripts/build-quran-words.py
+.quran-words-cache/
