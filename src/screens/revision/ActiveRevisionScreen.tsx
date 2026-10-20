@@ -402,57 +402,69 @@ export default function ActiveRevisionScreen() {
 
   // ===== End session =====
 
+  const finishRecording = recorder.finish;
+  const submittingRef = useRef(false);
   const submitSession = useCallback(async () => {
-    await commitPendingPages();
-    const pagesRevised = Array.from(completedPages).filter(
-      (p) => !silentlySavedRef.current.has(p),
-    );
-    const pagesSkipped = assignment.pages.filter(
-      (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
-    );
-    const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
-
-    const updatedPages = pages.map((p) => {
-      if (pagesRevised.includes(p.pageNumber)) {
-        return {
-          ...p,
-          lastRevisedDate: new Date().toISOString(),
-          totalRevisionCount: p.totalRevisionCount + 1,
-          skipCount: 0,
-        };
-      }
-      if (pagesSkipped.includes(p.pageNumber)) {
-        return { ...p, skipCount: p.skipCount + 1 };
-      }
-      return p;
-    });
-
-    if (changedPageNumbers.length > 0) {
-      await updatePages(updatedPages, changedPageNumbers);
-    }
-
-    if (pagesRevised.length > 0) {
-      const durationDelta = Math.max(
-        0,
-        Math.round((Date.now() - lastSaveTimeRef.current) / 60_000),
+    // Once: a second tap while this runs would log twice and go back twice.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      // Ending the session ends its recording (leaving without ending keeps it,
+      // paused, for when the session is reopened).
+      await finishRecording();
+      await commitPendingPages();
+      const pagesRevised = Array.from(completedPages).filter(
+        (p) => !silentlySavedRef.current.has(p),
       );
-      const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
-        ([page, rating]) => ({ page, rating }),
+      const pagesSkipped = assignment.pages.filter(
+        (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
       );
-      await addLog({
-        date: sessionDay ?? getCurrentRevisionDay(user),
-        assignedPages: assignment.pages,
-        pagesRevised,
-        pagesSkipped,
-        weaknessUpdates: weaknessUpdatesArray,
-        durationMinutes: durationDelta,
+      const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
+
+      const updatedPages = pages.map((p) => {
+        if (pagesRevised.includes(p.pageNumber)) {
+          return {
+            ...p,
+            lastRevisedDate: new Date().toISOString(),
+            totalRevisionCount: p.totalRevisionCount + 1,
+            skipCount: 0,
+          };
+        }
+        if (pagesSkipped.includes(p.pageNumber)) {
+          return { ...p, skipCount: p.skipCount + 1 };
+        }
+        return p;
       });
-      pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
-      lastSaveTimeRef.current = Date.now();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
 
-    navigation.goBack();
+      if (changedPageNumbers.length > 0) {
+        await updatePages(updatedPages, changedPageNumbers);
+      }
+
+      if (pagesRevised.length > 0) {
+        const durationDelta = Math.max(
+          0,
+          Math.round((Date.now() - lastSaveTimeRef.current) / 60_000),
+        );
+        const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
+          ([page, rating]) => ({ page, rating }),
+        );
+        await addLog({
+          date: sessionDay ?? getCurrentRevisionDay(user),
+          assignedPages: assignment.pages,
+          pagesRevised,
+          pagesSkipped,
+          weaknessUpdates: weaknessUpdatesArray,
+          durationMinutes: durationDelta,
+        });
+        pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
+        lastSaveTimeRef.current = Date.now();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      navigation.goBack();
+    } finally {
+      submittingRef.current = false;
+    }
   }, [
     commitPendingPages,
     completedPages,
@@ -463,6 +475,7 @@ export default function ActiveRevisionScreen() {
     addLog,
     user,
     navigation,
+    finishRecording,
   ]);
 
   const handleEndSession = () => {

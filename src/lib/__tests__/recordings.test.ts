@@ -75,6 +75,7 @@ import {
   normalizePageMarks,
   pageAt,
   appendSegment,
+  closeRecording,
   findRevisionRecording,
   locateInSegments,
   segmentStart,
@@ -313,6 +314,29 @@ describe('recording sessions (pause and resume)', () => {
     await appendSegment(null, temp('r1'), info(10_000, { kind: 'reading' }));
     expect(await findRevisionRecording('2026-10-20')).toMatchObject({ id, durationMs: 10_000 });
     expect(await findRevisionRecording('2026-10-21')).toBeNull();
+  });
+
+  it('a session saved as open stays open until it is closed', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000, { open: true }));
+    expect(await findRevisionRecording('2026-10-20')).toMatchObject({ id, open: true, createdAt: 500 });
+    await appendSegment(id, temp('s2'), info(4_000, { open: true }));
+    expect(await findRevisionRecording('2026-10-20')).toMatchObject({ open: true, durationMs: 14_000 });
+    await closeRecording(id!);
+    expect(await findRevisionRecording('2026-10-20')).toMatchObject({ open: false, durationMs: 14_000 });
+    expect((await listRecordings())[0].segments).toHaveLength(2); // closing keeps the audio
+  });
+
+  it('recordings without the flag (older ones) are not open', async () => {
+    await appendSegment(null, temp('s1'), info(10_000));
+    expect(await findRevisionRecording('2026-10-20')).toMatchObject({ open: false });
+  });
+
+  it('closing a deleted or unknown recording does nothing', async () => {
+    const { id } = await appendSegment(null, temp('s1'), info(10_000, { open: true }));
+    await deleteRecording(id!);
+    await expect(closeRecording(id!)).resolves.toBeUndefined();
+    await expect(closeRecording('nope')).resolves.toBeUndefined();
+    expect(await listRecordings()).toEqual([]);
   });
 
   it('deletes every segment file', async () => {
