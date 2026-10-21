@@ -81,6 +81,11 @@ describe('users/{userId}', () => {
       await assertFails(setDoc(doc(alice, `users/${ALICE}`), validUser(BOB)));
     });
 
+    it('rejects a create that makes the account a preview tester (admin only)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(setDoc(doc(alice, `users/${ALICE}`), { ...validUser(ALICE), previewTester: true }));
+    });
+
     it('rejects creates where dailyPageCapacity is out of range', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       const bad = { ...validUser(ALICE), dailyPageCapacity: 999 };
@@ -110,6 +115,17 @@ describe('users/{userId}', () => {
     it('owner can update an allowlisted field (theme)', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { theme: 'light' }));
+    });
+
+    it('rejects making oneself a preview tester, or removing it (admin only)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { previewTester: true } as any));
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await updateDoc(doc(ctx.firestore(), `users/${ALICE}`), { previewTester: true });
+      });
+      // A tester's other writes still work; the flag itself can't change.
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { theme: 'light' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { previewTester: false } as any));
     });
 
     it('rejects writes to non-allowlisted fields (e.g., isAdmin injection)', async () => {

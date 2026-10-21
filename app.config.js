@@ -6,7 +6,7 @@ export default {
     slug: "revision-buddy",
     owner: "achilles1802",
     scheme: "revisely",
-    version: "1.0.1",
+    version: "1.0.2",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
     // build that lacks it.

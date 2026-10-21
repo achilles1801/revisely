@@ -6,6 +6,9 @@ export interface User {
   id: string;
   createdAt: string;
   name?: string;                    // User's display name
+  /** Set by an admin only (clients can't write it): this account's TestFlight
+   *  installs follow the preview update channel (lib/updateChannel). */
+  previewTester?: boolean;
 
   // Smart Tracking opt-in feature
   smartTrackingEnabled: boolean;

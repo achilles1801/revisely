@@ -1,0 +1,137 @@
+name: Promote to production
+
+# App Store users get JavaScript only from here, and only an update that TestFlight already had.
+#
+# develop publishes every push to the `preview` channel (preview.yml), which TestFlight installs follow.
+# Once it has been tried there, develop is merged into main; this then finds the preview update built
+# from exactly what main holds (the "[app <hash>]" in its message, .github/scripts/app-hash.sh: every
+# file that goes into the app) and republishes that same update (the same bundle and assets, not a new
+# build of them) to `production`. If main's app was never published to preview (a change made on main
+# directly, or main ahead of develop), nothing is promoted and the run fails: make the change on
+# develop, try it in TestFlight, merge again. Docs, store and scripts changes don't count.
+#
+# The promote job waits for approval in the `production` environment (Actions > the run > Review
+# deployments): the TestFlight sign-off. An update promoted for a runtime that the App Store doesn't
+# have yet (a new version in review) reaches App Store users when that version is released.
+#
+# workflow_dispatch can promote a given update group instead (e.g. a fix for an older binary, published
+# to preview from a branch cut before a native change); it goes through the same approval.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'tests/**'
+      - 'functions/**'
+      - '.maestro/**'
+      - 'store/**'
+      - 'scripts/**'
+      - '**/*.md'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+    inputs:
+      group:
+        description: Preview update group to promote (empty = the one with main's app hash)
+        type: string
+        required: false
+
+concurrency:
+  group: eas-promote
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  find:
+    name: Find the tested update
+    runs-on: ubuntu-latest
+    outputs:
+      group: ${{ steps.find.outputs.group }}
+      runtime: ${{ steps.find.outputs.runtime }}
+      message: ${{ steps.find.outputs.message }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # eas reads app.config.js, which needs the project's packages and the Firebase plist.
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write the Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
+      - name: Find it on preview
+        id: find
+        env:
+          GROUP: ${{ inputs.group }}
+        run: |
+          APP=$(.github/scripts/app-hash.sh)
+          eas update:list --branch preview --limit 50 --json --non-interactive > preview.json
+          if [ -n "$GROUP" ]; then
+            MATCH=$(jq -c --arg g "$GROUP" '[.currentPage[] | select(.group == $g)][0] // empty' preview.json)
+            WHAT="update group $GROUP"
+          else
+            MATCH=$(jq -c --arg t "[app $APP]" '[.currentPage[] | select((.message // "") | contains($t))][0] // empty' preview.json)
+            WHAT="main's app (hash $APP)"
+          fi
+          if [ -z "$MATCH" ]; then
+            echo "::error title=Not tested in TestFlight::No preview update found for $WHAT. Nothing was promoted. Make the change on develop (it publishes to preview), try it in TestFlight, then merge develop into main again."
+            exit 1
+          fi
+          {
+            echo "group=$(jq -r .group <<<"$MATCH")"
+            echo "runtime=$(jq -r .runtimeVersion <<<"$MATCH")"
+            # Listed as "<message>" (N minutes ago by X): keep the message, without its [app ...].
+            echo "message=$(jq -r '(.message // "") | sub("^\""; "") | sub("\" \\([^)]*\\)$"; "") | sub(" \\[app [0-9a-f]+\\]$"; "")' <<<"$MATCH" | head -n 1 | cut -c 1-200)"
+          } >> "$GITHUB_OUTPUT"
+          echo "### Ready to promote" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"- group `\(.group)`\n- runtime `\(.runtimeVersion)`\n- \(.message)"' <<<"$MATCH" >> "$GITHUB_STEP_SUMMARY"
+
+  promote:
+    name: Promote (after TestFlight sign-off)
+    needs: find
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # eas reads app.config.js, which needs the project's packages and the Firebase plist.
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write the Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
+      - name: Republish to production
+        env:
+          GROUP: ${{ needs.find.outputs.group }}
+          MESSAGE: ${{ needs.find.outputs.message }}
+        run: |
+          eas update:republish --group "$GROUP" --destination-branch production \
+            --message "Promoted from preview: $MESSAGE" --non-interactive
+          echo "Promoted $GROUP (runtime ${{ needs.find.outputs.runtime }}) to production." >> "$GITHUB_STEP_SUMMARY"

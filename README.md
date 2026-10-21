@@ -56,10 +56,10 @@ CI runs all of the above except Maestro on every PR and on every push to `develo
 
 | Branch | What happens on push |
 |---|---|
-| `develop` | CI only. Day-to-day work lands here. |
-| `main` | CI, then a release: [EAS Update](.github/workflows/update.yml) publishes the JS to the `production` channel, and starts a TestFlight build first if native code changed. |
+| `develop` | CI, then [Preview](.github/workflows/preview.yml): the JS goes to the `preview` channel, which TestFlight installs follow (a new TestFlight build first if native code changed). Day-to-day work lands here. |
+| `main` | CI, then [Promote to production](.github/workflows/promote.yml): the update already tried in TestFlight (published from `develop` with the same app files as main) is republished to `production`, after approval. |
 
-To release, open a PR from `develop` to `main` and merge it once CI is green.
+To release, try the change in TestFlight, open a PR from `develop` to `main`, merge it once CI is green, and approve the `Promote to production` run.
 
 The runtime version is a fingerprint of the native side, so an update only ever reaches a binary
 built from the same native code. A new library with native code, a plugin, a permission or the icon
