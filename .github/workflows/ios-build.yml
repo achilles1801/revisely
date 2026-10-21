@@ -2,8 +2,8 @@ name: iOS build
 
 # Builds the production iOS app on a GitHub macOS runner (`eas build --local`) and
 # uploads it to TestFlight (`eas submit`). Local builds use no EAS build credits,
-# and macOS runners cost nothing on a public repository. Called by EAS Update
-# (native code changed) and by EAS Build (by hand).
+# and macOS runners cost nothing on a public repository. Called by Preview
+# (preview.yml, native code changed on develop) and by EAS Build (by hand).
 #
 # Signing credentials and the App Store Connect API key stay on EAS and are
 # fetched with EXPO_TOKEN. EAS variables with Secret visibility cannot be read
@@ -88,7 +88,7 @@ jobs:
         if: ${{ inputs.submit }}
         run: eas submit --platform ios --profile production --path "$RUNNER_TEMP/revisely.ipa" --non-interactive
 
-      # The marker EAS Update looks for: local builds are not listed by
+      # The marker preview.yml looks for: local builds are not listed by
       # `eas build:list`, so this tag is how it knows the fingerprint has a build.
       - name: Tag the fingerprint
         if: ${{ inputs.submit && inputs.fingerprint != '' }}

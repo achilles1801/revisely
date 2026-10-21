@@ -1,8 +1,8 @@
 name: EAS Build
 
 # A native build, started by hand from the Actions tab, e.g. to replace a TestFlight build before it
-# expires (90 days). Rarely needed otherwise: EAS Update starts one by itself when a push to main
-# changes native code. Runs on a GitHub macOS runner (ios-build.yml), so it uses no EAS build credits.
+# expires (90 days). Rarely needed otherwise: Preview (preview.yml) starts one by itself when a push to
+# develop changes native code. Runs on a GitHub macOS runner (ios-build.yml), so it uses no EAS build credits.
 on:
   workflow_dispatch:
     inputs:

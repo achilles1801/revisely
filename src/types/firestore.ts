@@ -94,6 +94,9 @@ export interface NotificationSettings {
  * Aggregated stats are denormalized here for quick dashboard reads.
  */
 export interface FirestoreUser {
+  /** Set by an admin only (functions/scripts/set-preview-tester.js; the rules
+   *  refuse it from clients): TestFlight installs follow the preview channel. */
+  previewTester?: boolean;
   // Identity
   /** User ID from Firebase Auth */
   uid: string;

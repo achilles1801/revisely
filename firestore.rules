@@ -180,6 +180,9 @@ service cloud.firestore {
 
       // Users can create their own document (on signup)
       allow create: if isOwner(userId) &&
+                       // Set by an admin only (it moves TestFlight installs to
+                       // the preview update channel).
+                       !hasField('previewTester') &&
                        hasField('uid') &&
                        incomingData().uid == userId &&
                        hasField('createdAt') &&

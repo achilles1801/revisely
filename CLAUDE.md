@@ -6,17 +6,37 @@ file is the release mechanics and the traps behind them.
 ## Branches and releases
 
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
-- **A push to `main` is a release.** Merge `develop` into `main` through a PR, only once CI is green.
-  `EAS Update` (`.github/workflows/update.yml`) then publishes the JS to the `production` channel, and
-  builds and submits to TestFlight first if native code changed.
+- **Nothing reaches App Store users without passing TestFlight first.**
+  1. A push to `develop` (`Preview`, `.github/workflows/preview.yml`) publishes the JS to the `preview`
+     channel, and builds and submits to TestFlight first if native code changed. Each update's message
+     ends with `[app <hash>]`, a hash of every file that goes into the app (`.github/scripts/app-hash.sh`;
+     docs, store, scripts, functions, tests, rules and workflows don't count).
+  2. A tester's TestFlight install follows `preview`. The binary's channel is `production`; once the
+     account has loaded, `src/lib/updateChannel.ts` switches to `preview` with
+     `Updates.setUpdateRequestHeadersOverride` only if the install is from TestFlight (sandbox receipt,
+     `modules/install-source`) **and** the account has `previewTester: true`. It then fetches the
+     preview update, which runs from the next cold start. App Review also installs with a sandbox
+     receipt, which is why the account matters: the reviewer is not a tester and stays on
+     `production`. Mark or unmark a tester with
+     `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-preview-tester.js <email> [--off]`
+     (`--list` shows them; clients can't write the field). Binaries before 1.0.2 lack the module and
+     stay on `production`, in TestFlight too.
+  3. Try it in TestFlight, then merge `develop` into `main` (a PR, CI green). Changes made on `main`
+     directly that go into the app block promotion until they come back through `develop`.
+  4. `Promote to production` (`.github/workflows/promote.yml`) finds the preview update with main's
+     app hash and republishes that same update to `production`, after you approve the run in the
+     `production` environment (Actions > the run > Review deployments; only `main` may deploy there).
+     No matching preview update: nothing is promoted and the run fails. It never builds.
+- **Nothing publishes to `production` except promote.yml.** Not a laptop, not another workflow. A fix
+  goes through `develop` and TestFlight like anything else. App Store submission stays manual.
 - Native builds run on a GitHub macOS runner (`ios-build.yml`: `eas build --local`, then
   `eas submit --path`), which uses no EAS build credits; the repo is public, so runner minutes are free.
   Local builds are not listed by `eas build:list`, so a submitted build pushes a tag `ios-fp/<fingerprint>`,
-  and `update.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
+  and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
-  commit on `main`.
-- Pushes that touch only docs, tests, `functions/`, Firestore rules or `.md` files do not release
-  (`paths-ignore` in `update.yml`). Firebase rules and functions still deploy by hand
+  commit on `develop` (TestFlight) or `main` (App Store, promoted).
+- Pushes that touch only docs, tests, `functions/`, Firestore rules or `.md` files publish nothing
+  (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
 ## Runtime version is a fingerprint
@@ -78,11 +98,9 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - **TestFlight builds expire 90 days after upload.** If native code has not changed in a while, run
   `EAS Build` from the Actions tab before the installed build expires (it builds on the runner too).
   The new build has the same fingerprint, so current updates reach it.
-- **Every release goes through TestFlight first by raising `version`** in the release PR (1.0.1, 1.0.2,
-  ...). That changes the fingerprint, so the merge builds a new binary for TestFlight, and the update
-  published with it reaches only that binary: App Store users get nothing until the version is approved.
-  A merge without a version bump goes straight to App Store users as an update; keep that for urgent
-  JS fixes.
+- **A native change raises `version`** (1.0.2, 1.0.3, ...) in the same PR. On `develop` that builds a new
+  binary for TestFlight; promoted updates for its fingerprint reach App Store users only once that
+  version is approved.
 - A failed submission does not need a rebuild:
   `eas submit -p ios --id <build id>`. `eas submit:list --platform ios --json` shows the error.
 - Apple refuses uploads while an agreement is unaccepted ("A required agreement is missing or has
@@ -98,8 +116,9 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - Free, available in every territory except mainland China (an ICP filing is required there).
   Category Education. Age rating 13+ (`ageRatingOverrideV2`), matching the privacy policy and terms:
   the app is not directed to children under 13, which keeps it outside COPPA. Keep the three aligned.
-- The App Store binary listens to the same `production` channel as TestFlight, so **a merge to `main`
-  reaches App Store users too**. Test on the simulator before merging.
+- **1.0.1 (build 14) was submitted on 2026-10-21**, release automatic on approval. Build 14 predates the
+  channel switch: in TestFlight it follows `production`, like the App Store. From 1.0.2, TestFlight
+  follows `preview` and the App Store `production` (see Branches and releases).
 
 `scripts/asc.js` drives App Store Connect (listing, screenshots, build, release type, submission).
 Listing text is `store/listing.json`; screenshots are `store/screenshots/` (6.9" iPhone,
@@ -113,21 +132,25 @@ export ASC_KEY_ID=Y9QXNBSWCN ASC_ISSUER_ID=98e03813-82b9-4a37-8c3b-962d9af24baa 
 Key `AQ87A9LM2W` is the one EAS Submit created and holds; its .p8 cannot be downloaded again. Do not
 revoke it, or CI submissions stop.
 
-**JS-only change:** merge to `main` as usual. No review, no new App Store version; users get it on
-their next launches. To undo, revert and merge, or republish the previous update from the EAS
-dashboard. Apple permits this as long as the app does not change what it fundamentally is.
+**JS-only change:** merge to `develop`, test in TestFlight, merge `develop` into `main` and approve the
+promotion. No review, no new App Store version; users get it on their next launches. To undo, revert on
+`develop`, test, merge and promote again (or promote an earlier preview group by hand: run
+`Promote to production` with its group id). Apple permits this as long as the app does not change what
+it fundamentally is.
 
 **Native change** (a library with native code, plugins, permissions, icon, splash, Expo SDK):
 1. In the same PR, raise `version` in `app.config.js` (e.g. `1.0.0` -> `1.0.1`). Every App Store
    version needs a higher version string, and the build must carry it. Raise it only with native
    changes: the version is part of the fingerprint, so a bump alone starts a build.
-2. Merge. CI builds and submits the next build to TestFlight. Add it to the Team (Expo) group by hand,
-   test it.
+2. Merge to `develop`. CI builds and submits the next build to TestFlight. Add it to the Team (Expo)
+   group by hand, test it.
 3. `node scripts/asc.js version 1.0.1`, `whats-new "..."`, `build <n>`, re-seed the reviewer (below),
    `submit`.
-4. Ship it promptly: once the native change is on `main`, every later update targets the new
+4. Ship it promptly: once the native change is on `develop`, every later update targets the new
    fingerprint, and App Store users on the old binary get nothing until they install the new version.
-   A fix for the old binary has to be published by hand from the last commit before the native change.
+   A fix for the old binary: a branch from the last commit before the native change, `Preview` run on
+   it by hand (workflow_dispatch), then `Promote to production` with that update's group id. TestFlight
+   can't load it (the TestFlight builds are on the new runtime), so test it on the simulator.
 
 **Before every submission**, re-seed the reviewer account so its 7-day streak ends yesterday, as the
 review notes say:

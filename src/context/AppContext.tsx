@@ -23,6 +23,8 @@ import {
 } from '../lib/schedulePersistence';
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
+import { applyUpdateChannel } from '../lib/updateChannel';
+import * as Sentry from '@sentry/react-native';
 import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 
 // ============================================================================
@@ -60,6 +62,7 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     scheduleShiftPages: fsUser.scheduleShiftPages,
     translationId: fsUser.translationId,
     reciter: fsUser.reciter,
+    previewTester: fsUser.previewTester === true,
   };
 }
 
@@ -131,6 +134,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pages, setPages] = useState<UserPage[]>([]);
   const [logs, setLogs] = useState<RevisionLog[]>([]);
   const [loading, setLoading] = useState(true);
+  // A tester's TestFlight install follows the preview update channel; anything
+  // else production (lib/updateChannel). Decided once the account is known.
+  const userId = user?.id;
+  const previewTester = user?.previewTester === true;
+  const signedOut = !loading && !user;
+  useEffect(() => {
+    // While the account loads, nothing changes; signed out is production.
+    if (!userId && !signedOut) return;
+    const channel = applyUpdateChannel(!!userId && previewTester);
+    if (channel) Sentry.setTag('update_channel', channel);
+  }, [userId, previewTester, signedOut]);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
