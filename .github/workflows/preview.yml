@@ -1,23 +1,26 @@
-name: EAS Update
+name: Preview
 
-# Every push to main is a release: its JavaScript and assets go out as an over-the-air update on the
-# `production` channel, plus a new TestFlight build whenever the push changed native code. Work
-# happens on develop and reaches main through a PR, once CI is green.
+# Every push to develop goes to TestFlight first: its JavaScript and assets are published as an
+# over-the-air update on the `preview` channel, plus a new TestFlight build whenever the push changed
+# native code. TestFlight installs follow `preview` (src/lib/updateChannel.ts); App Store installs
+# follow `production`, which only ever gets an update from here once it has been tried in TestFlight
+# and promoted unchanged (promote.yml, on a merge of develop into main).
+#
+# Each update's message ends with "[app <hash>]", a hash of every file that goes into the app
+# (.github/scripts/app-hash.sh), so promote.yml can find exactly the update that was tested for what
+# it is asked to release. Docs, store and scripts changes don't change it.
 #
 # The runtime version is a fingerprint of the native side (app.config.js, fingerprint.config.js), and
 # an update reaches only binaries with the same one. So before publishing, the fingerprint is looked
 # up; one with no build gets a build on a GitHub macOS runner (ios-build.yml, no EAS build credits),
-# submitted to TestFlight.
-#
-# Raising `version` in app.config.js changes the fingerprint. That is how a release goes through
-# TestFlight first: the update published here reaches only the new binary, so App Store users get
-# nothing until that version is approved, while TestFlight testers can try it straight away.
+# submitted to TestFlight. Raise `version` in app.config.js with any native change: the new binary is
+# what goes to App Store review (manually) once tested.
 #
 # Config values (Firebase keys, client ids, Sentry) come from the `production` environment on EAS,
 # the same one production builds read, so an update carries the config its binary was built with.
 on:
   push:
-    branches: [main]
+    branches: [develop]
     paths-ignore:
       - 'docs/**'
       - 'tests/**'
@@ -33,7 +36,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: eas-update
+  group: eas-preview
   cancel-in-progress: false
 
 permissions:
@@ -146,11 +149,13 @@ jobs:
           PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
 
-      - name: eas update
+      - name: eas update (preview)
         run: |
-          SUBJECT=$(echo "$MESSAGE" | head -n 1)
-          eas update --channel production --environment production --platform ios \
-            --message "$SUBJECT" --non-interactive
+          # Short enough that the hash survives: EAS lists messages cut at 512 characters.
+          SUBJECT=$(echo "$MESSAGE" | head -n 1 | cut -c 1-300)
+          APP=$(.github/scripts/app-hash.sh)
+          eas update --channel preview --environment production --platform ios \
+            --message "$SUBJECT [app $APP]" --non-interactive
 
       # Source maps for the bundle just published (left in dist/ by eas update), so Sentry shows
       # crashes from updates with file names and line numbers. Skipped without the secret.
