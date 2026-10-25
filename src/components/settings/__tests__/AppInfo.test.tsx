@@ -103,6 +103,9 @@ describe('checkForUpdateNow', () => {
     mockCheck.mockResolvedValueOnce({ isAvailable: true });
     mockFetch.mockResolvedValueOnce({ isNew: true });
     expect((await checkForUpdateNow()).result).toBe('downloaded');
+    mockCheck.mockResolvedValueOnce({ isAvailable: false, isRollBackToEmbedded: true });
+    mockFetch.mockResolvedValueOnce({ isNew: false, isRollBackToEmbedded: true });
+    expect((await checkForUpdateNow()).result).toBe('downloaded');
     mockCheck.mockRejectedValueOnce(new Error('offline'));
     expect(await checkForUpdateNow()).toEqual({ result: 'error', error: 'offline' });
   });

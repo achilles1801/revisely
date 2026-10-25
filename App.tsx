@@ -15,7 +15,9 @@ import { currentRelease, releaseTags } from './src/lib/releaseInfo';
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
 // (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
 // environment = the update channel. Crash-free rates per update come from these
-// sessions; promotion to production checks them (.github/workflows/promote.yml).
+// sessions: promotion to production checks the candidate's preview sessions
+// (.github/workflows/promote.yml). Promotion republishes the update under a new
+// group, so production sessions carry that group's name.
 const release = currentRelease();
 
 Sentry.init({

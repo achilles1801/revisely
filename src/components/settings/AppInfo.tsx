@@ -19,9 +19,10 @@ export async function checkForUpdateNow(): Promise<{ result: UpdateCheckResult; 
   if (__DEV__ || !Updates.isEnabled) return { result: 'unavailable' };
   try {
     const check = await Updates.checkForUpdateAsync();
-    if (!check.isAvailable) return { result: 'up-to-date' };
+    // A roll back to the built-in version counts as an update waiting too.
+    if (!check.isAvailable && !check.isRollBackToEmbedded) return { result: 'up-to-date' };
     const fetched = await Updates.fetchUpdateAsync();
-    return { result: fetched.isNew ? 'downloaded' : 'up-to-date' };
+    return { result: fetched.isNew || fetched.isRollBackToEmbedded ? 'downloaded' : 'up-to-date' };
   } catch (err) {
     logger.warn('Manual update check failed', err);
     return { result: 'error', error: err instanceof Error ? err.message : String(err) };

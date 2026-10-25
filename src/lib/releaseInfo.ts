@@ -78,7 +78,8 @@ export function currentRelease(): ReleaseInfo {
     version: Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? null,
     build: Application.nativeBuildVersion ?? null,
     runtimeVersion: Updates.runtimeVersion ?? null,
-    channel: Updates.channel ?? null,
+    // iOS reports no channel as "".
+    channel: Updates.channel || null,
     updateId: Updates.updateId ?? null,
     updateGroup: manifestUpdateGroup(),
     isEmbeddedLaunch: Updates.isEmbeddedLaunch,
