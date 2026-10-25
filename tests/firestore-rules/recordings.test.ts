@@ -1,5 +1,5 @@
 import { assertFails, assertSucceeds, RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
 import { getTestEnv, cleanupTestEnv } from './setup';
 
@@ -46,6 +46,19 @@ describe('recording backup: users/{uid}/recordings', () => {
     });
     await assertFails(getDoc(doc(bob, `users/${ALICE}/recordings/rec-1`)));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `users/${ALICE}/recordings/rec-1`)));
+  });
+
+  it('a deleted recording can leave a tombstone (deletedAt, the server time, nothing else)', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    const r = doc(alice, `users/${ALICE}/recordings/rec-3`);
+    await assertSucceeds(setDoc(r, recording()));
+    await assertSucceeds(setDoc(r, { deletedAt: serverTimestamp() }));
+    await assertFails(setDoc(r, { deletedAt: new Date(0) }));
+    await assertFails(setDoc(r, { deletedAt: serverTimestamp(), note: 'x' }));
+    // And a recording can come back over its tombstone.
+    await assertSucceeds(setDoc(r, recording()));
+    const bob = env.authenticatedContext(BOB).firestore();
+    await assertFails(setDoc(doc(bob, `users/${ALICE}/recordings/rec-3`), { deletedAt: serverTimestamp() }));
   });
 
   it('refuses malformed records (unknown fields, bad kind, no segments)', async () => {
@@ -101,6 +114,16 @@ describe('recording backup: Storage recordings/{uid}/', () => {
     await assertFails(uploadBytes(ref(bob, `recordings/${ALICE}/rec-1-0.m4a`), audio, { contentType: 'audio/mp4' }));
     await assertFails(deleteObject(ref(bob, `recordings/${ALICE}/rec-1-0.m4a`)));
     await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), `recordings/${ALICE}/rec-1-0.m4a`)));
+  });
+
+  it('a file is never overwritten, even by its owner', async () => {
+    const storage = env.authenticatedContext(ALICE).storage();
+    const r = ref(storage, `recordings/${ALICE}/rec-9-0.m4a`);
+    await assertSucceeds(uploadBytes(r, audio, { contentType: 'audio/mp4' }));
+    await assertFails(uploadBytes(r, new Uint8Array([1, 2, 3]), { contentType: 'audio/mp4' }));
+    // Deleted, the name can be used again (backup turned back on after deleting it).
+    await assertSucceeds(deleteObject(r));
+    await assertSucceeds(uploadBytes(r, audio, { contentType: 'audio/mp4' }));
   });
 
   it('only audio is accepted', async () => {

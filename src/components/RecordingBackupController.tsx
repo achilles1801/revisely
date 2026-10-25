@@ -3,6 +3,7 @@ import { Alert, AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { onRecordingsChanged } from '../lib/recordings';
 import { configureBackup, onBackupStatus, requestBackup, setNetwork } from '../lib/recordingBackupController';
 import { logger } from '../lib/logger';
@@ -17,9 +18,12 @@ export const backupNoticeKey = (uid: string) => `recordingBackup.noticeShown.${u
  */
 export function RecordingBackupController() {
   const { user, saveUser } = useApp();
+  const { firebaseUser } = useAuth();
   const userRef = useRef(user);
   userRef.current = user;
-  const uid = user?.id ?? null;
+  // The signed-in account, once its own settings have loaded (during sign-up
+  // the user object is a placeholder with another id).
+  const uid = firebaseUser && user?.id === firebaseUser.uid ? firebaseUser.uid : null;
   const enabled = user ? user.recordingBackup !== false : false;
   const allowCellular = user?.recordingBackupCellular === true;
   const [noticeShown, setNoticeShown] = useState<boolean | null>(null);
@@ -77,9 +81,12 @@ export function RecordingBackupController() {
           AsyncStorage.setItem(backupNoticeKey(uid), 'true').catch((err) => logger.warn('Could not save notice', err));
           setNoticeShown(true);
         };
+        const cellular = userRef.current?.recordingBackupCellular === true;
         Alert.alert(
           'Your recordings are backed up',
-          'Recordings are now saved to your Revisely account as well as this phone, so you keep them if you lose or change your phone. Only you can access them. Uploads use Wi-Fi. You can turn this off in Settings → Recordings.',
+          `Recordings are now saved to your Revisely account as well as this phone, so you keep them if you lose or change your phone. Only you can access them. Uploads use ${
+            cellular ? 'Wi-Fi or mobile data' : 'Wi-Fi only'
+          }. You can turn this off in Settings → Activity → Back up recordings.`,
           [
             {
               text: 'Turn off',

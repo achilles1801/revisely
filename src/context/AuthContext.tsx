@@ -210,12 +210,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOutUser = async () => {
     setIsLoading(true);
     setError(null);
+    // Recordings deleted on this phone are deleted from the backup first (a
+    // queue left here would only run when this account signs in here again).
+    await stopBackup({ flushDeletes: true });
     try {
       await logoutUser();
       // Clear the native Google session too so the next sign-in shows the
       // account chooser instead of silently picking the previous account.
       await signOutGoogle();
     } catch (err: any) {
+      resumeBackup();
       setError(getErrorMessage(err.code));
       throw err;
     } finally {

@@ -407,9 +407,11 @@ service cloud.firestore {
       // What the backup holds about each recording; the audio is in Storage
       // under recordings/<uid>/ (storage.rules), readable only by the owner.
 
+      // A deleted recording leaves a tombstone ({deletedAt}), so another phone
+      // with a copy doesn't upload it again.
       match /recordings/{recordingId} {
         allow read, delete: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidRecordingDoc();
+        allow create, update: if isOwner(userId) && (isValidRecordingDoc() || isRecordingTombstone());
       }
 
       // ======================================================================
@@ -436,6 +438,11 @@ service cloud.firestore {
              data.durationMs is number && data.durationMs >= 0 &&
              data.pageMarks is list && data.pageMarks.size() <= 2000 &&
              data.segments is list && data.segments.size() >= 1 && data.segments.size() <= 500;
+    }
+
+    function isRecordingTombstone() {
+      return incomingData().keys().hasOnly(['deletedAt']) &&
+             incomingData().deletedAt == request.time;
     }
 
     function isValidPageList(pages) {

@@ -35,7 +35,7 @@ import {
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import type { CloudRecording } from '../lib/recordings';
+import type { BackupListing, CloudRecording } from '../lib/recordings';
 import {
   FirestoreUser,
   FirestorePage,
@@ -688,18 +688,31 @@ export async function submitFeedback(input: {
 // recording, users/<uid>/recordings/<id>. The audio is in Storage.
 // ============================================================================
 
-export async function listRecordingDocs(userId: string): Promise<CloudRecording[]> {
+export async function listRecordingDocs(userId: string): Promise<BackupListing> {
   const snap = await getDocsFromServer(collection(db, 'users', userId, 'recordings'));
-  return snap.docs.map((d) => {
-    const data = d.data() as Omit<CloudRecording, 'id'> & { updatedAt?: unknown };
-    const { updatedAt: _u, ...rest } = data;
-    return { ...rest, id: d.id };
-  });
+  const live: CloudRecording[] = [];
+  const deleted: BackupListing['deleted'] = [];
+  const ms = (v: unknown) => (v instanceof Timestamp ? v.toMillis() : undefined);
+  for (const d of snap.docs) {
+    const data = d.data() as Omit<CloudRecording, 'id' | 'updatedAt'> & { updatedAt?: unknown; deletedAt?: unknown };
+    if (data.deletedAt !== undefined) {
+      deleted.push({ id: d.id, at: ms(data.deletedAt) ?? 0 });
+      continue;
+    }
+    const { updatedAt, ...rest } = data;
+    live.push({ ...rest, id: d.id, updatedAt: ms(updatedAt) });
+  }
+  return { live, deleted };
 }
 
 export async function putRecordingDoc(userId: string, rec: CloudRecording): Promise<void> {
-  const { id, ...data } = rec;
+  const { id, updatedAt: _u, ...data } = rec;
   await setDoc(doc(db, 'users', userId, 'recordings', id), { ...data, updatedAt: serverTimestamp() });
+}
+
+/** Leave a record that the recording was deleted (other phones with a copy then don't upload it again). */
+export async function tombstoneRecordingDoc(userId: string, id: string): Promise<void> {
+  await setDoc(doc(db, 'users', userId, 'recordings', id), { deletedAt: serverTimestamp() });
 }
 
 export async function deleteRecordingDoc(userId: string, id: string): Promise<void> {

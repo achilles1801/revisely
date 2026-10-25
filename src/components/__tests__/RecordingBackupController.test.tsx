@@ -23,6 +23,10 @@ let mockUser: any = { id: 'u1' };
 jest.mock('../../context/AppContext', () => ({
   useApp: () => ({ user: mockUser, saveUser: mockSaveUser }),
 }));
+let mockAuthUid: string | null = 'u1';
+jest.mock('../../context/AuthContext', () => ({
+  useAuth: () => ({ firebaseUser: mockAuthUid ? { uid: mockAuthUid } : null }),
+}));
 
 import { RecordingBackupController, backupNoticeKey } from '../RecordingBackupController';
 
@@ -33,6 +37,7 @@ beforeEach(async () => {
   mockConfigure.mockClear();
   mockSaveUser.mockClear();
   mockUser = { id: 'u1' };
+  mockAuthUid = 'u1';
 });
 
 describe('<RecordingBackupController />', () => {
@@ -87,6 +92,25 @@ describe('<RecordingBackupController />', () => {
     await act(async () => buttons.find((b: any) => b.text === 'Turn off').onPress());
     expect(mockSaveUser).toHaveBeenCalledWith({ id: 'u1', recordingBackup: false });
     expect(await AsyncStorage.getItem(backupNoticeKey('u1'))).toBe('true');
+    alert.mockRestore();
+  });
+
+  it('waits for the account’s own settings (during sign-up the user is a placeholder with another id)', async () => {
+    mockUser = { id: 'placeholder-123' };
+    render(<RecordingBackupController />);
+    await flush();
+    expect(mockConfigure).toHaveBeenLastCalledWith(null);
+    expect(mockConfigure).not.toHaveBeenCalledWith(expect.objectContaining({ uid: 'placeholder-123' }));
+  });
+
+  it('the notice says which networks uploads use', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockUser = { id: 'u1', recordingBackupCellular: true };
+    render(<RecordingBackupController />);
+    await flush();
+    act(() => mockStatusListener?.({ phase: 'needs-notice', pending: 1 }));
+    expect(alert.mock.calls[0][1]).toContain('Wi-Fi or mobile data');
+    expect(alert.mock.calls[0][1]).toContain('Settings → Activity → Back up recordings');
     alert.mockRestore();
   });
 

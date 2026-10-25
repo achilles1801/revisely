@@ -250,12 +250,27 @@ export default function SettingsScreen() {
   const homePrefs = useHomePrefs();
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
-  const [recordings, setRecordings] = useState<{ count: number; bytes: number } | null>(null);
+  // On this phone: how many, their size here; how many are backed up, and how
+  // many are only in the backup (restored, not downloaded yet).
+  const [recordings, setRecordings] = useState<{
+    count: number;
+    bytes: number;
+    backedUp: number;
+    cloudOnly: number;
+  } | null>(null);
 
   const loadRecordings = useCallback(() => {
     listRecordings()
       .then((list) =>
-        setRecordings({ count: list.length, bytes: list.reduce((sum, r) => sum + r.sizeBytes, 0) }),
+        setRecordings({
+          count: list.length,
+          bytes: list.reduce(
+            (sum, r) => sum + (r.segments.every((sg) => sg.local) ? r.sizeBytes : 0),
+            0,
+          ),
+          backedUp: list.filter((r) => r.backedUp).length,
+          cloudOnly: list.filter((r) => r.segments.some((sg) => !sg.local)).length,
+        }),
       )
       .catch(() => setRecordings(null));
   }, []);
@@ -326,7 +341,7 @@ export default function SettingsScreen() {
     const save = (value: boolean) =>
       updateUser({ recordingBackup: value }).catch((err) => logger.warn('Could not change backup', err));
     if (on) save(true);
-    else askTurnOffBackup(() => save(false));
+    else if (firebaseUser) askTurnOffBackup(firebaseUser.uid, () => save(false), recordings?.cloudOnly ?? 0);
   };
 
   const handleSubmitFeedback = async () => {
@@ -526,10 +541,20 @@ export default function SettingsScreen() {
                 ? () =>
                     Alert.alert(
                       'Recordings',
-                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}). ${
-                        localUser.recordingBackup !== false
-                          ? 'They are backed up to your account.'
-                          : 'They are stored only on this phone.'
+                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(
+                        recordings.bytes,
+                      )} on this phone). ${
+                        recordings.backedUp === recordings.count
+                          ? recordings.count === 1
+                            ? 'It is backed up to your account.'
+                            : 'All are backed up to your account.'
+                          : recordings.backedUp > 0
+                            ? `${recordings.backedUp} of them are backed up to your account.`
+                            : 'They are on this phone only.'
+                      }${
+                        recordings.cloudOnly > 0
+                          ? ` ${recordings.cloudOnly} download${recordings.cloudOnly === 1 ? 's' : ''} from your backup when played.`
+                          : ''
                       } They're listed by day in Activity.`,
                       [
                         { text: 'Open Activity', onPress: () => navigation.navigate('Activity') },
@@ -582,7 +607,11 @@ export default function SettingsScreen() {
               rightSlot={
                 <Switch
                   value={localUser.recordingBackupCellular === true}
-                  onValueChange={(v) => updateUser({ recordingBackupCellular: v })}
+                  onValueChange={(v) =>
+                    updateUser({ recordingBackupCellular: v }).catch((err) =>
+                      logger.warn('Could not change mobile data backup', err),
+                    )
+                  }
                   trackColor={{ false: theme.border, true: theme.accent }}
                   thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
                   accessibilityLabel="Back up recordings over mobile data"
