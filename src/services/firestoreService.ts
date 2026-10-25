@@ -15,7 +15,9 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
   updateDoc,
   deleteDoc,
   addDoc,
@@ -134,7 +136,9 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
   };
 
   await setDoc(getUserRef(input.uid), userData);
-  await initializeAllPages(input.uid);
+  // Pages only where the server has none: a user document can go missing while
+  // its pages (a subcollection) remain, and those hold real progress.
+  if (!(await pagesExistOnServer(input.uid))) await initializeAllPages(input.uid);
 
   return userData;
 }
@@ -228,12 +232,19 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
 }
 
 export function subscribeToUser(
-  callback: (user: FirestoreUser | null) => void,
+  callback: (user: FirestoreUser | null, meta: { fromCache: boolean }) => void,
   userId?: string,
 ): Unsubscribe {
   return onSnapshot(getUserRef(userId), (snapshot) => {
-    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null);
+    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
+      fromCache: snapshot.metadata.fromCache,
+    });
   });
+}
+
+/** Whether the user's document exists, asked of the server (not the local cache). */
+export async function userDocExistsOnServer(userId?: string): Promise<boolean> {
+  return (await getDocFromServer(getUserRef(userId))).exists();
 }
 
 // ============================================================================
@@ -305,15 +316,21 @@ export async function batchUpdatePages(
 }
 
 export function subscribeToPages(
-  callback: (pages: FirestorePage[]) => void,
+  callback: (pages: FirestorePage[], meta: { fromCache: boolean }) => void,
   userId?: string,
 ): Unsubscribe {
   const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
   return onSnapshot(
     q,
-    (snapshot) => callback(snapshot.docs.map((d) => d.data() as FirestorePage)),
+    (snapshot) =>
+      callback(snapshot.docs.map((d) => d.data() as FirestorePage), { fromCache: snapshot.metadata.fromCache }),
     (error) => logger.error('subscribeToPages failed', error),
   );
+}
+
+/** Whether the user has any page documents, asked of the server (not the local cache). */
+export async function pagesExistOnServer(userId?: string): Promise<boolean> {
+  return !(await getDocsFromServer(query(getPagesCollectionRef(userId), limit(1)))).empty;
 }
 
 // ============================================================================
@@ -577,9 +594,26 @@ export async function addAppUsageSeconds(seconds: number, userId?: string): Prom
  * cleans up the Firebase Auth user too). Required by App Store guideline
  * 5.1.1(v).
  */
+// The account being deleted: its listeners see its data vanish and must not
+// recreate it (lib/userDoc).
+let deletingUid: string | null = null;
+export function isDeletingAccount(uid: string | undefined | null): boolean {
+  return uid != null && uid === deletingUid;
+}
+
 export async function deleteAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
+  deletingUid = user.uid;
+  try {
+    await deleteAccountOnServer(user);
+  } catch (err) {
+    deletingUid = null;
+    throw err;
+  }
+}
+
+async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>): Promise<void> {
   const idToken = await user.getIdToken(/* forceRefresh */ true);
 
   let appCheckToken: string | null = null;

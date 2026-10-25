@@ -16,6 +16,8 @@ import {
   Pressable,
 } from 'react-native';
 import Constants from 'expo-constants';
+import { AppInfo } from '../../components/settings/AppInfo';
+import { reportProblem } from '../../lib/sentry';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -728,6 +730,11 @@ export default function SettingsScreen() {
             }}
           />
           <Row
+            icon="bug-outline"
+            label="Report a problem"
+            onPress={reportProblem}
+          />
+          <Row
             icon="mail-outline"
             label="Contact support"
             onPress={() =>
@@ -747,8 +754,8 @@ export default function SettingsScreen() {
             icon="document-outline"
             label="Terms of Service"
             onPress={() => Linking.openURL('https://revisely.app/terms/')}
-            isLast
           />
+          <AppInfo />
         </Section>
 
         {firebaseUser && (
