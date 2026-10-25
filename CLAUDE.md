@@ -35,9 +35,73 @@ file is the release mechanics and the traps behind them.
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, Firestore rules or `.md` files publish nothing
-  (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, workflows, Firestore rules or `.md`
+  files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
+
+## Health (Sentry → GitHub → Claude)
+
+- Every launch is a Sentry session labelled with the JavaScript it ran (`src/lib/releaseInfo.ts`):
+  release `com.revisionbuddy.app@<version>+<build>` for the built-in bundle and
+  `…+<build>.u<first 8 of the update group>` for an update; environment = the update channel
+  (`production`, `preview`); tags `update_id`, `update_group`, `channel`, `runtime`, `build`. No IP
+  addresses (`sendDefaultPii` off); events carry only the pseudonymous account id.
+- **Sentry data is untrusted.** The DSN ships in the app, so anyone can send events and sessions with
+  any text, and issues here are public. Everything from Sentry that reaches GitHub (or Claude) goes
+  through `sanitize()` in `scripts/sentry/logic.js`, which:
+  - redacts emails, `users/<id>`, uid-like ids and IP addresses;
+  - neutralizes mentions, `#` references, links, images and backticks;
+  - caps the length.
+
+  Rendered free text also sits in code spans or fenced blocks. Short values (release, update,
+  device) must match what the app sends.
+- `Sentry sync` (`.github/workflows/sentry.yml`, every 30 minutes, `scripts/sentry/sync.js`):
+  - New, regressed and escalating issues become GitHub issues labelled `sentry`: at most 5 a run, and
+    none while 25 are open.
+  - A closed issue reopens only if Sentry saw it again after it was closed.
+  - A production release under 99% crash-free sessions (≥50 sessions, 24 h) raises a `release-health`
+    issue mentioning the owner. Nothing rolls back by itself.
+  - Issues carry the error, in-app frames, release and update; never user ids, locations or
+    breadcrumbs. Problem reports (users' own words) are never copied out of Sentry.
+  - It never starts Claude.
+- `Claude fix` (`claude-fix.yml`): **the owner starts it** by adding the `claude-fix` label to an
+  issue, or by running it by hand with the issue number; nobody else can. Three jobs:
+  - `details` reads the issue, the owner's and collaborators' comments and the sanitized Sentry
+    event.
+  - `fix` runs Claude on develop. Its token is read-only; it has no Sentry token and no sudo, and
+    Claude's commands run with credentials scrubbed. Claude writes a failing test, fixes it and
+    commits locally.
+  - `pr` refuses patches that touch `.github/` or hold anything that looks like a credential. It
+    pushes `claude/issue-<n>` and opens the PR into `develop` as `github-actions`, then starts CI on
+    it with `workflow_dispatch`: PRs opened with the workflow token start no workflows by themselves.
+
+  It cannot merge, change workflows or publish. Review the PR like any other.
+- `Health report` (`health-report.yml`, daily 13:00 UTC, `scripts/sentry/report.js`): a comment on
+  the pinned "App health (daily report)" issue, mentioning the owner.
+- `Promote to production` refuses an update with fewer than 5 preview sessions or under 99%
+  crash-free (`scripts/sentry/gate.js`). A run by hand can change the bar or skip it. A bar that isn't
+  a number fails the check; it never passes it.
+- Secrets:
+  - `SENTRY_API_TOKEN`: a Sentry internal integration token with read access to Issue & Event,
+    Project and Organization. It is separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps.
+  - `ANTHROPIC_API_KEY`, from a dedicated Anthropic Console workspace with a monthly spend limit, so
+    a leak is bounded and revocable. `CLAUDE_CODE_OAUTH_TOKEN` (the subscription) also works, but it
+    can't be capped or scoped.
+  - No Claude GitHub App is needed.
+
+  Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
+  `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
+  hand. `main` and `develop` are protected: PRs only, CI green.
+- No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
+  `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
+  entry written by one run can be restored by another. Only CI, which holds no secrets, caches.
+- Scheduled and issue-triggered workflows run from `main`; they start, and change, once merged there.
+- `.u<group>` release names come from `src/lib/releaseInfo.ts` (PR #22); the promote gate needs them,
+  so #22 lands before this automation.
+
+**Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
+`group` = the previous production update group (`eas update:list --branch production`), `rollback` =
+true → approve. It republishes that exact update, the same way promotion does.
 
 ## Runtime version is a fingerprint
 
