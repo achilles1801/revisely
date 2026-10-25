@@ -1,0 +1,67 @@
+name: Sentry sync
+
+# Every 30 minutes: new, regressed and escalating Sentry issues become GitHub issues (labelled
+# `sentry`, plus `claude-fix` when Claude is set up, which starts claude-fix.yml for each), and a
+# production release below 99% crash-free sessions raises a `release-health` issue (no rollback).
+# scripts/sentry/sync.js; issues carry no personal data (the repository is public).
+#
+# Needs the SENTRY_API_TOKEN secret (Sentry read access). Without it the run only leaves a notice.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sentry-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  actions: write # starts claude-fix.yml for the issues it opens
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
+      HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Require a Sentry API token
+        id: token
+        run: |
+          if [ -z "$SENTRY_API_TOKEN" ]; then
+            echo "::notice::Add a SENTRY_API_TOKEN repository secret to sync Sentry issues (see CLAUDE.md, Health)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      - name: Sync issues and check production health
+        id: sync
+        if: steps.token.outputs.ready == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AUTO_FIX: ${{ env.HAS_CLAUDE }}
+          MENTION: '@${{ github.repository_owner }}'
+        run: node scripts/sentry/sync.js
+
+      # Issues opened with the workflow token don't fire `labeled`, so the fixes are started here.
+      - name: Start Claude on the new issues
+        if: steps.sync.outputs.issues != '' && env.HAS_CLAUDE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUES: ${{ steps.sync.outputs.issues }}
+        run: |
+          for n in ${ISSUES//,/ }; do
+            gh workflow run claude-fix.yml --ref develop -f issue="$n"
+          done

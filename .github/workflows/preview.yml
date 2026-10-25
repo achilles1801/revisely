@@ -32,7 +32,7 @@ on:
       - 'firestore.rules'
       - 'firestore.indexes.json'
       - 'firebase.json'
-      - '.github/workflows/ci.yml'
+      - '.github/**'
   workflow_dispatch:
 
 concurrency:

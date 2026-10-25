@@ -35,9 +35,40 @@ file is the release mechanics and the traps behind them.
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, Firestore rules or `.md` files publish nothing
-  (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, workflows, Firestore rules or `.md`
+  files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
+
+## Health (Sentry → GitHub → Claude)
+
+- Every launch is a Sentry session labelled with the JavaScript it ran (`src/lib/releaseInfo.ts`):
+  release `com.revisionbuddy.app@<version>+<build>` for the built-in bundle and
+  `…+<build>.u<first 8 of the update group>` for an update; environment = the update channel
+  (`production`, `preview`); tags `update_id`, `update_group`, `channel`, `runtime`, `build`. No IP
+  addresses (`sendDefaultPii` off); events carry only the pseudonymous account id.
+- `Sentry sync` (`.github/workflows/sentry.yml`, every 30 minutes, `scripts/sentry/sync.js`): new,
+  regressed and escalating issues become GitHub issues labelled `sentry` (and `claude-fix` when Claude
+  is set up); a production release under 99% crash-free sessions (≥50 sessions, 24 h) raises a
+  `release-health` issue mentioning the owner. Nothing rolls back by itself. Issues are public: they
+  carry the error, in-app frames, release and update, never user ids, locations or breadcrumbs, and
+  problem reports (users' own words) are never copied out of Sentry.
+- `Claude fix` (`claude-fix.yml`): for each such issue, or any issue someone labels `claude-fix`,
+  Claude reads the Sentry event (`scripts/sentry/issue-details.js`), writes a failing test, fixes it
+  and opens a PR into `develop`. It cannot merge, edit workflows or publish.
+- `Health report` (`health-report.yml`, daily 13:00 UTC, `scripts/sentry/report.js`): a comment on
+  the pinned "App health (daily report)" issue, mentioning the owner.
+- `Promote to production` refuses an update with fewer than 5 preview sessions or under 99%
+  crash-free (`scripts/sentry/gate.js`); a run by hand can change the bar or skip it.
+- Secrets: `SENTRY_API_TOKEN` (a Sentry internal integration token with read access to Issue & Event,
+  Project and Organization; separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps),
+  `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), and the Claude GitHub App installed on the
+  repository (its token lets Claude's PRs run CI). `main` and `develop` are protected: PRs only, CI
+  green.
+- Scheduled workflows run from `main`; they start once they are merged there.
+
+**Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
+`group` = the previous production update group (`eas update:list --branch production`), `rollback` =
+true → approve. It republishes that exact update, the same way promotion does.
 
 ## Runtime version is a fingerprint
 
