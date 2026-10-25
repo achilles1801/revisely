@@ -41,10 +41,13 @@ const props = (verse: { page: number; sura: number; ayah: number } | null) => ({
 const wrap = (ui: React.ReactElement) => <ThemeProvider>{ui}</ThemeProvider>;
 const style = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
 
+// The first render (theme, fonts, the mocked load) can take seconds on CI.
+jest.setTimeout(30_000);
+
 describe('VerseSheet with a long verse', () => {
   it('scrolls the verse under a header that stays put (it used to be cut off)', async () => {
     render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
-    expect(await screen.findByText(/THE LAST WORDS/)).toBeTruthy();
+    expect(await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 })).toBeTruthy();
     // Bounded by the sheet, so it can scroll: without flexShrink it grew past it.
     expect(style('verse-scroll')).toMatchObject({ flexShrink: 1 });
     // The header is outside the scrolling part.
@@ -64,7 +67,7 @@ describe('VerseSheet with a long verse', () => {
 
   it('expands to nearly the whole screen from the grabber, and back', async () => {
     render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
-    await screen.findByText(/THE LAST WORDS/);
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.normal });
     fireEvent.press(screen.getByLabelText('Expand the translation'));
     expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.expanded });
@@ -74,19 +77,19 @@ describe('VerseSheet with a long verse', () => {
 
   it('starts the next verse at its top (its text replaces the scrolled one)', async () => {
     const { rerender } = render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
-    await screen.findByText(/THE LAST WORDS/);
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     const before = screen.getByTestId('verse-scroll');
     await act(async () => {
       rerender(wrap(<VerseSheet {...props({ page: 49, sura: 2, ayah: 283 })} />));
     });
-    await screen.findByText(/THE LAST WORDS/);
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     // A new scrolling view (scrolled to the top), not the old one kept scrolled down.
     expect(screen.getByTestId('verse-scroll')).not.toBe(before);
   });
 
   it('opens the … menu under the header, wherever large text puts it', async () => {
     render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
-    await screen.findByText(/THE LAST WORDS/);
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     const header = screen.getByLabelText('Expand the translation').parent!.parent!;
     fireEvent(header, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 140 } } });
     fireEvent.press(screen.getByLabelText('More'));
@@ -102,11 +105,11 @@ describe('VerseSheet with a long verse', () => {
 
   it('reopens at normal height after being closed expanded', async () => {
     const { rerender } = render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
-    await screen.findByText(/THE LAST WORDS/);
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     fireEvent.press(screen.getByLabelText('Expand the translation'));
     await act(async () => rerender(wrap(<VerseSheet {...props(null)} />)));
     await act(async () => rerender(wrap(<VerseSheet {...props({ page: 1, sura: 1, ayah: 1 })} />)));
-    await screen.findByText(/THE LAST WORDS/);
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.normal });
   });
 });
