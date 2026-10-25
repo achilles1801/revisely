@@ -41,7 +41,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       # Pinned so a runner image update cannot change the toolchain under us.
       # Apple requires the iOS 26 SDK (Xcode 26) for uploads.
@@ -59,6 +58,8 @@ jobs:
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       # Twice: at the fixed path for resolving the native config here, and outside

@@ -32,7 +32,7 @@ on:
       - 'firestore.rules'
       - 'firestore.indexes.json'
       - 'firebase.json'
-      - '.github/workflows/ci.yml'
+      - '.github/**'
   workflow_dispatch:
 
 concurrency:
@@ -64,13 +64,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       - run: npm ci --legacy-peer-deps
 
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       # Resolving the native config needs the plist, which is gitignored.
@@ -135,13 +136,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       - run: npm ci --legacy-peer-deps
 
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Write the Firebase plist

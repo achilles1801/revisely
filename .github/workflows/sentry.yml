@@ -1,0 +1,57 @@
+name: Sentry sync
+
+# Every 30 minutes: new, regressed and escalating Sentry issues become GitHub issues labelled
+# `sentry`, and a production release below 99% crash-free sessions raises a `release-health` issue
+# (no rollback). scripts/sentry/sync.js; issue text from Sentry is sanitized (the repository is public,
+# and anyone can send events with the app's DSN).
+#
+# It never starts Claude. The owner reads the issue and adds the `claude-fix` label to have Claude
+# open a fix PR (claude-fix.yml).
+#
+# Needs the SENTRY_API_TOKEN secret (Sentry read access). Without it the run only leaves a notice.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sentry-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
+    steps:
+      - name: Require a Sentry API token
+        id: token
+        run: |
+          if [ -z "$SENTRY_API_TOKEN" ]; then
+            echo "::notice::Add a SENTRY_API_TOKEN repository secret to sync Sentry issues (see CLAUDE.md, Health)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      - name: Sync issues and check production health
+        if: steps.token.outputs.ready == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+        run: node scripts/sentry/sync.js
