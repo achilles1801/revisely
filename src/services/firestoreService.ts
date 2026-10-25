@@ -15,6 +15,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocFromServer,
   getDocs,
   updateDoc,
   deleteDoc,
@@ -228,12 +229,19 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
 }
 
 export function subscribeToUser(
-  callback: (user: FirestoreUser | null) => void,
+  callback: (user: FirestoreUser | null, meta: { fromCache: boolean }) => void,
   userId?: string,
 ): Unsubscribe {
   return onSnapshot(getUserRef(userId), (snapshot) => {
-    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null);
+    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
+      fromCache: snapshot.metadata.fromCache,
+    });
   });
+}
+
+/** Whether the user's document exists, asked of the server (not the local cache). */
+export async function userDocExistsOnServer(userId?: string): Promise<boolean> {
+  return (await getDocFromServer(getUserRef(userId))).exists();
 }
 
 // ============================================================================

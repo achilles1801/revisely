@@ -24,6 +24,7 @@ import {
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
 import { applyUpdateChannel } from '../lib/updateChannel';
+import { recreateUserDocIfMissing } from '../lib/userDoc';
 import * as Sentry from '@sentry/react-native';
 import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 
@@ -207,31 +208,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // or first launch after re-creating an account), recreate the doc so
     // subsequent updates have something to land on.
     let userRecreationInFlight = false;
-    const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser) => {
+    const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser, { fromCache }) => {
       if (fsUser) {
         userRecreationInFlight = false;
         setUser(firestoreUserToLocal(fsUser));
         setOnboardingComplete(fsUser.onboardingComplete);
         return;
       }
-
-      const currentAuth = getAuth();
-      const fbUser = currentAuth.currentUser;
+      const fbUser = getAuth().currentUser;
       if (fbUser && !userRecreationInFlight) {
         userRecreationInFlight = true;
-        try {
-          await firestoreService.createUser({
-            uid: fbUser.uid,
-            email: fbUser.email,
-            displayName: fbUser.displayName,
-            photoURL: fbUser.photoURL,
-          });
-          // Subscription will refire with the new doc — fall through.
+        const outcome = await recreateUserDocIfMissing({
+          fromCache,
+          existsOnServer: () => firestoreService.userDocExistsOnServer(fbUser.uid),
+          create: () =>
+            firestoreService.createUser({
+              uid: fbUser.uid,
+              email: fbUser.email,
+              displayName: fbUser.displayName,
+              photoURL: fbUser.photoURL,
+            }),
+          onLostRace: (err) => logger.warn('User doc appeared while recreating it', err),
+          onError: (err) => logger.error('Failed to recreate missing user doc:', err),
+        });
+        // Waiting, created or there after all: the subscription refires with it.
+        if (outcome !== 'failed') {
+          if (outcome === 'wait') userRecreationInFlight = false;
           return;
-        } catch (err) {
-          logger.error('Failed to recreate missing user doc:', err);
-          userRecreationInFlight = false;
         }
+        userRecreationInFlight = false;
+      } else if (fromCache) {
+        return;
       }
       setUser(null);
       setOnboardingComplete(false);

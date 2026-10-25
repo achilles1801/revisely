@@ -10,13 +10,24 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
+import { currentRelease, releaseTags } from './src/lib/releaseInfo';
+
+// Every launch is one Sentry session, labelled with the exact JavaScript it ran
+// (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
+// environment = the update channel. Crash-free rates per update come from these
+// sessions; promotion to production checks them (.github/workflows/promote.yml).
+const release = currentRelease();
 
 Sentry.init({
   dsn: 'https://4b773a246bc154edecad8310adec9d6e@o4511369474015232.ingest.us.sentry.io/4511369481945088',
+  release: release.sentryRelease,
+  dist: release.sentryDist,
+  environment: release.sentryEnvironment,
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  // No IP addresses or other personal data; events carry only the account's
+  // pseudonymous id (src/lib/sentry.ts identifyUser).
+  sendDefaultPii: false,
+  enableAutoSessionTracking: true,
 
   // Enable Logs
   enableLogs: true,
@@ -25,11 +36,30 @@ Sentry.init({
   // declared in the App Store privacy label. Kept off until it's declared.
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
-  integrations: [],
+  integrations: [
+    // Settings → Report a problem (src/lib/sentry.ts reportProblem). A report
+    // carries the release and tags below, the recent breadcrumbs, and a
+    // screenshot if the user takes one; the native SDK keeps it until it can
+    // be sent when offline.
+    Sentry.feedbackIntegration({
+      formTitle: 'Report a problem',
+      messageLabel: 'What happened?',
+      messagePlaceholder: 'What were you doing, and what went wrong?',
+      submitButtonLabel: 'Send report',
+      showName: false,
+      showEmail: false,
+      isNameRequired: false,
+      isEmailRequired: false,
+      enableScreenshot: false,
+      enableTakeScreenshot: true,
+      successMessageText: 'Thank you. Your report was sent.',
+    }),
+  ],
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,
 });
+Sentry.setTags(releaseTags(release));
 
 function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
