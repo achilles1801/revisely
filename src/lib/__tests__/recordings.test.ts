@@ -94,6 +94,7 @@ import {
   isValidCloudRecording,
   saveUploadSession,
   markBackupDeleted,
+  dropMissingSegment,
   clearWipe,
   isSegmentOf,
   adoptDownloadedSegment,
@@ -551,6 +552,12 @@ describe('backup bookkeeping', () => {
       expect(await listRecordings()).toEqual([]);
     });
 
+    it('"Delete all" also takes recordings the backup listed that this phone hasn’t seen', async () => {
+      await save('a', 100);
+      await deleteAllRecordings('alice', { withBackup: true, alsoIds: ['other', '../bad'] });
+      expect(pendingCloudDeletes(U).items.map((i) => i.id)).toEqual([expect.any(String), 'other']);
+    });
+
     it('deleting everything on this phone only (a deleted account) leaves the backup alone', async () => {
       await save('a', 100);
       await deleteAllRecordings('alice');
@@ -640,6 +647,39 @@ describe('backup bookkeeping', () => {
       mockFs.set('doc/recordings/alice/r1-0.m4a', 'x');
       expect(await pendingUploads(U)).toEqual([]);
       expect(await mergeCloudRecordings(U, live(cloudRec('r1', [1, 0])))).toBe(0);
+    });
+
+    it('this phone’s own recording gets parts only the backup has (a twin restored from the same iCloud backup), to download', async () => {
+      const a = await save('a', 100);
+      const name = fileOf(a!.uri);
+      const other = name.replace(/-0\.m4a$/, '-1.m4a');
+      await markSegmentUploaded(U, a!.id, name, 11);
+      await mergeCloudRecordings(
+        U,
+        live({
+          ...cloudRec(a!.id, [0], { kind: 'revision', day: '2026-10-20', createdAt: 100 }),
+          segments: [
+            { fileName: name, durationMs: 5000, sizeBytes: 11 },
+            { fileName: other, durationMs: 3000, sizeBytes: 900 },
+          ],
+        }),
+      );
+      const [rec] = await listRecordings();
+      expect(rec.segments.map((sg) => [sg.fileName, sg.local])).toEqual([
+        [name, true],
+        [other, false],
+      ]);
+      expect((await cloudOnlyRecordings(U)).map((r) => r.id)).toEqual([a!.id]);
+      // Not continued here while part of it is elsewhere.
+      expect(await findForDay('2026-10-20')).toBeNull();
+    });
+
+    it('a part the backup turns out not to have is dropped; with none left, the recording goes', async () => {
+      await mergeCloudRecordings(U, live(cloudRec('r1', [0, 1])));
+      await dropMissingSegment(U, 'r1', 'r1-0.m4a');
+      expect((await listRecordings())[0].segments.map((sg) => sg.fileName)).toEqual(['r1-1.m4a']);
+      await dropMissingSegment(U, 'r1', 'r1-1.m4a');
+      expect(await listRecordings()).toEqual([]);
     });
 
     it('a restored recording gets the segments its phone adds later', async () => {

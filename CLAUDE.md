@@ -196,11 +196,18 @@ These invariants must not be broken:
 - **Copies from another phone** (`restored`) are never continued here. They are uploaded only when `adopted`: the backup lost them without a tombstone and every part is on the phone.
 
 How it works:
-- **Deleting a recording** (also "Delete all", one by one, offline-safe) queues it in `Documents/recordings-sync/<uid>-deletes.json`. The run then tombstones the record and deletes every file named after it. Deletions run even with backup off, and are flushed on sign-out.
+- **Deleting a recording** queues it in `Documents/recordings-sync/<uid>-deletes.json` and works offline. The run then:
+  1. Tombstones every queued recording, even one with no record yet.
+  2. Lists the files once and deletes every file named after those recordings.
+
+  Deletions run even with backup off, and are flushed on sign-out. "Delete all" first lists the backup (it refuses offline) so that recordings this phone hasn't seen go too.
 - **"Turn off and delete backups"** needs the connection:
-  1. List the backup and merge it into the phone.
-  2. Download everything that is only in the backup, refusing if any download fails.
-  3. Delete exactly the files and live records that were listed. Tombstones stay.
+  1. Save "off" first.
+  2. List the backup and merge it into the phone.
+  3. Download everything that is only in the backup. A part that is already gone (404) is dropped; any other failure refuses.
+  4. Delete exactly the files and live records that were listed. Tombstones stay.
+
+  It refuses while an earlier wipe is pending, or if a record can't be read.
 - **Uploads:**
   - The resumable protocol in 4 MB chunks on the foreground session (REST plus `createUploadTask`).
   - The session is saved in the index, so an upload carries on after the app closes.
@@ -210,6 +217,7 @@ How it works:
 - **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
 - **Known limits:**
   - NetInfo reports an iPhone hotspot as Wi-Fi.
+  - File uploads aren't gated on the server. A phone that hasn't yet heard that backup is off, or that is still signed in to an account deleted elsewhere (its ID token lasts up to an hour), can leave files without a record. A Storage rule using `firestore.get` would close this. It needs the IAM role `roles/firebaserules.firestoreServiceAgent` for the Storage service agent (`firebase deploy --only storage` prompts to grant it), so it isn't in place yet.
   - Two phones restored from one iCloud backup both own its open recording. Their name clash is reported and the file skipped, never overwritten.
   - Tombstones accumulate, adding listing reads.
 - **Deploy order:** `firestore.rules` and `storage.rules` must be live before this reaches `develop`, which publishes to `preview` at once (`firebase deploy --only firestore:rules,storage`). Keep the profile-image rules that were live before.

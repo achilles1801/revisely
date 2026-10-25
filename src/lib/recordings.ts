@@ -371,16 +371,19 @@ export const isReadingRecordingDuring = (startedAt: number, endedAt: number) => 
  * account itself was deleted, which removes the backup on the server), only
  * this phone.
  */
-export function deleteAllRecordings(uid?: string, { withBackup = false } = {}): Promise<void> {
+export function deleteAllRecordings(
+  uid?: string,
+  { withBackup = false, alsoIds = [] as string[] } = {},
+): Promise<void> {
   return serial(async () => {
     const owner = uid ?? getAuth().currentUser?.uid ?? 'signed-out';
     const dir = new Directory(Paths.document, 'recordings', owner);
-    if (withBackup && dir.exists) {
-      const entries = await readIndex(dir);
-      // Every recording listed here, deleted one by one (tombstones, so other
-      // phones don't upload their copies again). Works offline; recordings the
-      // backup has that this phone hasn't listed yet are left alone.
-      queueCloudDeletes(entries.map(cloudDeleteFor), owner);
+    if (withBackup) {
+      const entries = dir.exists ? await readIndex(dir) : [];
+      // Every recording, deleted one by one (tombstones, so other phones don't
+      // upload their copies again): those listed here, and `alsoIds`, the
+      // backup's own list just fetched (recordings not listed here yet).
+      queueCloudDeletes([...entries.map(cloudDeleteFor), ...alsoIds.filter(isSafeName).map((id) => ({ id }))], owner);
     }
     if (dir.exists) dir.delete();
     notifyChanged();
@@ -671,12 +674,12 @@ function reconcile(dir: Directory, e: StoredRecording, c: CloudRecording | undef
       if (!sg.uploaded) return [sg];
       return file ? [unmark(sg)] : [];
     });
-    if (e.restored && !e.adopted) {
-      // Made elsewhere: segments that phone has added since.
-      const names = new Set(segs.map((sg) => sg.fileName));
-      for (const r of c.segments) if (!names.has(r.fileName)) next.push({ ...r, uploaded: true });
-      next.sort(bySegmentIndex);
-    }
+    // Parts the backup has that this phone doesn't (the phone that made a
+    // restored copy carried on; or a twin restored from the same iCloud backup):
+    // listed here, to download when played.
+    const names = new Set(segs.map((sg) => sg.fileName));
+    for (const r of c.segments) if (!names.has(r.fileName)) next.push({ ...r, uploaded: true });
+    next.sort(bySegmentIndex);
     backupDeleted = false;
   } else {
     // Not in the backup. Deleted (a tombstone): kept here only. Otherwise the
@@ -822,6 +825,28 @@ export function adoptDownloadedSegment(uid: string, recordingId: string, fileNam
     if (!target.exists) part.move(target);
     else if (part.exists) part.delete();
     return target.uri;
+  });
+}
+
+/** A part the backup no longer has (a download found nothing) and this phone
+ *  never had: no longer listed. The recording goes too if nothing is left. */
+export function dropMissingSegment(uid: string, recordingId: string, fileName: string): Promise<void> {
+  return serial(async () => {
+    const dir = dirFor(uid);
+    const entries = await readIndex(dir);
+    const e = entries.find((x) => x.id === recordingId);
+    if (!e || new File(dir, fileName).exists) return;
+    const segs = segmentsOf(e).filter((sg) => sg.fileName !== fileName);
+    const { fileName: _legacy, ...rest } = e;
+    writeIndex(
+      dir,
+      segs.length === 0
+        ? entries.filter((x) => x.id !== recordingId)
+        : entries.map((x) =>
+            x.id === recordingId ? { ...rest, segments: segs, durationMs: segs.reduce((sum, sg) => sum + sg.durationMs, 0) } : x,
+          ),
+    );
+    notifyChanged();
   });
 }
 

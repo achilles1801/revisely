@@ -6,7 +6,10 @@ import {
   BackupListing,
   RecordingMeta,
   cloudOnlyRecordings,
+  deleteAllRecordings,
+  isValidCloudRecording,
   mergeCloudRecordings,
+  pendingCloudDeletes,
   queueWholeBackupDelete,
 } from './recordings';
 import { downloadMissingSegments } from './recordingBackup';
@@ -49,9 +52,15 @@ export type DeleteBackupResult =
   /** The backup couldn't be listed (offline): nothing was deleted. */
   | { ok: false; offline: true }
   /** Recordings only in the backup couldn't be downloaded: nothing was deleted. */
-  | { ok: false; notDownloaded: number };
+  | { ok: false; notDownloaded: number }
+  /** A deletion of the backup is still under way, or the backup holds a record
+   *  this version can't read (it would be deleted unseen): nothing was deleted. */
+  | { ok: false; busy: true };
 
 export interface DeleteBackupIo {
+  wipePending: (uid: string) => boolean;
+  /** A record this version can read (and so brings into the phone). */
+  readable: (record: unknown) => boolean;
   list: (uid: string) => Promise<BackupListing>;
   files: (uid: string) => Promise<string[]>;
   merge: (uid: string, listing: BackupListing) => Promise<unknown>;
@@ -61,6 +70,8 @@ export interface DeleteBackupIo {
 }
 
 const defaultDeleteIo: DeleteBackupIo = {
+  wipePending: (uid) => pendingCloudDeletes(uid).wipe != null,
+  readable: isValidCloudRecording,
   list: listRecordingDocs,
   files: (uid) => listSegments(uid),
   merge: mergeCloudRecordings,
@@ -76,10 +87,27 @@ const defaultDeleteIo: DeleteBackupIo = {
  * is deleted. If anything can't be listed or downloaded, nothing is deleted.
  */
 export async function deleteBackupKeepLocal(uid: string, io: DeleteBackupIo = defaultDeleteIo): Promise<DeleteBackupResult> {
+  // One at a time: while a deletion is pending the phone doesn't merge the
+  // backup, so a new one couldn't see (and download) what it would delete.
+  if (io.wipePending(uid)) {
+    requestBackup();
+    return { ok: false, busy: true };
+  }
   let listing: BackupListing;
   let fileNames: string[];
   try {
     [listing, fileNames] = await Promise.all([io.list(uid), io.files(uid)]);
+  } catch (err) {
+    logger.warn('Could not list the backup before deleting it', err);
+    return { ok: false, offline: true };
+  }
+  // A record this version can't read is never brought here: its audio would be
+  // deleted without being downloaded.
+  if (listing.live.some((c) => !io.readable(c))) {
+    logger.error('Recording backup: the backup holds a record that can’t be read; not deleting it');
+    return { ok: false, busy: true };
+  }
+  try {
     await io.merge(uid, listing);
   } catch (err) {
     logger.warn('Could not list the backup before deleting it', err);
@@ -105,15 +133,20 @@ export async function deleteBackupKeepLocal(uid: string, io: DeleteBackupIo = de
  * Settings → "Back up recordings" switched off: off, or off and the backup
  * deleted (the recordings stay on this phone). `turnOff` saves the setting.
  */
-export function askTurnOffBackup(uid: string, turnOff: () => void, cloudOnly: number): void {
+export function askTurnOffBackup(uid: string, turnOff: () => Promise<unknown> | void, cloudOnly: number): void {
   const deleteBackups = async () => {
-    turnOff();
+    // Off first (the server then refuses new records), so nothing more is added
+    // while the backup is listed. Not waiting long for it: offline, the listing
+    // fails anyway.
+    await waitAtMost(Promise.resolve(turnOff()), 10_000);
     const result: DeleteBackupResult = await deleteBackupKeepLocal(uid).catch((err) => {
       logger.warn('Could not delete backups', err);
       return { ok: false as const, offline: true as const };
     });
     if (result.ok) {
       Alert.alert('Backup deleted', 'Your recordings are on this phone only now.');
+    } else if ('busy' in result) {
+      Alert.alert('Backup kept', 'Your backup can’t be deleted right now, so nothing was deleted. Try again in a minute.');
     } else if ('notDownloaded' in result && result.notDownloaded > 0) {
       const n = result.notDownloaded;
       Alert.alert(
@@ -153,4 +186,38 @@ export function askTurnOffBackup(uid: string, turnOff: () => void, cloudOnly: nu
       },
     ],
   );
+}
+
+const waitAtMost = (p: Promise<unknown>, ms: number) => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([p.catch(() => undefined), new Promise((r) => (timer = setTimeout(r, ms)))]).finally(() =>
+    clearTimeout(timer),
+  );
+};
+
+/**
+ * Settings → Recordings → "Delete all": every recording on this phone and in the
+ * backup. The backup is listed first so recordings this phone hasn't seen yet
+ * go too; false if it can't be reached (nothing is deleted then).
+ */
+export async function deleteAllEverywhere(
+  uid: string,
+  io: { list: (uid: string) => Promise<BackupListing>; deleteAll: typeof deleteAllRecordings } = {
+    list: listRecordingDocs,
+    deleteAll: deleteAllRecordings,
+  },
+): Promise<boolean> {
+  let listing: BackupListing;
+  try {
+    listing = (await Promise.race([
+      io.list(uid),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timed out')), 15_000)),
+    ])) as BackupListing;
+  } catch (err) {
+    logger.warn('Could not list the backup before deleting everything', err);
+    return false;
+  }
+  await io.deleteAll(uid, { withBackup: true, alsoIds: listing.live.map((c) => c.id) });
+  requestBackup();
+  return true;
 }

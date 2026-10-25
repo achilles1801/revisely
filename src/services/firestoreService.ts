@@ -722,17 +722,12 @@ export async function putRecordingDoc(userId: string, rec: CloudRecording): Prom
 }
 
 /**
- * A deleted recording's record becomes a tombstone, so another phone with a copy
- * never uploads it again (and the rules refuse anyone writing it back). Nothing
- * to do if there is no record, or it is a tombstone already.
+ * A deleted recording's record becomes a tombstone, so no phone with a copy
+ * uploads it again (the rules refuse writing over one). Written even when there
+ * is no record now: one may come later from a phone that still has a copy.
  */
 export async function tombstoneRecordingDoc(userId: string, id: string): Promise<void> {
-  const ref = doc(db, 'users', userId, 'recordings', id);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists() || snap.data().deletedAt !== undefined) return;
-    tx.set(ref, { deletedAt: serverTimestamp() });
-  });
+  await setDoc(doc(db, 'users', userId, 'recordings', id), { deletedAt: serverTimestamp() });
 }
 
 /** Delete a recording's record (the whole backup going). Tombstones stay. */

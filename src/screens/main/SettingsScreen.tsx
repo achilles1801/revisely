@@ -41,7 +41,7 @@ import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
 import { avatarInitial } from '../../lib/displayName';
 import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
-import { askTurnOffBackup, backupLabel, useBackupStatus } from '../../lib/recordingBackupUi';
+import { askTurnOffBackup, backupLabel, deleteAllEverywhere, useBackupStatus } from '../../lib/recordingBackupUi';
 import { formatBytes } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
 import {
@@ -572,9 +572,27 @@ export default function SettingsScreen() {
                                 style: 'destructive',
                                 onPress: async () => {
                                   // The whole folder, including any file not in the index,
-                                  // and the backup.
-                                  await deleteAllRecordings(undefined, { withBackup: true });
-                                  loadRecordings();
+                                  // and the backup (listed first, for recordings not seen here).
+                                  const uid = firebaseUser?.uid;
+                                  if (uid && (await deleteAllEverywhere(uid))) {
+                                    loadRecordings();
+                                    return;
+                                  }
+                                  Alert.alert(
+                                    'Couldn’t reach your backup',
+                                    'Nothing was deleted. Delete the recordings on this phone only? Those in your backup stay there.',
+                                    [
+                                      { text: 'Cancel', style: 'cancel' },
+                                      {
+                                        text: 'Delete on this phone',
+                                        style: 'destructive',
+                                        onPress: async () => {
+                                          await deleteAllRecordings(uid);
+                                          loadRecordings();
+                                        },
+                                      },
+                                    ],
+                                  );
                                 },
                               },
                               ],

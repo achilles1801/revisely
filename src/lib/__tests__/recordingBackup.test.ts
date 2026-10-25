@@ -28,7 +28,8 @@ function world() {
     tombstones: new Map<string, number>(),
     uploads: [] as string[],
   };
-  const fail: { upload?: (name: string) => Error | undefined; list?: Error; tombstone?: Error } = {};
+  const fail: { upload?: (name: string) => Error | undefined; list?: Error; tombstone?: Error; put?: Error } = {};
+  let listings = 0;
   const deps: BackupDeps = {
     pendingCloudDeletes: () => ({
       items: [...phone.queue.items],
@@ -59,11 +60,11 @@ function world() {
     },
     tombstoneRecordingDoc: async (_uid, id) => {
       if (fail.tombstone) throw fail.tombstone;
-      if (!cloud.docs.has(id)) return;
       cloud.docs.delete(id);
       cloud.tombstones.set(id, 1);
     },
     putRecordingDoc: async (_uid, rec) => {
+      if (fail.put) throw fail.put;
       if (cloud.tombstones.has(rec.id)) return 'deleted';
       cloud.docs.set(rec.id, rec);
       return 'ok';
@@ -108,7 +109,10 @@ function world() {
     deleteSegment: async (_uid, name) => {
       cloud.files.delete(name);
     },
-    listSegments: async () => [...cloud.files.keys()],
+    listSegments: async () => {
+      listings++;
+      return [...cloud.files.keys()];
+    },
   };
   const addRecording = (id: string, segments = 1) => {
     phone.recordings.add(id);
@@ -116,7 +120,7 @@ function world() {
       phone.pending.push({ recordingId: id, fileName: `${id}-${n}.m4a`, uri: `file:///${id}-${n}.m4a`, sizeBytes: 10 });
     }
   };
-  return { phone, cloud, deps, fail, addRecording };
+  return { phone, cloud, deps, fail, addRecording, listings: () => listings };
 }
 
 const ON: BackupSettings = { enabled: true, allowCellular: false, noticeShown: true };
@@ -198,9 +202,22 @@ describe('runBackup', () => {
     expect(result.phase).toBe('off');
     expect([...w.cloud.files.keys()]).toEqual(['r10-0.m4a']);
     expect(w.cloud.docs.size).toBe(0);
-    expect([...w.cloud.tombstones.keys()]).toEqual(['r1']); // r2 had no record: none needed
+    // r2 had no record: a tombstone anyway (a phone with a copy may upload one later).
+    expect([...w.cloud.tombstones.keys()]).toEqual(['r1', 'r2']);
     expect(w.phone.queue.items).toEqual([]);
     expect(w.phone.merged).toEqual([]);
+    // Every tombstone first, then the files listed once.
+    expect(w.listings()).toBe(1);
+  });
+
+  it('a phone told by the server that backup is off (its record refused) uploads nothing more', async () => {
+    const w = world();
+    w.addRecording('r1');
+    w.addRecording('r2');
+    w.fail.put = Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+    const result = await runBackup('u', ON, WIFI, w.deps, { list: false });
+    expect(result.phase).toBe('off');
+    expect(w.cloud.uploads).toEqual(['r1-0.m4a']);
   });
 
   it('a deletion that fails is retried later without holding up uploads', async () => {
@@ -401,6 +418,7 @@ describe('downloadMissingSegments', () => {
   function io(existing: string[] = []) {
     const files = new Set(existing);
     const downloads: string[] = [];
+    const dropped: string[] = [];
     const file = (path: string) => ({
       uri: path,
       get exists() {
@@ -413,12 +431,16 @@ describe('downloadMissingSegments', () => {
     return {
       files,
       downloads,
+      dropped,
       io: {
         download: async (_uid: string, name: string, to: string) => {
           downloads.push(name);
           files.add(to);
         },
         partFor: (_uid: string, n: string) => file(`doc/${n}.part`),
+      drop: async (_uid: string, _id: string, n: string) => {
+        dropped.push(n);
+      },
         adopt: async (_uid: string, _id: string, n: string, part: { uri: string }): Promise<string | null> => {
           files.delete(part.uri);
           files.add(`doc/${n}`);
@@ -456,5 +478,25 @@ describe('downloadMissingSegments', () => {
     };
     await expect(downloadMissingSegments('u', rec([false]), t.io)).rejects.toThrow('deleted');
     expect([...t.files]).toEqual([]);
+  });
+
+  it('a part the backup no longer has (404) is dropped, and the rest plays', async () => {
+    const t = io();
+    t.io.download = async (_u, name, to) => {
+      if (name === 'r1-0.m4a') throw Object.assign(new Error('Download failed (404)'), { status: 404 });
+      t.files.add(to);
+    };
+    const out = await downloadMissingSegments('u', rec([false, false]), t.io);
+    expect(t.dropped).toEqual(['r1-0.m4a']);
+    expect(out.segments.map((sg) => sg.fileName)).toEqual(['r1-1.m4a']);
+    expect(out.durationMs).toBe(1000);
+  });
+
+  it('with nothing left in the backup: says so', async () => {
+    const t = io();
+    t.io.download = async () => {
+      throw Object.assign(new Error('Download failed (404)'), { status: 404 });
+    };
+    await expect(downloadMissingSegments('u', rec([false]), t.io)).rejects.toThrow('no longer in your backup');
   });
 });

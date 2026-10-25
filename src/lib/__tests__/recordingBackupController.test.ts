@@ -20,7 +20,7 @@ import {
   setNetwork,
   stopBackup,
 } from '../recordingBackupController';
-import { askTurnOffBackup, backupLabel, deleteBackupKeepLocal } from '../recordingBackupUi';
+import { askTurnOffBackup, backupLabel, deleteAllEverywhere, deleteBackupKeepLocal } from '../recordingBackupUi';
 import { Alert } from 'react-native';
 
 // Deps that count runs (every run asks for pending uploads), can be held open,
@@ -327,8 +327,19 @@ describe('turning backup off', () => {
   const press = (alert: jest.SpyInstance, call: number, text: string) =>
     (alert.mock.calls[call][2] as { text: string; onPress?: () => void }[]).find((b) => b.text === text)?.onPress?.();
 
+  const valid = {
+    id: 'r1',
+    kind: 'revision',
+    day: '2026-10-25',
+    createdAt: 1,
+    durationMs: 1000,
+    pageMarks: [],
+    segments: [{ fileName: 'r1-0.m4a', durationMs: 1000, sizeBytes: 10 }],
+  };
   const io = (over: Partial<Parameters<typeof deleteBackupKeepLocal>[1]> = {}) => ({
-    list: jest.fn(async () => ({ live: [{ id: 'r1' } as any], deleted: [] })),
+    wipePending: jest.fn(() => false),
+    readable: (c: any) => Array.isArray(c?.segments),
+    list: jest.fn(async () => ({ live: [valid as any], deleted: [] })),
     files: jest.fn(async () => ['r1-0.m4a', 'orphan-0.m4a']),
     merge: jest.fn(async () => 0),
     cloudOnly: jest.fn(async () => [] as any[]),
@@ -361,7 +372,7 @@ describe('turning backup off', () => {
   it('lists the backup now, brings it into the phone, downloads what is only there, then deletes exactly that', async () => {
     const t = io({ cloudOnly: jest.fn().mockResolvedValueOnce([{ id: 'r1' }]).mockResolvedValue([]) });
     expect(await deleteBackupKeepLocal('u1', t)).toEqual({ ok: true });
-    expect(t.merge).toHaveBeenCalledWith('u1', { live: [{ id: 'r1' }], deleted: [] });
+    expect(t.merge).toHaveBeenCalledWith('u1', { live: [valid], deleted: [] });
     expect(t.download).toHaveBeenCalledWith('u1', { id: 'r1' });
     expect(t.queue).toHaveBeenCalledWith('u1', { fileNames: ['r1-0.m4a', 'orphan-0.m4a'], docIds: ['r1'] });
     // In that order: listed and merged before anything was checked or downloaded.
@@ -385,5 +396,49 @@ describe('turning backup off', () => {
     });
     expect(await deleteBackupKeepLocal('u1', t)).toEqual({ ok: false, notDownloaded: 1 });
     expect(t.queue).not.toHaveBeenCalled();
+  });
+
+  it('one at a time: while a deletion is still under way, nothing more is deleted', async () => {
+    const t = io({ wipePending: jest.fn(() => true) });
+    expect(await deleteBackupKeepLocal('u1', t)).toEqual({ ok: false, busy: true });
+    expect(t.list).not.toHaveBeenCalled();
+    expect(t.queue).not.toHaveBeenCalled();
+  });
+
+  it('a record this version can’t read: nothing is deleted (its audio would go unseen)', async () => {
+    const t = io({ list: jest.fn(async () => ({ live: [valid as any, { id: 'odd', segments: 'x' } as any], deleted: [] })) });
+    expect(await deleteBackupKeepLocal('u1', t)).toEqual({ ok: false, busy: true });
+    expect(t.queue).not.toHaveBeenCalled();
+  });
+
+  it('waits for the setting to be saved before listing the backup', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    let saved: () => void = () => {};
+    const turnOff = jest.fn(() => new Promise<void>((r) => (saved = r)));
+    askTurnOffBackup('u1', turnOff, 0);
+    press(alert, 0, 'Turn off and delete backups');
+    await flush();
+    expect(turnOff).toHaveBeenCalled();
+    expect(mockCloudOnly).not.toHaveBeenCalled();
+    saved();
+    alert.mockRestore();
+  });
+});
+
+describe('deleting every recording ("Delete all")', () => {
+  it('lists the backup first, so recordings this phone hasn’t seen go too', async () => {
+    const deleteAll = jest.fn(async () => undefined);
+    const ok = await deleteAllEverywhere('u1', {
+      list: async () => ({ live: [{ id: 'r1' } as any, { id: 'r2' } as any], deleted: [] }),
+      deleteAll: deleteAll as any,
+    });
+    expect(ok).toBe(true);
+    expect(deleteAll).toHaveBeenCalledWith('u1', { withBackup: true, alsoIds: ['r1', 'r2'] });
+  });
+
+  it('can’t reach the backup: deletes nothing', async () => {
+    const deleteAll = jest.fn();
+    expect(await deleteAllEverywhere('u1', { list: async () => Promise.reject(new Error('offline')), deleteAll })).toBe(false);
+    expect(deleteAll).not.toHaveBeenCalled();
   });
 });

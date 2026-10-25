@@ -34,6 +34,7 @@ import {
   UploadSession,
   adoptDownloadedSegment,
   clearCloudDeletes,
+  dropMissingSegment,
   clearWipe,
   cloudRecordingFor,
   markBackupDeleted,
@@ -138,8 +139,12 @@ export const defaultDeps: BackupDeps = {
   listSegments,
 };
 
-/** A file of recording `id`: <id>-<n>.<ext>, or an older recording's <id>.<ext>. */
-const isFileOf = (id: string, name: string) => name.startsWith(`${id}-`) || name.startsWith(`${id}.`);
+const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A file of recording `id`: <id>-<n>.<audio ext>, or an older recording's <id>.<audio ext>. */
+const isFileOf = (id: string, name: string) =>
+  new RegExp(`^${escapeRe(id)}(-\\d+)?\\.(m4a|aac|mp4|caf|wav)$`, 'i').test(name);
+/** Firestore refused the write: the account's backup is off on the server (rules). */
+const isPermissionDenied = (err: unknown) => (err as { code?: unknown } | null)?.code === 'permission-denied';
 const inBatches = <T>(items: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
 
@@ -206,21 +211,31 @@ export async function runBackup(
       return done(settings.enabled ? 'idle' : 'off');
     }
     let failedDeletes = 0;
-    // The backup's file names, listed once for all the deletions (only after
-    // the tombstones: a phone uploading one of these meanwhile is refused its
-    // record and removes the file itself).
-    let backupFiles: string[] | null = null;
+    // Tombstones first, all of them; then the backup's files, listed once. A
+    // phone uploading part of one of these meanwhile either did so before the
+    // listing (so it is deleted here) or is refused its record afterwards and
+    // removes the file itself.
+    const tombstoned: string[] = [];
     for (const item of queue.items) {
       if (stopped()) return done('idle');
       try {
         await deps.tombstoneRecordingDoc(uid, item.id);
-        backupFiles ??= await deps.listSegments(uid);
-        for (const name of backupFiles) {
-          if (isFileOf(item.id, name)) await deps.deleteSegment(uid, name);
-        }
-        deps.clearCloudDeletes(uid, [item.id]);
+        tombstoned.push(item.id);
       } catch (err) {
         logger.warn('Recording backup: could not delete a recording’s backup', err);
+        failedDeletes++;
+      }
+    }
+    if (tombstoned.length > 0) {
+      try {
+        const backupFiles = await deps.listSegments(uid);
+        for (const id of tombstoned) {
+          if (stopped()) return done('idle');
+          for (const name of backupFiles) if (isFileOf(id, name)) await deps.deleteSegment(uid, name);
+          deps.clearCloudDeletes(uid, [id]);
+        }
+      } catch (err) {
+        logger.warn('Recording backup: could not delete recordings’ files', err);
         failedDeletes++;
       }
     }
@@ -276,10 +291,23 @@ export async function runBackup(
         }
         await deps.markSegmentUploaded(uid, p.recordingId, p.fileName, size || p.sizeBytes);
         const rec = await deps.cloudRecordingFor(uid, p.recordingId);
+        let put: 'ok' | 'deleted' | null = null;
+        if (rec) {
+          try {
+            put = await deps.putRecordingDoc(uid, rec);
+          } catch (err) {
+            if (!isPermissionDenied(err)) throw err;
+            // Backup is off for the account (this phone hasn't heard yet), or the
+            // rules aren't deployed: upload nothing more. The next listing
+            // unmarks this part if its record never got written.
+            logger.error('Recording backup: the backup refused a record', err);
+            return done('off');
+          }
+        }
         if (!rec) {
           // Deleted on this phone while it was uploading: its copy goes too.
           await deps.deleteSegment(uid, p.fileName);
-        } else if ((await deps.putRecordingDoc(uid, rec)) === 'deleted') {
+        } else if (put === 'deleted') {
           // Deleted on another phone meanwhile: the backup stays deleted, and
           // this phone keeps its copy, local only.
           deletedElsewhere.add(p.recordingId);
@@ -313,6 +341,8 @@ interface FileLike {
 
 export interface DownloadIo {
   download: (uid: string, fileName: string, toUri: string) => Promise<void>;
+  /** A part the backup no longer has: no longer listed. */
+  drop: (uid: string, recordingId: string, fileName: string) => Promise<void>;
   /** The file a download goes to before it is complete. */
   partFor: (uid: string, fileName: string) => FileLike;
   /** Puts a complete download in place; null if its recording was deleted meanwhile. */
@@ -321,6 +351,7 @@ export interface DownloadIo {
 
 const defaultIo: DownloadIo = {
   download: (uid, name, to) => downloadSegment(uid, name, to),
+  drop: dropMissingSegment,
   partFor: (uid, n) => segmentFile(uid, `${n}.part`),
   adopt: (uid, id, n, part) => adoptDownloadedSegment(uid, id, n, part as Parameters<typeof adoptDownloadedSegment>[3]),
 };
@@ -345,11 +376,23 @@ export async function downloadMissingSegments(uid: string, rec: RecordingMeta, i
       await io.download(uid, sg.fileName, part.uri);
     } catch (err) {
       if (part.exists) part.delete();
+      // Not in the backup (any more): the rest of the recording still plays.
+      if ((err as { status?: unknown } | null)?.status === 404) {
+        logger.warn('Recording backup: a part of a recording is missing from the backup');
+        await io.drop(uid, rec.id, sg.fileName);
+        continue;
+      }
       throw err;
     }
     const uri = await io.adopt(uid, rec.id, sg.fileName, part);
     if (!uri) throw new Error('This recording was deleted.');
     segments.push({ ...sg, uri, local: true });
   }
-  return { ...rec, segments, uri: segments[0]?.uri ?? rec.uri };
+  if (segments.length === 0) throw new Error('This recording is no longer in your backup.');
+  return {
+    ...rec,
+    segments,
+    uri: segments[0].uri,
+    durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),
+  };
 }
