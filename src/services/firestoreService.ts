@@ -136,7 +136,9 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
   };
 
   await setDoc(getUserRef(input.uid), userData);
-  await initializeAllPages(input.uid);
+  // Pages only where the server has none: a user document can go missing while
+  // its pages (a subcollection) remain, and those hold real progress.
+  if (!(await pagesExistOnServer(input.uid))) await initializeAllPages(input.uid);
 
   return userData;
 }

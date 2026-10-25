@@ -197,10 +197,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // FIRESTORE SUBSCRIPTIONS - Real-time data sync
   // ============================================================================
 
+  // Whether the server has told us about the user document (it exists, or it
+  // was missing and has been created). Until then the app keeps loading: an
+  // existing user offline on a fresh install must not see onboarding, whose
+  // defaults would be written over their account when they reconnect.
+  const [userResolved, setUserResolved] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
     setLoading(true);
+    setUserResolved(false);
     setError(null);
 
     // Subscribe to user document. If Firebase Auth says we're logged in but
@@ -251,6 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (outcome === 'wait') {
             timers.push(setTimeout(() => ensure(what, false, attempt + 1), retryDelayMs(attempt)));
           } else if (outcome === 'failed' && what === 'user') {
+            setUserResolved(true);
             setUser(null);
             setOnboardingComplete(false);
           }
@@ -261,11 +269,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser, { fromCache }) => {
       if (fsUser) {
+        setUserResolved(true);
         setUser(firestoreUserToLocal(fsUser));
         setOnboardingComplete(fsUser.onboardingComplete);
         return;
       }
       if (!getAuth().currentUser) {
+        setUserResolved(true);
         setUser(null);
         setOnboardingComplete(false);
         return;
@@ -841,7 +851,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user,
         pages,
         logs,
-        loading,
+        loading: loading || (isAuthenticated && !userResolved),
         onboardingComplete,
         isAuthenticated,
         error,

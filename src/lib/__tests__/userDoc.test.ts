@@ -32,6 +32,13 @@ describe('ensureOnServer', () => {
     expect(o.onError).not.toHaveBeenCalled();
   });
 
+  it('a server error that is not "offline" is a failure, not a silent retry', async () => {
+    const o = make([Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' })]);
+    expect(await ensureOnServer({ fromCache: false, ...o })).toBe('failed');
+    expect(o.onError).toHaveBeenCalled();
+    expect(o.create).not.toHaveBeenCalled();
+  });
+
   it('does not overwrite data the server has (REACT-NATIVE-6, lost page progress)', async () => {
     const o = make([true]);
     expect(await ensureOnServer({ fromCache: false, ...o })).toBe('exists');

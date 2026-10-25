@@ -33,9 +33,12 @@ export async function ensureOnServer(opts: {
   let exists: boolean;
   try {
     exists = await opts.existsOnServer();
-  } catch {
-    // Offline or the server didn't answer: can't tell yet.
-    return 'wait';
+  } catch (err) {
+    // Offline or the server didn't answer: can't tell yet. Anything else
+    // (permissions, App Check) is a real failure.
+    if (isOffline(err)) return 'wait';
+    opts.onError?.(err);
+    return 'failed';
   }
   if (exists) return 'exists';
   if (opts.skip?.()) return 'skipped';
@@ -51,6 +54,12 @@ export async function ensureOnServer(opts: {
     opts.onError?.(err);
     return 'failed';
   }
+}
+
+/** Firestore's "couldn't reach the server" (code `unavailable`, or the offline message). */
+export function isOffline(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown } | null;
+  return e?.code === 'unavailable' || /offline|unavailable|network/i.test(String(e?.message ?? ''));
 }
 
 /** Delay before asking the server again after a 'wait' (5 s, 15 s, 30 s, then every minute). */
