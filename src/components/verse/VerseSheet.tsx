@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  PanResponder,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -42,10 +43,24 @@ type LoadState =
   | { status: 'ready'; text: VerseText }
   | { status: 'error' };
 
+/** Sheet height: as it opens, and expanded (swipe the grabber up, or tap it). */
+export const SHEET_HEIGHT = { normal: '70%', expanded: '92%' } as const;
+
+/** What a vertical swipe on the grabber does (dy: points moved, up negative). */
+export function grabberSwipe(dy: number, expanded: boolean): 'expand' | 'shrink' | 'close' | null {
+  if (dy < -30) return expanded ? null : 'expand';
+  if (dy > 30) return expanded ? 'shrink' : 'close';
+  return null;
+}
+
 /**
  * A held verse's Arabic text and translation, with previous/next and the
  * translation picker under "…". A plain Modal rather than a gorhom sheet, like
  * the other overlays on the reading screens.
+ *
+ * The header stays put and the verse scrolls under it: a long verse (2:282)
+ * runs well past the sheet. The grabber expands the sheet to nearly the whole
+ * screen (swipe up or tap) and back (swipe down; down again closes it).
  */
 export function VerseSheet({
   verse,
@@ -62,6 +77,36 @@ export function VerseSheet({
   const [attempt, setAttempt] = useState(0);
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
   const translation = resolveTranslation(translationId);
+  const [expanded, setExpanded] = useState(false);
+  // Where the "…" menu opens: under the header, however tall large text makes it.
+  const [headerBottom, setHeaderBottom] = useState(96);
+
+  // A closed sheet reopens at normal height. (Another verse starts at its top
+  // by itself: loading it replaces the scrolling part.)
+  useEffect(() => {
+    if (verse == null) setExpanded(false);
+  }, [verse]);
+
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const grabberPan = useMemo(
+    () =>
+      PanResponder.create({
+        // Claimed from the start, so a swipe from the title works too; the
+        // header's buttons are deeper and still take their taps.
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderRelease: (_e, g) => {
+          const action = grabberSwipe(g.dy, expandedRef.current);
+          if (action === 'expand') setExpanded(true);
+          else if (action === 'shrink') setExpanded(false);
+          else if (action === 'close') onCloseRef.current();
+        },
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (verse == null) {
@@ -85,55 +130,73 @@ export function VerseSheet({
   return (
     <Modal visible={verse != null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Close translation">
-        <Pressable onPress={(e) => e.stopPropagation()} style={styles.sheet}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={[styles.sheet, { maxHeight: expanded ? SHEET_HEIGHT.expanded : SHEET_HEIGHT.normal }]}
+          testID="verse-sheet"
+        >
           <GlassCard style={StyleSheet.absoluteFillObject} />
           <SafeAreaView style={styles.safe}>
-            <View style={[styles.grabber, { backgroundColor: theme.border }]} />
-            <View style={styles.headerRow}>
-              <PressableScale onPress={onClose} haptic="light" style={styles.roundBtn} accessibilityLabel="Close">
-                <Ionicons name="close" size={20} color={theme.textPrimary} />
-              </PressableScale>
-              <View style={styles.titleBox}>
-                <View style={styles.titleLine}>
-                  <Text style={styles.surahName} numberOfLines={1}>
-                    {surah?.nameDisplay ?? ''}
-                  </Text>
-                  {surah ? <Text style={styles.surahArabic}>{surah.nameArabicVoweled}</Text> : null}
-                </View>
-                <Text style={styles.ayahLabel}>Ayah {verse?.ayah}</Text>
-              </View>
-              <View style={styles.pill}>
-                <Pressable
-                  onPress={() => prev && onNavigate(prev)}
-                  disabled={!prev}
-                  hitSlop={6}
-                  accessibilityLabel="Previous verse"
-                  style={styles.pillBtn}
-                >
-                  <Ionicons name="chevron-back" size={18} color={prev ? theme.textPrimary : theme.textMuted} />
-                </Pressable>
-                <Pressable
-                  onPress={() => next && onNavigate(next)}
-                  disabled={!next}
-                  hitSlop={6}
-                  accessibilityLabel="Next verse"
-                  style={styles.pillBtn}
-                >
-                  <Ionicons name="chevron-forward" size={18} color={next ? theme.textPrimary : theme.textMuted} />
-                </Pressable>
-              </View>
-              <PressableScale
-                onPress={() => setMenu(menu === 'closed' ? 'root' : 'closed')}
-                haptic="light"
-                style={styles.roundBtn}
-                accessibilityLabel="More"
+            {/* Grabber and header: swipe up to expand, down to shrink or close. */}
+            <View
+              {...grabberPan.panHandlers}
+              onLayout={(e) => setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
+            >
+              <Pressable
+                onPress={() => setExpanded((e) => !e)}
+                hitSlop={{ top: 8, bottom: 8, left: 40, right: 40 }}
+                style={styles.grabberHit}
+                accessibilityRole="button"
+                accessibilityLabel={expanded ? 'Make the translation smaller' : 'Expand the translation'}
               >
-                <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
-              </PressableScale>
+                <View style={[styles.grabber, { backgroundColor: theme.border }]} />
+              </Pressable>
+              <View style={styles.headerRow}>
+                <PressableScale onPress={onClose} haptic="light" style={styles.roundBtn} accessibilityLabel="Close">
+                  <Ionicons name="close" size={20} color={theme.textPrimary} />
+                </PressableScale>
+                <View style={styles.titleBox}>
+                  <View style={styles.titleLine}>
+                    <Text style={styles.surahName} numberOfLines={1}>
+                      {surah?.nameDisplay ?? ''}
+                    </Text>
+                    {surah ? <Text style={styles.surahArabic}>{surah.nameArabicVoweled}</Text> : null}
+                  </View>
+                  <Text style={styles.ayahLabel}>Ayah {verse?.ayah}</Text>
+                </View>
+                <View style={styles.pill}>
+                  <Pressable
+                    onPress={() => prev && onNavigate(prev)}
+                    disabled={!prev}
+                    hitSlop={6}
+                    accessibilityLabel="Previous verse"
+                    style={styles.pillBtn}
+                  >
+                    <Ionicons name="chevron-back" size={18} color={prev ? theme.textPrimary : theme.textMuted} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => next && onNavigate(next)}
+                    disabled={!next}
+                    hitSlop={6}
+                    accessibilityLabel="Next verse"
+                    style={styles.pillBtn}
+                  >
+                    <Ionicons name="chevron-forward" size={18} color={next ? theme.textPrimary : theme.textMuted} />
+                  </Pressable>
+                </View>
+                <PressableScale
+                  onPress={() => setMenu(menu === 'closed' ? 'root' : 'closed')}
+                  haptic="light"
+                  style={styles.roundBtn}
+                  accessibilityLabel="More"
+                >
+                  <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
+                </PressableScale>
+              </View>
             </View>
 
             {menu !== 'closed' && (
-              <View style={styles.dropdown}>
+              <View style={[styles.dropdown, { top: headerBottom }]}>
                 <GlassCard elevated style={StyleSheet.absoluteFillObject} />
                 {menu === 'root' ? (
                   <>
@@ -202,7 +265,12 @@ export function VerseSheet({
               </View>
             )}
             {state.status === 'ready' && (
-              <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+              <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator
+                testID="verse-scroll"
+              >
                 <View style={[styles.keyChip, { borderColor: theme.border, backgroundColor: theme.glass }]}>
                   <Text style={[typography.caption, { color: theme.textSecondary }]}>
                     {state.text.sura}:{state.text.ayah}
@@ -224,7 +292,6 @@ const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'flex-end' },
     sheet: {
-      maxHeight: '70%',
       minHeight: 240,
       borderTopLeftRadius: radius.lg,
       borderTopRightRadius: radius.lg,
@@ -233,7 +300,8 @@ const makeStyles = (theme: ThemeColors) =>
       overflow: 'hidden',
     },
     safe: { flexShrink: 1 },
-    grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginTop: spacing.sm, marginBottom: spacing.md },
+    grabberHit: { alignSelf: 'center', paddingTop: spacing.sm, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },
+    grabber: { width: 40, height: 5, borderRadius: 3 },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
     roundBtn: {
       width: 36,
@@ -261,7 +329,6 @@ const makeStyles = (theme: ThemeColors) =>
     dropdown: {
       position: 'absolute',
       right: 0,
-      top: 96,
       width: 280,
       borderRadius: radius.md,
       overflow: 'hidden',
@@ -281,7 +348,9 @@ const makeStyles = (theme: ThemeColors) =>
       borderRadius: radius.full,
       backgroundColor: theme.accent,
     },
-    scroll: { flexGrow: 0 },
+    // Sized to the verse up to the space left under the header, then scrolls:
+    // without flexShrink a long verse grew past the sheet and was cut off.
+    scroll: { flexGrow: 0, flexShrink: 1 },
     scrollContent: { paddingBottom: spacing.lg },
     keyChip: {
       alignSelf: 'flex-start',
