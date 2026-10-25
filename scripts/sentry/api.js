@@ -27,8 +27,12 @@ const sentryApi = {
   /** Issues matching a search, most recent first. */
   issues: (query, statsPeriod = '24h', limit = 25) =>
     sentry(`/projects/${SENTRY.org}/${SENTRY.project}/issues/`, { query, statsPeriod, limit, sort: 'date' }),
-  latestEvent: (issueId) => sentry(`/organizations/${SENTRY.org}/issues/${issueId}/events/latest/`),
-  /** Session totals grouped by release and status (healthy/errored/crashed/abnormal). */
+  latestEvent: (issueId) => sentry(`/organizations/${SENTRY.org}/issues/${encodeURIComponent(issueId)}/events/latest/`),
+  /**
+   * Session totals grouped by release and status (healthy/errored/crashed/abnormal), read from each
+   * group's `totals`. Hourly buckets for periods in hours, so "24h" is the last 24 hours rather than
+   * whole days; daily buckets for longer periods (the gate's 14 days), to stay within the API's limit.
+   */
   sessionsByRelease: ({ environment, statsPeriod = '24h' }) =>
     sentry(`/organizations/${SENTRY.org}/sessions/`, {
       project: SENTRY.projectId,
@@ -36,7 +40,7 @@ const sentryApi = {
       groupBy: ['release', 'session.status'],
       environment,
       statsPeriod,
-      interval: '1d',
+      interval: /h$/.test(statsPeriod) ? '1h' : '1d',
     }),
 };
 
@@ -58,10 +62,23 @@ async function github(method, path, body) {
   return res.status === 204 ? null : res.json();
 }
 
+/** Every page of a GitHub list endpoint (100 a page; stops at 50 pages). */
+async function githubAll(path) {
+  const out = [];
+  const sep = path.includes('?') ? '&' : '?';
+  for (let page = 1; page <= 50; page++) {
+    const batch = await github('GET', `${path}${sep}per_page=100&page=${page}`);
+    out.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return out;
+}
+
 const githubApi = {
-  /** Open and closed issues with a label (up to 100, newest first). */
-  issuesWithLabel: (label, state = 'all') =>
-    github('GET', `/issues?labels=${encodeURIComponent(label)}&state=${state}&per_page=100`),
+  /** All issues with a label (open and closed by default), every page. */
+  issuesWithLabel: (label, state = 'all') => githubAll(`/issues?labels=${encodeURIComponent(label)}&state=${state}`),
+  issue: (number) => github('GET', `/issues/${number}`),
+  comments: (number) => githubAll(`/issues/${number}/comments`),
   createIssue: (title, body, labels) => github('POST', '/issues', { title, body, labels }),
   comment: (number, body) => github('POST', `/issues/${number}/comments`, { body }),
   reopen: (number) => github('PATCH', `/issues/${number}`, { state: 'open' }),

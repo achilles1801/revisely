@@ -84,7 +84,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       # eas reads app.config.js, which needs the project's packages and the Firebase plist.
       - run: npm ci --legacy-peer-deps
@@ -92,6 +91,8 @@ jobs:
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Write the Firebase plist
@@ -171,7 +172,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       # eas reads app.config.js, which needs the project's packages and the Firebase plist.
       - run: npm ci --legacy-peer-deps
@@ -179,6 +179,8 @@ jobs:
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Write the Firebase plist
