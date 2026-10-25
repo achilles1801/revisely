@@ -92,9 +92,13 @@ interface Tracked {
   cancelled: boolean;
 }
 const uploadsInFlight = new Set<Tracked>();
+// Bumped by every cancel: an upload that was between requests when it came (no
+// request in flight to cancel) sees it before sending the next one.
+let cancelGeneration = 0;
 
 /** Cancel the uploads in flight (each then ends with TransferStopped). */
 export function cancelUploads(): void {
+  cancelGeneration++;
   for (const t of uploadsInFlight) {
     t.cancelled = true;
     t.task.cancelAsync().catch(() => undefined);
@@ -184,7 +188,7 @@ export interface UploadOptions {
   chunkBytes?: number;
 }
 
-/** Ask the backup how much of a session it has; null if the session is gone. */
+/** Ask the backup how much of a session it has; null if the session is gone (or unreadable). */
 async function querySession(session: UploadSession): Promise<{ final: boolean; received: number } | null> {
   const res = await fetch(session.url, {
     method: 'POST',
@@ -208,23 +212,27 @@ export async function uploadSegment(
 ): Promise<number> {
   const path = objectPath(uid, fileName);
   const chunkBytes = opts.chunkBytes ?? CHUNK_BYTES;
+  const generation = cancelGeneration;
+  const check = () => {
+    if (cancelGeneration !== generation || opts.stopped?.()) throw new TransferStopped();
+  };
   let session = opts.session && opts.session.sizeBytes === sizeBytes ? opts.session : null;
   let offset = 0;
-  if (session) {
-    const state = await querySession(session);
-    if (state?.final) {
-      const info = await remoteInfo(uid, fileName);
-      if (info) {
-        await opts.onSession?.(null);
-        return info.size;
-      }
-      session = null;
-    } else if (state) {
+  if (opts.session) {
+    const state = session ? await querySession(session) : null;
+    if (state && !state.final) {
       offset = state.received;
     } else {
+      // Finished, expired or for another size: the session is no use. The file
+      // may be in the backup already (the answer to its last chunk was lost).
       session = null;
+      await opts.onSession?.(null);
+      const info = await remoteInfo(uid, fileName);
+      if (info && info.size === sizeBytes) return info.size;
+      if (info) throw new CloudError('A different file is already backed up under this name', 409);
     }
   }
+  check();
   if (!session) {
     const start = await fetch(uploadUrl(bucketName(), path), {
       method: 'POST',
@@ -239,24 +247,26 @@ export async function uploadSegment(
       body: JSON.stringify({ name: path, contentType: AUDIO_TYPE }),
     });
     const url = header(start.headers, 'X-Goog-Upload-URL');
-    if (!start.ok || !url) throw new CloudError(`Backup upload refused (${start.status})`, start.status);
+    if (!start.ok || !url) throw new CloudError(`Backup upload refused (${start.status})`, start.status || 500);
     session = { url, offset: 0, sizeBytes };
     offset = 0;
     await opts.onSession?.(session);
   }
   const source = new File(fileUri);
   for (;;) {
-    if (opts.stopped?.()) throw new TransferStopped();
+    check();
     const length = Math.min(chunkBytes, sizeBytes - offset);
     const last = offset + length >= sizeBytes;
+    const headers = {
+      ...(await authHeaders()),
+      'X-Goog-Upload-Command': last ? 'upload, finalize' : 'upload',
+      'X-Goog-Upload-Offset': String(offset),
+    };
+    check(); // a cancel while the tokens were fetched
     const chunk = chunkFile(source, offset, length);
     let result: FileSystemUploadResult;
     try {
-      result = await sendFile(session.url, chunk.uri, {
-        ...(await authHeaders()),
-        'X-Goog-Upload-Command': last ? 'upload, finalize' : 'upload',
-        'X-Goog-Upload-Offset': String(offset),
-      });
+      result = await sendFile(session.url, chunk.uri, headers);
     } finally {
       if (chunk.exists) chunk.delete();
     }
@@ -322,7 +332,7 @@ export async function downloadSegment(uid: string, fileName: string, toUri: stri
   }
 }
 
-/** The names of every file in the account's backup (for deleting all of it). */
+/** The names of every file in the account's backup (the API lists folders only). */
 export async function listSegments(uid: string): Promise<string[]> {
   const prefix = `recordings/${uid}/`;
   const names: string[] = [];

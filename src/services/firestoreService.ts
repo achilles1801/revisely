@@ -29,6 +29,7 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp,
+  runTransaction,
   deleteField,
   increment,
   DocumentReference,
@@ -705,16 +706,41 @@ export async function listRecordingDocs(userId: string): Promise<BackupListing> 
   return { live, deleted };
 }
 
-export async function putRecordingDoc(userId: string, rec: CloudRecording): Promise<void> {
-  const { id, updatedAt: _u, ...data } = rec;
-  await setDoc(doc(db, 'users', userId, 'recordings', id), { ...data, updatedAt: serverTimestamp() });
+/**
+ * Write a recording's record, unless the recording was deleted (its record is a
+ * tombstone; the rules refuse writing over one too): then 'deleted'.
+ */
+export async function putRecordingDoc(userId: string, rec: CloudRecording): Promise<'ok' | 'deleted'> {
+  const ref = doc(db, 'users', userId, 'recordings', rec.id);
+  const { id: _id, updatedAt: _u, ...data } = rec;
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists() && snap.data().deletedAt !== undefined) return 'deleted' as const;
+    tx.set(ref, { ...data, updatedAt: serverTimestamp() });
+    return 'ok' as const;
+  });
 }
 
-/** Leave a record that the recording was deleted (other phones with a copy then don't upload it again). */
+/**
+ * A deleted recording's record becomes a tombstone, so another phone with a copy
+ * never uploads it again (and the rules refuse anyone writing it back). Nothing
+ * to do if there is no record, or it is a tombstone already.
+ */
 export async function tombstoneRecordingDoc(userId: string, id: string): Promise<void> {
-  await setDoc(doc(db, 'users', userId, 'recordings', id), { deletedAt: serverTimestamp() });
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists() || snap.data().deletedAt !== undefined) return;
+    tx.set(ref, { deletedAt: serverTimestamp() });
+  });
 }
 
-export async function deleteRecordingDoc(userId: string, id: string): Promise<void> {
-  await deleteDoc(doc(db, 'users', userId, 'recordings', id));
+/** Delete a recording's record (the whole backup going). Tombstones stay. */
+export async function deleteLiveRecordingDoc(userId: string, id: string): Promise<void> {
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists() || snap.data().deletedAt !== undefined) return;
+    tx.delete(ref);
+  });
 }

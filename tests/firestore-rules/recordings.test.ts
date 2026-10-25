@@ -19,8 +19,21 @@ const recording = (extra: Record<string, unknown> = {}) => ({
 
 describe('recording backup: users/{uid}/recordings', () => {
   let env: RulesTestEnvironment;
+  const userDoc = (extra: Record<string, unknown> = {}) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${ALICE}`), {
+        uid: ALICE,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        dailyPageCapacity: 20,
+        ...extra,
+      });
+    });
   beforeAll(async () => {
     env = await getTestEnv();
+  });
+  beforeEach(async () => {
+    await userDoc();
   });
   afterEach(async () => {
     await env.clearFirestore();
@@ -48,17 +61,33 @@ describe('recording backup: users/{uid}/recordings', () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), `users/${ALICE}/recordings/rec-1`)));
   });
 
-  it('a deleted recording can leave a tombstone (deletedAt, the server time, nothing else)', async () => {
+  it('a deleted recording leaves a tombstone (deletedAt, the server time, nothing else)', async () => {
     const alice = env.authenticatedContext(ALICE).firestore();
     const r = doc(alice, `users/${ALICE}/recordings/rec-3`);
     await assertSucceeds(setDoc(r, recording()));
-    await assertSucceeds(setDoc(r, { deletedAt: serverTimestamp() }));
     await assertFails(setDoc(r, { deletedAt: new Date(0) }));
     await assertFails(setDoc(r, { deletedAt: serverTimestamp(), note: 'x' }));
-    // And a recording can come back over its tombstone.
-    await assertSucceeds(setDoc(r, recording()));
+    await assertSucceeds(setDoc(r, { deletedAt: serverTimestamp() }));
     const bob = env.authenticatedContext(BOB).firestore();
     await assertFails(setDoc(doc(bob, `users/${ALICE}/recordings/rec-3`), { deletedAt: serverTimestamp() }));
+  });
+
+  it('a tombstone is permanent: never written over, never deleted', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    const r = doc(alice, `users/${ALICE}/recordings/rec-4`);
+    await assertSucceeds(setDoc(r, { deletedAt: serverTimestamp() }));
+    await assertFails(setDoc(r, recording()));
+    await assertFails(deleteDoc(r));
+    await assertSucceeds(getDoc(r));
+  });
+
+  it('records are written only while the account’s backup is on; tombstones always', async () => {
+    await userDoc({ recordingBackup: false });
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertFails(setDoc(doc(alice, `users/${ALICE}/recordings/rec-5`), recording()));
+    await assertSucceeds(setDoc(doc(alice, `users/${ALICE}/recordings/rec-6`), { deletedAt: serverTimestamp() }));
+    await userDoc({ recordingBackup: true });
+    await assertSucceeds(setDoc(doc(alice, `users/${ALICE}/recordings/rec-5`), recording()));
   });
 
   it('refuses malformed records (unknown fields, bad kind, no segments)', async () => {
@@ -71,14 +100,6 @@ describe('recording backup: users/{uid}/recordings', () => {
   });
 
   it('the user can turn backup and mobile-data backup on and off', async () => {
-    await env.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), `users/${ALICE}`), {
-        uid: ALICE,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        dailyPageCapacity: 20,
-      });
-    });
     const alice = env.authenticatedContext(ALICE).firestore();
     await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { recordingBackup: false, recordingBackupCellular: true }));
   });

@@ -16,7 +16,8 @@ function world() {
     pending: [] as PendingUpload[],
     marked: [] as string[],
     sessions: new Map<string, UploadSession | null>(),
-    queue: { items: [] as { id: string; fileNames: string[]; tombstone?: boolean }[], all: false, allAt: undefined as number | undefined },
+    queue: { items: [] as { id: string }[], wipe: undefined as { fileNames: string[]; docIds: string[] } | undefined },
+    backupDeleted: [] as string[],
     merged: [] as BackupListing[],
     /** Recordings still on the phone (cloudRecordingFor answers for these). */
     recordings: new Set<string>(),
@@ -27,16 +28,24 @@ function world() {
     tombstones: new Map<string, number>(),
     uploads: [] as string[],
   };
-  const fail: { upload?: (name: string) => Error | undefined; list?: Error } = {};
+  const fail: { upload?: (name: string) => Error | undefined; list?: Error; tombstone?: Error } = {};
   const deps: BackupDeps = {
     pendingCloudDeletes: () => ({
       items: [...phone.queue.items],
-      all: phone.queue.all,
-      ...(phone.queue.allAt != null ? { allAt: phone.queue.allAt } : {}),
+      ...(phone.queue.wipe ? { wipe: { ...phone.queue.wipe } } : {}),
     }),
-    clearCloudDeletes: (_uid, ids, all = false) => {
+    clearCloudDeletes: (_uid, ids) => {
       phone.queue.items = phone.queue.items.filter((i) => !ids.includes(i.id));
-      if (all) phone.queue.all = false;
+    },
+    clearWipe: (_uid, done) => {
+      const w = phone.queue.wipe;
+      if (!w) return;
+      if (!done) phone.queue.wipe = undefined;
+      else
+        phone.queue.wipe = {
+          fileNames: w.fileNames.filter((n) => !done.fileNames?.includes(n)),
+          docIds: w.docIds.filter((d) => !done.docIds?.includes(d)),
+        };
     },
     listRecordingDocs: async () => {
       if (fail.list) throw fail.list;
@@ -45,16 +54,22 @@ function world() {
         deleted: [...cloud.tombstones].map(([id, at]) => ({ id, at })),
       };
     },
-    deleteRecordingDoc: async (_uid, id) => {
-      cloud.docs.delete(id);
-      cloud.tombstones.delete(id);
+    deleteLiveRecordingDoc: async (_uid, id) => {
+      cloud.docs.delete(id); // tombstones stay
     },
     tombstoneRecordingDoc: async (_uid, id) => {
+      if (fail.tombstone) throw fail.tombstone;
+      if (!cloud.docs.has(id)) return;
       cloud.docs.delete(id);
       cloud.tombstones.set(id, 1);
     },
     putRecordingDoc: async (_uid, rec) => {
+      if (cloud.tombstones.has(rec.id)) return 'deleted';
       cloud.docs.set(rec.id, rec);
+      return 'ok';
+    },
+    markBackupDeleted: async (_uid, id) => {
+      phone.backupDeleted.push(id);
     },
     mergeCloudRecordings: async (_uid, listing) => {
       phone.merged.push(listing);
@@ -170,62 +185,88 @@ describe('runBackup', () => {
     expect(w.cloud.docs.has('r1')).toBe(false);
   });
 
-  it('deletes the backups of recordings deleted here, even with backup off; backed-up ones leave a tombstone', async () => {
+  it('deletes the backups of recordings deleted here, even with backup off: a tombstone, then every file of theirs', async () => {
     const w = world();
-    w.cloud.files.set('r1-0.m4a', { size: 10, createdAt: 1 }).set('r2-0.m4a', { size: 10, createdAt: 1 });
+    w.cloud.files
+      .set('r1-0.m4a', { size: 10, createdAt: 1 })
+      .set('r1-1.m4a', { size: 10, createdAt: 1 }) // uploaded by another phone: this one never knew
+      .set('r10-0.m4a', { size: 10, createdAt: 1 }) // another recording whose id starts the same
+      .set('r2-0.m4a', { size: 10, createdAt: 1 });
     w.cloud.docs.set('r1', { id: 'r1' } as CloudRecording);
-    w.phone.queue.items.push({ id: 'r1', fileNames: ['r1-0.m4a'], tombstone: true });
-    w.phone.queue.items.push({ id: 'r2', fileNames: ['r2-0.m4a'], tombstone: false });
+    w.phone.queue.items.push({ id: 'r1' }, { id: 'r2' });
     const result = await runBackup('u', { ...ON, enabled: false }, WIFI, w.deps);
     expect(result.phase).toBe('off');
-    expect(w.cloud.files.size).toBe(0);
+    expect([...w.cloud.files.keys()]).toEqual(['r10-0.m4a']);
     expect(w.cloud.docs.size).toBe(0);
-    expect([...w.cloud.tombstones.keys()]).toEqual(['r1']);
+    expect([...w.cloud.tombstones.keys()]).toEqual(['r1']); // r2 had no record: none needed
     expect(w.phone.queue.items).toEqual([]);
     expect(w.phone.merged).toEqual([]);
   });
 
+  it('a deletion that fails is retried later without holding up uploads', async () => {
+    const w = world();
+    w.addRecording('r9');
+    w.phone.queue.items.push({ id: 'r1' });
+    w.fail.tombstone = new Error('permission-denied');
+    const result = await runBackup('u', ON, WIFI, w.deps);
+    expect(w.cloud.uploads).toEqual(['r9-0.m4a']);
+    expect(w.phone.queue.items).toEqual([{ id: 'r1' }]);
+    expect(result).toMatchObject({ phase: 'error', error: '1 backup deletions failed' });
+  });
+
   describe('deleting the whole backup', () => {
-    it('removes every file (also ones without a record) and every record, and ends the run', async () => {
+    it('deletes exactly what was listed when it was asked, and ends the run', async () => {
       const w = world();
       w.addRecording('r9'); // would upload, if the run carried on
-      w.cloud.files.set('r1-0.m4a', { size: 10, createdAt: 1 }).set('orphan-0.m4a', { size: 10, createdAt: 1 });
-      w.cloud.docs.set('r1', { id: 'r1' } as CloudRecording);
+      w.cloud.files
+        .set('r1-0.m4a', { size: 10, createdAt: 1 })
+        .set('orphan-0.m4a', { size: 10, createdAt: 1 })
+        .set('later-0.m4a', { size: 10, createdAt: 2 }); // arrived after the listing
+      w.cloud.docs.set('r1', { id: 'r1' } as CloudRecording).set('later', { id: 'later' } as CloudRecording);
       w.cloud.tombstones.set('old', 1);
-      w.phone.queue.all = true;
-      w.phone.queue.items.push({ id: 'r1', fileNames: ['r1-0.m4a'] });
+      w.phone.queue.wipe = { fileNames: ['r1-0.m4a', 'orphan-0.m4a'], docIds: ['r1'] };
       // Still on: the "off" that came with it may not have reached this run.
       const result = await runBackup('u', ON, WIFI, w.deps);
       expect(result).toMatchObject({ phase: 'idle', pending: 1 });
-      expect(w.cloud.files.size).toBe(0);
-      expect(w.cloud.docs.size).toBe(0);
-      expect(w.cloud.tombstones.size).toBe(0);
-      expect(w.phone.queue).toMatchObject({ items: [], all: false });
+      expect([...w.cloud.files.keys()]).toEqual(['later-0.m4a']);
+      expect([...w.cloud.docs.keys()]).toEqual(['later']);
+      expect([...w.cloud.tombstones.keys()]).toEqual(['old']); // tombstones stay
+      expect(w.phone.queue.wipe).toBeUndefined();
       expect(w.cloud.uploads).toEqual([]);
     });
 
-    it('only takes what the backup held when it was asked (an old queue restored from a phone backup)', async () => {
+    it('stopped halfway, carries on next time from where it was', async () => {
       const w = world();
-      const asked = Date.parse('2026-01-01T00:00:00Z');
-      w.phone.queue.all = true;
-      w.phone.queue.allAt = asked;
-      w.cloud.files
-        .set('old-0.m4a', { size: 10, createdAt: asked - 60_000 })
-        .set('new-0.m4a', { size: 10, createdAt: asked + 24 * 3600_000 });
-      w.cloud.docs.set('old', { id: 'old', updatedAt: asked - 60_000 } as CloudRecording);
-      w.cloud.docs.set('new', { id: 'new', updatedAt: asked + 24 * 3600_000 } as CloudRecording);
+      const names = Array.from({ length: 30 }, (_, i) => `r${i}-0.m4a`);
+      for (const n of names) w.cloud.files.set(n, { size: 10, createdAt: 1 });
+      w.phone.queue.wipe = { fileNames: names, docIds: [] };
+      let calls = 0;
+      await runBackup('u', ON, WIFI, w.deps, { stopped: () => ++calls > 0 });
+      expect(w.phone.queue.wipe?.fileNames).toHaveLength(5);
       await runBackup('u', ON, WIFI, w.deps);
-      expect([...w.cloud.files.keys()]).toEqual(['new-0.m4a']);
-      expect([...w.cloud.docs.keys()]).toEqual(['new']);
+      expect(w.cloud.files.size).toBe(0);
+      expect(w.phone.queue.wipe).toBeUndefined();
     });
+  });
+
+  it('a recording deleted on another phone while this one uploaded it: kept here only, its uploaded files removed', async () => {
+    const w = world();
+    w.addRecording('r1', 2);
+    w.cloud.tombstones.set('r1', 1);
+    const result = await runBackup('u', ON, WIFI, w.deps, { list: false });
+    expect(w.phone.backupDeleted).toEqual(['r1']);
+    expect(w.cloud.uploads).toEqual(['r1-0.m4a']); // the second part never went
+    expect(w.cloud.files.size).toBe(0);
+    expect(w.cloud.docs.has('r1')).toBe(false);
+    expect(result.phase).toBe('idle');
   });
 
   it('lists the backup into the phone when asked, and not otherwise', async () => {
     const w = world();
     w.cloud.docs.set('r1', { id: 'r1' } as CloudRecording);
-    await runBackup('u', ON, WIFI, w.deps, { list: false });
+    expect((await runBackup('u', ON, WIFI, w.deps, { list: false })).listed).toBeUndefined();
     expect(w.phone.merged).toEqual([]);
-    await runBackup('u', ON, WIFI, w.deps);
+    expect((await runBackup('u', ON, WIFI, w.deps)).listed).toBe(true);
     expect(w.phone.merged).toEqual([{ live: [{ id: 'r1' }], deleted: [] }]);
   });
 
@@ -285,7 +326,7 @@ describe('runBackup', () => {
   it('offline: does nothing, and says how much is waiting', async () => {
     const w = world();
     w.addRecording('r1');
-    w.phone.queue.items.push({ id: 'x', fileNames: ['x-0.m4a'] });
+    w.phone.queue.items.push({ id: 'x' });
     const result = await runBackup('u', ON, { connected: false, type: 'none' }, w.deps);
     expect(result).toMatchObject({ phase: 'offline', pending: 1 });
     expect(w.phone.queue.items).toHaveLength(1);

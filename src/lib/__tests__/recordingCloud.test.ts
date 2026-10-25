@@ -233,6 +233,7 @@ describe('recording backup over Firebase Storage', () => {
       fetchMock
         .mockResolvedValueOnce(res(200, {}, { 'X-Goog-Upload-Status': 'final' }))
         .mockResolvedValueOnce(res(200, { size: '10', timeCreated: '2026-10-25T10:00:00Z' }));
+      // (the finished session is dropped, then the file is found in the backup)
       expect(
         await uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10, {
           session: { url: SESSION, offset: 8, sizeBytes: 10 },
@@ -241,32 +242,70 @@ describe('recording backup over Firebase Storage', () => {
       expect(mockUploadCalls).toEqual([]);
     });
 
-    it('an expired session, or one for a file of another size, starts over', async () => {
+    it('an expired session, or one for a file of another size, is dropped and the upload starts over', async () => {
       mockFiles.set('file:///a-0.m4a', bytes(10));
-      fetchMock.mockResolvedValueOnce(res(404)).mockResolvedValueOnce(started());
+      // query: gone; the file isn't in the backup; start.
+      fetchMock.mockResolvedValueOnce(res(404)).mockResolvedValueOnce(res(404)).mockResolvedValueOnce(started());
+      const sessions: unknown[] = [];
       await uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10, {
         session: { url: 'https://old', offset: 4, sizeBytes: 10 },
+        onSession: (s) => void sessions.push(s),
       });
-      expect(fetchMock.mock.calls[1][1].headers['X-Goog-Upload-Command']).toBe('start');
+      expect(sessions[0]).toBeNull();
+      expect(fetchMock.mock.calls[2][1].headers['X-Goog-Upload-Command']).toBe('start');
       expect(mockUploadCalls[0].headers['X-Goog-Upload-Offset']).toBe('0');
 
-      fetchMock.mockClear().mockResolvedValueOnce(started());
+      fetchMock.mockClear().mockResolvedValueOnce(res(404)).mockResolvedValueOnce(started());
       await uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10, {
         session: { url: 'https://old', offset: 4, sizeBytes: 99 },
       });
-      expect(fetchMock.mock.calls[0][1].headers['X-Goog-Upload-Command']).toBe('start');
+      expect(fetchMock.mock.calls[1][1].headers['X-Goog-Upload-Command']).toBe('start');
+    });
+
+    it('a dead session whose file did arrive (its last answer was lost) is just reported done', async () => {
+      fetchMock.mockResolvedValueOnce(res(404)).mockResolvedValueOnce(res(200, { size: '10', timeCreated: 'x' }));
+      expect(
+        await uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10, { session: { url: 'https://old', offset: 8, sizeBytes: 10 } }),
+      ).toBe(10);
+      expect(mockUploadCalls).toEqual([]);
+    });
+
+    it('a dead session with a different file under the name is refused, never overwritten', async () => {
+      fetchMock.mockResolvedValueOnce(res(404)).mockResolvedValueOnce(res(200, { size: '3' }));
+      await expect(
+        uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10, { session: { url: 'https://old', offset: 8, sizeBytes: 10 } }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it('a cancel that comes while the tokens are fetched still stops it before anything is sent', async () => {
+      mockFiles.set('file:///a-0.m4a', bytes(10));
+      fetchMock.mockResolvedValueOnce(started());
+      let release: () => void = () => {};
+      let calls = 0;
+      mockUser = {
+        getIdToken: () => {
+          calls++;
+          // The second token fetch (for the first chunk) waits.
+          return calls === 2 ? new Promise<string>((r) => (release = () => r('id-token'))) : Promise.resolve('id-token');
+        },
+      };
+      const upload = uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10);
+      await tick();
+      cancelUploads(); // nothing in flight to cancel yet
+      release();
+      await expect(upload).rejects.toMatchObject({ name: 'TransferStopped' });
+      expect(mockUploadCalls).toEqual([]);
     });
 
     it('stops between chunks when told to, keeping the session', async () => {
       mockFiles.set('file:///a-0.m4a', bytes(10));
       fetchMock.mockResolvedValueOnce(started());
       mockUploadAnswer = async () => ({ status: 200, body: '', headers: {} });
-      let n = 0;
       const sessions: unknown[] = [];
       await expect(
         uploadSegment('u1', 'a-0.m4a', 'file:///a-0.m4a', 10, {
           chunkBytes: 4,
-          stopped: () => ++n > 1,
+          stopped: () => mockUploadCalls.length >= 1, // after the first chunk
           onSession: (s) => {
             sessions.push(s);
           },

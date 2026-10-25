@@ -159,11 +159,10 @@ describeEmulator('recording backup against the Storage emulator', () => {
 
   it('an upload stopped after a chunk carries on from its session, and the file arrives whole', async () => {
     let session: UploadSession | null = null;
-    let n = 0;
     await expect(
       uploadSegment('alice', 'resume-0.m4a', `file://${file}`, audio.length, {
         chunkBytes: CHUNK,
-        stopped: () => ++n > 1,
+        stopped: () => (session?.offset ?? 0) > 0, // after the first chunk
         onSession: (s) => {
           session = s;
         },

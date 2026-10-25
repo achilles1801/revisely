@@ -407,11 +407,19 @@ service cloud.firestore {
       // What the backup holds about each recording; the audio is in Storage
       // under recordings/<uid>/ (storage.rules), readable only by the owner.
 
-      // A deleted recording leaves a tombstone ({deletedAt}), so another phone
-      // with a copy doesn't upload it again.
+      // A deleted recording leaves a tombstone ({deletedAt}): permanent (the
+      // account's deletion removes it, on the server), never written over, so no
+      // phone backs the recording up again. Records are written only while the
+      // account's backup is on (a phone that hasn't heard it was turned off
+      // can't put recordings back).
       match /recordings/{recordingId} {
-        allow read, delete: if isOwner(userId);
-        allow create, update: if isOwner(userId) && (isValidRecordingDoc() || isRecordingTombstone());
+        allow read: if isOwner(userId);
+        allow delete: if isOwner(userId) && !isTombstoned();
+        allow create: if isOwner(userId) &&
+                         (isRecordingTombstone() || (isValidRecordingDoc() && recordingBackupOn(userId)));
+        allow update: if isOwner(userId) &&
+                         (isRecordingTombstone() ||
+                          (isValidRecordingDoc() && recordingBackupOn(userId) && !isTombstoned()));
       }
 
       // ======================================================================
@@ -438,6 +446,14 @@ service cloud.firestore {
              data.durationMs is number && data.durationMs >= 0 &&
              data.pageMarks is list && data.pageMarks.size() <= 2000 &&
              data.segments is list && data.segments.size() >= 1 && data.segments.size() <= 500;
+    }
+
+    function isTombstoned() {
+      return 'deletedAt' in resource.data;
+    }
+
+    function recordingBackupOn(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.get('recordingBackup', true) != false;
     }
 
     function isRecordingTombstone() {

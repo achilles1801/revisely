@@ -3,12 +3,13 @@
 // On by default (user.recordingBackup !== false; Settings turns it off). Each
 // run, in order:
 //   1. Deletes the backups of recordings deleted on this phone (always, even
-//      with backup off, so a deleted recording never lingers in the cloud). A
-//      recording that was backed up leaves a tombstone, so another phone with a
-//      copy doesn't upload it again. Deleting the whole backup ends the run: the
-//      setting that came with it (off) may not have reached this run yet, and
-//      uploading again would undo it. Only what the backup held when that was
-//      asked is deleted.
+//      with backup off, so a deleted recording never lingers in the cloud): the
+//      record becomes a tombstone first (no phone uploads it again, and the
+//      rules refuse writing over it), then every file under its name goes. A
+//      deletion that fails is retried next run without holding up the rest.
+//      Deleting the whole backup (backup turned off with "delete backups")
+//      deletes exactly what was listed when the user asked, and ends the run:
+//      the setting that came with it (off) may not have reached this run yet.
 //   2. When asked to (the controller does every so often), lists the backup
 //      (Firestore users/<uid>/recordings) into this phone's index, so a new
 //      phone or a reinstall shows every recording; their audio downloads when
@@ -17,7 +18,9 @@
 //      resumable chunks: on Wi-Fi, or on mobile data only if the user allowed
 //      it, checked again before every chunk. A file already in the backup at the
 //      right size is just marked. After each upload the recording's record in
-//      Firestore is updated.
+//      Firestore is updated; if it was deleted on another phone meanwhile (a
+//      tombstone), this phone keeps its copy, local only, and removes the file
+//      it just uploaded.
 // A file the backup refuses is skipped (and reported) instead of holding up the
 // rest. Any other failure stops the run; the next one (on launch, coming back to
 // the app, the network returning, a new recording, or the retry timer) carries on.
@@ -31,7 +34,9 @@ import {
   UploadSession,
   adoptDownloadedSegment,
   clearCloudDeletes,
+  clearWipe,
   cloudRecordingFor,
+  markBackupDeleted,
   markSegmentUploaded,
   mergeCloudRecordings,
   pendingCloudDeletes,
@@ -49,7 +54,7 @@ import {
   uploadSegment,
 } from './recordingCloud';
 import {
-  deleteRecordingDoc,
+  deleteLiveRecordingDoc,
   listRecordingDocs,
   putRecordingDoc,
   tombstoneRecordingDoc,
@@ -88,16 +93,20 @@ export interface BackupStatus {
   uploaded: number;
   restored: number;
   error?: string;
+  /** This run listed the backup into the phone. */
+  listed?: boolean;
   at: number;
 }
 
 export interface BackupDeps {
   pendingCloudDeletes: (uid: string) => DeleteQueue;
-  clearCloudDeletes: (uid: string, ids: string[], all?: boolean) => void;
+  clearCloudDeletes: (uid: string, ids: string[]) => void;
+  clearWipe: (uid: string, done: { fileNames?: string[]; docIds?: string[] } | null) => void;
   listRecordingDocs: (uid: string) => Promise<BackupListing>;
-  deleteRecordingDoc: (uid: string, id: string) => Promise<void>;
+  deleteLiveRecordingDoc: (uid: string, id: string) => Promise<void>;
   tombstoneRecordingDoc: (uid: string, id: string) => Promise<void>;
-  putRecordingDoc: (uid: string, rec: CloudRecording) => Promise<void>;
+  putRecordingDoc: (uid: string, rec: CloudRecording) => Promise<'ok' | 'deleted'>;
+  markBackupDeleted: (uid: string, id: string) => Promise<void>;
   mergeCloudRecordings: (uid: string, listing: BackupListing) => Promise<number>;
   pendingUploads: (uid: string) => Promise<PendingUpload[]>;
   markSegmentUploaded: (uid: string, recordingId: string, fileName: string, sizeBytes: number) => Promise<void>;
@@ -112,10 +121,12 @@ export interface BackupDeps {
 export const defaultDeps: BackupDeps = {
   pendingCloudDeletes,
   clearCloudDeletes,
+  clearWipe,
   listRecordingDocs,
-  deleteRecordingDoc,
+  deleteLiveRecordingDoc,
   tombstoneRecordingDoc,
   putRecordingDoc,
+  markBackupDeleted,
   mergeCloudRecordings,
   pendingUploads,
   markSegmentUploaded,
@@ -127,8 +138,10 @@ export const defaultDeps: BackupDeps = {
   listSegments,
 };
 
-/** Phone clocks drift: the whole-backup deletion also takes what arrived just after it was asked. */
-const CLOCK_SLACK_MS = 10 * 60_000;
+/** A file of recording `id`: <id>-<n>.<ext>, or an older recording's <id>.<ext>. */
+const isFileOf = (id: string, name: string) => name.startsWith(`${id}-`) || name.startsWith(`${id}.`);
+const inBatches = <T>(items: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
 
 /** Whether uploads may use this network. Mobile data, a metered connection or
  *  one not identified yet count as mobile data. */
@@ -177,32 +190,39 @@ export async function runBackup(
 
     // 1. Deletions, whatever the setting.
     const queue = deps.pendingCloudDeletes(uid);
-    if (queue.all) {
-      const cutoff = queue.allAt != null ? queue.allAt + CLOCK_SLACK_MS : Infinity;
-      for (const name of await deps.listSegments(uid)) {
-        if (cutoff !== Infinity) {
-          const info = await deps.remoteInfo(uid, name);
-          if (!info || info.createdAt > cutoff) continue;
-        }
-        await deps.deleteSegment(uid, name);
+    if (queue.wipe) {
+      for (const batch of inBatches(queue.wipe.fileNames, 25)) {
+        for (const name of batch) await deps.deleteSegment(uid, name);
+        deps.clearWipe(uid, { fileNames: batch });
+        if (stopped()) return done('idle');
       }
-      const listing = await deps.listRecordingDocs(uid);
-      for (const d of listing.live) if ((d.updatedAt ?? 0) <= cutoff) await deps.deleteRecordingDoc(uid, d.id);
-      for (const d of listing.deleted) if (d.at <= cutoff) await deps.deleteRecordingDoc(uid, d.id);
-      deps.clearCloudDeletes(
-        uid,
-        queue.items.map((i) => i.id),
-        true,
-      );
+      for (const batch of inBatches(queue.wipe.docIds, 25)) {
+        for (const id of batch) await deps.deleteLiveRecordingDoc(uid, id);
+        deps.clearWipe(uid, { docIds: batch });
+        if (stopped()) return done('idle');
+      }
+      deps.clearWipe(uid, null);
       status.pending = settings.enabled ? (await deps.pendingUploads(uid)).length : 0;
       return done(settings.enabled ? 'idle' : 'off');
     }
+    let failedDeletes = 0;
+    // The backup's file names, listed once for all the deletions (only after
+    // the tombstones: a phone uploading one of these meanwhile is refused its
+    // record and removes the file itself).
+    let backupFiles: string[] | null = null;
     for (const item of queue.items) {
       if (stopped()) return done('idle');
-      for (const name of item.fileNames) await deps.deleteSegment(uid, name);
-      if (item.tombstone) await deps.tombstoneRecordingDoc(uid, item.id);
-      else await deps.deleteRecordingDoc(uid, item.id);
-      deps.clearCloudDeletes(uid, [item.id]);
+      try {
+        await deps.tombstoneRecordingDoc(uid, item.id);
+        backupFiles ??= await deps.listSegments(uid);
+        for (const name of backupFiles) {
+          if (isFileOf(item.id, name)) await deps.deleteSegment(uid, name);
+        }
+        deps.clearCloudDeletes(uid, [item.id]);
+      } catch (err) {
+        logger.warn('Recording backup: could not delete a recording’s backup', err);
+        failedDeletes++;
+      }
     }
 
     if (!settings.enabled) return done('off');
@@ -212,17 +232,25 @@ export async function runBackup(
       const listing = await deps.listRecordingDocs(uid);
       if (stopped()) return done('idle');
       status.restored = await deps.mergeCloudRecordings(uid, listing);
+      status.listed = true;
     }
 
     // 3. Uploads.
     const pending = await deps.pendingUploads(uid);
     status.pending = pending.length;
     onProgress?.({ ...status });
-    if (pending.length === 0) return done('idle');
-    if (!settings.noticeShown) return done('needs-notice');
+    const finished = () =>
+      refused > 0 || failedDeletes > 0
+        ? done('error', [refused > 0 && `${refused} could not be backed up`, failedDeletes > 0 && `${failedDeletes} backup deletions failed`].filter(Boolean).join('; '))
+        : done('idle');
     let refused = 0;
+    if (pending.length === 0) return finished();
+    if (!settings.noticeShown) return done('needs-notice');
+    // Recordings found deleted elsewhere during this run: their other parts don't upload.
+    const deletedElsewhere = new Set<string>();
     for (const p of pending) {
       if (stopped()) return done('idle');
+      if (deletedElsewhere.has(p.recordingId)) continue;
       if (!canUpload(net(), settings)) return notAllowed();
       try {
         let size: number;
@@ -248,9 +276,17 @@ export async function runBackup(
         }
         await deps.markSegmentUploaded(uid, p.recordingId, p.fileName, size || p.sizeBytes);
         const rec = await deps.cloudRecordingFor(uid, p.recordingId);
-        if (rec) await deps.putRecordingDoc(uid, rec);
-        // Deleted on this phone while it was uploading: its copy goes too.
-        else await deps.deleteSegment(uid, p.fileName);
+        if (!rec) {
+          // Deleted on this phone while it was uploading: its copy goes too.
+          await deps.deleteSegment(uid, p.fileName);
+        } else if ((await deps.putRecordingDoc(uid, rec)) === 'deleted') {
+          // Deleted on another phone meanwhile: the backup stays deleted, and
+          // this phone keeps its copy, local only.
+          deletedElsewhere.add(p.recordingId);
+          await deps.markBackupDeleted(uid, p.recordingId);
+          for (const sg of rec.segments) await deps.deleteSegment(uid, sg.fileName);
+          continue;
+        }
         status.uploaded++;
         status.pending--;
         onProgress?.({ ...status });
@@ -261,7 +297,7 @@ export async function runBackup(
         refused++;
       }
     }
-    return refused > 0 ? done('error', `${refused} could not be backed up`) : done('idle');
+    return finished();
   } catch (err) {
     logger.warn('Recording backup run failed', err);
     return done('error', err instanceof Error ? err.message : String(err));

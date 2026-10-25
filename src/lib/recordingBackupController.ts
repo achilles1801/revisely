@@ -134,6 +134,11 @@ export async function stopBackup({ flushDeletes = false, timeoutMs = 10_000 } = 
   }
 }
 
+/** The sign-out or account deletion went through: nothing to resume. */
+export function discardStoppedBackup(): void {
+  stoppedConfig = null;
+}
+
 export function resumeBackup(): void {
   const cfg = stoppedConfig;
   stoppedConfig = null;
@@ -158,7 +163,7 @@ async function run() {
         if (current()) publish(s);
       },
     });
-    if (list && result.phase !== 'error' && result.phase !== 'offline') lastListed.set(cfg.uid, now());
+    if (result.listed) lastListed.set(cfg.uid, now());
     else if (list) listNext = true;
     if (!current()) {
       again = again || !!config;

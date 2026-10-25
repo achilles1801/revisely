@@ -185,22 +185,35 @@ disclosed in the privacy policy.
 recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore
 `users/<uid>/recordings/<id>`. It's on unless `recordingBackup === false`, Wi-Fi only unless
 `recordingBackupCellular`, and a one-time notice comes before the first upload.
+
+These invariants must not be broken:
+- **Local audio** is only ever deleted by the user deleting it on that phone.
+- **Tombstones** (`{deletedAt}`) are permanent:
+  - The rules refuse writing a live record over one, and refuse deleting one (only `deleteUserAccount` removes them).
+  - A phone whose put meets a tombstone keeps its copy local-only (`backupDeleted`) and removes the files it uploaded.
+- **Live records** can be written only while the account's backup is on (the rules read the user doc).
+- **Storage objects are create-only** (`resource == null`): a name is one file, ever.
+- **Copies from another phone** (`restored`) are never continued here. They are uploaded only when `adopted`: the backup lost them without a tombstone and every part is on the phone.
+
+How it works:
+- **Deleting a recording** (also "Delete all", one by one, offline-safe) queues it in `Documents/recordings-sync/<uid>-deletes.json`. The run then tombstones the record and deletes every file named after it. Deletions run even with backup off, and are flushed on sign-out.
+- **"Turn off and delete backups"** needs the connection:
+  1. List the backup and merge it into the phone.
+  2. Download everything that is only in the backup, refusing if any download fails.
+  3. Delete exactly the files and live records that were listed. Tombstones stay.
 - **Uploads:**
-  - The Firebase resumable protocol in 4 MB chunks, on the foreground session (REST plus `createUploadTask`).
+  - The resumable protocol in 4 MB chunks on the foreground session (REST plus `createUploadTask`).
   - The session is saved in the index, so an upload carries on after the app closes.
-  - The network is checked before every chunk, and the chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
-  - The Storage rules are create-only (`resource == null`). A name is one file, ever.
-- **Restored recordings:**
-  - Flagged `restored`. They download when played and are never continued or uploaded from that phone.
-  - Segment numbers only go up (max + 1), so names don't collide.
-- **Deletions:**
-  - Queued on the phone (`Documents/recordings-sync/<uid>-deletes.json`) and processed even with backup off, and on sign-out.
-  - A recording that was backed up leaves a tombstone doc (`{deletedAt}`). Other phones then keep their copy local-only (`backupDeleted`) and never re-upload it.
-  - Merging never deletes audio on the phone.
-  - "Turn off and delete backups" first downloads anything that is only in the backup, and refuses to proceed otherwise. Deleting the whole backup only takes what existed when it was asked for (`allAt`).
+  - The network is checked before every chunk.
+  - The chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
+- **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
 - **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
-- **Rules:** `storage.rules` is in the repo now. Deploy it with `firebase deploy --only storage`, keeping the profile-image rules that were live before.
-- **Release:** The client half is JS-only. It still reaches App Store users only with 1.0.2, since develop's runtime is build 19's. Update the App Privacy answers (Audio Data: collected, linked, App Functionality) before 1.0.2 goes to review.
+- **Known limits:**
+  - NetInfo reports an iPhone hotspot as Wi-Fi.
+  - Two phones restored from one iCloud backup both own its open recording. Their name clash is reported and the file skipped, never overwritten.
+  - Tombstones accumulate, adding listing reads.
+- **Deploy order:** `firestore.rules` and `storage.rules` must be live before this reaches `develop`, which publishes to `preview` at once (`firebase deploy --only firestore:rules,storage`). Keep the profile-image rules that were live before.
+- **Release:** the client is JS-only but reaches App Store users only with 1.0.2 (develop's runtime is build 19's). The App Privacy answers (Audio Data: collected, linked, App Functionality) must be updated before 1.0.2 goes to review.
 - **Emulator check of the real requests:**
   `firebase emulators:exec --only storage --project demo-revisely 'npx jest recordingCloud.emulator'`.
 

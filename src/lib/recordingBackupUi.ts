@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-import { RecordingMeta, cloudOnlyRecordings, queueWholeBackupDelete } from './recordings';
+import {
+  BackupListing,
+  RecordingMeta,
+  cloudOnlyRecordings,
+  mergeCloudRecordings,
+  queueWholeBackupDelete,
+} from './recordings';
 import { downloadMissingSegments } from './recordingBackup';
+import { listSegments } from './recordingCloud';
+import { listRecordingDocs } from '../services/firestoreService';
 import { logger } from './logger';
 import { getBackupStatus, onBackupStatus, requestBackup } from './recordingBackupController';
 import type { BackupStatus } from './recordingBackup';
@@ -38,30 +46,57 @@ export function backupLabel(s: BackupStatus): string {
 
 export type DeleteBackupResult =
   | { ok: true }
+  /** The backup couldn't be listed (offline): nothing was deleted. */
+  | { ok: false; offline: true }
   /** Recordings only in the backup couldn't be downloaded: nothing was deleted. */
   | { ok: false; notDownloaded: number };
 
+export interface DeleteBackupIo {
+  list: (uid: string) => Promise<BackupListing>;
+  files: (uid: string) => Promise<string[]>;
+  merge: (uid: string, listing: BackupListing) => Promise<unknown>;
+  cloudOnly: (uid: string) => Promise<RecordingMeta[]>;
+  download: (uid: string, rec: RecordingMeta) => Promise<unknown>;
+  queue: (uid: string, snapshot: { fileNames: string[]; docIds: string[] }) => Promise<boolean>;
+}
+
+const defaultDeleteIo: DeleteBackupIo = {
+  list: listRecordingDocs,
+  files: (uid) => listSegments(uid),
+  merge: mergeCloudRecordings,
+  cloudOnly: cloudOnlyRecordings,
+  download: (uid, rec) => downloadMissingSegments(uid, rec),
+  queue: queueWholeBackupDelete,
+};
+
 /**
  * Turned off with "delete backups": the backup goes, the recordings stay on this
- * phone. Recordings only in the backup (restored, never played) are downloaded
- * first; if any can't be, nothing is deleted.
+ * phone. Needs the connection: the backup is listed now (and brought into this
+ * phone), everything only in it is downloaded, and then exactly what was listed
+ * is deleted. If anything can't be listed or downloaded, nothing is deleted.
  */
-export async function deleteBackupKeepLocal(
-  uid: string,
-  download: (uid: string, rec: RecordingMeta) => Promise<unknown> = downloadMissingSegments,
-): Promise<DeleteBackupResult> {
+export async function deleteBackupKeepLocal(uid: string, io: DeleteBackupIo = defaultDeleteIo): Promise<DeleteBackupResult> {
+  let listing: BackupListing;
+  let fileNames: string[];
+  try {
+    [listing, fileNames] = await Promise.all([io.list(uid), io.files(uid)]);
+    await io.merge(uid, listing);
+  } catch (err) {
+    logger.warn('Could not list the backup before deleting it', err);
+    return { ok: false, offline: true };
+  }
   let notDownloaded = 0;
-  for (const rec of await cloudOnlyRecordings(uid)) {
+  for (const rec of await io.cloudOnly(uid)) {
     try {
-      await download(uid, rec);
+      await io.download(uid, rec);
     } catch (err) {
       logger.warn('Could not download a recording before deleting the backup', err);
       notDownloaded++;
     }
   }
-  if (notDownloaded > 0 || !(await queueWholeBackupDelete(uid))) {
-    return { ok: false, notDownloaded: Math.max(notDownloaded, (await cloudOnlyRecordings(uid)).length) };
-  }
+  if (notDownloaded > 0) return { ok: false, notDownloaded };
+  const queued = await io.queue(uid, { fileNames, docIds: listing.live.map((d) => d.id) });
+  if (!queued) return { ok: false, notDownloaded: (await io.cloudOnly(uid)).length };
   requestBackup();
   return { ok: true };
 }
@@ -73,19 +108,20 @@ export async function deleteBackupKeepLocal(
 export function askTurnOffBackup(uid: string, turnOff: () => void, cloudOnly: number): void {
   const deleteBackups = async () => {
     turnOff();
-    const result = await deleteBackupKeepLocal(uid).catch((err) => {
+    const result: DeleteBackupResult = await deleteBackupKeepLocal(uid).catch((err) => {
       logger.warn('Could not delete backups', err);
-      return { ok: false as const, notDownloaded: 0 };
+      return { ok: false as const, offline: true as const };
     });
     if (result.ok) {
       Alert.alert('Backup deleted', 'Your recordings are on this phone only now.');
-    } else {
+    } else if ('notDownloaded' in result && result.notDownloaded > 0) {
+      const n = result.notDownloaded;
       Alert.alert(
         'Backup kept',
-        result.notDownloaded > 0
-          ? `${result.notDownloaded} recording${result.notDownloaded === 1 ? ' is' : 's are'} only in your backup and couldn’t be downloaded, so nothing was deleted. Try again with a connection.`
-          : 'The backup couldn’t be deleted. Try again later.',
+        `${n} recording${n === 1 ? ' is' : 's are'} only in your backup and couldn’t be downloaded, so nothing was deleted. Try again with a good connection.`,
       );
+    } else {
+      Alert.alert('Backup kept', 'Your backup couldn’t be reached, so nothing was deleted. Try again when you’re online.');
     }
   };
   Alert.alert(

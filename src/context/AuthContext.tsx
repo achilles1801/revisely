@@ -15,7 +15,7 @@ import { signOutGoogle } from '../lib/googleAuth';
 import { identifyUser } from '../lib/sentry';
 import { logger } from '../lib/logger';
 import { deleteAllRecordings, forgetCloudDeletes } from '../lib/recordings';
-import { resumeBackup, stopBackup } from '../lib/recordingBackupController';
+import { discardStoppedBackup, resumeBackup, stopBackup } from '../lib/recordingBackupController';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -184,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await stopBackup();
     try {
       await firestoreService.deleteAccount();
+      discardStoppedBackup();
       // The server deleted the account's backup; this removes the recordings on
       // this phone, and the backup deletions still queued here.
       if (uid) {
@@ -218,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear the native Google session too so the next sign-in shows the
       // account chooser instead of silently picking the previous account.
       await signOutGoogle();
+      discardStoppedBackup();
     } catch (err: any) {
       resumeBackup();
       setError(getErrorMessage(err.code));
