@@ -727,7 +727,12 @@ export async function putRecordingDoc(userId: string, rec: CloudRecording): Prom
  * is no record now: one may come later from a phone that still has a copy.
  */
 export async function tombstoneRecordingDoc(userId: string, id: string): Promise<void> {
-  await setDoc(doc(db, 'users', userId, 'recordings', id), { deletedAt: serverTimestamp() });
+  // A transaction rather than a plain write: offline it fails at once instead of
+  // waiting (and holding up the backup) until the connection is back.
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    tx.set(ref, { deletedAt: serverTimestamp() });
+  });
 }
 
 /** Delete a recording's record (the whole backup going). Tombstones stay. */

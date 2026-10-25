@@ -143,7 +143,10 @@ const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** A file of recording `id`: <id>-<n>.<audio ext>, or an older recording's <id>.<audio ext>. */
 const isFileOf = (id: string, name: string) =>
   new RegExp(`^${escapeRe(id)}(-\\d+)?\\.(m4a|aac|mp4|caf|wav)$`, 'i').test(name);
-/** Firestore refused the write: the account's backup is off on the server (rules). */
+/** The rules' limits on a recording's record. */
+const MAX_RECORD_SEGMENTS = 500;
+const MAX_RECORD_MARKS = 2000;
+/** Firestore refused the write: the account's backup is off on the server (rules), or the record is too big. */
 const isPermissionDenied = (err: unknown) => (err as { code?: unknown } | null)?.code === 'permission-denied';
 const inBatches = <T>(items: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
@@ -218,6 +221,11 @@ export async function runBackup(
     const tombstoned: string[] = [];
     for (const item of queue.items) {
       if (stopped()) return done('idle');
+      if (!item.tombstone) {
+        // Never in the backup: nothing in the account to delete.
+        deps.clearCloudDeletes(uid, [item.id]);
+        continue;
+      }
       try {
         await deps.tombstoneRecordingDoc(uid, item.id);
         tombstoned.push(item.id);
@@ -297,11 +305,23 @@ export async function runBackup(
             put = await deps.putRecordingDoc(uid, rec);
           } catch (err) {
             if (!isPermissionDenied(err)) throw err;
+            if (rec.segments.length > MAX_RECORD_SEGMENTS || rec.pageMarks.length > MAX_RECORD_MARKS) {
+              // Too big for a record (the rules' limits): this recording is
+              // skipped, the others carry on.
+              logger.error('Recording backup: a recording is too big for its record', {
+                segments: rec.segments.length,
+                pageMarks: rec.pageMarks.length,
+              });
+              refused++;
+              deletedElsewhere.add(p.recordingId);
+              continue;
+            }
             // Backup is off for the account (this phone hasn't heard yet), or the
-            // rules aren't deployed: upload nothing more. The next listing
-            // unmarks this part if its record never got written.
+            // rules aren't deployed: upload nothing more until something
+            // changes. The next listing unmarks this part if its record never
+            // got written.
             logger.error('Recording backup: the backup refused a record', err);
-            return done('off');
+            return done('idle', 'The backup refused a record');
           }
         }
         if (!rec) {
@@ -329,6 +349,14 @@ export async function runBackup(
   } catch (err) {
     logger.warn('Recording backup run failed', err);
     return done('error', err instanceof Error ? err.message : String(err));
+  }
+}
+
+/** Nothing of the recording is left in the backup (its record pointed at nothing). */
+export class RecordingGone extends Error {
+  constructor() {
+    super('This recording is no longer in your backup.');
+    this.name = 'RecordingGone';
   }
 }
 
@@ -388,7 +416,7 @@ export async function downloadMissingSegments(uid: string, rec: RecordingMeta, i
     if (!uri) throw new Error('This recording was deleted.');
     segments.push({ ...sg, uri, local: true });
   }
-  if (segments.length === 0) throw new Error('This recording is no longer in your backup.');
+  if (segments.length === 0) throw new RecordingGone();
   return {
     ...rec,
     segments,

@@ -16,7 +16,7 @@ function world() {
     pending: [] as PendingUpload[],
     marked: [] as string[],
     sessions: new Map<string, UploadSession | null>(),
-    queue: { items: [] as { id: string }[], wipe: undefined as { fileNames: string[]; docIds: string[] } | undefined },
+    queue: { items: [] as { id: string; tombstone?: boolean }[], wipe: undefined as { fileNames: string[]; docIds: string[] } | undefined },
     backupDeleted: [] as string[],
     merged: [] as BackupListing[],
     /** Recordings still on the phone (cloudRecordingFor answers for these). */
@@ -197,12 +197,13 @@ describe('runBackup', () => {
       .set('r10-0.m4a', { size: 10, createdAt: 1 }) // another recording whose id starts the same
       .set('r2-0.m4a', { size: 10, createdAt: 1 });
     w.cloud.docs.set('r1', { id: 'r1' } as CloudRecording);
-    w.phone.queue.items.push({ id: 'r1' }, { id: 'r2' });
+    w.phone.queue.items.push({ id: 'r1', tombstone: true }, { id: 'r2', tombstone: true }, { id: 'local', tombstone: false });
     const result = await runBackup('u', { ...ON, enabled: false }, WIFI, w.deps);
     expect(result.phase).toBe('off');
     expect([...w.cloud.files.keys()]).toEqual(['r10-0.m4a']);
     expect(w.cloud.docs.size).toBe(0);
-    // r2 had no record: a tombstone anyway (a phone with a copy may upload one later).
+    // r2 had no record: a tombstone anyway (a phone with a copy may upload one
+    // later). "local" was never in the backup: nothing in the account at all.
     expect([...w.cloud.tombstones.keys()]).toEqual(['r1', 'r2']);
     expect(w.phone.queue.items).toEqual([]);
     expect(w.phone.merged).toEqual([]);
@@ -216,18 +217,38 @@ describe('runBackup', () => {
     w.addRecording('r2');
     w.fail.put = Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
     const result = await runBackup('u', ON, WIFI, w.deps, { list: false });
-    expect(result.phase).toBe('off');
+    expect(result).toMatchObject({ phase: 'idle', error: 'The backup refused a record' });
     expect(w.cloud.uploads).toEqual(['r1-0.m4a']);
+  });
+
+  it('a recording too big for its record is skipped; the others carry on', async () => {
+    const w = world();
+    w.addRecording('big');
+    w.addRecording('r2');
+    const denied = Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+    const put = w.deps.putRecordingDoc;
+    w.deps.putRecordingDoc = async (uid, rec) => {
+      if (rec.id === 'big') throw denied;
+      return put(uid, rec);
+    };
+    const cloudFor = w.deps.cloudRecordingFor;
+    w.deps.cloudRecordingFor = async (uid, id) => {
+      const rec = await cloudFor(uid, id);
+      return rec && id === 'big' ? { ...rec, pageMarks: Array.from({ length: 2001 }, (_, i) => ({ atMs: i, page: 1 })) } : rec;
+    };
+    const result = await runBackup('u', ON, WIFI, w.deps, { list: false });
+    expect(w.cloud.docs.has('r2')).toBe(true);
+    expect(result).toMatchObject({ phase: 'error', error: '1 could not be backed up' });
   });
 
   it('a deletion that fails is retried later without holding up uploads', async () => {
     const w = world();
     w.addRecording('r9');
-    w.phone.queue.items.push({ id: 'r1' });
+    w.phone.queue.items.push({ id: 'r1', tombstone: true });
     w.fail.tombstone = new Error('permission-denied');
     const result = await runBackup('u', ON, WIFI, w.deps);
     expect(w.cloud.uploads).toEqual(['r9-0.m4a']);
-    expect(w.phone.queue.items).toEqual([{ id: 'r1' }]);
+    expect(w.phone.queue.items).toEqual([{ id: 'r1', tombstone: true }]);
     expect(result).toMatchObject({ phase: 'error', error: '1 backup deletions failed' });
   });
 

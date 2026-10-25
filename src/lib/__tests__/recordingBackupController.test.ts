@@ -34,7 +34,7 @@ function fakeDeps() {
     failUploads: 0,
     uids: [] as string[],
     deletes: [] as string[],
-    queue: { items: [] as { id: string }[] },
+    queue: { items: [] as { id: string; tombstone?: boolean }[] },
   };
   const deps: BackupDeps = {
     pendingCloudDeletes: () => ({ items: [...state.queue.items] }),
@@ -279,7 +279,7 @@ describe('stopping backup (account deletion, sign-out)', () => {
     setNetwork(WIFI);
     configureBackup({ uid: 'u1', settings });
     await flush();
-    f.state.queue.items.push({ id: 'gone' });
+    f.state.queue.items.push({ id: 'gone', tombstone: true } as any);
     await stopBackup({ flushDeletes: true });
     expect(f.state.deletes).toEqual(['gone']);
     expect(f.state.queue.items).toEqual([]);

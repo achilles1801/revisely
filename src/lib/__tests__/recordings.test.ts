@@ -530,12 +530,18 @@ describe('backup bookkeeping', () => {
   });
 
   describe('deleting', () => {
-    it('queues the backup of each deleted recording, once', async () => {
+    it('queues the backup of each deleted recording, once; a tombstone only for one that was ever in the backup', async () => {
       const { id } = await appendSegment(null, temp('s1'), { kind: 'revision', day: 'd', segmentMs: 4000, pageMarks: [], createdAt: 9 });
       const b = await save('b', 300);
+      await markSegmentUploaded(U, b!.id, fileOf(b!.uri), 11);
       await deleteRecording(id!);
       await deleteRecording(b!.id);
-      expect(pendingCloudDeletes(U)).toEqual({ items: [{ id }, { id: b!.id }] });
+      expect(pendingCloudDeletes(U)).toEqual({
+        items: [
+          { id, tombstone: false },
+          { id: b!.id, tombstone: true },
+        ],
+      });
       await deleteRecording(id!);
       expect(pendingCloudDeletes(U).items).toHaveLength(2);
       clearCloudDeletes(U, [id!, b!.id]);
@@ -547,7 +553,12 @@ describe('backup bookkeeping', () => {
       const a = await save('a', 100);
       await mergeCloudRecordings(U, live(cloudRec('r1', [0])));
       await deleteAllRecordings(undefined, { withBackup: true });
-      expect(pendingCloudDeletes(U)).toEqual({ items: [{ id: a!.id }, { id: 'r1' }] });
+      expect(pendingCloudDeletes(U)).toEqual({
+        items: [
+          { id: a!.id, tombstone: false },
+          { id: 'r1', tombstone: true },
+        ],
+      });
       expect(pendingCloudDeletes('bob')).toEqual({ items: [] });
       expect(await listRecordings()).toEqual([]);
     });
@@ -579,7 +590,10 @@ describe('backup bookkeeping', () => {
         'doc/recordings-sync/alice-deletes.json',
         JSON.stringify({ items: [{ id: '../x' }, { id: 'ok' }], wipe: { fileNames: ['a-0.m4a', '../b'], docIds: ['a'] } }),
       );
-      expect(pendingCloudDeletes(U)).toEqual({ items: [{ id: 'ok' }], wipe: { fileNames: ['a-0.m4a'], docIds: ['a'] } });
+      expect(pendingCloudDeletes(U)).toEqual({
+        items: [{ id: 'ok', tombstone: false }],
+        wipe: { fileNames: ['a-0.m4a'], docIds: ['a'] },
+      });
     });
 
     it('a recording found deleted elsewhere while uploading stays here only', async () => {
@@ -674,12 +688,44 @@ describe('backup bookkeeping', () => {
       expect(await findForDay('2026-10-20')).toBeNull();
     });
 
-    it('a part the backup turns out not to have is dropped; with none left, the recording goes', async () => {
-      await mergeCloudRecordings(U, live(cloudRec('r1', [0, 1])));
-      await dropMissingSegment(U, 'r1', 'r1-0.m4a');
-      expect((await listRecordings())[0].segments.map((sg) => sg.fileName)).toEqual(['r1-1.m4a']);
+    it('a part the backup turns out not to have is dropped, stays dropped, and the page marks after it move up', async () => {
+      await mergeCloudRecordings(
+        U,
+        live(
+          cloudRec('r1', [0, 1, 2], {
+            pageMarks: [
+              { atMs: 0, page: 1 },
+              { atMs: 1000, page: 2 },
+              { atMs: 4000, page: 3 },
+              { atMs: 7000, page: 4 },
+            ],
+          }),
+        ),
+      );
+      // Part 1 (3–6 s on the timeline) is missing.
       await dropMissingSegment(U, 'r1', 'r1-1.m4a');
+      let [rec] = await listRecordings();
+      expect(rec.segments.map((sg) => sg.fileName)).toEqual(['r1-0.m4a', 'r1-2.m4a']);
+      expect(rec.durationMs).toBe(6000);
+      expect(rec.pageMarks).toEqual([
+        { atMs: 0, page: 1 },
+        { atMs: 1000, page: 2 },
+        { atMs: 3000, page: 3 },
+        { atMs: 4000, page: 4 },
+      ]);
+      // The backup still lists it: not brought back.
+      await mergeCloudRecordings(U, live(cloudRec('r1', [0, 1, 2])));
+      [rec] = await listRecordings();
+      expect(rec.segments.map((sg) => sg.fileName)).toEqual(['r1-0.m4a', 'r1-2.m4a']);
+    });
+
+    it('with nothing left, the recording goes, and its empty record in the backup is deleted', async () => {
+      await mergeCloudRecordings(U, live(cloudRec('r1', [0])));
+      await dropMissingSegment(U, 'r1', 'r1-0.m4a');
       expect(await listRecordings()).toEqual([]);
+      expect(pendingCloudDeletes(U).items).toEqual([{ id: 'r1', tombstone: true }]);
+      // And it doesn't come back with the next listing.
+      expect(await mergeCloudRecordings(U, live(cloudRec('r1', [0])))).toBe(0);
     });
 
     it('a restored recording gets the segments its phone adds later', async () => {

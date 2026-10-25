@@ -118,6 +118,8 @@ export async function deleteBackupKeepLocal(uid: string, io: DeleteBackupIo = de
     try {
       await io.download(uid, rec);
     } catch (err) {
+      // Nothing of it was in the backup: there is nothing to keep.
+      if ((err as Error | null)?.name === 'RecordingGone') continue;
       logger.warn('Could not download a recording before deleting the backup', err);
       notDownloaded++;
     }
