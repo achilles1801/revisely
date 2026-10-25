@@ -47,6 +47,9 @@ jest.mock('expo-file-system', () => {
     async text() {
       return mockFs.get(this.uri) ?? '';
     }
+    textSync() {
+      return mockFs.get(this.uri) ?? '';
+    }
     delete() {
       mockFs.delete(this.uri);
     }
@@ -79,6 +82,18 @@ import {
   findRevisionRecording,
   locateInSegments,
   segmentStart,
+  pendingUploads,
+  markSegmentUploaded,
+  pendingCloudDeletes,
+  clearCloudDeletes,
+  forgetCloudDeletes,
+  mergeCloudRecordings,
+  cloudRecordingFor,
+  clearUploadedMarks,
+  queueWholeBackupDelete,
+  onRecordingsChanged,
+  isValidCloudRecording,
+  CloudRecording,
 } from '../recordings';
 import { formatBytes, formatRecordingTime } from '../recordingFormat';
 
@@ -366,7 +381,10 @@ describe('recording sessions (pause and resume)', () => {
       ]),
     );
     const [rec] = await listRecordings();
-    expect(rec.segments).toEqual([{ uri: 'doc/recordings/alice/old.m4a', durationMs: 9000 }]);
+    expect(rec.segments).toEqual([
+      { uri: 'doc/recordings/alice/old.m4a', durationMs: 9000, fileName: 'old.m4a', local: true },
+    ]);
+    expect(rec.backedUp).toBe(false);
     await deleteRecording('old');
     expect(mockFs.has('doc/recordings/alice/old.m4a')).toBe(false);
   });
@@ -393,5 +411,226 @@ describe('rebaseMarks', () => {
     expect(rebaseMarks(marks, 6_000)).toEqual([{ atMs: 0, page: 2 }, { atMs: 3_000, page: 3 }]);
     expect(rebaseMarks(marks, 0)).toBe(marks);
     expect(rebaseMarks([], 100)).toEqual([]);
+  });
+});
+
+describe('backup bookkeeping', () => {
+  const save = (name: string, createdAt: number, durationMs = 5000) =>
+    saveRecording(temp(name), { kind: 'revision', day: '2026-10-20', durationMs, pageMarks: [], createdAt });
+  const fileOf = (uri: string) => uri.split('/').pop() as string;
+  const cloudRec = (id: string, fileNames: string[], extra: Partial<CloudRecording> = {}): CloudRecording => ({
+    id,
+    kind: 'reading',
+    day: '2026-10-21',
+    createdAt: 5000,
+    durationMs: fileNames.length * 3000,
+    pageMarks: [{ atMs: 0, page: 7 }],
+    segments: fileNames.map((fileName) => ({ fileName, durationMs: 3000, sizeBytes: 900 })),
+    ...extra,
+  });
+
+  it('lists the segments not backed up yet, until each is marked', async () => {
+    const a = await save('a', 100);
+    const b = await save('b', 200);
+    expect((await pendingUploads()).map((p) => p.recordingId).sort()).toEqual([a!.id, b!.id].sort());
+    expect((await pendingUploads())[0]).toMatchObject({ sizeBytes: 11 });
+
+    await markSegmentUploaded(a!.id, fileOf(a!.uri), 11);
+    expect((await pendingUploads()).map((p) => p.recordingId)).toEqual([b!.id]);
+    const list = await listRecordings();
+    expect(list.find((r) => r.id === a!.id)?.backedUp).toBe(true);
+    expect(list.find((r) => r.id === b!.id)?.backedUp).toBe(false);
+  });
+
+  it('the backup record lists only backed-up segments; none means no record', async () => {
+    const { id } = await appendSegment(null, temp('s1'), { kind: 'revision', day: 'd', segmentMs: 4000, pageMarks: [], createdAt: 9 });
+    await appendSegment(id, temp('s2'), { kind: 'revision', day: 'd', segmentMs: 6000, pageMarks: [] });
+    expect(await cloudRecordingFor(id!)).toBeNull();
+    const [first] = await pendingUploads();
+    await markSegmentUploaded(id!, first.fileName, 11);
+    expect(await cloudRecordingFor(id!)).toMatchObject({
+      id,
+      durationMs: 4000,
+      segments: [{ fileName: first.fileName, durationMs: 4000, sizeBytes: 11 }],
+    });
+    expect(await cloudRecordingFor('nope')).toBeNull();
+  });
+
+  it('a backed-up segment whose file is not here stays listed, to download', async () => {
+    const a = await save('a', 100);
+    await markSegmentUploaded(a!.id, fileOf(a!.uri), 4321);
+    mockFs.delete(a!.uri);
+    const [rec] = await listRecordings();
+    expect(rec.segments[0]).toMatchObject({ local: false, fileName: fileOf(a!.uri) });
+    expect(rec.sizeBytes).toBe(4321);
+    expect(rec.backedUp).toBe(true);
+    // Not backed up and not here: gone.
+    await markSegmentUploaded(a!.id, fileOf(a!.uri), 4321, false);
+    expect(await listRecordings()).toEqual([]);
+  });
+
+  it('deleting a recording queues its backup for deletion, every segment', async () => {
+    const { id } = await appendSegment(null, temp('s1'), { kind: 'revision', day: 'd', segmentMs: 4000, pageMarks: [], createdAt: 9 });
+    await appendSegment(id, temp('s2'), { kind: 'revision', day: 'd', segmentMs: 6000, pageMarks: [] });
+    await deleteRecording(id!);
+    const q = pendingCloudDeletes('alice');
+    expect(q.all).toBe(false);
+    expect(q.items).toEqual([{ id, fileNames: [expect.stringMatching(/-0\.m4a$/), expect.stringMatching(/-1\.m4a$/)] }]);
+    // Queued once even if deleted again.
+    await deleteRecording(id!);
+    expect(pendingCloudDeletes('alice').items).toHaveLength(1);
+
+    clearCloudDeletes('alice', [id!]);
+    expect(pendingCloudDeletes('alice')).toEqual({ items: [], all: false });
+    expect([...mockFs.keys()].some((k) => k.includes('recordings-sync/alice'))).toBe(false);
+  });
+
+  it('the queue survives the recordings folder being deleted, and is per account', async () => {
+    const a = await save('a', 100);
+    await deleteAllRecordings(undefined, { withBackup: true });
+    expect(pendingCloudDeletes('alice')).toEqual({ items: [{ id: a!.id, fileNames: [fileOf(a!.uri)] }], all: true });
+    expect(pendingCloudDeletes('bob')).toEqual({ items: [], all: false });
+    // Done with all of it.
+    clearCloudDeletes('alice', [a!.id], true);
+    expect(pendingCloudDeletes('alice')).toEqual({ items: [], all: false });
+  });
+
+  it('deleting everything on this phone only (sign-out, a deleted account) leaves the backup', async () => {
+    await save('a', 100);
+    await deleteAllRecordings('alice');
+    expect(pendingCloudDeletes('alice')).toEqual({ items: [], all: false });
+  });
+
+  it('a deleted account forgets its queued deletions', async () => {
+    const a = await save('a', 100);
+    await deleteRecording(a!.id);
+    forgetCloudDeletes('alice');
+    expect(pendingCloudDeletes('alice').items).toEqual([]);
+  });
+
+  it('an unreadable queue is treated as empty', () => {
+    mockFs.set('doc/recordings-sync/', '');
+    mockFs.set('doc/recordings-sync/alice-deletes.json', '{oops');
+    expect(pendingCloudDeletes('alice')).toEqual({ items: [], all: false });
+  });
+
+  it('turning backup off with "delete backups" unmarks everything and queues the whole backup', async () => {
+    const a = await save('a', 100);
+    await markSegmentUploaded(a!.id, fileOf(a!.uri), 11);
+    await queueWholeBackupDelete();
+    expect(pendingCloudDeletes('alice').all).toBe(true);
+    expect((await listRecordings())[0].backedUp).toBe(false);
+    expect(await pendingUploads()).toHaveLength(1);
+  });
+
+  describe('restoring from the backup', () => {
+    it('lists recordings from the backup (a new phone), to download when played', async () => {
+      expect(await mergeCloudRecordings([cloudRec('r1', ['r1-1.m4a', 'r1-0.m4a'])])).toBe(1);
+      const [rec] = await listRecordings();
+      expect(rec).toMatchObject({ id: 'r1', kind: 'reading', durationMs: 6000, sizeBytes: 1800, backedUp: true });
+      expect(rec.segments.map((sg) => [sg.fileName, sg.local])).toEqual([
+        ['r1-1.m4a', false],
+        ['r1-0.m4a', false],
+      ]);
+      expect(rec.pageMarks).toEqual([{ atMs: 0, page: 7 }]);
+      // Nothing to upload: none of it is here.
+      expect(await pendingUploads()).toEqual([]);
+      // Again: nothing new.
+      expect(await mergeCloudRecordings([cloudRec('r1', ['r1-1.m4a', 'r1-0.m4a'])])).toBe(0);
+    });
+
+    it('marks what the backup already has, and adds segments recorded on another phone', async () => {
+      const a = await save('a', 100);
+      const name = fileOf(a!.uri); // <id>-0.m4a
+      const other = name.replace(/-0\.m4a$/, '-1.m4a');
+      await mergeCloudRecordings([
+        cloudRec(a!.id, [other, name], { kind: 'revision', day: '2026-10-20', createdAt: 100 }),
+      ]);
+      const [rec] = await listRecordings();
+      expect(rec.segments.map((sg) => [sg.fileName, sg.local])).toEqual([
+        [name, true],
+        [other, false],
+      ]);
+      expect(rec.backedUp).toBe(true);
+      expect(rec.durationMs).toBe(5000 + 3000);
+      expect(await pendingUploads()).toEqual([]);
+    });
+
+    it('does not bring back recordings deleted here and waiting for their backup to go', async () => {
+      const a = await save('a', 100);
+      await deleteRecording(a!.id);
+      expect(await mergeCloudRecordings([cloudRec(a!.id, [fileOf(a!.uri)]), cloudRec('r2', ['r2-0.m4a'])])).toBe(1);
+      expect((await listRecordings()).map((r) => r.id)).toEqual(['r2']);
+    });
+
+    it('brings back nothing while the whole backup is being deleted', async () => {
+      await queueWholeBackupDelete();
+      expect(await mergeCloudRecordings([cloudRec('r2', ['r2-0.m4a'])])).toBe(0);
+      expect(await listRecordings()).toEqual([]);
+    });
+
+    it('unmarks a segment the backup no longer lists, so it uploads again', async () => {
+      const a = await save('a', 100);
+      await markSegmentUploaded(a!.id, fileOf(a!.uri), 11);
+      await mergeCloudRecordings([]);
+      expect((await listRecordings())[0].backedUp).toBe(false);
+      expect((await pendingUploads()).map((p) => p.recordingId)).toEqual([a!.id]);
+    });
+
+    it('drops a restored recording the backup no longer has (deleted on another phone)', async () => {
+      await mergeCloudRecordings([cloudRec('r1', ['r1-0.m4a']), cloudRec('r2', ['r2-0.m4a'])]);
+      await mergeCloudRecordings([cloudRec('r2', ['r2-0.m4a'])]);
+      expect((await listRecordings()).map((r) => r.id)).toEqual(['r2']);
+    });
+
+    it('leaves out malformed records (names that would be paths, wrong types)', async () => {
+      const bad = [
+        cloudRec('../escape', ['x-0.m4a']),
+        cloudRec('r3', ['../../index.json']),
+        cloudRec('r4', ['r4-0.m4a'], { kind: 'other' as any }),
+        cloudRec('r5', []),
+        { ...cloudRec('r6', ['r6-0.m4a']), segments: [{ fileName: 'r6-0.m4a', durationMs: 'long' }] } as any,
+        null as any,
+      ];
+      for (const b of bad) expect(isValidCloudRecording(b)).toBe(false);
+      expect(await mergeCloudRecordings([...bad, cloudRec('ok', ['ok-0.m4a'])])).toBe(1);
+      expect((await listRecordings()).map((r) => r.id)).toEqual(['ok']);
+    });
+
+    it('keeps only sensible page marks from the backup', async () => {
+      await mergeCloudRecordings([
+        cloudRec('r1', ['r1-0.m4a'], {
+          pageMarks: [{ atMs: 0, page: 3 }, { atMs: -1, page: 4 }, { atMs: 10, page: 9999 }, null as any, { atMs: 20, page: 5 }],
+        }),
+      ]);
+      expect((await listRecordings())[0].pageMarks).toEqual([
+        { atMs: 0, page: 3 },
+        { atMs: 20, page: 5 },
+      ]);
+    });
+
+    it('clearing the marks keeps the recordings here', async () => {
+      const a = await save('a', 100);
+      await markSegmentUploaded(a!.id, fileOf(a!.uri), 11);
+      await clearUploadedMarks();
+      const [rec] = await listRecordings();
+      expect(rec).toMatchObject({ id: a!.id, backedUp: false });
+    });
+  });
+
+  it('tells listeners when recordings change (saved, deleted, restored)', async () => {
+    const listener = jest.fn();
+    const off = onRecordingsChanged(listener);
+    const a = await save('a', 100);
+    expect(listener).toHaveBeenCalledTimes(1);
+    await deleteRecording(a!.id);
+    expect(listener).toHaveBeenCalledTimes(2);
+    await mergeCloudRecordings([cloudRec('r1', ['r1-0.m4a'])]);
+    expect(listener).toHaveBeenCalledTimes(3);
+    await mergeCloudRecordings([cloudRec('r1', ['r1-0.m4a'])]); // nothing changed
+    expect(listener).toHaveBeenCalledTimes(3);
+    off();
+    await save('b', 200);
+    expect(listener).toHaveBeenCalledTimes(3);
   });
 });

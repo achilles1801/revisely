@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { getAuth } from 'firebase/auth';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
@@ -22,6 +23,7 @@ import {
 } from '../../lib/recordings';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
+import { downloadMissingSegments } from '../../lib/recordingBackup';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 
 interface RecordingsListProps {
@@ -136,7 +138,27 @@ export function RecordingsList({
     player.play();
   };
 
-  const play = (r: RecordingMeta, fromMs = 0) => {
+  // A recording restored from the backup (another phone, a reinstall) is
+  // downloaded the first time it's played (lib/recordingBackup).
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const play = async (r: RecordingMeta, fromMs = 0) => {
+    if (r.segments.every((sg) => sg.local)) return playLocal(r, fromMs);
+    const uid = getAuth().currentUser?.uid;
+    if (!uid || downloadingId) return;
+    setDownloadingId(r.id);
+    try {
+      const local = await downloadMissingSegments(uid, r);
+      setItems((list) => list.map((x) => (x.id === r.id ? local : x)));
+      playLocal(local, fromMs);
+    } catch (err) {
+      logger.warn('Could not download recording', err);
+      Alert.alert('Couldn’t download this recording', 'Check your connection and try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const playLocal = (r: RecordingMeta, fromMs = 0) => {
     if (isRecordingActive()) {
       Alert.alert('Recording in progress', 'Pause the recording to play this one.');
       return;
@@ -223,7 +245,9 @@ export function RecordingsList({
   const confirmDelete = (r: RecordingMeta) => {
     Alert.alert(
       'Delete this recording?',
-      'It is stored only on this phone and cannot be recovered.',
+      r.backedUp
+        ? 'It is deleted from this phone and from your backup, and cannot be recovered.'
+        : 'It cannot be recovered.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -275,18 +299,38 @@ export function RecordingsList({
                 <Pressable
                   onPress={() => togglePause(r)}
                   style={[styles.playBtn, { backgroundColor: theme.accent }]}
-                  accessibilityLabel={active && !paused ? 'Pause recording' : 'Play recording'}
+                  accessibilityLabel={
+                    downloadingId === r.id
+                      ? 'Downloading recording'
+                      : active && !paused
+                        ? 'Pause recording'
+                        : 'Play recording'
+                  }
                 >
-                  <Ionicons name={active && !paused ? 'pause' : 'play'} size={16} color="#fff" />
+                  {downloadingId === r.id ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name={active && !paused ? 'pause' : 'play'} size={16} color="#fff" />
+                  )}
                 </Pressable>
                 <View style={{ flex: 1 }}>
                   <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
                     {KIND_LABEL[r.kind]} · {time}
                   </Text>
-                  <Text style={[typography.caption, { color: theme.textMuted }]}>
-                    {active ? `${formatRecordingTime(position)} / ` : ''}
-                    {formatRecordingTime(r.durationMs)}
-                  </Text>
+                  <View style={styles.captionRow}>
+                    <Text style={[typography.caption, { color: theme.textMuted }]}>
+                      {active ? `${formatRecordingTime(position)} / ` : ''}
+                      {formatRecordingTime(r.durationMs)}
+                    </Text>
+                    {r.backedUp && (
+                      <Ionicons
+                        name={r.segments.every((sg) => sg.local) ? 'cloud-done-outline' : 'cloud-download-outline'}
+                        size={13}
+                        color={theme.textMuted}
+                        accessibilityLabel={r.segments.every((sg) => sg.local) ? 'Backed up' : 'In your backup; downloads when played'}
+                      />
+                    )}
+                  </View>
                 </View>
                 <Pressable
                   onPress={() => confirmDelete(r)}
@@ -346,6 +390,7 @@ const makeStyles = (theme: ThemeColors) =>
     card: { borderRadius: radius.md, overflow: 'hidden' },
     row: { padding: spacing.md, gap: spacing.sm },
     rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    captionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     playBtn: {
       width: 34,
       height: 34,

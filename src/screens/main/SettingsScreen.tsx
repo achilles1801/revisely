@@ -41,7 +41,9 @@ import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
 import { avatarInitial } from '../../lib/displayName';
 import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
+import { askTurnOffBackup, backupLabel, useBackupStatus } from '../../lib/recordingBackupUi';
 import { formatBytes } from '../../lib/recordingFormat';
+import { logger } from '../../lib/logger';
 import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
@@ -318,6 +320,15 @@ export default function SettingsScreen() {
     setShowNameModal(false);
   };
 
+  // Recording backup (lib/recordingBackup): on by default.
+  const backupStatus = useBackupStatus();
+  const handleBackupToggle = (on: boolean) => {
+    const save = (value: boolean) =>
+      updateUser({ recordingBackup: value }).catch((err) => logger.warn('Could not change backup', err));
+    if (on) save(true);
+    else askTurnOffBackup(() => save(false));
+  };
+
   const handleSubmitFeedback = async () => {
     const trimmed = feedbackText.trim();
     if (!trimmed || feedbackSubmitting) return;
@@ -515,25 +526,34 @@ export default function SettingsScreen() {
                 ? () =>
                     Alert.alert(
                       'Recordings',
-                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}), stored only on this phone. They're listed by day in Activity.`,
+                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}). ${
+                        localUser.recordingBackup !== false
+                          ? 'They are backed up to your account.'
+                          : 'They are stored only on this phone.'
+                      } They're listed by day in Activity.`,
                       [
                         { text: 'Open Activity', onPress: () => navigation.navigate('Activity') },
                         {
                           text: 'Delete all',
                           style: 'destructive',
                           onPress: () =>
-                            Alert.alert('Delete all recordings?', "This can't be undone.", [
+                            Alert.alert(
+                              'Delete all recordings?',
+                              "From this phone and from your backup. This can't be undone.",
+                              [
                               { text: 'Cancel', style: 'cancel' },
                               {
                                 text: 'Delete all',
                                 style: 'destructive',
                                 onPress: async () => {
-                                  // The whole folder, including any file not in the index.
-                                  await deleteAllRecordings();
+                                  // The whole folder, including any file not in the index,
+                                  // and the backup.
+                                  await deleteAllRecordings(undefined, { withBackup: true });
                                   loadRecordings();
                                 },
                               },
-                            ]),
+                              ],
+                            ),
                         },
                         { text: 'Cancel', style: 'cancel' },
                       ],
@@ -541,6 +561,35 @@ export default function SettingsScreen() {
                 : undefined
             }
           />
+          <Row
+            icon="cloud-upload-outline"
+            label="Back up recordings"
+            value={localUser.recordingBackup !== false ? backupLabel(backupStatus) : undefined}
+            rightSlot={
+              <Switch
+                value={localUser.recordingBackup !== false}
+                onValueChange={handleBackupToggle}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+                accessibilityLabel="Back up recordings to your account"
+              />
+            }
+          />
+          {localUser.recordingBackup !== false && (
+            <Row
+              icon="cellular-outline"
+              label="Back up over mobile data"
+              rightSlot={
+                <Switch
+                  value={localUser.recordingBackupCellular === true}
+                  onValueChange={(v) => updateUser({ recordingBackupCellular: v })}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+                  accessibilityLabel="Back up recordings over mobile data"
+                />
+              }
+            />
+          )}
           <Row
             icon="hourglass-outline"
             label="Time in app"

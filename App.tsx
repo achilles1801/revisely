@@ -7,6 +7,7 @@ import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { RecordingBackupController } from './src/components/RecordingBackupController';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
@@ -89,6 +90,7 @@ function App() {
                   calling useTheme()/useApp() throws when it opens. */}
               <BottomSheetModalProvider>
                 <RootNavigator />
+                <RecordingBackupController />
               </BottomSheetModalProvider>
             </AppProvider>
           </AuthProvider>

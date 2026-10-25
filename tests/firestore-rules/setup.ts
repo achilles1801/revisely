@@ -7,6 +7,7 @@ import {
 
 const PROJECT_ID = 'revisley-rules-test';
 const RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
+const STORAGE_RULES_PATH = path.resolve(__dirname, '../../storage.rules');
 
 let testEnv: RulesTestEnvironment | undefined;
 
@@ -18,6 +19,11 @@ export async function getTestEnv(): Promise<RulesTestEnvironment> {
         rules: fs.readFileSync(RULES_PATH, 'utf8'),
         host: '127.0.0.1',
         port: 8080,
+      },
+      storage: {
+        rules: fs.readFileSync(STORAGE_RULES_PATH, 'utf8'),
+        host: '127.0.0.1',
+        port: 9199,
       },
     });
   }

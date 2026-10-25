@@ -35,6 +35,7 @@ import {
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
+import type { CloudRecording } from '../lib/recordings';
 import {
   FirestoreUser,
   FirestorePage,
@@ -217,6 +218,8 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
   if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
   if (updates.translationId !== undefined) updateData.translationId = updates.translationId;
+  if (updates.recordingBackup !== undefined) updateData.recordingBackup = updates.recordingBackup;
+  if (updates.recordingBackupCellular !== undefined) updateData.recordingBackupCellular = updates.recordingBackupCellular;
   if (updates.reciter !== undefined) updateData.reciter = updates.reciter;
 
   if (updates.notifications) {
@@ -678,4 +681,27 @@ export async function submitFeedback(input: {
     platform: input.platform ?? null,
     createdAt: serverTimestamp(),
   });
+}
+
+// ============================================================================
+// RECORDING BACKUP (lib/recordingBackup): what the backup holds about each
+// recording, users/<uid>/recordings/<id>. The audio is in Storage.
+// ============================================================================
+
+export async function listRecordingDocs(userId: string): Promise<CloudRecording[]> {
+  const snap = await getDocsFromServer(collection(db, 'users', userId, 'recordings'));
+  return snap.docs.map((d) => {
+    const data = d.data() as Omit<CloudRecording, 'id'> & { updatedAt?: unknown };
+    const { updatedAt: _u, ...rest } = data;
+    return { ...rest, id: d.id };
+  });
+}
+
+export async function putRecordingDoc(userId: string, rec: CloudRecording): Promise<void> {
+  const { id, ...data } = rec;
+  await setDoc(doc(db, 'users', userId, 'recordings', id), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function deleteRecordingDoc(userId: string, id: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId, 'recordings', id));
 }

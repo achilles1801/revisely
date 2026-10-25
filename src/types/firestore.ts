@@ -189,6 +189,10 @@ export interface FirestoreUser {
   translationId?: string;
   /** Reciter and style for Play: '<reciter>:<style>'. */
   reciter?: string;
+  /** Back recordings up to the account (absent = on). */
+  recordingBackup?: boolean;
+  /** Let the backup use mobile data (absent = off). */
+  recordingBackupCellular?: boolean;
 }
 
 /**
@@ -237,6 +241,8 @@ export interface UpdateUserInput {
   scheduleShiftPages?: number;
   translationId?: string;
   reciter?: string;
+  recordingBackup?: boolean;
+  recordingBackupCellular?: boolean;
 }
 
 // ============================================================================

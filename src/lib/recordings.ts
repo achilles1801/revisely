@@ -1,10 +1,15 @@
 // Recordings of the user reciting, made during revision or reading.
 //
-// Kept on this device only, in the documents directory (they are the user's
-// own data, so unlike cached pages they belong there), one folder per account:
+// Kept in the documents directory (they are the user's own data, so unlike
+// cached pages they belong there), one folder per account:
 // recordings/<uid>/<id>-<n>.m4a (one file per segment: each Pause finishes one,
-// so a recording survives the app being closed) plus an index.json. Nothing is
-// uploaded. `storage: 'device'` on each entry leaves room for a cloud copy later.
+// so a recording survives the app being closed) plus an index.json.
+//
+// Unless the user turns it off, each segment is also backed up to their account
+// (lib/recordingBackup): `uploaded` marks the segments that are, and a recording
+// restored from the backup on another phone lists segments not downloaded yet.
+// Deleting a recording queues the deletion of its backup (outside the folder, so
+// "Delete all", which removes the folder, still reaches the backup).
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { getAuth } from 'firebase/auth';
@@ -22,6 +27,10 @@ export interface PageMark {
 export interface StoredSegment {
   fileName: string;
   durationMs: number;
+  /** Backed up to the account (lib/recordingBackup). */
+  uploaded?: boolean;
+  /** File size, kept for segments that may not be on this phone. */
+  sizeBytes?: number;
 }
 
 export interface StoredRecording {
@@ -44,11 +53,22 @@ export interface StoredRecording {
   storage: 'device';
 }
 
+export interface MetaSegment {
+  /** Where the file is (or goes, once downloaded). */
+  uri: string;
+  durationMs: number;
+  fileName: string;
+  /** On this phone; otherwise only in the backup (download before playing). */
+  local: boolean;
+}
+
 export interface RecordingMeta extends Omit<StoredRecording, 'fileName' | 'storage' | 'segments'> {
   /** The first segment, for callers that only need one file. */
   uri: string;
-  segments: { uri: string; durationMs: number }[];
+  segments: MetaSegment[];
   sizeBytes: number;
+  /** Every segment is backed up. */
+  backedUp: boolean;
 }
 
 /** A recording's segments, including the single file of an older recording. */
@@ -193,6 +213,7 @@ export function appendSegment(
       if (target.exists) target.delete();
       throw err;
     }
+    notifyChanged();
     return { id, kept: true, restarted };
   });
 }
@@ -239,19 +260,29 @@ export function closeRecording(id: string): Promise<void> {
 }
 
 function toMeta(dir: Directory, e: StoredRecording): RecordingMeta | null {
-  // Segments whose file is gone are skipped; with none left, the entry is gone.
+  // Segments neither on this phone nor backed up are skipped; with none left,
+  // the entry is gone.
   const files = segmentsOf(e)
-    .map((sg) => ({ sg, file: new File(dir, sg.fileName) }))
-    .filter(({ file }) => file.exists);
+    .map((sg) => {
+      const file = new File(dir, sg.fileName);
+      return { sg, file, local: file.exists };
+    })
+    .filter(({ sg, local }) => local || sg.uploaded);
   if (files.length === 0) return null;
   const { fileName: _f, storage: _s, segments: _g, ...rest } = e;
-  const segments = files.map(({ sg, file }) => ({ uri: file.uri, durationMs: sg.durationMs }));
+  const segments = files.map(({ sg, file, local }) => ({
+    uri: file.uri,
+    durationMs: sg.durationMs,
+    fileName: sg.fileName,
+    local,
+  }));
   return {
     ...rest,
     durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),
     uri: segments[0].uri,
     segments,
-    sizeBytes: files.reduce((sum, { file }) => sum + (file.size ?? 0), 0),
+    sizeBytes: files.reduce((sum, { sg, file, local }) => sum + (local ? file.size ?? 0 : sg.sizeBytes ?? 0), 0),
+    backedUp: files.every(({ sg }) => sg.uploaded === true),
   };
 }
 
@@ -283,7 +314,12 @@ export function deleteRecordings(match: (r: StoredRecording) => boolean): Promis
         }
       }
     }
-    if (gone.length > 0) writeIndex(dir, entries.filter((e) => !match(e)));
+    if (gone.length > 0) {
+      writeIndex(dir, entries.filter((e) => !match(e)));
+      // Its backup goes too (also a copy uploading right now, or one restored).
+      queueCloudDeletes(gone.map((e) => ({ id: e.id, fileNames: segmentsOf(e).map((sg) => sg.fileName) })));
+      notifyChanged();
+    }
     return gone.length;
   });
 }
@@ -299,11 +335,345 @@ export const isReadingRecordingDuring = (startedAt: number, endedAt: number) => 
   r.kind === 'reading' && r.createdAt >= startedAt && r.createdAt <= endedAt;
 
 /** Every recording of an account on this device (account deletion, sign-out wipe). */
-export function deleteAllRecordings(uid?: string): Promise<void> {
+/**
+ * Delete every recording of the account on this phone (the whole folder). With
+ * `withBackup`, the backup too (Settings → Delete all); without it (the account
+ * itself was deleted, which removes the backup on the server), only this phone.
+ */
+export function deleteAllRecordings(uid?: string, { withBackup = false } = {}): Promise<void> {
   return serial(async () => {
-    const dir = new Directory(Paths.document, 'recordings', uid ?? getAuth().currentUser?.uid ?? 'signed-out');
+    const owner = uid ?? getAuth().currentUser?.uid ?? 'signed-out';
+    const dir = new Directory(Paths.document, 'recordings', owner);
+    if (withBackup && dir.exists) {
+      const entries = await readIndex(dir);
+      queueCloudDeletes(entries.map((e) => ({ id: e.id, fileNames: segmentsOf(e).map((sg) => sg.fileName) })), owner, true);
+    }
     if (dir.exists) dir.delete();
+    notifyChanged();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Backup bookkeeping (lib/recordingBackup does the network side)
+// ---------------------------------------------------------------------------
+
+/** A recording whose backup is to be deleted. `all`: everything in the backup. */
+export interface CloudDelete {
+  id: string;
+  fileNames: string[];
+}
+export interface DeleteQueue {
+  items: CloudDelete[];
+  /** Delete the whole backup (every file in it). */
+  all: boolean;
+}
+
+function syncDir(): Directory {
+  const dir = new Directory(Paths.document, 'recordings-sync');
+  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+  return dir;
+}
+function deleteQueueFile(uid: string): File {
+  return new File(syncDir(), `${uid}-deletes.json`);
+}
+function readDeleteQueue(uid: string): DeleteQueue {
+  try {
+    const f = deleteQueueFile(uid);
+    if (!f.exists) return { items: [], all: false };
+    const parsed = JSON.parse(f.textSync());
+    return { items: Array.isArray(parsed?.items) ? parsed.items : [], all: parsed?.all === true };
+  } catch (err) {
+    logger.warn('Backup delete queue unreadable', err);
+    return { items: [], all: false };
+  }
+}
+function writeDeleteQueue(uid: string, q: DeleteQueue) {
+  const f = deleteQueueFile(uid);
+  if (q.items.length === 0 && !q.all) {
+    if (f.exists) f.delete();
+    return;
+  }
+  if (!f.exists) f.create();
+  f.write(JSON.stringify(q));
+}
+function currentUid(): string | null {
+  return getAuth().currentUser?.uid ?? null;
+}
+
+function queueCloudDeletes(items: CloudDelete[], uid = currentUid(), all = false) {
+  if (!uid) return;
+  try {
+    const q = readDeleteQueue(uid);
+    const known = new Set(q.items.map((i) => i.id));
+    writeDeleteQueue(uid, { items: [...q.items, ...items.filter((i) => !known.has(i.id))], all: q.all || all });
+  } catch (err) {
+    logger.warn('Could not queue backup deletion', err);
+  }
+}
+
+/** Backups waiting to be deleted. */
+export function pendingCloudDeletes(uid: string): DeleteQueue {
+  return readDeleteQueue(uid);
+}
+
+/** Forget the account's queued backup deletions (the account was deleted, and its backup with it). */
+export function forgetCloudDeletes(uid: string) {
+  try {
+    const f = deleteQueueFile(uid);
+    if (f.exists) f.delete();
+  } catch (err) {
+    logger.warn('Could not clear backup delete queue', err);
+  }
+}
+
+/** Done with these (deleted from the backup, or found not to be there). */
+export function clearCloudDeletes(uid: string, ids: string[], all = false) {
+  const q = readDeleteQueue(uid);
+  const done = new Set(ids);
+  writeDeleteQueue(uid, { items: q.items.filter((i) => !done.has(i.id)), all: all ? false : q.all });
+}
+
+/** A segment on this phone that isn't backed up yet. */
+export interface PendingUpload {
+  recordingId: string;
+  fileName: string;
+  uri: string;
+  sizeBytes: number;
+}
+
+export function pendingUploads(): Promise<PendingUpload[]> {
+  return serial(async () => {
+    const dir = accountDir();
+    const out: PendingUpload[] = [];
+    for (const e of await readIndex(dir)) {
+      for (const sg of segmentsOf(e)) {
+        if (sg.uploaded) continue;
+        const file = new File(dir, sg.fileName);
+        if (file.exists) out.push({ recordingId: e.id, fileName: sg.fileName, uri: file.uri, sizeBytes: file.size ?? 0 });
+      }
+    }
+    return out;
+  });
+}
+
+/** Set (or clear) a segment's backed-up mark. */
+export function markSegmentUploaded(recordingId: string, fileName: string, sizeBytes: number, uploaded = true): Promise<void> {
+  return serial(async () => {
+    const dir = accountDir();
+    const entries = await readIndex(dir);
+    let changed = false;
+    const next = entries.map((e) => {
+      if (e.id !== recordingId) return e;
+      const segs = segmentsOf(e).map((sg) => {
+        if (sg.fileName !== fileName) return sg;
+        changed = true;
+        return uploaded ? { ...sg, uploaded: true, sizeBytes } : { fileName: sg.fileName, durationMs: sg.durationMs, sizeBytes };
+      });
+      const { fileName: _legacy, ...rest } = e;
+      return { ...rest, segments: segs };
+    });
+    if (changed) writeIndex(dir, next);
+  });
+}
+
+/** Clear every backed-up mark (the backup was deleted, but the recordings stay here). */
+export function clearUploadedMarks(): Promise<void> {
+  return serial(async () => {
+    const dir = accountDir();
+    const entries = await readIndex(dir);
+    writeIndex(
+      dir,
+      entries.map((e) => {
+        const { fileName: _legacy, ...rest } = e;
+        return {
+          ...rest,
+          segments: segmentsOf(e).map((sg) => ({ fileName: sg.fileName, durationMs: sg.durationMs, sizeBytes: sg.sizeBytes })),
+        };
+      }),
+    );
+    notifyChanged();
+  });
+}
+
+/** What the backup keeps about a recording (Firestore, users/<uid>/recordings/<id>). */
+export interface CloudRecording {
+  id: string;
+  kind: RecordingKind;
+  day: string;
+  createdAt: number;
+  durationMs: number;
+  pageMarks: PageMark[];
+  segments: { fileName: string; durationMs: number; sizeBytes: number }[];
+}
+
+/** The backup's record of a recording: its segments that are backed up. Null if none is. */
+export function cloudRecordingFor(id: string): Promise<CloudRecording | null> {
+  return serial(async () => {
+    const e = (await readIndex(accountDir())).find((x) => x.id === id);
+    if (!e) return null;
+    const segments = segmentsOf(e)
+      .filter((sg) => sg.uploaded)
+      .map((sg) => ({ fileName: sg.fileName, durationMs: sg.durationMs, sizeBytes: sg.sizeBytes ?? 0 }));
+    if (segments.length === 0) return null;
+    return {
+      id: e.id,
+      kind: e.kind,
+      day: e.day,
+      createdAt: e.createdAt,
+      durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),
+      pageMarks: e.pageMarks,
+      segments,
+    };
+  });
+}
+
+/**
+ * Bring the backup's recordings into this phone's index (a new phone, a
+ * reinstall): new ones are listed with their segments to download on demand;
+ * known ones get their backed-up segments marked. Recordings deleted here and
+ * waiting for their backup to go are not brought back.
+ *
+ * `cloud` is the whole backup. A segment marked backed up that it doesn't list
+ * (its recording was deleted on another phone, or the record of it was never
+ * written) is unmarked if its file is here, so it uploads again, and dropped if
+ * not, since there is nothing left to download. Returns how many were added.
+ */
+export function mergeCloudRecordings(fromServer: CloudRecording[]): Promise<number> {
+  // What comes from the server is the user's own data, but its names become
+  // paths on this phone: anything malformed is left out.
+  const cloud = fromServer.filter(isValidCloudRecording);
+  return serial(async () => {
+    const dir = accountDir();
+    const entries = await readIndex(dir);
+    const uid = currentUid();
+    const deleting: DeleteQueue = uid ? readDeleteQueue(uid) : { items: [], all: false };
+    if (deleting.all) return 0;
+    const gone = new Set(deleting.items.map((i) => i.id));
+    let added = 0;
+    let changed = false;
+    const byId = new Map(entries.map((e) => [e.id, e]));
+    const listed = new Map(cloud.map((c) => [c.id, new Set(c.segments.map((sg) => sg.fileName))]));
+    for (const e of entries) {
+      if (gone.has(e.id)) continue;
+      const inCloud = listed.get(e.id) ?? new Set<string>();
+      const segs = segmentsOf(e);
+      if (!segs.some((sg) => sg.uploaded && !inCloud.has(sg.fileName))) continue;
+      const kept = segs.flatMap((sg) => {
+        if (!sg.uploaded || inCloud.has(sg.fileName)) return [sg];
+        if (!new File(dir, sg.fileName).exists) return [];
+        return [{ fileName: sg.fileName, durationMs: sg.durationMs, sizeBytes: sg.sizeBytes }];
+      });
+      changed = true;
+      if (kept.length === 0) {
+        byId.delete(e.id);
+        continue;
+      }
+      const { fileName: _legacy, ...rest } = e;
+      byId.set(e.id, { ...rest, segments: kept, durationMs: kept.reduce((sum, sg) => sum + sg.durationMs, 0) });
+    }
+    for (const c of cloud) {
+      if (gone.has(c.id)) continue;
+      const local = byId.get(c.id);
+      if (!local) {
+        byId.set(c.id, {
+          id: c.id,
+          kind: c.kind,
+          day: c.day,
+          createdAt: c.createdAt,
+          durationMs: c.durationMs,
+          segments: c.segments.map((sg) => ({ ...sg, uploaded: true })),
+          pageMarks: normalizePageMarks(
+            (c.pageMarks ?? []).filter(
+              (m) => !!m && isCount(m.atMs) && Number.isInteger(m.page) && m.page >= 1 && m.page <= 604,
+            ),
+          ),
+          storage: 'device',
+        });
+        added++;
+        changed = true;
+        continue;
+      }
+      const segs = segmentsOf(local);
+      const names = new Set(segs.map((sg) => sg.fileName));
+      const inCloud = new Map(c.segments.map((sg) => [sg.fileName, sg]));
+      const merged = segs.map((sg) => {
+        const remote = inCloud.get(sg.fileName);
+        if (!remote || sg.uploaded) return sg;
+        changed = true;
+        return { ...sg, uploaded: true, sizeBytes: remote.sizeBytes };
+      });
+      // Segments backed up from another phone that this one never had.
+      for (const sg of c.segments) {
+        if (!names.has(sg.fileName)) {
+          merged.push({ ...sg, uploaded: true });
+          changed = true;
+        }
+      }
+      const { fileName: _legacy, ...rest } = local;
+      byId.set(c.id, {
+        ...rest,
+        segments: merged.sort((a, b) => segmentIndex(a.fileName) - segmentIndex(b.fileName)),
+        durationMs: merged.reduce((sum, sg) => sum + sg.durationMs, 0),
+      });
+    }
+    if (changed) {
+      writeIndex(dir, [...byId.values()]);
+      notifyChanged();
+    }
+    return added;
+  });
+}
+
+const SAFE_NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+const isSafeName = (v: unknown): v is string =>
+  typeof v === 'string' && v.length <= 200 && SAFE_NAME.test(v) && !v.includes('..');
+const isCount = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+/** A backup record usable here: safe names, numbers where numbers belong. */
+export function isValidCloudRecording(c: unknown): c is CloudRecording {
+  const r = c as Partial<CloudRecording> | null;
+  return (
+    !!r &&
+    isSafeName(r.id) &&
+    (r.kind === 'revision' || r.kind === 'reading') &&
+    typeof r.day === 'string' &&
+    isCount(r.createdAt) &&
+    isCount(r.durationMs) &&
+    (r.pageMarks === undefined || Array.isArray(r.pageMarks)) &&
+    Array.isArray(r.segments) &&
+    r.segments.length > 0 &&
+    r.segments.every((sg) => !!sg && isSafeName(sg.fileName) && isCount(sg.durationMs) && isCount(sg.sizeBytes))
+  );
+}
+
+/** The n in <id>-<n>.m4a (segments play in that order). */
+function segmentIndex(fileName: string): number {
+  const m = fileName.match(/-(\d+)\.[a-z0-9]+$/i);
+  return m ? Number(m[1]) : 0;
+}
+
+/** Where a segment's file lives on this phone (for downloading it). */
+export function segmentFile(fileName: string): File {
+  return new File(accountDir(), fileName);
+}
+
+// Changes to the recordings (saved, deleted, restored), for the backup and lists.
+type ChangeListener = () => void;
+const changeListeners = new Set<ChangeListener>();
+export function onRecordingsChanged(listener: ChangeListener): () => void {
+  changeListeners.add(listener);
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+function notifyChanged() {
+  for (const l of changeListeners) {
+    try {
+      l();
+    } catch (err) {
+      logger.warn('Recordings listener failed', err);
+    }
+  }
 }
 
 /** Which segment holds `ms` of a recording's timeline, and how far into it. */
@@ -360,4 +730,11 @@ export function releaseRecording(owner: string): void {
     recordingOwner = null;
     capturing = false;
   }
+}
+
+/** Delete the whole backup, keeping the recordings on this phone (backup turned off). */
+export function queueWholeBackupDelete(): Promise<void> {
+  return serial(async () => {
+    queueCloudDeletes([], currentUid(), true);
+  }).then(clearUploadedMarks);
 }

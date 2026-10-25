@@ -181,6 +181,23 @@ quran.com-images records while drawing the same page images (coordinates are 102
 2600×4206, so one scale factor maps them). Translations are Saheeh International from api.alquran.cloud,
 disclosed in the privacy policy.
 
+**Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
+recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a` with the Firebase resumable protocol
+(REST plus an iOS background `uploadAsync`), with a record per recording in Firestore
+`users/<uid>/recordings/<id>`. It's on unless `recordingBackup === false`, Wi-Fi only unless
+`recordingBackupCellular`, and a one-time notice comes before the first upload.
+
+- Restored recordings download when played. Deletions are queued on the phone
+  (`Documents/recordings-sync/<uid>-deletes.json`) and run even with backup off.
+- `deleteUserAccount` deletes the Storage prefix first.
+- `storage.rules` is in the repo now: deploy it with `firebase deploy --only storage`, and keep the
+  profile-image rules that were live before.
+- The client half is JS-only, so a promotion ships it to App Store users. The App Privacy answers
+  (Audio Data: collected, linked, App Functionality) must be updated in App Store Connect before
+  promoting.
+- To check the real requests against the emulator:
+  `firebase emulators:exec --only storage --project demo-revisely 'npx jest recordingCloud.emulator'`.
+
 **Firestore rules before features:** the user document has a field allowlist. A release that writes a
 new user field needs `firebase deploy --only firestore:rules` first, or those writes are refused.
 

@@ -14,7 +14,8 @@ import * as firestoreService from '../services/firestoreService';
 import { signOutGoogle } from '../lib/googleAuth';
 import { identifyUser } from '../lib/sentry';
 import { logger } from '../lib/logger';
-import { deleteAllRecordings } from '../lib/recordings';
+import { deleteAllRecordings, forgetCloudDeletes } from '../lib/recordings';
+import { resumeBackup, stopBackup } from '../lib/recordingBackupController';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -179,11 +180,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(null);
     const uid = getAuth().currentUser?.uid;
+    // No upload may land after the server deletes the backup.
+    await stopBackup();
     try {
       await firestoreService.deleteAccount();
-      // Recordings live only on this phone; they go with the account.
+      // The server deleted the account's backup; this removes the recordings on
+      // this phone, and the backup deletions still queued here.
       if (uid) {
-        deleteAllRecordings(uid).catch((err) => logger.warn('Could not delete recordings', err));
+        deleteAllRecordings(uid)
+          .then(() => forgetCloudDeletes(uid))
+          .catch((err) => logger.warn('Could not delete recordings', err));
       }
       // signOutUser is implicit — Firebase Auth user is gone, onAuthStateChanged
       // fires with null. We sign out locally to be sure.
@@ -193,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Already signed out by the delete call.
       }
     } catch (err: any) {
+      resumeBackup();
       setError(getErrorMessage(err.code) || err?.message || 'Failed to delete account.');
       throw err;
     } finally {
