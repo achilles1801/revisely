@@ -35,7 +35,7 @@ export function TimerSheet({ visible, onClose, onOpenQuran }: TimerSheetProps) {
         {/* Behind the sheet, not around it, or its controls can't scroll (see Backdrop). */}
         <Backdrop onPress={onClose} label="Dismiss timer" />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Timer</Text>

@@ -63,7 +63,7 @@ export function BulkActionsModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}}>
-          <GlassCard style={styles.sheetGlass} />
+          <GlassCard surface="chrome" style={styles.sheetGlass} />
           <View style={styles.dragHandle} />
 
           <View style={styles.header}>
@@ -93,7 +93,7 @@ export function BulkActionsModal({
           </View>
 
           <View style={styles.tabs}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             <PressableScale
               onPress={() => setActiveTab('juz')}
               haptic="selection"

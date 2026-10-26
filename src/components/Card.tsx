@@ -5,6 +5,8 @@ import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
 import { shadows } from '../theme/shadows';
 import { GlassCard } from './GlassCard';
+import { useDesign } from '../design/DesignContext';
+import { radiusV2 } from '../theme/v2';
 
 type CardVariant = 'flat' | 'outlined' | 'elevated';
 
@@ -24,6 +26,23 @@ export function Card({
   noPadding = false,
 }: CardProps) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
+
+  if (isNew) {
+    // Flat content: a surface on paper with a hairline, no shadow, no glass.
+    return (
+      <View
+        style={[
+          styles.flat,
+          variant !== 'flat' && { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth },
+          !noPadding && styles.padding,
+          style,
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
 
   const outlineStyle: ViewStyle | null =
     variant === 'outlined'
@@ -53,5 +72,9 @@ const styles = StyleSheet.create({
   },
   padding: {
     padding: spacing.md,
+  },
+  flat: {
+    borderRadius: radiusV2.card,
+    overflow: 'hidden',
   },
 });

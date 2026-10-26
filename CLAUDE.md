@@ -260,6 +260,29 @@ Fahd Complex fonts (open-source quran.com-images). They are served from the Stor
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
 
+## The redesign (new design, preview)
+
+The plan is the doc "Revisely UI Modernization: Research & Plan" (Claude Docs). It ships screen by
+screen behind Settings → Preview → **New design (preview)**: testers only (`lib/testerTools`: dev
+builds, `previewTester` accounts on TestFlight; never the App Store or App Review), kept per device,
+switching the whole app live.
+- It is not a fork: `useDesign().isNew` (`src/design/DesignContext.tsx`) picks variants inside the
+  same screens and components. Tokens are `src/theme/v2.ts` (paper/ink palette, type scale, radii,
+  layout, springs); `ThemeContext` maps the v2 palette onto the classic token names, so every screen
+  takes the new colours at once, and exposes `palette` for moved components. When a screen is moved,
+  give it an `isNew` branch (or variant components) and leave the classic path working until the
+  switch is removed.
+- Glass only on navigation: `GlassCard surface="chrome"` for sheets, menus, the tab bar and floating
+  controls; content GlassCards and `Card` are flat surfaces in the new design. No gradient.
+- Taps don't buzz in the new design (`PressableScale`); outcomes use `design/haptics`
+  (`useHaptics()`), which Settings → Haptics turns off.
+- Fonts: Newsreader (OFL, `@expo-google-fonts/newsreader`, loaded with `useFonts`, so OTA) for one
+  display moment per screen; Amiri for Arabic display. Text colours are checked at ≥ 4.5:1 in
+  `src/design/__tests__`.
+- Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
+  a native change for a versioned release. Until then "System" isn't offered and falls back to the
+  classic Light/Dark choice (`systemAppearanceAvailable()`).
+
 ## UI traps
 
 - **Never wrap a scroll view in a Pressable.** On the new architecture (iOS), a ScrollView doesn't

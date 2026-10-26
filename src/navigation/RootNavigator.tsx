@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import { MainNavigator } from './MainNavigator';
 import { navigationRef } from './navigationRef';
@@ -14,6 +15,7 @@ export function RootNavigator() {
   const { loading, onboardingComplete } = useApp();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { theme, isDark } = useTheme();
+  const { isNew } = useDesign();
 
   // App-wide gradient gives glass surfaces something to refract. Nav theme bg
   // is transparent so the gradient shows through every screen.
@@ -50,13 +52,16 @@ export function RootNavigator() {
   );
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={gradientColors}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+    // The new design: flat paper or ink, no gradient (glass only on navigation).
+    <View style={[styles.root, isNew && { backgroundColor: theme.bg }]}>
+      {!isNew && (
+        <LinearGradient
+          colors={gradientColors}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      )}
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <View style={{ flex: 1 }}>{content}</View>
       </NavigationContainer>

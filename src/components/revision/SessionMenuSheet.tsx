@@ -49,7 +49,7 @@ export function SessionMenuSheet({
           onPress={(e) => e.stopPropagation()}
           style={styles.sheet}
         >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
           {actions.map((action, i) => (
             <PressableScale

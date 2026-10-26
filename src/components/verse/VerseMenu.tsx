@@ -76,7 +76,7 @@ export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose 
         onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
         testID="verse-menu"
       >
-        <GlassCard elevated style={StyleSheet.absoluteFillObject} />
+        <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />
         <Row icon="play" title="Play" subtitle={playSubtitle ?? 'to the end of the juz'} onPress={onPlay} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Row icon="language-outline" title="Translation" onPress={onTranslation} />

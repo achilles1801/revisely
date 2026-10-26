@@ -57,7 +57,7 @@ export function ReadingPagesSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         {session && (
           <View style={styles.sheet}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             <View style={styles.sheetHeader}>
               <PressableScale onPress={onClose} haptic="light" hitSlop={8}>
                 <Text style={styles.cancel}>Cancel</Text>

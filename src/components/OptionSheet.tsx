@@ -46,7 +46,7 @@ export function OptionSheet<T extends string>({
             { paddingBottom: insets.bottom + spacing.sm },
           ]}
         >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={[styles.grabber, { backgroundColor: theme.border }]} />
           <Text style={[styles.title, { color: theme.textPrimary }]}>{title}</Text>
           <ScrollView style={{ flexGrow: 0 }} showsVerticalScrollIndicator={false}>
