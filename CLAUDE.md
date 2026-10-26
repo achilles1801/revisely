@@ -301,6 +301,27 @@ deploys and never go in files. The worker is its own TypeScript project (`npx ts
 in CI) and its tests run with the app's (`worker/__tests__`). Changes to it publish no app update, and
 `claude-fix` refuses patches that touch it.
 
+### The Clear Quran API keys (secrets, and rotating them)
+
+Two keys, issued in The Clear Quran developer portal (theclearquran.org/developers → API Keys), live
+only as secrets of the Cloudflare Worker `revisely` (dashboard: Workers & Pages → revisely →
+Settings → Variables and Secrets): `TCQ_API_KEY_LIVE` (prefix `tcq_eng_liv_`, used for the App Store
+app) and `TCQ_API_KEY_SANDBOX` (prefix `tcq_eng_sbx_`, TestFlight and dev). Never in the repo, `.env`,
+CI, PR text, Sentry or chat; Worker Previews get neither.
+
+To rotate one (or after a leak: revoke the old key in the portal first):
+1. In the portal, create a new key: product English, the same environment (Production or Sandbox).
+2. From the repo root, after `npx wrangler@4.153.0 login` if `npx wrangler@4.153.0 whoami` says so:
+   ```bash
+   npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE
+   ```
+   (or `TCQ_API_KEY_SANDBOX`), and paste the key at the hidden prompt; typed there, it never reaches
+   shell history. It takes effect at once: Wrangler deploys the current code with the new secret.
+3. Check: `npx wrangler@4.153.0 secret list` lists the names (never values); run
+   `npx wrangler@4.153.0 tail revisely` while opening a verse in The Clear Quran on a build of that
+   channel (App Store for live, TestFlight for sandbox) and look for no `answered 401/403` lines.
+4. Revoke the old key in the portal.
+
 ## UI traps
 
 - **Never wrap a scroll view in a Pressable.** On the new architecture (iOS), a ScrollView doesn't
