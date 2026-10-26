@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, Modal, Pressable, SafeAreaView, StyleSheet, Text } from 'react-native';
+import { Alert, Dimensions, Modal, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects, versesOnPage } from '../../lib/ayahBounds';
@@ -11,6 +11,7 @@ import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
 import type { PlayerControls } from '../reader/PlayerCapsule';
 import { ReciterList } from './ReciterList';
+import { Backdrop } from '../Backdrop';
 import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
 import { resolveVoice, shortVoiceLabel } from '../../lib/recitation';
@@ -213,8 +214,10 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         animationType="slide"
         onRequestClose={() => setReciterPickerOpen(false)}
       >
-        <Pressable style={pickerStyles.overlay} onPress={() => setReciterPickerOpen(false)}>
-          <Pressable onPress={(e) => e.stopPropagation()} style={pickerStyles.sheet}>
+        <View style={pickerStyles.overlay}>
+          {/* Behind the sheet, not around it, or the list can't scroll (see Backdrop). */}
+          <Backdrop onPress={() => setReciterPickerOpen(false)} label="Close reciters" />
+          <View style={pickerStyles.sheet}>
             <GlassCard style={StyleSheet.absoluteFillObject} />
             <SafeAreaView>
               <Text style={[pickerStyles.title, { color: theme.textPrimary }]}>Reciter</Text>
@@ -227,8 +230,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
                 maxHeight={460}
               />
             </SafeAreaView>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </>
   );

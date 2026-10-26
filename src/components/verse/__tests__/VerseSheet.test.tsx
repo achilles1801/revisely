@@ -5,6 +5,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 
 // The glass background needs the native view.
 jest.mock('../../GlassCard', () => ({ GlassCard: () => null }));
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 // 2:282, the longest verse: far taller than any sheet.
 const mockLongArabic = 'يَـٰٓأَيُّهَا ٱلَّذِينَ ءَامَنُوٓا۟ إِذَا تَدَايَنتُم بِدَيْنٍ إِلَىٰٓ أَجَلٍۢ مُّسَمًّۭى فَٱكْتُبُوهُ '.repeat(12);
@@ -27,7 +28,14 @@ jest.mock('../../../lib/translation', () => {
   };
 });
 
-import { grabberSwipe, SHEET_HEIGHT, VerseSheet } from '../VerseSheet';
+import { Dimensions } from 'react-native';
+import { touchHandlingAncestor } from '../../../../jest/scrollable';
+import { grabberSwipe, overscrollAction, sheetMaxHeight, VerseSheet } from '../VerseSheet';
+
+// The safe-area mock has no insets (react-native-safe-area-context/jest/mock).
+const TOP = 0;
+const SCREEN = Dimensions.get('window').height;
+const HEIGHT = { normal: sheetMaxHeight(SCREEN, TOP, false), expanded: sheetMaxHeight(SCREEN, TOP, true) };
 
 const props = (verse: { page: number; sura: number; ayah: number } | null) => ({
   verse,
@@ -50,6 +58,9 @@ describe('VerseSheet with a long verse', () => {
     expect(await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 })).toBeTruthy();
     // Bounded by the sheet, so it can scroll: without flexShrink it grew past it.
     expect(style('verse-scroll')).toMatchObject({ flexShrink: 1 });
+    // And a drag reaches it: nothing above it handles touches. The backdrop used
+    // to wrap the sheet, and on iOS that kept the verse from scrolling at all.
+    expect(touchHandlingAncestor(screen.getByTestId('verse-scroll'))).toBeNull();
     // The header is outside the scrolling part.
     const scroll = screen.getByTestId('verse-scroll');
     const inside = (label: string) => {
@@ -68,11 +79,11 @@ describe('VerseSheet with a long verse', () => {
   it('expands to nearly the whole screen from the grabber, and back', async () => {
     render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
     await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
-    expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.normal });
+    expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.normal });
     fireEvent.press(screen.getByLabelText('Expand the translation'));
-    expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.expanded });
+    expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.expanded });
     fireEvent.press(screen.getByLabelText('Make the translation smaller'));
-    expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.normal });
+    expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.normal });
   });
 
   it('starts the next verse at its top (its text replaces the scrolled one)', async () => {
@@ -110,7 +121,42 @@ describe('VerseSheet with a long verse', () => {
     await act(async () => rerender(wrap(<VerseSheet {...props(null)} />)));
     await act(async () => rerender(wrap(<VerseSheet {...props({ page: 1, sura: 1, ayah: 1 })} />)));
     await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
-    expect(style('verse-sheet')).toMatchObject({ maxHeight: SHEET_HEIGHT.normal });
+    expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.normal });
+  });
+});
+
+describe('the sheet', () => {
+  it('a tap on the dimmed backdrop closes it', async () => {
+    const p = props({ page: 48, sura: 2, ayah: 282 });
+    render(wrap(<VerseSheet {...p} />));
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
+    fireEvent.press(screen.getByLabelText('Close translation'));
+    expect(p.onClose).toHaveBeenCalled();
+  });
+
+  it('pulling the verse down past its top shrinks an expanded sheet, then closes it', async () => {
+    const p = props({ page: 48, sura: 2, ayah: 282 });
+    render(wrap(<VerseSheet {...p} />));
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
+    const pull = (y: number) =>
+      fireEvent(screen.getByTestId('verse-scroll'), 'scrollEndDrag', { nativeEvent: { contentOffset: { x: 0, y } } });
+    fireEvent.press(screen.getByLabelText('Expand the translation'));
+    pull(-30); // a small bounce: nothing
+    expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.expanded });
+    pull(-120);
+    expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.normal });
+    expect(p.onClose).not.toHaveBeenCalled();
+    pull(-120);
+    expect(p.onClose).toHaveBeenCalled();
+  });
+
+  it('is at most 70% of the screen, or everything below the status bar expanded', () => {
+    expect(sheetMaxHeight(667, 20, false)).toBe(467);
+    expect(sheetMaxHeight(667, 20, true)).toBe(639);
+    expect(sheetMaxHeight(956, 62, true)).toBe(886);
+    expect(overscrollAction(-10, false)).toBeNull();
+    expect(overscrollAction(-100, true)).toBe('shrink');
+    expect(overscrollAction(-100, false)).toBe('close');
   });
 });
 
