@@ -284,6 +284,9 @@ Review), kept per device, switching the whole app live.
   in the new design is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar;
   the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
   `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
+- Moved so far: Home, Settings, tab bar, sheets and menus, the revision session and reader chrome
+  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity (a feed of
+  day posts; a day opens as a thread of its sessions and daily log).
 - Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
   `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
