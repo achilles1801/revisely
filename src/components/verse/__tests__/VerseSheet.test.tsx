@@ -5,6 +5,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 
 // The glass background needs the native view.
 jest.mock('../../GlassCard', () => ({ GlassCard: () => null }));
+jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 // 2:282, the longest verse: far taller than any sheet.
@@ -171,33 +172,24 @@ describe('grabberSwipe', () => {
   });
 });
 
-describe('VerseSheet: The Clear Quran credit', () => {
-  const { initClearQuranPreview, setClearQuranPreview, resetClearQuranPreviewForTests } =
-    jest.requireActual('../../../lib/clearQuranPreview');
+describe('VerseSheet: The Clear Quran', () => {
   const { getVerseText } = jest.requireMock('../../../lib/translation');
+  const { ClearQuranError } = jest.requireActual('../../../lib/clearQuran');
   const { Linking } = require('react-native');
+  const tcqVerse = (translation: string) => (page: number, sura: number, ayah: number) =>
+    Promise.resolve({ sura, ayah, surahName: 'Al-Baqarah', arabic: mockLongArabic, translation, translationName: 'The Clear Quran®' });
 
-  beforeEach(() => {
-    resetClearQuranPreviewForTests();
-  });
-
-  it('with The Clear Quran chosen: one credit line pinned under the verse, linking to its site', async () => {
-    await initClearQuranPreview(true);
-    setClearQuranPreview(true);
-    getVerseText.mockImplementationOnce((page: number, sura: number, ayah: number) =>
-      Promise.resolve({
-        sura,
-        ayah,
-        surahName: 'Al-Baqarah',
-        arabic: mockLongArabic,
-        translation: '[The Clear Quran® translation will appear here]',
-        translationName: 'The Clear Quran®',
-        placeholder: true,
-      }),
+  it('shows its text exactly as given, with one credit line pinned under the verse, linking to its site', async () => {
+    getVerseText.mockImplementationOnce(
+      tcqVerse('Indeed, those who persist in disbelief—it is the same whether you warn them or not—they will never believe.<footnote id="9" number="1"></footnote>'),
     );
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     render(wrap(<VerseSheet {...props({ page: 3, sura: 2, ayah: 6 })} translationId="en.khattab" />));
-    expect(await screen.findByText('[The Clear Quran® translation will appear here]', {}, { timeout: 10_000 })).toBeTruthy();
+    await screen.findByTestId('verse-translation', {}, { timeout: 10_000 });
+    // The words untouched; the footnote marker as its raised number.
+    expect(screen.getByText(/Indeed, those who persist in disbelief—it is the same whether you warn them or not—they will never believe\./)).toBeTruthy();
+    expect(screen.getByText('¹')).toBeTruthy();
+    expect(screen.queryByText(/<footnote/)).toBeNull();
     const credit = screen.getByTestId('translation-credit');
     expect(screen.getByText('The Clear Quran® by Dr. Mustafa Khattab')).toBeTruthy();
     // Outside the scrolling part, so it is always in view.
@@ -211,6 +203,19 @@ describe('VerseSheet: The Clear Quran credit', () => {
     open.mockRestore();
   });
 
+  it("when its text can't be loaded: \"Couldn't load translation\" and a retry, never another translation", async () => {
+    getVerseText
+      .mockImplementationOnce(() => Promise.reject(new ClearQuranError('RATE_LIMITED', 'busy')))
+      .mockImplementationOnce(tcqVerse('In the Name of Allah—the Most Compassionate, Most Merciful.'));
+    render(wrap(<VerseSheet {...props({ page: 1, sura: 1, ayah: 1 })} translationId="en.khattab" />));
+    expect(await screen.findByText("Couldn't load translation", {}, { timeout: 10_000 })).toBeTruthy();
+    expect(screen.getByText(/Try again in a minute/)).toBeTruthy();
+    expect(screen.queryByText('Saheeh International')).toBeNull();
+    expect(screen.queryByTestId('verse-translation')).toBeNull();
+    fireEvent.press(screen.getByText('Try again'));
+    expect(await screen.findByText('In the Name of Allah—the Most Compassionate, Most Merciful.', {}, { timeout: 10_000 })).toBeTruthy();
+  });
+
   it('with Saheeh International: no credit line, its name under the verse as before', async () => {
     render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
     await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
@@ -218,22 +223,16 @@ describe('VerseSheet: The Clear Quran credit', () => {
     expect(screen.getByText('Saheeh International')).toBeTruthy();
   });
 
-  it('the picker lists "The Clear Quran® — Dr. Mustafa Khattab" with its site; choosable only in the preview', async () => {
-    render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
+  it('the picker lists "The Clear Quran® — Dr. Mustafa Khattab", English · theclearquran.org, and it can be chosen', async () => {
+    const p = props({ page: 48, sura: 2, ayah: 282 });
+    render(wrap(<VerseSheet {...p} />));
     await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
     fireEvent.press(screen.getByLabelText('More'));
     fireEvent.press(screen.getByText('Select translation'));
-    const row = () => screen.getByText('The Clear Quran® — Dr. Mustafa Khattab');
-    expect(row()).toBeTruthy();
     expect(screen.getByText('theclearquran.org')).toBeTruthy();
-    expect(screen.getByText(/Not available yet/)).toBeTruthy();
-
-    await act(async () => {
-      await initClearQuranPreview(true);
-      setClearQuranPreview(true);
-    });
-    // Now choosable: no longer "not available".
+    expect(screen.getByText('English · theclearquran.org')).toBeTruthy();
     expect(screen.queryByText(/Not available yet/)).toBeNull();
-    expect(row()).toBeTruthy();
+    fireEvent.press(screen.getByText('The Clear Quran® — Dr. Mustafa Khattab'));
+    expect(p.onChangeTranslation).toHaveBeenCalledWith('en.khattab');
   });
 });

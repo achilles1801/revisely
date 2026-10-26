@@ -26,11 +26,12 @@ import {
   getVerseText,
   isTranslationAvailable,
   pickerTitle,
+  CLEAR_QURAN_ID,
   resolveTranslation,
   TRANSLATIONS,
   VerseText,
 } from '../../lib/translation';
-import { useClearQuranPreview } from '../../lib/clearQuranPreview';
+import { clearQuranErrorHint, clearQuranSegments } from '../../lib/clearQuran';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
@@ -52,7 +53,7 @@ interface VerseSheetProps {
 type LoadState =
   | { status: 'loading' }
   | { status: 'ready'; text: VerseText }
-  | { status: 'error' };
+  | { status: 'error'; error: unknown };
 
 /**
  * The sheet's height limit, in points: as it opens (70% of the screen), and
@@ -109,8 +110,6 @@ export function VerseSheet({
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
-  // A tester's preview of The Clear Quran (turned on or off) changes the choice.
-  useClearQuranPreview();
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
@@ -158,7 +157,7 @@ export function VerseSheet({
     setState({ status: 'loading' });
     getVerseText(verse.page, verse.sura, verse.ayah, translation.id)
       .then((text) => live && setState({ status: 'ready', text }))
-      .catch(() => live && setState({ status: 'error' }));
+      .catch((error) => live && setState({ status: 'error', error }));
     return () => {
       live = false;
     };
@@ -314,10 +313,22 @@ export function VerseSheet({
               </View>
             )}
             {state.status === 'error' && (
-              <View style={styles.center}>
-                <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
-                  Couldn't load this verse. Check your connection.
-                </Text>
+              <View style={styles.center} testID="verse-error">
+                {translation.id === CLEAR_QURAN_ID ? (
+                  // Only ever this, or its own text: never another translation under its name.
+                  <>
+                    <Text style={[typography.bodyMedium, { color: theme.textPrimary, fontWeight: '600' }]}>
+                      Couldn't load translation
+                    </Text>
+                    <Text style={[typography.bodySmall, { color: theme.textSecondary, textAlign: 'center' }]}>
+                      {clearQuranErrorHint(state.error)}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
+                    Couldn't load this verse. Check your connection.
+                  </Text>
+                )}
                 <PressableScale onPress={() => setAttempt((a) => a + 1)} haptic="light" style={styles.retryBtn}>
                   <Text style={[typography.bodySmall, { color: '#fff', fontWeight: '700' }]}>Try again</Text>
                 </PressableScale>
@@ -340,8 +351,19 @@ export function VerseSheet({
                 <Text style={styles.arabic} maxFontSizeMultiplier={2}>
                   {state.text.arabic}
                 </Text>
-                <Text style={[styles.translation, state.text.placeholder && styles.placeholder]}>
-                  {state.text.translation}
+                <Text style={styles.translation} testID="verse-translation">
+                  {translation.id === CLEAR_QURAN_ID
+                    ? // Exactly as given; its footnote markers shown as raised numbers.
+                      clearQuranSegments(state.text.translation).map((seg, i) =>
+                        'footnote' in seg ? (
+                          <Text key={i} style={styles.footnote}>
+                            {seg.footnote}
+                          </Text>
+                        ) : (
+                          seg.text
+                        ),
+                      )
+                    : state.text.translation}
                 </Text>
                 {/* A credited translation has its credit pinned below instead. */}
                 {!translation.credit && <Text style={styles.source}>{state.text.translationName}</Text>}
@@ -453,7 +475,7 @@ const makeStyles = (theme: ThemeColors) =>
     },
     translation: { ...typography.bodyLarge, fontSize: 18, lineHeight: 27, color: theme.textPrimary },
     source: { ...typography.caption, color: theme.textMuted, marginTop: spacing.md },
-    placeholder: { color: theme.textSecondary, fontStyle: 'italic' },
+    footnote: { color: theme.accent },
     credit: {
       borderTopWidth: StyleSheet.hairlineWidth,
       paddingTop: spacing.sm,

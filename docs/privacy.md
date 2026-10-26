@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-10-25**
+**Last updated: 2026-10-26**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
 
@@ -74,8 +74,12 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
 | **AlQuran Cloud (Islamic Network)** | Verse text and English translations | Not specified |
 | **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
+| **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
+| **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
 
 When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
+
+If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only the verse number, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. Our server may keep a verse's text for up to an hour so it isn't requested again; The Clear Quran® text is not stored on your device.
 
 We do not transfer your data to any party not listed above for any other purpose.
 

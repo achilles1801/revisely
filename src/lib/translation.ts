@@ -5,15 +5,15 @@
 // the caches directory; a verse carried over from the previous page is listed
 // under that page by the API, so it is fetched on its own.
 //
-// Translations are listed in TRANSLATIONS. One that is not `available` is shown
-// in the picker as unavailable: The Clear Quran (Dr. Mustafa Khattab) is licensed
-// content that the Quran Foundation API serves only to approved clients. Its
-// publisher requires the credit line (`credit`) wherever it is shown. Until its
-// text arrives, testers can preview where that goes (lib/clearQuranPreview).
+// Translations are listed in TRANSLATIONS. The Clear Quran® (Dr. Mustafa
+// Khattab) is licensed: its text comes from The Clear Quran API through our
+// worker (lib/clearQuran), is never stored on the device, and its publisher
+// requires the credit line (`credit`) wherever it is shown. One that is not
+// `available` is shown in the picker as unavailable.
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { logger } from './logger';
-import { CLEAR_QURAN_PLACEHOLDER, isClearQuranPreview } from './clearQuranPreview';
+import { getClearQuranVerse } from './clearQuran';
 
 export interface TranslationInfo {
   id: string;
@@ -44,7 +44,7 @@ export const TRANSLATIONS: TranslationInfo[] = [
     author: 'Dr. Mustafa Khattab',
     language: 'English',
     edition: null,
-    available: false,
+    available: true,
     credit: {
       text: 'The Clear Quran® by Dr. Mustafa Khattab',
       linkLabel: 'theclearquran.org',
@@ -56,9 +56,9 @@ export const TRANSLATIONS: TranslationInfo[] = [
 export const DEFAULT_TRANSLATION_ID = 'en.sahih';
 const ARABIC_EDITION = 'quran-uthmani';
 
-/** Can be chosen: available, or The Clear Quran in a tester's preview. */
+/** Can be chosen. */
 export function isTranslationAvailable(t: TranslationInfo): boolean {
-  return t.available || (t.id === CLEAR_QURAN_ID && isClearQuranPreview());
+  return t.available;
 }
 
 /** Shown in the picker: "The Clear Quran® — Dr. Mustafa Khattab". */
@@ -193,8 +193,6 @@ export interface VerseText {
   arabic: string;
   translation: string;
   translationName: string;
-  /** The translation's text isn't here yet: `translation` is a labelled placeholder. */
-  placeholder?: boolean;
 }
 
 /** The Arabic and the chosen translation of one verse. */
@@ -205,17 +203,19 @@ export async function getVerseText(
   translationId?: string | null,
 ): Promise<VerseText> {
   const t = resolveTranslation(translationId);
-  if (!t.available) {
-    // The preview: the Arabic, and a placeholder where the translation will be.
-    const arabic = await getAyahEdition(page, sura, ayah, ARABIC_EDITION);
+  if (t.id === CLEAR_QURAN_ID) {
+    // Its own source; if it fails, the sheet says so (never another translation).
+    const [arabic, text] = await Promise.all([
+      getAyahEdition(page, sura, ayah, ARABIC_EDITION),
+      getClearQuranVerse(sura, ayah),
+    ]);
     return {
       sura,
       ayah,
       surahName: arabic.surahName,
       arabic: stripBismillah(arabic.text, sura, ayah),
-      translation: CLEAR_QURAN_PLACEHOLDER,
+      translation: text,
       translationName: t.name,
-      placeholder: true,
     };
   }
   const [arabic, translated] = await Promise.all([

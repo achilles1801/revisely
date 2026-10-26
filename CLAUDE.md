@@ -249,8 +249,17 @@ the App Privacy answers in App Store Connect (no API; done by hand) together.
 **Verse positions and translations:** press-and-hold on a verse uses `src/data/ayahBounds.json`, built
 by `scripts/build-ayah-bounds.py` from Quran Android's `ayahinfo_1024.db`, the glyph bounds that
 quran.com-images records while drawing the same page images (coordinates are 1024-wide; the images are
-2600×4206, so one scale factor maps them). Translations are Saheeh International from api.alquran.cloud,
-disclosed in the privacy policy.
+2600×4206, so one scale factor maps them). Translations: Saheeh International from api.alquran.cloud,
+and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
+
+**The Clear Quran® (licensed):** the publisher (Al-Furqaan Foundation, info@theclearquran.org)
+requires the credit "The Clear Quran® by Dr. Mustafa Khattab" + theclearquran.org wherever it is
+shown (pinned under the verse; in the picker), the text exactly as the API gives it (footnote markers
+`<footnote id number>` are shown as raised numbers, nothing else is changed), and never another
+translation under its name (errors show "Couldn't load translation" + retry). The app keeps it in
+memory for the launch only (`src/lib/clearQuran.ts`), never on disk. Plan: Basic, 10,000 requests a
+month, 5 a second; the docs also say 60 a minute and 1,000 an hour. The terms live in the developer
+agreement signed in their portal (theclearquran.org/developers).
 
 **Firestore rules before features:** the user document has a field allowlist. A release that writes a
 new user field needs `firebase deploy --only firestore:rules` first, or those writes are refused.
@@ -259,6 +268,27 @@ new user field needs `firebase deploy --only firestore:rules` first, or those wr
 Fahd Complex fonts (open-source quran.com-images). They are served from the Storage bucket at
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
+
+## Worker (revisely.app/api)
+
+`wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs
+`/api/*` (nothing else reaches the code). `GET /api/tcq/verses/<surah>:<verse>`:
+- needs a Firebase ID token (`Authorization: Bearer`), verified in the worker against Google's keys
+  (`worker/auth.ts`; project `FIREBASE_PROJECT_ID`). 30 requests a minute per user (`ratelimits`).
+- calls The Clear Quran API (`https://api.theclearquran.org/verses/<key>`, `Authorization: Bearer
+  <key>`) with `TCQ_API_KEY_LIVE` when the app sends `X-Revisely-Channel: production` (the App Store
+  app) and `TCQ_API_KEY_SANDBOX` otherwise (TestFlight, dev). Sandbox keys only work against the
+  sandbox API: `TCQ_API_BASE_SANDBOX` is its base URL.
+- keeps a verse in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
+  checked); answers the app with `Cache-Control: no-store`.
+- maps their 429 to 429 (Retry-After), 404 to 404, anything else to 502; no key configured is 503.
+
+Secrets are set with `npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE` (and `…_SANDBOX`) from the
+repo root, after `npx wrangler@4.153.0 login`; never in files. Cloudflare Workers Builds deploys on
+each push to `main`; between releases, `npx wrangler@4.153.0 deploy` from an up-to-date `develop`
+deploys the worker (and develop's `docs/`). Logs: `npx wrangler@4.153.0 tail revisely` (nothing is
+stored). The worker is its own TypeScript project (`npx tsc --noEmit -p worker`, in CI) and its tests
+run with the app's (`worker/__tests__`). Changes to it publish no app update.
 
 ## UI traps
 

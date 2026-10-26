@@ -31,6 +31,8 @@ jobs:
           cache: npm
       - run: npm ci --legacy-peer-deps
       - run: npx tsc --noEmit
+      # The Cloudflare worker (worker/, wrangler.jsonc): its own types.
+      - run: npx tsc --noEmit -p worker
 
   # -----------------------------------------------------------------------
   # Jest unit + component tests for the React Native app.
