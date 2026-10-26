@@ -126,7 +126,7 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
 function SheetGlassBackground({ style }: BottomSheetBackgroundProps) {
   return (
     <View style={[style, styles.background]} pointerEvents="none">
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+      <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
     </View>
   );
 }

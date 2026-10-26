@@ -8,6 +8,9 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ClearQuranPreviewGate } from './src/components/ClearQuranPreviewGate';
+import { DesignProvider } from './src/design/DesignContext';
+import { DesignGate } from './src/design/DesignGate';
+import { Newsreader_400Regular, Newsreader_500Medium } from '@expo-google-fonts/newsreader';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
@@ -75,8 +78,11 @@ function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
   // render — text falls back to the system Arabic face rather than blocking
   // the app forever.
+  // Newsreader (OFL): the new design's display face, for one moment per screen.
   const [fontsLoaded, fontError] = useFonts({
     'Amiri-Regular': require('./assets/fonts/Amiri-Regular.ttf'),
+    Newsreader_400Regular,
+    Newsreader_500Medium,
   });
 
   useEffect(() => {
@@ -89,19 +95,22 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <AppProvider>
-              {/* Sheets render into this provider's host, so it must sit
-                  inside the context providers — otherwise any sheet content
-                  calling useTheme()/useApp() throws when it opens. */}
-              <BottomSheetModalProvider>
-                <RootNavigator />
-                <ClearQuranPreviewGate />
-              </BottomSheetModalProvider>
-            </AppProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <DesignProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <AppProvider>
+                {/* Sheets render into this provider's host, so it must sit
+                    inside the context providers — otherwise any sheet content
+                    calling useTheme()/useApp() throws when it opens. */}
+                <BottomSheetModalProvider>
+                  <RootNavigator />
+                  <ClearQuranPreviewGate />
+                  <DesignGate />
+                </BottomSheetModalProvider>
+              </AppProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </DesignProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

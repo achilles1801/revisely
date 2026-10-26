@@ -28,6 +28,7 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute, RouteProp } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { useDesign } from '../design/DesignContext';
 import type { MainTabParamList } from '../navigation/MainNavigator';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -36,6 +37,13 @@ const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
   Read: { active: 'book', inactive: 'book-outline' },
   Insights: { active: 'sparkles', inactive: 'sparkles-outline' },
+};
+
+// The new design: Insights ranks weak pages, it isn't generated content, so no
+// sparkles (which now reads as "AI"): a gauge, for strength.
+const TAB_ICONS_V2: Record<string, { active: IconName; inactive: IconName }> = {
+  ...TAB_ICONS,
+  Insights: { active: 'speedometer', inactive: 'speedometer-outline' },
 };
 
 const FULL_SCREEN_ROUTES = new Set<string>([
@@ -91,7 +99,8 @@ export function LiquidGlassTabBar({
   onInsightsTabPress,
 }: LiquidGlassTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette } = useTheme();
+  const { isNew: isNewDesign } = useDesign();
   const [trackWidth, setTrackWidth] = useState(0);
 
   // Routes the user can actually see in the bar. The Insights route is still
@@ -171,7 +180,10 @@ export function LiquidGlassTabBar({
       pointerEvents="none"
       style={[styles.indicatorWrap, indicatorStyle]}
     >
-      {NATIVE_GLASS ? (
+      {isNewDesign ? (
+        // The new design: a solid wash under a jade icon (no glass on the glass bar).
+        <View style={[styles.indicatorSurface, { backgroundColor: palette.jadeWash }]} />
+      ) : NATIVE_GLASS ? (
         <GlassView
           glassEffectStyle="regular"
           colorScheme={isDark ? 'dark' : 'light'}
@@ -259,7 +271,11 @@ function TabItem({
   isDark,
   navigation,
 }: TabItemProps) {
-  const icons = TAB_ICONS[routeName] ?? {
+  const { isNew } = useDesign();
+  const { palette } = useTheme();
+  // The new design doesn't pulse for attention (motion confirms, it doesn't decorate).
+  glowing = glowing && !isNew;
+  const icons = (isNew ? TAB_ICONS_V2 : TAB_ICONS)[routeName] ?? {
     active: 'ellipse',
     inactive: 'ellipse-outline',
   };
@@ -327,7 +343,7 @@ function TabItem({
       <Ionicons
         name={focused ? icons.active : icons.inactive}
         size={22}
-        color={focused ? '#FFFFFF' : inactiveColor}
+        color={focused ? (isNew ? palette.jade : '#FFFFFF') : inactiveColor}
       />
     </Pressable>
   );

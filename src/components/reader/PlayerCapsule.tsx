@@ -87,7 +87,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
       ]}
       testID="player-capsule"
     >
-      {!surface && <GlassCard elevated style={StyleSheet.absoluteFillObject} />}
+      {!surface && <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />}
       {active && iconBtn('stop', 'Stop', player.onStop, 15)}
       {!active && (
         <Pressable

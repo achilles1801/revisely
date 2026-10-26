@@ -3,6 +3,7 @@ import { StyleSheet, View, ViewProps, StyleProp, ViewStyle } from 'react-native'
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
 
 type GlassCardProps = ViewProps & {
   children?: React.ReactNode;
@@ -15,6 +16,12 @@ type GlassCardProps = ViewProps & {
   elevated?: boolean;
   /** Thin top-edge highlight — the "wet" specular line. Best on rounded/pill shapes. */
   specular?: boolean;
+  /**
+   * What the surface is. In the new design only navigation chrome (tab bar,
+   * toolbars, sheets, the floating capsule) is glass; content is a flat surface.
+   * The classic design ignores it. Default: content.
+   */
+  surface?: 'content' | 'chrome';
 };
 
 export function GlassCard({
@@ -25,9 +32,19 @@ export function GlassCard({
   tintColor,
   elevated = false,
   specular = false,
+  surface = 'content',
   ...rest
 }: GlassCardProps) {
-  const { isDark } = useTheme();
+  const { isDark, theme } = useTheme();
+  const { isNew } = useDesign();
+
+  if (isNew && surface === 'content') {
+    return (
+      <View style={[styles.base, { backgroundColor: theme.surface }, style]} {...rest}>
+        {children}
+      </View>
+    );
+  }
 
   // Lighter than the previous defaults (0.45 / 0.14) so the glass actually
   // reads as glass instead of frosted plastic. Override per-instance if a

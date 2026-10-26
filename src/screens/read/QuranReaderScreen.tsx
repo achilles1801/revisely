@@ -367,7 +367,7 @@ function ReaderGuideModal({
         {/* Behind the card, not around it, or its steps can't scroll (see Backdrop). */}
         <Backdrop onPress={onClose} label="Dismiss" />
         <View style={styles.card}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.headerRow}>
             <Text style={styles.title}>How the reader works</Text>
             <PressableScale

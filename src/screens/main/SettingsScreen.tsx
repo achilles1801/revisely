@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
+import { useDesign } from '../../design/DesignContext';
+import { typeV2 } from '../../theme/v2';
 import { reportProblem } from '../../lib/sentry';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -32,7 +34,7 @@ import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
+import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { scheduleDailyReminder } from '../../lib/notifications';
@@ -61,16 +63,19 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Reusable bits — kept inline since they're tightly coupled to settings rows.
 // ---------------------------------------------------------------------------
 
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   return (
-    <View style={{ marginBottom: spacing.lg }}>
+    <View style={{ marginBottom: isNew ? spacing.xl : spacing.lg }}>
       {title && (
         <Text
           style={[
-            typography.label,
-            { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
+            // The new design: sentence case, a real subhead, not an uppercase eyebrow.
+            isNew ? typeV2.subhead : typography.label,
+            { color: isNew ? theme.textSecondary : theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
           ]}
+          accessibilityRole="header"
         >
           {title}
         </Text>
@@ -79,6 +84,11 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
         <GlassCard style={StyleSheet.absoluteFillObject} />
         {children}
       </View>
+      {footer ? (
+        <Text style={[typeV2.footnote, { color: theme.textMuted, marginTop: spacing.xs, paddingHorizontal: spacing.md }]}>
+          {footer}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -225,6 +235,7 @@ export default function SettingsScreen() {
   const { user, saveUser, resetOnboarding } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, themeMode, setThemeMode, isDark } = useTheme();
+  const design = useDesign();
   const screenStyles = useMemo(() => makeStyles(theme), [theme]);
   const [localUser, setLocalUser] = useState(user);
 
@@ -448,6 +459,28 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={screenStyles.content}>
+        {design.allowed && (
+          // Testers only (lib/testerTools): switch the whole app to the redesign in
+          // progress and back, to compare. Kept on this device.
+          <Section title="Preview" footer="The redesign in progress, for testers. Switch back any time.">
+            <Row
+              icon="flask-outline"
+              label="New design (preview)"
+              isLast
+              rightSlot={
+                <Switch
+                  value={design.isNew}
+                  onValueChange={(on) => design.setChosen(on ? 'new' : 'classic')}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+                  accessibilityLabel="New design (preview)"
+                  testID="new-design-switch"
+                />
+              }
+            />
+          </Section>
+        )}
+
         {firebaseUser && (
           <Section title="Account">
             <View
@@ -634,7 +667,7 @@ export default function SettingsScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', gap: spacing.sm }}>
               <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-                <Ionicons name="sparkles-outline" size={16} color={theme.accent} />
+                <Ionicons name={design.isNew ? 'speedometer-outline' : 'sparkles-outline'} size={16} color={theme.accent} />
               </View>
               <View style={styles.rowText}>
                 <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
@@ -707,13 +740,40 @@ export default function SettingsScreen() {
             <ThemeSegmentedControl
               value={themeMode}
               onChange={setThemeMode}
-              options={[
-                { value: 'light', label: 'Light', icon: 'sunny-outline' },
-                { value: 'dark', label: 'Dark', icon: 'moon-outline' },
-              ]}
+              options={
+                design.isNew && systemAppearanceAvailable()
+                  ? [
+                      { value: 'system', label: 'System', icon: 'phone-portrait-outline' },
+                      { value: 'light', label: 'Light', icon: 'sunny-outline' },
+                      { value: 'dark', label: 'Dark', icon: 'moon-outline' },
+                    ]
+                  : [
+                      { value: 'light', label: 'Light', icon: 'sunny-outline' },
+                      { value: 'dark', label: 'Dark', icon: 'moon-outline' },
+                    ]
+              }
             />
           </View>
         </Section>
+
+        {design.isNew && (
+          <Section title="Haptics" footer="Only for moments that matter: a page done, a session finished.">
+            <Row
+              icon="phone-portrait-outline"
+              label="Haptics"
+              isLast
+              rightSlot={
+                <Switch
+                  value={design.hapticsOn}
+                  onValueChange={design.setHapticsOn}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
+                  accessibilityLabel="Haptics"
+                />
+              }
+            />
+          </Section>
+        )}
 
         <Section title="Support">
           <Row

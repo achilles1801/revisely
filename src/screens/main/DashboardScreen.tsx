@@ -49,6 +49,12 @@ import { formatDateReadable } from '../../lib/utils';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { useDesign } from '../../design/DesignContext';
+import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { TodayCard } from '../../components/home/TodayCard';
+import { MemorizedSection } from '../../components/home/MemorizedSection';
+import { LastSession } from '../../components/home/LastSession';
+import { layoutV2 } from '../../theme/v2';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
 
@@ -66,6 +72,8 @@ export default function DashboardScreen() {
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
   const homePrefs = useHomePrefs();
+  const { isNew } = useDesign();
+  const tabFootprint = useTabBarFootprint();
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
   const carryingRef = useRef(false);
@@ -182,6 +190,13 @@ export default function DashboardScreen() {
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [logs],
   );
+
+  // Pages revised today: the new design's page chips fill in as they're done.
+  const donePagesToday = useMemo(() => {
+    const done = new Set<number>();
+    logs.filter((log) => log.date === revisionDay).forEach((log) => log.pagesRevised.forEach((p) => done.add(p)));
+    return done;
+  }, [logs, revisionDay]);
 
   const filteredSessions = useMemo(() => {
     if (juzFilter === null) return sessionLogs;
@@ -564,6 +579,104 @@ export default function DashboardScreen() {
   const showSeeAllToggle = filteredSessions.length > COMPACT_SESSION_LIMIT;
   const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
 
+  const editModal = selectedLog && (
+    <EditSessionModal
+      visible={showEditModal}
+      onClose={() => {
+        setShowEditModal(false);
+        setSelectedLog(null);
+        setSelectedSessionPages([]);
+      }}
+      log={selectedLog}
+      quranData={quranData}
+      sessionPages={selectedSessionPages}
+      onSave={handleSaveSession}
+      onDelete={handleDeleteSession}
+    />
+  );
+
+  if (isNew) {
+    // The new design (design/DesignContext): flat paper, one card (today as
+    // real pages), the mushaf map, and the last session; the full history is
+    // Activity's. Padding leaves the tab bar and the floating timer clear.
+    const lastLog = sessionLogs[0];
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={[styles.contentV2, { paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + layoutV2.sectionGap }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textSecondary} />}
+          testID="home-v2"
+        >
+          <View style={styles.headerV2}>
+            <View style={styles.headerText}>
+              <Greeting
+                name={userName}
+                date={today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              />
+            </View>
+            <PressableScale
+              onPress={() => navigation.navigate('Activity')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Open activity"
+              style={[styles.iconButtonV2, { backgroundColor: theme.bgAlt }]}
+            >
+              <Ionicons name="pulse-outline" size={20} color={theme.textPrimary} />
+            </PressableScale>
+            <PressableScale
+              onPress={() => navigation.navigate('Settings')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
+              style={[styles.iconButtonV2, { backgroundColor: theme.bgAlt }]}
+            >
+              <Ionicons name="settings-outline" size={20} color={theme.textPrimary} />
+            </PressableScale>
+          </View>
+
+          <TodayCard
+            status={todayStatus.status}
+            pages={assignment.pages}
+            done={donePagesToday}
+            streak={calculatedStreak}
+            onPrimary={handleCtaPress}
+            onEditSchedule={() => navigation.navigate('PlanEdit')}
+            leftovers={leftovers.length}
+            onCarryOver={handleCarryOver}
+            carrying={carrying}
+            onPushBack={handlePushBack}
+            shifting={shifting}
+          />
+
+          {showKahfCard && (
+            <KahfCard
+              state={kahfState === 'done' ? 'done' : 'prompt'}
+              saving={kahfSaving}
+              onRead={openKahf}
+              onMarkRead={markKahfRead}
+              onDismiss={() => setHomePrefs({ kahfDismissedDay: revisionDay })}
+            />
+          )}
+
+          {homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized') && (
+            <MemorizedSection pages={pages} onPress={() => navigation.navigate('Memorization')} />
+          )}
+
+          {lastLog && (
+            <LastSession
+              log={lastLog}
+              onPress={() => handleSessionPress(lastLog)}
+              onSeeAll={() => navigation.navigate('Activity')}
+            />
+          )}
+        </ScrollView>
+        {editModal}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -778,21 +891,7 @@ export default function DashboardScreen() {
         </LiquidGlassActionBar>
       )}
 
-      {selectedLog && (
-        <EditSessionModal
-          visible={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedLog(null);
-            setSelectedSessionPages([]);
-          }}
-          log={selectedLog}
-          quranData={quranData}
-          sessionPages={selectedSessionPages}
-          onSave={handleSaveSession}
-          onDelete={handleDeleteSession}
-        />
-      )}
+      {editModal}
 
       <JuzPickerSheet
         visible={juzPickerOpen}
@@ -948,7 +1047,7 @@ function JuzPickerSheet({
           onPress={(e) => e.stopPropagation()}
           style={sheetStyles.sheet}
         >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={sheetStyles.dragHandle} />
           <Text style={sheetStyles.title}>Filter by juz</Text>
           <ScrollView style={sheetStyles.list}>
@@ -997,6 +1096,15 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
+    // The new design.
+    contentV2: {
+      flexGrow: 1,
+      paddingHorizontal: layoutV2.screenMargin,
+      paddingTop: spacing.md,
+      gap: layoutV2.sectionGap,
+    },
+    headerV2: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    iconButtonV2: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     content: {
       flexGrow: 1,
       paddingHorizontal: spacing.lg,

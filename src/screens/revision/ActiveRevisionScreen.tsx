@@ -940,7 +940,7 @@ function RevisionGuideModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.headerRow}>
             <Text style={styles.title}>How revision works</Text>
             <PressableScale

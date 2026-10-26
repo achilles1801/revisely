@@ -6,6 +6,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useDesign } from '../design/DesignContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -26,6 +27,9 @@ interface PressableScaleProps extends Omit<PressableProps, 'style' | 'children'>
  *   2. A haptic tick on press-in. Defaults to light; opt out with haptic="none".
  *
  * Use everywhere a button, card, or list row is interactive.
+ *
+ * In the new design taps don't buzz: the scale is the feedback, and haptics
+ * mark outcomes instead (design/haptics).
  */
 export function PressableScale({
   children,
@@ -38,6 +42,7 @@ export function PressableScale({
   ...rest
 }: PressableScaleProps) {
   const pressed = useSharedValue(0);
+  const { isNew } = useDesign();
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -48,7 +53,7 @@ export function PressableScale({
   }));
 
   const triggerHaptic = useCallback(() => {
-    if (haptic === 'none' || disabled) return;
+    if (haptic === 'none' || disabled || isNew) return;
     switch (haptic) {
       case 'light':
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -63,7 +68,7 @@ export function PressableScale({
         Haptics.selectionAsync();
         break;
     }
-  }, [haptic, disabled]);
+  }, [haptic, disabled, isNew]);
 
   return (
     <AnimatedPressable
