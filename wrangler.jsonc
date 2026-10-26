@@ -35,5 +35,23 @@
       "namespace_id": "1001",
       "simple": { "limit": 30, "period": 60 }
     }
-  ]
+  ],
+  // Workers Builds runs `wrangler preview` for branches other than main, which
+  // needs this block (previews inherit nothing). Previews get no API keys, so
+  // /api/tcq answers 503 there and uses none of the plan.
+  "previews": {
+    "vars": {
+      "FIREBASE_PROJECT_ID": "revision-buddy-3a398",
+      "TCQ_API_BASE_LIVE": "https://api.theclearquran.org",
+      "TCQ_API_BASE_SANDBOX": "https://api.theclearquran.org",
+      "TCQ_EDGE_CACHE_SECONDS": "0"
+    },
+    "ratelimits": [
+      {
+        "name": "TCQ_USER_LIMIT",
+        "namespace_id": "1002",
+        "simple": { "limit": 30, "period": 60 }
+      }
+    ]
+  }
 }
