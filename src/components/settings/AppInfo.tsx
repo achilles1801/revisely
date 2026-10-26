@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { currentRelease, diagnosticLines, ReleaseInfo } from '../../lib/releaseInfo';
+import {
+  clearQuranPreviewAllowed,
+  initClearQuranPreview,
+  setClearQuranPreview,
+  useClearQuranPreview,
+} from '../../lib/clearQuranPreview';
 import { sendTestError, triggerTestNativeCrash } from '../../lib/sentry';
 import { logger } from '../../lib/logger';
 
@@ -45,8 +51,22 @@ export function showsTestActions(r: ReleaseInfo): boolean {
  * needs to know). Tap to see the details and share them; long-press to check for
  * an update now. Preview and development builds also get test-crash actions.
  */
-export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo }) {
+export function AppInfo({
+  release = currentRelease(),
+  previewTester,
+}: {
+  release?: ReleaseInfo;
+  /** The account is a preview tester (user.previewTester). */
+  previewTester?: boolean;
+}) {
   const { theme } = useTheme();
+  // Testers only: The Clear Quran in the translation picker, with a placeholder
+  // for its text, to show (and screenshot) where it is credited.
+  const clearQuranAllowed = clearQuranPreviewAllowed(release, previewTester);
+  const clearQuranOn = useClearQuranPreview();
+  useEffect(() => {
+    if (clearQuranAllowed) void initClearQuranPreview(true);
+  }, [clearQuranAllowed]);
   const { lastCheckForUpdateTimeSinceRestart } = Updates.useUpdates();
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -112,6 +132,14 @@ export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo 
             <Action label="Check for updates" onPress={check} />
             <Action label="Share" onPress={() => Share.share({ message: lines.join('\n') }).catch(() => undefined)} />
           </View>
+          {clearQuranAllowed && (
+            <View style={styles.actions}>
+              <Action
+                label={clearQuranOn ? 'The Clear Quran preview: on' : 'The Clear Quran preview: off'}
+                onPress={() => setClearQuranPreview(!clearQuranOn)}
+              />
+            </View>
+          )}
           {showsTestActions(release) && (
             <View style={styles.actions}>
               <Action label="Send test error" onPress={() => { sendTestError(); Alert.alert('Sent', 'A test error went to Sentry.'); }} />

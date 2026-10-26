@@ -124,3 +124,70 @@ describe('grabberSwipe', () => {
     expect(grabberSwipe(-10, true)).toBeNull();
   });
 });
+
+describe('VerseSheet: The Clear Quran credit', () => {
+  const { initClearQuranPreview, setClearQuranPreview, resetClearQuranPreviewForTests } =
+    jest.requireActual('../../../lib/clearQuranPreview');
+  const { getVerseText } = jest.requireMock('../../../lib/translation');
+  const { Linking } = require('react-native');
+
+  beforeEach(() => {
+    resetClearQuranPreviewForTests();
+  });
+
+  it('with The Clear Quran chosen: one credit line pinned under the verse, linking to its site', async () => {
+    await initClearQuranPreview(true);
+    setClearQuranPreview(true);
+    getVerseText.mockImplementationOnce((page: number, sura: number, ayah: number) =>
+      Promise.resolve({
+        sura,
+        ayah,
+        surahName: 'Al-Baqarah',
+        arabic: mockLongArabic,
+        translation: '[The Clear Quran® translation will appear here]',
+        translationName: 'The Clear Quran®',
+        placeholder: true,
+      }),
+    );
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    render(wrap(<VerseSheet {...props({ page: 3, sura: 2, ayah: 6 })} translationId="en.khattab" />));
+    expect(await screen.findByText('[The Clear Quran® translation will appear here]', {}, { timeout: 10_000 })).toBeTruthy();
+    const credit = screen.getByTestId('translation-credit');
+    expect(screen.getByText('The Clear Quran® by Dr. Mustafa Khattab')).toBeTruthy();
+    // Outside the scrolling part, so it is always in view.
+    let node = credit.parent;
+    while (node) {
+      expect(node).not.toBe(screen.getByTestId('verse-scroll'));
+      node = node.parent;
+    }
+    fireEvent.press(screen.getByText('theclearquran.org'));
+    expect(open).toHaveBeenCalledWith('https://theclearquran.org');
+    open.mockRestore();
+  });
+
+  it('with Saheeh International: no credit line, its name under the verse as before', async () => {
+    render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
+    expect(screen.queryByTestId('translation-credit')).toBeNull();
+    expect(screen.getByText('Saheeh International')).toBeTruthy();
+  });
+
+  it('the picker lists "The Clear Quran® — Dr. Mustafa Khattab" with its site; choosable only in the preview', async () => {
+    render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
+    fireEvent.press(screen.getByLabelText('More'));
+    fireEvent.press(screen.getByText('Select translation'));
+    const row = () => screen.getByText('The Clear Quran® — Dr. Mustafa Khattab');
+    expect(row()).toBeTruthy();
+    expect(screen.getByText('theclearquran.org')).toBeTruthy();
+    expect(screen.getByText(/Not available yet/)).toBeTruthy();
+
+    await act(async () => {
+      await initClearQuranPreview(true);
+      setClearQuranPreview(true);
+    });
+    // Now choosable: no longer "not available".
+    expect(screen.queryByText(/Not available yet/)).toBeNull();
+    expect(row()).toBeTruthy();
+  });
+});
