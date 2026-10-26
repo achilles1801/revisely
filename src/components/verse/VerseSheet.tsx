@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -19,7 +20,15 @@ import { fonts, typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { getSurahDisplay } from '../../lib/quranData';
-import { getVerseText, resolveTranslation, TRANSLATIONS, VerseText } from '../../lib/translation';
+import {
+  getVerseText,
+  isTranslationAvailable,
+  pickerTitle,
+  resolveTranslation,
+  TRANSLATIONS,
+  VerseText,
+} from '../../lib/translation';
+import { useClearQuranPreview } from '../../lib/clearQuranPreview';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
@@ -76,6 +85,8 @@ export function VerseSheet({
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
+  // A tester's preview of The Clear Quran (turned on or off) changes the choice.
+  useClearQuranPreview();
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
@@ -225,26 +236,37 @@ export function VerseSheet({
                     maxHeight={320}
                   />
                 ) : (
-                  TRANSLATIONS.map((t) => (
-                    <Pressable
-                      key={t.id}
-                      style={[styles.dropRow, !t.available && { opacity: 0.5 }]}
-                      disabled={!t.available}
-                      onPress={() => {
-                        onChangeTranslation(t.id);
-                        setMenu('closed');
-                      }}
-                      accessibilityState={{ selected: t.id === translation.id, disabled: !t.available }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>{t.name}</Text>
-                        <Text style={[typography.caption, { color: theme.textMuted }]}>
-                          {t.available ? `${t.language} · ${t.author}` : `${t.author} · not available yet`}
-                        </Text>
-                      </View>
-                      {t.id === translation.id && <Ionicons name="checkmark" size={18} color={theme.accent} />}
-                    </Pressable>
-                  ))
+                  TRANSLATIONS.map((t) => {
+                    const available = isTranslationAvailable(t);
+                    return (
+                      <Pressable
+                        key={t.id}
+                        style={[styles.dropRow, !available && { opacity: 0.5 }]}
+                        disabled={!available}
+                        onPress={() => {
+                          onChangeTranslation(t.id);
+                          setMenu('closed');
+                        }}
+                        accessibilityState={{ selected: t.id === translation.id, disabled: !available }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>{pickerTitle(t)}</Text>
+                          {t.credit ? (
+                            // Credited as in the sheet: the publisher's site.
+                            <Text style={styles.creditText}>
+                              {available ? `${t.language} · ` : 'Not available yet · '}
+                              <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
+                            </Text>
+                          ) : (
+                            <Text style={[typography.caption, { color: theme.textMuted }]}>
+                              {available ? `${t.language} · ${t.author}` : `${t.author} · not available yet`}
+                            </Text>
+                          )}
+                        </View>
+                        {t.id === translation.id && <Ionicons name="checkmark" size={18} color={theme.accent} />}
+                      </Pressable>
+                    );
+                  })
                 )}
               </View>
             )}
@@ -277,9 +299,27 @@ export function VerseSheet({
                   </Text>
                 </View>
                 <Text style={styles.arabic}>{state.text.arabic}</Text>
-                <Text style={styles.translation}>{state.text.translation}</Text>
-                <Text style={styles.source}>{state.text.translationName}</Text>
+                <Text style={[styles.translation, state.text.placeholder && styles.placeholder]}>
+                  {state.text.translation}
+                </Text>
+                {/* A credited translation has its credit pinned below instead. */}
+                {!translation.credit && <Text style={styles.source}>{state.text.translationName}</Text>}
               </ScrollView>
+            )}
+            {state.status === 'ready' && translation.credit && (
+              // Pinned under the verse, however long it is: always in view.
+              <View style={[styles.credit, { borderTopColor: theme.border }]} testID="translation-credit">
+                <Text style={styles.creditText}>{translation.credit.text}</Text>
+                <Text
+                  style={styles.creditLink}
+                  onPress={() => Linking.openURL(translation.credit!.url).catch(() => undefined)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${translation.credit.linkLabel}, opens the website`}
+                  suppressHighlighting={false}
+                >
+                  {translation.credit.linkLabel}
+                </Text>
+              </View>
             )}
           </SafeAreaView>
         </Pressable>
@@ -371,4 +411,13 @@ const makeStyles = (theme: ThemeColors) =>
     },
     translation: { ...typography.bodyLarge, fontSize: 18, lineHeight: 27, color: theme.textPrimary },
     source: { ...typography.caption, color: theme.textMuted, marginTop: spacing.md },
+    placeholder: { color: theme.textSecondary, fontStyle: 'italic' },
+    credit: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      paddingTop: spacing.sm,
+      marginTop: spacing.xs,
+      gap: 2,
+    },
+    creditText: { ...typography.caption, color: theme.textSecondary },
+    creditLink: { ...typography.caption, color: theme.accent, fontWeight: '600', alignSelf: 'flex-start' },
   });

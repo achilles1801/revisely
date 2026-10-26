@@ -1,6 +1,28 @@
 jest.mock('expo-file-system', () => ({}));
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
 
-import { parsePageResponse, resolveTranslation, stripBismillah } from '../translation';
+import {
+  CLEAR_QURAN_ID,
+  getVerseText,
+  isTranslationAvailable,
+  parsePageResponse,
+  pickerTitle,
+  resolveTranslation,
+  stripBismillah,
+  TRANSLATIONS,
+} from '../translation';
+import {
+  CLEAR_QURAN_PLACEHOLDER,
+  clearQuranPreviewAllowed,
+  initClearQuranPreview,
+  isClearQuranPreview,
+  resetClearQuranPreviewForTests,
+  setClearQuranPreview,
+} from '../clearQuranPreview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ReleaseInfo } from '../releaseInfo';
 
 describe('parsePageResponse', () => {
   it('maps the alquran.cloud page response', () => {
@@ -63,5 +85,72 @@ describe('translations', () => {
     expect(stripBismillah(baqarah1, 2, 1)).toBe('الٓمٓ');
     expect(stripBismillah(baqarah1, 1, 1)).toBe(baqarah1); // it is Al-Fatihah 1
     expect(stripBismillah('ذَٰلِكَ ٱلْكِتَٰبُ', 2, 2)).toBe('ذَٰلِكَ ٱلْكِتَٰبُ');
+  });
+});
+
+describe('The Clear Quran: credit, and the testers’ preview', () => {
+  const tcq = TRANSLATIONS.find((t) => t.id === CLEAR_QURAN_ID)!;
+
+  beforeEach(async () => {
+    resetClearQuranPreviewForTests();
+    await AsyncStorage.clear();
+  });
+
+  it('carries the credit the publisher requires, and is listed with its author', () => {
+    expect(tcq.credit).toEqual({
+      text: 'The Clear Quran® by Dr. Mustafa Khattab',
+      linkLabel: 'theclearquran.org',
+      url: 'https://theclearquran.org',
+    });
+    expect(pickerTitle(tcq)).toBe('The Clear Quran® — Dr. Mustafa Khattab');
+    expect(pickerTitle(TRANSLATIONS[0])).toBe('Saheeh International');
+  });
+
+  it('can’t be chosen without the preview: a saved choice falls back to Saheeh', () => {
+    expect(isTranslationAvailable(tcq)).toBe(false);
+    expect(resolveTranslation(CLEAR_QURAN_ID).id).toBe('en.sahih');
+  });
+
+  it('the preview is only for development builds and testers on the preview channel', () => {
+    const release = (channel: string | null, isDev = false) => ({ channel, isDev }) as ReleaseInfo;
+    expect(clearQuranPreviewAllowed(release('preview'), true)).toBe(true);
+    expect(clearQuranPreviewAllowed(release(null, true), undefined)).toBe(true);
+    expect(clearQuranPreviewAllowed(release('production'), true)).toBe(false); // the App Store
+    expect(clearQuranPreviewAllowed(release('preview'), false)).toBe(false); // App Review, others
+    expect(clearQuranPreviewAllowed(release('preview'), undefined)).toBe(false);
+  });
+
+  it('where not allowed, the switch does nothing (and a saved "on" is ignored)', async () => {
+    await AsyncStorage.setItem('@revisely_clear_quran_preview', 'true');
+    await initClearQuranPreview(false);
+    setClearQuranPreview(true);
+    expect(isClearQuranPreview()).toBe(false);
+    expect(resolveTranslation(CLEAR_QURAN_ID).id).toBe('en.sahih');
+  });
+
+  it('allowed and on: it can be chosen, and shows a labelled placeholder (never another translation’s text)', async () => {
+    await initClearQuranPreview(true);
+    setClearQuranPreview(true);
+    expect(await AsyncStorage.getItem('@revisely_clear_quran_preview')).toBe('true');
+    expect(resolveTranslation(CLEAR_QURAN_ID).id).toBe(CLEAR_QURAN_ID);
+    const fetchMock = jest.fn(async (_url: string) => ({
+      ok: true,
+      json: async () => ({
+        data: { ayahs: [{ numberInSurah: 6, text: 'إِنَّ ٱلَّذِينَ', surah: { number: 2, englishName: 'Al-Baqarah' } }] },
+      }),
+    }));
+    (global as any).fetch = fetchMock;
+    const text = await getVerseText(3, 2, 6, CLEAR_QURAN_ID);
+    expect(text).toMatchObject({
+      translation: CLEAR_QURAN_PLACEHOLDER,
+      translationName: 'The Clear Quran®',
+      placeholder: true,
+      arabic: 'إِنَّ ٱلَّذِينَ',
+    });
+    // Only the Arabic was fetched.
+    expect(fetchMock.mock.calls.every(([url]) => String(url).includes('quran-uthmani'))).toBe(true);
+    // Remembered across launches.
+    await initClearQuranPreview(true);
+    expect(isClearQuranPreview()).toBe(true);
   });
 });
