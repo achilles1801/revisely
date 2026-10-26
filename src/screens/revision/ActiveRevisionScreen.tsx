@@ -876,7 +876,7 @@ const makeStyles = (theme: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    submitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    submitText: { color: theme.onAccent, fontWeight: '700', fontSize: 14 },
   });
 
 function RevisionGuideModal({
@@ -1044,7 +1044,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodySmall,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });

@@ -524,7 +524,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodySmall,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });

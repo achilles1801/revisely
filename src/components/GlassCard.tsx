@@ -4,6 +4,10 @@ import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '../context/ThemeContext';
 import { useDesign } from '../design/DesignContext';
+import { layoutV2 } from '../theme/v2';
+
+// Floating controls in the new design: a soft shadow instead of glass.
+const v2Lift = { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 };
 
 type GlassCardProps = ViewProps & {
   children?: React.ReactNode;
@@ -17,9 +21,10 @@ type GlassCardProps = ViewProps & {
   /** Thin top-edge highlight — the "wet" specular line. Best on rounded/pill shapes. */
   specular?: boolean;
   /**
-   * What the surface is. In the new design only navigation chrome (tab bar,
-   * toolbars, sheets, the floating capsule) is glass; content is a flat surface.
-   * The classic design ignores it. Default: content.
+   * What the surface is: content (cards) or navigation chrome (sheets, menus,
+   * the tab bar, floating controls). The new design has no glass: content is
+   * the quiet fill, chrome a solid sheet. The classic design ignores it.
+   * Default: content.
    */
   surface?: 'content' | 'chrome';
 };
@@ -35,12 +40,18 @@ export function GlassCard({
   surface = 'content',
   ...rest
 }: GlassCardProps) {
-  const { isDark, theme } = useTheme();
+  const { isDark, palette } = useTheme();
   const { isNew } = useDesign();
 
-  if (isNew && surface === 'content') {
+  if (isNew) {
+    const solid =
+      surface === 'content'
+        ? { backgroundColor: palette.fill }
+        : elevated
+          ? { backgroundColor: palette.sheet, borderWidth: layoutV2.hairline, borderColor: palette.separator, ...v2Lift }
+          : { backgroundColor: palette.sheet };
     return (
-      <View style={[styles.base, { backgroundColor: theme.surface }, style]} {...rest}>
+      <View style={[styles.base, solid, style]} {...rest}>
         {children}
       </View>
     );

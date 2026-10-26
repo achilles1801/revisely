@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SettingIcon } from './settings/SettingIcon';
+import { SettingSwitch } from './settings/SettingSwitch';
 import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
@@ -41,9 +43,7 @@ export function CarryOverSetting({
   return (
     <>
       <View style={styles.row}>
-        <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-          <Ionicons name="arrow-redo-outline" size={16} color={theme.accent} />
-        </View>
+        <SettingIcon name="arrow-redo-outline" tileStyle={styles.rowIcon} />
         <View style={styles.label}>
           <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
             Keep daily amount
@@ -57,11 +57,9 @@ export function CarryOverSetting({
             <Ionicons name="information-circle-outline" size={18} color={theme.textMuted} />
           </Pressable>
         </View>
-        <Switch
+        <SettingSwitch
           value={keepAmount}
           onValueChange={(v) => onChange(v ? 'shift' : 'add')}
-          trackColor={{ false: theme.border, true: theme.accent }}
-          thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
         />
       </View>
 
@@ -97,7 +95,7 @@ export function CarryOverSetting({
               scale={0.98}
               style={[styles.doneBtn, { backgroundColor: theme.accent }]}
             >
-              <Text style={[typography.bodySmall, { color: '#fff', fontWeight: '700' }]}>Got it</Text>
+              <Text style={[typography.bodySmall, { color: theme.onAccent, fontWeight: '700' }]}>Got it</Text>
             </PressableScale>
           </Pressable>
         </Pressable>

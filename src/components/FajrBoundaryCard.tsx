@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Switch, Alert, Modal, ScrollView, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Alert, Modal, ScrollView, Pressable } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { SettingIcon } from './settings/SettingIcon';
+import { SettingSwitch } from './settings/SettingSwitch';
 import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
@@ -107,9 +109,7 @@ export function FajrBoundaryCard() {
   return (
     <View>
       <View style={[styles.row, enabled && styles.rowDivider]}>
-        <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-          <Ionicons name="moon-outline" size={16} color={theme.accent} />
-        </View>
+        <SettingIcon name="moon-outline" tileStyle={styles.rowIcon} />
         <View style={{ flex: 1 }}>
           <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
             Start day at fajr
@@ -118,21 +118,17 @@ export function FajrBoundaryCard() {
             Resets at {resetsAt}
           </Text>
         </View>
-        <Switch
+        <SettingSwitch
           value={enabled}
           onValueChange={handleToggle}
           disabled={busy}
-          trackColor={{ false: theme.border, true: theme.accent }}
-          thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
         />
       </View>
 
       {enabled && (
         <PressableScale onPress={() => setMethodOpen(true)} haptic="light" scale={0.99}>
           <View style={styles.row}>
-            <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-              <Ionicons name="calculator-outline" size={16} color={theme.accent} />
-            </View>
+            <SettingIcon name="calculator-outline" tileStyle={styles.rowIcon} />
             <Text style={[typography.bodyMedium, { color: theme.textPrimary, flex: 1 }]}>
               Method
             </Text>
