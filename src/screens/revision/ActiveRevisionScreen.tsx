@@ -5,14 +5,13 @@ import {
   Modal,
   Pressable,
   SafeAreaView,
-  StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -24,18 +23,22 @@ import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
-import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { useVerseActions } from '../../components/verse/useVerseActions';
-import { navigateToActivityDay } from '../../navigation/navigationRef';
+import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
-import {
-  FLOATING_TIMER_SIZE,
-  useFloatingTimerOffset,
-} from '../../components/timer/floatingTimerOffset';
+import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
+import { TimerChip } from '../../components/timer/TimerChip';
+import { ReaderFrame } from '../../components/reader/ReaderFrame';
+import { ReaderActivity } from '../../components/reader/ReaderActivity';
+import { CAPSULE_HEIGHT, PlayerCapsule } from '../../components/reader/PlayerCapsule';
+import { useReaderChrome } from '../../components/reader/useReaderChrome';
+import { useTapHint } from '../../components/reader/useTapHint';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -54,15 +57,8 @@ import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 
 const AUTO_SAVE_INTERVAL_MS = 5000;
-// Where the now-playing bar sits, and roughly how tall the "Submit session"
-// bar is: the floating timer is raised above whichever is showing.
-// The bottom bar: tall enough for the player (otherwise the page number).
-const FOOTER_CONTENT_HEIGHT = 56;
-const FOOTER_PADDING_BOTTOM = spacing.xs;
-const TIMER_SLOT_IDLE = FLOATING_TIMER_SIZE + spacing.md * 2;
-const TIMER_SLOT_RUNNING = 136;
-const SUBMIT_BAR_HEIGHT = 74;
-const UNDO_TOAST_TOP = spacing.xl + spacing.md + 56;
+// Under the page, with the controls: the capsule.
+const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
@@ -159,13 +155,33 @@ export default function ActiveRevisionScreen() {
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
   });
-  // The player sits in the bottom bar, under the page (never over it).
-  // Tapping the page hides or shows it; a new recitation shows it again.
-  const [playerShown, setPlayerShown] = useState(true);
-  useEffect(() => {
-    if (verseActions.playerVisible) setPlayerShown(true);
-  }, [verseActions.playerVisible]);
-  const togglePlayer = useCallback(() => setPlayerShown((v) => !v), []);
+  // Reading: nothing but the page (its number, the juz and surah). A tap on
+  // the page brings the controls (beside the page, never over it); another
+  // tap, or turning the page, puts them away.
+  // Every page revised: the controls stay up, with Submit.
+  const submitVisible =
+    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
+  const chrome = useReaderChrome({ locked: submitVisible });
+  const tapHint = useTapHint();
+  const dismissHint = tapHint.dismiss;
+  const toggleChrome = chrome.toggle;
+  const onTapPage = useCallback(() => {
+    dismissHint();
+    toggleChrome();
+  }, [dismissHint, toggleChrome]);
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Arriving on the session's last page, not yet revised: the controls come up
+  // (✓ is there; there is no next page to swipe it done).
+  const showChrome = chrome.show;
+  const lastSessionPage = assignment?.pages[assignment.pages.length - 1];
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPageNumber(page);
+      if (page === lastSessionPage && !completedPages.has(page)) showChrome();
+    },
+    [lastSessionPage, completedPages, showChrome],
+  );
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -281,7 +297,6 @@ export default function ActiveRevisionScreen() {
   // stopwatch, leaving this screen does not pause it and finishing today's
   // pages does not stop it; the user ends it from the timer itself.
   const { noteRevisedPages, timer } = useReadingTimer();
-  const insets = useSafeAreaInsets();
   const prevCompletedRef = useRef(completedPages);
   useEffect(() => {
     const prev = prevCompletedRef.current;
@@ -290,16 +305,8 @@ export default function ActiveRevisionScreen() {
     if (added.length > 0) noteRevisedPages(added);
   }, [completedPages, noteRevisedPages]);
 
-  // The floating timer docks in the bottom bar's right-hand slot (above the
-  // submit bar when it shows), and moves above the undo toast while it shows.
-  const submitVisible =
-    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
-  const docked =
-    insets.bottom +
-    (submitVisible ? SUBMIT_BAR_HEIGHT : 0) +
-    FOOTER_PADDING_BOTTOM +
-    (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2;
-  useFloatingTimerOffset(Math.max(docked, undoState ? UNDO_TOAST_TOP : 0));
+  // The timer is in the controls here, not floating over the page.
+  useFloatingTimerOffset('hidden');
 
   if (!user || !assignment) {
     return (
@@ -585,83 +592,133 @@ export default function ActiveRevisionScreen() {
     [completedPages],
   );
 
+  const palette = getReadPalette(isDark);
+  const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
+  const compact = width < 430 && crowded;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: getReadPalette(isDark).pageBg }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      <SessionBar
-        scopeLabel={scopeLabel}
-        revisedCount={completedCount}
-        totalCount={totalPages}
-        isCurrentPageRevised={isCurrentRevised}
-        onBack={handleSaveAndBack}
-        onToggleCurrent={handleToggleCurrent}
-        onOverflow={() => setMenuOpen(true)}
-        recordSlot={
-          <RecordButton
-            recorder={recorder}
-            color={theme.textPrimary}
-            background={theme.glass}
-            border={theme.border}
-          />
-        }
-      />
-
-      <View style={styles.breadcrumb} pointerEvents="none">
-        <Text style={styles.crumbLeft} numberOfLines={1}>
-          Juz {currentJuz} · Hizb {currentHizb}
-        </Text>
-        <View style={styles.crumbRight}>
-          {firstSurahOnPage?.name ? (
-            <Text style={styles.crumbSurah} numberOfLines={1}>
-              {firstSurahOnPage.name}
+    <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
+      <ReaderFrame
+        chromeVisible={chrome.visible}
+        active={isScreenFocused}
+        onBackgroundPress={onTapPage}
+        background={palette.pageBg}
+        isDark={isDark}
+        quietHeader={
+          <View style={styles.quietHeader}>
+            <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              Juz {currentJuz} · {completedCount}/{totalPages}
             </Text>
-          ) : null}
-          {firstSurahOnPage?.nameArabic ? (
-            <Text style={styles.crumbArabic}>{firstSurahOnPage.nameArabic}</Text>
-          ) : null}
-        </View>
-      </View>
-
-      {/* The page fits between the breadcrumb and the bottom bar. */}
-      <View style={styles.viewerWrap}>
+            {firstSurahOnPage ? (
+              <View style={styles.crumbRight}>
+                <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                  {firstSurahOnPage.name}
+                </Text>
+                {firstSurahOnPage.nameArabic ? (
+                  <Text style={[styles.crumbArabic, { color: palette.textSecondary, fontSize: 13 }]}>
+                    {firstSurahOnPage.nameArabic}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        }
+        header={
+          <View style={styles.header}>
+            <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
+            <View style={styles.titleCol}>
+              <Text style={[styles.title, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                Revising {scopeLabel}{' '}
+                <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
+                  · {completedCount}/{totalPages}
+                </Text>
+              </Text>
+              <Text style={[styles.subtitle, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
+              </Text>
+            </View>
+            <RoundButton
+              icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
+              label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+              onPress={handleToggleCurrent}
+              palette={palette}
+              active={isCurrentRevised}
+            />
+            <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={palette} />
+          </View>
+        }
+        footer={
+          <View style={styles.footer}>
+            <PlayerCapsule
+              player={verseActions.player}
+              page={displayPageNumber}
+              compact={compact}
+              surface={{ background: palette.control, border: palette.divider }}
+              record={
+                <RecordButton
+                  recorder={recorder}
+                  color={palette.textSecondary}
+                  background={palette.control}
+                  border={palette.divider}
+                />
+              }
+              timer={
+                <TimerChip
+                  compact={compact}
+                  onOpenQuran={() => {
+                    if (navigationRef.isReady()) navigationRef.navigate('Read');
+                  }}
+                />
+              }
+              trailing={
+                submitVisible ? (
+                  <PressableScale
+                    onPress={handleEndSession}
+                    haptic="medium"
+                    style={[styles.submit, { backgroundColor: theme.accent }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Submit session"
+                  >
+                    <Text style={styles.submitText}>Submit</Text>
+                  </PressableScale>
+                ) : undefined
+              }
+            />
+          </View>
+        }
+        footerHeight={FOOTER_HEIGHT}
+        pageLabel={
+          <View style={styles.pageLabel}>
+            <Text style={[styles.pageNum, { color: palette.textPrimary }]} maxFontSizeMultiplier={1.3}>
+              {displayPageNumber}
+            </Text>
+            {isCurrentRevised && <Ionicons name="checkmark" size={12} color={palette.textSecondary} />}
+          </View>
+        }
+        activity={
+          <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+        }
+        hint={
+          tapHint.shown ? (
+            <Text style={[styles.quietText, { color: palette.textSecondary }]} maxFontSizeMultiplier={1.3}>
+              Tap the page for the controls
+            </Text>
+          ) : null
+        }
+      >
         <MushafPager
           ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}
-          onPageChange={setCurrentPageNumber}
+          onPageChange={handlePageChange}
           onAdvance={handleAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
-          onTap={togglePlayer}
+          onTap={onTapPage}
+          onUserSwipe={chrome.hide}
           extraData={extraData}
         />
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.footerContent}>
-          {verseActions.player && playerShown ? (
-            verseActions.player
-          ) : (
-            <Text style={styles.pageNum}>{displayPageNumber}</Text>
-          )}
-        </View>
-        {/* The floating timer docks here (wider while it shows a clock). */}
-        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
-      </View>
-
-      {/* All revised → submit button slides up */}
-      {completedCount === totalPages && totalPages > 0 && (
-        <View style={styles.submitWrap}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <Button
-            title="Submit session"
-            onPress={handleEndSession}
-            variant="primary"
-            style={{ width: '100%' }}
-          />
-        </View>
-      )}
+      </ReaderFrame>
 
       <UndoToast
         visible={!!savedRecording}
@@ -674,7 +731,7 @@ export default function ActiveRevisionScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={spacing.xl}
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       <UndoToast
@@ -682,7 +739,7 @@ export default function ActiveRevisionScreen() {
         message={undoState?.message ?? ''}
         onUndo={handleUndo}
         onDismiss={() => setUndoState(null)}
-        bottomInset={spacing.xl}
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       <SessionMenuSheet
@@ -745,7 +802,7 @@ export default function ActiveRevisionScreen() {
           onClose={() => setShowRating(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -772,58 +829,54 @@ const makeStyles = (theme: ThemeColors) =>
       textAlign: 'center',
     },
     retryButton: { minWidth: 160 },
-    viewerWrap: { flex: 1 },
-    breadcrumb: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      gap: spacing.sm,
+    quietHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      gap: spacing.md,
     },
-    crumbLeft: {
-      ...typography.caption,
-      color: theme.textPrimary,
-    },
+    quietText: { ...typography.caption },
     crumbRight: {
       flexDirection: 'row',
       alignItems: 'baseline',
       gap: spacing.xs,
-    },
-    crumbSurah: {
-      ...typography.caption,
-      color: theme.textPrimary,
+      flexShrink: 1,
     },
     crumbArabic: {
       fontFamily: fonts.arabic,
       fontSize: 14,
-      color: theme.textPrimary,
     },
-    footer: {
+    header: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingLeft: spacing.md,
-      paddingBottom: FOOTER_PADDING_BOTTOM,
-      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      gap: spacing.sm,
     },
-    footerContent: {
+    titleCol: { flex: 1, alignItems: 'center' },
+    title: { ...typography.titleSmall },
+    subtitle: { ...typography.caption },
+    footer: {
       flex: 1,
-      height: FOOTER_CONTENT_HEIGHT,
-      justifyContent: 'center',
-      alignItems: 'stretch',
+      paddingHorizontal: spacing.sm,
+      paddingBottom: spacing.sm,
+      justifyContent: 'flex-end',
     },
+    pageLabel: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     pageNum: {
       textAlign: 'center',
       fontSize: 13,
       fontWeight: '500',
-      color: theme.textPrimary,
+      fontVariant: ['tabular-nums'],
     },
-    submitWrap: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
-      overflow: 'hidden',
+    submit: {
+      height: 36,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
+    submitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   });
 
 function RevisionGuideModal({
@@ -852,24 +905,29 @@ function RevisionGuideModal({
       body: 'Swiping forward auto-credits the page you just left as revised. You can undo from the toast that appears, or tap the checkmark in the top bar to toggle the current page by hand.',
     },
     {
+      icon: 'finger-print-outline',
+      title: 'Tap the page for the controls',
+      body: 'While you revise there is only the page. Tap it to show the controls (✓, the menu, play, record, the timer); tap again, or turn the page, to put them away.',
+    },
+    {
       icon: 'language-outline',
       title: 'Hold a verse',
-      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
+      body: 'Press and hold any verse to hear it recited or read its translation. ▶ in the controls recites from the top of the page.',
     },
     {
       icon: 'mic-outline',
       title: 'Record yourself',
-      body: 'Tap the mic in the top bar to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
+      body: 'Tap the mic in the controls to record your recitation. Tap the time to pause or resume, and ■ to stop. Find recordings in Activity.',
     },
     {
       icon: 'ellipsis-horizontal-circle-outline',
       title: 'More in the menu',
-      body: 'Open (⋮) for bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
+      body: 'Open (⋯) for bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
     },
     {
       icon: 'stopwatch-outline',
       title: 'Time your revision',
-      body: 'Tap the stopwatch button in the corner to start the timer, and tap the time to pause or stop it. Pages you mark revised while it runs are saved with the session, in Activity.',
+      body: 'Tap the stopwatch in the controls to start the timer, and tap the time to pause or stop it. Pages you mark revised while it runs are saved with the session, in Activity.',
     },
     {
       icon: 'save-outline',

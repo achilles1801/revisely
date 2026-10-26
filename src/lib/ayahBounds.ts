@@ -31,6 +31,17 @@ function pageData(page: number): number[] {
   return bounds[String(page)] ?? [];
 }
 
+/** The verses on a page, top to bottom (the first may have begun on the page before). */
+export function versesOnPage(page: number): AyahRef[] {
+  const d = pageData(page);
+  const out: AyahRef[] = [];
+  for (let i = 0; i < d.length; i += 6) {
+    const last = out[out.length - 1];
+    if (!last || last.sura !== d[i] || last.ayah !== d[i + 1]) out.push({ page, sura: d[i], ayah: d[i + 1] });
+  }
+  return out;
+}
+
 /** The rectangles (bounds space) covering one verse on a page. */
 export function ayahRects(page: number, sura: number, ayah: number): Rect[] {
   const d = pageData(page);

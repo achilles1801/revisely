@@ -11,6 +11,8 @@ export interface ReadPalette {
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  /** The reader's controls (buttons, the capsule): set off from the page. */
+  control: string;
   /** Tint applied to the (black-ink) page PNGs; null = render as-is. */
   pageTint: string | null;
 }
@@ -23,6 +25,7 @@ const DARK: ReadPalette = {
   textPrimary: '#FFFFFF',
   textSecondary: '#AEAEB2',
   textMuted: '#8E8E93',
+  control: '#1C1C1E',
   pageTint: '#FFFFFF',
 };
 
@@ -34,6 +37,7 @@ const LIGHT: ReadPalette = {
   textPrimary: '#000000',
   textSecondary: '#3C3C43',
   textMuted: '#8E8E93',
+  control: '#F2F2F7',
   pageTint: null,
 };
 
