@@ -17,7 +17,13 @@ export const CLEAR_QURAN_API = 'https://revisely.app/api/tcq';
 const TIMEOUT_MS = 15_000;
 const KEEP = 300;
 
-export type ClearQuranErrorCode = 'UNAUTHENTICATED' | 'RATE_LIMITED' | 'NOT_FOUND' | 'UNAVAILABLE' | 'NETWORK';
+export type ClearQuranErrorCode =
+  | 'UNAUTHENTICATED'
+  | 'RATE_LIMITED'
+  | 'DAILY_LIMIT'
+  | 'NOT_FOUND'
+  | 'UNAVAILABLE'
+  | 'NETWORK';
 
 export class ClearQuranError extends Error {
   constructor(
@@ -71,9 +77,15 @@ async function request(key: string, force: boolean, deps: ClearQuranDeps): Promi
   }
 }
 
-function errorFor(status: number): ClearQuranError {
+async function errorFor(res: Response): Promise<ClearQuranError> {
+  const { status } = res;
   if (status === 401) return new ClearQuranError('UNAUTHENTICATED', 'Sign in to load this translation');
-  if (status === 429) return new ClearQuranError('RATE_LIMITED', 'Too many requests right now');
+  if (status === 429) {
+    // The worker's daily budgets (worker/budget.ts) say so; anything else is a short wait.
+    const body = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+    if (body?.error?.code === 'DAILY_LIMIT') return new ClearQuranError('DAILY_LIMIT', 'Daily limit reached');
+    return new ClearQuranError('RATE_LIMITED', 'Too many requests right now');
+  }
   if (status === 404) return new ClearQuranError('NOT_FOUND', 'Verse not found');
   return new ClearQuranError('UNAVAILABLE', 'The translation is unavailable right now');
 }
@@ -87,7 +99,7 @@ export async function getClearQuranVerse(sura: number, ayah: number, deps: Clear
   let res = await request(key, false, deps);
   // A token that expired in the background: refresh it once.
   if (res.status === 401) res = await request(key, true, deps);
-  if (!res.ok) throw errorFor(res.status);
+  if (!res.ok) throw await errorFor(res);
 
   const body = (await res.json().catch(() => null)) as { verse_key?: unknown; text?: unknown } | null;
   if (!body || body.verse_key !== key || typeof body.text !== 'string' || body.text.length === 0) {
@@ -131,6 +143,8 @@ export function clearQuranErrorHint(err: unknown): string {
   switch (code) {
     case 'RATE_LIMITED':
       return 'Too many requests right now. Try again in a minute.';
+    case 'DAILY_LIMIT':
+      return 'The Clear Quran has reached its limit for today. Try again tomorrow.';
     case 'UNAUTHENTICATED':
       return 'Sign in again, then try again.';
     case 'NOT_FOUND':

@@ -6,7 +6,8 @@
 
 import worker from '../index';
 import { resetKeyCache, verifyIdToken } from '../auth';
-import { handleTcq, tcqEnvironment, TcqEnv, VERSE_COUNTS, verseKey } from '../tcq';
+import { handleTcq, redactKeys, tcqEnvironment, TcqEnv, VERSE_COUNTS, verseKey } from '../tcq';
+import { secondsToMidnight, spend, TcqBudget } from '../budget';
 import { getSurahDisplay } from '../../src/lib/quranData';
 
 const PROJECT = 'revision-buddy-3a398';
@@ -303,5 +304,192 @@ describe('routing', () => {
   it('refuses anything but GET', async () => {
     const { res } = await call('/api/tcq/verses/2:255', { method: 'POST' });
     expect(res.status).toBe(405);
+  });
+});
+
+describe('sign-in: odd tokens are refused with 401, never a server error', () => {
+  const enc = (o: unknown) => b64url(JSON.stringify(o));
+  it.each([
+    ['alg none', async () => `${enc({ alg: 'none', kid: 'key-1' })}.${(await token()).split('.')[1]}.`],
+    ['alg HS256', async () => `${enc({ alg: 'HS256', kid: 'key-1' })}.${(await token()).split('.')[1]}.c2ln`],
+    ['no kid', async () => `${enc({ alg: 'RS256' })}.${(await token()).split('.')[1]}.c2ln`],
+    ['signature "A"', async () => (await token()).replace(/\.[^.]+$/, '.A')],
+    ['signature "@@@@"', async () => (await token()).replace(/\.[^.]+$/, '.@@@@')],
+    ['header null', async () => `${enc(null)}.${(await token()).split('.')[1]}.c2ln`],
+    ['claims an array', async () => `${(await token()).split('.')[0]}.${enc([1])}.c2ln`],
+    ['issued in the future', async () => token({ iat: NOW + 600 })],
+    ['signed in in the future', async () => token({ auth_time: NOW + 600 })],
+    ['no auth_time', async () => token({ auth_time: undefined })],
+  ])('%s', async (_name, make) => {
+    const { res, upstream } = await call('/api/tcq/verses/2:255', { auth: await make() });
+    expect(res.status).toBe(401);
+    expect(upstream).toHaveLength(0);
+  });
+});
+
+describe("Google's keys", () => {
+  async function keyPair() {
+    return (await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['sign', 'verify'],
+    )) as CryptoKeyPair;
+  }
+
+  it('a rotated key is picked up, but unknown kids refetch at most once a minute', async () => {
+    const second = await keyPair();
+    const secondJwk = await crypto.subtle.exportKey('jwk', second.publicKey);
+    let published = [{ ...jwk, kid: 'key-1' }];
+    const fetches: string[] = [];
+    const f = (async (url: string) => {
+      fetches.push(String(url));
+      return new Response(JSON.stringify({ keys: published }), { headers: { 'Cache-Control': 'max-age=20000' } });
+    }) as unknown as typeof fetch;
+    await verifyIdToken(await token(), PROJECT, NOW, f);
+    expect(fetches).toHaveLength(1);
+    const rotated = await token({}, 'key-2', second.privateKey);
+    // Not published yet: refused, and within the minute no more fetches however many tries.
+    await expect(verifyIdToken(rotated, PROJECT, NOW + 10, f)).rejects.toThrow('Unknown signing key');
+    expect(fetches).toHaveLength(1);
+    published = [...published, { ...secondJwk, kid: 'key-2' }];
+    await expect(verifyIdToken(rotated, PROJECT, NOW + 30, f)).rejects.toThrow('Unknown signing key');
+    expect(fetches).toHaveLength(1);
+    // A minute on, it is fetched and accepted.
+    await expect(verifyIdToken(rotated, PROJECT, NOW + 61, f)).resolves.toBe('user-123');
+    expect(fetches).toHaveLength(2);
+  });
+
+  it('if a refresh fails, the keys it had keep working', async () => {
+    let up = true;
+    const f = (async () =>
+      up
+        ? new Response(JSON.stringify({ keys: [{ ...jwk, kid: 'key-1' }] }), { headers: { 'Cache-Control': 'max-age=100' } })
+        : new Response('down', { status: 503 })) as unknown as typeof fetch;
+    await verifyIdToken(await token(), PROJECT, NOW, f);
+    up = false;
+    // The keys are past their max-age and Google is down: the old ones still verify.
+    await expect(verifyIdToken(await token(), PROJECT, NOW + 200, f)).resolves.toBe('user-123');
+  });
+
+  it("with no keys at all and Google unreachable: 503 (not the user's fault), then no hammering", async () => {
+    const f = jest.fn(async () => new Response('down', { status: 503 })) as unknown as typeof fetch;
+    const res = await handleTcq(
+      new Request('https://revisely.app/api/tcq/verses/1:1', { headers: { Authorization: `Bearer ${await token()}` } }),
+      ENV,
+      ctx(),
+      { fetch: f, cache: null, now: NOW },
+    );
+    expect(res.status).toBe(503);
+    await handleTcq(
+      new Request('https://revisely.app/api/tcq/verses/1:1', { headers: { Authorization: `Bearer ${await token()}` } }),
+      ENV,
+      ctx(),
+      { fetch: f, cache: null, now: NOW + 5 },
+    );
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+});
+
+function fakeBudget() {
+  const store = new Map<string, unknown>();
+  const storage = {
+    get: async (k: string) => store.get(k),
+    put: async (k: string, v: unknown) => void store.set(k, v),
+    deleteAll: async () => store.clear(),
+  };
+  const object = new TcqBudget({ storage } as unknown as DurableObjectState);
+  const ns = {
+    idFromName: () => ({}),
+    get: () => ({ fetch: (url: string, init?: RequestInit) => object.fetch(new Request(url, init)) }),
+  } as unknown as DurableObjectNamespace;
+  return { store, ns, storage };
+}
+
+describe('daily budgets', () => {
+  const limits = { liveDaily: 3, sandboxDaily: 1, userDaily: 2 };
+
+  it('counts per user and for everyone, per key, and resets at midnight UTC', async () => {
+    const { storage } = fakeBudget();
+    const day1 = Date.UTC(2026, 9, 26, 12) / 1000;
+    const go = (uid: string, env: 'live' | 'sandbox', now = day1) => spend(storage as never, { uid, env, now, limits });
+    expect(await go('a', 'live')).toEqual({ ok: true });
+    expect(await go('a', 'live')).toEqual({ ok: true });
+    expect(await go('a', 'live')).toEqual({ ok: false, scope: 'user', retryAfter: 12 * 3600 });
+    expect(await go('b', 'live')).toEqual({ ok: true }); // 3 of 3 for everyone
+    expect(await go('c', 'live')).toMatchObject({ ok: false, scope: 'everyone' });
+    expect(await go('c', 'sandbox')).toEqual({ ok: true }); // the sandbox key has its own count
+    // The next day starts again.
+    expect(await go('a', 'live', day1 + 86_400)).toEqual({ ok: true });
+    expect(secondsToMidnight(Date.UTC(2026, 9, 26, 23, 59, 30) / 1000)).toBe(30);
+  });
+
+  it('a spent budget answers 429 DAILY_LIMIT until midnight, and costs no request', async () => {
+    const { ns } = fakeBudget();
+    const env = { ...ENV, TCQ_BUDGET: ns, TCQ_DAILY_LIMIT_LIVE: '1', TCQ_USER_DAILY_LIMIT: '10' };
+    const first = await call('/api/tcq/verses/2:255', { env, channel: 'production', cache: null });
+    expect(first.res.status).toBe(200);
+    const second = await call('/api/tcq/verses/2:256', { env, channel: 'production', cache: null });
+    expect(second.res.status).toBe(429);
+    expect(second.body.error.code).toBe('DAILY_LIMIT');
+    expect(Number(second.res.headers.get('Retry-After'))).toBe(secondsToMidnight(NOW));
+    expect(second.upstream).toHaveLength(0);
+  });
+
+  it('answers from the cache cost nothing', async () => {
+    const { ns, store } = fakeBudget();
+    const env = { ...ENV, TCQ_BUDGET: ns };
+    const cache = memoryCache();
+    await call('/api/tcq/verses/2:255', { env, cache, channel: 'production' });
+    await call('/api/tcq/verses/2:255', { env, cache, channel: 'production' });
+    expect(store.get('all:live')).toBe(1);
+  });
+
+  it('if the budget can’t be reached, the request goes through (logged)', async () => {
+    const broken = { idFromName: () => ({}), get: () => ({ fetch: async () => { throw new Error('DO down'); } }) };
+    const { res } = await call('/api/tcq/verses/2:255', { env: { ...ENV, TCQ_BUDGET: broken as never } });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('robustness', () => {
+  it('a rate limiter that fails lets the request through', async () => {
+    const limit = jest.fn(async () => { throw new Error('limiter down'); });
+    const { res } = await call('/api/tcq/verses/2:255', { env: { ...ENV, TCQ_USER_LIMIT: { limit } } });
+    expect(res.status).toBe(200);
+  });
+
+  it('an unreadable cache entry is fetched again', async () => {
+    const cache = memoryCache();
+    cache.store.set('https://revisely.app/__cache/tcq/sandbox/verses/2:255', new Response('not json'));
+    const { res, upstream } = await call('/api/tcq/verses/2:255', { cache });
+    expect(res.status).toBe(200);
+    expect(upstream).toHaveLength(1);
+  });
+
+  it('an upstream timeout is a 502', async () => {
+    const { res, body } = await call('/api/tcq/verses/2:255', {
+      api: () => {
+        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      },
+    });
+    expect(res.status).toBe(502);
+    expect(body.error.code).toBe('UPSTREAM_ERROR');
+  });
+
+  it('never logs a key', () => {
+    expect(redactKeys('bad key tcq_eng_liv_AbC123-x_y given')).toBe('bad key tcq_[redacted] given');
+    expect(redactKeys('tcq_eng_sbx_zzz')).toBe('tcq_[redacted]');
+  });
+
+  it('anything unexpected is a JSON 500, never Cloudflare’s HTML error page', async () => {
+    const broken = {
+      url: 'https://revisely.app/api/tcq/verses/1:1',
+      get method(): string {
+        throw new Error('boom');
+      },
+    } as unknown as Request;
+    const res = await worker.fetch(broken, { ...ENV, ASSETS: { fetch: jest.fn() } }, ctx());
+    expect(res.status).toBe(500);
+    expect(res.headers.get('Content-Type')).toBe('application/json');
   });
 });

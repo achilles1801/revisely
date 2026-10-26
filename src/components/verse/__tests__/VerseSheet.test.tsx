@@ -31,7 +31,7 @@ jest.mock('../../../lib/translation', () => {
 
 import { Dimensions } from 'react-native';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
-import { grabberSwipe, overscrollAction, sheetMaxHeight, VerseSheet } from '../VerseSheet';
+import { grabberSwipe, overscrollAction, sheetMaxHeight, VerseSheet, visibleLoadState } from '../VerseSheet';
 
 // The safe-area mock has no insets (react-native-safe-area-context/jest/mock).
 const TOP = 0;
@@ -214,6 +214,39 @@ describe('VerseSheet: The Clear Quran', () => {
     expect(screen.queryByTestId('verse-translation')).toBeNull();
     fireEvent.press(screen.getByText('Try again'));
     expect(await screen.findByText('In the Name of Allah—the Most Compassionate, Most Merciful.', {}, { timeout: 10_000 })).toBeTruthy();
+  });
+
+  it('a result is shown only for the translation and verse it was loaded for', () => {
+    const text = { sura: 2, ayah: 6, surahName: 'Al-Baqarah', arabic: 'x', translation: 'Saheeh text', translationName: 'Saheeh International' };
+    const saheeh = { status: 'ready' as const, text, for: 'en.sahih|2:6' };
+    // The first render after choosing The Clear Quran (before its load starts):
+    // Saheeh's text must not appear above The Clear Quran's credit.
+    expect(visibleLoadState(saheeh, 'en.khattab|2:6')).toEqual({ status: 'loading' });
+    expect(visibleLoadState(saheeh, 'en.sahih|2:7')).toEqual({ status: 'loading' });
+    expect(visibleLoadState(saheeh, 'en.sahih|2:6')).toBe(saheeh);
+    const failed = { status: 'error' as const, error: new Error('x'), for: 'en.sahih|2:6' };
+    expect(visibleLoadState(failed, 'en.khattab|2:6')).toEqual({ status: 'loading' });
+  });
+
+  it('switching to it never shows its credit under the previous translation’s text', async () => {
+    let resolveTcq: (v: unknown) => void = () => undefined;
+    const p = props({ page: 48, sura: 2, ayah: 282 });
+    const { rerender } = render(wrap(<VerseSheet {...p} />));
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
+    getVerseText.mockImplementationOnce(() => new Promise((r) => (resolveTcq = r)));
+    rerender(wrap(<VerseSheet {...p} translationId="en.khattab" />));
+    // Saheeh's text is gone the moment the choice changes; no credit until its own text is in.
+    expect(screen.queryByText(/THE LAST WORDS/)).toBeNull();
+    expect(screen.queryByTestId('translation-credit')).toBeNull();
+    await act(async () =>
+      resolveTcq({ sura: 2, ayah: 282, surahName: 'Al-Baqarah', arabic: 'x', translation: 'O believers!', translationName: 'The Clear Quran®' }),
+    );
+    expect(screen.getByText('O believers!')).toBeTruthy();
+    expect(screen.getByTestId('translation-credit')).toBeTruthy();
+    // And back: the credit goes with its text.
+    rerender(wrap(<VerseSheet {...p} translationId="en.sahih" />));
+    expect(screen.queryByText('O believers!')).toBeNull();
+    expect(screen.queryByTestId('translation-credit')).toBeNull();
   });
 
   it('with Saheeh International: no credit line, its name under the verse as before', async () => {

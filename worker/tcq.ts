@@ -8,10 +8,13 @@
 // - The text goes back exactly as the API returns it (`text_english`).
 // - Successful answers are kept in this data centre's cache for
 //   TCQ_EDGE_CACHE_SECONDS (short; 0 turns it off); the app keeps nothing.
+// - Requests that reach The Clear Quran count against daily budgets, for
+//   everyone and per user (worker/budget.ts), so the plan can't be spent.
 // - Errors come back as { error: { code, message } } with a status the app
 //   maps to "Couldn't load translation" + retry. Never another translation.
 
 import { AuthError, verifyIdToken } from './auth';
+import { checkBudget } from './budget';
 
 export interface TcqEnv {
   FIREBASE_PROJECT_ID: string;
@@ -22,6 +25,21 @@ export interface TcqEnv {
   TCQ_API_KEY_SANDBOX?: string;
   /** Per-user limit (wrangler.jsonc "ratelimits"); optional. */
   TCQ_USER_LIMIT?: RateLimit;
+  /** Daily budgets (worker/budget.ts); optional. */
+  TCQ_BUDGET?: DurableObjectNamespace;
+  TCQ_DAILY_LIMIT_LIVE?: string;
+  TCQ_DAILY_LIMIT_SANDBOX?: string;
+  TCQ_USER_DAILY_LIMIT?: string;
+}
+
+const int = (value: string | undefined, fallback: number) => {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+
+/** Never log a key, even if an error message repeats it. */
+export function redactKeys(text: string): string {
+  return text.replace(/tcq_[a-z]{3}_[a-z]{3}_[A-Za-z0-9_-]*/g, 'tcq_[redacted]');
 }
 
 /** Verses per surah (Hafs), to refuse impossible verses before they cost a request. */
@@ -40,6 +58,7 @@ export type ErrorCode =
   | 'UNAUTHENTICATED'
   | 'NOT_FOUND'
   | 'RATE_LIMITED'
+  | 'DAILY_LIMIT'
   | 'NOT_CONFIGURED'
   | 'UPSTREAM_ERROR'
   | 'METHOD_NOT_ALLOWED';
@@ -97,8 +116,16 @@ export async function handleTcq(
     console.error('tcq: could not check the sign-in', err);
     return errorResponse(503, 'UPSTREAM_ERROR', 'Could not check your sign-in; try again');
   }
-  if (env.TCQ_USER_LIMIT && !(await env.TCQ_USER_LIMIT.limit({ key: uid })).success) {
-    return errorResponse(429, 'RATE_LIMITED', 'Too many requests; try again in a minute', { 'Retry-After': '60' });
+  if (env.TCQ_USER_LIMIT) {
+    let allowed = true;
+    try {
+      allowed = (await env.TCQ_USER_LIMIT.limit({ key: uid })).success;
+    } catch (err) {
+      console.error('tcq: rate limiter unavailable', err);
+    }
+    if (!allowed) {
+      return errorResponse(429, 'RATE_LIMITED', 'Too many requests; try again in a minute', { 'Retry-After': '60' });
+    }
   }
 
   const which = tcqEnvironment(request.headers.get('X-Revisely-Channel'));
@@ -113,11 +140,34 @@ export async function handleTcq(
   // Keyed by environment and verse only: no user, no token.
   const cacheKey = new Request(`${new URL(request.url).origin}/__cache/tcq/${which}/verses/${key}`);
   if (ttl > 0 && deps.cache) {
-    const hit = await deps.cache.match(cacheKey);
-    if (hit) {
-      const body = (await hit.json()) as { text: string };
-      return verseResponse(key, body.text, true);
+    try {
+      const hit = await deps.cache.match(cacheKey);
+      const text = hit ? ((await hit.json()) as { text?: unknown }).text : undefined;
+      if (typeof text === 'string' && text.length > 0) return verseResponse(key, text, true);
+    } catch (err) {
+      console.warn('tcq: unreadable cache entry; fetching', err);
     }
+  }
+
+  // Only what reaches The Clear Quran counts against the plan.
+  const budget = await checkBudget(env.TCQ_BUDGET, {
+    uid,
+    env: which,
+    now: deps.now ?? Math.floor(Date.now() / 1000),
+    limits: {
+      liveDaily: int(env.TCQ_DAILY_LIMIT_LIVE, 300),
+      sandboxDaily: int(env.TCQ_DAILY_LIMIT_SANDBOX, 100),
+      userDaily: int(env.TCQ_USER_DAILY_LIMIT, 150),
+    },
+  });
+  if (!budget.ok) {
+    console.warn(`tcq: daily ${budget.scope === 'user' ? 'per-user' : which} budget spent`);
+    return errorResponse(
+      429,
+      'DAILY_LIMIT',
+      budget.scope === 'user' ? 'Daily limit reached for your account' : 'Daily limit reached',
+      { 'Retry-After': String(budget.retryAfter) },
+    );
   }
 
   let upstream: Response;
@@ -142,7 +192,8 @@ export async function handleTcq(
   }
   if (!upstream.ok) {
     // 401/403 mean our key (revoked, wrong environment, unsigned agreement); 5xx theirs.
-    console.error(`tcq: ${which} answered ${upstream.status}: ${(await upstream.text()).slice(0, 300)}`);
+    const detail = await upstream.text().catch(() => '');
+    console.error(`tcq: ${which} answered ${upstream.status}: ${redactKeys(detail.slice(0, 300))}`);
     return errorResponse(502, 'UPSTREAM_ERROR', 'The Clear Quran could not answer; try again');
   }
 

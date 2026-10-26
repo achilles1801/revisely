@@ -66,6 +66,7 @@ describe('getClearQuranVerse', () => {
   it.each([
     ['UNAUTHENTICATED', () => [json(401, {}), json(401, {})]],
     ['RATE_LIMITED', () => [json(429, {})]],
+    ['DAILY_LIMIT', () => [json(429, { error: { code: 'DAILY_LIMIT', message: 'Daily limit reached' } })]],
     ['NOT_FOUND', () => [json(404, {})]],
     ['UNAVAILABLE', () => [json(502, {})]],
     ['UNAVAILABLE', () => [json(503, {})]],
@@ -88,6 +89,7 @@ describe('getClearQuranVerse', () => {
   it('the sheet’s hint for each failure', () => {
     expect(clearQuranErrorHint(new ClearQuranError('RATE_LIMITED', ''))).toMatch(/Try again in a minute/);
     expect(clearQuranErrorHint(new ClearQuranError('NETWORK', ''))).toMatch(/connection/);
+    expect(clearQuranErrorHint(new ClearQuranError('DAILY_LIMIT', ''))).toMatch(/tomorrow/);
     expect(clearQuranErrorHint(new Error('arabic failed'))).toMatch(/connection/);
   });
 });

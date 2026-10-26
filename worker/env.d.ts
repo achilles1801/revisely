@@ -19,3 +19,24 @@ interface CacheStorage {
   /** The data centre's cache (Workers Cache API). */
   readonly default: Cache;
 }
+
+interface DurableObjectStorage {
+  get<T>(key: string): Promise<T | undefined>;
+  put<T>(key: string, value: T): Promise<void>;
+  deleteAll(): Promise<void>;
+}
+
+interface DurableObjectState {
+  readonly storage: DurableObjectStorage;
+}
+
+interface DurableObjectId {}
+
+interface DurableObjectStub {
+  fetch(input: string, init?: RequestInit): Promise<Response>;
+}
+
+interface DurableObjectNamespace {
+  idFromName(name: string): DurableObjectId;
+  get(id: DurableObjectId): DurableObjectStub;
+}

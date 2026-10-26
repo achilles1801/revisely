@@ -35,8 +35,8 @@ file is the release mechanics and the traps behind them.
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, `scripts/`, workflows, Firestore rules or `.md`
-  files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler.jsonc`, workflows,
+  Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
 ## Health (Sentry → GitHub → Claude)
@@ -78,7 +78,7 @@ file is the release mechanics and the traps behind them.
   - `fix` runs Claude on develop. Its token is read-only; it has no Sentry token and no sudo, and
     Claude's commands run with credentials scrubbed. Claude writes a failing test, fixes it and
     commits locally.
-  - `pr` refuses patches that touch `.github/` or hold anything that looks like a credential. It
+  - `pr` refuses patches that touch `.github/`, `worker/` or `wrangler.jsonc`, or hold anything that looks like a credential. It
     pushes `claude/issue-<n>` and opens the PR into `develop` as `github-actions`, then starts CI on
     it with `workflow_dispatch`: PRs opened with the workflow token start no workflows by themselves.
 
@@ -274,21 +274,32 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
 `wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs
 `/api/*` (nothing else reaches the code). `GET /api/tcq/verses/<surah>:<verse>`:
 - needs a Firebase ID token (`Authorization: Bearer`), verified in the worker against Google's keys
-  (`worker/auth.ts`; project `FIREBASE_PROJECT_ID`). 30 requests a minute per user (`ratelimits`).
+  (`worker/auth.ts`; project `FIREBASE_PROJECT_ID`); every malformed token is a 401.
+- 30 requests a minute per user (`ratelimits`), and daily budgets for what reaches The Clear Quran
+  (`worker/budget.ts`, one Durable Object): `TCQ_DAILY_LIMIT_LIVE` for everyone on the live key (300 ×
+  30 days stays under the 10,000-a-month plan), `TCQ_DAILY_LIMIT_SANDBOX`, `TCQ_USER_DAILY_LIMIT` per
+  account; spent: 429 `DAILY_LIMIT` until midnight UTC. Anyone can make an account, so these are what
+  keep one user from spending the month for everyone. Raise them with the plan.
 - calls The Clear Quran API (`https://api.theclearquran.org/verses/<key>`, `Authorization: Bearer
   <key>`) with `TCQ_API_KEY_LIVE` when the app sends `X-Revisely-Channel: production` (the App Store
   app) and `TCQ_API_KEY_SANDBOX` otherwise (TestFlight, dev). Sandbox keys only work against the
   sandbox API: `TCQ_API_BASE_SANDBOX` is its base URL.
 - keeps a verse in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
-  checked); answers the app with `Cache-Control: no-store`.
-- maps their 429 to 429 (Retry-After), 404 to 404, anything else to 502; no key configured is 503.
+  checked); answers the app with `Cache-Control: no-store`; logs never include a key (`redactKeys`).
+- maps their 429 to 429 (Retry-After), 404 to 404, anything else to 502; no key configured is 503;
+  anything unexpected is a JSON 500 (`worker/index.ts`).
+- `observability` is off: no stored request logs (they would say who read which verse). Watch live with
+  `npx wrangler@4.153.0 tail revisely`.
 
-Secrets are set with `npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE` (and `…_SANDBOX`) from the
-repo root, after `npx wrangler@4.153.0 login`; never in files. Cloudflare Workers Builds deploys on
-each push to `main`; between releases, `npx wrangler@4.153.0 deploy` from an up-to-date `develop`
-deploys the worker (and develop's `docs/`). Logs: `npx wrangler@4.153.0 tail revisely` (nothing is
-stored). The worker is its own TypeScript project (`npx tsc --noEmit -p worker`, in CI) and its tests
-run with the app's (`worker/__tests__`). Changes to it publish no app update.
+**Deploying:** Cloudflare Workers Builds deploys `main` on every push (and runs `wrangler preview` for
+other branches, which is why `wrangler.jsonc` has a `previews` block: previews get no keys and answer
+503). So worker changes reach revisely.app through a PR into `main`: they are outside the app hash, so
+they don't hold up promotion, and the same files come back through develop unchanged. Never deploy the
+worker from a laptop except to recover. Secrets: `npx wrangler@4.153.0 login`, then `npx
+wrangler@4.153.0 secret put TCQ_API_KEY_LIVE` (and `…_SANDBOX`) from the repo root; they persist across
+deploys and never go in files. The worker is its own TypeScript project (`npx tsc --noEmit -p worker`,
+in CI) and its tests run with the app's (`worker/__tests__`). Changes to it publish no app update, and
+`claude-fix` refuses patches that touch it.
 
 ## UI traps
 
