@@ -36,8 +36,8 @@ export function reportProblem() {
 }
 
 /**
- * Checks that crashes reach Sentry readable, for preview and development builds
- * only (Settings → App info shows them there): a handled JavaScript error, and a
+ * Checks that crashes reach Sentry readable, for TestFlight (preview) builds only
+ * (Settings → App info shows them there): a handled JavaScript error, and a
  * native crash, whose stack only reads properly if the build's dSYMs were uploaded.
  */
 export function sendTestError() {

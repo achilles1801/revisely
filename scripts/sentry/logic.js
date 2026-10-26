@@ -313,6 +313,8 @@ function dailyReport({ date, newIssues, regressed, top, feedback, production, pr
     `## App health · ${date} (last 24 h)`,
     mention ? `${mention} ${head}` : head,
     '',
+    '_Production and preview only: development and simulator builds don\'t report._',
+    '',
     `### New issues (${newIssues.length})`,
     issueList(newIssues),
     '',

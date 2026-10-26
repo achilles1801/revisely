@@ -41,15 +41,16 @@ export function appInfoSummary(r: ReleaseInfo): string {
   return [r.versionLabel, r.channel ?? undefined, js].filter(Boolean).join(' · ');
 }
 
-/** Test actions are for builds that aren't on the App Store's channel. */
+/** Test actions check that TestFlight (preview) builds report to Sentry. Not on
+ *  the App Store's channel, and not where nothing reports (development, simulators). */
 export function showsTestActions(r: ReleaseInfo): boolean {
-  return r.isDev || (r.channel != null && r.channel !== 'production');
+  return r.sentryEnabled && r.channel === 'preview';
 }
 
 /**
  * Settings → About → App info: which build and update this is (what support
  * needs to know). Tap to see the details and share them; long-press to check for
- * an update now. Preview and development builds also get test-crash actions.
+ * an update now. TestFlight (preview) builds also get test-crash actions.
  */
 export function AppInfo({
   release = currentRelease(),
