@@ -36,6 +36,8 @@ import { ReaderFrame } from '../../components/reader/ReaderFrame';
 import { ReaderActivity } from '../../components/reader/ReaderActivity';
 import { CAPSULE_HEIGHT, PlayerCapsule } from '../../components/reader/PlayerCapsule';
 import { useReaderChrome } from '../../components/reader/useReaderChrome';
+import { useTapHint } from '../../components/reader/useTapHint';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
@@ -156,8 +158,30 @@ export default function ActiveRevisionScreen() {
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (beside the page, never over it); another
   // tap, or turning the page, puts them away.
-  const chrome = useReaderChrome();
+  // Every page revised: the controls stay up, with Submit.
+  const submitVisible =
+    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
+  const chrome = useReaderChrome({ locked: submitVisible });
+  const tapHint = useTapHint();
+  const dismissHint = tapHint.dismiss;
+  const toggleChrome = chrome.toggle;
+  const onTapPage = useCallback(() => {
+    dismissHint();
+    toggleChrome();
+  }, [dismissHint, toggleChrome]);
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Arriving on the session's last page, not yet revised: the controls come up
+  // (✓ is there; there is no next page to swipe it done).
+  const showChrome = chrome.show;
+  const lastSessionPage = assignment?.pages[assignment.pages.length - 1];
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPageNumber(page);
+      if (page === lastSessionPage && !completedPages.has(page)) showChrome();
+    },
+    [lastSessionPage, completedPages, showChrome],
+  );
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -283,13 +307,6 @@ export default function ActiveRevisionScreen() {
 
   // The timer is in the controls here, not floating over the page.
   useFloatingTimerOffset('hidden');
-  // Every page revised: the controls come up once, with Submit.
-  const submitVisible =
-    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
-  const showChrome = chrome.show;
-  useEffect(() => {
-    if (submitVisible) showChrome();
-  }, [submitVisible, showChrome]);
 
   if (!user || !assignment) {
     return (
@@ -583,16 +600,18 @@ export default function ActiveRevisionScreen() {
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame
         chromeVisible={chrome.visible}
+        active={isScreenFocused}
+        onBackgroundPress={onTapPage}
         background={palette.pageBg}
         isDark={isDark}
         quietHeader={
           <View style={styles.quietHeader}>
-            <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1}>
+            <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
               Juz {currentJuz} · {completedCount}/{totalPages}
             </Text>
             {firstSurahOnPage ? (
               <View style={styles.crumbRight}>
-                <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1}>
+                <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                   {firstSurahOnPage.name}
                 </Text>
                 {firstSurahOnPage.nameArabic ? (
@@ -608,13 +627,13 @@ export default function ActiveRevisionScreen() {
           <View style={styles.header}>
             <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
-              <Text style={[styles.title, { color: palette.textPrimary }]} numberOfLines={1}>
+              <Text style={[styles.title, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Revising {scopeLabel}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
                   · {completedCount}/{totalPages}
                 </Text>
               </Text>
-              <Text style={[styles.subtitle, { color: palette.textSecondary }]} numberOfLines={1}>
+              <Text style={[styles.subtitle, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
               </Text>
             </View>
@@ -634,12 +653,18 @@ export default function ActiveRevisionScreen() {
               player={verseActions.player}
               page={displayPageNumber}
               compact={compact}
-              surface={{ background: palette.card, border: palette.divider }}
+              surface={{ background: palette.control, border: palette.divider }}
               record={
-                <RecordButton recorder={recorder} color={theme.textPrimary} background={theme.glass} border={theme.border} />
+                <RecordButton
+                  recorder={recorder}
+                  color={palette.textSecondary}
+                  background={palette.control}
+                  border={palette.divider}
+                />
               }
               timer={
                 <TimerChip
+                  compact={compact}
                   onOpenQuran={() => {
                     if (navigationRef.isReady()) navigationRef.navigate('Read');
                   }}
@@ -664,23 +689,32 @@ export default function ActiveRevisionScreen() {
         footerHeight={FOOTER_HEIGHT}
         pageLabel={
           <View style={styles.pageLabel}>
-            <Text style={[styles.pageNum, { color: palette.textPrimary }]}>{displayPageNumber}</Text>
+            <Text style={[styles.pageNum, { color: palette.textPrimary }]} maxFontSizeMultiplier={1.3}>
+              {displayPageNumber}
+            </Text>
             {isCurrentRevised && <Ionicons name="checkmark" size={12} color={palette.textSecondary} />}
           </View>
         }
         activity={
           <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
         }
+        hint={
+          tapHint.shown ? (
+            <Text style={[styles.quietText, { color: palette.textSecondary }]} maxFontSizeMultiplier={1.3}>
+              Tap the page for the controls
+            </Text>
+          ) : null
+        }
       >
         <MushafPager
           ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}
-          onPageChange={setCurrentPageNumber}
+          onPageChange={handlePageChange}
           onAdvance={handleAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
-          onTap={chrome.toggle}
+          onTap={onTapPage}
           onUserSwipe={chrome.hide}
           extraData={extraData}
         />
@@ -697,7 +731,7 @@ export default function ActiveRevisionScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={FOOTER_HEIGHT}
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       <UndoToast
@@ -705,7 +739,7 @@ export default function ActiveRevisionScreen() {
         message={undoState?.message ?? ''}
         onUndo={handleUndo}
         onDismiss={() => setUndoState(null)}
-        bottomInset={FOOTER_HEIGHT}
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       <SessionMenuSheet

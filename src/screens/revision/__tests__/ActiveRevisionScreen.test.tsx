@@ -21,12 +21,13 @@ jest.mock('expo-glass-effect', () => {
 });
 jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 // The page: a tap toggles the controls, and the test can swipe it.
-const mockPager: { onUserSwipe?: () => void } = {};
+const mockPager: { onUserSwipe?: () => void; onPageChange?: (p: number) => void } = {};
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable } = require('react-native');
   return {
-    MushafPager: (props: { onTap?: () => void; onUserSwipe?: () => void }) => {
+    MushafPager: (props: { onTap?: () => void; onUserSwipe?: () => void; onPageChange?: (p: number) => void }) => {
       mockPager.onUserSwipe = props.onUserSwipe;
+      mockPager.onPageChange = props.onPageChange;
       return <Pressable accessibilityLabel="The page" onPress={props.onTap} />;
     },
   };
@@ -195,10 +196,32 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
   });
 
-  it('with every page revised, the controls come up with Submit', () => {
+  it('with every page revised, the controls stay up with Submit (a swipe or tap doesn’t hide them)', () => {
     setup(DAY_PAGES);
     render(<ActiveRevisionScreen />);
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
     expect(screen.getByLabelText('Submit session')).toBeTruthy();
+    act(() => mockPager.onUserSwipe?.());
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(screen.getByLabelText('Submit session')).toBeTruthy();
+  });
+
+  it('arriving on the last page, not yet revised, brings the controls (✓ is there)', () => {
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
+    act(() => {
+      mockPager.onUserSwipe?.();
+      mockPager.onPageChange?.(340);
+    });
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+  });
+
+  it('a tap above or below the page toggles the controls too', () => {
+    setup([332, 333]);
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(byTestId('reader-background'));
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
   });
 });

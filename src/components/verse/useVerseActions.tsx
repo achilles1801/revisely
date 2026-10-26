@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Dimensions, Modal, Pressable, SafeAreaView, StyleSheet, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
-import { AyahRef, ayahRects, firstVerseOnPage } from '../../lib/ayahBounds';
+import { AyahRef, ayahRects, versesOnPage } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
 import { nextVerse, nextVerseInJuz, pageOfVerse, previousVerse, toAyahRef, VerseKey } from '../../lib/verses';
 import { logger } from '../../lib/logger';
@@ -109,10 +109,12 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     setSelected(null);
   }, [selected, advance, recitation, owner]);
 
-  /** ▶ in the controls: recite from the top of a page. */
+  /** ▶ in the controls: recite from the first verse that begins on a page (the
+   *  one continuing from the page before is part of that page's reading). */
   const playPage = useCallback(
     (page: number) => {
-      const first = firstVerseOnPage(page);
+      const verses = versesOnPage(page);
+      const first = verses.find((v) => pageOfVerse(v) === page) ?? verses[0];
       if (!first || !allowed.has(page)) return;
       if (isRecordingActive()) {
         Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');

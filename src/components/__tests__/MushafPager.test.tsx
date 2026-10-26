@@ -139,3 +139,54 @@ describe('<MushafPager /> scrollToPage', () => {
     expect(onPageChange).toHaveBeenLastCalledWith(12, 11);
   });
 });
+
+describe('<MushafPager /> turning the page by swiping', () => {
+  function setupSwipe() {
+    const order: string[] = [];
+    const onUserSwipe = jest.fn(() => order.push('swipe'));
+    const onPageChange = jest.fn(() => order.push('page'));
+    const ref = createRef<MushafPagerHandle>();
+    render(<MushafPager ref={ref} pages={PAGES} onPageChange={onPageChange} onUserSwipe={onUserSwipe} />);
+    const list = screen.UNSAFE_getByType(FlatList);
+    const report = (index: number) =>
+      act(() => {
+        list.props.onViewableItemsChanged({
+          viewableItems: [{ index, item: PAGES[index], key: `${index}`, isViewable: true }],
+          changed: [],
+        });
+      });
+    const drag = () => act(() => list.props.onScrollBeginDrag());
+    return { ref, onUserSwipe, onPageChange, report, drag, order };
+  }
+
+  it('reports a page turned by a swipe, before the page change', () => {
+    const { onUserSwipe, report, drag, order } = setupSwipe();
+    drag();
+    expect(onUserSwipe).not.toHaveBeenCalled(); // only once the page has turned
+    report(1);
+    expect(onUserSwipe).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['swipe', 'page']);
+  });
+
+  it('a drag that snaps back is not a turn', () => {
+    const { onUserSwipe, report, drag } = setupSwipe();
+    drag();
+    report(0);
+    expect(onUserSwipe).not.toHaveBeenCalled();
+  });
+
+  it('a jump (page bar, recitation) is not a swipe', () => {
+    const { ref, onUserSwipe, report } = setupSwipe();
+    act(() => {
+      ref.current!.scrollToPage(10);
+    });
+    report(9);
+    expect(onUserSwipe).not.toHaveBeenCalled();
+  });
+
+  it('the page is one element for VoiceOver, telling what a tap does', () => {
+    render(<MushafPager pages={[3]} onTap={jest.fn()} />);
+    const page = screen.getByLabelText('Page 3');
+    expect(page.props.accessibilityHint).toBe('Shows or hides the controls');
+  });
+});

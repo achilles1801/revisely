@@ -22,6 +22,8 @@ import { ReaderFrame } from '../../components/reader/ReaderFrame';
 import { ReaderActivity } from '../../components/reader/ReaderActivity';
 import { CAPSULE_HEIGHT, PlayerCapsule } from '../../components/reader/PlayerCapsule';
 import { useReaderChrome } from '../../components/reader/useReaderChrome';
+import { useTapHint } from '../../components/reader/useTapHint';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -102,9 +104,17 @@ export default function QuranReaderScreen() {
   // the page brings the controls (they sit beside the page, never over it);
   // another tap, or turning the page, puts them away.
   const chrome = useReaderChrome();
+  const tapHint = useTapHint();
+  const dismissHint = tapHint.dismiss;
+  const toggleChrome = chrome.toggle;
+  const onTapPage = useCallback(() => {
+    dismissHint();
+    toggleChrome();
+  }, [dismissHint, toggleChrome]);
   // The timer is in the controls here, not floating over the page.
   useFloatingTimerOffset('hidden');
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
@@ -163,11 +173,13 @@ export default function QuranReaderScreen() {
     <View style={styles.container}>
       <ReaderFrame
         chromeVisible={chrome.visible}
+        active={isScreenFocused}
+        onBackgroundPress={onTapPage}
         background={palette.pageBg}
         isDark={isDark}
         quietHeader={
           <View style={styles.quietHeader}>
-            <Text style={styles.quietText} numberOfLines={1}>
+            <Text style={styles.quietText} numberOfLines={1} maxFontSizeMultiplier={1.3}>
               Juz {juz}
             </Text>
             <SurahName surah={firstSurah} palette={palette} quiet />
@@ -178,7 +190,7 @@ export default function QuranReaderScreen() {
             <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} />
             <View style={styles.titleCol}>
               <SurahName surah={firstSurah} palette={palette} />
-              <Text style={styles.subtitle} numberOfLines={1}>
+              <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Page {currentPage} · Juz {juz} · Hizb {hizb}
               </Text>
             </View>
@@ -192,21 +204,32 @@ export default function QuranReaderScreen() {
               player={verseActions.player}
               page={currentPage}
               compact={compact}
-              surface={{ background: palette.card, border: palette.divider }}
+              surface={{ background: palette.control, border: palette.divider }}
               record={
                 <RecordButton
                   recorder={recorder}
                   color={palette.textSecondary}
-                  background={palette.card}
+                  background={palette.control}
                   border={palette.divider}
                 />
               }
-              timer={<TimerChip />}
+              timer={<TimerChip compact={compact} />}
             />
           </View>
         }
         footerHeight={FOOTER_HEIGHT}
-        pageLabel={<Text style={styles.pageNum}>{currentPage}</Text>}
+        pageLabel={
+          <Text style={styles.pageNum} maxFontSizeMultiplier={1.3}>
+            {currentPage}
+          </Text>
+        }
+        hint={
+          tapHint.shown ? (
+            <Text style={styles.hint} maxFontSizeMultiplier={1.3}>
+              Tap the page for the controls
+            </Text>
+          ) : null
+        }
         activity={
           <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
         }
@@ -218,7 +241,7 @@ export default function QuranReaderScreen() {
           onPageChange={handlePageChange}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
-          onTap={chrome.toggle}
+          onTap={onTapPage}
           onUserSwipe={chrome.hide}
         />
       </ReaderFrame>
@@ -234,7 +257,8 @@ export default function QuranReaderScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={FOOTER_HEIGHT}
+        // At the bottom of the room under the page, never over the text.
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       {verseActions.overlay}
@@ -262,11 +286,19 @@ function SurahName({
   const color = quiet ? palette.textSecondary : palette.textPrimary;
   return (
     <View style={surahStyles.row}>
-      <Text style={[quiet ? surahStyles.quiet : surahStyles.title, { color }]} numberOfLines={1}>
+      <Text
+        style={[quiet ? surahStyles.quiet : surahStyles.title, { color }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.3}
+      >
         {surah.name}
       </Text>
       {surah.nameArabic ? (
-        <Text style={[surahStyles.arabic, { color, fontSize: quiet ? 13 : 16 }]} numberOfLines={1}>
+        <Text
+          style={[surahStyles.arabic, { color, fontSize: quiet ? 13 : 16 }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+        >
           {surah.nameArabic}
         </Text>
       ) : null}
@@ -412,6 +444,10 @@ const makeStyles = (palette: ReadPalette) =>
       paddingBottom: spacing.sm,
       gap: spacing.xs,
       justifyContent: 'flex-end',
+    },
+    hint: {
+      ...typography.caption,
+      color: palette.textSecondary,
     },
     pageNum: {
       textAlign: 'center',

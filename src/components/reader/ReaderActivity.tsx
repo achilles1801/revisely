@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
+import { displayMs, formatClock } from '../../lib/readingTimer';
 import { recordedMs } from '../recordings/RecordButton';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import type { RecitationState } from '../../lib/recitation';
@@ -19,8 +21,9 @@ interface ReaderActivityProps {
 
 /**
  * While reading with the controls hidden: a small sign that something is
- * running, a recording (red dot and its time) or a recitation (its verse), so
- * it isn't forgotten. Tapping it brings the controls back. Nothing otherwise.
+ * running, a recording (red dot and its time), a recitation (its verse) or the
+ * timer (its clock), so it isn't forgotten. Tapping it brings the controls back.
+ * Nothing otherwise.
  */
 export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityProps) {
   const { theme } = useTheme();
@@ -28,20 +31,25 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
   const recordingShown = phase !== 'idle' && (phase !== 'starting' || baseMs > 0 || segmentStartedAt != null);
   const capturing = phase === 'recording';
   const reciting = playback.status !== 'idle' && playback.verse != null;
+  const { timer } = useReadingTimer();
+  const timing = timer?.runningSince != null;
+  const timerNow = useNow(timing, 1000);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!capturing) return;
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, [capturing]);
-  if (!recordingShown && !reciting) return null;
+  if (!recordingShown && !reciting && !timer) return null;
 
   const time = formatRecordingTime(recordedMs(baseMs, segmentStartedAt, now));
+  const clock = timer ? formatClock(displayMs(timer, timerNow)) : '';
   const label = [
     recordingShown ? `${capturing ? 'Recording' : 'Recording paused'}, ${time}` : null,
     reciting
       ? `${playback.status === 'playing' ? 'Reciting' : 'Recitation paused'} ${playback.verse!.sura}:${playback.verse!.ayah}`
       : null,
+    timer ? `${timing ? 'Timer running' : 'Timer paused'}, ${clock}` : null,
   ]
     .filter(Boolean)
     .join('. ');
@@ -58,7 +66,9 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
       {recordingShown && (
         <View style={styles.item}>
           <View style={[styles.dot, capturing ? { backgroundColor: RED } : styles.dotPaused]} />
-          <Text style={[styles.text, { color: RED }]}>{time}</Text>
+          <Text style={[styles.text, { color: RED }]} maxFontSizeMultiplier={1.2}>
+            {time}
+          </Text>
         </View>
       )}
       {reciting && (
@@ -68,8 +78,16 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
             size={12}
             color={theme.accent}
           />
-          <Text style={[styles.text, { color: theme.accent }]}>
+          <Text style={[styles.text, { color: theme.accent }]} maxFontSizeMultiplier={1.2}>
             {playback.verse!.sura}:{playback.verse!.ayah}
+          </Text>
+        </View>
+      )}
+      {timer && (
+        <View style={styles.item}>
+          <Ionicons name={timing ? 'stopwatch-outline' : 'pause'} size={12} color={theme.textSecondary} />
+          <Text style={[styles.text, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
+            {clock}
           </Text>
         </View>
       )}

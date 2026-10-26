@@ -49,6 +49,12 @@ describe('useVerseActions: ▶ in the controls', () => {
     expect(advance({ sura: 2, ayah: 24 })).toBeNull(); // 2:25 is on page 5
   });
 
+  it('a page that is all one verse begun on the page before (48: 2:282) plays that verse', () => {
+    const { result } = renderHook(() => useVerseActions({ pages: [47, 48, 49], currentPage: 48 }));
+    act(() => result.current.player.onPlayPage(48));
+    expect(mockRecitation.play.mock.calls[0][0]).toMatchObject({ sura: 2, ayah: 282 });
+  });
+
   it('plays nothing for a page outside the screen’s pages', () => {
     const { result } = renderHook(() => useVerseActions({ pages: [2, 3], currentPage: 3 }));
     act(() => result.current.player.onPlayPage(50));

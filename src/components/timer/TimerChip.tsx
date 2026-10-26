@@ -16,6 +16,8 @@ export const TIMER_CHIP_SIZE = 36;
 interface TimerChipProps {
   /** "Open the Quran" in the controls; omitted in the reader. */
   onOpenQuran?: () => void;
+  /** Crowded: the clock without its icon. */
+  compact?: boolean;
 }
 
 /**
@@ -23,7 +25,7 @@ interface TimerChipProps {
  * over the page): a stopwatch while idle, the live clock while a session runs or
  * is paused. Tapping opens the same controls as the floating button.
  */
-export function TimerChip({ onOpenQuran }: TimerChipProps) {
+export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { timer } = useReadingTimer();
@@ -46,8 +48,15 @@ export function TimerChip({ onOpenQuran }: TimerChipProps) {
           ]}
           accessibilityLabel={`${running ? 'Timer running' : 'Timer paused'}, ${clock}. Open timer controls`}
         >
-          <Ionicons name={running ? 'stopwatch' : 'pause'} size={14} color={running ? theme.accent : theme.warning} />
-          <Text style={[styles.clock, { color: running ? theme.accent : theme.textPrimary }]}>{clock}</Text>
+          {!compact && (
+            <Ionicons name={running ? 'stopwatch' : 'pause'} size={14} color={running ? theme.accent : theme.warning} />
+          )}
+          <Text
+            style={[styles.clock, { color: running ? theme.accent : theme.textPrimary }]}
+            maxFontSizeMultiplier={1.2}
+          >
+            {clock}
+          </Text>
         </PressableScale>
       ) : (
         <PressableScale
@@ -61,7 +70,19 @@ export function TimerChip({ onOpenQuran }: TimerChipProps) {
           <Ionicons name="stopwatch-outline" size={18} color={theme.textPrimary} />
         </PressableScale>
       )}
-      <TimerSheet visible={open} onClose={() => setOpen(false)} onOpenQuran={onOpenQuran} />
+      <TimerSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        onOpenQuran={
+          onOpenQuran
+            ? () => {
+                // The sheet closes first, or it would stay open over the Quran.
+                setOpen(false);
+                onOpenQuran();
+              }
+            : undefined
+        }
+      />
     </>
   );
 }

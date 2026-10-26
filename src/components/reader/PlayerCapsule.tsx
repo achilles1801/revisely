@@ -107,7 +107,11 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
         accessibilityLabel={`${active ? `${surah} ${state.verse!.sura}:${state.verse!.ayah}, ` : ''}${player.voiceName}. Choose reciter`}
       >
         {active && (
-          <Text style={[typography.bodySmall, styles.verse, { color: theme.textPrimary }]} numberOfLines={1}>
+          <Text
+            style={[typography.bodySmall, styles.verse, { color: theme.textPrimary }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+          >
             {state.verse!.sura}:{state.verse!.ayah} · {surah}
           </Text>
         )}
@@ -115,9 +119,10 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
           <Text
             style={[
               active ? typography.caption : typography.bodySmall,
-              { color: failed ? theme.error : active ? theme.textMuted : theme.textPrimary, flexShrink: 1 },
+              { color: failed ? theme.error : active ? theme.textSecondary : theme.textPrimary, flexShrink: 1 },
             ]}
             numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
           >
             {failed ? 'Couldn’t play. Check your connection.' : player.voiceName}
           </Text>

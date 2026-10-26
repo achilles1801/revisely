@@ -1,5 +1,5 @@
 import React, { ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StatusBar, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../theme/spacing';
 
@@ -9,6 +9,12 @@ export const READER_HEADER_HEIGHT = 48;
 interface ReaderFrameProps {
   /** The controls are showing (otherwise: reading, nothing but the page). */
   chromeVisible: boolean;
+  /** The screen is the focused one. Only then does it set the status bar,
+   *  which is app-wide: hidden here must not stay hidden on the next screen. */
+  active?: boolean;
+  /** A tap anywhere that isn't a control (above or below the page as well as
+   *  on it): show or hide the controls. */
+  onBackgroundPress?: () => void;
   background: string;
   isDark: boolean;
   /** With the controls: the header (back, title, actions). */
@@ -24,18 +30,25 @@ interface ReaderFrameProps {
   pageLabel: ReactNode;
   /** While reading: what is running (a recording, a recitation), beside the page number. */
   activity?: ReactNode;
+  /** While reading: a line under the page number (a first-time hint). */
+  hint?: ReactNode;
   /** The pages. */
   children: ReactNode;
 }
 
-/** The largest value seen: hiding the status bar must not shrink the top inset
- *  (it does on phones without a notch), or the page would move. */
+// The status bar's height where it isn't inside the safe area (iPhones without
+// a notch), so the top inset is the same whether or not it shows.
+const STATUS_BAR_FLOOR = Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight ?? 0);
+
+/** The largest value seen, and at least the status bar: hiding the status bar
+ *  must not shrink the top inset (it does on phones without a notch), or the
+ *  page would move. */
 function useStableInset(value: number): number {
   const [max, setMax] = useState(value);
   useEffect(() => {
     if (value > max) setMax(value);
   }, [value, max]);
-  return Math.max(value, max);
+  return Math.max(value, max, STATUS_BAR_FLOOR);
 }
 
 /**
@@ -47,6 +60,8 @@ function useStableInset(value: number): number {
  */
 export function ReaderFrame({
   chromeVisible,
+  active = true,
+  onBackgroundPress,
   background,
   isDark,
   header,
@@ -55,6 +70,7 @@ export function ReaderFrame({
   footerHeight,
   pageLabel,
   activity,
+  hint,
   children,
 }: ReaderFrameProps) {
   const insets = useSafeAreaInsets();
@@ -79,12 +95,22 @@ export function ReaderFrame({
 
   return (
     <View style={[styles.root, { backgroundColor: background }]}>
-      <StatusBar
-        hidden={!chromeVisible}
-        animated
-        showHideTransition="fade"
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-      />
+      {active && (
+        <StatusBar
+          hidden={!chromeVisible}
+          animated
+          showHideTransition="fade"
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+        />
+      )}
+      {onBackgroundPress && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onBackgroundPress}
+          accessible={false}
+          testID="reader-background"
+        />
+      )}
       <View style={[styles.pages, { top: top + READER_HEADER_HEIGHT, bottom: insets.bottom + footerHeight }]}>
         {children}
       </View>
@@ -111,6 +137,11 @@ export function ReaderFrame({
           <View pointerEvents="none">{pageLabel}</View>
           <View style={styles.side} />
         </View>
+        {hint ? (
+          <View style={styles.hint} pointerEvents="none">
+            {hint}
+          </View>
+        ) : null}
       </Animated.View>
 
       {/* The controls */}
@@ -155,5 +186,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   side: { flex: 1, flexDirection: 'row' },
+  hint: { alignItems: 'center', paddingTop: 2 },
   sideStart: { justifyContent: 'flex-start' },
 });

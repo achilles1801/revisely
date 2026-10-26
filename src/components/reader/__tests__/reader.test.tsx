@@ -146,6 +146,22 @@ describe('<ReaderActivity />', () => {
     expect(onPress).toHaveBeenCalled();
   });
 
+  it('a running timer: its clock', async () => {
+    mockTimer.timer = {
+      mode: 'stopwatch',
+      targetSeconds: null,
+      startedAt: 1_000_000,
+      runningSince: 1_000_000,
+      accumulatedMs: 0,
+      date: '2026-10-26',
+      pagesVisited: [],
+    };
+    withTheme(<ReaderActivity recorder={idleRecorder} playback={idle} onPress={jest.fn()} />);
+    expect(await screen.findByText('1:05')).toBeTruthy();
+    expect(screen.getByLabelText(/Timer running, 1:05/)).toBeTruthy();
+    mockTimer.timer = null;
+  });
+
   it('a recitation: its verse', async () => {
     withTheme(
       <ReaderActivity recorder={idleRecorder} playback={{ status: 'playing', verse: { sura: 2, ayah: 255 } }} onPress={jest.fn()} />,
@@ -215,6 +231,42 @@ describe('<ReaderFrame />', () => {
   });
 });
 
+describe('<ReaderFrame /> around the page', () => {
+  const frame = (props: Partial<React.ComponentProps<typeof ReaderFrame>>) => (
+    <ReaderFrame
+      chromeVisible={false}
+      background="#000"
+      isDark
+      header={<Text>HEADER</Text>}
+      quietHeader={<Text>Juz 1</Text>}
+      footer={<Text>FOOTER</Text>}
+      footerHeight={60}
+      pageLabel={<Text>3</Text>}
+      {...props}
+    >
+      <Text>PAGE</Text>
+    </ReaderFrame>
+  );
+
+  it('sets the status bar only while its screen is focused (it is app-wide)', async () => {
+    withTheme(frame({ active: false }));
+    await act(async () => {});
+    expect(screen.UNSAFE_queryAllByType(StatusBar)).toHaveLength(0);
+  });
+
+  it('a tap above or below the page toggles the controls too', async () => {
+    const onBackgroundPress = jest.fn();
+    withTheme(frame({ onBackgroundPress }));
+    fireEvent.press(await screen.findByTestId('reader-background'));
+    expect(onBackgroundPress).toHaveBeenCalled();
+  });
+
+  it('shows a hint under the page number while reading', async () => {
+    withTheme(frame({ hint: <Text>Tap the page for the controls</Text> }));
+    expect(await screen.findByText('Tap the page for the controls')).toBeTruthy();
+  });
+});
+
 describe('useReaderChrome', () => {
   it('reading by default; tap toggles; swipe hides; locked keeps them up', () => {
     const { result, rerender } = renderHook(({ locked }: { locked: boolean }) => useReaderChrome({ locked }), {
@@ -226,6 +278,12 @@ describe('useReaderChrome', () => {
     act(() => result.current.hide());
     expect(result.current.visible).toBe(false);
     rerender({ locked: true });
+    expect(result.current.visible).toBe(true);
+    // Taps and swipes while locked change nothing...
+    act(() => result.current.toggle());
+    act(() => result.current.hide());
+    // ...and when it lets go, they stay up (the user is using them).
+    rerender({ locked: false });
     expect(result.current.visible).toBe(true);
   });
 });
@@ -239,6 +297,24 @@ describe('<TimerChip />', () => {
     withTheme(<TimerChip />);
     fireEvent.press(await screen.findByLabelText('Open timer'));
     expect(await screen.findByLabelText('Start timer')).toBeTruthy();
+  });
+
+  it('"Open the Quran" closes the sheet first', async () => {
+    mockTimer.timer = {
+      mode: 'stopwatch',
+      targetSeconds: null,
+      startedAt: 1_000_000,
+      runningSince: 1_000_000,
+      accumulatedMs: 0,
+      date: '2026-10-26',
+      pagesVisited: [],
+    };
+    const onOpenQuran = jest.fn();
+    withTheme(<TimerChip onOpenQuran={onOpenQuran} />);
+    fireEvent.press(await screen.findByLabelText(/Timer running/));
+    fireEvent.press(await screen.findByText('Open the Quran'));
+    expect(onOpenQuran).toHaveBeenCalled();
+    expect(screen.queryByText('Open the Quran')).toBeNull();
   });
 
   it('running: the live clock', async () => {

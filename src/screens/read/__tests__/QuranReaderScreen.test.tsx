@@ -79,6 +79,7 @@ const byTestId = (id: string) => screen.getByTestId(id, { includeHiddenElements:
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  await AsyncStorage.clear();
   // The guide was seen.
   await AsyncStorage.setItem('@revisley_reader_guide_dismissed', 'true');
 });
@@ -120,6 +121,20 @@ describe('QuranReaderScreen: reading, and the controls on a tap', () => {
     fireEvent.press(screen.getByLabelText('The page'));
     fireEvent.press(screen.getByLabelText('The page'));
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('says once, under the page number, to tap the page for the controls', async () => {
+    await open();
+    expect(screen.getByText('Tap the page for the controls')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(screen.queryByText('Tap the page for the controls', { includeHiddenElements: true })).toBeNull();
+    expect(await AsyncStorage.getItem('@revisely_reader_tap_hint_seen')).toBe('true');
+  });
+
+  it('a tap above or below the page toggles the controls too', async () => {
+    await open();
+    fireEvent.press(byTestId('reader-background'));
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
   });
 
   it('holding a verse still works (the page passes it on)', async () => {

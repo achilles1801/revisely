@@ -24,7 +24,7 @@ export function RoundButton({ icon, label, onPress, palette, active }: RoundButt
       hitSlop={8}
       style={[
         styles.button,
-        { backgroundColor: active ? palette.textPrimary : palette.card, borderColor: palette.divider },
+        { backgroundColor: active ? palette.textPrimary : palette.control, borderColor: palette.divider },
       ]}
       accessibilityRole="button"
       accessibilityLabel={label}
