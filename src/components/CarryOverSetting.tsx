@@ -3,6 +3,9 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SettingIcon } from './settings/SettingIcon';
 import { SettingSwitch } from './settings/SettingSwitch';
+import { useDesign } from '../design/DesignContext';
+import { Sheet } from './v2/Sheet';
+import { typeV2 } from '../theme/v2';
 import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
@@ -36,7 +39,8 @@ export function CarryOverSetting({
   mode: CarryOverMode | undefined;
   onChange: (mode: CarryOverMode) => void;
 }) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const [infoOpen, setInfoOpen] = useState(false);
   const keepAmount = (mode ?? DEFAULT_CARRY_OVER_MODE) === 'shift';
 
@@ -63,48 +67,73 @@ export function CarryOverSetting({
         />
       </View>
 
-      <Modal visible={infoOpen} transparent animationType="fade" onRequestClose={() => setInfoOpen(false)}>
-        <Pressable style={styles.overlay} onPress={() => setInfoOpen(false)}>
-          <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <Text style={[typography.titleLarge, { color: theme.textPrimary }]}>
-              Keep daily amount
-            </Text>
-            <Text style={[typography.bodySmall, styles.intro, { color: theme.textSecondary }]}>
-              When you didn’t finish yesterday, Home offers to add the pages you missed to
-              today. This decides how they fit in.
-            </Text>
-            <View style={styles.options}>
-              {OPTIONS.map((o) => (
-                <View key={o.title} style={styles.option}>
-                  <View style={[styles.optionIcon, { backgroundColor: theme.accent + '20' }]}>
-                    <Ionicons name={o.icon} size={18} color={theme.accent} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[typography.titleSmall, { color: theme.textPrimary, marginBottom: 2 }]}>
-                      {o.title}
-                    </Text>
-                    <Text style={[typography.bodySmall, { color: theme.textSecondary }]}>{o.body}</Text>
-                  </View>
-                </View>
-              ))}
+      {isNew ? (
+        <Sheet
+          visible={infoOpen}
+          onClose={() => setInfoOpen(false)}
+          title="Keep daily amount"
+          footer={{ label: 'Got it', onPress: () => setInfoOpen(false) }}
+          scroll
+        >
+          <Text style={[typeV2.body, styles.intro, { color: palette.secondary }]}>
+            When you didn’t finish yesterday, Home offers to add the pages you missed to today. This decides how
+            they fit in.
+          </Text>
+          {OPTIONS.map((o) => (
+            <View key={o.title} style={styles.optionV2}>
+              <Ionicons name={o.icon} size={24} color={palette.text} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeV2.name, { color: palette.text }]}>{o.title}</Text>
+                <Text style={[typeV2.body, { color: palette.secondary }]}>{o.body}</Text>
+              </View>
             </View>
-            <PressableScale
-              onPress={() => setInfoOpen(false)}
-              haptic="light"
-              scale={0.98}
-              style={[styles.doneBtn, { backgroundColor: theme.accent }]}
-            >
-              <Text style={[typography.bodySmall, { color: theme.onAccent, fontWeight: '700' }]}>Got it</Text>
-            </PressableScale>
+          ))}
+        </Sheet>
+      ) : (
+        <Modal visible={infoOpen} transparent animationType="fade" onRequestClose={() => setInfoOpen(false)}>
+          <Pressable style={styles.overlay} onPress={() => setInfoOpen(false)}>
+            <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
+              <GlassCard style={StyleSheet.absoluteFillObject} />
+              <Text style={[typography.titleLarge, { color: theme.textPrimary }]}>
+                Keep daily amount
+              </Text>
+              <Text style={[typography.bodySmall, styles.intro, { color: theme.textSecondary }]}>
+                When you didn’t finish yesterday, Home offers to add the pages you missed to
+                today. This decides how they fit in.
+              </Text>
+              <View style={styles.options}>
+                {OPTIONS.map((o) => (
+                  <View key={o.title} style={styles.option}>
+                    <View style={[styles.optionIcon, { backgroundColor: theme.accent + '20' }]}>
+                      <Ionicons name={o.icon} size={18} color={theme.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typography.titleSmall, { color: theme.textPrimary, marginBottom: 2 }]}>
+                        {o.title}
+                      </Text>
+                      <Text style={[typography.bodySmall, { color: theme.textSecondary }]}>{o.body}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <PressableScale
+                onPress={() => setInfoOpen(false)}
+                haptic="light"
+                scale={0.98}
+                style={[styles.doneBtn, { backgroundColor: theme.accent }]}
+              >
+                <Text style={[typography.bodySmall, { color: theme.onAccent, fontWeight: '700' }]}>Got it</Text>
+              </PressableScale>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  optionV2: { flexDirection: 'row', gap: 16, paddingVertical: 12 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

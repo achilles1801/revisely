@@ -4,6 +4,8 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { SettingIcon } from './settings/SettingIcon';
 import { SettingSwitch } from './settings/SettingSwitch';
+import { useDesign } from '../design/DesignContext';
+import { ActionSheet } from './v2/ActionSheet';
 import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
@@ -25,6 +27,7 @@ import {
  */
 export function FajrBoundaryCard() {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const styles = makeStyles(theme);
   const { user, saveUser } = useApp();
   const [busy, setBusy] = useState(false);
@@ -143,51 +146,74 @@ export function FajrBoundaryCard() {
         </PressableScale>
       )}
 
-      <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setMethodOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <Text style={[typography.titleMedium, { color: theme.textPrimary, marginBottom: spacing.sm }]}>
-              Calculation method
-            </Text>
-            <ScrollView>
-              {FAJR_CALCULATION_METHODS.map((m) => {
-                const selected =
-                  (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id;
-                return (
-                  <PressableScale key={m.id} onPress={() => handlePickMethod(m.id)} haptic="selection">
-                    <View
-                      style={[
-                        styles.methodRow,
-                        { borderBottomColor: theme.border },
-                        selected && { backgroundColor: theme.accent + '15' },
-                      ]}
-                    >
-                      <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
-                        {m.label}
-                      </Text>
-                      {selected && <Ionicons name="checkmark" size={18} color={theme.accent} />}
-                    </View>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
-            <PressableScale
-              onPress={() => {
-                setMethodOpen(false);
-                handleRefreshLocation();
-              }}
-              haptic="light"
-              style={styles.locationBtn}
-            >
-              <Ionicons name="location-outline" size={16} color={theme.accent} />
-              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '600' }]}>
-                {hasCoords ? 'Update location' : 'Set location'}
+      {isNew ? (
+        <ActionSheet
+          visible={methodOpen}
+          onClose={() => setMethodOpen(false)}
+          title="Calculation method"
+          actions={[
+            ...FAJR_CALCULATION_METHODS.map((m) => ({
+              key: m.id,
+              label: m.label,
+              selected: (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id,
+              onPress: () => handlePickMethod(m.id),
+            })),
+            {
+              key: 'location',
+              label: hasCoords ? 'Update location' : 'Set location',
+              icon: 'location-outline' as const,
+              section: 'Location',
+              onPress: handleRefreshLocation,
+            },
+          ]}
+        />
+      ) : (
+        <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
+          <Pressable style={styles.backdrop} onPress={() => setMethodOpen(false)}>
+            <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+              <GlassCard style={StyleSheet.absoluteFillObject} />
+              <Text style={[typography.titleMedium, { color: theme.textPrimary, marginBottom: spacing.sm }]}>
+                Calculation method
               </Text>
-            </PressableScale>
+              <ScrollView>
+                {FAJR_CALCULATION_METHODS.map((m) => {
+                  const selected =
+                    (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id;
+                  return (
+                    <PressableScale key={m.id} onPress={() => handlePickMethod(m.id)} haptic="selection">
+                      <View
+                        style={[
+                          styles.methodRow,
+                          { borderBottomColor: theme.border },
+                          selected && { backgroundColor: theme.accent + '15' },
+                        ]}
+                      >
+                        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
+                          {m.label}
+                        </Text>
+                        {selected && <Ionicons name="checkmark" size={18} color={theme.accent} />}
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </ScrollView>
+              <PressableScale
+                onPress={() => {
+                  setMethodOpen(false);
+                  handleRefreshLocation();
+                }}
+                haptic="light"
+                style={styles.locationBtn}
+              >
+                <Ionicons name="location-outline" size={16} color={theme.accent} />
+                <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '600' }]}>
+                  {hasCoords ? 'Update location' : 'Set location'}
+                </Text>
+              </PressableScale>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }

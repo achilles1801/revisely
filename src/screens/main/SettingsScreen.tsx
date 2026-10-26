@@ -22,6 +22,7 @@ import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
+import { Sheet } from '../../components/v2/Sheet';
 import { reportProblem } from '../../lib/sentry';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -932,7 +933,7 @@ export default function SettingsScreen() {
 
         <View style={screenStyles.timePickerContainer}>
           <View style={screenStyles.timeColumn}>
-            <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
+            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
             <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
               {HOURS.map((hour) => {
                 const selected = tempHour === hour;
@@ -968,7 +969,7 @@ export default function SettingsScreen() {
           <Text style={[typography.displayLarge, { color: theme.textPrimary, marginHorizontal: spacing.xs }]}>:</Text>
 
           <View style={screenStyles.timeColumn}>
-            <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
+            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
             <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
               {MINUTES.map((minute) => {
                 const selected = tempMinute === minute;
@@ -1144,7 +1145,15 @@ function BottomSheetModal({
   children: React.ReactNode;
 }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
+  if (isNew) {
+    return (
+      <Sheet visible={visible} onClose={onClose} onShow={onShow} keyboard>
+        <View style={{ paddingTop: spacing.sm }}>{children}</View>
+      </Sheet>
+    );
+  }
   return (
     <Modal
       visible={visible}

@@ -280,7 +280,10 @@ Review), kept per device, switching the whole app live.
   only means "done". Every menu is `v2/ActionSheet` (ThreadMenu style: handle, 18/600 title, icon
   rows, red destructive rows, a Cancel bar); its action runs after the sheet has gone. The tab bar
   is flat and icon-only. No Threads/Meta names, logos or icons, no likes or reposts.
-- Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`.
+- Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
+  in the new design is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar;
+  the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
+  `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
 - Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
   `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
