@@ -260,6 +260,18 @@ Fahd Complex fonts (open-source quran.com-images). They are served from the Stor
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
 
+## UI traps
+
+- **Never wrap a scroll view in a Pressable.** On the new architecture (iOS), a ScrollView doesn't
+  scroll while any view above it holds the touch, and a Pressable (or a PanResponder) takes every
+  touch that starts inside it. A modal sheet's dimmed backdrop is `<Backdrop>`
+  (`src/components/Backdrop.tsx`), rendered as the sheet's sibling, before it. Layout tests can't
+  see this; `touchHandlingAncestor()` (`jest/scrollable.ts`) can. The long-verse fix of PR #20
+  bounded the height correctly and still didn't scroll on a phone for this reason.
+- Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
+  accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
+  rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
+
 ## Known-good reference
 
 Tag `testflight-10-ota-sep30` is the code that ran on TestFlight build 10 with the Sep 30 updates,

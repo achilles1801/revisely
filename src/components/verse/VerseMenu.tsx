@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../GlassCard';
@@ -9,6 +9,9 @@ import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
 
 import { MENU_HEIGHT, MENU_WIDTH, menuPosition } from '../../lib/verseMenu';
+
+/** The rows' text grows with Dynamic Type only this far, so the menu fits beside the verse. */
+const MENU_TEXT_SCALE = 1.4;
 
 interface VerseMenuProps {
   /** Screen point of the press; null hides the menu. */
@@ -27,7 +30,12 @@ interface VerseMenuProps {
  */
 export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose }: VerseMenuProps) {
   const { theme } = useTheme();
-  const pos = point ? menuPosition(point, Dimensions.get('window')) : { left: 0, top: 0 };
+  // Its height once laid out: large text makes it taller than MENU_HEIGHT, and it
+  // must still open on screen. Hidden until measured, so it doesn't jump.
+  const [height, setHeight] = useState<number | null>(null);
+  const pos = point
+    ? menuPosition(point, Dimensions.get('window'), undefined, undefined, height ?? MENU_HEIGHT)
+    : { left: 0, top: 0 };
 
   const Row = ({
     icon,
@@ -47,9 +55,13 @@ export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose 
     >
       <Ionicons name={icon} size={20} color={theme.textPrimary} />
       <View style={{ flex: 1 }}>
-        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>{title}</Text>
+        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]} maxFontSizeMultiplier={MENU_TEXT_SCALE}>
+          {title}
+        </Text>
         {subtitle ? (
-          <Text style={[typography.caption, { color: theme.textMuted }]}>{subtitle}</Text>
+          <Text style={[typography.caption, { color: theme.textMuted }]} maxFontSizeMultiplier={MENU_TEXT_SCALE}>
+            {subtitle}
+          </Text>
         ) : null}
       </View>
     </Pressable>
@@ -59,7 +71,11 @@ export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
-      <View style={[styles.menu, { left: pos.left, top: pos.top }]}>
+      <View
+        style={[styles.menu, { left: pos.left, top: pos.top, opacity: height == null ? 0 : 1 }]}
+        onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
+        testID="verse-menu"
+      >
         <GlassCard elevated style={StyleSheet.absoluteFillObject} />
         <Row icon="play" title="Play" subtitle={playSubtitle ?? 'to the end of the juz'} onPress={onPlay} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />

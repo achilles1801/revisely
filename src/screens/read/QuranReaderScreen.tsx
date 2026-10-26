@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { Backdrop } from '../../components/Backdrop';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
@@ -362,8 +363,10 @@ function ReaderGuideModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
+      <View style={styles.overlay}>
+        {/* Behind the card, not around it, or its steps can't scroll (see Backdrop). */}
+        <Backdrop onPress={onClose} label="Dismiss" />
+        <View style={styles.card}>
           <GlassCard style={StyleSheet.absoluteFillObject} />
           <View style={styles.headerRow}>
             <Text style={styles.title}>How the reader works</Text>
@@ -404,8 +407,8 @@ function ReaderGuideModal({
               <Text style={styles.primaryBtnText}>Got it</Text>
             </PressableScale>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

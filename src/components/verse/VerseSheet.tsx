@@ -5,13 +5,15 @@ import {
   Modal,
   PanResponder,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Backdrop } from '../Backdrop';
 import { GlassCard } from '../GlassCard';
 import { PressableScale } from '../PressableScale';
 import { useTheme } from '../../context/ThemeContext';
@@ -52,8 +54,25 @@ type LoadState =
   | { status: 'ready'; text: VerseText }
   | { status: 'error' };
 
-/** Sheet height: as it opens, and expanded (swipe the grabber up, or tap it). */
-export const SHEET_HEIGHT = { normal: '70%', expanded: '92%' } as const;
+/**
+ * The sheet's height limit, in points: as it opens (70% of the screen), and
+ * expanded (swipe the grabber up, or tap it) to everything below the status bar.
+ * The sheet fits a short verse; a longer one scrolls inside the limit.
+ */
+export function sheetMaxHeight(screenHeight: number, topInset: number, expanded: boolean): number {
+  return Math.round(expanded ? screenHeight - topInset - 8 : screenHeight * 0.7);
+}
+
+/** Pulling the verse down past its top by this much (iOS overscroll) shrinks an
+ *  expanded sheet, or closes one at normal height. */
+export const OVERSCROLL_TO_DISMISS = 80;
+export function overscrollAction(offsetY: number, expanded: boolean): 'shrink' | 'close' | null {
+  if (offsetY > -OVERSCROLL_TO_DISMISS) return null;
+  return expanded ? 'shrink' : 'close';
+}
+
+/** Header and credit text grow with Dynamic Type only this far, so the verse keeps the room. */
+const CHROME_TEXT_SCALE = 1.4;
 
 /** What a vertical swipe on the grabber does (dy: points moved, up negative). */
 export function grabberSwipe(dy: number, expanded: boolean): 'expand' | 'shrink' | 'close' | null {
@@ -69,7 +88,12 @@ export function grabberSwipe(dy: number, expanded: boolean): 'expand' | 'shrink'
  *
  * The header stays put and the verse scrolls under it: a long verse (2:282)
  * runs well past the sheet. The grabber expands the sheet to nearly the whole
- * screen (swipe up or tap) and back (swipe down; down again closes it).
+ * screen (swipe up or tap) and back (swipe down; down again closes it); pulling
+ * the verse down past its top does the same. A credited translation's credit
+ * stays pinned under the verse.
+ *
+ * The dimmed backdrop sits behind the sheet, not around it: a scroll view inside
+ * a Pressable doesn't scroll on iOS (see Backdrop).
  */
 export function VerseSheet({
   verse,
@@ -91,6 +115,10 @@ export function VerseSheet({
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
   const [headerBottom, setHeaderBottom] = useState(96);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const { height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const maxHeight = sheetMaxHeight(screenHeight, insets.top, expanded);
 
   // A closed sheet reopens at normal height. (Another verse starts at its top
   // by itself: loading it replaces the scrolling part.)
@@ -102,6 +130,13 @@ export function VerseSheet({
   expandedRef.current = expanded;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const act = (action: 'expand' | 'shrink' | 'close' | null) => {
+    if (action === 'expand') setExpanded(true);
+    else if (action === 'shrink') setExpanded(false);
+    else if (action === 'close') onCloseRef.current();
+  };
+  const actRef = useRef(act);
+  actRef.current = act;
   const grabberPan = useMemo(
     () =>
       PanResponder.create({
@@ -109,12 +144,7 @@ export function VerseSheet({
         // header's buttons are deeper and still take their taps.
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
-        onPanResponderRelease: (_e, g) => {
-          const action = grabberSwipe(g.dy, expandedRef.current);
-          if (action === 'expand') setExpanded(true);
-          else if (action === 'shrink') setExpanded(false);
-          else if (action === 'close') onCloseRef.current();
-        },
+        onPanResponderRelease: (_e, g) => actRef.current(grabberSwipe(g.dy, expandedRef.current)),
       }),
     [],
   );
@@ -140,14 +170,14 @@ export function VerseSheet({
 
   return (
     <Modal visible={verse != null} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Close translation">
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
-          style={[styles.sheet, { maxHeight: expanded ? SHEET_HEIGHT.expanded : SHEET_HEIGHT.normal }]}
+      <View style={styles.overlay}>
+        <Backdrop onPress={onClose} label="Close translation" />
+        <View
+          style={[styles.sheet, { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) }]}
+          onLayout={(e) => setSheetHeight(e.nativeEvent.layout.height)}
           testID="verse-sheet"
         >
           <GlassCard style={StyleSheet.absoluteFillObject} />
-          <SafeAreaView style={styles.safe}>
             {/* Grabber and header: swipe up to expand, down to shrink or close. */}
             <View
               {...grabberPan.panHandlers}
@@ -168,12 +198,18 @@ export function VerseSheet({
                 </PressableScale>
                 <View style={styles.titleBox}>
                   <View style={styles.titleLine}>
-                    <Text style={styles.surahName} numberOfLines={1}>
+                    <Text style={styles.surahName} numberOfLines={1} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                       {surah?.nameDisplay ?? ''}
                     </Text>
-                    {surah ? <Text style={styles.surahArabic}>{surah.nameArabicVoweled}</Text> : null}
+                    {surah ? (
+                      <Text style={styles.surahArabic} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                        {surah.nameArabicVoweled}
+                      </Text>
+                    ) : null}
                   </View>
-                  <Text style={styles.ayahLabel}>Ayah {verse?.ayah}</Text>
+                  <Text style={styles.ayahLabel} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                    Ayah {verse?.ayah}
+                  </Text>
                 </View>
                 <View style={styles.pill}>
                   <Pressable
@@ -233,7 +269,8 @@ export function VerseSheet({
                     onChange={(choice) => {
                       onChangeReciter(choice);
                     }}
-                    maxHeight={320}
+                    // Within the sheet, however short a short verse leaves it.
+                    maxHeight={Math.max(160, Math.min(320, sheetHeight - headerBottom - spacing.md))}
                   />
                 ) : (
                   TRANSLATIONS.map((t) => {
@@ -291,14 +328,18 @@ export function VerseSheet({
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator
+                onScrollEndDrag={(e) => act(overscrollAction(e.nativeEvent.contentOffset.y, expanded))}
                 testID="verse-scroll"
               >
                 <View style={[styles.keyChip, { borderColor: theme.border, backgroundColor: theme.glass }]}>
-                  <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                  <Text style={[typography.caption, { color: theme.textSecondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                     {state.text.sura}:{state.text.ayah}
                   </Text>
                 </View>
-                <Text style={styles.arabic}>{state.text.arabic}</Text>
+                {/* The Arabic grows to twice its size; the translation as far as the reader's setting goes. */}
+                <Text style={styles.arabic} maxFontSizeMultiplier={2}>
+                  {state.text.arabic}
+                </Text>
                 <Text style={[styles.translation, state.text.placeholder && styles.placeholder]}>
                   {state.text.translation}
                 </Text>
@@ -309,9 +350,12 @@ export function VerseSheet({
             {state.status === 'ready' && translation.credit && (
               // Pinned under the verse, however long it is: always in view.
               <View style={[styles.credit, { borderTopColor: theme.border }]} testID="translation-credit">
-                <Text style={styles.creditText}>{translation.credit.text}</Text>
+                <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                  {translation.credit.text}
+                </Text>
                 <Text
                   style={styles.creditLink}
+                  maxFontSizeMultiplier={CHROME_TEXT_SCALE}
                   onPress={() => Linking.openURL(translation.credit!.url).catch(() => undefined)}
                   accessibilityRole="link"
                   accessibilityLabel={`${translation.credit.linkLabel}, opens the website`}
@@ -321,9 +365,8 @@ export function VerseSheet({
                 </Text>
               </View>
             )}
-          </SafeAreaView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -339,7 +382,6 @@ const makeStyles = (theme: ThemeColors) =>
       paddingBottom: spacing.md,
       overflow: 'hidden',
     },
-    safe: { flexShrink: 1 },
     grabberHit: { alignSelf: 'center', paddingTop: spacing.sm, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },
     grabber: { width: 40, height: 5, borderRadius: 3 },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
@@ -388,8 +430,8 @@ const makeStyles = (theme: ThemeColors) =>
       borderRadius: radius.full,
       backgroundColor: theme.accent,
     },
-    // Sized to the verse up to the space left under the header, then scrolls:
-    // without flexShrink a long verse grew past the sheet and was cut off.
+    // Sized to the verse up to the room left between the header and the credit,
+    // then scrolls: without flexShrink a long verse grew past the sheet.
     scroll: { flexGrow: 0, flexShrink: 1 },
     scrollContent: { paddingBottom: spacing.lg },
     keyChip: {

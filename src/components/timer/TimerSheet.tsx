@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Backdrop } from '../Backdrop';
 import { GlassCard } from '../GlassCard';
 import { PressableScale } from '../PressableScale';
 import { TimerControls } from './TimerControls';
@@ -30,11 +31,10 @@ export function TimerSheet({ visible, onClose, onOpenQuran }: TimerSheetProps) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
-          style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
-        >
+      <View style={styles.overlay}>
+        {/* Behind the sheet, not around it, or its controls can't scroll (see Backdrop). */}
+        <Backdrop onPress={onClose} label="Dismiss timer" />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
           <GlassCard style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
           <View style={styles.sheetHeader}>
@@ -57,8 +57,8 @@ export function TimerSheet({ visible, onClose, onOpenQuran }: TimerSheetProps) {
               onOpenQuran={onOpenQuran}
             />
           </ScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
