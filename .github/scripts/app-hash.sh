@@ -5,6 +5,6 @@
 # scripts change on either branch neither publishes anything nor stops a tested update being promoted.
 set -eu
 git ls-tree -r HEAD \
-  | grep -vE '	(docs/|tests/|functions/|\.maestro/|store/|scripts/|\.github/)' \
-  | grep -vE '	(.*\.md|firestore\.rules|firestore\.indexes\.json|firebase\.json)$' \
+  | grep -vE '	(docs/|tests/|functions/|worker/|\.maestro/|store/|scripts/|\.github/)' \
+  | grep -vE '	(.*\.md|firestore\.rules|firestore\.indexes\.json|firebase\.json|wrangler\.jsonc)$' \
   | git hash-object --stdin
