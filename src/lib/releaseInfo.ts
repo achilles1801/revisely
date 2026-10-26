@@ -8,6 +8,7 @@
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 
 export const BUNDLE_ID = 'com.revisionbuddy.app';
 
@@ -24,6 +25,8 @@ export interface ReleaseInput {
   emergencyLaunchReason: string | null;
   updateCreatedAt: Date | null;
   isDev: boolean;
+  /** A real phone or tablet, not a simulator. */
+  isDevice: boolean;
 }
 
 export interface ReleaseInfo extends ReleaseInput {
@@ -33,6 +36,8 @@ export interface ReleaseInfo extends ReleaseInput {
   sentryRelease: string;
   /** Sentry environment: the update channel (production, preview), or development. */
   sentryEnvironment: string;
+  /** Whether this launch reports to Sentry at all (see sentryReports). */
+  sentryEnabled: boolean;
   /** Sentry dist: the build number (unchanged from before). */
   sentryDist: string | undefined;
   /** The first 8 characters of the update group, or null for the built-in bundle. */
@@ -48,6 +53,20 @@ export function shortUpdate(group: string | null): string | null {
   return hex.length >= 8 ? hex.slice(0, 8) : null;
 }
 
+/** The channels of builds people install (App Store, TestFlight): the only ones that report. */
+export const REPORTING_CHANNELS = ['production', 'preview'] as const;
+
+/**
+ * Only installed builds report to Sentry: a store or TestFlight binary on a real
+ * device, on the production or preview channel. Development (Metro), simulators
+ * (screenshots, UI automation) and dev clients (no channel, or `development`)
+ * send nothing, so their crashes can't open issues, alert or count against a
+ * release.
+ */
+export function sentryReports(input: Pick<ReleaseInput, 'isDev' | 'isDevice' | 'channel'>): boolean {
+  return !input.isDev && input.isDevice && (REPORTING_CHANNELS as readonly string[]).includes(input.channel ?? '');
+}
+
 export function describeRelease(input: ReleaseInput): ReleaseInfo {
   const version = input.version ?? '0.0.0';
   const build = input.build ?? '0';
@@ -58,6 +77,7 @@ export function describeRelease(input: ReleaseInput): ReleaseInfo {
     ...input,
     sentryRelease,
     sentryEnvironment,
+    sentryEnabled: sentryReports(input),
     sentryDist: input.build ?? undefined,
     updateShort,
     versionLabel: `${version} (${build})`,
@@ -87,6 +107,7 @@ export function currentRelease(): ReleaseInfo {
     emergencyLaunchReason: Updates.emergencyLaunchReason ?? null,
     updateCreatedAt: Updates.createdAt ?? null,
     isDev: __DEV__,
+    isDevice: Device.isDevice,
   });
   return cached;
 }

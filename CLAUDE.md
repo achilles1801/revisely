@@ -46,6 +46,13 @@ file is the release mechanics and the traps behind them.
   `…+<build>.u<first 8 of the update group>` for an update; environment = the update channel
   (`production`, `preview`); tags `update_id`, `update_group`, `channel`, `runtime`, `build`. No IP
   addresses (`sendDefaultPii` off); events carry only the pseudonymous account id.
+- **Only installed builds report**: a real device on the `production` or `preview` channel, outside
+  `__DEV__` (`sentryReports()` in `src/lib/releaseInfo.ts`). Development, simulators (screenshots,
+  Maestro) and dev clients start Sentry without a DSN, so the native crash reporter stays off too:
+  `enabled: false` alone still starts it, and native crashes never pass through `beforeSend`. The
+  health scripts read issues and events from `production` and `preview` only (`SENTRY_ENVIRONMENTS`
+  in `scripts/sentry/api.js`). The Sentry alert rule "Send a notification for high priority issues"
+  has an action filter "environment is in production,preview"; keep any new alert rule to the same.
 - **Sentry data is untrusted.** The DSN ships in the app, so anyone can send events and sessions with
   any text, and issues here are public. Everything from Sentry that reaches GitHub (or Claude) goes
   through `sanitize()` in `scripts/sentry/logic.js`, which:

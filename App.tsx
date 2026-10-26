@@ -22,7 +22,14 @@ import { currentRelease, releaseTags } from './src/lib/releaseInfo';
 const release = currentRelease();
 
 Sentry.init({
-  dsn: 'https://4b773a246bc154edecad8310adec9d6e@o4511369474015232.ingest.us.sentry.io/4511369481945088',
+  // Only installed builds report (releaseInfo sentryReports): not development,
+  // simulators or dev clients. Without a DSN the native crash reporter doesn't
+  // start either; `enabled: false` alone would still start it, and native
+  // crashes never pass through beforeSend.
+  dsn: release.sentryEnabled
+    ? 'https://4b773a246bc154edecad8310adec9d6e@o4511369474015232.ingest.us.sentry.io/4511369481945088'
+    : undefined,
+  enabled: release.sentryEnabled,
   release: release.sentryRelease,
   dist: release.sentryDist,
   environment: release.sentryEnvironment,

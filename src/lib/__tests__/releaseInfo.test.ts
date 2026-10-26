@@ -1,4 +1,4 @@
-import { describeRelease, diagnosticLines, releaseTags, shortUpdate, ReleaseInput } from '../releaseInfo';
+import { describeRelease, diagnosticLines, releaseTags, sentryReports, shortUpdate, ReleaseInput } from '../releaseInfo';
 
 const base: ReleaseInput = {
   version: '1.0.2',
@@ -12,6 +12,7 @@ const base: ReleaseInput = {
   emergencyLaunchReason: null,
   updateCreatedAt: new Date('2026-10-25T04:16:53Z'),
   isDev: false,
+  isDevice: true,
 };
 
 describe('releaseInfo', () => {
@@ -34,6 +35,17 @@ describe('releaseInfo', () => {
     expect(describeRelease({ ...base, updateGroup: null }).updateShort).toBe('01a1574f');
     expect(describeRelease({ ...base, isDev: true }).sentryEnvironment).toBe('development');
     expect(describeRelease({ ...base, channel: null }).sentryEnvironment).toBe('production');
+  });
+
+  it('reports to Sentry only from installed builds: a real device on production or preview', () => {
+    expect(describeRelease(base).sentryEnabled).toBe(true);
+    expect(sentryReports({ isDev: false, isDevice: true, channel: 'production' })).toBe(true);
+    // Metro, simulators (screenshots, UI automation) and dev clients send nothing.
+    expect(sentryReports({ isDev: true, isDevice: true, channel: 'production' })).toBe(false);
+    expect(sentryReports({ isDev: false, isDevice: false, channel: 'production' })).toBe(false);
+    expect(sentryReports({ isDev: false, isDevice: false, channel: 'preview' })).toBe(false);
+    expect(sentryReports({ isDev: false, isDevice: true, channel: null })).toBe(false);
+    expect(sentryReports({ isDev: false, isDevice: true, channel: 'development' })).toBe(false);
   });
 
   it('only accepts 8 hex characters for the short form', () => {

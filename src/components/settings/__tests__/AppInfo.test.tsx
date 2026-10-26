@@ -35,6 +35,7 @@ const base: ReleaseInput = {
   emergencyLaunchReason: null,
   updateCreatedAt: null,
   isDev: false,
+  isDevice: true,
 };
 const g = globalThis as { __DEV__?: boolean };
 const wrap = (ui: React.ReactElement) => render(<ThemeProvider>{ui}</ThemeProvider>);
@@ -73,7 +74,9 @@ describe('App info', () => {
     expect(mockNativeCrash).not.toHaveBeenCalled();
     buttons.find((b: any) => b.text === 'Crash').onPress();
     expect(mockNativeCrash).toHaveBeenCalled();
-    expect(showsTestActions(describeRelease({ ...base, isDev: true }))).toBe(true);
+    // Nothing reports from development or a simulator, so there is nothing to test there.
+    expect(showsTestActions(describeRelease({ ...base, channel: 'preview', isDev: true }))).toBe(false);
+    expect(showsTestActions(describeRelease({ ...base, channel: 'preview', isDevice: false }))).toBe(false);
   });
 
   it('warns when the last update could not start', async () => {

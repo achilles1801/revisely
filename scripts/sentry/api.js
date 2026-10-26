@@ -3,12 +3,20 @@
 //
 // Env: SENTRY_API_TOKEN (read access: Issue & Event, Project, Organization),
 // GITHUB_TOKEN and GITHUB_REPOSITORY (owner/repo) for the GitHub side.
+//
+// Issues and events are read from the environments of installed builds only
+// (production, preview; SENTRY_ENVIRONMENTS overrides): development and simulator
+// builds don't report, and anything sent under another environment is ignored.
 
 const SENTRY = {
   base: process.env.SENTRY_API_BASE || 'https://sentry.io/api/0',
   org: process.env.SENTRY_ORG || 'revisely',
   project: process.env.SENTRY_PROJECT || 'react-native',
   projectId: process.env.SENTRY_PROJECT_ID || '4511369481945088',
+  environments: (process.env.SENTRY_ENVIRONMENTS || 'production,preview')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean),
 };
 
 async function sentry(path, params = {}) {
@@ -24,10 +32,21 @@ async function sentry(path, params = {}) {
 }
 
 const sentryApi = {
-  /** Issues matching a search, most recent first. */
+  /** Issues matching a search in the reporting environments, most recent first. */
   issues: (query, statsPeriod = '24h', limit = 25) =>
-    sentry(`/projects/${SENTRY.org}/${SENTRY.project}/issues/`, { query, statsPeriod, limit, sort: 'date' }),
-  latestEvent: (issueId) => sentry(`/organizations/${SENTRY.org}/issues/${encodeURIComponent(issueId)}/events/latest/`),
+    sentry(`/organizations/${SENTRY.org}/issues/`, {
+      project: SENTRY.projectId,
+      environment: SENTRY.environments,
+      query,
+      statsPeriod,
+      limit,
+      sort: 'date',
+    }),
+  /** The issue's latest event in the reporting environments. */
+  latestEvent: (issueId) =>
+    sentry(`/organizations/${SENTRY.org}/issues/${encodeURIComponent(issueId)}/events/latest/`, {
+      environment: SENTRY.environments,
+    }),
   /**
    * Session totals grouped by release and status (healthy/errored/crashed/abnormal), read from each
    * group's `totals`. Hourly buckets for periods in hours, so "24h" is the last 24 hours rather than
