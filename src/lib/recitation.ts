@@ -159,6 +159,13 @@ export function voiceLabel(voice: Voice): string {
     : voice.reciter.name;
 }
 
+/** Short, for tight places (the reader's controls): "Al-Husary (Mu'allim)". */
+export function shortVoiceLabel(voice: Voice): string {
+  return voice.reciter.styles.length > 1
+    ? `${voice.reciter.short} (${STYLE_INFO[voice.style].label})`
+    : voice.reciter.short;
+}
+
 export function recitationUrl(
   v: VerseKey,
   choice: string | null | undefined = DEFAULT_VOICE,

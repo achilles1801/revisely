@@ -51,6 +51,8 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
+  /** The user started turning the page by swiping (not a jump). */
+  onUserSwipe?: () => void;
   /** Press and hold on a verse. Receives the verse under the finger and the
    *  screen point pressed (to place a menu beside it). */
   onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
@@ -154,6 +156,8 @@ const PageItem = React.memo(function PageItem({
           onPress={onTap}
           onLongPress={onLongPressAyah ? handleLongPress : undefined}
           delayLongPress={350}
+          accessibilityLabel={`Page ${pageNumber}`}
+          accessibilityHint={onTap ? 'Shows or hides the controls' : undefined}
         >
           {highlightRects.map((r, i) => (
             <View
@@ -210,6 +214,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     onPageChange,
     onAdvance,
     onTap,
+    onUserSwipe,
     onLongPressAyah,
     highlightedAyah,
     extraData,
@@ -337,6 +342,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       onViewableItemsChanged={handleViewableItemsChanged}
       onScrollBeginDrag={() => {
         draggedRef.current = true;
+        onUserSwipe?.();
       }}
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(_, index) => ({

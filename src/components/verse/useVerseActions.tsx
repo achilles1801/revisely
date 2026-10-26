@@ -2,18 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Dimensions, Modal, Pressable, SafeAreaView, StyleSheet, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
-import { AyahRef, ayahRects } from '../../lib/ayahBounds';
+import { AyahRef, ayahRects, firstVerseOnPage } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
 import { nextVerse, nextVerseInJuz, pageOfVerse, previousVerse, toAyahRef, VerseKey } from '../../lib/verses';
 import { logger } from '../../lib/logger';
 import { isRecordingActive } from '../../lib/recordings';
 import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
-import { NowPlayingBar } from './NowPlayingBar';
+import type { PlayerControls } from '../reader/PlayerCapsule';
 import { ReciterList } from './ReciterList';
 import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
-import { resolveVoice, voiceLabel } from '../../lib/recitation';
+import { resolveVoice, shortVoiceLabel } from '../../lib/recitation';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -86,6 +86,15 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     setSelected(null);
   }, []);
 
+  // Play continues to the end of the juz, within this screen's pages.
+  const advance = useCallback(
+    (v: VerseKey) => {
+      const next = nextVerseInJuz(v);
+      return next && allowed.has(pageOfVerse(next)) ? next : null;
+    },
+    [allowed],
+  );
+
   const play = useCallback(() => {
     if (!selected) return;
     if (isRecordingActive()) {
@@ -95,14 +104,24 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
       Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
       return;
     }
-    const advance = (v: VerseKey) => {
-      const next = nextVerseInJuz(v);
-      return next && allowed.has(pageOfVerse(next)) ? next : null;
-    };
     recitation.play(selected, advance, owner);
     setMenuPoint(null);
     setSelected(null);
-  }, [selected, allowed, recitation, owner]);
+  }, [selected, advance, recitation, owner]);
+
+  /** ▶ in the controls: recite from the top of a page. */
+  const playPage = useCallback(
+    (page: number) => {
+      const first = firstVerseOnPage(page);
+      if (!first || !allowed.has(page)) return;
+      if (isRecordingActive()) {
+        Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
+        return;
+      }
+      recitation.play(first, advance, owner);
+    },
+    [allowed, advance, recitation, owner],
+  );
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
@@ -153,29 +172,20 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   // Previous / next verse while playing, within this screen's pages.
   const playingVerse = playerVisibleState(mine, playback) ? playback.verse : null;
   const stepTo = (v: VerseKey | null) =>
-    v && allowed.has(pageOfVerse(v))
-      ? () => {
-          const advance = (cur: VerseKey) => {
-            const next = nextVerseInJuz(cur);
-            return next && allowed.has(pageOfVerse(next)) ? next : null;
-          };
-          recitation.play(v, advance, owner);
-        }
-      : undefined;
+    v && allowed.has(pageOfVerse(v)) ? () => recitation.play(v, advance, owner) : undefined;
 
-  /** The recitation controls, for the screen's bottom bar. Null when nothing plays. */
-  const player = playingVerse ? (
-    <NowPlayingBar
-      state={playback}
-      onPause={() => recitation.pause()}
-      onResume={() => recitation.resume()}
-      onStop={() => recitation.stop(owner)}
-      onPrevious={stepTo(previousVerse(playingVerse))}
-      onNext={stepTo(nextVerse(playingVerse))}
-      voiceName={voiceLabel(resolveVoice(user?.reciter))}
-      onPickReciter={() => setReciterPickerOpen(true)}
-    />
-  ) : null;
+  /** The recitation controls, for the screen's control capsule (PlayerCapsule). */
+  const player: PlayerControls = {
+    state: playingVerse ? playback : { status: 'idle', verse: null },
+    voiceName: shortVoiceLabel(resolveVoice(user?.reciter)),
+    onPlayPage: playPage,
+    onPause: () => recitation.pause(),
+    onResume: () => recitation.resume(),
+    onStop: () => recitation.stop(owner),
+    onPrevious: playingVerse ? stepTo(previousVerse(playingVerse)) : undefined,
+    onNext: playingVerse ? stepTo(nextVerse(playingVerse)) : undefined,
+    onPickReciter: () => setReciterPickerOpen(true),
+  };
 
   const overlay = (
     <>
@@ -226,8 +236,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     onLongPressAyah,
     overlay,
     player,
-    /** Something is playing (the screen shows `player` in its bottom bar). */
-    playerVisible: player != null,
+    /** This screen's recitation is playing, paused or loading. */
+    playerVisible: playingVerse != null,
   };
 }
 

@@ -31,6 +31,13 @@ function pageData(page: number): number[] {
   return bounds[String(page)] ?? [];
 }
 
+/** The first verse on a page (it may have begun on the page before): where
+ *  "play this page" starts. Null for a page with no verse data. */
+export function firstVerseOnPage(page: number): AyahRef | null {
+  const d = pageData(page);
+  return d.length >= 2 ? { page, sura: d[0], ayah: d[1] } : null;
+}
+
 /** The rectangles (bounds space) covering one verse on a page. */
 export function ayahRects(page: number, sura: number, ayah: number): Rect[] {
   const d = pageData(page);

@@ -20,7 +20,17 @@ jest.mock('expo-glass-effect', () => {
   return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
 });
 jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
-jest.mock('../../../components/MushafPager', () => ({ MushafPager: () => null }));
+// The page: a tap toggles the controls, and the test can swipe it.
+const mockPager: { onUserSwipe?: () => void } = {};
+jest.mock('../../../components/MushafPager', () => {
+  const { Pressable } = require('react-native');
+  return {
+    MushafPager: (props: { onTap?: () => void; onUserSwipe?: () => void }) => {
+      mockPager.onUserSwipe = props.onUserSwipe;
+      return <Pressable accessibilityLabel="The page" onPress={props.onTap} />;
+    },
+  };
+});
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => ({
@@ -143,7 +153,8 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
   it('only adds when nothing saved was unchecked', async () => {
     setup([332, 333]);
     render(<ActiveRevisionScreen />);
-    // Opens on 331 (first unrevised); mark it and leave.
+    // Opens on 331 (first unrevised); show the controls, mark it and leave.
+    fireEvent.press(screen.getByLabelText('The page'));
     fireEvent.press(screen.getByLabelText('Mark current page as revised'));
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
@@ -152,5 +163,42 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
       expect.objectContaining({ pagesRevised: [331] }),
     );
     expect(mockApp.updateLog).not.toHaveBeenCalled();
+  });
+});
+
+// The controls stay rendered (they fade); hidden, they are hidden from screen readers too.
+const byTestId = (id: string) => screen.getByTestId(id, { includeHiddenElements: true });
+
+describe('ActiveRevisionScreen — reading and the controls', () => {
+  it('opens on the page alone: its number, the juz and surah; the controls hidden', () => {
+    setup([332, 333]);
+    render(<ActiveRevisionScreen />);
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
+    expect(byTestId('reader-footer').props.pointerEvents).toBe('none');
+    expect(screen.getByText('331')).toBeTruthy();
+    expect(screen.queryByLabelText('Mark current page as revised')).toBeNull();
+  });
+
+  it('a tap on the page shows the controls; turning the page hides them', () => {
+    setup([332, 333]);
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+    expect(screen.getByLabelText('Play from this page')).toBeTruthy();
+    expect(screen.getByLabelText('Record your recitation')).toBeTruthy();
+    expect(screen.getByLabelText('Open timer')).toBeTruthy();
+    act(() => mockPager.onUserSwipe?.());
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
+    // And a second tap hides them too.
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('with every page revised, the controls come up with Submit', () => {
+    setup(DAY_PAGES);
+    render(<ActiveRevisionScreen />);
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+    expect(screen.getByLabelText('Submit session')).toBeTruthy();
   });
 });

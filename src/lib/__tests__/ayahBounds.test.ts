@@ -1,4 +1,4 @@
-import { ayahAt, ayahRects } from '../ayahBounds';
+import { ayahAt, ayahRects, firstVerseOnPage } from '../ayahBounds';
 
 describe('ayahBounds', () => {
   // Page 50 opens Aal-i-Imraan; the first glyph of 3:1 spans x 920–979, y 251–301.
@@ -22,5 +22,12 @@ describe('ayahBounds', () => {
   it('covers a verse that continues onto the next page', () => {
     // Al-Baqarah 2:6 starts on page 2 and ends on page 3.
     expect(ayahRects(3, 2, 6).length).toBeGreaterThan(0);
+  });
+
+  it('gives the first verse on a page (where ▶ starts), even one begun on the page before', () => {
+    expect(firstVerseOnPage(1)).toEqual({ page: 1, sura: 1, ayah: 1 });
+    expect(firstVerseOnPage(3)).toEqual({ page: 3, sura: 2, ayah: 6 });
+    expect(firstVerseOnPage(604)).toEqual({ page: 604, sura: 112, ayah: 1 });
+    expect(firstVerseOnPage(999)).toBeNull();
   });
 });

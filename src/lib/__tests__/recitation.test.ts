@@ -34,6 +34,7 @@ import {
   recitationUrl,
   resolveVoice,
   voiceLabel,
+  shortVoiceLabel,
 } from '../recitation';
 
 beforeEach(() => {
@@ -232,5 +233,7 @@ describe('reciters', () => {
   it('labels the style only when a reciter has more than one', () => {
     expect(voiceLabel(resolveVoice('husary:mujawwad'))).toBe('Mahmoud Khalil Al-Husary · Mujawwad');
     expect(voiceLabel(resolveVoice('alafasy:murattal'))).toBe('Mishary Rashid Alafasy');
+    expect(shortVoiceLabel(resolveVoice('husary:muallim'))).toBe("Al-Husary (Mu'allim)");
+    expect(shortVoiceLabel(resolveVoice('alafasy:murattal'))).toBe('Alafasy');
   });
 });
