@@ -204,7 +204,12 @@ async function main() {
   const totalPagesRevised = sessions.reduce((sum, s) => sum + s.data.pagesRevised.length, 0);
   await db.doc(`users/${uid}`).set({
     uid,
-    displayName: 'Screenshots',
+    // A demo name, not a person: it heads Home's Today post in the store shots.
+    displayName: 'Karim',
+    accent: 'indigo',
+    // Store shots show recordings placed on the simulator by hand (CLAUDE.md,
+    // Screenshots); with backup off they stay there and nothing uploads.
+    recordingBackup: false,
     email: EMAIL,
     photoURL: null,
     createdAt: ts(daysAgo(120)),
