@@ -149,7 +149,7 @@ describe('<WelcomeScreen /> in the new design', () => {
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
   });
 
-  it('Jade has no glow', async () => {
+  it('Jade glows in light too (#62), its accent text in ink', async () => {
     render(
       <DesignProvider initial={{ allowed: true, chosen: 'new', accent: 'jade' }}>
         <ThemeProvider>
@@ -158,7 +158,7 @@ describe('<WelcomeScreen /> in the new design', () => {
       </DesignProvider>,
     );
     await act(async () => {});
-    expect(screen.queryByTestId('hero-glow')).toBeNull();
+    expect(screen.getByTestId('hero-glow')).toBeTruthy();
     expect(styleOf('welcome-accent').color).toBe(paletteV2(false, 'jade').accentText);
   });
 

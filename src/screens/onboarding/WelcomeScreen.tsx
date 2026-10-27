@@ -58,7 +58,7 @@ export default function WelcomeScreen() {
   }));
 
   if (isNew) {
-    // Flat ground with the accent's glow at the top (none with Jade), the
+    // Flat ground with the accent's glow at the top (Jade glows in light only), the
     // words in the middle and the one action at the foot. The middle scrolls,
     // so the largest text sizes never push "Begin" off the screen.
     return (
