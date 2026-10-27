@@ -32,10 +32,15 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
         style={[styles.weekday, { color: isToday ? theme.accent : theme.textMuted }]}
         numberOfLines={1}
         adjustsFontSizeToFit
+        maxFontSizeMultiplier={1.3}
       >
         {isToday ? 'TODAY' : date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()}
       </Text>
-      <Text style={[styles.date, { color: isToday ? theme.accent : theme.textPrimary }]}>
+      {/* A 40pt column: the date grows only so far, like other chrome text. */}
+      <Text
+        style={[styles.date, { color: isToday ? theme.accent : theme.textPrimary }]}
+        maxFontSizeMultiplier={1.3}
+      >
         {date.getDate()}
       </Text>
     </View>

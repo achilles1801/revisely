@@ -523,6 +523,12 @@ Review), kept per device, switching the whole app live.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
+- **Drag and swipe rows** (`components/plan/ReorderableDayList`, the schedule's days) are
+  react-native-gesture-handler and Reanimated, JS only. A row lifts after 350 ms with the finger
+  still; moving 10pt first cancels the lift, so scrolling and swiping still work. While a row is
+  lifted, the screen's ScrollView has `scrollEnabled` off and the list scrolls it near the edges.
+  Maestro has no hold-and-drag: a slow `swipe` (about 190pt over 9 s) moves little enough in the
+  first 350 ms to lift the row, then drags it.
 
 ## Known-good reference
 

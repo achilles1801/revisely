@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
   Alert,
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import Animated, { useAnimatedRef, useScrollOffset, useSharedValue } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,21 +35,21 @@ import { settleCarryOverForNewPlan } from '../../lib/carryOver';
 import {
   defaultStartPage,
   effectiveDailyPages,
+  insertDay,
   moveDay,
   PlanDirection,
   planStats,
+  removeDay,
   rotateCustomPlanToToday,
 } from '../../lib/planBuilder';
-import { pageCountLabel } from '../../lib/planDisplay';
+import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan } from '../../types';
-import {
-  GroupedRow,
-  GroupedSection,
-  HeaderTextButton,
-} from '../../components/plan/Grouped';
+import { GroupedRow, GroupedSection } from '../../components/plan/Grouped';
 import { PlanSheet } from '../../components/plan/PlanSheet';
 import { InlineStepper } from '../../components/plan/InlineStepper';
-import { DayRow, DAY_ROW_INSET } from '../../components/plan/DayRow';
+import { DAY_ROW_INSET } from '../../components/plan/DayRow';
+import { ReorderableDayList, ScrollLink } from '../../components/plan/ReorderableDayList';
+import { UndoToast } from '../../components/revision/UndoToast';
 import {
   PlanBuilderHandle,
   PlanBuilderSheet,
@@ -139,8 +140,20 @@ export default function PlanEditScreen() {
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // A day lifted for dragging: the page stops scrolling by touch (the list
+  // scrolls it near the edges instead).
+  const [dragging, setDragging] = useState(false);
+  // The day just deleted, until Undo or the toast goes.
+  const [removed, setRemoved] = useState<{ index: number; pages: number[]; seq: number } | null>(null);
+  const insets = useSafeAreaInsets();
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollOffset = useScrollOffset(scrollRef);
+  const contentHeight = useSharedValue(0);
+  const scrollLink = useMemo<ScrollLink>(
+    () => ({ ref: scrollRef, offset: scrollOffset, contentHeight }),
+    [scrollRef, scrollOffset, contentHeight],
+  );
   const [cycleCollapsed, setCycleCollapsed] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [tempMode, setTempMode] = useState<QuotaMode>(user?.scheduleMode ?? 'pages');
@@ -236,15 +249,23 @@ export default function PlanEditScreen() {
     navigation.navigate('PlanDayEdit', { dayIndex: index, initialPages: days[index] });
   };
 
-  const deleteDay = useCallback((index: number) => {
-    Haptics.selectionAsync();
-    setDays((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  // What's on a day moves to another date; the dates stay (ReorderableDayList).
+  const moveDayTo = useCallback((from: number, to: number) => {
+    setDays((prev) => moveDay(prev, from, to));
   }, []);
 
-  const shiftDay = useCallback((index: number, delta: number) => {
-    Haptics.selectionAsync();
-    setDays((prev) => moveDay(prev, index, index + delta));
-  }, []);
+  // The cycle loses the day; the days after it move up a date. Undo puts it back.
+  const deleteDay = (index: number) => {
+    if (days.length <= 1 || !days[index]) return;
+    setRemoved((prev) => ({ index, pages: [...days[index]], seq: (prev?.seq ?? 0) + 1 }));
+    setDays(removeDay(days, index));
+  };
+
+  const undoDelete = () => {
+    if (!removed) return;
+    setDays((prev) => insertDay(prev, removed.index, removed.pages));
+    setRemoved(null);
+  };
 
   const addDay = useCallback(() => {
     setDays((prev) => [...prev, []]);
@@ -263,7 +284,7 @@ export default function PlanEditScreen() {
   const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => {
     setDays(next);
     setDirection(dir);
-    setEditing(false);
+    setRemoved(null);
     setExpanded(false);
   }, []);
 
@@ -440,8 +461,7 @@ export default function PlanEditScreen() {
   const stats = planStats(days);
   const hasMemorized = memorizedPages.length > 0;
   const isLongCycle = days.length > LONG_CYCLE_DAYS;
-  const showAll = expanded || editing || days.length <= COLLAPSED_DAYS;
-  const visibleDays = showAll ? days : days.slice(0, COLLAPSED_DAYS);
+  const showAll = expanded || days.length <= COLLAPSED_DAYS;
   const canSave = isDirty && days.length > 0;
 
   const quotaSummary =
@@ -465,11 +485,16 @@ export default function PlanEditScreen() {
     stats.restDays > 0 ? ` · ${stats.restDays} rest day${stats.restDays === 1 ? '' : 's'}` : ''
   }. Tap Cycle to show the days.`;
 
-  const cycleFooter = editing
-    ? 'Tap the red button to remove a day. Use the arrows to change the order.'
-    : isLongCycle
-      ? `A ${days.length}-day cycle is a long gap between revisions. Past about two weeks, pages usually need more reinforcement.`
-      : 'Tap a day to change what’s on it. Touch and hold to rearrange.';
+  const cycleFooter = isLongCycle
+    ? `A ${days.length}-day cycle is a long gap between revisions. Past about two weeks, pages usually need more reinforcement.`
+    : 'Tap a day to change what’s on it. Touch and hold to move it to another date; swipe left to delete it.';
+
+  const removedSummary = removed ? summarizeDay(removed.pages) : null;
+  const removedMessage = removedSummary
+    ? removedSummary.isRest
+      ? 'Rest day deleted'
+      : `${removedSummary.title} deleted`
+    : '';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -484,7 +509,9 @@ export default function PlanEditScreen() {
           {({ pressed }) => (
             <View style={[styles.navBack, { opacity: pressed ? 0.5 : 1 }]}>
               <Ionicons name="chevron-back" size={24} color={theme.accent} />
-              <Text style={styles.navText}>Back</Text>
+              <Text style={styles.navText} maxFontSizeMultiplier={1.4}>
+                Back
+              </Text>
             </View>
           )}
         </Pressable>
@@ -509,6 +536,7 @@ export default function PlanEditScreen() {
                     !canSave && { color: theme.textMuted },
                     pressed && { opacity: 0.5 },
                   ]}
+                  maxFontSizeMultiplier={1.4}
                 >
                   Save
                 </Text>
@@ -518,10 +546,16 @@ export default function PlanEditScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!dragging}
+        scrollEventThrottle={16}
+        onContentSizeChange={(_w, h) => {
+          contentHeight.value = h;
+        }}
       >
         <View style={styles.hero}>
           <Text style={styles.heroTitle} accessibilityRole="header">
@@ -534,71 +568,23 @@ export default function PlanEditScreen() {
         {days.length > 0 ? (
           <GroupedSection
             header="Cycle"
-            collapsed={cycleCollapsed && !editing}
-            onToggleCollapsed={
-              editing ? undefined : () => setCycleCollapsedPersisted(!cycleCollapsed)
-            }
+            collapsed={cycleCollapsed}
+            onToggleCollapsed={() => setCycleCollapsedPersisted(!cycleCollapsed)}
             collapsedFooter={cycleSummary}
-            headerRight={
-              <HeaderTextButton
-                label={editing ? 'Done' : 'Edit'}
-                bold={editing}
-                onPress={() => {
-                  // Editing a folded cycle unfolds it first.
-                  if (!editing && cycleCollapsed) setCycleCollapsedPersisted(false);
-                  setEditing((v) => !v);
-                }}
-              />
-            }
             footer={cycleFooter}
-            footerTone={!editing && isLongCycle ? 'warning' : 'default'}
-            separatorInset={DAY_ROW_INSET + (editing ? 40 : 0)}
+            footerTone={isLongCycle ? 'warning' : 'default'}
+            separatorInset={DAY_ROW_INSET}
           >
-            {visibleDays.map((dayPages, index) => (
-              <DayRow
-                key={index}
-                index={index}
-                pages={dayPages}
-                today={today}
-                showChevron={!editing}
-                onPress={editing ? undefined : () => goToDayEditor(index)}
-                onLongPress={editing ? undefined : () => setEditing(true)}
-                leading={
-                  editing ? (
-                    <Pressable
-                      onPress={() => deleteDay(index)}
-                      disabled={days.length <= 1}
-                      hitSlop={8}
-                      style={[styles.minusSlot, days.length <= 1 && styles.disabled]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove day ${index + 1}`}
-                    >
-                      <Ionicons name="remove-circle" size={24} color={theme.error} />
-                    </Pressable>
-                  ) : undefined
-                }
-                trailing={
-                  editing ? (
-                    <View style={styles.reorder}>
-                      <ReorderButton
-                        icon="chevron-up"
-                        label={`Move day ${index + 1} earlier`}
-                        disabled={index === 0}
-                        onPress={() => shiftDay(index, -1)}
-                        theme={theme}
-                      />
-                      <ReorderButton
-                        icon="chevron-down"
-                        label={`Move day ${index + 1} later`}
-                        disabled={index === days.length - 1}
-                        onPress={() => shiftDay(index, 1)}
-                        theme={theme}
-                      />
-                    </View>
-                  ) : undefined
-                }
-              />
-            ))}
+            <ReorderableDayList
+              days={days}
+              limit={showAll ? undefined : COLLAPSED_DAYS}
+              today={today}
+              scroll={scrollLink}
+              onPressDay={goToDayEditor}
+              onMove={moveDayTo}
+              onDelete={deleteDay}
+              onDragChange={setDragging}
+            />
             {!showAll ? (
               <GroupedRow
                 title={`Show All ${days.length} Days`}
@@ -606,9 +592,7 @@ export default function PlanEditScreen() {
                 onPress={() => setExpanded(true)}
               />
             ) : null}
-            {editing ? (
-              <GroupedRow title="Add Rest Day" icon="add-circle" tone="accent" onPress={addDay} />
-            ) : null}
+            <GroupedRow title="Add Rest Day" icon="add-circle" tone="accent" onPress={addDay} />
           </GroupedSection>
         ) : (
           <GroupedSection
@@ -693,7 +677,17 @@ export default function PlanEditScreen() {
             />
           ) : null}
         </GroupedSection>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <UndoToast
+        key={removed?.seq ?? 0}
+        visible={removed != null}
+        message={removedMessage}
+        onUndo={undoDelete}
+        onDismiss={() => setRemoved(null)}
+        duration={4000}
+        bottomInset={insets.bottom}
+      />
 
       <PlanBuilderSheet
         ref={builderRef}
@@ -829,40 +823,6 @@ export default function PlanEditScreen() {
   );
 }
 
-function ReorderButton({
-  icon,
-  label,
-  disabled,
-  onPress,
-  theme,
-}: {
-  icon: 'chevron-up' | 'chevron-down';
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-  theme: ThemeColors;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={4}
-      style={({ pressed }) => ({
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-        opacity: disabled ? 0.25 : pressed ? 0.5 : 1,
-      })}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-    >
-      <Ionicons name={icon} size={20} color={theme.textSecondary} />
-    </Pressable>
-  );
-}
-
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
@@ -920,15 +880,6 @@ const makeStyles = (theme: ThemeColors) =>
       lineHeight: 18,
       color: theme.accent,
       marginTop: 2,
-    },
-    minusSlot: {
-      width: 28,
-      alignItems: 'center',
-    },
-    disabled: { opacity: 0.3 },
-    reorder: {
-      flexDirection: 'row',
-      marginRight: -spacing.xs,
     },
     sheetBody: {
       paddingHorizontal: spacing.md,

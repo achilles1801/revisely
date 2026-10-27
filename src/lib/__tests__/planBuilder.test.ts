@@ -7,6 +7,8 @@ import {
   groupDays,
   isGroupFullyIncluded,
   moveDay,
+  removeDay,
+  insertDay,
   orderPages,
   planStats,
   resolveStartPage,
@@ -252,6 +254,17 @@ describe('moveDay', () => {
     expect(moveDay([[1], [2], [3]], 0, 1)).toEqual([[2], [1], [3]]);
     expect(moveDay([[1], [2], [3]], 2, 99)).toEqual([[1], [2], [3]]);
     expect(moveDay([[1], [2], [3]], 2, -1)).toEqual([[3], [1], [2]]);
+  });
+});
+
+describe('removeDay / insertDay', () => {
+  it('removes a day and puts it back', () => {
+    expect(removeDay([[1], [2], [3]], 1)).toEqual([[1], [3]]);
+    expect(insertDay([[1], [3]], 1, [2])).toEqual([[1], [2], [3]]);
+  });
+
+  it('keeps at least one day', () => {
+    expect(removeDay([[1]], 0)).toEqual([[1]]);
   });
 });
 

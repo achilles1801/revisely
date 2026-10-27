@@ -13,6 +13,8 @@ import {
   Share,
   TextInput,
   Pressable,
+  LayoutAnimation,
+  AccessibilityState,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
@@ -57,10 +59,12 @@ import { logger } from '../../lib/logger';
 import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
+  homeMetricsSummary,
   setHomePrefs,
   toggleHomeMetric,
   useHomePrefs,
 } from '../../lib/homePrefs';
+import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -135,6 +139,7 @@ function Row({
   onPress,
   destructive,
   isLast,
+  accessibilityState,
 }: {
   icon?: IconName;
   iconColor?: string;
@@ -144,6 +149,7 @@ function Row({
   onPress?: () => void;
   destructive?: boolean;
   isLast?: boolean;
+  accessibilityState?: AccessibilityState;
 }) {
   const { theme, palette } = useTheme();
   const { isNew } = useDesign();
@@ -169,7 +175,12 @@ function Row({
     );
     if (!onPress) return row;
     return (
-      <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={value ? `${label}, ${value}` : label}>
+      <Tap
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={value ? `${label}, ${value}` : label}
+        accessibilityState={accessibilityState}
+      >
         {row}
       </Tap>
     );
@@ -213,7 +224,14 @@ function Row({
 
   if (!onPress) return inner;
   return (
-    <PressableScale onPress={onPress} haptic="light" scale={0.99}>
+    <PressableScale
+      onPress={onPress}
+      haptic="light"
+      scale={0.99}
+      accessibilityRole="button"
+      accessibilityLabel={value ? `${label}, ${value}` : label}
+      accessibilityState={accessibilityState}
+    >
       {inner}
     </PressableScale>
   );
@@ -326,6 +344,12 @@ export default function SettingsScreen() {
   const [tempName, setTempName] = useState(user?.name ?? '');
   const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
+  // The progress card's options stay folded until opened (remembered per device).
+  const [metricsOpen, setMetricsOpen] = usePersistedFlag('@revisely_settings_progress_open', false);
+  const toggleMetricsOpen = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+    setMetricsOpen(!metricsOpen);
+  }, [metricsOpen, setMetricsOpen]);
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
   // On this phone: how many, their size here; how many are backed up, and how
@@ -766,24 +790,43 @@ export default function SettingsScreen() {
               />
             }
           />
-          {homePrefs.showProgressCard &&
-            ALL_HOME_METRICS.map((metric, i) => {
-              const selected = homePrefs.metrics.includes(metric);
-              return (
-                <Row
-                  key={metric}
-                  label={HOME_METRIC_LABELS[metric]}
-                  onPress={() => toggleHomeMetric(metric)}
-                  rightSlot={
-                    <Ionicons
-                      name="checkmark"
-                      size={20}
-                      color={selected ? theme.accent : 'transparent'}
-                    />
-                  }
+          {homePrefs.showProgressCard ? (
+            // What the card shows, folded into one row until opened.
+            <Row
+              label="Shows"
+              value={homeMetricsSummary(homePrefs.metrics)}
+              onPress={toggleMetricsOpen}
+              accessibilityState={{ expanded: metricsOpen }}
+              rightSlot={
+                <Ionicons
+                  name={metricsOpen ? 'chevron-up' : 'chevron-down'}
+                  size={design.isNew ? 16 : 18}
+                  color={theme.textMuted}
+                  style={design.isNew ? undefined : { marginLeft: spacing.xs }}
                 />
-              );
-            })}
+              }
+            />
+          ) : null}
+          {homePrefs.showProgressCard && metricsOpen
+            ? ALL_HOME_METRICS.map((metric) => {
+                const selected = homePrefs.metrics.includes(metric);
+                return (
+                  <Row
+                    key={metric}
+                    label={HOME_METRIC_LABELS[metric]}
+                    onPress={() => toggleHomeMetric(metric)}
+                    accessibilityState={{ selected }}
+                    rightSlot={
+                      <Ionicons
+                        name="checkmark"
+                        size={20}
+                        color={selected ? theme.accent : 'transparent'}
+                      />
+                    }
+                  />
+                );
+              })
+            : null}
           <Row
             icon="book-outline"
             label="Friday Al-Kahf reminder"
@@ -797,7 +840,10 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        <Section title="Reading">
+        <Section
+          title="Reading"
+          footer="On by default. The screen stays awake while you read, revise or play a recording."
+        >
           <Row
             icon="sunny-outline"
             label="Keep screen on while reading"
