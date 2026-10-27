@@ -22,7 +22,7 @@ import { Sheet } from '../../components/v2/Sheet';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { OptionSheet } from '../../components/OptionSheet';
 import { SessionMenuSheet } from '../../components/revision/SessionMenuSheet';
-import { paletteLight } from '../../theme/v2';
+import { DEFAULT_ACCENT, paletteLight, paletteV2 } from '../../theme/v2';
 
 const v2 = (ui: React.ReactElement) => (
   <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
@@ -122,7 +122,7 @@ describe('sheets in the new design', () => {
       ),
     );
     await act(async () => {});
-    expect(flat(screen.getByTestId('pill-stopwatch').props.style).backgroundColor).toBe(paletteLight.primary);
+    expect(flat(screen.getByTestId('pill-stopwatch').props.style).backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).primary);
     expect(flat(screen.getByTestId('pill-timer').props.style).borderWidth).toBe(1);
     fireEvent.press(screen.getByTestId('pill-timer'));
     expect(onChange).toHaveBeenCalledWith('timer');

@@ -216,6 +216,7 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.fajrCalculationMethod !== undefined) updateData.fajrCalculationMethod = updates.fajrCalculationMethod;
   if (updates.scheduleAnchorDate !== undefined) updateData.scheduleAnchorDate = updates.scheduleAnchorDate;
   if (updates.carryOverMode !== undefined) updateData.carryOverMode = updates.carryOverMode;
+  if (updates.accent !== undefined) updateData.accent = updates.accent;
   if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
   if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
   if (updates.translationId !== undefined) updateData.translationId = updates.translationId;

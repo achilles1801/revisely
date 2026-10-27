@@ -15,14 +15,17 @@ import { TextStyle } from 'react-native';
 import type { ThemeColors } from './colors';
 
 /**
- * The accent, chosen in Settings → Preview (testers): Jade is the design as
- * agreed (ink buttons, jade only for "done"); Crimson and Indigo are trials
- * that put the accent on the primary action, links, the active tab, "done",
- * the calendar and a glow behind Today.
+ * The new design's accent (Settings → Appearance → Accent, kept with the
+ * account). Indigo is the default; Crimson and Indigo put the accent on the
+ * primary action, links, the active tab, "done", the calendar and a glow
+ * behind Home's top; Jade keeps ink buttons and jade only for "done".
  */
 export type AccentName = 'jade' | 'crimson' | 'indigo';
-export const ACCENTS: AccentName[] = ['jade', 'crimson', 'indigo'];
+/** In the order Settings offers them. */
+export const ACCENTS: AccentName[] = ['indigo', 'crimson', 'jade'];
 export const ACCENT_LABELS: Record<AccentName, string> = { jade: 'Jade', crimson: 'Crimson', indigo: 'Indigo' };
+/** For new installs and anyone who hasn't chosen. */
+export const DEFAULT_ACCENT: AccentName = 'indigo';
 
 /** A glow's colour stops, centre (offset 0) to edge (offset 1). */
 export type HeroStops = readonly { offset: number; color: string; opacity: number }[];

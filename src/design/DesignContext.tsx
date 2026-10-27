@@ -11,7 +11,7 @@
 
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ACCENTS, AccentName } from '../theme/v2';
+import { ACCENTS, AccentName, DEFAULT_ACCENT } from '../theme/v2';
 
 export type DesignName = 'classic' | 'new';
 
@@ -31,8 +31,10 @@ export interface DesignState {
   /** Haptics on meaningful moments (new design; Settings → Haptics). */
   hapticsOn: boolean;
   setHapticsOn: (on: boolean) => void;
-  /** The new design's accent (Settings → Preview, a trial for testers). */
+  /** The new design's accent (Settings → Appearance; Jade in the classic design). */
   accent: AccentName;
+  /** Set it on this device (Settings also saves it to the account; DesignGate
+   *  brings the account's choice here). */
   setAccent: (accent: AccentName) => void;
 }
 
@@ -63,7 +65,8 @@ export function DesignProvider({
   const [chosen, setChosenState] = useState<DesignName>(initial?.chosen ?? 'classic');
   const [allowed, setAllowed] = useState(initial?.allowed ?? false);
   const [hapticsOn, setHapticsState] = useState(initial?.hapticsOn ?? true);
-  const [accent, setAccentState] = useState<AccentName>(initial?.accent ?? 'jade');
+  // Cached on the device so the first frame has it; the account's copy wins once loaded.
+  const [accent, setAccentState] = useState<AccentName>(initial?.accent ?? DEFAULT_ACCENT);
 
   useEffect(() => {
     if (initial) return;

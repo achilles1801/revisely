@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DesignProvider } from '../DesignContext';
 import { ThemeProvider } from '../../context/ThemeContext';
 import { LiquidGlassTabBar } from '../../components/LiquidGlassTabBar';
-import { paletteLight } from '../../theme/v2';
+import { DEFAULT_ACCENT, paletteLight, paletteV2 } from '../../theme/v2';
 
 const routes = [
   { key: 'home-1', name: 'Home' },
@@ -52,7 +52,7 @@ describe('the tab bar in the new design', () => {
   it('is a flat, icon-only bar: the selected tab filled in ink, the rest outlined', async () => {
     await setup(0);
     expect(screen.getByTestId('tab-bar-v2')).toBeTruthy();
-    expect(screen.getByTestId('icon-home').props.children).toBe(paletteLight.text);
+    expect(screen.getByTestId('icon-home').props.children).toBe(paletteV2(false, DEFAULT_ACCENT).accentText);
     expect(screen.getByTestId('icon-book-outline').props.children).toBe(paletteLight.secondary);
     // Insights is a chart, not sparkles.
     expect(screen.getByTestId('icon-stats-chart-outline')).toBeTruthy();
