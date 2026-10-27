@@ -556,9 +556,14 @@ classic default), and a fresh install starts in light.
   (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient but
   Home's glow and the accent's progress fill: the primary button is a solid pill
   (`v2/PillButton`). Every menu is `v2/ActionSheet` (handle, 18/600 title, icon rows, red
-  destructive rows, a Cancel bar); its action runs after the sheet has gone. The tab bar
-  (`navigation/TabBar`) is flat and icon-only; `ActionBar` takes its place for a screen's own
-  actions. No Threads/Meta names, logos or icons, no likes or reposts.
+  destructive rows, a Cancel bar); its action runs after the sheet has gone. The one exception is
+  the held verse's menu (`verse/VerseMenu`, Oct 27 2026): a small card beside the verse
+  (`verse/menuPlacement`: below it, above it near the bottom, beside the finger for a verse that
+  fills the page), a scrim of 4% (`palette.scrim`), no title or Cancel; any touch outside closes it.
+  It is a view in the screen, not a Modal, so its action runs at once and the verse sheet or the
+  share sheet can open straight after. The tab bar (`navigation/TabBar`) is flat and icon-only,
+  with a small accent dot under the current tab that follows a swipe (below); `ActionBar` takes
+  its place for a screen's own actions. No Threads/Meta names, logos or icons, no likes or reposts.
 - Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
   is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar; the backdrop is its
   sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
@@ -627,6 +632,11 @@ classic default), and a fresh install starts in light.
     own, the pan never started and the row under the finger got a tap.
   - The gesture is made once and reads what changes from shared values; in Jest, Reanimated's mock
     makes a new shared value every render, so `PagerTabs.test` keeps them across renders.
+  - The swipe accent: a 5pt dot under the current tab's icon stretches into a short pill between
+    two tabs (front end ahead, back end behind; `wormFrame`) and gathers again as the tab lands,
+    1:1 with `position` on the UI thread. A swipe that lands on another tab ticks (selection
+    haptic); taps don't. Reduce Motion (`design/motion`'s `useReduceMotion`; Reanimated's jest mock
+    has no `useReducedMotion`) gives a dot per tab that fades instead of travelling.
 - **Pull to refresh over Home's glow:** iOS paints the pull area opaque, so the glow ended in a
   hard line under the header while pulling (and while a refresh hung). Home's `RefreshControl` has
   `backgroundColor: 'transparent'`; refreshes go through `hooks/usePullToRefresh`, which always ends

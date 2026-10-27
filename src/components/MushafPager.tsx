@@ -30,6 +30,7 @@ import {
   prefetchPages,
 } from '../lib/pageCache';
 import { AyahRef, ayahAt, ayahRects } from '../lib/ayahBounds';
+import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -55,7 +56,8 @@ interface MushafPagerProps {
   onUserSwipe?: () => void;
   /** Press and hold on a verse. Receives the verse under the finger and the
    *  screen point pressed (to place a menu beside it). */
-  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
+  /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
   /** Verse to highlight (e.g. while its translation is open). */
   highlightedAyah?: AyahRef | null;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
@@ -74,7 +76,8 @@ export interface MushafPagerHandle {
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
-  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
+  /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
   /** The highlighted verse, drawn on every page it has lines on (a verse can
    *  run onto the next page). */
   highlight: AyahRef | null;
@@ -125,7 +128,20 @@ const PageItem = React.memo(function PageItem({
     if (!onLongPressAyah) return;
     const { locationX, locationY, pageX, pageY } = e.nativeEvent;
     const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
-    if (ayah) onLongPressAyah(ayah, { x: pageX, y: pageY });
+    if (!ayah) return;
+    // The image's corner on screen, so the verse's lines can be placed there
+    // too (its menu goes beside them, not over them).
+    const ox = pageX - locationX;
+    const oy = pageY - locationY;
+    const verse = unionBox(
+      ayahRects(pageNumber, ayah.sura, ayah.ayah).map((r) => ({
+        x: ox + r.x0 * BOUNDS_SCALE,
+        y: oy + r.y0 * BOUNDS_SCALE,
+        width: (r.x1 - r.x0) * BOUNDS_SCALE,
+        height: (r.y1 - r.y0) * BOUNDS_SCALE,
+      })),
+    );
+    onLongPressAyah(ayah, { x: pageX, y: pageY }, verse);
   };
 
   const highlightRects = useMemo(

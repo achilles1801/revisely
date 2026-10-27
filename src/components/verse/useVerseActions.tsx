@@ -9,6 +9,7 @@ import { logger } from '../../lib/logger';
 import { isRecordingActive } from '../../lib/recordings';
 import { prefetchVerseText } from '../../lib/translation';
 import { VerseMenu } from './VerseMenu';
+import type { Box } from './menuPlacement';
 import { VerseSheet } from './VerseSheet';
 import type { PlayerControls } from '../reader/PlayerCapsule';
 import { ReciterList } from './ReciterList';
@@ -61,6 +62,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   const [playback, setPlayback] = useState<RecitationState>(recitation.getState());
   const [selected, setSelected] = useState<AyahRef | null>(null);
   const [menuPoint, setMenuPoint] = useState<{ x: number; y: number } | null>(null);
+  // The held verse's lines on screen: its menu goes beside them.
+  const [menuAnchor, setMenuAnchor] = useState<Box | null>(null);
   const [sheetVerse, setSheetVerse] = useState<AyahRef | null>(null);
   const allowed = useMemo(() => new Set(pages), [pages]);
   const [owner] = useState(() => `verse-actions-${Math.random().toString(36).slice(2)}`);
@@ -109,11 +112,12 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     if (allowedRef.current.has(page)) onShowPageRef.current?.(page);
   }, [playingKey]);
 
-  const onLongPressAyah = useCallback((ayah: AyahRef, point?: { x: number; y: number }) => {
+  const onLongPressAyah = useCallback((ayah: AyahRef, point?: { x: number; y: number }, verse?: Box | null) => {
     haptics.impact();
     // The menu offers Translation: its text starts loading now, not on the tap.
     prefetchVerseText(ayah.page, ayah.sura, ayah.ayah, translationIdRef.current);
     setSelected(ayah);
+    setMenuAnchor(verse ?? null);
     const { width, height } = Dimensions.get('window');
     setMenuPoint(point ?? { x: width / 2, y: height / 2 });
   }, [haptics]);
@@ -170,9 +174,7 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
-    // The menu clears the selection as it closes, before this runs: keep the
-    // verse highlighted under its sheet.
-    setSelected(selected);
+    // The verse stays highlighted under its sheet; the menu goes.
     setMenuPoint(null);
   }, [selected]);
 
@@ -184,7 +186,7 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     AccessibilityInfo.announceForAccessibility(text);
   }, []);
 
-  // Copy and Share run once the menu has gone, with the verse it was opened on.
+  // Copy and Share: the verse the menu was opened on; the menu closes.
   const copyVerse = useCallback(() => {
     const verse = selected;
     setMenuPoint(null);
@@ -322,6 +324,7 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     <>
       <VerseMenu
         point={menuPoint}
+        anchor={menuAnchor}
         verseLabel={selected ? `${selectedSurah ? `${selectedSurah} ` : ''}${selected.sura}:${selected.ayah}` : undefined}
         playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · ${playUpToPhrase(selected, audio.playUpTo)}`}
         onPlay={play}

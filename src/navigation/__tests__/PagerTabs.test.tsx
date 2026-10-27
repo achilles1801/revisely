@@ -17,6 +17,8 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 require('react-native-gesture-handler/jestSetup');
+const mockTick = jest.fn(async () => undefined);
+jest.mock('expo-haptics', () => ({ selectionAsync: () => mockTick() }));
 
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
@@ -137,6 +139,17 @@ describe('the pager in a navigator', () => {
     expect(tab()).toBe('Home');
     swipe(-60, -900);
     expect(tab()).toBe('Read');
+  });
+
+  it('a light tick when a swipe lands on another tab; none when it springs back', async () => {
+    await mount();
+    mockTick.mockClear();
+    swipe(-60);
+    expect(tab()).toBe('Home');
+    expect(mockTick).not.toHaveBeenCalled();
+    swipe(-600);
+    expect(tab()).toBe('Read');
+    expect(mockTick).toHaveBeenCalledTimes(1);
   });
 
   it('without Smart Tracking, Insights is not swiped to', async () => {

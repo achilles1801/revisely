@@ -39,6 +39,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useHaptics } from '../design/haptics';
 
 /** Pages past either end move this much: the iOS rubber band (c = 0.55). */
 export function rubberBand(overPages: number): number {
@@ -186,6 +187,12 @@ function PagerTabs({
     if (route && page !== now) nav.navigate(route.name);
   }, []);
 
+  // A light tick when a swipe lands on another tab (taps don't buzz).
+  const haptics = useHaptics();
+  const hapticsRef = useRef(haptics);
+  hapticsRef.current = haptics;
+  const tick = useCallback(() => hapticsRef.current.selection(), []);
+
   const pan = useMemo(
     () =>
       Gesture.Pan()
@@ -214,10 +221,13 @@ function PagerTabs({
           const page = snapPage(start.value, position.value, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value);
           target.value = page;
           position.value = withSpring(page, { ...SPRING, velocity });
-          if (page !== Math.round(start.value)) runOnJS(go)(page);
+          if (page !== Math.round(start.value)) {
+            runOnJS(tick)();
+            runOnJS(go)(page);
+          }
         })
         .withTestId('tab-pager'),
-    [go, position, start, target, pageWidth, lo, hi, swipeOn],
+    [go, tick, position, start, target, pageWidth, lo, hi, swipeOn],
   );
 
   const row = useAnimatedStyle(() => ({ transform: [{ translateX: -position.value * pageWidth.value }] }));
