@@ -290,10 +290,13 @@ iPhone 17 Pro Max simulator: the dev client, with Metro started with `--no-dev -
 overlays; use another port if 8081 is taken) and `xcrun simctl status_bar booted override --time
 9:41 ...`. Reopen the app from the home screen to clear the back-link in the status bar.
 
-**Public pages** (`docs/`, served at revisely.app by Cloudflare on push to `main`): the privacy
-policy and terms give email (`privacy@revisely.app`) as the only contact. Do not add a postal
-address. `docs/privacy/index.html` and `docs/terms/index.html` are edited by hand alongside the `.md`
-files; change both. When the app gains or loses something that collects data, update the policy and
+**Public pages** (`docs/`, served at revisely.app by Cloudflare on push to `main`): the one contact
+is `support@revisely.app` (routed; it replaced `privacy@revisely.app` on 2026-10-27) in the footers,
+on `/support/`, and in the privacy policy and terms. Do not add a postal address. The App Store
+listing uses the same: support URL `https://revisely.app/support/` and "Contact:" in the review
+notes (`store/listing.json`; App Store Connect gets them from `scripts/asc.js listing`, run with
+the next submission). `docs/privacy/index.html` and `docs/terms/index.html` are edited by hand
+alongside the `.md` files; change both. When the app gains or loses something that collects data, update the policy and
 the App Privacy answers in App Store Connect (no API; done by hand) together.
 
 **Verse positions and translations:** press-and-hold on a verse uses `src/data/ayahBounds.json`, built
