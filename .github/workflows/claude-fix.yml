@@ -219,8 +219,18 @@ jobs:
           export PATH=/usr/bin:/bin GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
           out="$RUNNER_TEMP/claude-patch"
           rm -rf "$out" && mkdir -p "$out"
-          if [ ! -d .git ] || [ -L .git ] || [ -e .git/commondir ]; then
-            echo "::error::.git was replaced; not exporting."
+          problem=""
+          if [ -L .git ]; then problem=".git is a symlink"
+          elif [ ! -d .git ]; then problem=".git is not a directory"
+          elif [ -e .git/commondir ]; then problem=".git/commondir exists"
+          fi
+          if [ -n "$problem" ]; then
+            echo "::error::.git was replaced ($problem); not exporting."
+            # Names, types and sizes only (.git/config holds the action's token in the remote URL).
+            ls -la .git | head -40 || true
+            if [ -f .git/commondir ]; then
+              echo "commondir: $(wc -c < .git/commondir) bytes: $(head -c 200 .git/commondir | tr -cd '[:print:]')"
+            fi
             exit 1
           fi
           rm -f .git/config
