@@ -1,5 +1,12 @@
-// GET /api/tcq/verses/:sura::ayah — one verse of The Clear Quran® (English),
-// fetched from The Clear Quran API with our key, which never leaves the worker.
+// The Clear Quran® (English) for the app, fetched from The Clear Quran API with
+// our key, which never leaves the worker.
+//
+// GET /api/tcq/windows/:sura::ayah — the block of verses that holds a verse:
+//   up to 30 verses of one surah, aligned (1–30, 31–60, …), the most the API
+//   returns per request. One request to The Clear Quran serves the whole block,
+//   so moving between verses costs nothing, and the block is cached here.
+// GET /api/tcq/verses/:sura::ayah — one verse (builds that predate blocks),
+//   served from the same block.
 //
 // - Only for signed-in users of the app (a Firebase ID token): the text is
 //   licensed to Revisely, and the free plan has 10,000 requests a month.
@@ -10,10 +17,14 @@
 //   and only once TCQ_API_BASE_SANDBOX names a sandbox host (empty now: dev
 //   builds use the live key too). See tcqEnvironment().
 // - The text goes back exactly as the API returns it (`text_english`).
-// - Successful answers are kept in this data centre's cache for
-//   TCQ_EDGE_CACHE_SECONDS (short; 0 turns it off); the app keeps nothing.
+// - Blocks are kept in this data centre's cache for TCQ_EDGE_CACHE_SECONDS
+//   (short; 0 turns it off); the app keeps them in memory for one launch.
 // - Requests that reach The Clear Quran count against daily budgets, for
 //   everyone and per user (worker/budget.ts), so the plan can't be spent.
+// - If The Clear Quran refuses the range query, single verses are fetched
+//   instead (and for the next 10 minutes), so the text keeps coming, slower.
+// - Every answer has a Server-Timing header (sign-in, cache, budget, The Clear
+//   Quran), for measuring where time goes.
 // - Errors come back as { error: { code, message } } with a status the app
 //   maps to "Couldn't load translation" + retry. Never another translation.
 
@@ -55,8 +66,47 @@ export const VERSE_COUNTS = [
   25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6,
 ];
 
-const PATH = /^\/api\/tcq\/verses\/(\d{1,3}):(\d{1,3})$/;
-const UPSTREAM_TIMEOUT_MS = 8000;
+/** The most verses The Clear Quran returns per request (more is a 400). */
+export const WINDOW = 30;
+
+export interface VerseWindow {
+  sura: number;
+  from: number;
+  to: number;
+}
+
+/** The aligned block of verses holding sura:ayah (2:45 → 2:31–60; 112:2 → 112:1–4). */
+export function windowOf(sura: number, ayah: number): VerseWindow {
+  const from = Math.floor((ayah - 1) / WINDOW) * WINDOW + 1;
+  return { sura, from, to: Math.min(from + WINDOW - 1, VERSE_COUNTS[sura - 1]) };
+}
+
+const PATH = /^\/api\/tcq\/(verses|windows)\/(\d{1,3}):(\d{1,3})$/;
+const UPSTREAM_TIMEOUT_MS = 10_000;
+/** After The Clear Quran refuses the range query, single verses for this long. */
+const RANGE_RETRY_AFTER_MS = 10 * 60_000;
+
+export interface TcqRoute {
+  kind: 'verse' | 'window';
+  sura: number;
+  ayah: number;
+}
+
+/** What a path asks for, if it names a real verse. */
+export function route(pathname: string): TcqRoute | null {
+  const m = PATH.exec(pathname);
+  if (!m) return null;
+  const sura = Number(m[2]);
+  const ayah = Number(m[3]);
+  if (sura < 1 || sura > 114 || ayah < 1 || ayah > VERSE_COUNTS[sura - 1]) return null;
+  return { kind: m[1] === 'windows' ? 'window' : 'verse', sura, ayah };
+}
+
+/** "2:255" if the path asks for one real verse, else null. */
+export function verseKey(pathname: string): string | null {
+  const r = route(pathname);
+  return r && r.kind === 'verse' ? `${r.sura}:${r.ayah}` : null;
+}
 
 export type ErrorCode =
   | 'BAD_REQUEST'
@@ -75,22 +125,53 @@ export function errorResponse(status: number, code: ErrorCode, message: string, 
   });
 }
 
-function verseResponse(verseKey: string, text: string, cached: boolean) {
-  return new Response(JSON.stringify({ verse_key: verseKey, text }), {
+function ok(body: unknown, cached: boolean, timing: Timing) {
+  return new Response(JSON.stringify(body), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Cache': cached ? 'HIT' : 'MISS' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Cache': cached ? 'HIT' : 'MISS',
+      'Server-Timing': timing.header(),
+    },
   });
 }
 
-/** "2:255" if it names a real verse, else null. */
-export function verseKey(pathname: string): string | null {
-  const m = PATH.exec(pathname);
-  if (!m) return null;
-  const sura = Number(m[1]);
-  const ayah = Number(m[2]);
-  if (sura < 1 || sura > 114 || ayah < 1 || ayah > VERSE_COUNTS[sura - 1]) return null;
-  return `${sura}:${ayah}`;
+/** Server-Timing entries: how long each step took, in milliseconds. */
+class Timing {
+  private readonly parts: string[] = [];
+  async time<T>(name: string, run: () => Promise<T>): Promise<T> {
+    const start = Date.now();
+    try {
+      return await run();
+    } finally {
+      this.parts.push(`${name};dur=${Date.now() - start}`);
+    }
+  }
+  add(part: string) {
+    this.parts.push(part);
+  }
+  header() {
+    return this.parts.join(', ');
+  }
 }
+
+export interface TcqVerse {
+  verse_key: string;
+  text: string;
+}
+
+type Outcome =
+  | { ok: true; verses: TcqVerse[]; from: number; to: number; cached: boolean }
+  | {
+      ok: false;
+      status: number;
+      code: ErrorCode;
+      message: string;
+      headers?: Record<string, string>;
+      /** The Clear Quran turned the query itself down: single verses may still work. */
+      unsupported?: boolean;
+    };
 
 /**
  * Which key a request uses. The App Store app (`production`) and TestFlight (`preview`) use the
@@ -104,6 +185,49 @@ export function tcqEnvironment(channel: string | null, sandboxBase?: string): 'l
   return sandboxBase?.trim() ? 'sandbox' : 'live';
 }
 
+/** The verses of `win`, each with its text, if `body` holds exactly them; else null. */
+export function parseWindow(body: unknown, win: VerseWindow): TcqVerse[] | null {
+  const b = body as { success?: unknown; data?: unknown } | null;
+  if (!b || b.success !== true || !Array.isArray(b.data)) return null;
+  const texts = new Map<number, string>();
+  for (const item of b.data as { verse_key?: unknown; text_english?: unknown }[]) {
+    const m = typeof item?.verse_key === 'string' ? /^(\d+):(\d+)$/.exec(item.verse_key) : null;
+    if (!m || Number(m[1]) !== win.sura) return null;
+    const n = Number(m[2]);
+    if (n < win.from || n > win.to || typeof item.text_english !== 'string' || item.text_english.length === 0) return null;
+    texts.set(n, item.text_english);
+  }
+  const verses: TcqVerse[] = [];
+  for (let n = win.from; n <= win.to; n++) {
+    const text = texts.get(n);
+    if (text === undefined) return null;
+    verses.push({ verse_key: `${win.sura}:${n}`, text });
+  }
+  return verses;
+}
+
+/** A cached block, if the entry holds all of it. */
+async function readCached(cache: Cache, key: Request, win: VerseWindow): Promise<TcqVerse[] | null> {
+  try {
+    const hit = await cache.match(key);
+    if (!hit) return null;
+    const stored = ((await hit.json()) as { verses?: unknown }).verses;
+    if (!Array.isArray(stored)) return null;
+    const data = stored.map((v: { verse_key?: unknown; text?: unknown } | null) => ({ verse_key: v?.verse_key, text_english: v?.text }));
+    return parseWindow({ success: true, data }, win);
+  } catch (err) {
+    console.warn('tcq: unreadable cache entry; fetching', err);
+    return null;
+  }
+}
+
+let rangeRefusedAt = -Infinity;
+
+/** For tests: forget that the range query was refused. */
+export function resetRangeState(): void {
+  rangeRefusedAt = -Infinity;
+}
+
 export async function handleTcq(
   request: Request,
   env: TcqEnv,
@@ -114,15 +238,18 @@ export async function handleTcq(
   },
 ): Promise<Response> {
   if (request.method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'GET only', { Allow: 'GET' });
-  const key = verseKey(new URL(request.url).pathname);
-  if (!key) return errorResponse(400, 'BAD_REQUEST', 'Expected /api/tcq/verses/<surah>:<verse> for a real verse');
+  const asked = route(new URL(request.url).pathname);
+  if (!asked) {
+    return errorResponse(400, 'BAD_REQUEST', 'Expected /api/tcq/verses/<surah>:<verse> or /api/tcq/windows/<surah>:<verse>');
+  }
+  const timing = new Timing();
 
   // Signed-in users of the app only.
   const token = /^Bearer (.+)$/.exec(request.headers.get('Authorization') ?? '')?.[1];
   if (!token) return errorResponse(401, 'UNAUTHENTICATED', 'Sign in to load this translation');
   let uid: string;
   try {
-    uid = await verifyIdToken(token, env.FIREBASE_PROJECT_ID, deps.now, deps.fetch);
+    uid = await timing.time('auth', () => verifyIdToken(token, env.FIREBASE_PROJECT_ID, deps.now, deps.fetch));
   } catch (err) {
     if (err instanceof AuthError) return errorResponse(401, 'UNAUTHENTICATED', 'Sign in to load this translation');
     console.error('tcq: could not check the sign-in', err);
@@ -142,91 +269,143 @@ export async function handleTcq(
 
   const which = tcqEnvironment(request.headers.get('X-Revisely-Channel'), env.TCQ_API_BASE_SANDBOX);
   const apiKey = which === 'live' ? env.TCQ_API_KEY_LIVE : env.TCQ_API_KEY_SANDBOX;
-  const base = which === 'live' ? env.TCQ_API_BASE_LIVE : env.TCQ_API_BASE_SANDBOX;
+  const base = (which === 'live' ? env.TCQ_API_BASE_LIVE : env.TCQ_API_BASE_SANDBOX)?.replace(/\/+$/, '');
   if (!apiKey || !base) {
     console.error(`tcq: no ${which} key or base URL configured`);
     return errorResponse(503, 'NOT_CONFIGURED', 'This translation is not available right now');
   }
 
+  const now = deps.now ?? Math.floor(Date.now() / 1000);
   const ttl = Math.max(0, Math.floor(Number(env.TCQ_EDGE_CACHE_SECONDS ?? '0')) || 0);
-  // Keyed by environment and verse only: no user, no token.
-  const cacheKey = new Request(`${new URL(request.url).origin}/__cache/tcq/${which}/verses/${key}`);
-  if (ttl > 0 && deps.cache) {
+  const cache = ttl > 0 ? deps.cache : null;
+  const origin = new URL(request.url).origin;
+
+  /** One request to The Clear Quran, if the budgets allow it. */
+  const upstream = async (label: string, url: string, read: (body: unknown) => TcqVerse[] | null, win: VerseWindow): Promise<Outcome> => {
+    const budget = await timing.time('budget', () =>
+      checkBudget(env.TCQ_BUDGET, {
+        uid,
+        env: which,
+        now,
+        limits: {
+          liveDaily: int(env.TCQ_DAILY_LIMIT_LIVE, 300),
+          sandboxDaily: int(env.TCQ_DAILY_LIMIT_SANDBOX, 100),
+          userDaily: int(env.TCQ_USER_DAILY_LIMIT, 150),
+        },
+      }),
+    );
+    if (!budget.ok) {
+      console.warn(`tcq: daily ${budget.scope === 'user' ? 'per-user' : which} budget spent`);
+      return {
+        ok: false,
+        status: 429,
+        code: 'DAILY_LIMIT',
+        message: budget.scope === 'user' ? 'Daily limit reached for your account' : 'Daily limit reached',
+        headers: { 'Retry-After': String(budget.retryAfter) },
+      };
+    }
+
+    const start = Date.now();
+    let res: Response;
     try {
-      const hit = await deps.cache.match(cacheKey);
-      const text = hit ? ((await hit.json()) as { text?: unknown }).text : undefined;
-      if (typeof text === 'string' && text.length > 0) return verseResponse(key, text, true);
+      res = await timing.time(label, () =>
+        deps.fetch(url, {
+          headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        }),
+      );
     } catch (err) {
-      console.warn('tcq: unreadable cache entry; fetching', err);
+      console.error('tcq: request failed', err);
+      return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'Could not reach The Clear Quran; try again' };
+    }
+    const server = Number.parseFloat(res.headers.get('X-Response-Time') ?? '');
+    if (Number.isFinite(server)) timing.add(`tcq-server;dur=${server}`);
+    const warning = res.headers.get('X-Agreement-Warning');
+    if (warning) console.warn(`tcq: agreement warning: ${warning}`);
+
+    if (res.status === 429) {
+      const retry = res.headers.get('Retry-After') ?? '60';
+      console.warn(`tcq: rate limited (${which}), retry after ${retry}`);
+      return { ok: false, status: 429, code: 'RATE_LIMITED', message: 'The Clear Quran is busy; try again shortly', headers: { 'Retry-After': retry } };
+    }
+    // Refusing the query itself (not our key, not their outage): another form may still work.
+    const refused = [400, 403, 404, 405, 501, 503].includes(res.status);
+    if (!res.ok) {
+      // 401/403 mean our key (revoked, wrong environment, unsigned agreement); 5xx theirs.
+      const detail = await res.text().catch(() => '');
+      console.error(`tcq: ${which} answered ${res.status} to ${label}: ${redactKeys(detail.slice(0, 300))}`);
+      if (res.status === 404) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Verse not found', unsupported: true };
+      return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'The Clear Quran could not answer; try again', unsupported: refused };
+    }
+    const verses = read(await res.json().catch(() => null));
+    if (!verses) {
+      console.error(`tcq: unexpected answer to ${label} for ${win.sura}:${win.from}-${win.to}`);
+      return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'The Clear Quran sent an unexpected answer', unsupported: true };
+    }
+    console.log(`tcq: ${label} ${win.sura}:${win.from}-${win.to} (${which}) in ${Date.now() - start} ms`);
+    return { ok: true, verses, from: win.from, to: win.to, cached: false };
+  };
+
+  const remember = (key: Request, verses: TcqVerse[]) => {
+    if (!cache) return;
+    const stored = new Response(JSON.stringify({ verses }), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttl}` },
+    });
+    ctx.waitUntil(cache.put(key, stored));
+  };
+
+  const key = `${asked.sura}:${asked.ayah}`;
+  let result: Outcome | null = null;
+
+  // The block, from this data centre's cache or in one request.
+  const win = windowOf(asked.sura, asked.ayah);
+  const winKey = new Request(`${origin}/__cache/tcq/${which}/windows/${win.sura}:${win.from}-${win.to}`);
+  const cachedWin = cache ? await timing.time('cache', () => readCached(cache, winKey, win)) : null;
+  if (cachedWin) {
+    result = { ok: true, verses: cachedWin, from: win.from, to: win.to, cached: true };
+  } else if (Date.now() - rangeRefusedAt >= RANGE_RETRY_AFTER_MS) {
+    const limit = win.to - win.from + 1;
+    result = await upstream(
+      'tcq-window',
+      `${base}/verses?surah=${win.sura}&from_verse=${win.from}&to_verse=${win.to}&limit=${limit}`,
+      (body) => parseWindow(body, win),
+      win,
+    );
+    if (result.ok) remember(winKey, result.verses);
+    else if (result.unsupported) {
+      rangeRefusedAt = Date.now();
+      console.warn('tcq: the range query was refused; single verses for 10 minutes');
     }
   }
 
-  // Only what reaches The Clear Quran counts against the plan.
-  const budget = await checkBudget(env.TCQ_BUDGET, {
-    uid,
-    env: which,
-    now: deps.now ?? Math.floor(Date.now() / 1000),
-    limits: {
-      liveDaily: int(env.TCQ_DAILY_LIMIT_LIVE, 300),
-      sandboxDaily: int(env.TCQ_DAILY_LIMIT_SANDBOX, 100),
-      userDaily: int(env.TCQ_USER_DAILY_LIMIT, 150),
-    },
-  });
-  if (!budget.ok) {
-    console.warn(`tcq: daily ${budget.scope === 'user' ? 'per-user' : which} budget spent`);
-    return errorResponse(
-      429,
-      'DAILY_LIMIT',
-      budget.scope === 'user' ? 'Daily limit reached for your account' : 'Daily limit reached',
-      { 'Retry-After': String(budget.retryAfter) },
-    );
+  // Single verses: when the range query isn't available.
+  if (!result || (!result.ok && result.unsupported)) {
+    const one: VerseWindow = { sura: asked.sura, from: asked.ayah, to: asked.ayah };
+    const oneKey = new Request(`${origin}/__cache/tcq/${which}/windows/${key}-${asked.ayah}`);
+    const cachedOne = cache ? await timing.time('cache', () => readCached(cache, oneKey, one)) : null;
+    if (cachedOne) {
+      result = { ok: true, verses: cachedOne, from: asked.ayah, to: asked.ayah, cached: true };
+    } else {
+      result = await upstream(
+        'tcq-verse',
+        `${base}/verses/${key}`,
+        (body) => {
+          const b = body as { success?: unknown; data?: { verse_key?: unknown; text_english?: unknown } } | null;
+          if (!b || b.success !== true || (b.data?.verse_key != null && b.data.verse_key !== key)) return null;
+          return parseWindow({ success: true, data: [{ verse_key: key, text_english: b.data?.text_english }] }, one);
+        },
+        one,
+      );
+      if (result.ok) remember(oneKey, result.verses);
+    }
   }
 
-  let upstream: Response;
-  try {
-    upstream = await deps.fetch(`${base.replace(/\/+$/, '')}/verses/${key}`, {
-      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-  } catch (err) {
-    console.error('tcq: request failed', err);
-    return errorResponse(502, 'UPSTREAM_ERROR', 'Could not reach The Clear Quran; try again');
+  if (!result.ok) {
+    return errorResponse(result.status, result.code, result.message, { ...result.headers, 'Server-Timing': timing.header() });
   }
-
-  const warning = upstream.headers.get('X-Agreement-Warning');
-  if (warning) console.warn(`tcq: agreement warning: ${warning}`);
-
-  if (upstream.status === 404) return errorResponse(404, 'NOT_FOUND', 'Verse not found');
-  if (upstream.status === 429) {
-    const retry = upstream.headers.get('Retry-After') ?? '60';
-    console.warn(`tcq: rate limited (${which}), retry after ${retry}`);
-    return errorResponse(429, 'RATE_LIMITED', 'The Clear Quran is busy; try again shortly', { 'Retry-After': retry });
+  if (asked.kind === 'window') {
+    return ok({ surah: asked.sura, from: result.from, to: result.to, verses: result.verses }, result.cached, timing);
   }
-  if (!upstream.ok) {
-    // 401/403 mean our key (revoked, wrong environment, unsigned agreement); 5xx theirs.
-    const detail = await upstream.text().catch(() => '');
-    console.error(`tcq: ${which} answered ${upstream.status}: ${redactKeys(detail.slice(0, 300))}`);
-    return errorResponse(502, 'UPSTREAM_ERROR', 'The Clear Quran could not answer; try again');
-  }
-
-  let text: unknown;
-  try {
-    const body = (await upstream.json()) as { success?: boolean; data?: { verse_key?: string; text_english?: unknown } };
-    if (body.success !== true || (body.data?.verse_key != null && body.data.verse_key !== key)) throw new Error('shape');
-    text = body.data?.text_english;
-  } catch {
-    text = undefined;
-  }
-  if (typeof text !== 'string' || text.length === 0) {
-    console.error(`tcq: unexpected answer for ${key}`);
-    return errorResponse(502, 'UPSTREAM_ERROR', 'The Clear Quran sent an unexpected answer');
-  }
-
-  if (ttl > 0 && deps.cache) {
-    const stored = new Response(JSON.stringify({ text }), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttl}` },
-    });
-    ctx.waitUntil(deps.cache.put(cacheKey, stored));
-  }
-  return verseResponse(key, text, false);
+  const verse = result.verses.find((v) => v.verse_key === key)!;
+  return ok({ verse_key: key, text: verse.text }, result.cached, timing);
 }

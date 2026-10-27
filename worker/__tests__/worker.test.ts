@@ -6,9 +6,25 @@
 
 import worker from '../index';
 import { resetKeyCache, verifyIdToken } from '../auth';
-import { handleTcq, redactKeys, tcqEnvironment, TcqEnv, VERSE_COUNTS, verseKey } from '../tcq';
+import {
+  handleTcq,
+  parseWindow,
+  redactKeys,
+  resetRangeState,
+  route,
+  tcqEnvironment,
+  TcqEnv,
+  VERSE_COUNTS,
+  verseKey,
+  windowOf,
+} from '../tcq';
 import { secondsToMidnight, spend, TcqBudget } from '../budget';
 import { getSurahDisplay } from '../../src/lib/quranData';
+import { clearQuranBlock } from '../../src/lib/clearQuran';
+
+// The app's module, for its block alignment only.
+jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
+jest.mock('../../src/lib/releaseInfo', () => ({ currentRelease: () => ({ channel: null }) }));
 
 const PROJECT = 'revision-buddy-3a398';
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -28,6 +44,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetKeyCache();
+  resetRangeState();
   // The worker logs failures for `wrangler tail`; expected here.
   jest.spyOn(console, 'error').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -68,11 +85,38 @@ const ENV: TcqEnv = {
 // The text as The Clear Quran shows it: brackets and a footnote marker, kept as is.
 const TEXT = 'Allah! There is no god ˹worthy of worship˺ except Him,<footnote id="57" number="1"></footnote> the Ever-Living';
 
+const textOf = (key: string) => (key === '2:255' ? TEXT : `The text of ${key}`);
+
 function upstreamOk(key = '2:255', text: unknown = TEXT) {
   return new Response(JSON.stringify({ success: true, data: { verse_key: key, text_english: text, text_uthmani: 'x' } }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+/** The range query's answer: verses from..to of one surah, as the API documents it. */
+function windowOk(sura: number, from: number, to: number, text: (key: string) => unknown = textOf, headers = {}) {
+  const data = [];
+  for (let n = from; n <= to; n++) {
+    const key = `${sura}:${n}`;
+    data.push({ verse_key: key, chapter_number: sura, verse_number: n, text_english: text(key), text_uthmani: 'x' });
+  }
+  return new Response(JSON.stringify({ success: true, data, meta: { count: data.length } }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
+}
+
+/** The Clear Quran as documented: the range query and single verses. */
+function theClearQuran(url: string) {
+  const u = new URL(url);
+  if (u.pathname === '/verses') {
+    const q = (k: string) => Number(u.searchParams.get(k));
+    if (q('limit') > 30 || q('to_verse') - q('from_verse') + 1 > 30) return new Response('{}', { status: 400 });
+    return windowOk(q('surah'), q('from_verse'), q('to_verse'));
+  }
+  const key = decodeURIComponent(u.pathname.replace('/verses/', ''));
+  return upstreamOk(key, textOf(key));
 }
 
 /** A fetch that serves Google's keys and hands everything else to `api`. */
@@ -107,7 +151,7 @@ const ctx = () => {
 
 async function call(
   path: string,
-  { auth, channel, env = ENV, api = () => upstreamOk(), cache = memoryCache(), method = 'GET' }: {
+  { auth, channel, env = ENV, api = theClearQuran, cache = memoryCache(), method = 'GET' }: {
     auth?: string | null;
     channel?: string;
     env?: TcqEnv;
@@ -155,6 +199,122 @@ describe('which verses', () => {
   });
 });
 
+describe('blocks of verses', () => {
+  it('are aligned 30-verse blocks of one surah, the most the API returns', () => {
+    expect(windowOf(2, 1)).toEqual({ sura: 2, from: 1, to: 30 });
+    expect(windowOf(2, 30)).toEqual({ sura: 2, from: 1, to: 30 });
+    expect(windowOf(2, 31)).toEqual({ sura: 2, from: 31, to: 60 });
+    expect(windowOf(2, 45)).toEqual({ sura: 2, from: 31, to: 60 });
+    expect(windowOf(2, 286)).toEqual({ sura: 2, from: 271, to: 286 });
+    expect(windowOf(112, 2)).toEqual({ sura: 112, from: 1, to: 4 });
+    expect(windowOf(1, 7)).toEqual({ sura: 1, from: 1, to: 7 });
+    expect(route('/api/tcq/windows/2:45')).toEqual({ kind: 'window', sura: 2, ayah: 45 });
+    expect(route('/api/tcq/verses/2:45')).toEqual({ kind: 'verse', sura: 2, ayah: 45 });
+    expect(route('/api/tcq/windows/2:287')).toBeNull();
+    expect(route('/api/tcq/windows/2:1-30')).toBeNull();
+  });
+
+  it('the app aligns blocks exactly as the worker does, for every verse', () => {
+    for (let sura = 1; sura <= 114; sura++) {
+      for (let ayah = 1; ayah <= VERSE_COUNTS[sura - 1]; ayah++) {
+        expect(clearQuranBlock(sura, ayah)).toEqual(windowOf(sura, ayah));
+      }
+    }
+  });
+
+  it('one request to The Clear Quran answers the whole block, exactly as given', async () => {
+    const cache = memoryCache();
+    const first = await call('/api/tcq/windows/2:255', { cache, channel: 'production' });
+    expect(first.res.status).toBe(200);
+    expect(first.upstream.map((c) => c.url)).toEqual([`https://api.theclearquran.org/verses?${RANGE_2_255}`]);
+    expect(first.body.surah).toBe(2);
+    expect(first.body.from).toBe(241);
+    expect(first.body.to).toBe(270);
+    expect(first.body.verses).toHaveLength(30);
+    expect(first.body.verses[14]).toEqual({ verse_key: '2:255', text: TEXT });
+    expect(first.body.verses[0]).toEqual({ verse_key: '2:241', text: 'The text of 2:241' });
+    expect(first.res.headers.get('Cache-Control')).toBe('no-store');
+
+    // Any verse of the block, either route: from the cache, no request.
+    const again = await call('/api/tcq/windows/2:270', { cache, channel: 'production' });
+    expect(again.upstream).toHaveLength(0);
+    expect(again.res.headers.get('X-Cache')).toBe('HIT');
+    expect(again.body.verses).toEqual(first.body.verses);
+    const one = await call('/api/tcq/verses/2:256', { cache, channel: 'preview' });
+    expect(one.upstream).toHaveLength(0);
+    expect(one.body).toEqual({ verse_key: '2:256', text: 'The text of 2:256' });
+  });
+
+  it('a short surah is one block; the last block of a surah is short', async () => {
+    const short = await call('/api/tcq/windows/112:3', { channel: 'production' });
+    expect(short.upstream[0].url).toBe('https://api.theclearquran.org/verses?surah=112&from_verse=1&to_verse=4&limit=4');
+    expect(short.body.verses.map((v: { verse_key: string }) => v.verse_key)).toEqual(['112:1', '112:2', '112:3', '112:4']);
+    const end = await call('/api/tcq/windows/2:286', { channel: 'production' });
+    expect(end.body).toMatchObject({ from: 271, to: 286 });
+    expect(end.body.verses).toHaveLength(16);
+  });
+
+  it('accepts an answer only if it holds exactly the block, each verse with text', () => {
+    const win = { sura: 2, from: 1, to: 3 };
+    const data = (keys: string[], text = 'x') => ({ success: true, data: keys.map((k) => ({ verse_key: k, text_english: text })) });
+    expect(parseWindow(data(['2:1', '2:2', '2:3']), win)).toHaveLength(3);
+    expect(parseWindow(data(['2:3', '2:1', '2:2']), win)!.map((v) => v.verse_key)).toEqual(['2:1', '2:2', '2:3']);
+    expect(parseWindow(data(['2:1', '2:2']), win)).toBeNull(); // a verse missing (the API's default limit is 20)
+    expect(parseWindow(data(['2:1', '2:2', '2:3', '2:4']), win)).toBeNull();
+    expect(parseWindow(data(['3:1', '3:2', '3:3']), win)).toBeNull();
+    expect(parseWindow(data(['2:1', '2:2', '2:3'], ''), win)).toBeNull();
+    expect(parseWindow({ success: false, data: [] }, win)).toBeNull();
+    expect(parseWindow({ success: true, data: { verse_key: '2:1' } }, win)).toBeNull();
+    expect(parseWindow(null, win)).toBeNull();
+  });
+
+  it('if The Clear Quran refuses the range query, single verses (and no range query for a while)', async () => {
+    const { ns, store } = fakeBudget();
+    const env = { ...ENV, TCQ_BUDGET: ns };
+    const refusing = (url: string) =>
+      new URL(url).pathname === '/verses' ? new Response('{"success":false}', { status: 400 }) : theClearQuran(url);
+    const first = await call('/api/tcq/verses/2:255', { env, api: refusing, channel: 'production' });
+    expect(first.res.status).toBe(200);
+    expect(first.body).toEqual({ verse_key: '2:255', text: TEXT });
+    expect(first.upstream.map((c) => c.url)).toEqual([
+      `https://api.theclearquran.org/verses?${RANGE_2_255}`,
+      'https://api.theclearquran.org/verses/2:255',
+    ]);
+    // The app's block request gets a block of one.
+    const block = await call('/api/tcq/windows/2:256', { env, api: refusing, channel: 'production' });
+    expect(block.body).toEqual({ surah: 2, from: 256, to: 256, verses: [{ verse_key: '2:256', text: 'The text of 2:256' }] });
+    expect(block.upstream.map((c) => c.url)).toEqual(['https://api.theclearquran.org/verses/2:256']);
+    // Each request to The Clear Quran counted, the refused one too.
+    expect(store.get('all:live')).toBe(3);
+  });
+
+  it.each([
+    ['rate limited', () => new Response('{}', { status: 429, headers: { 'Retry-After': '30' } }), 429],
+    ['our key refused', () => new Response('{"success":false}', { status: 401 }), 502],
+    ['their server error', () => new Response('oops', { status: 500 }), 502],
+  ])('%s: no second request in another form', async (_name, api, status) => {
+    const { res, upstream } = await call('/api/tcq/verses/2:255', { api });
+    expect(res.status).toBe(status);
+    expect(upstream).toHaveLength(1);
+  });
+
+  it('says where the time went (Server-Timing), including The Clear Quran’s own', async () => {
+    const api = (url: string) => {
+      const u = new URL(url);
+      const q = (k: string) => Number(u.searchParams.get(k));
+      return windowOk(q('surah'), q('from_verse'), q('to_verse'), textOf, { 'X-Response-Time': '412ms' });
+    };
+    const { ns } = fakeBudget();
+    const cache = memoryCache();
+    const miss = await call('/api/tcq/windows/2:255', { api, cache, env: { ...ENV, TCQ_BUDGET: ns } });
+    const names = (h: string | null) => (h ?? '').split(', ').map((p) => p.split(';')[0]);
+    expect(names(miss.res.headers.get('Server-Timing'))).toEqual(['auth', 'cache', 'budget', 'tcq-window', 'tcq-server']);
+    expect(miss.res.headers.get('Server-Timing')).toContain('tcq-server;dur=412');
+    const hit = await call('/api/tcq/windows/2:255', { api, cache, env: { ...ENV, TCQ_BUDGET: ns } });
+    expect(names(hit.res.headers.get('Server-Timing'))).toEqual(['auth', 'cache']);
+  });
+});
+
 describe('sign-in', () => {
   it('refuses requests without a token, or with a forged, expired or foreign one', async () => {
     const other = (await crypto.subtle.generateKey(
@@ -194,6 +354,9 @@ describe('sign-in', () => {
   });
 });
 
+// 2:255 sits in the block 2:241–270.
+const RANGE_2_255 = 'surah=2&from_verse=241&to_verse=270&limit=30';
+
 describe('The Clear Quran API', () => {
   it('the App Store app and TestFlight use the live key; dev the sandbox one only with a sandbox host', async () => {
     expect(tcqEnvironment('production')).toBe('live');
@@ -206,15 +369,15 @@ describe('The Clear Quran API', () => {
     expect(tcqEnvironment('development', 'https://sandbox.example')).toBe('sandbox');
 
     const live = await call('/api/tcq/verses/2:255', { channel: 'production' });
-    expect(live.upstream[0].url).toBe('https://api.theclearquran.org/verses/2:255');
+    expect(live.upstream[0].url).toBe(`https://api.theclearquran.org/verses?${RANGE_2_255}`);
     expect((live.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_liv_TEST');
 
     const preview = await call('/api/tcq/verses/2:255', { channel: 'preview' });
-    expect(preview.upstream[0].url).toBe('https://api.theclearquran.org/verses/2:255');
+    expect(preview.upstream[0].url).toBe(`https://api.theclearquran.org/verses?${RANGE_2_255}`);
     expect((preview.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_liv_TEST');
 
     const dev = await call('/api/tcq/verses/2:255', { channel: 'development' });
-    expect(dev.upstream[0].url).toBe('https://sandbox.example/verses/2:255');
+    expect(dev.upstream[0].url).toBe(`https://sandbox.example/verses?${RANGE_2_255}`);
     expect((dev.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_sbx_TEST');
 
     // As configured today (no sandbox host): dev builds use the live key too.
@@ -222,7 +385,7 @@ describe('The Clear Quran API', () => {
       channel: 'development',
       env: { ...ENV, TCQ_API_BASE_SANDBOX: '' },
     });
-    expect(devNow.upstream[0].url).toBe('https://api.theclearquran.org/verses/2:255');
+    expect(devNow.upstream[0].url).toBe(`https://api.theclearquran.org/verses?${RANGE_2_255}`);
     expect((devNow.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_liv_TEST');
   });
 
@@ -274,12 +437,12 @@ describe('The Clear Quran API', () => {
 });
 
 describe('edge cache', () => {
-  it('keeps a verse for TCQ_EDGE_CACHE_SECONDS, per environment, keyed without user or token', async () => {
+  it('keeps a block for TCQ_EDGE_CACHE_SECONDS, per environment, keyed without user or token', async () => {
     const cache = memoryCache();
     const first = await call('/api/tcq/verses/2:255', { cache, channel: 'production' });
     expect(first.res.headers.get('X-Cache')).toBe('MISS');
-    expect([...cache.store.keys()]).toEqual(['https://revisely.app/__cache/tcq/live/verses/2:255']);
-    expect(cache.store.get('https://revisely.app/__cache/tcq/live/verses/2:255')!.headers.get('Cache-Control')).toBe(
+    expect([...cache.store.keys()]).toEqual(['https://revisely.app/__cache/tcq/live/windows/2:241-270']);
+    expect(cache.store.get('https://revisely.app/__cache/tcq/live/windows/2:241-270')!.headers.get('Cache-Control')).toBe(
       'public, max-age=3600',
     );
 
@@ -479,7 +642,7 @@ describe('robustness', () => {
 
   it('an unreadable cache entry is fetched again', async () => {
     const cache = memoryCache();
-    cache.store.set('https://revisely.app/__cache/tcq/sandbox/verses/2:255', new Response('not json'));
+    cache.store.set('https://revisely.app/__cache/tcq/sandbox/windows/2:241-270', new Response('not json'));
     const { res, upstream } = await call('/api/tcq/verses/2:255', { cache });
     expect(res.status).toBe(200);
     expect(upstream).toHaveLength(1);

@@ -26,6 +26,9 @@ jest.mock('../../../lib/translation', () => {
         translationName: 'Saheeh International',
       }),
     ),
+    // Nothing is in memory unless a test says so; fetching ahead is only recorded.
+    peekVerseText: jest.fn(() => null),
+    prefetchVerseNeighbours: jest.fn(),
   };
 });
 
@@ -267,5 +270,31 @@ describe('VerseSheet: The Clear Quran', () => {
     expect(screen.queryByText(/Not available yet/)).toBeNull();
     fireEvent.press(screen.getByText('The Clear Quran® — Dr. Mustafa Khattab'));
     expect(p.onChangeTranslation).toHaveBeenCalledWith('en.khattab');
+  });
+});
+
+describe('VerseSheet: moving between verses', () => {
+  const { getVerseText, peekVerseText, prefetchVerseNeighbours } = jest.requireMock('../../../lib/translation');
+  afterEach(() => peekVerseText.mockReset().mockReturnValue(null));
+
+  it('fetches the verses either side of the one shown, for its translation', async () => {
+    prefetchVerseNeighbours.mockClear();
+    render(wrap(<VerseSheet {...props({ page: 3, sura: 2, ayah: 6 })} translationId="en.khattab" />));
+    await screen.findByTestId('verse-translation', {}, { timeout: 10_000 });
+    expect(prefetchVerseNeighbours).toHaveBeenCalledWith({ page: 3, sura: 2, ayah: 6 }, 'en.khattab');
+  });
+
+  it('a verse fetched ahead shows in the first frame: no spinner, no wait', async () => {
+    getVerseText.mockClear();
+    peekVerseText.mockImplementation((page: number, sura: number, ayah: number, id: string) =>
+      sura === 2 && ayah === 7 && id === 'en.khattab'
+        ? { sura, ayah, surahName: 'Al-Baqarah', arabic: 'x', translation: 'Already here.', translationName: 'The Clear Quran®' }
+        : null,
+    );
+    render(wrap(<VerseSheet {...props({ page: 3, sura: 2, ayah: 7 })} translationId="en.khattab" />));
+    // Straight from memory: no load at all, so no spinner. (The theme renders its children async.)
+    expect(await screen.findByText('Already here.', {}, { timeout: 10_000 })).toBeTruthy();
+    expect(screen.getByTestId('translation-credit')).toBeTruthy();
+    expect(getVerseText).not.toHaveBeenCalled();
   });
 });

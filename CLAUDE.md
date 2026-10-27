@@ -309,7 +309,17 @@ shown (pinned under the verse; in the picker), the text exactly as the API gives
 translation under its name (errors show "Couldn't load translation" + retry). The app keeps it in
 memory for the launch only (`src/lib/clearQuran.ts`), never on disk. Plan: Basic, 10,000 requests a
 month, 5 a second; the docs also say 60 a minute and 1,000 an hour. The terms live in the developer
-agreement signed in their portal (theclearquran.org/developers).
+agreement signed in their portal (theclearquran.org/developers). The public docs say nothing about
+caching or storing the text; ask Furqaan before keeping it on the device or raising
+`TCQ_EDGE_CACHE_SECONDS`.
+
+**Its speed:** The Clear Quran answers a request in 1.6–5.3 s (Supabase edge functions in us-east-2;
+measured Oct 27 2026, ~95% of a verse's load time), so the text comes in blocks: the worker asks
+for 30 verses at once (the documented maximum), aligned 1–30, 31–60, … per surah, and the app
+keeps the block. A press and hold starts loading (before Translation is tapped), and the sheet
+fetches the next or previous block when the verse shown is two from its edge
+(`prefetchClearQuranAround`), so ‹ › are instant and a block costs one request of the plan. A verse
+already in memory is shown in the first frame (`peekVerseText`), with no spinner.
 
 **Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
 recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore
@@ -366,7 +376,10 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
 ## Worker (revisely.app/api)
 
 `wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs
-`/api/*` (nothing else reaches the code). `GET /api/tcq/verses/<surah>:<verse>`:
+`/api/*` (nothing else reaches the code). `GET /api/tcq/windows/<surah>:<verse>` answers the block
+holding that verse (`{ surah, from, to, verses: [{ verse_key, text }] }`, up to 30 verses, aligned
+1–30, 31–60, …; `windowOf()`), and `GET /api/tcq/verses/<surah>:<verse>` one verse from it (builds
+from before blocks). Each:
 - needs a Firebase ID token (`Authorization: Bearer`), verified in the worker against Google's keys
   (`worker/auth.ts`; project `FIREBASE_PROJECT_ID`); every malformed token is a 401.
 - 30 requests a minute per user (`ratelimits`), and daily budgets for what reaches The Clear Quran
@@ -374,7 +387,9 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
   Store, TestFlight and dev together (300 × 30 days stays under the 10,000-a-month plan),
   `TCQ_DAILY_LIMIT_SANDBOX`, `TCQ_USER_DAILY_LIMIT` per account; spent: 429 `DAILY_LIMIT` until midnight UTC. Anyone can make an account, so these are what
   keep one user from spending the month for everyone. Raise them with the plan.
-- calls The Clear Quran API (`https://api.theclearquran.org/verses/<key>`, `Authorization: Bearer
+- calls The Clear Quran API (`https://api.theclearquran.org/verses?surah=&from_verse=&to_verse=&limit=`,
+  one request per block; `/verses/<key>` for single verses if the range query is refused, then for
+  10 minutes; `Authorization: Bearer
   <key>`) with `TCQ_API_KEY_LIVE` when the app sends `X-Revisely-Channel: production` or `preview`
   (the App Store app, TestFlight). Development builds use `TCQ_API_KEY_SANDBOX` only if
   `TCQ_API_BASE_SANDBOX` names a sandbox host; it is empty, so they use the live key too
@@ -385,8 +400,11 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
   production API" (Oct 27 2026). No sandbox host is documented or resolvable, and the API answers 401
   on every path without a key, so it can't be found by probing. If they publish one, set
   `TCQ_API_BASE_SANDBOX` to it (a PR into `main`) and dev builds move to the sandbox key.
-- keeps a verse in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
+- keeps a block in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
   checked); answers the app with `Cache-Control: no-store`; logs never include a key (`redactKeys`).
+- says where the time went in `Server-Timing`: `auth`, `cache`, `budget`, `tcq-window` or
+  `tcq-verse` (the request to The Clear Quran) and `tcq-server` (their own `X-Response-Time`).
+  `wrangler tail` also logs each request to them with its time.
 - maps their 429 to 429 (Retry-After), 404 to 404, anything else to 502; no key configured is 503;
   anything unexpected is a JSON 500 (`worker/index.ts`).
 - `observability` is off: no stored request logs (they would say who read which verse). Watch live with
