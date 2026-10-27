@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -21,7 +21,13 @@ import {
   applyPendingSurahChanges,
   pruneCustomPlanForMemorized,
 } from '../../lib/memorizationChanges';
-import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
+import { LiquidGlassActionBar, useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { ProgressBar } from '../../components/ProgressBar';
+import { IconButton, TopBar } from '../../components/v2/TopBar';
+import { PillButton } from '../../components/v2/PillButton';
+import { Sheet } from '../../components/v2/Sheet';
+import { computeMemorizationStats, formatFractional } from '../../lib/memorizationStats';
+import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useDesign } from '../../design/DesignContext';
@@ -40,9 +46,13 @@ const MEMORIZATION_GUIDE_DISMISSED_KEY = '@revisley_memorization_guide_dismissed
 export default function MemorizationScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, pages, updatePages, saveUser } = useApp();
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
   const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const barFootprint = useTabBarFootprint();
+  // The new design opens "Schedule needs review" once the save sheet has gone
+  // (iOS can't present a sheet while another is being dismissed).
+  const reviewAfterSave = useRef(false);
 
   const [markMode, setMarkMode] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<
@@ -139,7 +149,8 @@ export default function MemorizationScreen() {
       setConfirmOpen(false);
 
       if (hadAnyChange && user?.customPlan) {
-        setReviewPromptOpen(true);
+        if (isNew) reviewAfterSave.current = true;
+        else setReviewPromptOpen(true);
       }
     } finally {
       setSaving(false);
@@ -152,6 +163,121 @@ export default function MemorizationScreen() {
   };
 
   const memorizedPageCount = pages.filter((p) => p.status === 'memorized').length;
+  const stats = useMemo(() => (isNew ? computeMemorizationStats(pages) : null), [isNew, pages]);
+  // The save sheet keeps its count while it slides away after saving.
+  const confirmCount = useRef(changeCount);
+  if (confirmOpen) confirmCount.current = changeCount;
+
+  if (isNew && stats) {
+    // The new design: a top bar (back, the title, edit), how much is
+    // memorized with its bar, then the browser's flat rows. Editing marks
+    // pages as drafts; a flat bar at the foot holds Cancel and Save.
+    const backV2 = () => {
+      if (markMode && changeCount > 0) setConfirmOpen(true);
+      else navigation.goBack();
+    };
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+        <TopBar
+          title="Memorization"
+          onBack={backV2}
+          right={
+            markMode ? null : (
+              <IconButton
+                icon="create-outline"
+                label="Edit memorized pages"
+                onPress={() => setMarkMode(true)}
+                testID="memorization-edit"
+              />
+            )
+          }
+          separator
+        />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
+          testID="memorization-v2"
+        >
+          <View style={[v2.summary, { borderBottomColor: palette.separator }]} testID="memorization-summary">
+            <Text style={[typeV2.title, typeV2.numeral, { color: palette.text }]}>
+              {`${stats.pages} of 604 pages`}
+            </Text>
+            <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
+              {`${formatFractional(stats.fractionalJuz)} of 30 juz · ${stats.surahs} of 114 surahs`}
+            </Text>
+            <View style={v2.bar}>
+              <ProgressBar progress={(stats.pages / 604) * 100} height={6} testID="memorization-progress" />
+            </View>
+          </View>
+          <MemorizationBrowser
+            pages={pages}
+            pendingChanges={pendingChanges}
+            onChange={setPendingChanges}
+            baseMemorizedSurahs={user?.memorizedSurahs ?? []}
+            pendingSurahChanges={pendingSurahChanges}
+            onSurahChange={setPendingSurahChanges}
+            markMode={markMode}
+            onMarkModeChange={setMarkMode}
+            hideMarkToggle
+          />
+        </ScrollView>
+
+        {markMode && (
+          <LiquidGlassActionBar>
+            <PillButton title="Cancel" variant="outline" onPress={handleCancel} testID="memorization-cancel" />
+            <View style={{ flex: 1 }} />
+            <PillButton
+              title={changeCount === 0 ? 'No changes' : `Save (${changeCount})`}
+              onPress={() => setConfirmOpen(true)}
+              disabled={changeCount === 0}
+              testID="memorization-save"
+            />
+          </LiquidGlassActionBar>
+        )}
+
+        <Sheet
+          visible={confirmOpen}
+          onClose={saving ? () => undefined : () => setConfirmOpen(false)}
+          title={`Save ${confirmCount.current} change${confirmCount.current === 1 ? '' : 's'}?`}
+          message="Your revision schedule follows what's memorized."
+          onHidden={() => {
+            if (!reviewAfterSave.current) return;
+            reviewAfterSave.current = false;
+            setReviewPromptOpen(true);
+          }}
+          testID="memorization-confirm"
+        >
+          <View style={v2.sheetActions}>
+            <PillButton size="lg" title="Save" onPress={handleSave} busy={saving} testID="confirm-save" />
+            <PillButton
+              size="lg"
+              variant="outline"
+              title="Discard changes"
+              onPress={() => {
+                setConfirmOpen(false);
+                handleCancel();
+              }}
+              disabled={saving}
+              testID="confirm-discard"
+            />
+          </View>
+        </Sheet>
+
+        <Sheet
+          visible={reviewPromptOpen}
+          onClose={() => setReviewPromptOpen(false)}
+          title="Schedule needs review"
+          message="Your custom schedule doesn't adjust itself. Pages you un-memorized were taken out; new ones aren't scheduled until you add them."
+          testID="memorization-review"
+        >
+          <View style={v2.sheetActions}>
+            <PillButton size="lg" title="Review schedule" onPress={handleReviewSchedule} testID="review-now" />
+            <PillButton size="lg" variant="outline" title="Later" onPress={() => setReviewPromptOpen(false)} testID="review-later" />
+          </View>
+        </Sheet>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -576,6 +702,19 @@ function ConfirmSaveSheet({
     </Modal>
   );
 }
+
+// The new design.
+const v2 = StyleSheet.create({
+  summary: {
+    paddingHorizontal: layoutV2.gutter,
+    paddingTop: layoutV2.rowPad,
+    paddingBottom: layoutV2.rowPad,
+    gap: 2,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  bar: { marginTop: 10 },
+  sheetActions: { gap: 10, paddingTop: 8 },
+});
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({

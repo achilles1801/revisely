@@ -17,7 +17,7 @@ import { PillTabs } from './v2/PillTabs';
 import { PillButton } from './v2/PillButton';
 import { Mark } from './v2/Mark';
 import { Tap } from './v2/Tap';
-import { typeV2 } from '../theme/v2';
+import { layoutV2, typeV2 } from '../theme/v2';
 
 interface PageData {
   pageNumber: number;
@@ -351,6 +351,6 @@ const v2 = StyleSheet.create({
   content: { flexShrink: 1 },
   controls: { gap: 10, paddingVertical: 8 },
   list: { flexShrink: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 0.5 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: layoutV2.hairline },
   rowText: { flex: 1 },
 });

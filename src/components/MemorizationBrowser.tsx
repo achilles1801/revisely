@@ -17,6 +17,14 @@ import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { SegmentedToggle } from './SegmentedToggle';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
+import { useHaptics } from '../design/haptics';
+import { ProgressBar } from './ProgressBar';
+import { Mark } from './v2/Mark';
+import { PillTabs } from './v2/PillTabs';
+import { Tap } from './v2/Tap';
+import { IconButton } from './v2/TopBar';
+import { arabicV2, layoutV2, markV2, radiusV2, typeV2 } from '../theme/v2';
 import { ThemeColors } from '../theme/colors';
 import { typography, fonts } from '../theme/typography';
 import { spacing } from '../theme/spacing';
@@ -83,6 +91,7 @@ export function MemorizationBrowser({
   hideMarkToggle = false,
 }: MemorizationBrowserProps) {
   const { theme, isDark } = useTheme();
+  const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme, isDark), [theme, isDark]);
 
   const [mode, setMode] = useState<BrowserMode>(initialMode);
@@ -237,9 +246,24 @@ export function MemorizationBrowser({
     setExpandedChildKey((curr) => (curr === key ? null : key));
   }, []);
 
+  const changeMode = (v: BrowserMode) => {
+    setMode(v);
+    setExpandedKey(null);
+    setExpandedChildKey(null);
+  };
+
   return (
     <View>
-      {/* Mode toggle + mark-mode toggle row */}
+      {isNew ? (
+        // The new design: pills for the three lenses, then flat rows.
+        <ControlsV2
+          mode={mode}
+          onMode={changeMode}
+          markMode={markMode}
+          onMarkMode={hideMarkToggle ? undefined : () => setMarkMode(!markMode)}
+        />
+      ) : (
+      /* Mode toggle + mark-mode toggle row */
       <View style={styles.controlRow}>
         <View style={styles.toggleWrap}>
           <SegmentedToggle
@@ -277,6 +301,7 @@ export function MemorizationBrowser({
           </PressableScale>
         )}
       </View>
+      )}
 
       {/* List body */}
       {mode === 'chapter' && (
@@ -402,9 +427,17 @@ interface BaseRowProps {
   onCheckPress?: () => void;
   theme: ThemeColors;
   styles: Styles;
+  /** A surah inside a juz or hizb (new design: indented, a smaller mark). */
+  nested?: boolean;
+  testID?: string;
 }
 
-function BaseRow({
+function BaseRow(props: BaseRowProps) {
+  const { isNew } = useDesign();
+  return isNew ? <BaseRowV2 {...props} /> : <ClassicBaseRow {...props} />;
+}
+
+function ClassicBaseRow({
   number,
   englishTitle,
   englishSub,
@@ -491,8 +524,7 @@ function ChapterList({
 }) {
   const all = getAllSurahs();
   return (
-    <View style={styles.listGroup}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+    <ListGroup styles={styles}>
       {all.map((s) => {
         const surahPages = getPagesForSurah(s.number);
         const memorized = countMemorized(surahPages);
@@ -519,6 +551,7 @@ function ChapterList({
               onCheckPress={() => toggleSurah(s.number, surahPages)}
               theme={theme}
               styles={styles}
+              testID={`surah-${s.number}`}
             />
             {isExpanded && (
               <PageGrid
@@ -533,7 +566,7 @@ function ChapterList({
           </View>
         );
       })}
-    </View>
+    </ListGroup>
   );
 }
 
@@ -568,8 +601,7 @@ function JuzList({
 }) {
   const juzes = Array.from({ length: 30 }, (_, i) => i + 1);
   return (
-    <View style={styles.listGroup}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+    <ListGroup styles={styles}>
       {juzes.map((juzNumber) => {
         const range = getJuzRange(juzNumber);
         const juzPages = getPagesForJuz(juzNumber);
@@ -601,9 +633,10 @@ function JuzList({
               onCheckPress={() => toggleScope(juzPages)}
               theme={theme}
               styles={styles}
+              testID={`juz-${juzNumber}`}
             />
             {isExpanded && (
-              <View style={styles.childGroup}>
+              <ChildGroup styles={styles}>
                 {getSurahsInJuz(juzNumber).map((s) => {
                   const sMemorized = countMemorized(s.pagesInJuz);
                   const sExpanded =
@@ -630,6 +663,8 @@ function JuzList({
                         onCheckPress={() => toggleSurah(s.number, s.pagesInJuz)}
                         theme={theme}
                         styles={styles}
+                        nested
+                        testID={`juz-${juzNumber}-surah-${s.number}`}
                       />
                       {sExpanded && (
                         <PageGrid
@@ -639,17 +674,18 @@ function JuzList({
                           togglePage={togglePage}
                           theme={theme}
                           styles={styles}
+                          nested
                         />
                       )}
                     </View>
                   );
                 })}
-              </View>
+              </ChildGroup>
             )}
           </View>
         );
       })}
-    </View>
+    </ListGroup>
   );
 }
 
@@ -684,8 +720,7 @@ function HizbList({
 }) {
   const hizbs: HizbInfo[] = getAllHizbs();
   return (
-    <View style={styles.listGroup}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+    <ListGroup styles={styles}>
       {hizbs.map((h) => (
         <HizbRow
           key={`h-${h.number}`}
@@ -704,7 +739,7 @@ function HizbList({
           styles={styles}
         />
       ))}
-    </View>
+    </ListGroup>
   );
 }
 
@@ -774,9 +809,10 @@ function HizbRow({
         onCheckPress={() => toggleScope(hizbPages)}
         theme={theme}
         styles={styles}
+        testID={`hizb-${hizb.number}`}
       />
       {expanded && (
-        <View style={styles.childGroup}>
+        <ChildGroup styles={styles}>
           {surahsInside.map((s) => {
             const sMemorized = countMemorized(s.pagesInHizb);
             const sExpanded =
@@ -803,6 +839,8 @@ function HizbRow({
                   onCheckPress={() => toggleSurah(s.number, s.pagesInHizb)}
                   theme={theme}
                   styles={styles}
+                  nested
+                  testID={`hizb-${hizb.number}-surah-${s.number}`}
                 />
                 {sExpanded && (
                   <PageGrid
@@ -812,12 +850,13 @@ function HizbRow({
                     togglePage={togglePage}
                     theme={theme}
                     styles={styles}
+                    nested
                   />
                 )}
               </View>
             );
           })}
-        </View>
+        </ChildGroup>
       )}
     </View>
   );
@@ -825,21 +864,29 @@ function HizbRow({
 
 // ===== Page grid (leaf level) =====
 
-function PageGrid({
-  pages,
-  getStatus,
-  markMode,
-  togglePage,
-  theme,
-  styles,
-}: {
+interface PageGridProps {
   pages: number[];
   getStatus: (page: number) => PageStatus;
   markMode: boolean;
   togglePage: (page: number) => void;
   theme: ThemeColors;
   styles: Styles;
-}) {
+  nested?: boolean;
+}
+
+function PageGrid(props: PageGridProps) {
+  const { isNew } = useDesign();
+  return isNew ? <PageGridV2 {...props} /> : <ClassicPageGrid {...props} />;
+}
+
+function ClassicPageGrid({
+  pages,
+  getStatus,
+  markMode,
+  togglePage,
+  theme,
+  styles,
+}: PageGridProps) {
   return (
     <View style={styles.pageGridWrap}>
       <Text style={styles.pageGridHint}>
@@ -884,6 +931,288 @@ function PageGrid({
     </View>
   );
 }
+
+// ===== Groups =====
+
+/** A list of rows: a glass card (classic), or rows straight on the ground (new design). */
+function ListGroup({ styles, children }: { styles: Styles; children: React.ReactNode }) {
+  const { isNew } = useDesign();
+  if (isNew) return <View testID="memorization-list">{children}</View>;
+  return (
+    <View style={styles.listGroup}>
+      <GlassCard style={StyleSheet.absoluteFillObject} />
+      {children}
+    </View>
+  );
+}
+
+/** The surahs inside an open juz or hizb: a tinted group (classic), indented rows (new design). */
+function ChildGroup({ styles, children }: { styles: Styles; children: React.ReactNode }) {
+  const { isNew } = useDesign();
+  return <View style={isNew ? undefined : styles.childGroup}>{children}</View>;
+}
+
+// ===== The new design =====
+
+const BROWSER_MODES_V2: { value: BrowserMode; label: string }[] = [
+  { value: 'chapter', label: 'Surahs' },
+  { value: 'juz', label: 'Juz' },
+  { value: 'hizb', label: 'Hizb' },
+];
+
+function ControlsV2({
+  mode,
+  onMode,
+  markMode,
+  onMarkMode,
+}: {
+  mode: BrowserMode;
+  onMode: (mode: BrowserMode) => void;
+  markMode: boolean;
+  /** Absent when the screen hosts the edit button itself. */
+  onMarkMode?: () => void;
+}) {
+  const { palette } = useTheme();
+  return (
+    <View style={[v2s.controls, { borderBottomColor: palette.separator }]}>
+      <View style={v2s.flex}>
+        <PillTabs<BrowserMode> options={BROWSER_MODES_V2} value={mode} onChange={onMode} testID="browser-modes" />
+      </View>
+      {onMarkMode ? (
+        <IconButton
+          icon={markMode ? 'checkmark' : 'create-outline'}
+          label={markMode ? 'Done marking' : 'Mark memorized pages'}
+          onPress={onMarkMode}
+          testID="browser-mark-toggle"
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/** Mark mode's checkbox: a ring, the primary fill with a check (all), or a dash (some). */
+function CheckV2({
+  state,
+  onPress,
+  label,
+  testID,
+}: {
+  state: 'empty' | 'partial' | 'full';
+  onPress?: () => void;
+  label: string;
+  testID?: string;
+}) {
+  const { palette } = useTheme();
+  const haptics = useHaptics();
+  const full = state === 'full';
+  const partial = state === 'partial';
+  return (
+    <Tap
+      onPress={
+        onPress
+          ? () => {
+              haptics.selection();
+              onPress();
+            }
+          : undefined
+      }
+      disabled={!onPress}
+      hitSlop={8}
+      accessibilityRole="checkbox"
+      accessibilityLabel={`${label} memorized`}
+      accessibilityState={{ checked: full ? true : partial ? 'mixed' : false }}
+      style={[
+        v2s.check,
+        { borderColor: full || partial ? palette.primary : palette.secondary },
+        full && { backgroundColor: palette.primary },
+      ]}
+      testID={testID}
+    >
+      {full ? (
+        <Ionicons name="checkmark" size={16} color={palette.onPrimary} />
+      ) : partial ? (
+        <Ionicons name="remove" size={16} color={palette.primary} />
+      ) : null}
+    </Tap>
+  );
+}
+
+/**
+ * A surah, juz or hizb in the new design: its number in a mark (the "done"
+ * check once every page is memorized), its name and details, the Arabic name,
+ * and a thin bar while partly memorized. In mark mode a checkbox leads.
+ */
+function BaseRowV2({
+  number,
+  englishTitle,
+  englishSub,
+  englishSubAlt,
+  arabic,
+  expanded,
+  markMode,
+  checkState,
+  progress,
+  onPress,
+  onCheckPress,
+  nested,
+  testID,
+}: BaseRowProps) {
+  const { palette } = useTheme();
+  const sub = [englishSub, englishSubAlt].filter(Boolean).join(' · ');
+  const partial = checkState === 'partial';
+  const state =
+    checkState === 'full'
+      ? 'memorized'
+      : partial
+        ? typeof progress === 'number'
+          ? `${Math.round(progress * 100)}% memorized`
+          : 'partly memorized'
+        : 'not memorized';
+  return (
+    <View style={[v2s.rowWrap, { borderBottomColor: palette.separator }]}>
+      <View style={[v2s.row, nested && v2s.nestedRow]}>
+        {markMode ? (
+          <CheckV2 state={checkState} onPress={onCheckPress} label={englishTitle} testID={testID ? `${testID}-check` : undefined} />
+        ) : null}
+        <Tap
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={[englishTitle, sub, state].filter(Boolean).join(', ')}
+          accessibilityState={{ expanded }}
+          style={v2s.rowTap}
+          testID={testID}
+        >
+          <Mark size={nested ? 'nested' : 'reply'} label={String(number)} done={checkState === 'full'} />
+          <View style={v2s.main}>
+            <Text style={[typeV2.name, { color: palette.text }]}>{englishTitle}</Text>
+            {sub ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{sub}</Text> : null}
+            {partial && typeof progress === 'number' && progress > 0 ? (
+              <View style={v2s.progress}>
+                <ProgressBar progress={progress * 100} height={3} />
+              </View>
+            ) : null}
+          </View>
+          {arabic ? (
+            <Text style={[arabicV2(20), v2s.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+              {arabic}
+            </Text>
+          ) : null}
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondary} />
+        </Tap>
+      </View>
+    </View>
+  );
+}
+
+/** An open surah's pages: memorized ones filled ("done"); tappable in mark mode. */
+function PageGridV2({ pages, getStatus, markMode, togglePage, nested }: PageGridProps) {
+  const { palette } = useTheme();
+  const haptics = useHaptics();
+  return (
+    <View style={[v2s.grid, nested && v2s.nestedGrid, { borderBottomColor: palette.separator }]}>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>
+        {markMode ? 'Tap a page to mark it memorized, or not' : 'Memorized pages are filled'}
+      </Text>
+      <View style={v2s.chips}>
+        {pages.map((p) => {
+          const on = getStatus(p) === 'memorized';
+          const style = [v2s.chip, { backgroundColor: on ? palette.done : palette.fill }];
+          const label = (
+            <Text
+              style={[typeV2.meta, typeV2.numeral, on && v2s.chipOn, { color: on ? palette.onDone : palette.text }]}
+              maxFontSizeMultiplier={1.6}
+            >
+              {p}
+            </Text>
+          );
+          return markMode ? (
+            <Tap
+              key={`pg-${p}`}
+              onPress={() => {
+                haptics.selection();
+                togglePage(p);
+              }}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`Page ${p}`}
+              accessibilityState={{ checked: on }}
+              style={style}
+              testID={`page-chip-${p}`}
+            >
+              {label}
+            </Tap>
+          ) : (
+            <View
+              key={`pg-${p}`}
+              style={style}
+              accessible
+              accessibilityLabel={`Page ${p}, ${on ? 'memorized' : 'not memorized'}`}
+              testID={`page-chip-${p}`}
+            >
+              {label}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// The new design: full-width rows with a 16pt gutter on hairlines; a surah
+// inside a juz or hizb is indented by a mark's width.
+const NESTED_INDENT = markV2.nested;
+
+const v2s = StyleSheet.create({
+  flex: { flex: 1 },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: 12,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  rowWrap: { borderBottomWidth: layoutV2.hairline },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: layoutV2.gutter },
+  nestedRow: { paddingLeft: layoutV2.gutter + NESTED_INDENT },
+  rowTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: layoutV2.markGap,
+    minHeight: 60,
+    paddingVertical: 10,
+    paddingRight: layoutV2.gutter,
+  },
+  check: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  main: { flex: 1, minWidth: 0 },
+  progress: { marginTop: 6 },
+  arabic: { maxWidth: 120, textAlign: 'right' },
+  grid: {
+    paddingHorizontal: layoutV2.gutter,
+    paddingTop: 10,
+    paddingBottom: 14,
+    gap: 8,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  nestedGrid: { paddingLeft: layoutV2.gutter + NESTED_INDENT },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    minWidth: 44,
+    minHeight: 32,
+    paddingHorizontal: 6,
+    borderRadius: radiusV2.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipOn: { fontWeight: '600' },
+});
 
 const makeStyles = (theme: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
