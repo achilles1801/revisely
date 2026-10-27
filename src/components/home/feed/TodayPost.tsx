@@ -8,6 +8,7 @@ import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
+import { ProgressRing } from '../../v2/ProgressRing';
 import { PillButton } from '../../v2/PillButton';
 import { RowText, ThreadRow } from '../../v2/ThreadRow';
 import { Tap } from '../../v2/Tap';
@@ -16,10 +17,16 @@ export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
 const count = (n: number) => `${n} page${n === 1 ? '' : 's'}`;
 
+/** "27% of the Quran" ("<1%" for a page or two). */
+export function percentOfQuran(fraction: number): string {
+  const percent = fraction * 100;
+  return `${percent < 1 && percent > 0 ? '<1' : Math.round(percent)}% of the Quran`;
+}
+
 /** "6.2 of 30 juz · 123 of 604 pages", in the order Settings → Home screen chose. */
 export function memorizedText(pages: UserPage[], metrics: HomeMetric[]) {
   const stats = computeMemorizationStats(pages);
-  const percent = (stats.pages / 604) * 100;
+  const fraction = stats.pages / 604;
   const parts: Record<HomeMetric, string> = {
     juz: `${formatFractional(stats.fractionalJuz)} of 30 juz`,
     pages: `${stats.pages} of 604 pages`,
@@ -28,7 +35,9 @@ export function memorizedText(pages: UserPage[], metrics: HomeMetric[]) {
   const shown = (metrics.length > 0 ? metrics : (['juz', 'pages'] as HomeMetric[])).map((m) => parts[m]);
   return {
     body: shown.join(' · '),
-    meta: `${percent < 1 && percent > 0 ? '<1' : Math.round(percent)}% of the Quran`,
+    meta: percentOfQuran(fraction),
+    /** Of the 604 pages: the ring around Today's mark. */
+    fraction,
   };
 }
 
@@ -83,6 +92,7 @@ export function TodayPost({
   done,
   streak,
   memorized,
+  memorizedFraction,
   onPrimary,
   onEditSchedule,
   onMemorization,
@@ -102,6 +112,8 @@ export function TodayPost({
   streak: number;
   /** "8.1 of 30 juz · 166 of 604 pages" (Settings → Home screen), or null to leave it out. */
   memorized: string | null;
+  /** How much of the Quran is memorized (0–1): a ring around the mark, shown with `memorized`. */
+  memorizedFraction?: number;
   onPrimary: () => void;
   onEditSchedule: () => void;
   onMemorization: () => void;
@@ -138,7 +150,19 @@ export function TodayPost({
   return (
     <View testID="today-thread">
       <ThreadRow
-        mark={<Mark label={initial} />}
+        mark={
+          memorized != null && memorizedFraction != null ? (
+            <ProgressRing
+              progress={memorizedFraction}
+              label={`Memorized ${percentOfQuran(memorizedFraction)}`}
+              testID="today-ring"
+            >
+              <Mark label={initial} />
+            </ProgressRing>
+          ) : (
+            <Mark label={initial} />
+          )
+        }
         name={name || 'Today'}
         meta={name ? meta : undefined}
         onMenu={() => setMenuOpen(true)}

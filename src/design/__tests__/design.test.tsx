@@ -23,7 +23,7 @@ import { DesignProvider, useDesign } from '../DesignContext';
 import { makeHaptics } from '../haptics';
 import { ThemeProvider, isExistingInstall, resolveThemeMode, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
-import { TodayPost, juzLabel, memorizedText, todayText } from '../../components/home/feed/TodayPost';
+import { TodayPost, juzLabel, memorizedText, percentOfQuran, todayText } from '../../components/home/feed/TodayPost';
 import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
@@ -227,6 +227,8 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     // The fills themselves stand out from the ground (non-text, 3:1).
     expect(contrast(p.primary, p.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(p.done, p.bg)).toBeGreaterThanOrEqual(3);
+    // The memorized ring around Today's mark, at both ends of its gradient.
+    for (const stop of p.ring) expect(contrast(stop, p.bg)).toBeGreaterThanOrEqual(3);
     // A day's number on each shade of Activity's calendar.
     p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
     // Screens not moved yet get the same colours under the classic names.
@@ -482,9 +484,32 @@ describe('Home in the new design (a feed)', () => {
   });
 
   it('leaves memorized out when Settings turns it off', async () => {
-    post({ memorized: null });
+    post({ memorized: null, memorizedFraction: 0.27 });
     await act(async () => {});
     expect(screen.queryByTestId('today-memorized')).toBeNull();
+    // The ring goes with it.
+    expect(screen.queryByTestId('today-ring')).toBeNull();
+    expect(screen.getByTestId('mark', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('a ring around the mark fills with how much of the Quran is memorized: no words, read by VoiceOver', async () => {
+    post({ memorizedFraction: 166 / 604 });
+    await act(async () => {});
+    const ring = screen.getByTestId('today-ring');
+    expect(ring.props.accessibilityRole).toBe('progressbar');
+    expect(ring.props.accessibilityLabel).toBe('Memorized 27% of the Quran');
+    expect(ring.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 27 });
+    // The mark keeps its size, so the row doesn't move; the ring is drawn just outside it.
+    expect(ring.props.style).toMatchObject({ width: 40, height: 40 });
+    expect(screen.getByTestId('mark', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText(/27%/)).toBeNull();
+  });
+
+  it('the percentage: whole numbers, “<1%” for a page or two', () => {
+    expect(percentOfQuran(166 / 604)).toBe('27% of the Quran');
+    expect(percentOfQuran(2 / 604)).toBe('<1% of the Quran');
+    expect(percentOfQuran(1)).toBe('100% of the Quran');
+    expect(memorizedText([], ['juz']).fraction).toBe(0);
   });
 
   it('the primary button is solid in the accent (Indigo by default); yesterday’s leftovers are an outline pill', async () => {
