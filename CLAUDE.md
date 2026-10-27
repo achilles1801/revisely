@@ -570,7 +570,10 @@ classic default), and a fresh install starts in light.
   own frame (gorhom `PlanSheet`) take the same colours and corners.
 - The owner's rules from testing (Oct 26 2026):
   - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
-    second card restating it. Lists show the **last 3** things (`RecentSection`) with "See all"
+    second card restating it. A thin ring around the post's mark (`v2/ProgressRing`, the accent's
+    `palette.ring`, both ends ≥ 3:1 on the ground) fills with memorized pages / 604: no words,
+    "Memorized 27% of the Quran" for VoiceOver, shown and hidden with the Memorized line (Settings →
+    Progress card). It draws in once Home has settled (350 ms), at once with Reduce Motion. Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
@@ -625,6 +628,10 @@ classic default), and a fresh install starts in light.
   position. Tabs stay mounted once shown (and the neighbours of the focused one are mounted ahead),
   so nothing reloads or blanks; the old bottom-tabs swipe blanked the mushaf after a quick
   back-and-forth. Insights is swiped to only with Smart Tracking on (`swipeableCount`).
+  - Only the tabs in the pager are laid out (`pagerRoutes`; `swipeableTabCount` in
+    `navigation/tabPages`): with Smart Tracking off, Read is the last page and the rubber band past it
+    shows the ground. Before (Oct 27), every tab sat in the row, so Insights peeked in. Turning it on
+    or off updates the pages at once; Home and Read keep their keys and never remount.
   - Only on a tab's main screen: the gesture fails at touch-down while a pushed screen shows, so the
     reader's page turns, the back swipe, swipe to delete and the calendar keep their gestures.
     Vertical scrolling wins (the pan fails after 10pt vertically).

@@ -372,10 +372,11 @@ export default function DashboardScreen() {
   // Friday's Al-Kahf, then the last few sessions; the rest is behind "See
   // all", searchable. A running timer shows in the top bar.
   const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
-  const memorized =
+  const progress =
     homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized')
-      ? memorizedText(pages, homePrefs.metrics).body
+      ? memorizedText(pages, homePrefs.metrics)
       : null;
+  const memorized = progress?.body ?? null;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
@@ -414,6 +415,7 @@ export default function DashboardScreen() {
           done={donePagesToday}
           streak={calculatedStreak}
           memorized={memorized}
+          memorizedFraction={progress?.fraction}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization')}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 
 // Shared values that last across renders, as on a device (the stock mock makes
@@ -24,7 +24,8 @@ import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createPagerTabNavigator, rubberBand, snapPage, swipeRange } from '../PagerTabs';
+import { createPagerTabNavigator, pagerRoutes, rubberBand, snapPage, swipeRange } from '../PagerTabs';
+import { swipeableTabCount } from '../tabPages';
 
 describe('the pager physics', () => {
   it('rubber band: nothing at the edge, growing ever slower, never a full page', () => {
@@ -60,6 +61,24 @@ describe('the pager physics', () => {
     expect(swipeRange(3, 2, 0)).toEqual([0, 2]);
     expect(swipeRange(3, 1, 0)).toEqual([0, 1]);
     expect(swipeRange(3, 1, 2)).toEqual([0, 2]);
+  });
+});
+
+describe('the pages in the pager, from the settings', () => {
+  const tabs = ['Home', 'Read', 'Insights'];
+
+  it('Smart Tracking off: Home and Read, whichever is focused; Read is the last page', () => {
+    const count = swipeableTabCount(false);
+    expect(pagerRoutes(tabs, count, 0)).toEqual(['Home', 'Read']);
+    expect(pagerRoutes(tabs, count, 1)).toEqual(['Home', 'Read']);
+  });
+
+  it('Smart Tracking on: all three', () => {
+    expect(pagerRoutes(tabs, swipeableTabCount(true), 1)).toEqual(tabs);
+  });
+
+  it('off while Insights is still the tab on screen: it stays until left', () => {
+    expect(pagerRoutes(tabs, swipeableTabCount(false), 2)).toEqual(tabs);
   });
 });
 
@@ -157,6 +176,56 @@ describe('the pager in a navigator', () => {
     swipe(-600);
     expect(tab()).toBe('Read');
     swipe(-600);
+    expect(tab()).toBe('Read');
+  });
+
+  it('Insights off: past Read is the rubber band and the ground, never a peek of Insights', async () => {
+    await mount(2);
+    swipe(-600);
+    expect(tab()).toBe('Read');
+    expect(screen.queryByTestId('tab-page-Insights', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByText('Insights screen', { includeHiddenElements: true })).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('tab-pager-row').props.style).width).toBe(2 * 750);
+    swipe(-600);
+    expect(tab()).toBe('Read');
+  });
+
+  it('turned off and on while reading: Insights leaves and comes back; Home and Read never remount', async () => {
+    let setCount: (n: number) => void = () => {};
+    function Harness() {
+      const [count, set] = React.useState(3);
+      setCount = set;
+      return (
+        <NavigationContainer ref={nav}>
+          <Tab.Navigator tabBar={() => null} swipeableCount={count}>
+            <Tab.Screen name="Home" component={Home} />
+            <Tab.Screen name="Read" component={Read} />
+            <Tab.Screen name="Insights" component={Insights} />
+          </Tab.Navigator>
+        </NavigationContainer>
+      );
+    }
+    for (const k of Object.keys(mounts)) delete mounts[k];
+    render(<Harness />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    swipe(-600);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    // Insights, beside Read, is drawn.
+    expect(screen.getByText('Insights screen', { includeHiddenElements: true })).toBeTruthy();
+    act(() => setCount(2));
+    expect(screen.queryByTestId('tab-page-Insights', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByText('Read screen')).toBeTruthy();
+    act(() => setCount(3));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(screen.getByTestId('tab-page-Insights', { includeHiddenElements: true })).toBeTruthy();
+    expect(mounts.Home).toBe(1);
+    expect(mounts.Read).toBe(1);
     expect(tab()).toBe('Read');
   });
 

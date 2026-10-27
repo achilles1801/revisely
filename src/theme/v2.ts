@@ -51,6 +51,12 @@ interface AccentTokens {
   /** A progress fill, start to end. */
   progress: readonly [string, string];
   /**
+   * The memorized ring around Today's mark, start to end: `progress` where both
+   * ends hold 3:1 on the ground, brighter starts in dark (its deep start would
+   * vanish on black).
+   */
+  ring: readonly [string, string];
+  /**
    * Activity's calendar: an empty day, then four steps of the accent, more
    * activity reading darker (light) or brighter (dark). Checked as an ordinal
    * ramp: one hue, monotone lightness, the first step ≥ 2:1 on the ground.
@@ -188,6 +194,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
         { offset: 1, color: '#3FA084', opacity: 0 },
       ],
       progress: ['#0E6B5A', '#0E6B5A'],
+      ring: ['#0E6B5A', '#0E6B5A'],
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
     },
@@ -203,6 +210,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       accentSubtle: '#181818',
       hero: null,
       progress: ['#4DBA9F', '#4DBA9F'],
+      ring: ['#4DBA9F', '#4DBA9F'],
       heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
     },
@@ -230,6 +238,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
         { offset: 1, color: '#DC1433', opacity: 0 },
       ],
       progress: ['#3E0812', '#DC1433'],
+      ring: ['#3E0812', '#DC1433'],
       heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
     },
@@ -249,6 +258,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
         { offset: 1, color: '#2E0E15', opacity: 0 },
       ],
       progress: ['#3E0812', '#DC1433'],
+      ring: ['#DC1433', '#F03C56'],
       heat: ['#2E0E15', '#8A0E26', '#B3112C', '#DC1433', '#F5455E'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000'],
     },
@@ -275,6 +285,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
         { offset: 1, color: '#624BD5', opacity: 0 },
       ],
       progress: ['#2E0EC6', '#9789DA'],
+      ring: ['#2E0EC6', '#9789DA'],
       heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
     },
@@ -294,6 +305,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
         { offset: 1, color: '#3A2694', opacity: 0 },
       ],
       progress: ['#2E0EC6', '#9789DA'],
+      ring: ['#624BD5', '#9789DA'],
       heat: ['#1C1C1E', '#3F2AA2', '#624BD5', '#7E6CD8', '#9789DA'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
     },

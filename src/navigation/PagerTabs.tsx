@@ -79,6 +79,17 @@ export function swipeRange(pageCount: number, lastSwipeable: number, focused: nu
   return [0, Math.max(0, Math.min(pageCount - 1, Math.max(lastSwipeable, focused)))];
 }
 
+/**
+ * The pages in the pager: the swipeable tabs, and a later one only while it is
+ * focused. Nothing else is laid out, so the rubber band past the last page
+ * shows the ground, never a peek of a tab that is turned off (Insights without
+ * Smart Tracking).
+ */
+export function pagerRoutes<R>(routes: readonly R[], swipeableCount: number, focused: number): R[] {
+  const [, max] = swipeRange(routes.length, swipeableCount - 1, focused);
+  return routes.slice(0, max + 1);
+}
+
 const SPRING = { damping: 32, stiffness: 320, mass: 1, overshootClamping: true } as const;
 
 export type PagerTabOptions = {
@@ -133,8 +144,11 @@ function PagerTabs({
 
   const { width } = useWindowDimensions();
   const index = state.index;
-  const count = state.routes.length;
-  const [min, max] = swipeRange(count, swipeableCount - 1, index);
+  const [min, max] = swipeRange(state.routes.length, swipeableCount - 1, index);
+  // Only these are laid out. A page that leaves (a tab turned off) unmounts;
+  // the others keep their keys, so nothing else remounts or blanks.
+  const pages = pagerRoutes(state.routes, swipeableCount, index);
+  const count = pages.length;
 
   // The focused tab is on its main screen: nothing pushed on its stack.
   const nested = state.routes[index].state;
@@ -237,7 +251,7 @@ function PagerTabs({
       <View style={styles.fill}>
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.row, { width: width * count }, row]} testID="tab-pager-row">
-            {state.routes.map((route, i) => {
+            {pages.map((route, i) => {
               const focused = i === index;
               return (
                 <View
