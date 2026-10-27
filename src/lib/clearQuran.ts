@@ -3,8 +3,9 @@
 // The app never holds the API key: it asks our worker (revisely.app/api/tcq,
 // worker/tcq.ts), which calls The Clear Quran API. Each request carries the
 // signed-in user's Firebase ID token (only Revisely users may use the licence)
-// and the app's update channel (the App Store app uses the production key,
-// TestFlight and development the sandbox one).
+// and the app's update channel. The App Store app and TestFlight use the live
+// key; development builds would use a sandbox key, but The Clear Quran
+// documents no sandbox host, so they use the live key too (worker/tcq.ts).
 //
 // The text is shown exactly as returned. It is kept in memory for this launch
 // only, never written to the device. When it can't be loaded the caller shows
