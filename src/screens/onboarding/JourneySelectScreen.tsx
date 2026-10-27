@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,8 +8,15 @@ import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { Stepper } from '../../components/Stepper';
+import { Mark } from '../../components/v2/Mark';
+import { PillButton } from '../../components/v2/PillButton';
+import { Tap } from '../../components/v2/Tap';
+import { TopBar } from '../../components/v2/TopBar';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
+import { useHaptics } from '../../design/haptics';
 import { ThemeColors } from '../../theme/colors';
+import { layoutV2, typeV2 } from '../../theme/v2';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -23,7 +30,9 @@ const OPTIONS: Array<{ value: JourneyStage; title: string; description: string; 
 
 export default function JourneySelectScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [selectedStage, setSelectedStage] = useState<JourneyStage>('in_progress');
 
@@ -35,6 +44,63 @@ export default function JourneySelectScreen() {
   };
 
   const totalSteps = 3;
+
+  if (isNew) {
+    // The two answers are rows on hairlines, each with its mark; the chosen
+    // one carries a check. The one action sits at the foot.
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="journey-select">
+        <TopBar onBack={() => navigation.goBack()} center={<Stepper total={totalSteps} current={1} />} />
+        <ScrollView contentContainerStyle={v2.scroll}>
+          <Text
+            style={[typeV2.title, v2.headline, { color: palette.text }]}
+            accessibilityRole="header"
+            maxFontSizeMultiplier={1.6}
+          >
+            Where are you in your journey?
+          </Text>
+          <View
+            style={[v2.list, { borderTopColor: palette.separator }]}
+            accessibilityRole="radiogroup"
+          >
+            {OPTIONS.map((option) => {
+              const isSelected = selectedStage === option.value;
+              return (
+                <Tap
+                  key={option.value}
+                  onPress={() => {
+                    if (isSelected) return;
+                    haptics.selection();
+                    setSelectedStage(option.value);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${option.title}. ${option.description}`}
+                  accessibilityState={{ checked: isSelected, selected: isSelected }}
+                  style={[v2.row, { borderBottomColor: palette.separator }]}
+                  testID={`journey-${option.value}`}
+                >
+                  <Mark icon={option.icon} />
+                  <View style={v2.rowText}>
+                    <Text style={[typeV2.name, { color: palette.text }]}>{option.title}</Text>
+                    <Text style={[typeV2.body, { color: palette.secondary }]}>{option.description}</Text>
+                  </View>
+                  <Ionicons
+                    name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={24}
+                    color={isSelected ? palette.accentText : palette.secondary}
+                    testID={isSelected ? `journey-${option.value}-checked` : undefined}
+                  />
+                </Tap>
+              );
+            })}
+          </View>
+        </ScrollView>
+        <View style={v2.footer}>
+          <PillButton title="Continue" size="lg" onPress={handleContinue} testID="journey-continue" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -114,6 +180,22 @@ export default function JourneySelectScreen() {
     </SafeAreaView>
   );
 }
+
+const v2 = StyleSheet.create({
+  scroll: { paddingTop: 8, paddingBottom: 24 },
+  headline: { paddingHorizontal: layoutV2.gutter, marginBottom: 20 },
+  list: { borderTopWidth: layoutV2.hairline },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: layoutV2.markGap,
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: layoutV2.rowPad,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  rowText: { flex: 1, minWidth: 0 },
+  footer: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16 },
+});
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -11,16 +11,21 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { Button } from '../../components/Button';
+import { HeroGlow } from '../../components/v2/HeroGlow';
+import { PillButton } from '../../components/v2/PillButton';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'Welcome'>;
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // Soft sequenced fade-in for the hero elements.
@@ -52,6 +57,54 @@ export default function WelcomeScreen() {
     opacity: buttonOpacity.value,
   }));
 
+  if (isNew) {
+    // Flat ground with the accent's glow at the top (none with Jade), the
+    // words in the middle and the one action at the foot. The middle scrolls,
+    // so the largest text sizes never push "Begin" off the screen.
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="welcome">
+        <HeroGlow />
+        <ScrollView contentContainerStyle={v2.scroll} showsVerticalScrollIndicator={false}>
+          <Animated.View style={[v2.top, bismillahAnim]}>
+            <Text
+              style={[arabicV2(24), v2.center, { color: palette.text }]}
+              accessibilityLanguage="ar"
+              maxFontSizeMultiplier={1.6}
+            >
+              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+            </Text>
+          </Animated.View>
+
+          <View style={v2.middle}>
+            <Animated.Text
+              style={[typeV2.largeTitle, v2.center, v2.headline, { color: palette.text }, headlineAnim]}
+              accessibilityRole="header"
+              maxFontSizeMultiplier={1.6}
+            >
+              Your Quran,{'\n'}
+              <Text style={{ color: palette.accentText }} testID="welcome-accent">
+                remembered
+              </Text>
+              .
+            </Animated.Text>
+            <Animated.Text style={[typeV2.body, v2.center, v2.subtext, { color: palette.secondary }, subtextAnim]}>
+              A personal revision companion. Track what you've memorized, review at the right moment, and never lose a page.
+            </Animated.Text>
+          </View>
+        </ScrollView>
+
+        <Animated.View style={[v2.footer, buttonAnim]}>
+          <PillButton
+            title="Begin"
+            size="lg"
+            onPress={() => navigation.navigate('JourneySelect')}
+            testID="welcome-begin"
+          />
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -81,6 +134,21 @@ export default function WelcomeScreen() {
     </SafeAreaView>
   );
 }
+
+const v2 = StyleSheet.create({
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: layoutV2.gutter,
+    paddingTop: 48,
+    paddingBottom: 24,
+  },
+  top: { alignItems: 'center' },
+  center: { textAlign: 'center' },
+  middle: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 32 },
+  headline: { marginBottom: 12 },
+  subtext: { maxWidth: 320 },
+  footer: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16 },
+});
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
