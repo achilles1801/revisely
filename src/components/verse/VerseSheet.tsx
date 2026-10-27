@@ -21,6 +21,11 @@ import { ThemeColors } from '../../theme/colors';
 import { fonts, typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
+import { shadows } from '../../theme/shadows';
+import { arabicV2, layoutV2, PaletteV2, radiusV2, typeV2 } from '../../theme/v2';
+import { useDesign } from '../../design/DesignContext';
+import { Tap } from '../v2/Tap';
+import { PillButton } from '../v2/PillButton';
 import { getSurahDisplay } from '../../lib/quranData';
 import {
   getVerseText,
@@ -105,6 +110,9 @@ export function grabberSwipe(dy: number, expanded: boolean): 'expand' | 'shrink'
  *
  * The dimmed backdrop sits behind the sheet, not around it: a scroll view inside
  * a Pressable doesn't scroll on iOS (see Backdrop).
+ *
+ * The new design keeps this frame (it does more than v2/Sheet) in the sheets'
+ * colours and corners: bare icons in the header, the "…" menu as a flat panel.
  */
 export function VerseSheet({
   verse,
@@ -115,8 +123,12 @@ export function VerseSheet({
   onNavigate,
   onClose,
 }: VerseSheetProps) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  const classicStyles = useMemo(() => makeStyles(theme), [theme]);
+  // Only in the new design: the classic path never reads the v2 palette.
+  const v2Styles = useMemo(() => (isNew ? makeStylesV2(palette) : null), [isNew, palette]);
+  const styles = v2Styles ?? classicStyles;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
@@ -203,7 +215,7 @@ export function VerseSheet({
           onLayout={(e) => setSheetHeight(e.nativeEvent.layout.height)}
           testID="verse-sheet"
         >
-          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
+          {!isNew && <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />}
             {/* Grabber and header: swipe up to expand, down to shrink or close. */}
             <View
               {...grabberPan.panHandlers}
@@ -216,8 +228,70 @@ export function VerseSheet({
                 accessibilityRole="button"
                 accessibilityLabel={expanded ? 'Make the translation smaller' : 'Expand the translation'}
               >
-                <View style={[styles.grabber, { backgroundColor: theme.border }]} />
+                <View style={[styles.grabber, !isNew && { backgroundColor: theme.border }]} />
               </Pressable>
+              {isNew ? (
+                <View style={styles.headerRow}>
+                  <Tap
+                    onPress={onClose}
+                    hitSlop={8}
+                    style={styles.roundBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                  >
+                    <Ionicons name="close" size={24} color={palette.text} />
+                  </Tap>
+                  <View style={styles.titleBox}>
+                    <View style={styles.titleLine}>
+                      <Text style={styles.surahName} numberOfLines={1} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                        {surah?.nameDisplay ?? ''}
+                      </Text>
+                      {surah ? (
+                        <Text style={styles.surahArabic} maxFontSizeMultiplier={CHROME_TEXT_SCALE} accessibilityLanguage="ar">
+                          {surah.nameArabicVoweled}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.ayahLabel} accessibilityRole="header" maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                      Ayah {verse?.ayah}
+                    </Text>
+                  </View>
+                  <View style={styles.pill}>
+                    <Tap
+                      onPress={() => prev && onNavigate(prev)}
+                      disabled={!prev}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Previous verse"
+                      accessibilityState={{ disabled: !prev }}
+                      style={[styles.pillBtn, !prev && v2Only.disabled]}
+                    >
+                      <Ionicons name="chevron-back" size={22} color={prev ? palette.text : palette.secondary} />
+                    </Tap>
+                    <Tap
+                      onPress={() => next && onNavigate(next)}
+                      disabled={!next}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Next verse"
+                      accessibilityState={{ disabled: !next }}
+                      style={[styles.pillBtn, !next && v2Only.disabled]}
+                    >
+                      <Ionicons name="chevron-forward" size={22} color={next ? palette.text : palette.secondary} />
+                    </Tap>
+                  </View>
+                  <Tap
+                    onPress={() => setMenu(menu === 'closed' ? 'root' : 'closed')}
+                    hitSlop={8}
+                    style={styles.roundBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="More"
+                    accessibilityState={{ expanded: menu !== 'closed' }}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={22} color={palette.text} />
+                  </Tap>
+                </View>
+              ) : (
               <View style={styles.headerRow}>
                 <PressableScale onPress={onClose} haptic="light" style={styles.roundBtn} accessibilityLabel="Close">
                   <Ionicons name="close" size={20} color={theme.textPrimary} />
@@ -266,9 +340,107 @@ export function VerseSheet({
                   <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
                 </PressableScale>
               </View>
+              )}
             </View>
 
-            {menu !== 'closed' && (
+            {menu !== 'closed' && isNew && (
+              // A flat panel in the sheet, not a second modal (iOS can't stack one
+              // over a sheet that is itself a modal).
+              <View style={[styles.dropdown, { top: headerBottom }]} testID="verse-menu-panel">
+                {menu === 'root' ? (
+                  <>
+                    <Tap
+                      style={styles.dropRow}
+                      onPress={() => setMenu('translations')}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select translation, ${pickerTitle(translation)}`}
+                    >
+                      <Ionicons name="language-outline" size={22} color={palette.text} />
+                      <View style={v2Only.flex}>
+                        <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                          Select translation
+                        </Text>
+                        <Text
+                          style={[typeV2.meta, { color: palette.secondary }]}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={CHROME_TEXT_SCALE}
+                        >
+                          {translation.name}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+                    </Tap>
+                    <Tap
+                      style={styles.dropRow}
+                      onPress={() => setMenu('reciters')}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select reciter, ${voiceLabel(resolveVoice(reciter))}`}
+                    >
+                      <Ionicons name="volume-high-outline" size={22} color={palette.text} />
+                      <View style={v2Only.flex}>
+                        <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                          Select reciter
+                        </Text>
+                        <Text
+                          style={[typeV2.meta, { color: palette.secondary }]}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={CHROME_TEXT_SCALE}
+                        >
+                          {voiceLabel(resolveVoice(reciter))}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+                    </Tap>
+                  </>
+                ) : menu === 'reciters' ? (
+                  <ReciterList
+                    value={reciter}
+                    onChange={(choice) => {
+                      onChangeReciter(choice);
+                    }}
+                    // Within the sheet, however short a short verse leaves it.
+                    maxHeight={Math.max(160, Math.min(320, sheetHeight - headerBottom - spacing.md))}
+                  />
+                ) : (
+                  TRANSLATIONS.map((t) => {
+                    const available = isTranslationAvailable(t);
+                    const chosen = t.id === translation.id;
+                    return (
+                      <Tap
+                        key={t.id}
+                        style={[styles.dropRow, !available && v2Only.disabled]}
+                        disabled={!available}
+                        onPress={() => {
+                          onChangeTranslation(t.id);
+                          setMenu('closed');
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: chosen, disabled: !available }}
+                      >
+                        <View style={v2Only.flex}>
+                          <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                            {pickerTitle(t)}
+                          </Text>
+                          {t.credit ? (
+                            // Credited as in the sheet: the publisher's site.
+                            <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                              {available ? `${t.language} · ` : 'Not available yet · '}
+                              <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
+                            </Text>
+                          ) : (
+                            <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                              {available ? `${t.language} · ${t.author}` : `${t.author} · not available yet`}
+                            </Text>
+                          )}
+                        </View>
+                        {chosen && <Ionicons name="checkmark" size={20} color={palette.text} />}
+                      </Tap>
+                    );
+                  })
+                )}
+              </View>
+            )}
+            {menu !== 'closed' && !isNew && (
               <View style={[styles.dropdown, { top: headerBottom }]}>
                 <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />
                 {menu === 'root' ? (
@@ -336,10 +508,28 @@ export function VerseSheet({
 
             {view.status === 'loading' && (
               <View style={styles.center}>
-                <ActivityIndicator color={theme.accent} />
+                <ActivityIndicator color={isNew ? palette.secondary : theme.accent} />
               </View>
             )}
-            {view.status === 'error' && (
+            {view.status === 'error' && isNew && (
+              <View style={styles.center} testID="verse-error">
+                {translation.id === CLEAR_QURAN_ID ? (
+                  // Only ever this, or its own text: never another translation under its name.
+                  <>
+                    <Text style={[typeV2.name, { color: palette.text }]}>Couldn't load translation</Text>
+                    <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
+                      {clearQuranErrorHint(view.error)}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
+                    Couldn't load this verse. Check your connection.
+                  </Text>
+                )}
+                <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
+              </View>
+            )}
+            {view.status === 'error' && !isNew && (
               <View style={styles.center} testID="verse-error">
                 {translation.id === CLEAR_QURAN_ID ? (
                   // Only ever this, or its own text: never another translation under its name.
@@ -369,8 +559,11 @@ export function VerseSheet({
                 onScrollEndDrag={(e) => act(overscrollAction(e.nativeEvent.contentOffset.y, expanded))}
                 testID="verse-scroll"
               >
-                <View style={[styles.keyChip, { borderColor: theme.border, backgroundColor: theme.glass }]}>
-                  <Text style={[typography.caption, { color: theme.textSecondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                <View style={[styles.keyChip, !isNew && { borderColor: theme.border, backgroundColor: theme.glass }]}>
+                  <Text
+                    style={isNew ? [typeV2.meta, typeV2.numeral, { color: palette.secondary }] : [typography.caption, { color: theme.textSecondary }]}
+                    maxFontSizeMultiplier={CHROME_TEXT_SCALE}
+                  >
                     {view.text.sura}:{view.text.ayah}
                   </Text>
                 </View>
@@ -398,7 +591,7 @@ export function VerseSheet({
             )}
             {view.status === 'ready' && translation.credit && (
               // Pinned under the verse, however long it is: always in view.
-              <View style={[styles.credit, { borderTopColor: theme.border }]} testID="translation-credit">
+              <View style={[styles.credit, !isNew && { borderTopColor: theme.border }]} testID="translation-credit">
                 <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                   {translation.credit.text}
                 </Text>
@@ -512,3 +705,104 @@ const makeStyles = (theme: ThemeColors) =>
     creditText: { ...typography.caption, color: theme.textSecondary },
     creditLink: { ...typography.caption, color: theme.accent, fontWeight: '600', alignSelf: 'flex-start' },
   });
+
+/** The new design: the same keys as the classic styles, in the sheets' colours and corners. */
+const makeStylesV2 = (p: PaletteV2) =>
+  StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: p.overlay, justifyContent: 'flex-end' },
+    sheet: {
+      minHeight: 240,
+      backgroundColor: p.sheet,
+      borderTopLeftRadius: radiusV2.sheet,
+      borderTopRightRadius: radiusV2.sheet,
+      paddingHorizontal: layoutV2.gutter,
+      paddingBottom: layoutV2.gutter,
+      overflow: 'hidden',
+    },
+    grabberHit: { alignSelf: 'center', paddingTop: 10, paddingBottom: 10, paddingHorizontal: spacing.lg },
+    grabber: {
+      width: layoutV2.handle.width,
+      height: layoutV2.handle.height,
+      borderRadius: layoutV2.handle.height / 2,
+      backgroundColor: p.handle,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingBottom: 12,
+      marginBottom: 12,
+      borderBottomWidth: layoutV2.hairline,
+      borderBottomColor: p.separator,
+    },
+    roundBtn: { minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
+    titleBox: { flex: 1, minWidth: 0 },
+    titleLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+    surahName: { ...typeV2.meta, color: p.secondary, flexShrink: 1 },
+    surahArabic: { ...arabicV2(15), lineHeight: undefined, color: p.secondary },
+    ayahLabel: { ...typeV2.sheetTitle, color: p.text },
+    pill: { flexDirection: 'row', alignItems: 'center' },
+    pillBtn: { minWidth: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
+    // A menu: chrome, so it may lift off the sheet.
+    dropdown: {
+      position: 'absolute',
+      right: layoutV2.gutter / 2,
+      width: 280,
+      paddingVertical: 4,
+      borderRadius: radiusV2.media,
+      backgroundColor: p.sheet,
+      borderWidth: layoutV2.hairline,
+      borderColor: p.separator,
+      zIndex: 10,
+      ...shadows.md,
+    },
+    dropRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      minHeight: 52,
+      paddingHorizontal: layoutV2.gutter,
+      paddingVertical: 10,
+    },
+    center: { paddingVertical: spacing.xl, paddingHorizontal: layoutV2.gutter, alignItems: 'center', gap: 12 },
+    retryBtn: {},
+    // As the classic: sized to the verse up to the room left, then scrolls.
+    scroll: { flexGrow: 0, flexShrink: 1 },
+    scrollContent: { paddingBottom: spacing.lg },
+    keyChip: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 2,
+      borderRadius: radiusV2.chip,
+      backgroundColor: p.fill,
+      marginBottom: layoutV2.gutter,
+    },
+    // Amiri's stacked marks need the classic's line height on the longest verses.
+    arabic: {
+      ...arabicV2(28),
+      lineHeight: 54,
+      color: p.text,
+      textAlign: 'right',
+      writingDirection: 'rtl',
+      marginBottom: layoutV2.gutter,
+    },
+    // Reading text: grows with Dynamic Type, uncapped.
+    translation: { ...typeV2.body, fontSize: 18, lineHeight: 27, color: p.text },
+    source: { ...typeV2.meta, color: p.secondary, marginTop: layoutV2.gutter },
+    footnote: { color: p.accentText },
+    credit: {
+      borderTopWidth: layoutV2.hairline,
+      borderTopColor: p.separator,
+      paddingTop: 12,
+      marginTop: 8,
+      gap: 2,
+    },
+    creditText: { ...typeV2.meta, color: p.secondary },
+    creditLink: { ...typeV2.meta, color: p.link, fontWeight: '600', alignSelf: 'flex-start' },
+  });
+
+const v2Only = StyleSheet.create({
+  flex: { flex: 1, minWidth: 0 },
+  disabled: { opacity: 0.4 },
+  centerText: { textAlign: 'center' },
+});

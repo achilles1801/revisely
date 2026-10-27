@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
-import { ACCENT_LABELS, ACCENTS, AccentName, paletteV2, radiusV2 } from '../../theme/v2';
+import { ACCENT_LABELS, ACCENTS, AccentName, paletteV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 
 /**
@@ -31,7 +31,7 @@ export function AccentPicker({ value, onChange }: { value: AccentName; onChange:
             style={[
               styles.chip,
               {
-                borderColor: selected ? palette.text : isDark ? '#333333' : '#D1D5DB',
+                borderColor: selected ? palette.text : palette.outline,
                 borderWidth: selected ? 1.5 : 1,
                 backgroundColor: selected ? palette.fill : 'transparent',
               },
@@ -39,7 +39,7 @@ export function AccentPicker({ value, onChange }: { value: AccentName; onChange:
             testID={`accent-${a}`}
           >
             <View style={[styles.swatch, { backgroundColor: paletteV2(isDark, a).done }]} />
-            <Text style={[styles.label, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+            <Text style={[typeV2.button, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
               {ACCENT_LABELS[a]}
             </Text>
           </Tap>
@@ -60,5 +60,4 @@ const styles = StyleSheet.create({
     borderRadius: radiusV2.pill,
   },
   swatch: { width: 14, height: 14, borderRadius: 7 },
-  label: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
 });

@@ -87,3 +87,9 @@ export type ThemeColors = typeof colors;
 export function getColors(isDark: boolean): ThemeColors {
   return isDark ? darkColors : colors;
 }
+
+/**
+ * The notification light on Android (the channel's `lightColor`), outside any
+ * theme: the system draws it, whatever the app's design or appearance.
+ */
+export const NOTIFICATION_LIGHT_COLOR = '#292524';

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Dimensions, Modal, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects, versesOnPage } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
@@ -19,6 +18,10 @@ import { resolveVoice, shortVoiceLabel } from '../../lib/recitation';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
+import { useDesign } from '../../design/DesignContext';
+import { useHaptics } from '../../design/haptics';
+import { Sheet } from '../v2/Sheet';
+import { getSurahDisplay } from '../../lib/quranData';
 
 interface Options {
   /** Pages this screen shows. Playback and verse navigation stay within them. */
@@ -39,6 +42,10 @@ interface Options {
 export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   const { user, saveUser } = useApp();
   const { theme } = useTheme();
+  const { isNew } = useDesign();
+  // A held verse is an outcome (it's selected): Medium, as before; the new
+  // design's Haptics setting can turn it off.
+  const haptics = useHaptics();
   const recitation = getRecitation();
   const [playback, setPlayback] = useState<RecitationState>(recitation.getState());
   const [selected, setSelected] = useState<AyahRef | null>(null);
@@ -79,13 +86,13 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   }, [playingKey]);
 
   const onLongPressAyah = useCallback((ayah: AyahRef, point?: { x: number; y: number }) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.impact();
     // The menu offers Translation: its text starts loading now, not on the tap.
     prefetchVerseText(ayah.page, ayah.sura, ayah.ayah, translationIdRef.current);
     setSelected(ayah);
     const { width, height } = Dimensions.get('window');
     setMenuPoint(point ?? { x: width / 2, y: height / 2 });
-  }, []);
+  }, [haptics]);
 
   const closeMenu = useCallback(() => {
     setMenuPoint(null);
@@ -133,6 +140,9 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
+    // The new design's menu clears the selection as it closes, before this runs:
+    // keep the verse highlighted under its sheet. (Unchanged in the classic one.)
+    setSelected(selected);
     setMenuPoint(null);
   }, [selected]);
 
@@ -195,10 +205,24 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     onPickReciter: () => setReciterPickerOpen(true),
   };
 
+  const selectedSurah = selected ? getSurahDisplay(selected.sura)?.nameDisplay : undefined;
+  const closeReciters = () => setReciterPickerOpen(false);
+  const reciterList = (
+    <ReciterList
+      value={user?.reciter}
+      onChange={(choice) => {
+        changeReciter(choice);
+        setReciterPickerOpen(false);
+      }}
+      maxHeight={460}
+    />
+  );
+
   const overlay = (
     <>
       <VerseMenu
         point={menuPoint}
+        verseLabel={selected ? `${selectedSurah ? `${selectedSurah} ` : ''}${selected.sura}:${selected.ayah}` : undefined}
         playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · to the end of the juz`}
         onPlay={play}
         onTranslation={openTranslation}
@@ -213,6 +237,11 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         onNavigate={navigateSheet}
         onClose={closeSheet}
       />
+      {isNew ? (
+        <Sheet visible={reciterPickerOpen} onClose={closeReciters} title="Reciter" testID="reciter-sheet">
+          {reciterList}
+        </Sheet>
+      ) : (
       <Modal
         visible={reciterPickerOpen}
         transparent
@@ -226,18 +255,12 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
             <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             <SafeAreaView>
               <Text style={[pickerStyles.title, { color: theme.textPrimary }]}>Reciter</Text>
-              <ReciterList
-                value={user?.reciter}
-                onChange={(choice) => {
-                  changeReciter(choice);
-                  setReciterPickerOpen(false);
-                }}
-                maxHeight={460}
-              />
+              {reciterList}
             </SafeAreaView>
           </View>
         </View>
       </Modal>
+      )}
     </>
   );
 

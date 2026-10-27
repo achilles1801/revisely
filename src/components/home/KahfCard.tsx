@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../GlassCard';
 import { PressableScale } from '../PressableScale';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
+import { KahfPost } from './feed/KahfPost';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -19,8 +21,17 @@ interface KahfCardProps {
   onDismiss: () => void;
 }
 
-/** Friday suggestion on Home: read Surah Al-Kahf, optionally log it. */
-export function KahfCard({ state, saving = false, onRead, onMarkRead, onDismiss }: KahfCardProps) {
+/**
+ * Friday suggestion on Home: read Surah Al-Kahf, optionally log it. In the new
+ * design it is a post in Home's feed (feed/KahfPost): no card, the minutes in
+ * a menu.
+ */
+export function KahfCard(props: KahfCardProps) {
+  const { isNew } = useDesign();
+  return isNew ? <KahfPost {...props} /> : <ClassicKahfCard {...props} />;
+}
+
+function ClassicKahfCard({ state, saving = false, onRead, onMarkRead, onDismiss }: KahfCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [picking, setPicking] = useState(false);

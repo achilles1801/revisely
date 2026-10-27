@@ -19,7 +19,8 @@ import {
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
-import { layoutV2, typeV2 } from '../../theme/v2';
+import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { useHaptics } from '../../design/haptics';
 import { AccentPicker } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
@@ -321,7 +322,7 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, saveUser, resetOnboarding } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
-  const { theme, themeMode, setThemeMode, isDark } = useTheme();
+  const { theme, palette, themeMode, setThemeMode, isDark } = useTheme();
   const design = useDesign();
   const tabFootprint = useTabBarFootprint();
   const screenStyles = useMemo(() => makeStyles(theme), [theme]);
@@ -864,6 +865,25 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Revision">
+          {design.isNew ? (
+            // Like Keep daily amount below: the line under the label says what it does.
+            <View style={v2.iconRow} testID="smart-tracking-row">
+              <SettingIcon name="analytics-outline" tileStyle={styles.rowIcon} />
+              <View style={v2.iconRowText}>
+                <Text style={[typeV2.body, { color: palette.text }]}>Smart Tracking</Text>
+                {!localUser.smartTrackingEnabled && (
+                  <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                    Turn on to rate pages from the session menu and see personalized insights.
+                  </Text>
+                )}
+              </View>
+              <SettingSwitch
+                value={localUser.smartTrackingEnabled}
+                onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
+                accessibilityLabel="Smart Tracking"
+              />
+            </View>
+          ) : (
           <View
             style={[
               styles.row,
@@ -875,9 +895,9 @@ export default function SettingsScreen() {
             ]}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', gap: spacing.sm }}>
-              <SettingIcon name={design.isNew ? 'analytics-outline' : 'sparkles-outline'} tileStyle={styles.rowIcon} />
+              <SettingIcon name="sparkles-outline" tileStyle={styles.rowIcon} />
               <View style={styles.rowText}>
-                <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
+                <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
               </View>
               <SettingSwitch
                 value={localUser.smartTrackingEnabled}
@@ -895,6 +915,7 @@ export default function SettingsScreen() {
               </Text>
             )}
           </View>
+          )}
           {!design.isNew && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />}
           <CarryOverSetting
             mode={localUser.carryOverMode}
@@ -933,7 +954,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Appearance">
-          <View style={[styles.row, { borderBottomWidth: 0 }]}>
+          <View style={design.isNew ? v2.iconRow : [styles.row, { borderBottomWidth: 0 }]}>
             <SettingIcon name="color-palette-outline" tileStyle={styles.rowIcon} />
             <View style={styles.rowText}>
               <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
@@ -1053,7 +1074,10 @@ export default function SettingsScreen() {
           </Section>
         )}
 
-        <Text style={screenStyles.versionText}>
+        <Text
+          style={design.isNew ? [typeV2.meta, v2.version, { color: palette.secondary }] : screenStyles.versionText}
+          maxFontSizeMultiplier={design.isNew ? 1.4 : undefined}
+        >
           Revisely · v{Constants.expoConfig?.version ?? '1.0.0'}
         </Text>
 
@@ -1069,226 +1093,274 @@ export default function SettingsScreen() {
         )}
       </ScrollView>
 
-      {/* Time picker sheet */}
-      <BottomSheetModal visible={showTimeModal} onClose={() => setShowTimeModal(false)}>
-        <View style={screenStyles.sheetHeader}>
-          <PressableScale
-            onPress={() => setShowTimeModal(false)}
-            haptic="light"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-          </PressableScale>
-          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Reminder time</Text>
-          <PressableScale
-            onPress={handleSaveTime}
-            haptic="medium"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
-          </PressableScale>
-        </View>
-
-        <View style={screenStyles.timePickerContainer}>
-          <View style={screenStyles.timeColumn}>
-            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
-            <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
-              {HOURS.map((hour) => {
-                const selected = tempHour === hour;
-                return (
-                  <PressableScale
-                    key={hour}
-                    onPress={() => setTempHour(hour)}
-                    haptic="selection"
-                    scale={0.96}
-                    style={[
-                      screenStyles.timeOption,
-                      selected && { backgroundColor: theme.accentSoft },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        typography.titleMedium,
-                        {
-                          color: selected ? theme.accent : theme.textSecondary,
-                          fontWeight: selected ? '700' : '400',
-                          textAlign: 'center',
-                        },
-                      ]}
-                    >
-                      {hour.toString().padStart(2, '0')}
-                    </Text>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          <Text style={[typography.displayLarge, { color: theme.textPrimary, marginHorizontal: spacing.xs }]}>:</Text>
-
-          <View style={screenStyles.timeColumn}>
-            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
-            <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
-              {MINUTES.map((minute) => {
-                const selected = tempMinute === minute;
-                return (
-                  <PressableScale
-                    key={minute}
-                    onPress={() => setTempMinute(minute)}
-                    haptic="selection"
-                    scale={0.96}
-                    style={[
-                      screenStyles.timeOption,
-                      selected && { backgroundColor: theme.accentSoft },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        typography.titleMedium,
-                        {
-                          color: selected ? theme.accent : theme.textSecondary,
-                          fontWeight: selected ? '700' : '400',
-                          textAlign: 'center',
-                        },
-                      ]}
-                    >
-                      {minute.toString().padStart(2, '0')}
-                    </Text>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </BottomSheetModal>
-
-      {/* Display name sheet */}
-      <BottomSheetModal
-        visible={showNameModal}
-        onClose={() => setShowNameModal(false)}
-        // Focus once the sheet is up, so the keyboard lifts a visible sheet.
-        onShow={() => nameInputRef.current?.focus()}
-      >
-        <View style={screenStyles.sheetHeader}>
-          <PressableScale
-            onPress={() => setShowNameModal(false)}
-            haptic="light"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-          </PressableScale>
-          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Display name</Text>
-          <PressableScale
-            onPress={handleSaveName}
-            haptic="medium"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
-          </PressableScale>
-        </View>
-
-        <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-          <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
-            How you'd like to be addressed in the app.
-          </Text>
-          <TextInput
-            ref={nameInputRef}
-            value={tempName}
-            onChangeText={setTempName}
-            placeholder="Your name"
-            placeholderTextColor={theme.textMuted}
-            maxLength={40}
-            returnKeyType="done"
-            onSubmitEditing={handleSaveName}
-            style={[
-              {
-                ...typography.bodyLarge,
-                color: theme.textPrimary,
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(0,0,0,0.06)',
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.sm,
-                borderWidth: 1,
-                borderColor: theme.border,
-              },
-            ]}
+      {design.isNew ? (
+        <>
+          <ReminderTimeSheetV2
+            visible={showTimeModal}
+            hour={tempHour}
+            minute={tempMinute}
+            onHour={setTempHour}
+            onMinute={setTempMinute}
+            onCancel={() => setShowTimeModal(false)}
+            onSave={handleSaveTime}
           />
-        </View>
-      </BottomSheetModal>
+          <TextSheetV2
+            visible={showNameModal}
+            title="Display name"
+            message="How you'd like to be addressed in the app."
+            value={tempName}
+            onChange={setTempName}
+            placeholder="Your name"
+            maxLength={40}
+            inputRef={nameInputRef}
+            // Focus once the sheet is up, so the keyboard lifts a visible sheet.
+            onShow={() => nameInputRef.current?.focus()}
+            onCancel={() => setShowNameModal(false)}
+            save={{ label: 'Save', onPress: handleSaveName }}
+            testID="name-sheet"
+          />
+          <TextSheetV2
+            visible={showFeedbackModal}
+            title="Send feedback"
+            message="Found a bug or have an idea? Tell us anything. We read every note."
+            value={feedbackText}
+            onChange={setFeedbackText}
+            placeholder="What's on your mind?"
+            maxLength={2000}
+            multiline
+            onCancel={() => setShowFeedbackModal(false)}
+            save={{
+              label: feedbackSubmitting ? 'Sending…' : 'Submit',
+              onPress: handleSubmitFeedback,
+              disabled: feedbackSubmitting || feedbackText.trim().length === 0,
+            }}
+            testID="feedback-sheet"
+          />
+        </>
+      ) : (
+        <>
+        {/* Time picker sheet */}
+        <BottomSheetModal visible={showTimeModal} onClose={() => setShowTimeModal(false)}>
+          <View style={screenStyles.sheetHeader}>
+            <PressableScale
+              onPress={() => setShowTimeModal(false)}
+              haptic="light"
+              style={{ padding: spacing.xxs }}
+            >
+              <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
+            </PressableScale>
+            <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Reminder time</Text>
+            <PressableScale
+              onPress={handleSaveTime}
+              haptic="medium"
+              style={{ padding: spacing.xxs }}
+            >
+              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
+            </PressableScale>
+          </View>
 
-      <BottomSheetModal
-        visible={showFeedbackModal}
-        onClose={() => setShowFeedbackModal(false)}
-      >
-        <View style={screenStyles.sheetHeader}>
-          <PressableScale
-            onPress={() => setShowFeedbackModal(false)}
-            haptic="light"
-            style={{ padding: spacing.xxs }}
-          >
-            <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-          </PressableScale>
-          <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Send feedback</Text>
-          <PressableScale
-            onPress={handleSubmitFeedback}
-            haptic="medium"
-            style={{ padding: spacing.xxs }}
-            disabled={feedbackSubmitting || feedbackText.trim().length === 0}
-          >
-            <Text
+          <View style={screenStyles.timePickerContainer}>
+            <View style={screenStyles.timeColumn}>
+              <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
+              <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour) => {
+                  const selected = tempHour === hour;
+                  return (
+                    <PressableScale
+                      key={hour}
+                      onPress={() => setTempHour(hour)}
+                      haptic="selection"
+                      scale={0.96}
+                      style={[
+                        screenStyles.timeOption,
+                        selected && { backgroundColor: theme.accentSoft },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          typography.titleMedium,
+                          {
+                            color: selected ? theme.accent : theme.textSecondary,
+                            fontWeight: selected ? '700' : '400',
+                            textAlign: 'center',
+                          },
+                        ]}
+                      >
+                        {hour.toString().padStart(2, '0')}
+                      </Text>
+                    </PressableScale>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Text style={[typography.displayLarge, { color: theme.textPrimary, marginHorizontal: spacing.xs }]}>:</Text>
+
+            <View style={screenStyles.timeColumn}>
+              <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
+              <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
+                {MINUTES.map((minute) => {
+                  const selected = tempMinute === minute;
+                  return (
+                    <PressableScale
+                      key={minute}
+                      onPress={() => setTempMinute(minute)}
+                      haptic="selection"
+                      scale={0.96}
+                      style={[
+                        screenStyles.timeOption,
+                        selected && { backgroundColor: theme.accentSoft },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          typography.titleMedium,
+                          {
+                            color: selected ? theme.accent : theme.textSecondary,
+                            fontWeight: selected ? '700' : '400',
+                            textAlign: 'center',
+                          },
+                        ]}
+                      >
+                        {minute.toString().padStart(2, '0')}
+                      </Text>
+                    </PressableScale>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+        </BottomSheetModal>
+
+        {/* Display name sheet */}
+        <BottomSheetModal
+          visible={showNameModal}
+          onClose={() => setShowNameModal(false)}
+          // Focus once the sheet is up, so the keyboard lifts a visible sheet.
+          onShow={() => nameInputRef.current?.focus()}
+        >
+          <View style={screenStyles.sheetHeader}>
+            <PressableScale
+              onPress={() => setShowNameModal(false)}
+              haptic="light"
+              style={{ padding: spacing.xxs }}
+            >
+              <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
+            </PressableScale>
+            <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Display name</Text>
+            <PressableScale
+              onPress={handleSaveName}
+              haptic="medium"
+              style={{ padding: spacing.xxs }}
+            >
+              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
+            </PressableScale>
+          </View>
+
+          <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
+            <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
+              How you'd like to be addressed in the app.
+            </Text>
+            <TextInput
+              ref={nameInputRef}
+              value={tempName}
+              onChangeText={setTempName}
+              placeholder="Your name"
+              placeholderTextColor={theme.textMuted}
+              maxLength={40}
+              returnKeyType="done"
+              onSubmitEditing={handleSaveName}
               style={[
-                typography.bodyMedium,
                 {
-                  color:
-                    feedbackSubmitting || feedbackText.trim().length === 0
-                      ? theme.textMuted
-                      : theme.accent,
-                  fontWeight: '700',
+                  ...typography.bodyLarge,
+                  color: theme.textPrimary,
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.08)'
+                    : 'rgba(0,0,0,0.06)',
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.sm,
+                  borderWidth: 1,
+                  borderColor: theme.border,
                 },
               ]}
-            >
-              {feedbackSubmitting ? 'Sending…' : 'Submit'}
-            </Text>
-          </PressableScale>
-        </View>
+            />
+          </View>
+        </BottomSheetModal>
 
-        <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-          <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
-            Found a bug or have an idea? Tell us anything — we read every note.
-          </Text>
-          <TextInput
-            value={feedbackText}
-            onChangeText={setFeedbackText}
-            placeholder="What's on your mind?"
-            placeholderTextColor={theme.textMuted}
-            multiline
-            maxLength={2000}
-            textAlignVertical="top"
-            style={[
-              {
-                ...typography.bodyMedium,
-                color: theme.textPrimary,
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(0,0,0,0.06)',
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.sm,
-                borderWidth: 1,
-                borderColor: theme.border,
-                minHeight: 140,
-              },
-            ]}
-          />
-        </View>
-      </BottomSheetModal>
+        <BottomSheetModal
+          visible={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+        >
+          <View style={screenStyles.sheetHeader}>
+            <PressableScale
+              onPress={() => setShowFeedbackModal(false)}
+              haptic="light"
+              style={{ padding: spacing.xxs }}
+            >
+              <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
+            </PressableScale>
+            <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Send feedback</Text>
+            <PressableScale
+              onPress={handleSubmitFeedback}
+              haptic="medium"
+              style={{ padding: spacing.xxs }}
+              disabled={feedbackSubmitting || feedbackText.trim().length === 0}
+            >
+              <Text
+                style={[
+                  typography.bodyMedium,
+                  {
+                    color:
+                      feedbackSubmitting || feedbackText.trim().length === 0
+                        ? theme.textMuted
+                        : theme.accent,
+                    fontWeight: '700',
+                  },
+                ]}
+              >
+                {feedbackSubmitting ? 'Sending…' : 'Submit'}
+              </Text>
+            </PressableScale>
+          </View>
+
+          <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
+            <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
+              Found a bug or have an idea? Tell us anything — we read every note.
+            </Text>
+            <TextInput
+              value={feedbackText}
+              onChangeText={setFeedbackText}
+              placeholder="What's on your mind?"
+              placeholderTextColor={theme.textMuted}
+              multiline
+              maxLength={2000}
+              textAlignVertical="top"
+              style={[
+                {
+                  ...typography.bodyMedium,
+                  color: theme.textPrimary,
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.08)'
+                    : 'rgba(0,0,0,0.06)',
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.sm,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  minHeight: 140,
+                },
+              ]}
+            />
+          </View>
+        </BottomSheetModal>
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
-// Polished modal-as-sheet. The KeyboardAvoidingView lifts the sheet above
+// The classic design's modal-as-sheet. The KeyboardAvoidingView lifts the sheet above
 // the keyboard: without it, the auto-focused name field's keyboard covers the
 // whole (short) sheet the instant it opens, so it looks like nothing happened.
 function BottomSheetModal({
@@ -1303,15 +1375,7 @@ function BottomSheetModal({
   children: React.ReactNode;
 }) {
   const { theme } = useTheme();
-  const { isNew } = useDesign();
   const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
-  if (isNew) {
-    return (
-      <Sheet visible={visible} onClose={onClose} onShow={onShow} keyboard>
-        <View style={{ paddingTop: spacing.sm }}>{children}</View>
-      </Sheet>
-    );
-  }
   return (
     <Modal
       visible={visible}
@@ -1333,6 +1397,155 @@ function BottomSheetModal({
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+/**
+ * The new design's reminder time: a v2 Sheet (Cancel, the title, Save), the
+ * hours in a column that scrolls, the minutes beside it. The chosen one sits on
+ * the accent's tint.
+ */
+function ReminderTimeSheetV2({
+  visible,
+  hour,
+  minute,
+  onHour,
+  onMinute,
+  onCancel,
+  onSave,
+}: {
+  visible: boolean;
+  hour: number;
+  minute: number;
+  onHour: (h: number) => void;
+  onMinute: (m: number) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  const { palette } = useTheme();
+  const haptics = useHaptics();
+  const column = (label: string, values: number[], value: number, onPick: (v: number) => void) => (
+    <View style={v2.timeColumn}>
+      <Text style={[typeV2.meta, v2.timeLabel, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
+      <ScrollView style={v2.timeScroll} showsVerticalScrollIndicator={false} testID={`time-${label.toLowerCase()}s`}>
+        {values.map((v) => {
+          const selected = v === value;
+          const text = v.toString().padStart(2, '0');
+          return (
+            <Tap
+              key={v}
+              onPress={() => {
+                if (selected) return;
+                haptics.selection();
+                onPick(v);
+              }}
+              style={[v2.timeOption, selected && { backgroundColor: palette.accentSubtle }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${label} ${text}`}
+              accessibilityState={{ selected }}
+              testID={`time-${label.toLowerCase()}-${v}`}
+            >
+              <Text
+                style={[
+                  typeV2.sheetTitle,
+                  typeV2.numeral,
+                  v2.timeText,
+                  { color: selected ? palette.accentText : palette.secondary, fontWeight: selected ? '600' : '400' },
+                ]}
+                maxFontSizeMultiplier={1.4}
+              >
+                {text}
+              </Text>
+            </Tap>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onCancel}
+      title="Reminder time"
+      left={{ label: 'Cancel', onPress: onCancel, testID: 'time-cancel' }}
+      right={{ label: 'Save', onPress: onSave, strong: true, testID: 'time-save' }}
+      testID="time-sheet"
+    >
+      <View style={v2.timePicker}>
+        {column('Hour', HOURS, hour, onHour)}
+        <Text style={[typeV2.title, v2.timeColon, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+          :
+        </Text>
+        {column('Minute', MINUTES, minute, onMinute)}
+      </View>
+    </Sheet>
+  );
+}
+
+/** The new design's one-field sheet (display name, feedback): Cancel, the title, Save. */
+function TextSheetV2({
+  visible,
+  title,
+  message,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  multiline,
+  inputRef,
+  onShow,
+  onCancel,
+  save,
+  testID,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  value: string;
+  onChange: (text: string) => void;
+  placeholder: string;
+  maxLength: number;
+  multiline?: boolean;
+  inputRef?: React.RefObject<TextInput | null>;
+  onShow?: () => void;
+  onCancel: () => void;
+  save: { label: string; onPress: () => void; disabled?: boolean };
+  testID: string;
+}) {
+  const { palette } = useTheme();
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onCancel}
+      onShow={onShow}
+      keyboard
+      title={title}
+      left={{ label: 'Cancel', onPress: onCancel, testID: `${testID}-cancel` }}
+      right={{ label: save.label, onPress: save.onPress, strong: true, disabled: save.disabled, testID: `${testID}-save` }}
+      testID={testID}
+    >
+      <View style={v2.sheetBody}>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{message}</Text>
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor={palette.secondary}
+          maxLength={maxLength}
+          multiline={multiline}
+          textAlignVertical={multiline ? 'top' : undefined}
+          returnKeyType={multiline ? 'default' : 'done'}
+          onSubmitEditing={multiline ? undefined : save.onPress}
+          selectionColor={palette.accentText}
+          style={[typeV2.body, v2.input, multiline && v2.inputMultiline, { color: palette.text, backgroundColor: palette.fill }]}
+          accessibilityLabel={title}
+          testID={`${testID}-input`}
+        />
+      </View>
+    </Sheet>
   );
 }
 
@@ -1409,6 +1622,30 @@ const v2 = StyleSheet.create({
   accentHead: { flexDirection: 'row', alignItems: 'center', minHeight: 32, gap: 8 },
   // Under the label: the icon (24), its 8pt and the row's 8pt.
   accentChips: { marginLeft: 40, marginTop: 8 },
+  // A row built around SettingIcon, which brings 8pt after its glyph: 8 more
+  // makes the 16 of the other rows.
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingVertical: 12,
+    paddingHorizontal: layoutV2.gutter,
+    gap: 8,
+  },
+  iconRowText: { flex: 1, marginRight: 8 },
+  version: { textAlign: 'center', marginTop: 24, marginBottom: 24 },
+  // Sheets.
+  sheetBody: { paddingTop: 8, paddingBottom: 4, gap: 12 },
+  input: { borderRadius: radiusV2.media, paddingHorizontal: 14, paddingVertical: 12 },
+  // A minimum, not a height: the field grows with its text and with Dynamic Type.
+  inputMultiline: { minHeight: 140 },
+  timePicker: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 },
+  timeColumn: { alignItems: 'center', width: 104 },
+  timeLabel: { marginBottom: 8 },
+  timeScroll: { maxHeight: 220, width: '100%' },
+  timeOption: { paddingVertical: 8, borderRadius: radiusV2.chip, marginVertical: 1 },
+  timeText: { textAlign: 'center' },
+  timeColon: { marginHorizontal: 8, marginTop: 28 },
 });
 
 const makeStyles = (theme: ThemeColors) =>

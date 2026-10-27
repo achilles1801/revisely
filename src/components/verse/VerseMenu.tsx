@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../GlassCard';
@@ -7,6 +7,8 @@ import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
+import { useDesign } from '../../design/DesignContext';
+import { ActionSheet } from '../v2/ActionSheet';
 
 import { MENU_HEIGHT, MENU_WIDTH, menuPosition } from '../../lib/verseMenu';
 
@@ -21,15 +23,24 @@ interface VerseMenuProps {
   playSubtitle?: string;
   onTranslation: () => void;
   onClose: () => void;
+  /** The held verse ("Al-Baqarah 2:255"): the new design's menu title. */
+  verseLabel?: string;
 }
 
 /**
  * The menu that opens on a held verse: Play and Translation. A plain overlay on
  * the screen, not a Modal: opening the verse sheet (a Modal) while a Modal is
  * still dismissing fails on iOS. Render it last in a full-screen container.
+ *
+ * In the new design every menu is the ActionSheet: its action runs once the
+ * sheet has gone, so the verse sheet can open after it.
  */
-export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose }: VerseMenuProps) {
+export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose, verseLabel }: VerseMenuProps) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
+  // The title stays while the menu slides away (the selection clears as it closes).
+  const lastLabel = useRef(verseLabel);
+  if (verseLabel) lastLabel.current = verseLabel;
   // Its height once laid out: large text makes it taller than MENU_HEIGHT, and it
   // must still open on screen. Hidden until measured, so it doesn't jump.
   const [height, setHeight] = useState<number | null>(null);
@@ -66,6 +77,21 @@ export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose 
       </View>
     </Pressable>
   );
+
+  if (isNew) {
+    return (
+      <ActionSheet
+        visible={point != null}
+        onClose={onClose}
+        title={lastLabel.current ?? 'Verse'}
+        actions={[
+          { key: 'play', label: 'Play', icon: 'play', subtitle: playSubtitle ?? 'to the end of the juz', onPress: onPlay },
+          { key: 'translation', label: 'Translation', icon: 'language-outline', onPress: onTranslation },
+        ]}
+        testID="verse-menu"
+      />
+    );
+  }
 
   if (!point) return null;
   return (
