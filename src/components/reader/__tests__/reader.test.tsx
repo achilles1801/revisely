@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatusBar, StyleSheet, Text } from 'react-native';
+import { Animated, StatusBar, StyleSheet, Text } from 'react-native';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { PlayerCapsule, PlayerControls } from '../PlayerCapsule';
@@ -313,13 +313,27 @@ describe('<TimerChip />', () => {
       date: '2026-10-26',
       pagesVisited: [],
     };
-    const onOpenQuran = jest.fn();
-    withTheme(<TimerChip onOpenQuran={onOpenQuran} />);
-    fireEvent.press(await screen.findByLabelText(/Timer running/));
-    fireEvent.press(await screen.findByText('Open the Quran'));
-    expect(onOpenQuran).toHaveBeenCalled();
-    // The sheet slides away.
-    await waitFor(() => expect(screen.queryByText('Open the Quran')).toBeNull());
+    // The sheet's slide finishes at once here, so this doesn't hang on how
+    // fast the machine runs animation frames.
+    const timing = jest.spyOn(Animated, 'timing').mockImplementation(
+      () =>
+        ({
+          start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }),
+          stop: () => {},
+          reset: () => {},
+        }) as unknown as Animated.CompositeAnimation,
+    );
+    try {
+      const onOpenQuran = jest.fn();
+      withTheme(<TimerChip onOpenQuran={onOpenQuran} />);
+      fireEvent.press(await screen.findByLabelText(/Timer running/));
+      fireEvent.press(await screen.findByText('Open the Quran'));
+      expect(onOpenQuran).toHaveBeenCalled();
+      // The sheet slides away.
+      await waitFor(() => expect(screen.queryByText('Open the Quran')).toBeNull());
+    } finally {
+      timing.mockRestore();
+    }
   });
 
   it('running: the live clock', async () => {
