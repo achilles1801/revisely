@@ -147,9 +147,35 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - GitHub repository secrets: `EXPO_TOKEN`, and `GOOGLE_SERVICE_INFO_PLIST` (base64 of the plist).
   `eas build` resolves the native config on the runner before sending the build, which needs the
   plist at its fixed path, so the workflows write it from that secret first.
-- The repository is **public**. Check a diff for keys before pushing.
+- The repository is **public**. Check a diff for keys before pushing; CI's "Secret scan" fails on
+  anything that looks like one (`bash scripts/check-secrets.sh` runs it locally). A secret that was
+  committed must be revoked: deleting the line leaves it in git history.
+
+**App Check debug token** (development builds only). Simulators can't use App Attest, so `__DEV__`
+builds use App Check's debug provider with a token registered in the console. It is read from
+`EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN` in your local, gitignored `.env` (`src/lib/appCheck.ts`), never
+from the repo. Release builds (preview, production) never carry it: the value sits inside the
+`__DEV__` branch, which the release bundler removes (verified: a marker value set in the variable is
+absent from `npx expo export --platform ios` and present in `--dev`), and EAS has no such variable.
+To create one:
+1. Firebase Console → project revision-buddy-3a398 → App Check → Apps → the iOS app
+   (`com.revisionbuddy.app`) → ⋮ → **Manage debug tokens** → **Add debug token** → generate, name it
+   (e.g. "Majd's simulator"), copy the value, save.
+2. In `.env` at the repo root: `EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN=<the value>` (see `.env.example`).
+3. Restart Metro with a clean cache (`npx expo start --dev-client --clear`): `EXPO_PUBLIC_*` values are
+   inlined at bundle time.
+
+Without one, the SDK logs a new debug token at launch (Xcode console: "App Check debug token"),
+which you can register the same way. To revoke a token, delete it under Manage debug tokens. The old
+hard-coded token was deleted from the console on 2026-10-27.
 
 ## CI
+
+- "Secret scan" (`scripts/check-secrets.sh`): `git grep` over tracked files for high-signal secret
+  patterns (private keys, Google/Anthropic/OpenAI/GitHub/Sentry/AWS/Slack/Stripe/Expo tokens, The
+  Clear Quran keys, App Check debug-token assignments), printing paths and lines, never the match.
+  `--self-test` checks every pattern still catches a sample. Coverage reports aren't committed
+  (`coverage/` is ignored; CI uploads them as an artifact).
 
 - The app typecheck excludes `functions/` and `tests/firestore-rules/`. Each has its own
   dependencies and its own job.
