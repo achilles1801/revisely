@@ -19,7 +19,7 @@ import { DesignProvider } from '../DesignContext';
 import { ThemeProvider } from '../../context/ThemeContext';
 import { RoundButton } from '../../components/reader/RoundButton';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
-import { GuideSheet } from '../../components/v2/GuideSheet';
+import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { getReadPalette } from '../../theme/readPalette';
 import { getQuranData } from '../../lib/quranData';
 import { paletteDark, paletteLight } from '../../theme/v2';
@@ -87,12 +87,13 @@ describe('the session and reader in the new design', () => {
     expect(onMarkJuzComplete).toHaveBeenCalledWith(30);
   });
 
-  it('“How it works” is a sheet of steps with Got it', async () => {
-    const onClose = jest.fn();
-    render(v2(<GuideSheet visible onClose={onClose} title="How revision works" steps={[{ icon: 'book-outline', title: 'Swipe', body: 'Turn pages.' }]} />));
+  it('no help buttons: Keep daily amount says what it does under its label', async () => {
+    const onChange = jest.fn();
+    const { rerender } = render(v2(<CarryOverSetting mode="shift" onChange={onChange} />));
     await act(async () => {});
-    expect(screen.getByText('How revision works')).toBeTruthy();
-    fireEvent.press(screen.getByText('Got it'));
-    expect(onClose).toHaveBeenCalled();
+    expect(screen.queryByLabelText('What does Keep daily amount do?')).toBeNull();
+    expect(screen.getByTestId('carry-over-explainer').props.children).toMatch(/today stays its usual size/);
+    rerender(v2(<CarryOverSetting mode="add" onChange={onChange} />));
+    expect(screen.getByTestId('carry-over-explainer').props.children).toMatch(/go on top of today/);
   });
 });

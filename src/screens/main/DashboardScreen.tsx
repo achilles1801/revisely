@@ -51,13 +51,14 @@ import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useDesign } from '../../design/DesignContext';
 import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
-import { TodayThread } from '../../components/home/feed/TodayThread';
+import { TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
-import { MemorizedPost } from '../../components/home/feed/MemorizedPost';
+import { RecentSection } from '../../components/activity/ActivityItemRow';
+import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
+import { HeroGlow } from '../../components/v2/HeroGlow';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
-import { Tap } from '../../components/v2/Tap';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
@@ -600,14 +601,20 @@ export default function DashboardScreen() {
   );
 
   if (isNew) {
-    // The new design (design/DesignContext): a feed. Today is a thread (a post
-    // and a reply per juz), then Friday's Al-Kahf, memorization, and the last
-    // few sessions as posts; the full history is Activity's. Padding leaves the
-    // tab bar and the floating timer clear.
+    // The new design (design/DesignContext): a feed. Today in one post (its
+    // pages, the action, how much is memorized), Friday's Al-Kahf, then the
+    // last few sessions; the rest is behind "See all", searchable. A running
+    // timer shows in the top bar (there's no floating timer button).
     const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
+    const memorized =
+      homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized')
+        ? memorizedText(pages, homePrefs.metrics).body
+        : null;
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+        <HeroGlow />
         <TopBar
+          left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
           center={
             <Text style={[arabicV2(20), { color: palette.text }]} accessibilityLanguage="ar" testID="salam">
               السلام عليكم
@@ -623,12 +630,12 @@ export default function DashboardScreen() {
         <ScrollView
           ref={scrollRef}
           style={styles.scrollView}
-          contentContainerStyle={{ paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + layoutV2.rowPad }}
+          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
           testID="home-v2"
         >
           <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
-          <TodayThread
+          <TodayPost
             name={userName}
             initial={avatarInitial(userName, firebaseUser?.email)}
             status={todayStatus.status}
@@ -636,6 +643,7 @@ export default function DashboardScreen() {
             juzBreakdown={assignment.juzBreakdown}
             done={donePagesToday}
             streak={calculatedStreak}
+            memorized={memorized}
             onPrimary={handleCtaPress}
             onEditSchedule={() => navigation.navigate('PlanEdit')}
             onMemorization={() => navigation.navigate('Memorization')}
@@ -656,31 +664,24 @@ export default function DashboardScreen() {
             />
           )}
 
-          {homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized') && (
-            <MemorizedPost pages={pages} metrics={homePrefs.metrics} onPress={() => navigation.navigate('Memorization')} />
-          )}
-
-          {recent.length > 0 && (
-            <>
-              <View style={styles.recentHeaderV2}>
-                <Text style={[typeV2.name, { color: palette.text }]} accessibilityRole="header">
-                  Recent sessions
-                </Text>
-                <Tap onPress={() => navigation.navigate('Activity')} hitSlop={10} accessibilityRole="button" testID="see-all-sessions">
-                  <Text style={[typeV2.body, { color: palette.secondary }]}>See all</Text>
-                </Tap>
-              </View>
-              {recent.map((log) => (
-                <SessionPost
-                  key={log.id}
-                  log={log}
-                  today={revisionDay}
-                  onEdit={() => handleEditSession(log)}
-                  onDelete={() => deleteLog(log.id)}
-                />
-              ))}
-            </>
-          )}
+          <RecentSection
+            title="Recent sessions"
+            count={recent.length}
+            emptyText="No sessions yet. Start your first revision above."
+            onSeeAll={() => navigation.navigate('ActivityAll', { kind: 'revision' })}
+            testID="home-recent"
+          >
+            {recent.map((log, i) => (
+              <SessionPost
+                key={log.id}
+                log={log}
+                today={revisionDay}
+                onEdit={() => handleEditSession(log)}
+                onDelete={() => deleteLog(log.id)}
+                separator={i < recent.length - 1}
+              />
+            ))}
+          </RecentSection>
         </ScrollView>
         {editModal}
       </SafeAreaView>
@@ -1106,15 +1107,6 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
-    // The new design.
-    recentHeaderV2: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: layoutV2.gutter,
-      paddingTop: layoutV2.rowPad + 8,
-      paddingBottom: 4,
-    },
     content: {
       flexGrow: 1,
       paddingHorizontal: spacing.lg,

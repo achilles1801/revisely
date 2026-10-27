@@ -14,7 +14,7 @@ interface ThemeContextType {
   isDark: boolean;
   /** The classic token names (in the new design, the v2 palette under them). */
   theme: typeof colors;
-  /** The v2 palette (paper, ink, jade…) for components moved to the new design. */
+  /** The v2 palette (with the chosen accent) for components moved to the new design. */
   palette: PaletteV2;
   setThemeMode: (mode: ThemeMode) => void;
 }
@@ -35,7 +35,7 @@ export function systemAppearanceAvailable(): boolean {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { isNew } = useDesign();
+  const { isNew, accent } = useDesign();
   const system = useColorScheme();
   const [classicMode, setClassicMode] = useState<'light' | 'dark'>('dark');
   const [v2Mode, setV2Mode] = useState<ThemeMode>('system');
@@ -73,14 +73,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const v2Effective: ThemeMode = v2Mode === 'system' && !systemAppearanceAvailable() ? classicMode : v2Mode;
   const themeMode: ThemeMode = isNew ? v2Effective : classicMode;
   const isDark = themeMode === 'system' ? system === 'dark' : themeMode === 'dark';
-  const theme = isNew ? v2ThemeColors(isDark) : isDark ? darkColors : colors;
+  const theme = isNew ? v2ThemeColors(isDark, accent) : isDark ? darkColors : colors;
 
   if (!isLoaded) {
     return null; // or a loading screen
   }
 
   return (
-    <ThemeContext.Provider value={{ themeMode, isDark, theme, palette: paletteV2(isDark), setThemeMode }}>
+    <ThemeContext.Provider value={{ themeMode, isDark, theme, palette: paletteV2(isDark, accent), setThemeMode }}>
       {children}
     </ThemeContext.Provider>
   );

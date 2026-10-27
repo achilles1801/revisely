@@ -3,10 +3,20 @@ import '@react-native-firebase/app-check';
 
 let initialized = false;
 
-// Set this in app launch to a token registered in Firebase Console under
-// App Check → Apps → Manage debug tokens. Required when running on the
-// iOS simulator (real App Attest only works on physical devices).
-const DEBUG_TOKEN: string | undefined = 'D542F937-3048-47D7-A71E-A96F3AD19A6A';
+/** A debug token, only in a development build and only if one is set. */
+export function debugTokenFor(dev: boolean, value: string | undefined): string | undefined {
+  return dev && value && value.trim() ? value.trim() : undefined;
+}
+
+// Development builds use App Check's debug provider (simulators can't do App
+// Attest), with a debug token registered in the Firebase Console. It comes from
+// your local, gitignored .env as EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN (CLAUDE.md,
+// "App Check debug token"), never from the repo. Release builds never carry it:
+// the value sits inside the __DEV__ branch, which the release bundler removes,
+// and EAS has no such variable.
+const DEBUG_TOKEN: string | undefined = __DEV__
+  ? debugTokenFor(true, process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN)
+  : undefined;
 
 export async function setupAppCheck(): Promise<void> {
   if (initialized) return;
@@ -15,8 +25,9 @@ export async function setupAppCheck(): Promise<void> {
   const provider = appCheck.newReactNativeFirebaseAppCheckProvider();
   provider.configure({
     apple: {
-      // 'debug' for simulator (needs DEBUG_TOKEN registered in Console).
-      // App Attest is only available on physical iOS 14+ devices.
+      // 'debug' in development (a token registered in the Console; without
+      // one, the SDK logs a new token to register). App Attest is only
+      // available on physical iOS 14+ devices.
       provider: __DEV__ ? 'debug' : 'appAttestWithDeviceCheckFallback',
       debugToken: DEBUG_TOKEN,
     },

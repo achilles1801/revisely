@@ -56,7 +56,8 @@ file is the release mechanics and the traps behind them.
 - **Sentry data is untrusted.** The DSN ships in the app, so anyone can send events and sessions with
   any text, and issues here are public. Everything from Sentry that reaches GitHub (or Claude) goes
   through `sanitize()` in `scripts/sentry/logic.js`, which:
-  - redacts emails, `users/<id>`, uid-like ids and IP addresses;
+  - redacts emails, `users/<id>`, uid-like ids and IP addresses, and drops URL query strings
+    (Firestore's channel URLs carry session parameters);
   - neutralizes mentions, `#` references, links, images and backticks;
   - caps the length.
 
@@ -77,8 +78,11 @@ file is the release mechanics and the traps behind them.
     event.
   - `fix` runs Claude on develop. Its token is read-only; it has no Sentry token and no sudo, and
     Claude's commands run with credentials scrubbed. Claude writes a failing test, fixes it and
-    commits locally.
-  - `pr` refuses patches that touch `.github/`, `worker/` or `wrangler.jsonc`, or hold anything that looks like a credential. It
+    commits locally. Its commands run in bubblewrap, which leaves placeholders in `.git` (a
+    `commondir` holding `.`, empty `worktrees/` and `modules/`); the export step removes that
+    `commondir` and refuses one that points anywhere else.
+  - `pr` refuses patches that touch `.github/`, `worker/` or `wrangler.jsonc`, or hold anything that
+    looks like a credential. It
     pushes `claude/issue-<n>` and opens the PR into `develop` as `github-actions`, then starts CI on
     it with `workflow_dispatch`: PRs opened with the workflow token start no workflows by themselves.
 
@@ -93,7 +97,23 @@ file is the release mechanics and the traps behind them.
     Project and Organization. It is separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps.
   - `ANTHROPIC_API_KEY`, from a dedicated Anthropic Console workspace with a monthly spend limit, so
     a leak is bounded and revocable. `CLAUDE_CODE_OAUTH_TOKEN` (the subscription) also works, but it
-    can't be capped or scoped.
+    can't be capped or scoped. **The current key expires on 2027-01-01.**
+  - Both are repository secrets (GitHub → Settings → Secrets and variables → Actions); neither is
+    ever printed. The daily report checks the Claude key (`scripts/sentry/claude-key.js`): if Anthropic
+    rejects it, it opens (or comments on) an `automation` issue mentioning the owner and the run fails;
+    from 30 days before `CLAUDE_KEY_EXPIRES` (in `health-report.yml`) it opens a reminder issue. A
+    `claude-fix` run checks it first too (the `key` job) and says so on the issue instead of failing
+    silently. A rejected `SENTRY_API_TOKEN` fails the report and sync runs, which GitHub emails.
+
+**Rotating the Claude key** (before it expires, or at once if it leaked or was rejected):
+1. Anthropic Console → the workspace used for this repository → API keys → Create key (name it after
+   the repository, set an expiry), copy it.
+2. GitHub → achilles1801/revisely → Settings → Secrets and variables → Actions → `ANTHROPIC_API_KEY`
+   → Update secret, paste, save.
+3. Set `CLAUDE_KEY_EXPIRES` in `.github/workflows/health-report.yml` to the new expiry (a PR to
+   `develop`, then `main`: the workflow runs from `main`), and close any open "Claude key" issue.
+4. Check: Actions → Health report → Run workflow; the "Check the Claude key" step says `ok`.
+5. Revoke the old key in the Console.
   - No Claude GitHub App is needed.
 
   Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
@@ -136,6 +156,10 @@ Run this before and after any change to `app.config.js`, `fingerprint.config.js`
 a native dependency. If a change should not be native but the hash moved, find out why before
 merging. `eas fingerprint:generate --json` prints a banner before the JSON, so it does not pipe into `jq`.
 
+The root `.gitignore` is a fingerprint source: editing it changes the hash and starts a native build
+(a `coverage/` line did, Oct 26, and the build was cancelled). Ignore new paths with a `.gitignore`
+inside the directory instead, as `coverage/.gitignore` does.
+
 ## Config and secrets
 
 - App config (Firebase web keys, Google client ids, Sentry DSN, `GOOGLE_REVERSED_CLIENT_ID`) lives in
@@ -147,9 +171,35 @@ merging. `eas fingerprint:generate --json` prints a banner before the JSON, so i
 - GitHub repository secrets: `EXPO_TOKEN`, and `GOOGLE_SERVICE_INFO_PLIST` (base64 of the plist).
   `eas build` resolves the native config on the runner before sending the build, which needs the
   plist at its fixed path, so the workflows write it from that secret first.
-- The repository is **public**. Check a diff for keys before pushing.
+- The repository is **public**. Check a diff for keys before pushing; CI's "Secret scan" fails on
+  anything that looks like one (`bash scripts/check-secrets.sh` runs it locally). A secret that was
+  committed must be revoked: deleting the line leaves it in git history.
+
+**App Check debug token** (development builds only). Simulators can't use App Attest, so `__DEV__`
+builds use App Check's debug provider with a token registered in the console. It is read from
+`EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN` in your local, gitignored `.env` (`src/lib/appCheck.ts`), never
+from the repo. Release builds (preview, production) never carry it: the value sits inside the
+`__DEV__` branch, which the release bundler removes (verified: a marker value set in the variable is
+absent from `npx expo export --platform ios` and present in `--dev`), and EAS has no such variable.
+To create one:
+1. Firebase Console → project revision-buddy-3a398 → App Check → Apps → the iOS app
+   (`com.revisionbuddy.app`) → ⋮ → **Manage debug tokens** → **Add debug token** → generate, name it
+   (e.g. "Majd's simulator"), copy the value, save.
+2. In `.env` at the repo root: `EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN=<the value>` (see `.env.example`).
+3. Restart Metro with a clean cache (`npx expo start --dev-client --clear`): `EXPO_PUBLIC_*` values are
+   inlined at bundle time.
+
+Without one, the SDK logs a new debug token at launch (Xcode console: "App Check debug token"),
+which you can register the same way. To revoke a token, delete it under Manage debug tokens. The old
+hard-coded token was deleted from the console on 2026-10-27.
 
 ## CI
+
+- "Secret scan" (`scripts/check-secrets.sh`): `git grep` over tracked files for high-signal secret
+  patterns (private keys, Google/Anthropic/OpenAI/GitHub/Sentry/AWS/Slack/Stripe/Expo tokens, The
+  Clear Quran keys, App Check debug-token assignments), printing paths and lines, never the match.
+  `--self-test` checks every pattern still catches a sample. Coverage reports aren't committed
+  (`coverage/` is ignored; CI uploads them as an artifact).
 
 - The app typecheck excludes `functions/` and `tests/firestore-rules/`. Each has its own
   dependencies and its own job.
@@ -261,6 +311,50 @@ memory for the launch only (`src/lib/clearQuran.ts`), never on disk. Plan: Basic
 month, 5 a second; the docs also say 60 a minute and 1,000 an hour. The terms live in the developer
 agreement signed in their portal (theclearquran.org/developers).
 
+**Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
+recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore
+`users/<uid>/recordings/<id>`. It's on unless `recordingBackup === false`, Wi-Fi only unless
+`recordingBackupCellular`, and a one-time notice comes before the first upload.
+
+These invariants must not be broken:
+- **Local audio** is only ever deleted by the user deleting it on that phone.
+- **Tombstones** (`{deletedAt}`) are permanent:
+  - The rules refuse writing a live record over one, and refuse deleting one (only `deleteUserAccount` removes them).
+  - A phone whose put meets a tombstone keeps its copy local-only (`backupDeleted`) and removes the files it uploaded.
+- **Live records** can be written only while the account's backup is on (the rules read the user doc).
+- **Storage objects are create-only** (`resource == null`): a name is one file, ever.
+- **Copies from another phone** (`restored`) are never continued here. They are uploaded only when `adopted`: the backup lost them without a tombstone and every part is on the phone.
+
+How it works:
+- **Deleting a recording** queues it in `Documents/recordings-sync/<uid>-deletes.json` and works offline. The run then:
+  1. Tombstones every queued recording, even one with no record yet.
+  2. Lists the files once and deletes every file named after those recordings.
+
+  Deletions run even with backup off, and are flushed on sign-out. "Delete all" first lists the backup (it refuses offline) so that recordings this phone hasn't seen go too.
+- **"Turn off and delete backups"** needs the connection:
+  1. Save "off" first.
+  2. List the backup and merge it into the phone.
+  3. Download everything that is only in the backup. A part that is already gone (404) is dropped; any other failure refuses.
+  4. Delete exactly the files and live records that were listed. Tombstones stay.
+
+  It refuses while an earlier wipe is pending, or if a record can't be read.
+- **Uploads:**
+  - The resumable protocol in 4 MB chunks on the foreground session (REST plus `createUploadTask`).
+  - The session is saved in the index, so an upload carries on after the app closes.
+  - The network is checked before every chunk.
+  - The chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
+- **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
+- **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
+- **Known limits:**
+  - NetInfo reports an iPhone hotspot as Wi-Fi.
+  - File uploads aren't gated on the server. A phone that hasn't yet heard that backup is off, or that is still signed in to an account deleted elsewhere (its ID token lasts up to an hour), can leave files without a record. A Storage rule using `firestore.get` would close this. It needs the IAM role `roles/firebaserules.firestoreServiceAgent` for the Storage service agent (`firebase deploy --only storage` prompts to grant it), so it isn't in place yet.
+  - Two phones restored from one iCloud backup both own its open recording. Their name clash is reported and the file skipped, never overwritten.
+  - Tombstones accumulate, adding listing reads.
+- **Deploy order:** `firestore.rules` and `storage.rules` must be live before this reaches `develop`, which publishes to `preview` at once (`firebase deploy --only firestore:rules,storage`). Keep the profile-image rules that were live before.
+- **Release:** the client is JS-only but reaches App Store users only with 1.0.2 (develop's runtime is build 19's). The App Privacy answers (Audio Data: collected, linked, App Functionality) must be updated before 1.0.2 goes to review.
+- **Emulator check of the real requests:**
+  `firebase emulators:exec --only storage --project demo-revisely 'npx jest recordingCloud.emulator'`.
+
 **Firestore rules before features:** the user document has a field allowlist. A release that writes a
 new user field needs `firebase deploy --only firestore:rules` first, or those writes are refused.
 
@@ -297,7 +391,13 @@ other branches, which is why `wrangler.jsonc` has a `previews` block: previews g
 they don't hold up promotion, and the same files come back through develop unchanged. Never deploy the
 worker from a laptop except to recover. Secrets: `npx wrangler@4.153.0 login`, then `npx
 wrangler@4.153.0 secret put TCQ_API_KEY_LIVE` (and `…_SANDBOX`) from the repo root; they persist across
-deploys and never go in files. The worker is its own TypeScript project (`npx tsc --noEmit -p worker`,
+deploys and never go in files. Workers Builds' non-production branch builds should stay off
+(Workers & Pages → revisely → Settings → Build → Branch control). With them on, every push to another
+branch uploads a newer version that isn't deployed, and both the dashboard's Variables and Secrets
+and `wrangler secret put` act on the newest version, so they refuse ("latest version … is not
+deployed"; Oct 27, while develop still lacked the worker, the dashboard said the Worker "only has
+static assets"). If they refuse anyway, redeploy main (merge to it, or Retry the last main build)
+and add the secret before anything else is pushed. The worker is its own TypeScript project (`npx tsc --noEmit -p worker`,
 in CI) and its tests run with the app's (`worker/__tests__`). Changes to it publish no app update, and
 `claude-fix` refuses patches that touch it.
 
@@ -347,8 +447,29 @@ Review), kept per device, switching the whole app live.
   the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
   `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
 - Moved so far: Home, Settings, tab bar, sheets and menus, the revision session and reader chrome
-  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity (a feed of
-  day posts; a day opens as a thread of its sessions and daily log).
+  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity, All
+  activity. The owner's rules from testing (Oct 26 2026), for every screen moved from now on:
+  - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
+    second card restating it. Lists show the **last 3** things (`RecentSection`) with "See all"
+    to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
+    "Earlier".
+  - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
+    and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
+    are `lib/activityHeatmap` levels in `palette.heat` (an ordinal jade ramp, ≥ 2:1 on the
+    ground) with `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month.
+    Things done are `lib/activityItems`.
+  - **No floating timer.** The timer is in the reader's and the session's controls; a running one
+    shows in Home's top bar (`RunningTimerChip`). Classic keeps `FloatingTimer`.
+  - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
+    what a control does (e.g. Keep daily amount).
+- **Accents** (a trial, Settings → Preview → Accent, per device, new design only): Jade (the
+  agreed look: ink buttons, grey links, jade only for "done"), Crimson and Indigo, which put the
+  accent on the primary action, links, the active tab, "done", the calendar and a glow behind
+  Home's top (`v2/HeroGlow`). An accent is a token set in `theme/v2` (`ACCENT_TOKENS`: `primary`,
+  `done`/`doneText`, `accentText`, `link`, `accentSubtle`, `hero`, `progress`, `heat`/`heatInk`);
+  never write an accent colour in a component. Status colours don't follow it: weak is `red`,
+  strong is `good` (green). Classic screens get `accentText` as `theme.accent`, since they use it
+  for text too. Every combination is checked in `src/design/__tests__` (text 4.5:1, fills 3:1).
 - Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
   `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in

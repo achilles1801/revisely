@@ -17,7 +17,7 @@ import {
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
-import { layoutV2, typeV2 } from '../../theme/v2';
+import { ACCENT_LABELS, ACCENTS, AccentName, layoutV2, typeV2 } from '../../theme/v2';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
@@ -50,7 +50,9 @@ import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
 import { avatarInitial } from '../../lib/displayName';
 import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
+import { askTurnOffBackup, backupLabel, deleteAllEverywhere, useBackupStatus } from '../../lib/recordingBackupUi';
 import { formatBytes } from '../../lib/recordingFormat';
+import { logger } from '../../lib/logger';
 import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
@@ -325,12 +327,27 @@ export default function SettingsScreen() {
   const homePrefs = useHomePrefs();
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
-  const [recordings, setRecordings] = useState<{ count: number; bytes: number } | null>(null);
+  // On this phone: how many, their size here; how many are backed up, and how
+  // many are only in the backup (restored, not downloaded yet).
+  const [recordings, setRecordings] = useState<{
+    count: number;
+    bytes: number;
+    backedUp: number;
+    cloudOnly: number;
+  } | null>(null);
 
   const loadRecordings = useCallback(() => {
     listRecordings()
       .then((list) =>
-        setRecordings({ count: list.length, bytes: list.reduce((sum, r) => sum + r.sizeBytes, 0) }),
+        setRecordings({
+          count: list.length,
+          bytes: list.reduce(
+            (sum, r) => sum + (r.segments.every((sg) => sg.local) ? r.sizeBytes : 0),
+            0,
+          ),
+          backedUp: list.filter((r) => r.backedUp).length,
+          cloudOnly: list.filter((r) => r.segments.some((sg) => !sg.local)).length,
+        }),
       )
       .catch(() => setRecordings(null));
   }, []);
@@ -393,6 +410,15 @@ export default function SettingsScreen() {
     const trimmed = tempName.trim();
     await updateUser({ name: trimmed.length > 0 ? trimmed : undefined });
     setShowNameModal(false);
+  };
+
+  // Recording backup (lib/recordingBackup): on by default.
+  const backupStatus = useBackupStatus();
+  const handleBackupToggle = (on: boolean) => {
+    const save = (value: boolean) =>
+      updateUser({ recordingBackup: value }).catch((err) => logger.warn('Could not change backup', err));
+    if (on) save(true);
+    else if (firebaseUser) askTurnOffBackup(firebaseUser.uid, () => save(false), recordings?.cloudOnly ?? 0);
   };
 
   const handleSubmitFeedback = async () => {
@@ -539,7 +565,7 @@ export default function SettingsScreen() {
             <Row
               icon="flask-outline"
               label="New design (preview)"
-              isLast
+              isLast={!design.isNew}
               rightSlot={
                 <SettingSwitch
                   value={design.isNew}
@@ -549,6 +575,21 @@ export default function SettingsScreen() {
                 />
               }
             />
+            {design.isNew && (
+              // A trial: the colour on actions, links, the active tab, "done"
+              // and the calendar (theme/v2 ACCENT_TOKENS).
+              <View style={[styles.row, { borderBottomWidth: 0 }]} testID="accent-row">
+                <SettingIcon name="color-filter-outline" tileStyle={styles.rowIcon} />
+                <View style={styles.rowText}>
+                  <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
+                </View>
+                <ThemeSegmentedControl<AccentName>
+                  value={design.accent}
+                  onChange={design.setAccent}
+                  options={ACCENTS.map((a) => ({ value: a, label: ACCENT_LABELS[a] }))}
+                />
+              </View>
+            )}
           </Section>
         )}
 
@@ -623,25 +664,62 @@ export default function SettingsScreen() {
                 ? () =>
                     Alert.alert(
                       'Recordings',
-                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(recordings.bytes)}), stored only on this phone. They're listed by day in Activity.`,
+                      `${recordings.count} recording${recordings.count === 1 ? '' : 's'} (${formatBytes(
+                        recordings.bytes,
+                      )} on this phone). ${
+                        recordings.backedUp === recordings.count
+                          ? recordings.count === 1
+                            ? 'It is backed up to your account.'
+                            : 'All are backed up to your account.'
+                          : recordings.backedUp > 0
+                            ? `${recordings.backedUp} of them are backed up to your account.`
+                            : 'They are on this phone only.'
+                      }${
+                        recordings.cloudOnly > 0
+                          ? ` ${recordings.cloudOnly} download${recordings.cloudOnly === 1 ? 's' : ''} from your backup when played.`
+                          : ''
+                      } They're listed by day in Activity.`,
                       [
                         { text: 'Open Activity', onPress: () => navigation.navigate('Activity') },
                         {
                           text: 'Delete all',
                           style: 'destructive',
                           onPress: () =>
-                            Alert.alert('Delete all recordings?', "This can't be undone.", [
+                            Alert.alert(
+                              'Delete all recordings?',
+                              "From this phone and from your backup. This can't be undone.",
+                              [
                               { text: 'Cancel', style: 'cancel' },
                               {
                                 text: 'Delete all',
                                 style: 'destructive',
                                 onPress: async () => {
-                                  // The whole folder, including any file not in the index.
-                                  await deleteAllRecordings();
-                                  loadRecordings();
+                                  // The whole folder, including any file not in the index,
+                                  // and the backup (listed first, for recordings not seen here).
+                                  const uid = firebaseUser?.uid;
+                                  if (uid && (await deleteAllEverywhere(uid))) {
+                                    loadRecordings();
+                                    return;
+                                  }
+                                  Alert.alert(
+                                    'Couldn’t reach your backup',
+                                    'Nothing was deleted. Delete the recordings on this phone only? Those in your backup stay there.',
+                                    [
+                                      { text: 'Cancel', style: 'cancel' },
+                                      {
+                                        text: 'Delete on this phone',
+                                        style: 'destructive',
+                                        onPress: async () => {
+                                          await deleteAllRecordings(uid);
+                                          loadRecordings();
+                                        },
+                                      },
+                                    ],
+                                  );
                                 },
                               },
-                            ]),
+                              ],
+                            ),
                         },
                         { text: 'Cancel', style: 'cancel' },
                       ],
@@ -649,6 +727,35 @@ export default function SettingsScreen() {
                 : undefined
             }
           />
+          <Row
+            icon="cloud-upload-outline"
+            label="Back up recordings"
+            value={localUser.recordingBackup !== false ? backupLabel(backupStatus) : undefined}
+            rightSlot={
+              <SettingSwitch
+                value={localUser.recordingBackup !== false}
+                onValueChange={handleBackupToggle}
+                accessibilityLabel="Back up recordings to your account"
+              />
+            }
+          />
+          {localUser.recordingBackup !== false && (
+            <Row
+              icon="cellular-outline"
+              label="Back up over mobile data"
+              rightSlot={
+                <SettingSwitch
+                  value={localUser.recordingBackupCellular === true}
+                  onValueChange={(v) =>
+                    updateUser({ recordingBackupCellular: v }).catch((err) =>
+                      logger.warn('Could not change mobile data backup', err),
+                    )
+                  }
+                  accessibilityLabel="Back up recordings over mobile data"
+                />
+              }
+            />
+          )}
           <Row
             icon="hourglass-outline"
             label="Time in app"
@@ -755,7 +862,7 @@ export default function SettingsScreen() {
               </Text>
             )}
           </View>
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />
+          {!design.isNew && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />}
           <CarryOverSetting
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}

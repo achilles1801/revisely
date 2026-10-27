@@ -3,6 +3,7 @@ import { setGlobalOptions } from 'firebase-functions/v2';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -16,14 +17,17 @@ const adminDb = getFirestore();
  * Required by Apple App Store guideline 5.1.1(v).
  *
  * Deletes (in order):
- *  1. users/{uid}/pages/* — page progress docs
- *  2. users/{uid}/sessions/* — session docs
- *  3. users/{uid}/journal/* — daily journal entries
- *  4. users/{uid}/readingSessions/* — reading timer sessions
- *  5. users/{uid}/stats/* — app usage totals
- *  6. users/{uid}/_quota/* — legacy rate-limit counter docs (if any)
- *  7. users/{uid} — user profile doc
- *  8. Firebase Auth user
+ *  1. Storage recordings/{uid}/ — the audio of backed-up recordings. First, so
+ *     that if it fails nothing else is gone yet and a retry starts over.
+ *  2. users/{uid}/pages/* — page progress docs
+ *  3. users/{uid}/sessions/* — session docs
+ *  4. users/{uid}/journal/* — daily journal entries
+ *  5. users/{uid}/readingSessions/* — reading timer sessions
+ *  6. users/{uid}/stats/* — app usage totals
+ *  7. users/{uid}/_quota/* — legacy rate-limit counter docs (if any)
+ *  8. users/{uid}/recordings/* — the records of backed-up recordings
+ *  9. users/{uid} — user profile doc
+ * 10. Firebase Auth user
  *
  * Requires App Check to prevent abuse: an attacker with a stolen ID token
  * could otherwise use this to delete arbitrary accounts they happen to control.
@@ -48,12 +52,16 @@ export const deleteUserAccount = onCall(
       }
     }
 
+    // The default bucket (from FIREBASE_CONFIG). The slash keeps it to this account.
+    await getStorage().bucket().deleteFiles({ prefix: `recordings/${uid}/` });
+
     await deleteSubcollection('pages');
     await deleteSubcollection('sessions');
     await deleteSubcollection('journal');
     await deleteSubcollection('readingSessions');
     await deleteSubcollection('stats');
     await deleteSubcollection('_quota');
+    await deleteSubcollection('recordings');
 
     await userRef.delete();
 

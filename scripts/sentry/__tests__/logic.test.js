@@ -205,6 +205,14 @@ describe('event details for the fix job', () => {
             values: [
               { timestamp: '2026-10-24T12:37:17Z', category: 'navigation', message: 'opened users/T3stUid0000000000000000000a1' },
               { category: 'http', data: { url: 'https://api.example/x', email: 'a@b.co', status_code: 403 } },
+              {
+                category: 'xhr',
+                data: {
+                  method: 'POST',
+                  url: 'https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?gsessionid=Gs3ss10nPar4mXyz&SID=s1dV4lue&%24httpHeaders=Authorization%3ABearer%20eyJhbGciOi.payload.sig',
+                  status_code: 200,
+                },
+              },
             ],
           },
         },
@@ -218,6 +226,12 @@ describe('event details for the fix job', () => {
     expect(d.ota_updates).toMatchObject({ update_id: 'e58fdbea' });
     expect(d.breadcrumbs[0]).toContain('users/<id>');
     expect(d.breadcrumbs[1]).toContain('403');
+    // URLs keep their path, never their query (session parameters, headers, tokens).
+    expect(d.breadcrumbs[2]).toContain('firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?…');
+    expect(d.breadcrumbs[2]).toContain('200');
+    for (const leak of ['gsessionid', 'Gs3ss10nPar4mXyz', 'SID=', 's1dV4lue', 'httpHeaders', 'Bearer', 'eyJhbGciOi']) {
+      expect(json).not.toContain(leak);
+    }
     for (const secret of ['T3stUid0000000000000000000a1', '203.0.113.7', 'Testville', 'a@b.co', 'someone@example.com']) {
       expect(json).not.toContain(secret);
     }

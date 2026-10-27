@@ -14,7 +14,53 @@
 import { TextStyle } from 'react-native';
 import type { ThemeColors } from './colors';
 
-export interface PaletteV2 {
+/**
+ * The accent, chosen in Settings → Preview (testers): Jade is the design as
+ * agreed (ink buttons, jade only for "done"); Crimson and Indigo are trials
+ * that put the accent on the primary action, links, the active tab, "done",
+ * the calendar and a glow behind Today.
+ */
+export type AccentName = 'jade' | 'crimson' | 'indigo';
+export const ACCENTS: AccentName[] = ['jade', 'crimson', 'indigo'];
+export const ACCENT_LABELS: Record<AccentName, string> = { jade: 'Jade', crimson: 'Crimson', indigo: 'Indigo' };
+
+/** A glow's colour stops, centre (offset 0) to edge (offset 1). */
+export type HeroStops = readonly { offset: number; color: string; opacity: number }[];
+
+/** What an accent sets. Every coloured thing in the new design reads one of these. */
+interface AccentTokens {
+  /** The primary action's fill (solid buttons, chosen pills, switches) and what's on it. */
+  primary: string;
+  onPrimary: string;
+  /** "Done" fills (the check, a revised page) and the glyph on them. A fill, not a text colour. */
+  done: string;
+  onDone: string;
+  /** "Done" as text (≥ 4.5:1 on every ground). */
+  doneText: string;
+  /** Text in the accent: the active tab, highlighted words (≥ 4.5:1 on every ground). */
+  accentText: string;
+  /** Text on an `accentText` fill (≥ 4.5:1). */
+  onAccentText: string;
+  /** Links ("See all"; ≥ 4.5:1). */
+  link: string;
+  /** A tinted ground (a selected row, a chip). */
+  accentSubtle: string;
+  /** The glow behind Home's Today post; null for none. */
+  hero: HeroStops | null;
+  /** A progress fill, start to end. */
+  progress: readonly [string, string];
+  /**
+   * Activity's calendar: an empty day, then four steps of the accent, more
+   * activity reading darker (light) or brighter (dark). Checked as an ordinal
+   * ramp: one hue, monotone lightness, the first step ≥ 2:1 on the ground.
+   */
+  heat: readonly [string, string, string, string, string];
+  /** A day's number on each `heat` step (≥ 4.5:1). */
+  heatInk: readonly [string, string, string, string, string];
+}
+
+export interface PaletteV2 extends AccentTokens {
+  accent: AccentName;
   /** Screen ground. */
   bg: string;
   text: string;
@@ -24,10 +70,11 @@ export interface PaletteV2 {
   separator: string;
   /** Destructive actions and errors. */
   red: string;
-  /** Revisely jade, for "done" only. */
-  done: string;
-  /** Text or a glyph on `done`. */
-  onDone: string;
+  /**
+   * Status "good" (a strong page, a positive figure): green whatever the
+   * accent, as status colours never follow it (weak is `red`).
+   */
+  good: string;
   /** Marks, chips, the Cancel bar: a quiet fill on the ground. */
   fill: string;
   /** Sheets and menus. */
@@ -36,50 +83,175 @@ export interface PaletteV2 {
   handle: string;
   /** Dimmed backdrop behind a sheet. */
   overlay: string;
-  /** The primary (solid) button. */
-  primary: string;
-  onPrimary: string;
 }
 
-export const paletteLight: PaletteV2 = {
+type Base = Omit<PaletteV2, keyof AccentTokens | 'accent'>;
+
+const BASE_LIGHT: Base = {
   bg: '#FFFFFF',
   text: '#1A1A1A',
   secondary: '#6B7280',
   separator: '#E5E7EB',
   red: '#DC2626',
-  done: '#0E6B5A',
-  onDone: '#FFFFFF',
+  good: '#0E6B5A',
   fill: '#F7F7F8',
   sheet: '#FFFFFF',
   handle: '#D1D5DB',
   overlay: 'rgba(0,0,0,0.4)',
-  primary: '#1A1A1A',
-  onPrimary: '#FFFFFF',
 };
 
-export const paletteDark: PaletteV2 = {
+const BASE_DARK: Base = {
   bg: '#000000',
   text: '#FFFFFF',
   secondary: '#8A8A93',
   separator: '#1F1F1F',
   red: '#F87171',
-  done: '#4DBA9F',
-  onDone: '#000000',
+  good: '#4DBA9F',
   fill: '#181818',
   sheet: '#101010',
   handle: '#3A3A3C',
   overlay: 'rgba(0,0,0,0.6)',
-  primary: '#FFFFFF',
-  onPrimary: '#000000',
 };
 
-export function paletteV2(isDark: boolean): PaletteV2 {
-  return isDark ? paletteDark : paletteLight;
+const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentTokens }> = {
+  // As agreed: ink buttons and links in grey; jade only means "done".
+  jade: {
+    light: {
+      primary: '#1A1A1A',
+      onPrimary: '#FFFFFF',
+      done: '#0E6B5A',
+      onDone: '#FFFFFF',
+      doneText: '#0E6B5A',
+      accentText: '#1A1A1A',
+      onAccentText: '#FFFFFF',
+      link: '#6B7280',
+      accentSubtle: '#F7F7F8',
+      hero: null,
+      progress: ['#0E6B5A', '#0E6B5A'],
+      heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
+      heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
+    },
+    dark: {
+      primary: '#FFFFFF',
+      onPrimary: '#000000',
+      done: '#4DBA9F',
+      onDone: '#000000',
+      doneText: '#4DBA9F',
+      accentText: '#FFFFFF',
+      onAccentText: '#000000',
+      link: '#8A8A93',
+      accentSubtle: '#181818',
+      hero: null,
+      progress: ['#4DBA9F', '#4DBA9F'],
+      heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
+      heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
+    },
+  },
+  // RedotPay, from colours sampled off its screens: #DC1433 for the action,
+  // links and active state (white on it 5.0:1), deep wine #3E0812 / #33080E /
+  // #2E0E15 for the glow, tints and an empty day. Text on dark is #F03C56, the
+  // same hue made light enough for 4.5:1 on the darkest fill.
+  crimson: {
+    light: {
+      primary: '#DC1433',
+      onPrimary: '#FFFFFF',
+      done: '#DC1433',
+      onDone: '#FFFFFF',
+      doneText: '#DC1433',
+      accentText: '#DC1433',
+      onAccentText: '#FFFFFF',
+      link: '#DC1433',
+      accentSubtle: '#FCE8EB',
+      hero: [
+        { offset: 0, color: '#DC1433', opacity: 0.1 },
+        { offset: 1, color: '#DC1433', opacity: 0 },
+      ],
+      progress: ['#3E0812', '#DC1433'],
+      heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
+      heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
+    },
+    dark: {
+      primary: '#DC1433',
+      onPrimary: '#FFFFFF',
+      done: '#DC1433',
+      onDone: '#FFFFFF',
+      doneText: '#F03C56',
+      accentText: '#F03C56',
+      onAccentText: '#000000',
+      link: '#F03C56',
+      accentSubtle: '#2E0E15',
+      hero: [
+        { offset: 0, color: '#3E0812', opacity: 1 },
+        { offset: 0.5, color: '#33080E', opacity: 0.6 },
+        { offset: 1, color: '#2E0E15', opacity: 0 },
+      ],
+      progress: ['#3E0812', '#DC1433'],
+      heat: ['#2E0E15', '#8A0E26', '#B3112C', '#DC1433', '#F5455E'],
+      heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000'],
+    },
+  },
+  // The real-estate app, from sampled colours: #624BD5 for the action (white
+  // on it 6.0:1), electric #2E0EC6 and muted #3A2694 for the glow and strong
+  // fills, lavender #9789DA for text on dark (#624BD5 there is 3.5:1).
+  indigo: {
+    light: {
+      primary: '#624BD5',
+      onPrimary: '#FFFFFF',
+      done: '#624BD5',
+      onDone: '#FFFFFF',
+      doneText: '#624BD5',
+      accentText: '#624BD5',
+      onAccentText: '#FFFFFF',
+      link: '#624BD5',
+      accentSubtle: '#EFECFB',
+      hero: [
+        { offset: 0, color: '#624BD5', opacity: 0.1 },
+        { offset: 1, color: '#624BD5', opacity: 0 },
+      ],
+      progress: ['#2E0EC6', '#9789DA'],
+      heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
+      heatInk: ['#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
+    },
+    dark: {
+      primary: '#624BD5',
+      onPrimary: '#FFFFFF',
+      done: '#624BD5',
+      onDone: '#FFFFFF',
+      doneText: '#9789DA',
+      accentText: '#9789DA',
+      onAccentText: '#000000',
+      link: '#9789DA',
+      accentSubtle: '#16113A',
+      hero: [
+        { offset: 0, color: '#2E0EC6', opacity: 0.45 },
+        { offset: 0.5, color: '#3A2694', opacity: 0.3 },
+        { offset: 1, color: '#3A2694', opacity: 0 },
+      ],
+      progress: ['#2E0EC6', '#9789DA'],
+      heat: ['#1C1C1E', '#3F2AA2', '#624BD5', '#7E6CD8', '#9789DA'],
+      heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
+    },
+  },
+};
+
+const PALETTES = Object.fromEntries(
+  ACCENTS.flatMap((a) => [
+    [`${a}-light`, { ...BASE_LIGHT, ...ACCENT_TOKENS[a].light, accent: a }],
+    [`${a}-dark`, { ...BASE_DARK, ...ACCENT_TOKENS[a].dark, accent: a }],
+  ]),
+) as Record<string, PaletteV2>;
+
+export function paletteV2(isDark: boolean, accent: AccentName = 'jade'): PaletteV2 {
+  return PALETTES[`${accent}-${isDark ? 'dark' : 'light'}`];
 }
 
+/** Jade, the default. */
+export const paletteLight: PaletteV2 = paletteV2(false);
+export const paletteDark: PaletteV2 = paletteV2(true);
+
 /** The v2 palette under the classic token names, for screens not yet moved. */
-export function v2ThemeColors(isDark: boolean): ThemeColors {
-  const p = paletteV2(isDark);
+export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): ThemeColors {
+  const p = paletteV2(isDark, accent);
   return {
     bg: p.bg,
     bgAlt: p.fill,
@@ -89,12 +261,13 @@ export function v2ThemeColors(isDark: boolean): ThemeColors {
     textSecondary: p.secondary,
     textMuted: p.secondary,
     textInverse: p.bg,
-    // No accent tint: what was jade is the ink (solid black, white in dark).
-    accent: p.primary,
-    accentSoft: p.fill,
-    onAccent: p.onPrimary,
+    // Classic screens use their accent for text as well as fills, so they get
+    // the text-safe one: the ink with Jade, the accent's text colour otherwise.
+    accent: p.accentText,
+    accentSoft: p.accentSubtle,
+    onAccent: p.onAccentText,
     gold: p.text,
-    success: p.done,
+    success: p.doneText,
     successBg: p.fill,
     warning: isDark ? '#FBBF24' : '#B45309',
     warningBg: p.fill,

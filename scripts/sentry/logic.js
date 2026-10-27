@@ -23,6 +23,9 @@ function trackedSentryId(body) {
 }
 
 const REDACTIONS = [
+  // Query strings and fragments of URLs: they carry session ids and tokens (Firestore's channel
+  // URLs hold its session parameters, and with the web SDK its request headers). Path kept.
+  [/\b(https?:\/\/[^\s?#"'<>`]+)[?#][^\s"'<>`]*/gi, '$1?…'],
   [/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '<email>'],
   [/\busers\/[^/\s'"`)\]]+/g, 'users/<id>'],
   [/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '<ip>'],
@@ -32,8 +35,8 @@ const REDACTIONS = [
 ];
 
 /**
- * Untrusted text made safe to show on GitHub: control and invisible characters removed, emails,
- * users/<id> paths, uid-like ids and IP addresses redacted, markdown links and images reduced to
+ * Untrusted text made safe to show on GitHub: control and invisible characters removed, URL query
+ * strings dropped, emails, users/<id> paths, uid-like ids and IP addresses redacted, markdown links and images reduced to
  * their text, backticks replaced (so it can't open or close code), @mentions and #references
  * neutralized, and the length capped. `multiline` keeps line breaks (for fenced blocks).
  */

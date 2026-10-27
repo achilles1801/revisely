@@ -314,7 +314,7 @@ export default function ActivityDayScreen() {
         ) : (
           <ScrollView
             ref={scrollRef}
-            contentContainerStyle={{ paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + layoutV2.rowPad }}
+            contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}

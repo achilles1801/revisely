@@ -21,12 +21,11 @@ import { makeHaptics } from '../haptics';
 import { testerToolsAllowed } from '../../lib/testerTools';
 import { ThemeProvider, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
-import { TodayThread, juzReplies, todayText } from '../../components/home/feed/TodayThread';
-import { sessionText } from '../../components/home/feed/SessionPost';
-import { memorizedText } from '../../components/home/feed/MemorizedPost';
+import { TodayPost, juzLabel, memorizedText, todayText } from '../../components/home/feed/TodayPost';
+import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { dayAgo } from '../../lib/dayAgo';
-import { paletteDark, paletteLight, v2ThemeColors } from '../../theme/v2';
+import { ACCENTS, AccentName, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
 import type { RevisionLog, UserPage } from '../../types';
 
 beforeEach(async () => {
@@ -151,24 +150,94 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(paletteDark.primary).toBe('#FFFFFF');
   });
 
-  it.each([
-    ['light', paletteLight, false],
-    ['dark', paletteDark, true],
-  ] as const)('%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets', (_name, p, isDark) => {
+  const combos = ACCENTS.flatMap((a) => [
+    [`${a}, light`, a, false],
+    [`${a}, dark`, a, true],
+  ]) as [string, AccentName, boolean][];
+
+  it.each(combos)('%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets', (_name, accent, isDark) => {
+    const p = paletteV2(isDark, accent);
     for (const ground of [p.bg, p.fill, p.sheet]) {
-      for (const ink of [p.text, p.secondary, p.red, p.done]) {
+      for (const ink of [p.text, p.secondary, p.red, p.good, p.doneText, p.accentText, p.link]) {
         expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
       }
     }
+    // Labels and glyphs on the accent's fills.
     expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.onAccentText, p.accentText)).toBeGreaterThanOrEqual(4.5);
+    // The fills themselves stand out from the ground (non-text, 3:1).
+    expect(contrast(p.primary, p.bg)).toBeGreaterThanOrEqual(3);
+    expect(contrast(p.done, p.bg)).toBeGreaterThanOrEqual(3);
+    // A day's number on each shade of Activity's calendar.
+    p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
     // Screens not moved yet get the same colours under the classic names.
-    const c = v2ThemeColors(isDark);
-    for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success]) {
+    const c = v2ThemeColors(isDark, accent);
+    for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success, c.accent]) {
       expect(contrast(ink, c.bg)).toBeGreaterThanOrEqual(4.5);
     }
     expect(contrast(c.onAccent, c.accent)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('Jade is the design as agreed: ink buttons, grey links, no glow', () => {
+    expect([paletteLight.primary, paletteLight.link, paletteLight.done, paletteLight.hero]).toEqual(['#1A1A1A', '#6B7280', '#0E6B5A', null]);
+    expect([paletteDark.primary, paletteDark.link, paletteDark.done, paletteDark.hero]).toEqual(['#FFFFFF', '#8A8A93', '#4DBA9F', null]);
+    // Classic names, as before the accents.
+    expect(v2ThemeColors(false).accent).toBe('#1A1A1A');
+    expect(v2ThemeColors(true).accent).toBe('#FFFFFF');
+  });
+
+  it('Crimson and Indigo start from the colours sampled off the reference apps', () => {
+    const crimson = paletteV2(true, 'crimson');
+    expect([crimson.primary, crimson.done, crimson.link, crimson.accentSubtle]).toEqual(['#DC1433', '#DC1433', '#F03C56', '#2E0E15']);
+    expect(crimson.hero?.map((s) => s.color)).toEqual(['#3E0812', '#33080E', '#2E0E15']);
+    expect(paletteV2(false, 'crimson').link).toBe('#DC1433');
+    const indigo = paletteV2(true, 'indigo');
+    expect([indigo.primary, indigo.done, indigo.link]).toEqual(['#624BD5', '#624BD5', '#9789DA']);
+    expect(indigo.hero?.[0].color).toBe('#2E0EC6');
+    expect(paletteV2(false, 'indigo').heat.slice(1, 4)).toEqual(['#9789DA', '#624BD5', '#2E0EC6']);
+  });
+});
+
+describe('the accent (Settings → Preview)', () => {
+  function AccentProbe() {
+    const { accent, setAccent } = useDesign();
+    const { palette, theme } = useTheme();
+    return (
+      <>
+        <Text testID="accent">{`${accent}|${palette.primary}|${theme.accent}`}</Text>
+        <Text onPress={() => setAccent('crimson')}>crimson</Text>
+      </>
+    );
+  }
+
+  it('switches the whole palette live and is kept on the device', async () => {
+    await AsyncStorage.setItem('@revisely_theme_v2', 'light');
+    render(
+      <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+        <ThemeProvider>
+          <AccentProbe />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('accent').props.children).toBe('jade|#1A1A1A|#1A1A1A');
+    fireEvent.press(screen.getByText('crimson'));
+    expect(screen.getByTestId('accent').props.children).toBe('crimson|#DC1433|#DC1433');
+    expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
+  });
+
+  it('is Jade outside the new design, whatever was chosen', async () => {
+    render(
+      <DesignProvider initial={{ allowed: true, chosen: 'classic', accent: 'indigo' }}>
+        <ThemeProvider>
+          <AccentProbe />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('accent').props.children).toMatch(/^jade\|/);
   });
 });
 
@@ -216,36 +285,33 @@ const wrap = (ui: React.ReactElement) => (
 
 describe('Home in the new design (a feed)', () => {
   beforeEach(() => AsyncStorage.setItem('@revisely_theme_v2', 'light'));
-  it('today is real pages and surahs, never "Juz 27 + 1 more"', () => {
+  it('today is real pages, juz and surahs in one post, never "Juz 27 + 1 more"', () => {
     const pages = Array.from({ length: 20 }, (_, i) => 503 + i);
-    expect(todayText('not_started', pages, new Set())).toEqual({
+    const juz = [
+      { juz: 26, pages: pages.slice(0, 19) },
+      { juz: 27, pages: pages.slice(19) },
+    ];
+    expect(todayText('not_started', pages, new Set(), juz)).toEqual({
       title: 'Pages 503–522',
-      detail: 'Al-Ahqaf to Adh-Dhariyat · 20 pages',
+      detail: '20 pages · Juz 26–27 · Al-Ahqaf to Adh-Dhariyat',
       cta: 'Start revision',
       solid: true,
     });
-    expect(todayText('partial', pages, new Set([503, 504])).detail).toBe('2 of 20 done · Al-Ahqaf to Adh-Dhariyat');
+    expect(todayText('partial', pages, new Set([503, 504]), juz).detail).toBe('2 of 20 done · Juz 26–27 · Al-Ahqaf to Adh-Dhariyat');
     expect(todayText('completed', pages, new Set(pages))).toMatchObject({ title: 'Done for today', solid: false });
     expect(todayText('not_started', [], new Set()).title).toBe('Nothing to revise yet');
   });
 
-  it('a reply per juz, done (jade) once all its pages are', () => {
-    const replies = juzReplies(
-      [
-        { juz: 26, pages: [520, 521] },
-        { juz: 27, pages: [522, 523, 524] },
-      ],
-      new Set([520, 521, 522]),
-    );
-    expect(replies.map((r) => [r.juz, r.complete, r.meta])).toEqual([
-      [26, true, '2 of 2 done'],
-      [27, false, '1 of 3 done'],
-    ]);
-    expect(replies[1].body).toBe('Pages 522–524 · Adh-Dhariyat to At-Tur');
+  it('names the juz briefly', () => {
+    expect(juzLabel([{ juz: 30 }])).toBe('Juz 30');
+    expect(juzLabel([{ juz: 27 }, { juz: 26 }])).toBe('Juz 26–27');
+    expect(juzLabel([{ juz: 3 }, { juz: 7 }])).toBe('Juz 3, 7');
+    expect(juzLabel([{ juz: 1 }, { juz: 3 }, { juz: 5 }, { juz: 9 }])).toBe('4 juz');
+    expect(juzLabel([])).toBe('');
   });
 
-  const thread = (over: Partial<React.ComponentProps<typeof TodayThread>> = {}) => {
-    const props: React.ComponentProps<typeof TodayThread> = {
+  const post = (over: Partial<React.ComponentProps<typeof TodayPost>> = {}) => {
+    const props: React.ComponentProps<typeof TodayPost> = {
       name: 'Karim',
       initial: 'K',
       status: 'partial',
@@ -256,6 +322,7 @@ describe('Home in the new design (a feed)', () => {
       ],
       done: new Set([520, 521]),
       streak: 7,
+      memorized: '8.1 of 30 juz · 166 of 604 pages',
       onPrimary: jest.fn(),
       onEditSchedule: jest.fn(),
       onMemorization: jest.fn(),
@@ -266,26 +333,34 @@ describe('Home in the new design (a feed)', () => {
       shifting: false,
       ...over,
     };
-    render(wrap(<TodayThread {...props} />));
+    render(wrap(<TodayPost {...props} />));
     return props;
   };
 
-  it('today is a thread: a post, then the juz joined by the thread line', async () => {
-    const props = thread();
+  it('today is one post: the pages, the action, and how much is memorized (no juz replies)', async () => {
+    const props = post();
     await act(async () => {});
     expect(screen.getByText('Karim')).toBeTruthy();
     expect(screen.getByText('Today · 7-day streak')).toBeTruthy();
-    expect(screen.getAllByTestId('juz-done', { includeHiddenElements: true })).toHaveLength(1);
-    expect(screen.getAllByTestId('juz', { includeHiddenElements: true })).toHaveLength(1);
-    // post → juz 26 → juz 27: a line below the post, above and below 26, above 27.
-    expect(screen.getAllByTestId('thread-line')).toHaveLength(4);
+    expect(screen.getByText('2 of 3 done · Juz 26–27 · Qaf to Adh-Dhariyat')).toBeTruthy();
+    expect(screen.queryByTestId('thread-line')).toBeNull();
+    expect(screen.queryByText('Juz 26')).toBeNull();
     fireEvent.press(screen.getByTestId('today-cta'));
     expect(props.onPrimary).toHaveBeenCalled();
     expect(screen.queryByTestId('today-carry-over')).toBeNull();
+    expect(screen.getByText('Memorized 8.1 of 30 juz · 166 of 604 pages')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('today-memorized'));
+    expect(props.onMemorization).toHaveBeenCalled();
+  });
+
+  it('leaves memorized out when Settings turns it off', async () => {
+    post({ memorized: null });
+    await act(async () => {});
+    expect(screen.queryByTestId('today-memorized')).toBeNull();
   });
 
   it('the primary button is solid ink; yesterday’s leftovers are an outline pill', async () => {
-    const props = thread({ leftovers: 3 });
+    const props = post({ leftovers: 3 });
     await act(async () => {});
     const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
     expect(flat('today-cta').backgroundColor).toBe(paletteLight.primary);
@@ -295,7 +370,7 @@ describe('Home in the new design (a feed)', () => {
   });
 
   it('⋯ opens the menu; its action runs once the sheet has gone', async () => {
-    const props = thread();
+    const props = post();
     await act(async () => {});
     fireEvent.press(screen.getByTestId('today-post-menu'));
     expect(screen.getByText('Edit schedule')).toBeTruthy();
@@ -303,7 +378,7 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onEditSchedule).not.toHaveBeenCalled();
   });
 
-  it('sessions read like posts: weekday, how long ago, pages, surahs', () => {
+  it('sessions read as what was done, then the pages and surahs', () => {
     const log: RevisionLog = {
       id: 'a',
       date: '2026-10-24',
@@ -313,12 +388,15 @@ describe('Home in the new design (a feed)', () => {
       weaknessUpdates: [],
       durationMinutes: 24,
     };
-    expect(sessionText(log, '2026-10-26')).toMatchObject({
-      name: 'Saturday',
-      meta: '2d',
-      pages: 'Pages 503–506',
-      surahs: 'Al-Ahqaf',
-      footer: '3 of 4 revised · 24 min',
+    expect(revisionItem(log)).toMatchObject({
+      title: 'Revised 3 of 4 pages',
+      detail: 'Pages 503–506 · 24 min · Al-Ahqaf',
+      done: false,
+      day: '2026-10-24',
+    });
+    expect(revisionItem({ ...log, pagesRevised: [503, 504, 505, 506], pagesSkipped: [] })).toMatchObject({
+      title: 'Revised 4 pages',
+      done: true,
     });
     expect(dayAgo('2026-10-26', '2026-10-26')).toBe('Today');
     expect(dayAgo('2026-10-25', '2026-10-26')).toBe('Yesterday');

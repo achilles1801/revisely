@@ -7,6 +7,9 @@
   // Secrets (never in this file; `npx wrangler@4.153.0 secret put <NAME>`):
   //   TCQ_API_KEY_LIVE     The Clear Quran API production key (tcq_eng_liv_…), App Store app
   //   TCQ_API_KEY_SANDBOX  The Clear Quran API sandbox key (tcq_eng_sbx_…), TestFlight and dev
+  // Both the dashboard (Settings → Variables and Secrets) and `secret put` act on
+  // the newest version: they refuse if a branch build uploaded one after the last
+  // deploy from main. Keep non-production branch builds off (CLAUDE.md, Worker).
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "revisely",
   "main": "worker/index.ts",

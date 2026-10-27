@@ -25,6 +25,7 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
 import { ThemeColors } from '../../theme/colors';
 import {
   calculatePageUrgency,
@@ -76,7 +77,7 @@ interface JuzRow {
 }
 
 export default function AlgorithmScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette } = useTheme();
   const { user, pages, logs, loadData } = useApp();
   const quranData = useMemo(() => getQuranData(), []);
 
@@ -89,6 +90,8 @@ export default function AlgorithmScreen() {
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [focusIndex, setFocusIndex] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  // The new design has no help buttons.
+  const { isNew } = useDesign();
   const [expandedLists, setExpandedLists] = useState<Record<BrowseMode, boolean>>({
     pages: false,
     surahs: false,
@@ -302,7 +305,8 @@ export default function AlgorithmScreen() {
     if (rating <= 1) return theme.error;
     if (rating === 2) return theme.warning;
     if (rating === 3) return theme.gold;
-    return theme.accent;
+    // Strong is status green in the new design, whatever the accent.
+    return isNew ? palette.good : theme.accent;
   };
 
   const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
@@ -326,7 +330,7 @@ export default function AlgorithmScreen() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>Insights</Text>
-            {user.smartTrackingEnabled && (
+            {user.smartTrackingEnabled && !isNew && (
               <PressableScale
                 onPress={() => setHelpOpen(true)}
                 haptic="light"

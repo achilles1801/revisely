@@ -7,6 +7,7 @@ import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { RecordingBackupController } from './src/components/RecordingBackupController';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
@@ -100,6 +101,7 @@ function App() {
                 <BottomSheetModalProvider>
                   <RootNavigator />
                   <DesignGate />
+                  <RecordingBackupController />
                 </BottomSheetModalProvider>
               </AppProvider>
             </AuthProvider>

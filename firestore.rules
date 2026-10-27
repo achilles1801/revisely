@@ -136,6 +136,8 @@ service cloud.firestore {
         'carryOverMode', 'carryOver', 'scheduleShiftPages',
         // Translation and reciter for a held verse.
         'translationId', 'reciter',
+        // Recording backup (on unless false) and whether it may use mobile data.
+        'recordingBackup', 'recordingBackupCellular',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -400,6 +402,27 @@ service cloud.firestore {
       }
 
       // ======================================================================
+      // RECORDING BACKUP (lib/recordingBackup)
+      // ======================================================================
+      // What the backup holds about each recording; the audio is in Storage
+      // under recordings/<uid>/ (storage.rules), readable only by the owner.
+
+      // A deleted recording leaves a tombstone ({deletedAt}): permanent (the
+      // account's deletion removes it, on the server), never written over, so no
+      // phone backs the recording up again. Records are written only while the
+      // account's backup is on (a phone that hasn't heard it was turned off
+      // can't put recordings back).
+      match /recordings/{recordingId} {
+        allow read: if isOwner(userId);
+        allow delete: if isOwner(userId) && !isTombstoned();
+        allow create: if isOwner(userId) &&
+                         (isRecordingTombstone() || (isValidRecordingDoc() && recordingBackupOn(userId)));
+        allow update: if isOwner(userId) &&
+                         (isRecordingTombstone() ||
+                          (isValidRecordingDoc() && recordingBackupOn(userId) && !isTombstoned()));
+      }
+
+      // ======================================================================
       // USAGE STATS (time spent in the app)
       // ======================================================================
 
@@ -412,6 +435,30 @@ service cloud.firestore {
                                  (resource == null ||
                                   incomingData().appSeconds >= resource.data.appSeconds);
       }
+    }
+
+    function isValidRecordingDoc() {
+      let data = incomingData();
+      return data.keys().hasOnly(['kind', 'day', 'createdAt', 'durationMs', 'pageMarks', 'segments', 'updatedAt']) &&
+             data.kind in ['revision', 'reading'] &&
+             data.day is string && data.day.size() == 10 &&
+             data.createdAt is number &&
+             data.durationMs is number && data.durationMs >= 0 &&
+             data.pageMarks is list && data.pageMarks.size() <= 2000 &&
+             data.segments is list && data.segments.size() >= 1 && data.segments.size() <= 500;
+    }
+
+    function isTombstoned() {
+      return 'deletedAt' in resource.data;
+    }
+
+    function recordingBackupOn(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.get('recordingBackup', true) != false;
+    }
+
+    function isRecordingTombstone() {
+      return incomingData().keys().hasOnly(['deletedAt']) &&
+             incomingData().deletedAt == request.time;
     }
 
     function isValidPageList(pages) {

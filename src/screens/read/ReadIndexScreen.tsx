@@ -171,8 +171,8 @@ export default function ReadIndexScreen() {
         ListHeaderComponent={header}
         contentContainerStyle={[
           styles.listContent,
-          // Room for the floating timer above the tab bar.
-          { paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + spacing.xl },
+          // Room for the floating timer above the tab bar (classic only).
+          { paddingBottom: tabFootprint + (isNewDesign ? 0 : FLOATING_TIMER_SIZE) + spacing.xl },
         ]}
         renderItem={({ item }) => (
           <View style={styles.section}>

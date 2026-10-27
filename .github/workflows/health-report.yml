@@ -4,6 +4,8 @@ name: Health report
 # issues, the busiest issues, problem reports, crash-free sessions and users per release in
 # production and preview) as a comment on the pinned "App health (daily report)" issue, mentioning the
 # owner so GitHub emails it. scripts/sentry/report.js. Needs SENTRY_API_TOKEN.
+# It also checks the Claude key (ANTHROPIC_API_KEY) that claude-fix.yml uses: rejected → an issue and a
+# failed run; 30 days before CLAUDE_KEY_EXPIRES → a reminder issue (scripts/sentry/claude-key.js).
 on:
   schedule:
     - cron: '0 13 * * *'
@@ -33,9 +35,28 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Check the Claude key
+        id: key
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          # When the key in the Anthropic Console expires. Change it when rotating (CLAUDE.md, Health).
+          CLAUDE_KEY_EXPIRES: '2027-01-01'
+        run: node scripts/sentry/claude-key.js
+
       - name: Post the report
         env:
           SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           MENTION: '@${{ github.repository_owner }}'
         run: node scripts/sentry/report.js
+
+      # After the report, so a dead key doesn't cost the day's report; the run still fails loudly.
+      - name: Fail if the Claude key was rejected
+        if: steps.key.outcome == 'failure'
+        run: |
+          echo "::error::The Claude key (ANTHROPIC_API_KEY) was rejected; see the 'automation' issue."
+          exit 1

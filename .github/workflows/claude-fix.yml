@@ -79,9 +79,36 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Before a runner is spent on Claude: is the key still accepted? If Anthropic rejects it (expired,
+  # revoked), say so on the issue and in an 'automation' issue mentioning the owner, and stop.
+  key:
+    name: Claude key
+    needs: details
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check the Claude key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+        run: node scripts/sentry/claude-key.js --issue "$ISSUE"
+
   fix:
     name: Claude investigates and commits a fix
-    needs: details
+    needs: [details, key]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -192,8 +219,29 @@ jobs:
           export PATH=/usr/bin:/bin GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
           out="$RUNNER_TEMP/claude-patch"
           rm -rf "$out" && mkdir -p "$out"
-          if [ ! -d .git ] || [ -L .git ] || [ -e .git/commondir ]; then
-            echo "::error::.git was replaced; not exporting."
+          problem=""
+          if [ -L .git ]; then problem=".git is a symlink"
+          elif [ ! -d .git ]; then problem=".git is not a directory"
+          elif [ -e .git/commondir ] || [ -L .git/commondir ]; then
+            # Claude Code's sandbox leaves placeholders in .git for the paths it protects: a commondir
+            # holding "." (this .git itself) and empty worktrees/, modules/. Drop that commondir; one
+            # pointing anywhere else would make git read another config, so refuse it.
+            if [ -f .git/commondir ] && [ ! -L .git/commondir ]; then
+              case "$(head -c 64 .git/commondir | tr -d '\n')" in
+                ''|.) rm -f .git/commondir ;;
+                *) problem=".git/commondir points elsewhere" ;;
+              esac
+            else
+              problem=".git/commondir is not a plain file"
+            fi
+          fi
+          if [ -n "$problem" ]; then
+            echo "::error::.git was replaced ($problem); not exporting."
+            # Names, types and sizes only (.git/config holds the action's token in the remote URL).
+            ls -la .git | head -40 || true
+            if [ -f .git/commondir ]; then
+              echo "commondir: $(wc -c < .git/commondir) bytes: $(head -c 200 .git/commondir | tr -cd '[:print:]')"
+            fi
             exit 1
           fi
           rm -f .git/config
@@ -213,8 +261,9 @@ jobs:
 
   pr:
     name: Open the PR
-    needs: [details, fix]
-    if: ${{ !cancelled() && needs.details.result == 'success' }}
+    needs: [details, key, fix]
+    # A rejected key has already been reported on the issue by the key job.
+    if: ${{ !cancelled() && needs.details.result == 'success' && needs.key.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -253,7 +302,7 @@ jobs:
           patch="$dir/fix.patch"
           summary="$dir/summary.md"
           # Anything that looks like a credential (Anthropic, GitHub, Sentry, Google keys, private keys).
-          CRED='sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sntr[ysu]_[A-Za-z0-9_=+/-]{20,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----|x-access-token:'
+          CRED='sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sntry[su]_[A-Za-z0-9_=+/-]{20,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----|x-access-token:'
           # Claude's text shown inertly: no backticks (it sits in a fenced block), mentions or #refs.
           inert() { perl -CSD -0777 -pe 's/`/\x27/g; s/@(?=[A-Za-z0-9_-])/\@\x{200B}/g; s/#(?=\d)/#\x{200B}/g; $_ = substr($_, 0, 6000)' "$@"; }
           notes=""
