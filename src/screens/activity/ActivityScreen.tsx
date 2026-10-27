@@ -51,6 +51,14 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, ReadingSession } from '../../types';
+import { useDesign } from '../../design/DesignContext';
+import { DayPost } from '../../components/activity/DayPost';
+import { IconButton, TopBar } from '../../components/v2/TopBar';
+import { PillButton } from '../../components/v2/PillButton';
+import { Mark } from '../../components/v2/Mark';
+import { RowText, ThreadRow } from '../../components/v2/ThreadRow';
+import { Tap } from '../../components/v2/Tap';
+import { layoutV2, typeV2 } from '../../theme/v2';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Activity'>;
 
@@ -65,7 +73,8 @@ const RECENT_DAYS = 7;
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, logs } = useApp();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette } = useTheme();
+  const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const tabFootprint = useTabBarFootprint();
 
@@ -148,13 +157,13 @@ export default function ActivityScreen() {
       ...(months.length > 0
         ? [
             {
-              title: 'BY MONTH',
+              title: isNew ? 'By month' : 'BY MONTH',
               options: months.map((m) => ({ value: m, label: journalFilterLabel(m) })),
             },
           ]
         : []),
     ],
-    [months],
+    [months, isNew],
   );
 
   const openDay = (date: string) => navigation.navigate('ActivityDay', { date });
@@ -172,6 +181,146 @@ export default function ActivityScreen() {
       tint={cardTint}
     />
   );
+
+  const sheets = (
+    <>
+  <OptionSheet<JournalFilter>
+    visible={picker === 'filter'}
+    title="Show"
+    sections={filterSections}
+    value={filter}
+    onSelect={setFilter}
+    onClose={() => setPicker(null)}
+  />
+  <OptionSheet<ActivitySort>
+    visible={picker === 'sort'}
+    title="Sort by"
+    sections={[
+      {
+        options: (Object.keys(ACTIVITY_SORT_LABELS) as ActivitySort[]).map((k) => ({
+          value: k,
+          label: ACTIVITY_SORT_LABELS[k],
+        })),
+      },
+    ]}
+    value={sort}
+    onSelect={setSort}
+    onClose={() => setPicker(null)}
+  />
+    </>
+  );
+
+  if (isNew) {
+    // The new design: a feed. A summary post, then a post per day (a line per
+    // kind of activity); a day opens as a thread.
+    const totals = isDefaultView ? week : listedTotals;
+    const foot = isDefaultView
+      ? `${week.activeDays} of ${recent.length} ${recent.length === 1 ? 'day' : 'days'} active`
+      : `${listedTotals.activeDays} ${listedTotals.activeDays === 1 ? 'day' : 'days'} active`;
+    const dayPost = (day: (typeof days)[number]) => (
+      <DayPost
+        key={day.date}
+        day={day}
+        label={formatJournalDayRelative(day.date, today)}
+        isToday={day.date === today}
+        onPress={() => openDay(day.date)}
+        onLog={logToday}
+      />
+    );
+    const header = (title: string) => (
+      <Text style={[typeV2.name, v2.section, { color: palette.text }]} accessibilityRole="header">
+        {title}
+      </Text>
+    );
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+        <TopBar
+          title="Activity"
+          onBack={() => navigation.goBack()}
+          right={<IconButton icon="add" label="Log today" onPress={logToday} size={28} />}
+          separator
+        />
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={palette.secondary} />
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={{ paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + layoutV2.rowPad }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
+            testID="activity-v2"
+          >
+            {loadError && (
+              <Tap onPress={load} style={[v2.banner, { borderBottomColor: palette.separator }]} accessibilityRole="button">
+                <Ionicons name="cloud-offline-outline" size={18} color={palette.secondary} />
+                <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of your activity. Tap to retry.</Text>
+              </Tap>
+            )}
+            {isEmpty ? (
+              <EmptyState
+                icon="pulse-outline"
+                title="Your activity will show up here"
+                message="Revision sessions, timed reading and your daily log, day by day. Time a session with the timer button, or note what you did today."
+                action={<PillButton title="Log today" icon="add" onPress={logToday} />}
+              />
+            ) : (
+              <>
+                <View style={v2.pills}>
+                  <PillButton
+                    title={journalFilterLabel(filter)}
+                    icon="calendar-outline"
+                    size="sm"
+                    variant={filter !== 'all' ? 'solid' : 'outline'}
+                    onPress={() => setPicker('filter')}
+                    accessibilityLabel={`Show: ${journalFilterLabel(filter)}`}
+                  />
+                  <PillButton
+                    title={ACTIVITY_SORT_LABELS[sort]}
+                    icon="swap-vertical-outline"
+                    size="sm"
+                    variant={sort !== 'newest' ? 'solid' : 'outline'}
+                    onPress={() => setPicker('sort')}
+                    accessibilityLabel={`Sort by: ${ACTIVITY_SORT_LABELS[sort]}`}
+                  />
+                </View>
+                <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
+                <ThreadRow
+                  mark={<Mark icon="stats-chart-outline" />}
+                  name={isDefaultView ? 'Last 7 days' : journalFilterLabel(filter)}
+                  meta={foot}
+                  testID="activity-summary"
+                >
+                  <RowText>
+                    {`${totals.revisedPages} ${totals.revisedPages === 1 ? 'page' : 'pages'} revised · ${
+                      totals.readingSeconds > 0 ? formatDuration(totals.readingSeconds) : '0m'
+                    } timed · ${formatMinutes(totals.journalMinutes)} logged`}
+                  </RowText>
+                </ThreadRow>
+                {isDefaultView ? (
+                  <>
+                    {header('Recent')}
+                    {recent.map(dayPost)}
+                    {earlier.length > 0 && (
+                      <>
+                        {header('Earlier')}
+                        {earlier.map(dayPost)}
+                      </>
+                    )}
+                  </>
+                ) : listed.length === 0 ? (
+                  <Text style={[typeV2.body, v2.empty, { color: palette.secondary }]}>Nothing logged in this range.</Text>
+                ) : (
+                  listed.map(dayPost)
+                )}
+              </>
+            )}
+          </ScrollView>
+        )}
+        {sheets}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -301,29 +450,7 @@ export default function ActivityScreen() {
         </ScrollView>
       )}
 
-      <OptionSheet<JournalFilter>
-        visible={picker === 'filter'}
-        title="Show"
-        sections={filterSections}
-        value={filter}
-        onSelect={setFilter}
-        onClose={() => setPicker(null)}
-      />
-      <OptionSheet<ActivitySort>
-        visible={picker === 'sort'}
-        title="Sort by"
-        sections={[
-          {
-            options: (Object.keys(ACTIVITY_SORT_LABELS) as ActivitySort[]).map((k) => ({
-              value: k,
-              label: ACTIVITY_SORT_LABELS[k],
-            })),
-          },
-        ]}
-        value={sort}
-        onSelect={setSort}
-        onClose={() => setPicker(null)}
-      />
+      {sheets}
     </SafeAreaView>
   );
 }
@@ -514,3 +641,18 @@ const makeStyles = (theme: ThemeColors) =>
       marginBottom: spacing.xs,
     },
   });
+
+// The new design.
+const v2 = StyleSheet.create({
+  pills: { flexDirection: 'row', gap: 8, paddingHorizontal: layoutV2.gutter, paddingVertical: 12 },
+  section: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad + 8, paddingBottom: 4 },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: 12,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  empty: { paddingHorizontal: layoutV2.gutter, paddingVertical: layoutV2.rowPad },
+});

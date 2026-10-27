@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { PressableScale } from '../../components/PressableScale';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
+import { typeV2 } from '../../theme/v2';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -75,9 +77,14 @@ function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
 export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark } = useTheme();
-  const palette = getReadPalette(isDark);
+  const { isNew: isNewDesign } = useDesign();
+  const palette = getReadPalette(isDark, isNewDesign);
   const tabFootprint = useTabBarFootprint();
   const styles = useMemo(() => makeStyles(palette), [palette]);
+  // The new design: sentence case, a real header, not an uppercase eyebrow.
+  const labelStyle = isNewDesign
+    ? [typeV2.name, { color: palette.textPrimary, marginBottom: 6, marginLeft: spacing.sm }]
+    : styles.sectionLabel;
 
   const [recent, setRecent] = useState<ReadingHistoryEntry[]>([]);
   // Tapping the Read tab while on it scrolls the index back to the top.
@@ -134,7 +141,7 @@ export default function ReadIndexScreen() {
 
       {recent.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>RECENT PAGES</Text>
+          <Text style={labelStyle}>{isNewDesign ? 'Recent pages' : 'RECENT PAGES'}</Text>
           <View style={styles.card}>
             {recent.map((entry, i) => (
               <RecentRow
@@ -169,7 +176,7 @@ export default function ReadIndexScreen() {
         ]}
         renderItem={({ item }) => (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>JUZ' {item.juz}</Text>
+            <Text style={labelStyle}>{isNewDesign ? `Juz' ${item.juz}` : `JUZ' ${item.juz}`}</Text>
             <View style={styles.card}>
               {item.surahs.map((s, i) => (
                 <SurahCardRow

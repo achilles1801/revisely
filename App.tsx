@@ -10,7 +10,6 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { ClearQuranPreviewGate } from './src/components/ClearQuranPreviewGate';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
-import { Newsreader_400Regular, Newsreader_500Medium } from '@expo-google-fonts/newsreader';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
@@ -78,11 +77,8 @@ function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
   // render — text falls back to the system Arabic face rather than blocking
   // the app forever.
-  // Newsreader (OFL): the new design's display face, for one moment per screen.
   const [fontsLoaded, fontError] = useFonts({
     'Amiri-Regular': require('./assets/fonts/Amiri-Regular.ttf'),
-    Newsreader_400Regular,
-    Newsreader_500Medium,
   });
 
   useEffect(() => {

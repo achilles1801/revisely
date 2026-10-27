@@ -29,6 +29,8 @@ import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
+import { useDesign } from '../../design/DesignContext';
+import { GuideSheet } from '../../components/v2/GuideSheet';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -56,7 +58,8 @@ export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { theme, isDark } = useTheme();
-  const palette = getReadPalette(isDark);
+  const { isNew: isNewDesign } = useDesign();
+  const palette = getReadPalette(isDark, isNewDesign);
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const initialPage = route.params.pageNumber;
@@ -323,6 +326,7 @@ function ReaderGuideModal({
   onClose: () => void;
   theme: ThemeColors;
 }) {
+  const { isNew: isNewGuide } = useDesign();
   const styles = useMemo(() => makeGuideStyles(theme), [theme]);
   const steps: Array<{
     icon: keyof typeof Ionicons.glyphMap;
@@ -360,6 +364,8 @@ function ReaderGuideModal({
       body: 'The Read tab is for free reading — it doesn’t affect your revision schedule or strength ratings. Use the Home tab when you want a tracked session.',
     },
   ];
+
+  if (isNewGuide) return <GuideSheet visible={visible} onClose={onClose} title="How the reader works" steps={steps} />;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -524,7 +530,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodySmall,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });

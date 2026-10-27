@@ -7,6 +7,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
+import { PillTabs } from './v2/PillTabs';
 import { ThemeColors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { radius } from '../theme/radius';
@@ -28,7 +30,7 @@ const SPRING = { damping: 18, stiffness: 200, mass: 0.7 };
 const TRACK_HEIGHT = 40;
 const TRACK_PADDING = 4;
 
-export function SegmentedToggle<T extends string = string>({
+function ClassicSegmentedToggle<T extends string = string>({
   options,
   value,
   onChange,
@@ -131,3 +133,9 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       fontWeight: '400',
     },
   });
+
+/** The classic control, or pills in the new design. */
+export function SegmentedToggle<T extends string = string>(props: SegmentedToggleProps<T>) {
+  const { isNew } = useDesign();
+  return isNew ? <PillTabs {...props} /> : <ClassicSegmentedToggle {...props} />;
+}

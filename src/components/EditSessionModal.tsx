@@ -19,6 +19,7 @@ import { MushafPager } from './MushafPager';
 import { WeaknessModal } from './WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from './revision/SessionMenuSheet';
 import { RevisionLog, QuranPage } from '../types';
+import { useDesign } from '../design/DesignContext';
 import {
   getHizbForPage,
   getJuzForPage,
@@ -44,7 +45,8 @@ export function EditSessionModal({
   onSave,
   onDelete,
 }: EditSessionModalProps) {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette } = useTheme();
+  const { isNew: isNewDesign } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
@@ -161,7 +163,7 @@ export function EditSessionModal({
             hitSlop={12}
             style={[
               styles.iconBtn,
-              isCurrentRevised && { backgroundColor: theme.textPrimary },
+              isCurrentRevised && { backgroundColor: isNewDesign ? palette.done : theme.textPrimary },
             ]}
             accessibilityLabel={
               isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'
@@ -170,7 +172,7 @@ export function EditSessionModal({
             <Ionicons
               name={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
               size={18}
-              color={isCurrentRevised ? theme.textInverse : theme.textPrimary}
+              color={isCurrentRevised ? (isNewDesign ? palette.onDone : theme.textInverse) : theme.textPrimary}
             />
           </PressableScale>
 

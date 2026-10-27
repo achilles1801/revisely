@@ -14,15 +14,20 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../../../modules/install-source', () => ({ __esModule: true, default: null }));
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 import { DesignProvider, useDesign } from '../DesignContext';
 import { makeHaptics } from '../haptics';
 import { testerToolsAllowed } from '../../lib/testerTools';
 import { ThemeProvider, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
-import { Greeting } from '../../components/home/Greeting';
-import { TodayCard, todayCopy } from '../../components/home/TodayCard';
-import { paletteDark, paletteLight } from '../../theme/v2';
+import { TodayThread, juzReplies, todayText } from '../../components/home/feed/TodayThread';
+import { sessionText } from '../../components/home/feed/SessionPost';
+import { memorizedText } from '../../components/home/feed/MemorizedPost';
+import { ActionSheet } from '../../components/v2/ActionSheet';
+import { dayAgo } from '../../lib/dayAgo';
+import { paletteDark, paletteLight, v2ThemeColors } from '../../theme/v2';
+import type { RevisionLog, UserPage } from '../../types';
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -115,7 +120,7 @@ describe('haptics', () => {
   });
 });
 
-describe('v2 palette', () => {
+describe('v2 palette (white and black grounds, no accent tint)', () => {
   const lum = (hex: string) => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
     const f = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -126,16 +131,44 @@ describe('v2 palette', () => {
     return (hi + 0.05) / (lo + 0.05);
   };
 
+  it('is the agreed palette', () => {
+    expect([paletteLight.bg, paletteLight.text, paletteLight.secondary, paletteLight.separator, paletteLight.red]).toEqual([
+      '#FFFFFF',
+      '#1A1A1A',
+      '#6B7280',
+      '#E5E7EB',
+      '#DC2626',
+    ]);
+    expect([paletteDark.bg, paletteDark.text, paletteDark.secondary, paletteDark.separator, paletteDark.red]).toEqual([
+      '#000000',
+      '#FFFFFF',
+      '#8A8A93',
+      '#1F1F1F',
+      '#F87171',
+    ]);
+    // The primary button is the ink: black in light, white in dark.
+    expect(paletteLight.primary).toBe(paletteLight.text);
+    expect(paletteDark.primary).toBe('#FFFFFF');
+  });
+
   it.each([
-    ['light', paletteLight],
-    ['dark', paletteDark],
-  ])('%s: every text colour reads at 4.5:1 or more on paper and on surface', (_name, p) => {
-    for (const ground of [p.paper, p.surface]) {
-      for (const ink of [p.ink, p.ink2, p.ink3, p.jade, p.gold, p.danger, p.warning, ...p.strength]) {
+    ['light', paletteLight, false],
+    ['dark', paletteDark, true],
+  ] as const)('%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets', (_name, p, isDark) => {
+    for (const ground of [p.bg, p.fill, p.sheet]) {
+      for (const ink of [p.text, p.secondary, p.red, p.done]) {
         expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
       }
     }
-    expect(contrast(p.onJade, p.jade)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
+    // Screens not moved yet get the same colours under the classic names.
+    const c = v2ThemeColors(isDark);
+    for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success]) {
+      expect(contrast(ink, c.bg)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(c.onAccent, c.accent)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
@@ -158,7 +191,10 @@ describe('ThemeContext in the new design', () => {
 
   it('this binary pins light mode, so "System" falls back to the classic choice, on the v2 palette', async () => {
     await AsyncStorage.setItem('@revision_buddy_theme', 'dark');
-    expect(await renderTheme()).toBe(`dark|true|${paletteDark.paper}`);
+    expect(await renderTheme()).toBe(`dark|true|${paletteDark.bg}`);
+    await AsyncStorage.setItem('@revisely_theme_v2', 'light');
+    screen.unmount();
+    expect(await renderTheme()).toBe(`light|false|${paletteLight.bg}`);
   });
 
   it('once the binary follows the system, System is the default', async () => {
@@ -172,61 +208,160 @@ describe('ThemeContext in the new design', () => {
   });
 });
 
-describe('Home in the new design', () => {
-  const wrap = (ui: React.ReactElement) => (
-    <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
-      <ThemeProvider>{ui}</ThemeProvider>
-    </DesignProvider>
-  );
+const wrap = (ui: React.ReactElement) => (
+  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+    <ThemeProvider>{ui}</ThemeProvider>
+  </DesignProvider>
+);
 
-  it('greets with the salam in Amiri above the name in the display serif', async () => {
-    render(wrap(<Greeting name="Karim" date="Monday, October 26" />));
-    await act(async () => {});
-    expect(screen.getByText('السلام عليكم').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ fontFamily: 'Amiri-Regular' })]),
-    );
-    expect(screen.getByTestId('greeting-name').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ fontFamily: 'Newsreader_500Medium' })]),
-    );
-    expect(screen.getByText('Monday, October 26')).toBeTruthy();
-  });
-
+describe('Home in the new design (a feed)', () => {
+  beforeEach(() => AsyncStorage.setItem('@revisely_theme_v2', 'light'));
   it('today is real pages and surahs, never "Juz 27 + 1 more"', () => {
     const pages = Array.from({ length: 20 }, (_, i) => 503 + i);
-    expect(todayCopy('not_started', pages, new Set())).toEqual({
+    expect(todayText('not_started', pages, new Set())).toEqual({
       title: 'Pages 503–522',
       detail: 'Al-Ahqaf to Adh-Dhariyat · 20 pages',
       cta: 'Start revision',
+      solid: true,
     });
-    expect(todayCopy('partial', pages, new Set([503, 504])).title).toBe('18 pages to go');
-    expect(todayCopy('completed', pages, new Set(pages)).title).toBe('Done for today');
-    expect(todayCopy('not_started', [], new Set()).title).toBe('Nothing to revise yet');
+    expect(todayText('partial', pages, new Set([503, 504])).detail).toBe('2 of 20 done · Al-Ahqaf to Adh-Dhariyat');
+    expect(todayText('completed', pages, new Set(pages))).toMatchObject({ title: 'Done for today', solid: false });
+    expect(todayText('not_started', [], new Set()).title).toBe('Nothing to revise yet');
   });
 
-  it('page chips fill in as pages are done; one filled action', async () => {
-    const onPrimary = jest.fn();
-    render(
-      wrap(
-        <TodayCard
-          status="partial"
-          pages={[10, 11, 12]}
-          done={new Set([10])}
-          streak={7}
-          onPrimary={onPrimary}
-          onEditSchedule={jest.fn()}
-          leftovers={0}
-          onCarryOver={jest.fn()}
-          carrying={false}
-          onPushBack={jest.fn()}
-          shifting={false}
-        />,
-      ),
+  it('a reply per juz, done (jade) once all its pages are', () => {
+    const replies = juzReplies(
+      [
+        { juz: 26, pages: [520, 521] },
+        { juz: 27, pages: [522, 523, 524] },
+      ],
+      new Set([520, 521, 522]),
     );
+    expect(replies.map((r) => [r.juz, r.complete, r.meta])).toEqual([
+      [26, true, '2 of 2 done'],
+      [27, false, '1 of 3 done'],
+    ]);
+    expect(replies[1].body).toBe('Pages 522–524 · Adh-Dhariyat to At-Tur');
+  });
+
+  const thread = (over: Partial<React.ComponentProps<typeof TodayThread>> = {}) => {
+    const props: React.ComponentProps<typeof TodayThread> = {
+      name: 'Karim',
+      initial: 'K',
+      status: 'partial',
+      pages: [520, 521, 522],
+      juzBreakdown: [
+        { juz: 26, pages: [520, 521] },
+        { juz: 27, pages: [522] },
+      ],
+      done: new Set([520, 521]),
+      streak: 7,
+      onPrimary: jest.fn(),
+      onEditSchedule: jest.fn(),
+      onMemorization: jest.fn(),
+      leftovers: 0,
+      onCarryOver: jest.fn(),
+      carrying: false,
+      onPushBack: jest.fn(),
+      shifting: false,
+      ...over,
+    };
+    render(wrap(<TodayThread {...props} />));
+    return props;
+  };
+
+  it('today is a thread: a post, then the juz joined by the thread line', async () => {
+    const props = thread();
     await act(async () => {});
-    expect(screen.getAllByTestId('page-chip-done')).toHaveLength(1);
-    expect(screen.getAllByTestId('page-chip')).toHaveLength(2);
-    expect(screen.getByLabelText('7-day streak')).toBeTruthy();
+    expect(screen.getByText('Karim')).toBeTruthy();
+    expect(screen.getByText('Today · 7-day streak')).toBeTruthy();
+    expect(screen.getAllByTestId('juz-done', { includeHiddenElements: true })).toHaveLength(1);
+    expect(screen.getAllByTestId('juz', { includeHiddenElements: true })).toHaveLength(1);
+    // post → juz 26 → juz 27: a line below the post, above and below 26, above 27.
+    expect(screen.getAllByTestId('thread-line')).toHaveLength(4);
     fireEvent.press(screen.getByTestId('today-cta'));
-    expect(onPrimary).toHaveBeenCalled();
+    expect(props.onPrimary).toHaveBeenCalled();
+    expect(screen.queryByTestId('today-carry-over')).toBeNull();
+  });
+
+  it('the primary button is solid ink; yesterday’s leftovers are an outline pill', async () => {
+    const props = thread({ leftovers: 3 });
+    await act(async () => {});
+    const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
+    expect(flat('today-cta').backgroundColor).toBe(paletteLight.primary);
+    expect(flat('today-carry-over').borderWidth).toBe(1);
+    fireEvent.press(screen.getByText('Add 3 from yesterday'));
+    expect(props.onCarryOver).toHaveBeenCalled();
+  });
+
+  it('⋯ opens the menu; its action runs once the sheet has gone', async () => {
+    const props = thread();
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('today-post-menu'));
+    expect(screen.getByText('Edit schedule')).toBeTruthy();
+    fireEvent.press(screen.getByText('Edit schedule'));
+    expect(props.onEditSchedule).not.toHaveBeenCalled();
+  });
+
+  it('sessions read like posts: weekday, how long ago, pages, surahs', () => {
+    const log: RevisionLog = {
+      id: 'a',
+      date: '2026-10-24',
+      assignedPages: [503, 504, 505, 506],
+      pagesRevised: [503, 504, 505],
+      pagesSkipped: [506],
+      weaknessUpdates: [],
+      durationMinutes: 24,
+    };
+    expect(sessionText(log, '2026-10-26')).toMatchObject({
+      name: 'Saturday',
+      meta: '2d',
+      pages: 'Pages 503–506',
+      surahs: 'Al-Ahqaf',
+      footer: '3 of 4 revised · 24 min',
+    });
+    expect(dayAgo('2026-10-26', '2026-10-26')).toBe('Today');
+    expect(dayAgo('2026-10-25', '2026-10-26')).toBe('Yesterday');
+    expect(dayAgo('2026-10-12', '2026-10-26')).toBe('2w');
+    expect(dayAgo('2026-08-01', '2026-10-26')).toBe('Aug 1');
+    expect(dayAgo('2025-08-01', '2026-10-26')).toBe('Aug 1, 2025');
+  });
+
+  it('memorized is one line, in the order Settings chose', () => {
+    const pages = Array.from({ length: 20 }, (_, i) => ({ pageNumber: 582 + i, status: 'memorized' }) as UserPage);
+    expect(memorizedText(pages, ['pages', 'juz']).body).toMatch(/^20 of 604 pages · .+ of 30 juz$/);
+  });
+});
+
+describe('ActionSheet (the ⋯ menu)', () => {
+  beforeEach(() => AsyncStorage.setItem('@revisely_theme_v2', 'light'));
+  it('runs the chosen action after the sheet is dismissed, and Cancel closes it', async () => {
+    const onPress = jest.fn();
+    const onClose = jest.fn();
+    const ui = (visible: boolean) =>
+      wrap(
+        <ActionSheet
+          visible={visible}
+          onClose={onClose}
+          title="Session"
+          actions={[{ key: 'delete', label: 'Delete session', icon: 'trash-outline', destructive: true, onPress }]}
+        />,
+      );
+    render(ui(true));
+    await act(async () => {});
+    expect(screen.getByText('Session')).toBeTruthy();
+    expect(screen.getByText('Delete session').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: paletteLight.red })]),
+    );
+    fireEvent.press(screen.getByTestId('sheet-cancel'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByText('Delete session'));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onPress).not.toHaveBeenCalled();
+    // The parent closes it; once the modal is gone (iOS: onDismiss) the action runs.
+    screen.rerender(ui(false));
+    const { Modal } = jest.requireActual('react-native');
+    act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

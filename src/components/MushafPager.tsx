@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
 import {
@@ -228,7 +229,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   ref,
 ) {
   const { isDark, theme } = useTheme();
-  const palette = getReadPalette(isDark);
+  const { isNew: isNewDesign } = useDesign();
+  const palette = getReadPalette(isDark, isNewDesign);
   const listRef = useRef<FlatList>(null);
   const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_SIZE);
   const currentIndexRef = useRef(0);

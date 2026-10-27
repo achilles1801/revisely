@@ -5,7 +5,6 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Switch,
   Alert,
   Modal,
   Platform,
@@ -18,7 +17,12 @@ import {
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
-import { typeV2 } from '../../theme/v2';
+import { layoutV2, typeV2 } from '../../theme/v2';
+import { TopBar } from '../../components/v2/TopBar';
+import { Mark } from '../../components/v2/Mark';
+import { PillButton } from '../../components/v2/PillButton';
+import { Tap } from '../../components/v2/Tap';
+import { Sheet } from '../../components/v2/Sheet';
 import { reportProblem } from '../../lib/sentry';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,6 +32,9 @@ import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
+import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { SettingSwitch } from '../../components/settings/SettingSwitch';
+import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -64,17 +71,28 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // ---------------------------------------------------------------------------
 
 function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
   const { isNew } = useDesign();
+  if (isNew) {
+    // A flat list: a bold sentence-case header, rows on the ground, a hairline
+    // closing the group.
+    return (
+      <View style={[v2.section, { borderBottomColor: palette.separator }]}>
+        {title ? (
+          <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
+            {title}
+          </Text>
+        ) : null}
+        {children}
+        {footer ? <Text style={[typeV2.meta, v2.footer, { color: palette.secondary }]}>{footer}</Text> : null}
+      </View>
+    );
+  }
   return (
-    <View style={{ marginBottom: isNew ? spacing.xl : spacing.lg }}>
+    <View style={{ marginBottom: spacing.lg }}>
       {title && (
         <Text
-          style={[
-            // The new design: sentence case, a real subhead, not an uppercase eyebrow.
-            isNew ? typeV2.subhead : typography.label,
-            { color: isNew ? theme.textSecondary : theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
-          ]}
+          style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md }]}
           accessibilityRole="header"
         >
           {title}
@@ -85,10 +103,22 @@ function Section({ title, footer, children }: { title?: string; footer?: string;
         {children}
       </View>
       {footer ? (
-        <Text style={[typeV2.footnote, { color: theme.textMuted, marginTop: spacing.xs, paddingHorizontal: spacing.md }]}>
+        <Text style={[typography.bodySmall, { color: theme.textMuted, marginTop: spacing.xs, paddingHorizontal: spacing.md }]}>
           {footer}
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+/** A row's icon: a tinted tile (classic) or a plain 24pt glyph (new design). */
+function RowIcon({ name, color, destructive }: { name: IconName; color?: string; destructive?: boolean }) {
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  if (isNew) return <Ionicons name={name} size={24} color={destructive ? palette.red : palette.text} />;
+  return (
+    <View style={[styles.rowIcon, { backgroundColor: (color ?? theme.accent) + '20' }]}>
+      <Ionicons name={name} size={16} color={color ?? theme.accent} />
     </View>
   );
 }
@@ -112,8 +142,35 @@ function Row({
   destructive?: boolean;
   isLast?: boolean;
 }) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const labelColor = destructive ? theme.error : theme.textPrimary;
+
+  if (isNew) {
+    const row = (
+      <View style={v2.row}>
+        {icon ? <RowIcon name={icon} destructive={destructive} /> : null}
+        <Text
+          style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
+        >
+          {label}
+        </Text>
+        {value !== undefined && (
+          <Text style={[typeV2.body, styles.rowValue, { color: palette.secondary }]} numberOfLines={1}>
+            {value}
+          </Text>
+        )}
+        {rightSlot}
+        {onPress && !rightSlot && <Ionicons name="chevron-forward" size={16} color={palette.secondary} />}
+      </View>
+    );
+    if (!onPress) return row;
+    return (
+      <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={value ? `${label}, ${value}` : label}>
+        {row}
+      </Tap>
+    );
+  }
 
   const inner = (
     <View
@@ -125,16 +182,7 @@ function Row({
         },
       ]}
     >
-      {icon && (
-        <View
-          style={[
-            styles.rowIcon,
-            { backgroundColor: (iconColor ?? theme.accent) + '20' },
-          ]}
-        >
-          <Ionicons name={icon} size={16} color={iconColor ?? theme.accent} />
-        </View>
-      )}
+      {icon && <RowIcon name={icon} color={iconColor} />}
       <View style={styles.rowText}>
         <Text style={[typography.bodyMedium, { color: labelColor }]}>{label}</Text>
       </View>
@@ -180,6 +228,23 @@ function ThemeSegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
+  if (isNew) {
+    return (
+      <View style={v2.pills}>
+        {options.map((opt) => (
+          <PillButton
+            key={opt.value}
+            title={opt.label}
+            size="sm"
+            variant={opt.value === value ? 'solid' : 'outline'}
+            onPress={() => onChange(opt.value)}
+            accessibilityLabel={`${opt.label}${opt.value === value ? ', selected' : ''}`}
+          />
+        ))}
+      </View>
+    );
+  }
   return (
     <View style={styles.segmented}>
       <GlassCard style={StyleSheet.absoluteFillObject} />
@@ -236,6 +301,7 @@ export default function SettingsScreen() {
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, themeMode, setThemeMode, isDark } = useTheme();
   const design = useDesign();
+  const tabFootprint = useTabBarFootprint();
   const screenStyles = useMemo(() => makeStyles(theme), [theme]);
   const [localUser, setLocalUser] = useState(user);
 
@@ -445,20 +511,27 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={screenStyles.container}>
-      <View style={screenStyles.header}>
-        <PressableScale
-          onPress={() => navigation.goBack()}
-          haptic="light"
-          style={screenStyles.backButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
-        </PressableScale>
-        <Text style={screenStyles.headerTitle}>Settings</Text>
-        <View style={screenStyles.backButton} />
-      </View>
+      {design.isNew ? (
+        <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
+      ) : (
+        <View style={screenStyles.header}>
+          <PressableScale
+            onPress={() => navigation.goBack()}
+            haptic="light"
+            style={screenStyles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
+          </PressableScale>
+          <Text style={screenStyles.headerTitle}>Settings</Text>
+          <View style={screenStyles.backButton} />
+        </View>
+      )}
 
-      <ScrollView contentContainerStyle={screenStyles.content}>
+      <ScrollView
+        contentContainerStyle={design.isNew ? [v2.content, { paddingBottom: tabFootprint + spacing.lg }] : screenStyles.content}
+        testID="settings-scroll"
+      >
         {design.allowed && (
           // Testers only (lib/testerTools): switch the whole app to the redesign in
           // progress and back, to compare. Kept on this device.
@@ -468,11 +541,9 @@ export default function SettingsScreen() {
               label="New design (preview)"
               isLast
               rightSlot={
-                <Switch
+                <SettingSwitch
                   value={design.isNew}
                   onValueChange={(on) => design.setChosen(on ? 'new' : 'classic')}
-                  trackColor={{ false: theme.border, true: theme.accent }}
-                  thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
                   accessibilityLabel="New design (preview)"
                   testID="new-design-switch"
                 />
@@ -485,20 +556,24 @@ export default function SettingsScreen() {
           <Section title="Account">
             <View
               style={[
-                screenStyles.profileRow,
+                design.isNew ? v2.profileRow : screenStyles.profileRow,
                 { borderBottomColor: theme.border },
               ]}
             >
-              <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
-                <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
-                  {avatarInitial(localUser.name, firebaseUser.email)}
-                </Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0, marginLeft: spacing.md }}>
+              {design.isNew ? (
+                <Mark label={avatarInitial(localUser.name, firebaseUser.email)} />
+              ) : (
+                <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
+                  <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
+                    {avatarInitial(localUser.name, firebaseUser.email)}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flex: 1, minWidth: 0, marginLeft: design.isNew ? layoutV2.markGap : spacing.md }}>
                 {/* Long names wrap to a second line before shrinking or cutting. */}
                 {localUser.name?.trim() ? (
                   <Text
-                    style={[typography.titleMedium, { color: theme.textPrimary }]}
+                    style={[design.isNew ? typeV2.name : typography.titleMedium, { color: theme.textPrimary }]}
                     numberOfLines={2}
                     adjustsFontSizeToFit
                     minimumFontScale={0.8}
@@ -507,7 +582,7 @@ export default function SettingsScreen() {
                   </Text>
                 ) : null}
                 <Text
-                  style={[typography.bodySmall, { color: theme.textSecondary }]}
+                  style={[design.isNew ? typeV2.meta : typography.bodySmall, { color: theme.textSecondary }]}
                   numberOfLines={1}
                   ellipsizeMode="middle"
                 >
@@ -592,11 +667,9 @@ export default function SettingsScreen() {
             icon="stats-chart-outline"
             label="Progress card"
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={homePrefs.showProgressCard}
                 onValueChange={(v) => setHomePrefs({ showProgressCard: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             }
           />
@@ -623,11 +696,9 @@ export default function SettingsScreen() {
             label="Friday Al-Kahf reminder"
             isLast
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={homePrefs.fridayKahfReminder}
                 onValueChange={(v) => setHomePrefs({ fridayKahfReminder: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             }
           />
@@ -639,11 +710,9 @@ export default function SettingsScreen() {
             label="Keep screen on while reading"
             isLast
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={homePrefs.keepScreenOn}
                 onValueChange={(v) => setHomePrefs({ keepScreenOn: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
                 accessibilityLabel="Keep screen on while reading, revising or listening"
               />
             }
@@ -666,17 +735,13 @@ export default function SettingsScreen() {
             ]}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', gap: spacing.sm }}>
-              <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-                <Ionicons name={design.isNew ? 'speedometer-outline' : 'sparkles-outline'} size={16} color={theme.accent} />
-              </View>
+              <SettingIcon name={design.isNew ? 'analytics-outline' : 'sparkles-outline'} tileStyle={styles.rowIcon} />
               <View style={styles.rowText}>
-                <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
+                <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
               </View>
-              <Switch
+              <SettingSwitch
                 value={localUser.smartTrackingEnabled}
                 onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             </View>
             {!localUser.smartTrackingEnabled && (
@@ -703,11 +768,9 @@ export default function SettingsScreen() {
             icon="notifications-outline"
             label="Enable notifications"
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={localUser.notificationsEnabled}
                 onValueChange={handleNotificationToggle}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             }
           />
@@ -731,11 +794,9 @@ export default function SettingsScreen() {
 
         <Section title="Appearance">
           <View style={[styles.row, { borderBottomWidth: 0 }]}>
-            <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-              <Ionicons name="color-palette-outline" size={16} color={theme.accent} />
-            </View>
+            <SettingIcon name="color-palette-outline" tileStyle={styles.rowIcon} />
             <View style={styles.rowText}>
-              <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
+              <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
             </View>
             <ThemeSegmentedControl
               value={themeMode}
@@ -763,11 +824,9 @@ export default function SettingsScreen() {
               label="Haptics"
               isLast
               rightSlot={
-                <Switch
+                <SettingSwitch
                   value={design.hapticsOn}
                   onValueChange={design.setHapticsOn}
-                  trackColor={{ false: theme.border, true: theme.accent }}
-                  thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
                   accessibilityLabel="Haptics"
                 />
               }
@@ -874,7 +933,7 @@ export default function SettingsScreen() {
 
         <View style={screenStyles.timePickerContainer}>
           <View style={screenStyles.timeColumn}>
-            <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
+            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
             <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
               {HOURS.map((hour) => {
                 const selected = tempHour === hour;
@@ -910,7 +969,7 @@ export default function SettingsScreen() {
           <Text style={[typography.displayLarge, { color: theme.textPrimary, marginHorizontal: spacing.xs }]}>:</Text>
 
           <View style={screenStyles.timeColumn}>
-            <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
+            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
             <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
               {MINUTES.map((minute) => {
                 const selected = tempMinute === minute;
@@ -1086,7 +1145,15 @@ function BottomSheetModal({
   children: React.ReactNode;
 }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
+  if (isNew) {
+    return (
+      <Sheet visible={visible} onClose={onClose} onShow={onShow} keyboard>
+        <View style={{ paddingTop: spacing.sm }}>{children}</View>
+      </Sheet>
+    );
+  }
   return (
     <Modal
       visible={visible}
@@ -1154,6 +1221,32 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
   segmentSelected: {},
+});
+
+// The new design: full-bleed rows with a 16pt gutter, no cards.
+const v2 = StyleSheet.create({
+  content: {},
+  section: { paddingTop: 8, paddingBottom: 8, borderBottomWidth: layoutV2.hairline },
+  sectionTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4 },
+  footer: { paddingHorizontal: layoutV2.gutter, paddingTop: 4, paddingBottom: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingVertical: 12,
+    paddingHorizontal: layoutV2.gutter,
+    gap: 16,
+  },
+  rowLabel: { flex: 1 },
+  // A row without an icon lines up with the labels of those with one.
+  indent: { marginLeft: 40 },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: layoutV2.rowPad,
+  },
+  pills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
 });
 
 const makeStyles = (theme: ThemeColors) =>

@@ -1,84 +1,76 @@
-// Design v2 tokens ("paper and ink"), from "Revisely UI Modernization:
-// Research & Plan". Used when the new design is on (design/DesignContext):
+// Design v2 tokens: the new design's look, from "Revisely: Threads-style UI
+// Migration". Used when the new design is on (design/DesignContext).
 //
-// - flat paper (light) or ink (dark) grounds, no gradient;
-// - one accent, jade, for "act here" and "done"; gold only for milestones;
-// - text pairs checked against WCAG (every value ≥ 4.5:1 on its ground).
+// - white (light) or black (dark) grounds, flat: no cards, no glass, no gradient;
+// - content is a feed of rows on 0.5pt separators, with avatar-size marks;
+// - no accent tint: the primary button is solid black (white in dark). Revisely's
+//   jade appears only for "done";
+// - text pairs are checked against WCAG (src/design/__tests__): ≥ 4.5:1.
 //
-// `v2ThemeColors` maps the palette onto the classic ThemeColors names, so every
-// screen picks up the new colours at once; screens moved to the new design use
-// the richer names (paper, ink, jadeWash…) through useDesign().
+// `v2ThemeColors` maps the palette onto the classic ThemeColors names, so
+// screens not yet moved take the new colours at once; moved screens use the
+// palette names through useTheme().palette.
 
 import { TextStyle } from 'react-native';
 import type { ThemeColors } from './colors';
 
 export interface PaletteV2 {
-  /** Screen ground, flat. */
-  paper: string;
-  /** Grouped rows, the one card per screen. */
-  surface: string;
-  /** Wells: tracks, inputs, segmented control base. */
-  surfaceSunken: string;
-  ink: string;
-  ink2: string;
-  /** Metadata; not on surfaceSunken in light. */
-  ink3: string;
-  /** Hairlines (0.5pt). */
-  line: string;
-  /** The one accent: primary action, done state, links. */
-  jade: string;
-  onJade: string;
-  /** Selected row, verse highlight, chip fill. */
-  jadeWash: string;
-  /** Milestones only. */
-  gold: string;
-  /** Page strength, weakest (1) to strongest (5); always with a label. */
-  strength: [string, string, string, string, string];
-  danger: string;
-  dangerWash: string;
-  warning: string;
-  warningWash: string;
-  warningInk: string;
+  /** Screen ground. */
+  bg: string;
+  text: string;
+  /** Metadata, placeholders, inactive icons. */
+  secondary: string;
+  /** Hairlines between rows (0.5pt) and the thread line. */
+  separator: string;
+  /** Destructive actions and errors. */
+  red: string;
+  /** Revisely jade, for "done" only. */
+  done: string;
+  /** Text or a glyph on `done`. */
+  onDone: string;
+  /** Marks, chips, the Cancel bar: a quiet fill on the ground. */
+  fill: string;
+  /** Sheets and menus. */
+  sheet: string;
+  /** A sheet's grab handle. */
+  handle: string;
+  /** Dimmed backdrop behind a sheet. */
+  overlay: string;
+  /** The primary (solid) button. */
+  primary: string;
+  onPrimary: string;
 }
 
 export const paletteLight: PaletteV2 = {
-  paper: '#FAF7F0',
-  surface: '#FFFFFF',
-  surfaceSunken: '#F2EDE3',
-  ink: '#1C1A17',
-  ink2: '#5E564C',
-  ink3: '#746C60',
-  line: '#E6DFD2',
-  jade: '#0E6B5A',
-  onJade: '#FFFFFF',
-  jadeWash: '#E3EFEA',
-  gold: '#8F6524',
-  strength: ['#A8402F', '#A0611D', '#7E7035', '#56794E', '#0E6B5A'],
-  danger: '#A8402F',
-  dangerWash: '#F7E6E1',
-  warning: '#A0611D',
-  warningWash: '#F8ECDB',
-  warningInk: '#6E4210',
+  bg: '#FFFFFF',
+  text: '#1A1A1A',
+  secondary: '#6B7280',
+  separator: '#E5E7EB',
+  red: '#DC2626',
+  done: '#0E6B5A',
+  onDone: '#FFFFFF',
+  fill: '#F7F7F8',
+  sheet: '#FFFFFF',
+  handle: '#D1D5DB',
+  overlay: 'rgba(0,0,0,0.4)',
+  primary: '#1A1A1A',
+  onPrimary: '#FFFFFF',
 };
 
 export const paletteDark: PaletteV2 = {
-  paper: '#0F1211',
-  surface: '#181C1A',
-  surfaceSunken: '#0A0C0B',
-  ink: '#F2EEE6',
-  ink2: '#B5AD9F',
-  ink3: '#8E877B',
-  line: '#2A302C',
-  jade: '#4DBA9F',
-  onJade: '#0F1211',
-  jadeWash: '#12302A',
-  gold: '#D9B26E',
-  strength: ['#E08A78', '#E0A15E', '#CDBB7A', '#93C08A', '#4DBA9F'],
-  danger: '#E08A78',
-  dangerWash: '#3A1D17',
-  warning: '#E0A15E',
-  warningWash: '#33240F',
-  warningInk: '#F0D8A8',
+  bg: '#000000',
+  text: '#FFFFFF',
+  secondary: '#8A8A93',
+  separator: '#1F1F1F',
+  red: '#F87171',
+  done: '#4DBA9F',
+  onDone: '#000000',
+  fill: '#181818',
+  sheet: '#101010',
+  handle: '#3A3A3C',
+  overlay: 'rgba(0,0,0,0.6)',
+  primary: '#FFFFFF',
+  onPrimary: '#000000',
 };
 
 export function paletteV2(isDark: boolean): PaletteV2 {
@@ -89,82 +81,88 @@ export function paletteV2(isDark: boolean): PaletteV2 {
 export function v2ThemeColors(isDark: boolean): ThemeColors {
   const p = paletteV2(isDark);
   return {
-    bg: p.paper,
-    bgAlt: p.surfaceSunken,
-    surface: p.surface,
-    bgDark: isDark ? '#070908' : '#1C1A17',
-    textPrimary: p.ink,
-    textSecondary: p.ink2,
-    textMuted: p.ink3,
-    textInverse: p.paper,
-    accent: p.jade,
-    accentSoft: p.jadeWash,
-    gold: p.gold,
-    success: p.jade,
-    successBg: p.jadeWash,
-    warning: p.warning,
-    warningBg: p.warningWash,
-    warningText: p.warningInk,
-    error: p.danger,
-    errorBg: p.dangerWash,
-    border: p.line,
-    borderLight: p.line,
-    // Content is flat in v2: what used to be a translucent fill is a surface.
-    glass: p.surface,
+    bg: p.bg,
+    bgAlt: p.fill,
+    surface: p.bg,
+    bgDark: isDark ? '#000000' : '#1A1A1A',
+    textPrimary: p.text,
+    textSecondary: p.secondary,
+    textMuted: p.secondary,
+    textInverse: p.bg,
+    // No accent tint: what was jade is the ink (solid black, white in dark).
+    accent: p.primary,
+    accentSoft: p.fill,
+    onAccent: p.onPrimary,
+    gold: p.text,
+    success: p.done,
+    successBg: p.fill,
+    warning: isDark ? '#FBBF24' : '#B45309',
+    warningBg: p.fill,
+    warningText: isDark ? '#FBBF24' : '#92400E',
+    error: p.red,
+    errorBg: isDark ? '#2A1212' : '#FEF2F2',
+    border: p.separator,
+    borderLight: p.separator,
+    // Flat: what used to be a translucent fill is the quiet fill.
+    glass: p.fill,
   };
 }
 
-/** Display face (Latin): Newsreader, OFL, loaded in App.tsx. */
-export const fontsV2 = {
-  display: 'Newsreader_500Medium',
-  displayRegular: 'Newsreader_400Regular',
-  /** Arabic display (salam, bismillah, surah names): Amiri. */
-  arabic: 'Amiri-Regular',
-};
+/** Arabic everywhere in the new design: Amiri (loaded in App.tsx). */
+export const fontsV2 = { arabic: 'Amiri-Regular' } as const;
 
 const t = <T extends Record<string, TextStyle>>(x: T) => x;
 
 /**
- * Type scale, mapped to iOS text styles. SF Pro for UI (no fontFamily set);
- * Newsreader for at most one display moment per screen; Amiri for Arabic.
- * No uppercase styles: section headers are sentence case.
+ * Type: SF Pro for everything Latin (no fontFamily set), Amiri for Arabic.
+ * Sentence case only; no uppercase eyebrows.
  */
 export const typeV2 = t({
-  /** Large Title, the one serif moment on a screen. */
-  display: { fontFamily: fontsV2.display, fontSize: 34, lineHeight: 40, letterSpacing: -0.4 },
-  /** Title 2. */
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '600', letterSpacing: -0.2 },
-  /** Headline: row titles, section headers that carry weight. */
-  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  body: { fontSize: 17, lineHeight: 22, fontWeight: '400' },
-  /** Subheadline: section headers, secondary rows. */
-  subhead: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
-  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  /** Large screen title (Activity, Insights). */
+  largeTitle: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
+  /** A profile-style name at the top of a screen. */
+  title: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.2 },
+  /** Top bar title. */
+  barTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  /** Sheet and menu titles. */
+  sheetTitle: { fontSize: 18, lineHeight: 24, fontWeight: '600' },
+  /** A row's author: who or what the row is about. */
+  name: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
+  body: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
+  /** Time, counts, footers. */
+  meta: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  /** Menu rows. */
+  menu: { fontSize: 16, lineHeight: 21, fontWeight: '400' },
+  button: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
   /** Numbers that line up (counts, times). */
-  numeral: { fontWeight: '600', fontVariant: ['tabular-nums'] },
+  numeral: { fontVariant: ['tabular-nums'] },
 });
 
-/** Arabic beside Latin: 1.3× the Latin size, line height 1.6×. */
-export function arabicDisplay(latinSize: number): TextStyle {
-  const size = Math.round(latinSize * 1.3);
+/** Arabic text in Amiri: a little larger than the Latin beside it, with room for its marks. */
+export function arabicV2(size: number): TextStyle {
   return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.round(size * 1.6) };
 }
 
-/** Concentric radii: chips, controls, the one card, sheets and the capsule. */
-export const radiusV2 = { chip: 8, control: 12, card: 16, sheet: 24, full: 999 } as const;
+/** Avatar-size marks: a top-level row, a reply, a nested reply. */
+export const markV2 = { top: 40, reply: 36, nested: 28 } as const;
+export type MarkSize = keyof typeof markV2;
 
-/** Layout constants. */
 export const layoutV2 = {
-  screenMargin: 20,
-  sectionGap: 32,
-  rowPaddingV: 12,
-  rowPaddingH: 16,
-  headerGap: 8,
+  /** Side padding on every screen. */
+  gutter: 16,
+  /** Vertical padding of a top-level row. */
+  rowPad: 16,
+  /** Vertical padding of a nested row. */
+  nestedPad: 12,
+  /** Between a mark and its row's text. */
+  markGap: 12,
+  /** The line joining a thread's marks. */
+  threadLine: 2,
+  /** Separators. */
+  hairline: 0.5,
+  /** The grab handle on sheets. */
+  handle: { width: 40, height: 4 },
 } as const;
 
-/** Two springs only. */
-export const springsV2 = {
-  snappy: { damping: 26, stiffness: 320, mass: 0.7 },
-  gentle: { damping: 22, stiffness: 160, mass: 0.9 },
-} as const;
+/** Pills 16–20, sheets 20, media 12. */
+export const radiusV2 = { chip: 8, media: 12, cancel: 16, pill: 18, sheet: 20, full: 999 } as const;

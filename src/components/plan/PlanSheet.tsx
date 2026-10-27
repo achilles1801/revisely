@@ -15,6 +15,8 @@ import {
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../GlassCard';
+import { useDesign } from '../../design/DesignContext';
+import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
 
@@ -59,7 +61,8 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
   },
   ref,
 ) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const insets = useSafeAreaInsets();
 
   const renderBackdrop = useCallback(
@@ -100,8 +103,12 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
         if (index >= 0) onPresented?.();
       }}
       backdropComponent={renderBackdrop}
-      backgroundComponent={SheetGlassBackground}
-      handleIndicatorStyle={{ backgroundColor: theme.textMuted, opacity: 0.4, width: 36 }}
+      backgroundComponent={isNew ? SheetSolidBackground : SheetGlassBackground}
+      handleIndicatorStyle={
+        isNew
+          ? { backgroundColor: palette.handle, width: layoutV2.handle.width, height: layoutV2.handle.height }
+          : { backgroundColor: theme.textMuted, opacity: 0.4, width: 36 }
+      }
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
@@ -131,6 +138,12 @@ function SheetGlassBackground({ style }: BottomSheetBackgroundProps) {
   );
 }
 
+/** The new design's sheet: solid, 20pt corners. */
+function SheetSolidBackground({ style }: BottomSheetBackgroundProps) {
+  const { palette } = useTheme();
+  return <View style={[style, styles.background, styles.backgroundV2, { backgroundColor: palette.sheet }]} pointerEvents="none" />;
+}
+
 export function SheetHeader({
   title,
   leftLabel,
@@ -144,15 +157,16 @@ export function SheetHeader({
   'title' | 'leftLabel' | 'onLeft' | 'rightLabel' | 'onRight' | 'rightDisabled' | 'rightLoading'
 >) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, isNew && { borderBottomWidth: layoutV2.hairline, borderBottomColor: theme.border, marginBottom: 6 }]}>
       <View style={[styles.side, styles.sideLeft]}>
         {leftLabel && onLeft ? (
           <HeaderButton label={leftLabel} onPress={onLeft} color={theme.accent} />
         ) : null}
       </View>
       <Text
-        style={[styles.title, { color: theme.textPrimary }]}
+        style={[styles.title, isNew && typeV2.sheetTitle, { color: theme.textPrimary }]}
         numberOfLines={1}
         accessibilityRole="header"
       >
@@ -219,6 +233,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     overflow: 'hidden',
   },
+  backgroundV2: { borderTopLeftRadius: radiusV2.sheet, borderTopRightRadius: radiusV2.sheet },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
