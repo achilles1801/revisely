@@ -439,7 +439,55 @@ h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 10px 22px; }
 .site-footer a { text-decoration: none; color: var(--secondary); }
 .site-footer a:hover { color: var(--text); }
+.site-footer a[aria-current="page"] { color: var(--text); }
 .site-footer p { margin: 0; }
+
+/* ---------- Donate ---------- */
+
+.give-hero { position: relative; isolation: isolate; padding: 64px 0 80px; text-align: center; }
+.give-hero::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  left: 0; right: 0; top: -61px; height: 560px;
+  background: var(--glow);
+}
+.give-hero .icon { width: 72px; height: 72px; border-radius: 16px; margin: 0 auto 28px; }
+@media (prefers-color-scheme: dark) { .give-hero .icon { box-shadow: 0 0 0 1px var(--separator); } }
+.give-title {
+  font-size: clamp(2.3rem, 6vw, 3.5rem); line-height: 1.04; letter-spacing: -0.035em;
+  max-width: 16ch; margin: 0 auto; text-wrap: balance;
+}
+.give-hero .lede { margin: 20px auto 0; text-wrap: pretty; }
+@media (min-width: 900px) { .give-hero { padding: 88px 0 104px; } }
+
+/* donate.js sets data-state: "open" with a payment link, "soon" without one. */
+.give-action { margin-top: 36px; min-height: 92px; }
+.give-open, .give-soon { display: none; }
+.give-action[data-state="open"] .give-open { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.give-action[data-state="soon"] .give-soon { display: inline-block; }
+.pill-lg { min-height: 50px; padding: 0 36px; font-size: 17px; }
+.give-note { margin: 0; font-size: 15px; color: var(--secondary); text-wrap: balance; }
+.give-soon {
+  margin: 0; padding: 12px 22px; border-radius: 999px;
+  background: var(--fill); color: var(--secondary);
+  font-size: 15px; font-weight: 600;
+}
+
+.give-notes { border-top: 0.5px solid var(--separator); padding: 72px 0; }
+.give-notes .head { max-width: 40rem; margin-bottom: 28px; }
+.notes { list-style: none; margin: 0; padding: 0; max-width: 46rem; }
+.notes li { padding: 16px 0; border-top: 0.5px solid var(--separator); color: var(--secondary); }
+.notes li:last-child { border-bottom: 0.5px solid var(--separator); }
+.notes strong { color: var(--text); font-weight: 600; }
+@media (min-width: 900px) {
+  .give-notes .wrap { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 64px; align-items: start; }
+  .give-notes .head { margin-bottom: 0; }
+}
+
+.give-close { border-top: 0.5px solid var(--separator); padding: 72px 0 88px; text-align: center; }
+.give-close-title { font-size: 1.35rem; letter-spacing: -0.02em; }
+.give-close p { margin: 10px auto 0; max-width: 30rem; color: var(--secondary); text-wrap: balance; }
+.give-link { display: inline-block; margin-top: 18px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.give-link:hover { color: var(--accent); text-decoration: underline; }
 
 /* ---------- Document pages (privacy, terms, support) ---------- */
 
