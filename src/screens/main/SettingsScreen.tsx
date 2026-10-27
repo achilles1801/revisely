@@ -65,6 +65,7 @@ import {
   useHomePrefs,
 } from '../../lib/homePrefs';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
+import { supportMailto } from '../../lib/contact';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -1014,7 +1015,7 @@ export default function SettingsScreen() {
             icon="mail-outline"
             label="Contact support"
             onPress={() =>
-              Linking.openURL('mailto:privacy@revisely.app?subject=Revisely%20support')
+              Linking.openURL(supportMailto())
             }
             isLast
           />
