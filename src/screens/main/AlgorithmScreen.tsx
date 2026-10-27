@@ -41,12 +41,31 @@ import {
 import { getQuranPageImageUrl } from '../../lib/quranImages';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
 import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
+import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { ProgressBar } from '../../components/ProgressBar';
+import { ActionSheet } from '../../components/v2/ActionSheet';
+import { PillButton } from '../../components/v2/PillButton';
+import { PillTabs } from '../../components/v2/PillTabs';
+import {
+  Hairline,
+  InsightRow,
+  PagePreviewSheet,
+  QuietLine,
+  SectionHeader,
+  ShowMore,
+  StrengthBar,
+} from '../../components/insights/InsightsV2';
+import { layoutV2, typeV2 } from '../../theme/v2';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_OUTER_MARGIN = spacing.lg * 2;
 const FOCUS_ITEM_WIDTH = SCREEN_WIDTH - CARD_OUTER_MARGIN;
 
 type BrowseMode = 'pages' | 'surahs' | 'juz';
+
+// The new design: Focus lists the first few; Browse shows a few, then "Show all".
+const FOCUS_LIMIT_V2 = 3;
+const LIST_LIMIT_V2 = 3;
 
 interface PageRow {
   pageNumber: number;
@@ -76,6 +95,14 @@ interface JuzRow {
   pageCount: number;
 }
 
+/**
+ * A juz row's meta: the numbers, then the juz's Arabic name in an isolate.
+ * Arabic first would make the whole line right to left ("page · average 1.0 1 · الم").
+ */
+export function juzMeta(juz: number, pageCount: number, avgStrength: number): string {
+  return `${pageCount} page${pageCount === 1 ? '' : 's'} · average ${avgStrength.toFixed(1)} · \u2068${getJuzName(juz)}\u2069`;
+}
+
 export default function AlgorithmScreen() {
   const { theme, isDark, palette } = useTheme();
   const { user, pages, logs, loadData } = useApp();
@@ -92,6 +119,7 @@ export default function AlgorithmScreen() {
   const [helpOpen, setHelpOpen] = useState(false);
   // The new design has no help buttons.
   const { isNew } = useDesign();
+  const tabFootprint = useTabBarFootprint();
   const [expandedLists, setExpandedLists] = useState<Record<BrowseMode, boolean>>({
     pages: false,
     surahs: false,
@@ -202,6 +230,16 @@ export default function AlgorithmScreen() {
       .slice(0, 10);
   }, [filteredPageRows]);
 
+  // The new design's Focus: the first few of every page, whatever Browse is
+  // filtered to (its filters sit below it).
+  const topPages = useMemo(
+    (): PageRow[] =>
+      [...allPageRows]
+        .sort((a, b) => (a.strength !== b.strength ? a.strength - b.strength : b.urgency - a.urgency))
+        .slice(0, FOCUS_LIMIT_V2),
+    [allPageRows],
+  );
+
   const sortedPages = useMemo((): PageRow[] => {
     const base =
       strengthFilter === null
@@ -290,6 +328,15 @@ export default function AlgorithmScreen() {
   }, [juzFilter]);
 
   if (!user) {
+    if (isNew) {
+      return (
+        <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+          <View style={styles.loadingContainer} testID="insights-loading">
+            <ActivityIndicator color={palette.secondary} />
+          </View>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.loadingContainer}>
@@ -312,6 +359,214 @@ export default function AlgorithmScreen() {
   const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
   const strengthFilterLabel =
     strengthFilter === null ? 'All strengths' : getRatingLabel(strengthFilter);
+
+  if (isNew) {
+    // The new design: a large title, then flat sections on hairlines.
+    // Strength (one bar: how many pages are weak, moderate, strong), Focus
+    // (the first few pages to revise), Browse (pages, surahs or juz, weakest
+    // first, filtered by juz and strength). A row opens its page in a sheet;
+    // a juz narrows Browse to it.
+    const listRows =
+      browseMode === 'pages' ? sortedPages.length : browseMode === 'surahs' ? sortedSurahs.length : sortedJuz.length;
+    const expanded = expandedLists[browseMode];
+    const limit = expanded ? Infinity : LIST_LIMIT_V2;
+    const emptyBrowse =
+      browseMode === 'juz' ? 'Nothing memorized yet' : `No ${browseMode} match these filters`;
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
+          testID="insights-v2"
+        >
+          <View style={v2.titleBlock}>
+            <Text style={[typeV2.largeTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+              Insights
+            </Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]}>Where you stand and what to focus on</Text>
+          </View>
+          <Hairline />
+
+          {!hasEnoughSessions ? (
+            <View testID="insights-warming">
+              <SectionHeader title="Insights warming up" />
+              <View style={v2.block}>
+                <Text style={[typeV2.body, { color: palette.secondary }]}>
+                  {`They start after ${INSIGHTS_MIN_SESSIONS} completed revision sessions.`}
+                </Text>
+                <View style={v2.progress}>
+                  <ProgressBar
+                    progress={(Math.min(completedSessionCount, INSIGHTS_MIN_SESSIONS) / INSIGHTS_MIN_SESSIONS) * 100}
+                    height={6}
+                    testID="insights-warming-progress"
+                  />
+                </View>
+                <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
+                  {`${completedSessionCount} of ${INSIGHTS_MIN_SESSIONS} so far`}
+                </Text>
+              </View>
+              <Hairline />
+            </View>
+          ) : (
+            <>
+              {allPageRows.length > 0 && (
+                <>
+                  <SectionHeader
+                    title="Strength"
+                    detail={`${allPageRows.length} revised page${allPageRows.length === 1 ? '' : 's'}`}
+                  />
+                  <StrengthBar ratings={allPageRows.map((r) => r.strength)} />
+                  <Hairline />
+                </>
+              )}
+
+              <SectionHeader title="Focus" detail="Revise these first: the weakest and most overdue" />
+              {topPages.length === 0 ? (
+                <QuietLine testID="focus-empty">Your top priority will appear here.</QuietLine>
+              ) : (
+                topPages.map((row, i) => (
+                  <InsightRow
+                    key={`focus-${row.pageNumber}`}
+                    number={row.pageNumber}
+                    name={`Page ${row.pageNumber} · ${row.surahName}`}
+                    rating={row.strength}
+                    text={`${getRatingLabel(row.strength)} · ${row.reason}`}
+                    onPress={() => openPagePreview(row.pageNumber)}
+                    separator={i < topPages.length - 1}
+                    testID={`focus-${row.pageNumber}`}
+                  />
+                ))
+              )}
+              <Hairline />
+
+              <SectionHeader title="Browse" detail="Weakest first" />
+              <View style={v2.controls}>
+                <PillTabs<BrowseMode>
+                  options={[
+                    { value: 'pages', label: 'Pages' },
+                    { value: 'surahs', label: 'Surahs' },
+                    { value: 'juz', label: 'Juz' },
+                  ]}
+                  value={browseMode}
+                  onChange={setBrowseMode}
+                  testID="browse-tabs"
+                />
+                <View style={v2.filters}>
+                  {browseMode !== 'juz' && (
+                    <PillButton
+                      title={filterLabel}
+                      icon="filter-outline"
+                      size="sm"
+                      variant={juzFilter !== null ? 'solid' : 'outline'}
+                      onPress={() => setJuzPickerOpen(true)}
+                      accessibilityLabel={`Juz: ${filterLabel}`}
+                      testID="filter-juz"
+                    />
+                  )}
+                  <PillButton
+                    title={strengthFilterLabel}
+                    icon="pulse-outline"
+                    size="sm"
+                    variant={strengthFilter !== null ? 'solid' : 'outline'}
+                    onPress={() => setStrengthPickerOpen(true)}
+                    accessibilityLabel={`Strength: ${strengthFilterLabel}`}
+                    testID="filter-strength"
+                  />
+                </View>
+              </View>
+              <Hairline />
+              {listRows === 0 ? (
+                <QuietLine testID="browse-empty">{emptyBrowse}</QuietLine>
+              ) : (
+                <View testID={`browse-${browseMode}`}>
+                  {browseMode === 'pages' &&
+                    sortedPages.slice(0, limit).map((row) => (
+                      <InsightRow
+                        key={`page-${row.pageNumber}`}
+                        number={row.pageNumber}
+                        name={`Page ${row.pageNumber} · ${row.surahName}`}
+                        rating={row.strength}
+                        text={`${getRatingLabel(row.strength)} · Juz ${row.juzNumber} · revised ${row.daysSinceRevision}d ago`}
+                        onPress={() => openPagePreview(row.pageNumber)}
+                        testID={`browse-page-${row.pageNumber}`}
+                      />
+                    ))}
+                  {browseMode === 'surahs' &&
+                    sortedSurahs.slice(0, limit).map((row) => (
+                      <InsightRow
+                        key={`surah-${row.surahNumber}`}
+                        number={row.surahNumber}
+                        name={row.surahName}
+                        rating={Math.round(row.avgStrength)}
+                        text={`${row.pageCount} page${row.pageCount === 1 ? '' : 's'} memorized · average ${row.avgStrength.toFixed(1)}`}
+                        onPress={() => openPagePreview(row.weakestPage)}
+                        accessibilityLabel={`${row.surahName}, ${row.pageCount} pages memorized, average strength ${row.avgStrength.toFixed(1)}. Opens its weakest page`}
+                        testID={`browse-surah-${row.surahNumber}`}
+                      />
+                    ))}
+                  {browseMode === 'juz' &&
+                    sortedJuz.slice(0, limit).map((row) => (
+                      <InsightRow
+                        key={`juz-${row.juzNumber}`}
+                        number={row.juzNumber}
+                        name={`Juz ${row.juzNumber}`}
+                        rating={Math.round(row.avgStrength)}
+                        text={juzMeta(row.juzNumber, row.pageCount, row.avgStrength)}
+                        onPress={() => handleJuzRowTap(row.juzNumber)}
+                        accessibilityLabel={`Juz ${row.juzNumber}, ${row.pageCount} pages, average strength ${row.avgStrength.toFixed(1)}. Shows its pages`}
+                        testID={`browse-juz-${row.juzNumber}`}
+                      />
+                    ))}
+                  {listRows > LIST_LIMIT_V2 ? (
+                    <ShowMore
+                      expanded={expanded}
+                      hidden={listRows - LIST_LIMIT_V2}
+                      onToggle={() => toggleListExpansion(browseMode)}
+                    />
+                  ) : null}
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+
+        <ActionSheet
+          visible={juzPickerOpen}
+          onClose={() => setJuzPickerOpen(false)}
+          title="Filter by juz"
+          actions={[
+            { key: 'all', label: 'All juz', selected: juzFilter === null, onPress: () => setJuzFilter(null) },
+            ...availableJuz.map((juz) => ({
+              key: `juz-${juz}`,
+              label: `Juz ${juz}`,
+              subtitle: getJuzName(juz),
+              selected: juzFilter === juz,
+              onPress: () => setJuzFilter(juz),
+            })),
+          ]}
+          testID="juz-picker"
+        />
+        <ActionSheet
+          visible={strengthPickerOpen}
+          onClose={() => setStrengthPickerOpen(false)}
+          title="Filter by strength"
+          actions={[
+            { key: 'all', label: 'All strengths', selected: strengthFilter === null, onPress: () => setStrengthFilter(null) },
+            ...RATINGS.map((rating) => ({
+              key: `strength-${rating.value}`,
+              label: rating.label,
+              selected: strengthFilter === rating.value,
+              onPress: () => setStrengthFilter(rating.value),
+            })),
+          ]}
+          testID="strength-picker"
+        />
+        <PagePreviewSheet pageNumber={previewPage} onClose={() => setPreviewPage(null)} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -1166,6 +1421,15 @@ function PagePreviewModal({
     </Modal>
   );
 }
+
+// The new design.
+const v2 = StyleSheet.create({
+  titleBlock: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 12, gap: 2 },
+  block: { paddingHorizontal: layoutV2.gutter, paddingBottom: layoutV2.rowPad, gap: 10 },
+  progress: { paddingVertical: 2 },
+  controls: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 12, gap: 10 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

@@ -13,7 +13,9 @@ import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset'
 import { PressableScale } from '../../components/PressableScale';
 import { useTheme } from '../../context/ThemeContext';
 import { useDesign } from '../../design/DesignContext';
-import { typeV2 } from '../../theme/v2';
+import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { Mark } from '../../components/v2/Mark';
+import { Tap } from '../../components/v2/Tap';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
@@ -76,7 +78,7 @@ function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
 
 export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { isDark } = useTheme();
+  const { isDark, palette: v2Palette } = useTheme();
   const { isNew: isNewDesign } = useDesign();
   const palette = getReadPalette(isDark, isNewDesign);
   const tabFootprint = useTabBarFootprint();
@@ -132,6 +134,55 @@ export default function ReadIndexScreen() {
     }
     return Array.from(groups.values()).sort((a, b) => a.juz - b.juz);
   }, []);
+
+  if (isNewDesign) {
+    // The new design: a large title, then flat rows on hairlines under a bold
+    // header per juz. A surah's number sits in its mark, its Arabic name (in
+    // Amiri) at the end.
+    const headerV2 = (
+      <View>
+        <View style={v2.titleBlock}>
+          <Text style={[typeV2.largeTitle, { color: v2Palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+            Surahs
+          </Text>
+        </View>
+        {recent.length > 0 && (
+          <View testID="read-recent">
+            <SectionTitleV2 title="Recent pages" />
+            {recent.map((entry) => (
+              <RecentRowV2
+                key={`recent-${entry.pageNumber}-${entry.lastReadAt}`}
+                entry={entry}
+                onPress={() => openPage(entry.pageNumber)}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    );
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: v2Palette.bg }]}>
+        <FlatList
+          ref={listRef}
+          data={juzGroups}
+          showsVerticalScrollIndicator
+          indicatorStyle={isDark ? 'white' : 'black'}
+          keyExtractor={(item) => `juz-group-${item.juz}`}
+          ListHeaderComponent={headerV2}
+          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+          renderItem={({ item }) => (
+            <View testID={`read-juz-${item.juz}`}>
+              <SectionTitleV2 title={`Juz' ${item.juz}`} />
+              {item.surahs.map((s) => (
+                <SurahRowV2 key={s.key} row={s} onPress={() => openPage(s.startPage)} />
+              ))}
+            </View>
+          )}
+          testID="read-index-v2"
+        />
+      </SafeAreaView>
+    );
+  }
 
   const header = (
     <View style={styles.headerWrap}>
@@ -272,6 +323,93 @@ function SurahCardRow({
     </PressableScale>
   );
 }
+
+// ===== The new design =====
+
+function SectionTitleV2({ title }: { title: string }) {
+  const { palette } = useTheme();
+  return (
+    <View style={v2.sectionTitle}>
+      <Text style={[typeV2.name, { color: palette.text }]} accessibilityRole="header">
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: () => void }) {
+  const { palette } = useTheme();
+  const surah = getFirstSurahOnPage(entry.pageNumber);
+  const display = surah
+    ? getSurahDisplay(surah.number) ?? fallbackDisplay(surah.name, surah.nameArabic)
+    : null;
+  const name = display?.nameDisplay ?? `Page ${entry.pageNumber}`;
+  const when = formatRelativeTime(entry.lastReadAt);
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}, page ${entry.pageNumber}, read ${when}`}
+      style={[v2.row, { borderBottomColor: palette.separator }]}
+      testID={`recent-${entry.pageNumber}`}
+    >
+      <Mark size="reply" icon="time-outline" />
+      <View style={v2.main}>
+        <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Page ${entry.pageNumber} · ${when}`}</Text>
+      </View>
+      {display?.nameArabicVoweled ? (
+        <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+          {display.nameArabicVoweled}
+        </Text>
+      ) : null}
+    </Tap>
+  );
+}
+
+function SurahRowV2({ row, onPress }: { row: SurahRow; onPress: () => void }) {
+  const { palette } = useTheme();
+  const verses = row.ayahCount > 0 ? ` · ${row.ayahCount} verses` : '';
+  const meta = `${row.revelationPlace}${verses} · page ${row.startPage}`;
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${row.number}. ${row.nameDisplay}, ${meta}`}
+      style={[v2.row, { borderBottomColor: palette.separator }]}
+      testID={`surah-${row.number}`}
+    >
+      <Mark size="reply" label={String(row.number)} />
+      <View style={v2.main}>
+        <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1}>
+          {row.nameDisplay}
+        </Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
+      </View>
+      <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+        {row.nameArabicVoweled}
+      </Text>
+    </Tap>
+  );
+}
+
+const v2 = StyleSheet.create({
+  titleBlock: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4 },
+  sectionTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad + 8, paddingBottom: 4 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: layoutV2.markGap,
+    minHeight: 64,
+    paddingVertical: 10,
+    paddingHorizontal: layoutV2.gutter,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  main: { flex: 1, minWidth: 0 },
+  arabic: { maxWidth: 140, textAlign: 'right' },
+});
 
 const makeStyles = (palette: ReadPalette) =>
   StyleSheet.create({

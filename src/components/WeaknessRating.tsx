@@ -20,7 +20,8 @@ import { useHaptics } from '../design/haptics';
 import { Sheet } from './v2/Sheet';
 import { Tap } from './v2/Tap';
 import { Toggle } from './v2/TopBar';
-import { typeV2 } from '../theme/v2';
+import { layoutV2, typeV2 } from '../theme/v2';
+import { strengthTone } from './insights/strength';
 
 interface WeaknessModalProps {
   pageNumber: number;
@@ -30,12 +31,13 @@ interface WeaknessModalProps {
   onClose: () => void;
 }
 
-// Maps a 1–5 rating to a semantic color from the theme. `good` is the new
-// design's status green: strong stays green whatever the accent.
-function ratingTone(rating: number, theme: ThemeColors, good?: string): string {
+// Maps a 1–5 rating to a semantic color from the theme (classic). The new
+// design uses strengthTone: weak red, moderate grey, strong green whatever
+// the accent.
+function ratingTone(rating: number, theme: ThemeColors): string {
   if (rating <= 2) return theme.error;
   if (rating === 3) return theme.warning;
-  return good ?? theme.accent;
+  return theme.accent;
 }
 
 export function WeaknessModal({
@@ -117,7 +119,7 @@ export function WeaknessModal({
               style={v2.row}
               testID={`rating-${rating.value}`}
             >
-              <View style={[v2.dot, { backgroundColor: ratingTone(rating.value, theme, palette.good) }]} />
+              <View style={[v2.dot, { backgroundColor: strengthTone(rating.value, palette) }]} testID={`rating-dot-${rating.value}`} />
               <Text style={[typeV2.menu, v2.label, { color: palette.text }, selected && v2.selected]}>{rating.label}</Text>
               {selected ? <Ionicons name="checkmark" size={20} color={palette.text} /> : null}
             </Tap>
@@ -310,5 +312,5 @@ const v2 = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   label: { flex: 1 },
   selected: { fontWeight: '600' },
-  juz: { borderTopWidth: 0.5, marginTop: 6 },
+  juz: { borderTopWidth: layoutV2.hairline, marginTop: 6 },
 });

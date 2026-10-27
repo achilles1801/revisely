@@ -20,6 +20,10 @@ import { WeaknessModal } from './WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from './revision/SessionMenuSheet';
 import { RevisionLog, QuranPage } from '../types';
 import { useDesign } from '../design/DesignContext';
+import { useHaptics } from '../design/haptics';
+import { RoundButton } from './reader/RoundButton';
+import { getReadPalette } from '../theme/readPalette';
+import { arabicV2, layoutV2, typeV2 } from '../theme/v2';
 import {
   getHizbForPage,
   getJuzForPage,
@@ -47,6 +51,7 @@ export function EditSessionModal({
 }: EditSessionModalProps) {
   const { theme, isDark, palette } = useTheme();
   const { isNew: isNewDesign } = useDesign();
+  const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
@@ -96,6 +101,7 @@ export function EditSessionModal({
 
   const isCurrentRevised = revisedPages.has(currentPageNumber);
   const toggleCurrent = () => {
+    if (isNewDesign) haptics.selection();
     setRevisedPages((prev) => {
       const next = new Set(prev);
       if (next.has(currentPageNumber)) next.delete(currentPageNumber);
@@ -133,6 +139,25 @@ export function EditSessionModal({
     return actions;
   }, [smartTrackingEnabled, currentPageNumber]);
 
+  // The new design: the session's page colours and its bare header icons
+  // (components/reader/RoundButton), the page marked revised the "done" check.
+  const read = getReadPalette(isDark, true);
+  const topBar = isNewDesign ? (
+    <View style={[styles.topBar, v2.topBar, { backgroundColor: read.pageBg }]}>
+      <RoundButton icon="close" label="Close and save" onPress={handleCloseWithSave} palette={read} />
+      <View style={styles.spacer} />
+      <RoundButton
+        icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
+        label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+        onPress={toggleCurrent}
+        palette={read}
+        active={isCurrentRevised}
+      />
+      <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={read} />
+    </View>
+  ) : null;
+  const crumbText = isNewDesign ? [typeV2.meta, { color: read.textSecondary }] : null;
+
   return (
     <Modal
       visible={visible}
@@ -140,10 +165,11 @@ export function EditSessionModal({
       presentationStyle="fullScreen"
       onRequestClose={handleCloseWithSave}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, isNewDesign && { backgroundColor: read.pageBg }]} testID="edit-session">
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-        {/* Top bar — matches SessionBar's monochrome styling, no center text. */}
+        {topBar ?? (
+        /* Top bar — matches SessionBar's monochrome styling, no center text. */
         <View style={styles.topBar}>
           <PressableScale
             onPress={handleCloseWithSave}
@@ -186,6 +212,7 @@ export function EditSessionModal({
             <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
           </PressableScale>
         </View>
+        )}
 
         <View style={styles.viewerWrap}>
           <MushafPager
@@ -195,22 +222,35 @@ export function EditSessionModal({
             extraData={extraData}
           />
 
-          <View style={styles.breadcrumb} pointerEvents="none">
-            <Text style={styles.crumbLeft}>
+          <View style={[styles.breadcrumb, isNewDesign && v2.breadcrumb]} pointerEvents="none">
+            <Text style={[styles.crumbLeft, crumbText]} maxFontSizeMultiplier={isNewDesign ? 1.3 : undefined}>
               Juz {juz} · Hizb {hizb}
             </Text>
             <View style={styles.crumbRight}>
               {firstSurah?.name ? (
-                <Text style={styles.crumbSurah}>{firstSurah.name}</Text>
+                <Text style={[styles.crumbSurah, crumbText]} maxFontSizeMultiplier={isNewDesign ? 1.3 : undefined}>
+                  {firstSurah.name}
+                </Text>
               ) : null}
               {firstSurah?.nameArabic ? (
-                <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
+                <Text
+                  style={[styles.crumbArabic, isNewDesign && [arabicV2(13), { color: read.textSecondary }]]}
+                  maxFontSizeMultiplier={isNewDesign ? 1.3 : undefined}
+                >
+                  {firstSurah.nameArabic}
+                </Text>
               ) : null}
             </View>
           </View>
 
           <View style={styles.footer} pointerEvents="none">
-            <Text style={styles.pageNum}>{currentPageNumber}</Text>
+            <Text
+              style={[styles.pageNum, isNewDesign && [typeV2.meta, typeV2.numeral, { color: read.textPrimary }]]}
+              maxFontSizeMultiplier={isNewDesign ? 1.3 : undefined}
+              testID="edit-session-page"
+            >
+              {currentPageNumber}
+            </Text>
           </View>
         </View>
 
@@ -320,3 +360,9 @@ const makeStyles = (theme: ThemeColors) =>
       color: theme.textPrimary,
     },
   });
+
+// The new design.
+const v2 = StyleSheet.create({
+  topBar: { paddingHorizontal: layoutV2.gutter - 6, gap: 8 },
+  breadcrumb: { left: layoutV2.gutter, right: layoutV2.gutter },
+});
