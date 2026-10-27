@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -18,11 +18,12 @@ import { OptionSheet } from '../../components/OptionSheet';
 import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
 import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { ActivityDayCard } from '../../components/activity/ActivityDayCard';
-import { listRecordings } from '../../lib/recordings';
-import { useActivityReload } from '../../components/activity/useActivityReload';
+import { useActivitySources } from '../../components/activity/useActivitySources';
+import { ActivityHeatmap } from '../../components/activity/ActivityHeatmap';
+import { ActivityItemRow, RecentSection } from '../../components/activity/ActivityItemRow';
+import { ActivityItem, buildActivityItems } from '../../lib/activityItems';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import * as firestoreService from '../../services/firestoreService';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import {
   ACTIVITY_SORT_LABELS,
@@ -44,19 +45,13 @@ import {
   shiftDay,
 } from '../../lib/journal';
 import { formatDuration } from '../../lib/readingTimer';
-import { logger } from '../../lib/logger';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
-import type { JournalEntry, ReadingSession } from '../../types';
 import { useDesign } from '../../design/DesignContext';
-import { DayPost } from '../../components/activity/DayPost';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
-import { PillButton } from '../../components/v2/PillButton';
-import { Mark } from '../../components/v2/Mark';
-import { RowText, ThreadRow } from '../../components/v2/ThreadRow';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
 
@@ -65,6 +60,8 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Activity'>;
 // Recent days always get a row (even when empty) so it's one tap to backfill
 // a day you forgot to log.
 const RECENT_DAYS = 7;
+// The new design: Recent is the last few things done; the rest is "See all".
+const RECENT_ITEMS = 3;
 
 /**
  * Everything you did, day by day: revision sessions, timed reading sessions
@@ -78,46 +75,23 @@ export default function ActivityScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const tabFootprint = useTabBarFootprint();
 
-  const [readings, setReadings] = useState<ReadingSession[]>([]);
-  const [journal, setJournal] = useState<JournalEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<JournalFilter>('all');
   const [sort, setSort] = useState<ActivitySort>('newest');
   const [picker, setPicker] = useState<'filter' | 'sort' | null>(null);
+  // The new design's graph: the day picked (today until one is tapped).
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
 
   const { day: today } = useRevisionDay(user);
-  const [recordingDays, setRecordingDays] = useState<string[]>([]);
-
-  const load = useCallback(async () => {
-    // Each source on its own, so one failing still shows the others.
-    const [r, j] = await Promise.allSettled([
-      firestoreService.getReadingSessions(),
-      firestoreService.getJournalEntries(400),
-    ]);
-    listRecordings()
-      .then((all) => setRecordingDays(all.map((rec) => rec.day)))
-      .catch((err) => logger.warn('Could not list recordings', err));
-    if (r.status === 'fulfilled') setReadings(r.value);
-    else logger.error('Failed to load reading sessions', r.reason);
-    if (j.status === 'fulfilled') setJournal(j.value);
-    else logger.error('Failed to load journal', j.reason);
-    setLoadError(r.status === 'rejected' || j.status === 'rejected');
-    setLoading(false);
-  }, []);
-
-  useActivityReload(load);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  const { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh } = useActivitySources();
+  const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
 
   const days = useMemo(
     () => buildActivityDays({ logs, readings, journal, recordingDays }, user),
     [logs, readings, journal, recordingDays, user],
+  );
+  const items = useMemo(
+    () => (isNew ? buildActivityItems({ logs, readings, journal, recordings }, user) : []),
+    [isNew, logs, readings, journal, recordings, user],
   );
   // No backfill rows for days before the account existed.
   const firstDay = useMemo(() => journalFirstDay(user, days), [user, days]);
@@ -211,27 +185,12 @@ export default function ActivityScreen() {
   );
 
   if (isNew) {
-    // The new design: a feed. A summary post, then a post per day (a line per
-    // kind of activity); a day opens as a thread.
-    const totals = isDefaultView ? week : listedTotals;
-    const foot = isDefaultView
-      ? `${week.activeDays} of ${recent.length} ${recent.length === 1 ? 'day' : 'days'} active`
-      : `${listedTotals.activeDays} ${listedTotals.activeDays === 1 ? 'day' : 'days'} active`;
-    const dayPost = (day: (typeof days)[number]) => (
-      <DayPost
-        key={day.date}
-        day={day}
-        label={formatJournalDayRelative(day.date, today)}
-        isToday={day.date === today}
-        onPress={() => openDay(day.date)}
-        onLog={logToday}
-      />
-    );
-    const header = (title: string) => (
-      <Text style={[typeV2.name, v2.section, { color: palette.text }]} accessibilityRole="header">
-        {title}
-      </Text>
-    );
+    // The new design: a contribution graph (a cell per day, darker the more it
+    // held; tap one to see that day in a line under it), then the last few
+    // things done. Everything else is behind "See all", searchable.
+    const recentItems = items.slice(0, RECENT_ITEMS);
+    const openItem = (it: ActivityItem) =>
+      navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <TopBar
@@ -247,7 +206,7 @@ export default function ActivityScreen() {
         ) : (
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={{ paddingBottom: tabFootprint + FLOATING_TIMER_SIZE + layoutV2.rowPad }}
+            contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
             testID="activity-v2"
           >
@@ -257,67 +216,35 @@ export default function ActivityScreen() {
                 <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of your activity. Tap to retry.</Text>
               </Tap>
             )}
-            {isEmpty ? (
-              <EmptyState
-                icon="pulse-outline"
-                title="Your activity will show up here"
-                message="Revision sessions, timed reading and your daily log, day by day. Time a session with the timer button, or note what you did today."
-                action={<PillButton title="Log today" icon="add" onPress={logToday} />}
+            <View style={v2.graph}>
+              <ActivityHeatmap
+                days={days}
+                today={today}
+                firstDay={firstDay}
+                selected={pickedDay ?? today}
+                onSelect={setPickedDay}
+                onOpenDay={openDay}
               />
-            ) : (
-              <>
-                <View style={v2.pills}>
-                  <PillButton
-                    title={journalFilterLabel(filter)}
-                    icon="calendar-outline"
-                    size="sm"
-                    variant={filter !== 'all' ? 'solid' : 'outline'}
-                    onPress={() => setPicker('filter')}
-                    accessibilityLabel={`Show: ${journalFilterLabel(filter)}`}
-                  />
-                  <PillButton
-                    title={ACTIVITY_SORT_LABELS[sort]}
-                    icon="swap-vertical-outline"
-                    size="sm"
-                    variant={sort !== 'newest' ? 'solid' : 'outline'}
-                    onPress={() => setPicker('sort')}
-                    accessibilityLabel={`Sort by: ${ACTIVITY_SORT_LABELS[sort]}`}
-                  />
-                </View>
-                <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
-                <ThreadRow
-                  mark={<Mark icon="stats-chart-outline" />}
-                  name={isDefaultView ? 'Last 7 days' : journalFilterLabel(filter)}
-                  meta={foot}
-                  testID="activity-summary"
-                >
-                  <RowText>
-                    {`${totals.revisedPages} ${totals.revisedPages === 1 ? 'page' : 'pages'} revised · ${
-                      totals.readingSeconds > 0 ? formatDuration(totals.readingSeconds) : '0m'
-                    } timed · ${formatMinutes(totals.journalMinutes)} logged`}
-                  </RowText>
-                </ThreadRow>
-                {isDefaultView ? (
-                  <>
-                    {header('Recent')}
-                    {recent.map(dayPost)}
-                    {earlier.length > 0 && (
-                      <>
-                        {header('Earlier')}
-                        {earlier.map(dayPost)}
-                      </>
-                    )}
-                  </>
-                ) : listed.length === 0 ? (
-                  <Text style={[typeV2.body, v2.empty, { color: palette.secondary }]}>Nothing logged in this range.</Text>
-                ) : (
-                  listed.map(dayPost)
-                )}
-              </>
-            )}
+            </View>
+            <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
+            <RecentSection
+              count={recentItems.length}
+              emptyText="No sessions yet. Start your first revision from Home."
+              onSeeAll={() => navigation.navigate('ActivityAll')}
+              testID="activity-recent"
+            >
+              {recentItems.map((it, i) => (
+                <ActivityItemRow
+                  key={it.key}
+                  item={it}
+                  today={today}
+                  onPress={() => openItem(it)}
+                  separator={i < recentItems.length - 1}
+                />
+              ))}
+            </RecentSection>
           </ScrollView>
         )}
-        {sheets}
       </SafeAreaView>
     );
   }
@@ -644,8 +571,7 @@ const makeStyles = (theme: ThemeColors) =>
 
 // The new design.
 const v2 = StyleSheet.create({
-  pills: { flexDirection: 'row', gap: 8, paddingHorizontal: layoutV2.gutter, paddingVertical: 12 },
-  section: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad + 8, paddingBottom: 4 },
+  graph: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: layoutV2.rowPad },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -654,5 +580,4 @@ const v2 = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: layoutV2.hairline,
   },
-  empty: { paddingHorizontal: layoutV2.gutter, paddingVertical: layoutV2.rowPad },
 });

@@ -21,7 +21,6 @@ import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { useDesign } from '../../design/DesignContext';
-import { GuideSheet } from '../../components/v2/GuideSheet';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
 import { getReadPalette } from '../../theme/readPalette';
@@ -193,11 +192,13 @@ export default function ActiveRevisionScreen() {
     message: string;
   } | null>(null);
 
+  // The new design has no help screens: the session explains itself.
   useEffect(() => {
+    if (isNewDesign) return;
     AsyncStorage.getItem(REVISION_GUIDE_DISMISSED_KEY).then((v) => {
       if (v !== 'true') setShowGuide(true);
     });
-  }, []);
+  }, [isNewDesign]);
 
   const silentlySavedRef = useRef<Set<number>>(new Set(alreadyRevisedToday));
   const lastSaveTimeRef = useRef<number>(sessionStartTime);
@@ -570,12 +571,16 @@ export default function ActiveRevisionScreen() {
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
-    {
-      key: 'guide',
-      label: 'How revision works',
-      icon: 'help-circle-outline',
-      onPress: () => setShowGuide(true),
-    },
+    ...(isNewDesign
+      ? []
+      : [
+          {
+            key: 'guide',
+            label: 'How revision works',
+            icon: 'help-circle-outline' as const,
+            onPress: () => setShowGuide(true),
+          },
+        ]),
     {
       key: 'save',
       label: saving ? 'Saving…' : 'Save and exit',
@@ -779,7 +784,7 @@ export default function ActiveRevisionScreen() {
       {verseActions.overlay}
 
       <RevisionGuideModal
-        visible={showGuide}
+        visible={showGuide && !isNewDesign}
         onClose={dismissGuideForever}
         theme={theme}
       />
@@ -901,7 +906,6 @@ function RevisionGuideModal({
   onClose: () => void;
   theme: ThemeColors;
 }) {
-  const { isNew: isNewGuide } = useDesign();
   const styles = useMemo(() => makeGuideStyles(theme), [theme]);
   const steps: Array<{
     icon: keyof typeof Ionicons.glyphMap;
@@ -949,8 +953,6 @@ function RevisionGuideModal({
       body: 'Your marks save automatically every few seconds and when you leave the app, so nothing is lost if you exit mid-session.',
     },
   ];
-
-  if (isNewGuide) return <GuideSheet visible={visible} onClose={onClose} title="How revision works" steps={steps} />;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

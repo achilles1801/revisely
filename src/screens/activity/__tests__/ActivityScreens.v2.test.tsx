@@ -3,6 +3,8 @@ import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ActivityScreen from '../ActivityScreen';
 import ActivityDayScreen from '../ActivityDayScreen';
+import ActivityAllScreen from '../ActivityAllScreen';
+import { paletteLight } from '../../../theme/v2';
 import { emptyJournalEntry, shiftDay } from '../../../lib/journal';
 import { getRevisionDayForUser } from '../../../lib/fajrBoundary';
 import type { JournalEntry, ReadingSession, RevisionLog, User } from '../../../types';
@@ -127,32 +129,99 @@ beforeEach(() => {
   mockRoute.params = {};
 });
 
+const layoutGraph = async () => {
+  fireEvent(await screen.findByTestId('heatmap'), 'layout', { nativeEvent: { layout: { width: 370, height: 160 } } });
+};
+const cellStyle = (date: string) =>
+  Object.assign({}, ...[screen.getByTestId(`heat-${date}`).props.style].flat(3).filter(Boolean));
+
 describe('<ActivityScreen /> in the new design', () => {
-  it('is a feed: a summary post, then a post per day with a line per kind of activity', async () => {
-    mockApp.logs = [log(today, [1, 2, 3], 12)];
-    mockService.getReadingSessions.mockResolvedValue([reading(today, 9, 20), reading(day(1), 7, 15)]);
+  it('a graph of days; the picked day in a line under it; the last three things done', async () => {
+    mockApp.logs = [log(today, Array.from({ length: 20 }, (_, i) => i + 1), 30)];
+    mockService.getReadingSessions.mockResolvedValue([reading(day(1), 7, 15), reading(day(3), 9, 5)]);
     mockService.getJournalEntries.mockResolvedValue([entry(day(2), { memorization: '1/2 p3' })]);
     render(<ActivityScreen />);
+    await layoutGraph();
 
-    expect(await screen.findByText('Today')).toBeTruthy();
-    expect(screen.getByText('Last 7 days')).toBeTruthy();
-    expect(screen.getByText('3 of 7 days active')).toBeTruthy();
-    expect(screen.getByText('3 pages revised · 35m timed · 0m logged')).toBeTruthy();
-    expect(screen.getByText('Revised pages 1–3')).toBeTruthy();
-    expect(screen.getAllByText('Timed session')).toHaveLength(2);
-    expect(screen.getByText('1/2 p3')).toBeTruthy();
-    // Sentence case, no uppercase eyebrows.
-    expect(screen.getByText('Recent')).toBeTruthy();
-    expect(screen.queryByText('RECENT')).toBeNull();
+    // A juz is level 3; 15 timed minutes level 2; a note level 1; nothing level 0.
+    expect(cellStyle(today).backgroundColor).toBe(paletteLight.heat[3]);
+    expect(cellStyle(day(1)).backgroundColor).toBe(paletteLight.heat[2]);
+    expect(cellStyle(day(2)).backgroundColor).toBe(paletteLight.heat[1]);
+    expect(cellStyle(day(4)).backgroundColor).toBe(paletteLight.heat[0]);
+    // Today is picked to begin with.
+    expect(cellStyle(today).borderWidth).toBe(2);
+    expect(screen.getByLabelText('Today: 20 pages revised, 30 min. Open the day')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId(`heat-${day(1)}`));
+    expect(cellStyle(day(1)).borderWidth).toBe(2);
+    expect(cellStyle(today).borderWidth).toBe(0);
+    fireEvent.press(screen.getByLabelText(/: 15 min\. Open the day$/));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: day(1) });
+
+    // An empty day says so, and doesn't open.
+    fireEvent.press(screen.getByTestId(`heat-${day(4)}`));
+    expect(screen.queryByLabelText(/Open the day$/)).toBeNull();
+    expect(screen.getByText(/No activity/)).toBeTruthy();
+
+    // Recent: the latest three, nothing older, no "Earlier", no filter pills.
+    expect(screen.getByText('Revised 20 pages')).toBeTruthy();
+    expect(screen.getByText('Read for 15 min')).toBeTruthy();
+    expect(screen.getByText('Daily log')).toBeTruthy();
+    expect(screen.queryByText('Read for 5 min')).toBeNull();
+    expect(screen.queryByText('Earlier')).toBeNull();
+    expect(screen.queryByText('All dates')).toBeNull();
+    fireEvent.press(screen.getByText('Read for 15 min'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: day(1) });
+    fireEvent.press(screen.getByText('See all'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityAll');
   });
 
-  it('an empty today offers Log today; any day opens', async () => {
-    mockService.getReadingSessions.mockResolvedValue([reading(day(3), 9, 5)]);
+  it('nothing yet: an empty graph and one line instead of a list', async () => {
     render(<ActivityScreen />);
-    fireEvent.press(await screen.findByText('Log today'));
+    await layoutGraph();
+    expect(cellStyle(today).backgroundColor).toBe(paletteLight.heat[0]);
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy();
+    expect(screen.getByTestId('recent-empty').props.children).toBe('No sessions yet. Start your first revision from Home.');
+    expect(screen.queryByText('See all')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Log today'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('JournalEntry', { date: today });
-    fireEvent.press(screen.getByLabelText(/^Open /));
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: day(3) });
+  });
+});
+
+describe('<ActivityAllScreen /> (See all)', () => {
+  beforeEach(() => {
+    mockApp.logs = [log(today, [1, 2, 3], 12)];
+    mockService.getReadingSessions.mockResolvedValue([reading(day(1), 7, 15, [293, 294])]);
+    mockService.getJournalEntries.mockResolvedValue([entry(day(2), { memorization: '1/2 p3' })]);
+  });
+
+  it('everything, newest first; search and the kind and date filters narrow it', async () => {
+    render(<ActivityAllScreen />);
+    expect(await screen.findByText('Revised 3 pages')).toBeTruthy();
+    expect(screen.getByText('Read for 15 min')).toBeTruthy();
+    expect(screen.getByTestId(`item-log-${day(2)}`)).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('activity-search'), 'kahf');
+    expect(screen.queryByText('Revised 3 pages')).toBeNull();
+    expect(screen.getByText('Read for 15 min')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('activity-search'), 'zzz');
+    expect(screen.getByText('Nothing matches.')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Clear search'));
+
+    fireEvent.press(screen.getByTestId('filter-log'));
+    expect(screen.getByTestId(`item-log-${day(2)}`)).toBeTruthy();
+    expect(screen.queryByText('Read for 15 min')).toBeNull();
+    fireEvent.press(screen.getByTestId('filter-all'));
+    fireEvent.press(screen.getByText('Read for 15 min'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: day(1) });
+  });
+
+  it('opens on a kind when asked (Home’s See all shows sessions)', async () => {
+    (mockRoute.params as { kind?: string }).kind = 'revision';
+    render(<ActivityAllScreen />);
+    expect(await screen.findByText('Revised 3 pages')).toBeTruthy();
+    expect(screen.queryByText('Read for 15 min')).toBeNull();
+    expect(screen.queryByTestId(`item-log-${day(2)}`)).toBeNull();
   });
 });
 

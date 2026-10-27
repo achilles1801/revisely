@@ -1,8 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
+import { computeMemorizationStats, formatFractional } from '../../../lib/memorizationStats';
+import type { HomeMetric } from '../../../lib/homePrefs';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../../../lib/pageRanges';
-import { layoutV2, markV2, typeV2 } from '../../../theme/v2';
+import type { UserPage } from '../../../types';
+import { typeV2 } from '../../../theme/v2';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
 import { PillButton } from '../../v2/PillButton';
@@ -11,11 +14,40 @@ import { Tap } from '../../v2/Tap';
 
 export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
-const MAX_REPLIES = 4;
 const count = (n: number) => `${n} page${n === 1 ? '' : 's'}`;
 
-/** What today's post says, from today's pages and those done. */
-export function todayText(status: TodayStatus, pages: number[], done: ReadonlySet<number>) {
+/** "6.2 of 30 juz · 123 of 604 pages", in the order Settings → Home screen chose. */
+export function memorizedText(pages: UserPage[], metrics: HomeMetric[]) {
+  const stats = computeMemorizationStats(pages);
+  const percent = (stats.pages / 604) * 100;
+  const parts: Record<HomeMetric, string> = {
+    juz: `${formatFractional(stats.fractionalJuz)} of 30 juz`,
+    pages: `${stats.pages} of 604 pages`,
+    surahs: `${stats.surahs} of 114 surahs`,
+  };
+  const shown = (metrics.length > 0 ? metrics : (['juz', 'pages'] as HomeMetric[])).map((m) => parts[m]);
+  return {
+    body: shown.join(' · '),
+    meta: `${percent < 1 && percent > 0 ? '<1' : Math.round(percent)}% of the Quran`,
+  };
+}
+
+/** "Juz 26", "Juz 26–27", "Juz 3, 7", or "5 juz". */
+export function juzLabel(juzBreakdown: { juz: number }[]): string {
+  const js = [...new Set(juzBreakdown.map((j) => j.juz))].sort((a, b) => a - b);
+  if (js.length === 0) return '';
+  if (js.length === 1) return `Juz ${js[0]}`;
+  if (js.every((j, i) => i === 0 || j === js[i - 1] + 1)) return `Juz ${js[0]}–${js[js.length - 1]}`;
+  return js.length <= 3 ? `Juz ${js.join(', ')}` : `${js.length} juz`;
+}
+
+/** What today's post says, from today's pages, the juz they're in and those done. */
+export function todayText(
+  status: TodayStatus,
+  pages: number[],
+  done: ReadonlySet<number>,
+  juzBreakdown: { juz: number }[] = [],
+) {
   const runs = pageRuns(pages);
   const total = runs.reduce((n, r) => n + r.last - r.first + 1, 0);
   if (total === 0) {
@@ -26,7 +58,7 @@ export function todayText(status: TodayStatus, pages: number[], done: ReadonlySe
       solid: true,
     };
   }
-  const where = describeSurahRuns(runs);
+  const where = [juzLabel(juzBreakdown), describeSurahRuns(runs)].filter(Boolean).join(' · ');
   if (status === 'completed') {
     return { title: 'Done for today', detail: `${count(Math.max(done.size, total))} revised · ${where}`, cta: 'Review session', solid: false };
   }
@@ -34,31 +66,15 @@ export function todayText(status: TodayStatus, pages: number[], done: ReadonlySe
     const doneHere = pages.filter((p) => done.has(p)).length;
     return { title: describePageRuns(runs), detail: `${doneHere} of ${total} done · ${where}`, cta: 'Continue revision', solid: true };
   }
-  return { title: describePageRuns(runs), detail: `${where} · ${count(total)}`, cta: 'Start revision', solid: true };
-}
-
-/** One reply per juz of today's pages: its pages, its surahs, how many are done. */
-export function juzReplies(juzBreakdown: { juz: number; pages: number[] }[], done: ReadonlySet<number>) {
-  return juzBreakdown.map(({ juz, pages }) => {
-    const runs = pageRuns(pages);
-    const n = runs.reduce((s, r) => s + r.last - r.first + 1, 0);
-    const d = pages.filter((p) => done.has(p)).length;
-    return {
-      juz,
-      complete: n > 0 && d >= n,
-      meta: d > 0 ? `${d} of ${n} done` : count(n),
-      body: `${describePageRuns(runs)} · ${describeSurahRuns(runs)}`,
-    };
-  });
+  return { title: describePageRuns(runs), detail: `${count(total)} · ${where}`, cta: 'Start revision', solid: true };
 }
 
 /**
- * Today on Home, as a thread: a post saying today's pages with the one action
- * (start, continue, review), and a reply for each juz they cover, joined by the
- * thread line. Each juz turns jade with a check once its pages are done. The ⋯
- * holds the schedule actions.
+ * Today on Home, in one post: today's pages, the juz and surahs they cover,
+ * the one action (start, continue, review), and under it how much is
+ * memorized (opens Memorization). The ⋯ holds the schedule actions.
  */
-export function TodayThread({
+export function TodayPost({
   name,
   initial,
   status,
@@ -66,6 +82,7 @@ export function TodayThread({
   juzBreakdown,
   done,
   streak,
+  memorized,
   onPrimary,
   onEditSchedule,
   onMemorization,
@@ -82,6 +99,8 @@ export function TodayThread({
   juzBreakdown: { juz: number; pages: number[] }[];
   done: ReadonlySet<number>;
   streak: number;
+  /** "8.1 of 30 juz · 166 of 604 pages" (Settings → Home screen), or null to leave it out. */
+  memorized: string | null;
   onPrimary: () => void;
   onEditSchedule: () => void;
   onMemorization: () => void;
@@ -93,12 +112,8 @@ export function TodayThread({
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
-  const text = todayText(status, pages, done);
+  const text = todayText(status, pages, done, juzBreakdown);
   const empty = pages.length === 0;
-  const replies = useMemo(() => (empty ? [] : juzReplies(juzBreakdown, done)), [empty, juzBreakdown, done]);
-  const visible = showAll ? replies : replies.slice(0, MAX_REPLIES);
-  const hidden = replies.length - visible.length;
   const meta = streak > 0 ? `Today · ${streak}-day streak` : 'Today';
 
   const actions: SheetAction[] = [
@@ -125,8 +140,6 @@ export function TodayThread({
         meta={name ? meta : undefined}
         onMenu={() => setMenuOpen(true)}
         menuLabel="Today's options"
-        lineBelow={visible.length > 0}
-        separator={visible.length === 0}
         testID="today-post"
         footer={
           <>
@@ -146,6 +159,20 @@ export function TodayThread({
                 testID="today-carry-over"
               />
             ) : null}
+            {memorized ? (
+              <Tap
+                onPress={onMemorization}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Memorized ${memorized}. Open memorization`}
+                style={styles.memorized}
+                testID="today-memorized"
+              >
+                <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
+                  {`Memorized ${memorized}`}
+                </Text>
+              </Tap>
+            ) : null}
           </>
         }
       >
@@ -157,48 +184,6 @@ export function TodayThread({
         </View>
         <RowText secondary>{text.detail}</RowText>
       </ThreadRow>
-
-      {visible.map((r, i) => {
-        const last = i === visible.length - 1 && hidden === 0;
-        return (
-          <ThreadRow
-            key={r.juz}
-            depth={1}
-            mark={<Mark size="reply" label={String(r.juz)} done={r.complete} testID={r.complete ? 'juz-done' : 'juz'} />}
-            name={`Juz ${r.juz}`}
-            meta={r.meta}
-            lineAbove
-            lineBelow={!last}
-            separator={last}
-            onPress={onPrimary}
-            accessibilityLabel={`Juz ${r.juz}, ${r.meta}. ${r.body}`}
-            testID={`today-juz-${r.juz}`}
-          >
-            <RowText secondary numberOfLines={2}>
-              {r.body}
-            </RowText>
-          </ThreadRow>
-        );
-      })}
-
-      {hidden > 0 ? (
-        <View>
-          <Tap
-            onPress={() => setShowAll(true)}
-            accessibilityRole="button"
-            style={styles.more}
-            testID="today-show-more"
-          >
-            <View style={styles.moreMarks}>
-              <View style={[styles.moreLine, { backgroundColor: palette.separator }]} />
-            </View>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>
-              Show {hidden} more juz
-            </Text>
-          </Tap>
-          <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
-        </View>
-      ) : null}
 
       <ActionSheet
         visible={menuOpen}
@@ -214,12 +199,5 @@ export function TodayThread({
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  more: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: layoutV2.gutter,
-    paddingBottom: layoutV2.nestedPad,
-  },
-  moreMarks: { width: markV2.top, alignItems: 'center', marginRight: layoutV2.markGap, height: 20 },
-  moreLine: { width: layoutV2.threadLine, height: 12, borderRadius: 1 },
+  memorized: { width: '100%', marginTop: 4 },
 });

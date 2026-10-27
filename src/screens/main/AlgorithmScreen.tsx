@@ -25,6 +25,7 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
 import { ThemeColors } from '../../theme/colors';
 import {
   calculatePageUrgency,
@@ -89,6 +90,8 @@ export default function AlgorithmScreen() {
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [focusIndex, setFocusIndex] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  // The new design has no help buttons.
+  const { isNew } = useDesign();
   const [expandedLists, setExpandedLists] = useState<Record<BrowseMode, boolean>>({
     pages: false,
     surahs: false,
@@ -326,7 +329,7 @@ export default function AlgorithmScreen() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>Insights</Text>
-            {user.smartTrackingEnabled && (
+            {user.smartTrackingEnabled && !isNew && (
               <PressableScale
                 onPress={() => setHelpOpen(true)}
                 haptic="light"

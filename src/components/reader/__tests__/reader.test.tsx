@@ -7,6 +7,7 @@ import { ReaderActivity } from '../ReaderActivity';
 import { ReaderFrame, READER_HEADER_HEIGHT } from '../ReaderFrame';
 import { useReaderChrome } from '../useReaderChrome';
 import { TimerChip } from '../../timer/TimerChip';
+import { RunningTimerChip } from '../../timer/RunningTimerChip';
 import type { ActiveReadingTimer } from '../../../lib/readingTimer';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -329,5 +330,31 @@ describe('<TimerChip />', () => {
     };
     withTheme(<TimerChip />);
     expect(await screen.findByLabelText(/Timer running, 1:05/)).toBeTruthy();
+  });
+});
+
+describe('<RunningTimerChip /> (Home in the new design, which has no floating timer)', () => {
+  beforeEach(() => {
+    mockTimer.timer = null;
+  });
+
+  it('shows nothing until a timer runs, then its clock, opening the controls', async () => {
+    const { unmount } = withTheme(<RunningTimerChip />);
+    expect(screen.queryByLabelText('Open timer')).toBeNull();
+    expect(screen.queryByLabelText(/Timer running/)).toBeNull();
+    unmount();
+
+    mockTimer.timer = {
+      mode: 'stopwatch',
+      targetSeconds: null,
+      startedAt: 1_000_000,
+      runningSince: 1_000_000,
+      accumulatedMs: 0,
+      date: '2026-10-26',
+      pagesVisited: [],
+    };
+    withTheme(<RunningTimerChip />);
+    fireEvent.press(await screen.findByLabelText(/Timer running/));
+    expect(await screen.findByLabelText('Discard timer')).toBeTruthy();
   });
 });
