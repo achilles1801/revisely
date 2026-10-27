@@ -304,7 +304,17 @@ carrying it is approved; App Store Connect takes the icon from the build, so `st
 `~/secrets/revisely-screenshots.txt`), seeded with `functions/scripts/seed-screenshots.js`, on an
 iPhone 17 Pro Max simulator: the dev client, with Metro started with `--no-dev --minify` (no debug
 overlays; use another port if 8081 is taken) and `xcrun simctl status_bar booted override --time
-9:41 ...`. Reopen the app from the home screen to clear the back-link in the status bar.
+9:41 --batteryState discharging --batteryLevel 100 ...` (discharging: no charging bolt). Reopen the
+app from the home screen to clear the back-link in the status bar.
+- The 1.0.2 set (Oct 27 2026), light, Indigo, 1320×2868 (the 6.9" set; no iPad, `supportsTablet`
+  is false): Home, the reader holding Al-Hamd with Saheeh International (not The Clear Quran, whose
+  licence covers the app), a revision session, the Activity month, a day with recordings, Insights.
+  `store/screenshots/dark/` holds the same in dark; `asc.js screenshots` uploads only the top-level
+  PNGs, so move a dark one up to use it.
+- The recordings are demo audio (a synthesized tone), placed on the simulator: two `.m4a` files and
+  an `index.json` entry each (`levels` drawn to look like recitation) in the app's
+  `Documents/recordings/<uid>/`, with the app closed. The seed turns the account's recording backup
+  off, so they never upload. The day's daily log was typed in the app.
 
 **Public pages** (`docs/`, served at revisely.app by Cloudflare on push to `main`): the one contact
 is `support@revisely.app` (routed; it replaced `privacy@revisely.app` on 2026-10-27) in the footers,
