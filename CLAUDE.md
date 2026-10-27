@@ -35,8 +35,8 @@ file is the release mechanics and the traps behind them.
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, `scripts/`, workflows, Firestore rules or `.md`
-  files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, `worker/`, `wrangler.jsonc`, workflows,
+  Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
 ## Health (Sentry → GitHub → Claude)
@@ -299,8 +299,17 @@ the App Privacy answers in App Store Connect (no API; done by hand) together.
 **Verse positions and translations:** press-and-hold on a verse uses `src/data/ayahBounds.json`, built
 by `scripts/build-ayah-bounds.py` from Quran Android's `ayahinfo_1024.db`, the glyph bounds that
 quran.com-images records while drawing the same page images (coordinates are 1024-wide; the images are
-2600×4206, so one scale factor maps them). Translations are Saheeh International from api.alquran.cloud,
-disclosed in the privacy policy.
+2600×4206, so one scale factor maps them). Translations: Saheeh International from api.alquran.cloud,
+and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
+
+**The Clear Quran® (licensed):** the publisher (Al-Furqaan Foundation, info@theclearquran.org)
+requires the credit "The Clear Quran® by Dr. Mustafa Khattab" + theclearquran.org wherever it is
+shown (pinned under the verse; in the picker), the text exactly as the API gives it (footnote markers
+`<footnote id number>` are shown as raised numbers, nothing else is changed), and never another
+translation under its name (errors show "Couldn't load translation" + retry). The app keeps it in
+memory for the launch only (`src/lib/clearQuran.ts`), never on disk. Plan: Basic, 10,000 requests a
+month, 5 a second; the docs also say 60 a minute and 1,000 an hour. The terms live in the developer
+agreement signed in their portal (theclearquran.org/developers).
 
 **Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
 recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore

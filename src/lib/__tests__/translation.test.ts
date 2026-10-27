@@ -1,7 +1,6 @@
 jest.mock('expo-file-system', () => ({}));
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
-);
+const mockClearQuranVerse = jest.fn();
+jest.mock('../clearQuran', () => ({ getClearQuranVerse: (...a: unknown[]) => mockClearQuranVerse(...a) }));
 
 import {
   CLEAR_QURAN_ID,
@@ -13,16 +12,6 @@ import {
   stripBismillah,
   TRANSLATIONS,
 } from '../translation';
-import {
-  CLEAR_QURAN_PLACEHOLDER,
-  clearQuranPreviewAllowed,
-  initClearQuranPreview,
-  isClearQuranPreview,
-  resetClearQuranPreviewForTests,
-  setClearQuranPreview,
-} from '../clearQuranPreview';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ReleaseInfo } from '../releaseInfo';
 
 describe('parsePageResponse', () => {
   it('maps the alquran.cloud page response', () => {
@@ -77,7 +66,6 @@ describe('translations', () => {
   it('falls back to Saheeh International for unknown or unavailable choices', () => {
     expect(resolveTranslation(undefined).id).toBe('en.sahih');
     expect(resolveTranslation('nope').id).toBe('en.sahih');
-    expect(resolveTranslation('en.khattab').id).toBe('en.sahih'); // not licensed yet
   });
 
   it('strips the basmala the API prefixes to first verses', () => {
@@ -88,12 +76,15 @@ describe('translations', () => {
   });
 });
 
-describe('The Clear Quran: credit, and the testers’ preview', () => {
+describe('The Clear Quran', () => {
   const tcq = TRANSLATIONS.find((t) => t.id === CLEAR_QURAN_ID)!;
+  const arabicPage = {
+    data: { ayahs: [{ numberInSurah: 6, text: 'إِنَّ ٱلَّذِينَ', surah: { number: 2, englishName: 'Al-Baqarah' } }] },
+  };
 
-  beforeEach(async () => {
-    resetClearQuranPreviewForTests();
-    await AsyncStorage.clear();
+  beforeEach(() => {
+    mockClearQuranVerse.mockReset();
+    (global as any).fetch = jest.fn(async (_url: string) => ({ ok: true, json: async () => arabicPage }));
   });
 
   it('carries the credit the publisher requires, and is listed with its author', () => {
@@ -106,51 +97,33 @@ describe('The Clear Quran: credit, and the testers’ preview', () => {
     expect(pickerTitle(TRANSLATIONS[0])).toBe('Saheeh International');
   });
 
-  it('can’t be chosen without the preview: a saved choice falls back to Saheeh', () => {
-    expect(isTranslationAvailable(tcq)).toBe(false);
-    expect(resolveTranslation(CLEAR_QURAN_ID).id).toBe('en.sahih');
-  });
-
-  it('the preview is only for development builds and testers on the preview channel', () => {
-    const release = (channel: string | null, isDev = false) => ({ channel, isDev }) as ReleaseInfo;
-    expect(clearQuranPreviewAllowed(release('preview'), true)).toBe(true);
-    expect(clearQuranPreviewAllowed(release(null, true), undefined)).toBe(true);
-    expect(clearQuranPreviewAllowed(release('production'), true)).toBe(false); // the App Store
-    expect(clearQuranPreviewAllowed(release('preview'), false)).toBe(false); // App Review, others
-    expect(clearQuranPreviewAllowed(release('preview'), undefined)).toBe(false);
-  });
-
-  it('where not allowed, the switch does nothing (and a saved "on" is ignored)', async () => {
-    await AsyncStorage.setItem('@revisely_clear_quran_preview', 'true');
-    await initClearQuranPreview(false);
-    setClearQuranPreview(true);
-    expect(isClearQuranPreview()).toBe(false);
-    expect(resolveTranslation(CLEAR_QURAN_ID).id).toBe('en.sahih');
-  });
-
-  it('allowed and on: it can be chosen, and shows a labelled placeholder (never another translation’s text)', async () => {
-    await initClearQuranPreview(true);
-    setClearQuranPreview(true);
-    expect(await AsyncStorage.getItem('@revisely_clear_quran_preview')).toBe('true');
+  it('is a normal choice now: a saved choice keeps it', () => {
+    expect(isTranslationAvailable(tcq)).toBe(true);
     expect(resolveTranslation(CLEAR_QURAN_ID).id).toBe(CLEAR_QURAN_ID);
-    const fetchMock = jest.fn(async (_url: string) => ({
-      ok: true,
-      json: async () => ({
-        data: { ayahs: [{ numberInSurah: 6, text: 'إِنَّ ٱلَّذِينَ', surah: { number: 2, englishName: 'Al-Baqarah' } }] },
-      }),
-    }));
-    (global as any).fetch = fetchMock;
+  });
+
+  it('shows its own text exactly as given, with the Arabic', async () => {
+    const given = 'Indeed, those who persist in disbelief—it is the same whether you warn them or not—they will never believe.';
+    mockClearQuranVerse.mockResolvedValue(given);
     const text = await getVerseText(3, 2, 6, CLEAR_QURAN_ID);
-    expect(text).toMatchObject({
-      translation: CLEAR_QURAN_PLACEHOLDER,
-      translationName: 'The Clear Quran®',
-      placeholder: true,
+    expect(mockClearQuranVerse).toHaveBeenCalledWith(2, 6);
+    expect(text).toEqual({
+      sura: 2,
+      ayah: 6,
+      surahName: 'Al-Baqarah',
       arabic: 'إِنَّ ٱلَّذِينَ',
+      translation: given,
+      translationName: 'The Clear Quran®',
     });
-    // Only the Arabic was fetched.
-    expect(fetchMock.mock.calls.every(([url]) => String(url).includes('quran-uthmani'))).toBe(true);
-    // Remembered across launches.
-    await initClearQuranPreview(true);
-    expect(isClearQuranPreview()).toBe(true);
+    // Its text came from The Clear Quran, not from alquran.cloud.
+    const urls = (global.fetch as jest.Mock).mock.calls.map(([url]) => String(url));
+    expect(urls.every((u) => u.includes('quran-uthmani'))).toBe(true);
+  });
+
+  it('when its text fails, the error stands: never another translation in its place', async () => {
+    mockClearQuranVerse.mockRejectedValue(new Error('RATE_LIMITED'));
+    await expect(getVerseText(3, 2, 6, CLEAR_QURAN_ID)).rejects.toThrow('RATE_LIMITED');
+    const urls = (global.fetch as jest.Mock).mock.calls.map(([url]) => String(url));
+    expect(urls.some((u) => u.includes('en.sahih'))).toBe(false);
   });
 });

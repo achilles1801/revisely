@@ -26,11 +26,12 @@ import {
   getVerseText,
   isTranslationAvailable,
   pickerTitle,
+  CLEAR_QURAN_ID,
   resolveTranslation,
   TRANSLATIONS,
   VerseText,
 } from '../../lib/translation';
-import { useClearQuranPreview } from '../../lib/clearQuranPreview';
+import { clearQuranErrorHint, clearQuranSegments } from '../../lib/clearQuran';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
@@ -49,10 +50,18 @@ interface VerseSheetProps {
   onClose: () => void;
 }
 
-type LoadState =
+// `for` names the translation and verse a result belongs to: until the next
+// result arrives, the previous one is not shown (a credit must never sit under
+// another translation's text, not even for one frame).
+export type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; text: VerseText }
-  | { status: 'error' };
+  | { status: 'ready'; text: VerseText; for: string }
+  | { status: 'error'; error: unknown; for: string };
+
+/** What a render may show: a result for another translation or verse counts as loading. */
+export function visibleLoadState(state: LoadState, current: string): LoadState {
+  return state.status !== 'loading' && state.for !== current ? { status: 'loading' } : state;
+}
 
 /**
  * The sheet's height limit, in points: as it opens (70% of the screen), and
@@ -109,8 +118,6 @@ export function VerseSheet({
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
-  // A tester's preview of The Clear Quran (turned on or off) changes the choice.
-  useClearQuranPreview();
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
@@ -155,16 +162,21 @@ export function VerseSheet({
       return;
     }
     let live = true;
+    const loadFor = `${translation.id}|${verse.sura}:${verse.ayah}`;
     setState({ status: 'loading' });
     getVerseText(verse.page, verse.sura, verse.ayah, translation.id)
-      .then((text) => live && setState({ status: 'ready', text }))
-      .catch(() => live && setState({ status: 'error' }));
+      .then((text) => live && setState({ status: 'ready', text, for: loadFor }))
+      .catch((error) => live && setState({ status: 'error', error, for: loadFor }));
     return () => {
       live = false;
     };
   }, [verse, translation.id, attempt]);
 
   const surah = verse ? getSurahDisplay(verse.sura) : undefined;
+  // What this render may show: a result for another translation or verse is
+  // still loading as far as the reader can see.
+  const current = verse ? `${translation.id}|${verse.sura}:${verse.ayah}` : '';
+  const view = visibleLoadState(state, current);
   const prev = verse ? previousVerse(verse) : null;
   const next = verse ? nextVerse(verse) : null;
 
@@ -308,22 +320,34 @@ export function VerseSheet({
               </View>
             )}
 
-            {state.status === 'loading' && (
+            {view.status === 'loading' && (
               <View style={styles.center}>
                 <ActivityIndicator color={theme.accent} />
               </View>
             )}
-            {state.status === 'error' && (
-              <View style={styles.center}>
-                <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
-                  Couldn't load this verse. Check your connection.
-                </Text>
+            {view.status === 'error' && (
+              <View style={styles.center} testID="verse-error">
+                {translation.id === CLEAR_QURAN_ID ? (
+                  // Only ever this, or its own text: never another translation under its name.
+                  <>
+                    <Text style={[typography.bodyMedium, { color: theme.textPrimary, fontWeight: '600' }]}>
+                      Couldn't load translation
+                    </Text>
+                    <Text style={[typography.bodySmall, { color: theme.textSecondary, textAlign: 'center' }]}>
+                      {clearQuranErrorHint(view.error)}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
+                    Couldn't load this verse. Check your connection.
+                  </Text>
+                )}
                 <PressableScale onPress={() => setAttempt((a) => a + 1)} haptic="light" style={styles.retryBtn}>
                   <Text style={[typography.bodySmall, { color: '#fff', fontWeight: '700' }]}>Try again</Text>
                 </PressableScale>
               </View>
             )}
-            {state.status === 'ready' && (
+            {view.status === 'ready' && (
               <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
@@ -333,21 +357,32 @@ export function VerseSheet({
               >
                 <View style={[styles.keyChip, { borderColor: theme.border, backgroundColor: theme.glass }]}>
                   <Text style={[typography.caption, { color: theme.textSecondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                    {state.text.sura}:{state.text.ayah}
+                    {view.text.sura}:{view.text.ayah}
                   </Text>
                 </View>
                 {/* The Arabic grows to twice its size; the translation as far as the reader's setting goes. */}
                 <Text style={styles.arabic} maxFontSizeMultiplier={2}>
-                  {state.text.arabic}
+                  {view.text.arabic}
                 </Text>
-                <Text style={[styles.translation, state.text.placeholder && styles.placeholder]}>
-                  {state.text.translation}
+                <Text style={styles.translation} testID="verse-translation">
+                  {translation.id === CLEAR_QURAN_ID
+                    ? // Exactly as given; its footnote markers shown as raised numbers.
+                      clearQuranSegments(view.text.translation).map((seg, i) =>
+                        'footnote' in seg ? (
+                          <Text key={i} style={styles.footnote}>
+                            {seg.footnote}
+                          </Text>
+                        ) : (
+                          seg.text
+                        ),
+                      )
+                    : view.text.translation}
                 </Text>
                 {/* A credited translation has its credit pinned below instead. */}
-                {!translation.credit && <Text style={styles.source}>{state.text.translationName}</Text>}
+                {!translation.credit && <Text style={styles.source}>{view.text.translationName}</Text>}
               </ScrollView>
             )}
-            {state.status === 'ready' && translation.credit && (
+            {view.status === 'ready' && translation.credit && (
               // Pinned under the verse, however long it is: always in view.
               <View style={[styles.credit, { borderTopColor: theme.border }]} testID="translation-credit">
                 <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
@@ -453,7 +488,7 @@ const makeStyles = (theme: ThemeColors) =>
     },
     translation: { ...typography.bodyLarge, fontSize: 18, lineHeight: 27, color: theme.textPrimary },
     source: { ...typography.caption, color: theme.textMuted, marginTop: spacing.md },
-    placeholder: { color: theme.textSecondary, fontStyle: 'italic' },
+    footnote: { color: theme.accent },
     credit: {
       borderTopWidth: StyleSheet.hairlineWidth,
       paddingTop: spacing.sm,

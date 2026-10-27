@@ -985,7 +985,7 @@ export default function SettingsScreen() {
             label="Terms of Service"
             onPress={() => Linking.openURL('https://revisely.app/terms/')}
           />
-          <AppInfo previewTester={localUser.previewTester} />
+          <AppInfo />
         </Section>
 
         {firebaseUser && (
