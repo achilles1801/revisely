@@ -20,6 +20,7 @@ import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
 import { TabBar } from './TabBar';
 import { createPagerTabNavigator } from './PagerTabs';
+import { swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
@@ -143,8 +144,7 @@ export function MainNavigator() {
               />
             );
           }}
-          // Insights is swiped to only while Smart Tracking is on.
-          swipeableCount={smartTrackingEnabled ? 3 : 2}
+          swipeableCount={swipeableTabCount(smartTrackingEnabled)}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />
