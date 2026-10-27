@@ -212,46 +212,86 @@ describe('ReciterList in the new design', () => {
   });
 });
 
-describe('VerseMenu in the new design', () => {
-  it('is the menu sheet: Play (who recites), Translation, Copy and Share; the choice runs once the sheet has gone', async () => {
-    const onPlay = jest.fn();
-    const onTranslation = jest.fn();
-    const onCopy = jest.fn();
-    const onShare = jest.fn();
-    const onClose = jest.fn();
-    const ui = (point: { x: number; y: number } | null) =>
+describe('VerseMenu: a small card beside the verse', () => {
+  const props = () => ({
+    onPlay: jest.fn(),
+    onTranslation: jest.fn(),
+    onCopy: jest.fn(),
+    onShare: jest.fn(),
+    onClose: jest.fn(),
+  });
+  const layout = (testID: string, width: number, height: number) =>
+    fireEvent(screen.getByTestId(testID), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width, height } } });
+
+  it('Play (who recites), Translation, Copy and Share; a choice runs at once (no modal to wait for)', async () => {
+    const p = props();
+    render(
       v2(
         <VerseMenu
-          point={point}
-          verseLabel={point ? 'Al-Baqarah 2:6' : undefined}
+          point={{ x: 100, y: 200 }}
+          verseLabel="Al-Baqarah 2:6"
           playSubtitle="Husary · to the end of the juz"
-          onPlay={onPlay}
-          onTranslation={onTranslation}
-          onCopy={onCopy}
-          onShare={onShare}
-          onClose={onClose}
+          {...p}
         />,
-      );
-    render(ui({ x: 100, y: 200 }));
-    await screen.findByTestId('sheet-action-play', {}, { timeout: 10_000 });
-    expect(screen.getByText('Al-Baqarah 2:6')).toBeTruthy();
+      ),
+    );
+    await act(async () => {});
+    expect(screen.getByText('Play')).toBeTruthy();
     expect(screen.getByText('Husary · to the end of the juz')).toBeTruthy();
-    expect(screen.getByTestId('sheet-action-translation')).toBeTruthy();
+    expect(screen.getByText('Translation')).toBeTruthy();
     expect(screen.getByText('Copy')).toBeTruthy();
     expect(screen.getByText('Share')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('sheet-action-translation'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onTranslation).not.toHaveBeenCalled();
-    // The parent clears the menu; once the modal is gone (iOS: onDismiss) the choice runs.
-    screen.rerender(ui(null));
-    // The title stays while it slides away.
-    expect(screen.getByText('Al-Baqarah 2:6')).toBeTruthy();
+    // No title and no Cancel: the verse is named for VoiceOver.
+    expect(screen.queryByText('Al-Baqarah 2:6')).toBeNull();
+    expect(screen.queryByText('Cancel')).toBeNull();
+    expect(screen.getByLabelText('Copy Al-Baqarah 2:6')).toBeTruthy();
+    expect(screen.getByLabelText('Play Al-Baqarah 2:6, Husary · to the end of the juz')).toBeTruthy();
+    // Not a native modal: the verse sheet or the share sheet can open right away.
     const { Modal } = jest.requireActual('react-native');
-    act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
-    expect(onTranslation).toHaveBeenCalledTimes(1);
-    expect(onPlay).not.toHaveBeenCalled();
-    expect(onCopy).not.toHaveBeenCalled();
-    expect(onShare).not.toHaveBeenCalled();
+    expect(screen.UNSAFE_queryAllByType(Modal)).toHaveLength(0);
+    fireEvent.press(screen.getByTestId('verse-menu-translation'));
+    expect(p.onTranslation).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByTestId('verse-menu-copy'));
+    expect(p.onCopy).toHaveBeenCalledTimes(1);
+    expect(p.onClose).not.toHaveBeenCalled();
+  });
+
+  it('beside the verse, in the sheets’ colour with an outline; the page behind barely dimmed', async () => {
+    render(v2(<VerseMenu point={{ x: 200, y: 330 }} anchor={{ x: 20, y: 300, width: 400, height: 60 }} {...props()} />));
+    await act(async () => {});
+    layout('verse-menu', 440, 956);
+    layout('verse-menu-card', 264, 190);
+    const card = style('verse-menu-card');
+    expect(card).toMatchObject({ backgroundColor: palette.sheet, borderColor: palette.outline, top: 368 });
+    // Centred on the finger (x 200).
+    expect(card.left).toBe(200 - 264 / 2);
+    expect(style('verse-menu-backdrop')).toMatchObject({ backgroundColor: palette.scrim });
+  });
+
+  it('a touch outside (a tap, or a swipe starting) closes it; so does VoiceOver’s escape', async () => {
+    const p = props();
+    render(v2(<VerseMenu point={{ x: 100, y: 200 }} {...p} />));
+    await act(async () => {});
+    const backdrop = screen.getByTestId('verse-menu-backdrop');
+    expect(backdrop.props.onStartShouldSetResponder()).toBe(true);
+    backdrop.props.onResponderGrant();
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+    const menu = screen.getByTestId('verse-menu');
+    expect(menu.props.accessibilityViewIsModal).toBe(true);
+    menu.props.onAccessibilityEscape();
+    expect(p.onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('closed: it lets touches through while it fades, then goes', async () => {
+    const p = props();
+    const ui = (point: { x: number; y: number } | null) => v2(<VerseMenu point={point} {...p} />);
+    render(ui({ x: 100, y: 200 }));
+    await act(async () => {});
+    screen.rerender(ui(null));
+    await act(async () => {});
+    const menu = screen.queryByTestId('verse-menu');
+    // Gone, or on its way out without catching touches.
+    if (menu) expect(menu.props.pointerEvents).toBe('none');
   });
 });
 
@@ -262,17 +302,14 @@ describe('useVerseActions in the new design', () => {
     return <>{actions.overlay}</>;
   }
 
-  it('hold a verse: a medium haptic, the menu titled with the verse; Translation opens the sheet with the verse still highlighted', async () => {
+  it('hold a verse: a medium haptic, the menu for that verse; Translation opens the sheet with the verse still highlighted', async () => {
     render(v2(<Reader />));
     await act(async () => {});
     act(() => actions.onLongPressAyah({ page: 3, sura: 2, ayah: 6 }, { x: 100, y: 300 }));
     expect(Haptics.impactAsync).toHaveBeenCalledWith('m');
-    expect(screen.getByText('Al-Baqarah 2:6')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('sheet-action-translation'));
-    // The menu has closed: once it's gone, the verse sheet opens.
-    const { Modal } = jest.requireActual('react-native');
-    const menuModal = screen.UNSAFE_getAllByType(Modal).find((m: any) => m.props.onDismiss);
-    act(() => menuModal.props.onDismiss());
+    expect(screen.getByLabelText('Translation of Al-Baqarah 2:6')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('verse-menu-translation'));
+    // The verse sheet opens at once: the menu is no modal to wait for.
     expect(await screen.findByText('Saheeh text of the verse.', {}, { timeout: 10_000 })).toBeTruthy();
     expect(actions.highlightedAyah).toMatchObject({ sura: 2, ayah: 6 });
   });
