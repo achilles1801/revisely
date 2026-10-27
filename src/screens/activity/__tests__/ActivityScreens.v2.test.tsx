@@ -5,6 +5,8 @@ import ActivityScreen from '../ActivityScreen';
 import ActivityDayScreen from '../ActivityDayScreen';
 import ActivityAllScreen from '../ActivityAllScreen';
 import { paletteLight } from '../../../theme/v2';
+import { monthTitle, weekStart, weekTitle } from '../../../lib/activityHeatmap';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { emptyJournalEntry, shiftDay } from '../../../lib/journal';
 import { getRevisionDayForUser } from '../../../lib/fajrBoundary';
 import type { JournalEntry, ReadingSession, RevisionLog, User } from '../../../types';
@@ -12,9 +14,9 @@ import type { JournalEntry, ReadingSession, RevisionLog, User } from '../../../t
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('expo-haptics', () => ({
-  selectionAsync: jest.fn(),
-  impactAsync: jest.fn(),
-  notificationAsync: jest.fn(),
+  selectionAsync: jest.fn(async () => undefined),
+  impactAsync: jest.fn(async () => undefined),
+  notificationAsync: jest.fn(async () => undefined),
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's' },
 }));
@@ -129,36 +131,50 @@ beforeEach(() => {
   mockRoute.params = {};
 });
 
-const layoutGraph = async () => {
-  fireEvent(await screen.findByTestId('heatmap'), 'layout', { nativeEvent: { layout: { width: 370, height: 160 } } });
+const layoutCalendar = async () => {
+  fireEvent(await screen.findByTestId('calendar-month'), 'layout', { nativeEvent: { layout: { width: 370, height: 300 } } });
 };
-const cellStyle = (date: string) =>
-  Object.assign({}, ...[screen.getByTestId(`heat-${date}`).props.style].flat(3).filter(Boolean));
+const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
+const shade = (date: string) => flat(`heat-fill-${date}`).backgroundColor;
+const ring = (date: string) => flat(`heat-${date}`).borderColor;
+// A day a few days back can be in last month: step back to it.
+const showMonthOf = (date: string) => {
+  if (screen.getByTestId('calendar-title').props.children !== monthTitle(date.slice(0, 7))) {
+    fireEvent.press(screen.getByTestId('calendar-back'));
+  }
+};
 
 describe('<ActivityScreen /> in the new design', () => {
-  it('a graph of days; the picked day in a line under it; the last three things done', async () => {
+  beforeEach(() => AsyncStorage.clear());
+
+  it('a month by default; the picked day in a line under it; the last three things done', async () => {
     mockApp.logs = [log(today, Array.from({ length: 20 }, (_, i) => i + 1), 30)];
     mockService.getReadingSessions.mockResolvedValue([reading(day(1), 7, 15), reading(day(3), 9, 5)]);
     mockService.getJournalEntries.mockResolvedValue([entry(day(2), { memorization: '1/2 p3' })]);
     render(<ActivityScreen />);
-    await layoutGraph();
+    await layoutCalendar();
 
-    // A juz is level 3; 15 timed minutes level 2; a note level 1; nothing level 0.
-    expect(cellStyle(today).backgroundColor).toBe(paletteLight.heat[3]);
-    expect(cellStyle(day(1)).backgroundColor).toBe(paletteLight.heat[2]);
-    expect(cellStyle(day(2)).backgroundColor).toBe(paletteLight.heat[1]);
-    expect(cellStyle(day(4)).backgroundColor).toBe(paletteLight.heat[0]);
-    // Today is picked to begin with.
-    expect(cellStyle(today).borderWidth).toBe(2);
+    expect(screen.getByTestId('calendar-title').props.children).toBe(monthTitle(today.slice(0, 7)));
+    // This month is the last one there is.
+    expect(screen.getByTestId('calendar-forward').props.accessibilityState).toMatchObject({ disabled: true });
+    // A juz is level 3; today is picked to begin with.
+    expect(shade(today)).toBe(paletteLight.heat[3]);
+    expect(ring(today)).toBe(paletteLight.text);
     expect(screen.getByLabelText('Today: 20 pages revised, 30 min. Open the day')).toBeTruthy();
 
+    // 15 timed minutes is level 2; picking it says so, and the line opens it.
+    showMonthOf(day(1));
+    expect(shade(day(1))).toBe(paletteLight.heat[2]);
     fireEvent.press(screen.getByTestId(`heat-${day(1)}`));
-    expect(cellStyle(day(1)).borderWidth).toBe(2);
-    expect(cellStyle(today).borderWidth).toBe(0);
+    expect(ring(day(1))).toBe(paletteLight.text);
     fireEvent.press(screen.getByLabelText(/: 15 min\. Open the day$/));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: day(1) });
 
-    // An empty day says so, and doesn't open.
+    // A note alone is level 1; nothing is 0, says so, and doesn't open.
+    showMonthOf(day(2));
+    expect(shade(day(2))).toBe(paletteLight.heat[1]);
+    showMonthOf(day(4));
+    expect(shade(day(4))).toBe(paletteLight.heat[0]);
     fireEvent.press(screen.getByTestId(`heat-${day(4)}`));
     expect(screen.queryByLabelText(/Open the day$/)).toBeNull();
     expect(screen.getByText(/No activity/)).toBeTruthy();
@@ -176,10 +192,28 @@ describe('<ActivityScreen /> in the new design', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityAll');
   });
 
-  it('nothing yet: an empty graph and one line instead of a list', async () => {
+  it('Week shows the seven days with what each held, steps back a week, and is remembered', async () => {
+    mockApp.logs = [log(today, [1, 2, 3], 12)];
     render(<ActivityScreen />);
-    await layoutGraph();
-    expect(cellStyle(today).backgroundColor).toBe(paletteLight.heat[0]);
+    await layoutCalendar();
+    fireEvent.press(screen.getByTestId('pill-week'));
+
+    expect(screen.queryByTestId('calendar-month')).toBeNull();
+    expect(screen.getByTestId('calendar-title').props.children).toBe(weekTitle(weekStart(today), today));
+    expect(screen.getByLabelText('Today: 3 pages revised, 12 min. Open the day')).toBeTruthy();
+    fireEvent.press(screen.getByTestId(`week-${today}`));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: today });
+    expect(await AsyncStorage.getItem('@revisely_activity_range')).toBe('week');
+
+    fireEvent.press(screen.getByTestId('calendar-back'));
+    expect(screen.getByTestId('calendar-title').props.children).toBe(weekTitle(shiftDay(weekStart(today), -7), today));
+    expect(screen.getByTestId(`week-${shiftDay(weekStart(today), -7)}`)).toBeTruthy();
+  });
+
+  it('nothing yet: an empty month and one line instead of a list', async () => {
+    render(<ActivityScreen />);
+    await layoutCalendar();
+    expect(shade(today)).toBe(paletteLight.heat[0]);
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
     expect(screen.getByTestId('recent-empty').props.children).toBe('No sessions yet. Start your first revision from Home.');
     expect(screen.queryByText('See all')).toBeNull();

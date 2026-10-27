@@ -161,6 +161,8 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     }
     expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
+    // A day's number on each shade of Activity's calendar.
+    p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
     // Screens not moved yet get the same colours under the classic names.
     const c = v2ThemeColors(isDark);
     for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success]) {

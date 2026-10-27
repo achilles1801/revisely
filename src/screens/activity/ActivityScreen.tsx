@@ -19,7 +19,7 @@ import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
 import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
 import { ActivityDayCard } from '../../components/activity/ActivityDayCard';
 import { useActivitySources } from '../../components/activity/useActivitySources';
-import { ActivityHeatmap } from '../../components/activity/ActivityHeatmap';
+import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
 import { ActivityItemRow, RecentSection } from '../../components/activity/ActivityItemRow';
 import { ActivityItem, buildActivityItems } from '../../lib/activityItems';
 import { useApp } from '../../context/AppContext';
@@ -185,9 +185,10 @@ export default function ActivityScreen() {
   );
 
   if (isNew) {
-    // The new design: a contribution graph (a cell per day, darker the more it
-    // held; tap one to see that day in a line under it), then the last few
-    // things done. Everything else is behind "See all", searchable.
+    // The new design: a calendar, a month by default or a week (a cell per
+    // day, darker the more it held; tap one to see that day in a line under
+    // it), then the last few things done. Everything else is behind "See all",
+    // searchable.
     const recentItems = items.slice(0, RECENT_ITEMS);
     const openItem = (it: ActivityItem) =>
       navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
@@ -217,7 +218,7 @@ export default function ActivityScreen() {
               </Tap>
             )}
             <View style={v2.graph}>
-              <ActivityHeatmap
+              <ActivityCalendar
                 days={days}
                 today={today}
                 firstDay={firstDay}

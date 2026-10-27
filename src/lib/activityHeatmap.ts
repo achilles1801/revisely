@@ -1,8 +1,8 @@
 import { ActivityDay, isActivityDayEmpty, summarizeActivityDay } from './activity';
 import { shiftDay } from './journal';
 
-// The contribution graph on Activity (new design): a column per week, a row per
-// weekday (Sunday on top), a cell per revision day, darker the more it held.
+// Activity's calendar (new design): a month (or a week) of revision days, each
+// in jade by how much it held.
 // Days are revision days ('YYYY-MM-DD', fajr-aware), so a session after
 // midnight but before fajr lands on the day it belongs to.
 
@@ -45,44 +45,57 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((localDay(to).getTime() - localDay(from).getTime()) / 86_400_000);
 }
 
-/**
- * `count` week columns ending with the week that holds `today`, oldest first.
- * Each column is Sunday to Saturday; days after today are null.
- */
-export function heatmapWeeks(today: string, count: number): (string | null)[][] {
-  const sunday = shiftDay(today, -localDay(today).getDay());
-  const weeks: (string | null)[][] = [];
-  for (let w = count - 1; w >= 0; w--) {
-    const start = shiftDay(sunday, -7 * w);
-    const col: (string | null)[] = [];
-    for (let d = 0; d < 7; d++) {
-      const date = shiftDay(start, d);
-      col.push(date > today ? null : date);
-    }
-    weeks.push(col);
-  }
-  return weeks;
+/** The Sunday that starts the week holding `day`. */
+export function weekStart(day: string): string {
+  return shiftDay(day, -localDay(day).getDay());
+}
+
+/** The week holding `day`, Sunday to Saturday. */
+export function weekOf(day: string): string[] {
+  const sunday = weekStart(day);
+  return Array.from({ length: 7 }, (_, i) => shiftDay(sunday, i));
+}
+
+/** 'YYYY-MM' moved by `delta` months. */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
- * Month names over the columns where a month starts ("Oct" over the first week
- * whose Sunday is in October). The first column's label is dropped when the
- * next one would sit on top of it.
+ * A month as calendar rows, Sunday to Saturday; days outside the month are
+ * null. Four to six rows.
  */
-export function monthLabels(weeks: (string | null)[][]): { index: number; label: string }[] {
-  const out: { index: number; label: string }[] = [];
-  let prev = '';
-  weeks.forEach((col, index) => {
-    const first = col.find((d): d is string => d != null);
-    if (!first) return;
-    const month = first.slice(0, 7);
-    if (month !== prev) {
-      out.push({ index, label: localDay(first).toLocaleDateString('en-US', { month: 'short' }) });
-      prev = month;
-    }
-  });
-  if (out.length > 1 && out[1].index - out[0].index < 3) out.shift();
-  return out;
+export function monthGrid(month: string): (string | null)[][] {
+  const first = `${month}-01`;
+  const rows: (string | null)[][] = [];
+  let day = weekStart(first);
+  while (rows.length === 0 || day.slice(0, 7) === month) {
+    const row = Array.from({ length: 7 }, (_, i) => {
+      const d = shiftDay(day, i);
+      return d.slice(0, 7) === month ? d : null;
+    });
+    rows.push(row);
+    day = shiftDay(day, 7);
+  }
+  return rows;
+}
+
+/** "October 2026". */
+export function monthTitle(month: string): string {
+  return localDay(`${month}-01`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+/** "Oct 25 – 31", "Sep 27 – Oct 3", with the year when it isn't this year's. */
+export function weekTitle(sunday: string, today: string): string {
+  const saturday = shiftDay(sunday, 6);
+  const a = localDay(sunday);
+  const b = localDay(saturday);
+  const mon = (d: Date) => d.toLocaleDateString('en-US', { month: 'short' });
+  const end = a.getMonth() === b.getMonth() ? `${b.getDate()}` : `${mon(b)} ${b.getDate()}`;
+  const year = saturday.slice(0, 4) !== today.slice(0, 4) ? `, ${b.getFullYear()}` : '';
+  return `${mon(a)} ${a.getDate()} – ${end}${year}`;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

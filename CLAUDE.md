@@ -291,9 +291,11 @@ Review), kept per device, switching the whole app live.
     second card restating it. Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
-  - Activity is a contribution graph (`activity/ActivityHeatmap`, levels in `lib/activityHeatmap`,
-    colours `palette.heat`, an ordinal jade ramp checked for ≥ 2:1 on the ground) with the picked
-    day in one line under it; things done are `lib/activityItems`.
+  - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
+    and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
+    are `lib/activityHeatmap` levels in `palette.heat` (an ordinal jade ramp, ≥ 2:1 on the
+    ground) with `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month.
+    Things done are `lib/activityItems`.
   - **No floating timer.** The timer is in the reader's and the session's controls; a running one
     shows in Home's top bar (`RunningTimerChip`). Classic keeps `FloatingTimer`.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says

@@ -5,8 +5,11 @@ import {
   heatCellLabel,
   heatDayLabel,
   heatLevel,
-  heatmapWeeks,
-  monthLabels,
+  monthGrid,
+  monthTitle,
+  shiftMonth,
+  weekOf,
+  weekTitle,
 } from '../activityHeatmap';
 import { buildActivityItems, filterActivityItems } from '../activityItems';
 import { emptyJournalEntry } from '../journal';
@@ -61,24 +64,34 @@ describe('heatmap levels', () => {
   });
 });
 
-describe('heatmap grid', () => {
-  it('weeks run Sunday to Saturday, the last holding today; later days are empty', () => {
-    // 2026-10-26 is a Monday.
-    const weeks = heatmapWeeks('2026-10-26', 3);
-    expect(weeks).toHaveLength(3);
-    expect(weeks[2]).toEqual(['2026-10-25', '2026-10-26', null, null, null, null, null]);
-    expect(weeks[1][0]).toBe('2026-10-18');
-    expect(weeks[0][6]).toBe('2026-10-17');
+describe('the calendar', () => {
+  it('a month is rows of Sunday to Saturday, blank outside the month', () => {
+    // October 2026 starts on a Thursday and ends on a Saturday: 5 rows.
+    const oct = monthGrid('2026-10');
+    expect(oct).toHaveLength(5);
+    expect(oct[0]).toEqual([null, null, null, null, '2026-10-01', '2026-10-02', '2026-10-03']);
+    expect(oct[4]).toEqual(['2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31']);
+    // February 2026 starts on a Sunday: exactly 4 rows.
+    expect(monthGrid('2026-02')).toHaveLength(4);
+    // August 2026 starts on a Saturday: 6 rows.
+    expect(monthGrid('2026-08')).toHaveLength(6);
   });
 
-  it('labels the column where each month starts, dropping a first label the next would crowd', () => {
-    const weeks = heatmapWeeks('2026-10-26', 10);
-    // Columns start Aug 23, Aug 30, Sep 6 … Oct 25.
-    expect(monthLabels(weeks)).toEqual([
-      { index: 2, label: 'Sep' },
-      { index: 6, label: 'Oct' },
+  it('weeks run Sunday to Saturday', () => {
+    expect(weekOf('2026-10-26')).toEqual([
+      '2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31',
     ]);
-    expect(monthLabels(heatmapWeeks('2026-10-26', 12))[0]).toEqual({ index: 0, label: 'Aug' });
+    expect(weekOf('2026-10-25')[0]).toBe('2026-10-25');
+  });
+
+  it('steps months across years; titles read naturally', () => {
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+    expect(monthTitle('2026-10')).toBe('October 2026');
+    expect(weekTitle('2026-10-25', '2026-10-26')).toBe('Oct 25 – 31');
+    expect(weekTitle('2026-09-27', '2026-10-26')).toBe('Sep 27 – Oct 3');
+    expect(weekTitle('2025-12-28', '2026-10-26')).toBe('Dec 28 – Jan 3');
+    expect(weekTitle('2025-10-26', '2026-10-26')).toBe('Oct 26 – Nov 1, 2025');
   });
 });
 
