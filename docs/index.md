@@ -13,4 +13,4 @@ A Quran revision tracker that schedules your daily review on a cycle through eve
 
 ## Contact
 
-For privacy questions or support, email `privacy@revisely.app`.
+For privacy questions or support, email `support@revisely.app`.

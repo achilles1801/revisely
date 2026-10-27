@@ -6,11 +6,11 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-10-26**
+**Last updated: 2026-10-27**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
 
-Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `privacy@revisely.app`.
+Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `support@revisely.app`.
 
 ## 1. What this app does
 
@@ -104,7 +104,7 @@ Depending on where you live, you have some or all of the following rights:
 
 - **Access** the personal information we hold about you.
 - **Correct** information that's inaccurate or incomplete.
-- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `privacy@revisely.app`.
+- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `support@revisely.app`.
 - **Export** your data in a portable format.
 - **Withdraw consent** for processing based on consent (e.g., push notifications, location).
 - **Object** to processing based on legitimate interests.
@@ -113,14 +113,14 @@ Depending on where you live, you have some or all of the following rights:
 We will respond to verifiable requests within 30 days. We do not discriminate against users who exercise their rights.
 
 ### California, Virginia, Colorado, Connecticut, Utah, Texas, and other US state residents
-You have additional rights under your state's privacy law, including the right to know what categories of personal information we collect, to opt out of any "sale" or "sharing" (we do neither), and to limit the use of sensitive personal information. To exercise these rights, contact `privacy@revisely.app`.
+You have additional rights under your state's privacy law, including the right to know what categories of personal information we collect, to opt out of any "sale" or "sharing" (we do neither), and to limit the use of sensitive personal information. To exercise these rights, contact `support@revisely.app`.
 
 ### Quebec residents (Law 25)
-You have the right to access, correct, and request deletion of your personal information. You may also withdraw consent for any consent-based processing. Contact `privacy@revisely.app`.
+You have the right to access, correct, and request deletion of your personal information. You may also withdraw consent for any consent-based processing. Contact `support@revisely.app`.
 
 ## 9. Children
 
-Revisely is not directed to children. It is intended for users 13 and older, or older where the age of digital consent in your country is higher (16 in some EU countries). We do not knowingly collect personal information from children under 13. If we learn that we have, we will delete that information and the associated account promptly. If you believe a child has provided us with personal data, please contact us at `privacy@revisely.app`.
+Revisely is not directed to children. It is intended for users 13 and older, or older where the age of digital consent in your country is higher (16 in some EU countries). We do not knowingly collect personal information from children under 13. If we learn that we have, we will delete that information and the associated account promptly. If you believe a child has provided us with personal data, please contact us at `support@revisely.app`.
 
 ## 10. Security
 
@@ -150,6 +150,6 @@ We may update this Privacy Policy from time to time. The updated version will be
 
 For privacy questions, data requests, or to report a concern, contact:
 
-- **Email:** `privacy@revisely.app`
+- **Email:** `support@revisely.app`
 
 If you are in the EU or UK and we have not designated a local representative, you may contact us directly at the email above. We will respond to your request within 30 days.
