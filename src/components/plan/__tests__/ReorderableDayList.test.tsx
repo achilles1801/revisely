@@ -26,7 +26,8 @@ import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-han
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { moveDay, removeDay } from '../../../lib/planBuilder';
-import { ACTION_WIDTH, DELETE_FILL, ReorderableDayList, ScrollLink } from '../ReorderableDayList';
+import { ACTION_WIDTH, ReorderableDayList, ScrollLink } from '../ReorderableDayList';
+import { ACCENTS, paletteV2 } from '../../../theme/v2';
 
 const lum = (hex: string) => {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
@@ -236,8 +237,20 @@ describe('swiping a day', () => {
     expect(actions).toEqual(['activate']);
   });
 
-  it('white Delete on its red is readable (4.5:1)', () => {
-    expect(contrast('#FFFFFF', DELETE_FILL)).toBeGreaterThanOrEqual(4.5);
+  it('Delete on its red is readable (4.5:1) and the red stands out (3:1), every accent, both modes', () => {
+    for (const accent of ACCENTS) {
+      for (const dark of [false, true]) {
+        const p = paletteV2(dark, accent);
+        expect(contrast(p.onRedFill, p.redFill)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(p.redFill, p.bg)).toBeGreaterThanOrEqual(3);
+      }
+    }
+    // The classic design keeps the white on #DC2626 it had.
+    expect([paletteV2(false).redFill, paletteV2(true).redFill, paletteV2(true).onRedFill]).toEqual([
+      '#DC2626',
+      '#DC2626',
+      '#FFFFFF',
+    ]);
   });
 });
 

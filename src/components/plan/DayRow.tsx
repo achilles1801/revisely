@@ -1,8 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { GroupedRow } from './Grouped';
+import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
 import { summarizeDay } from '../../lib/planDisplay';
+import { layoutV2, typeV2 } from '../../theme/v2';
 
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -21,11 +25,36 @@ export function dayTitle(index: number, today: Date): string {
   });
 }
 
-/** Leading calendar-style column: weekday over date number. */
+/**
+ * Leading calendar-style column: weekday over date number. In the new design
+ * the weekday is in sentence case ("Today", "Tue"), today in the accent.
+ */
 export function DateBadge({ index, today }: { index: number; today: Date }) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const date = addDays(today, index);
   const isToday = index === 0;
+  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  if (isNew) {
+    return (
+      <View style={styles.badge} testID={`date-badge-${index}`}>
+        <Text
+          style={[styles.weekdayV2, { color: isToday ? palette.accentText : palette.secondary }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.3}
+        >
+          {isToday ? 'Today' : weekday}
+        </Text>
+        <Text
+          style={[styles.dateV2, typeV2.numeral, { color: isToday ? palette.accentText : palette.text }]}
+          maxFontSizeMultiplier={1.3}
+        >
+          {date.getDate()}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.badge}>
       <Text
@@ -34,7 +63,7 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
         adjustsFontSizeToFit
         maxFontSizeMultiplier={1.3}
       >
-        {isToday ? 'TODAY' : date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()}
+        {isToday ? 'TODAY' : weekday.toUpperCase()}
       </Text>
       {/* A 40pt column: the date grows only so far, like other chrome text. */}
       <Text
@@ -47,6 +76,7 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
   );
 }
 
+/** Where a day's content starts: the gutter, the 40pt date column and 12pt. */
 export const DAY_ROW_INSET = 16 + 40 + 12;
 
 /** One cycle day in a grouped list. */
@@ -69,7 +99,53 @@ export function DayRow({
   trailing?: React.ReactNode;
   showChevron?: boolean;
 }) {
+  const { palette } = useTheme();
+  const { isNew } = useDesign();
   const summary = summarizeDay(pages);
+  const label = `${dayTitle(index, today)}: ${summary.title}, ${summary.subtitle}`;
+
+  if (isNew) {
+    // The date column, then what's on the day as a feed row's name and meta.
+    const row = (
+      <View style={styles.rowV2}>
+        {leading}
+        <DateBadge index={index} today={today} />
+        <View style={styles.textV2}>
+          <Text style={[typeV2.name, { color: summary.isRest ? palette.secondary : palette.text }]} numberOfLines={1}>
+            {summary.title}
+          </Text>
+          {summary.subtitle ? (
+            <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2}>
+              {summary.subtitle}
+            </Text>
+          ) : null}
+        </View>
+        {trailing}
+        {showChevron && (onPress || onLongPress) ? (
+          <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        ) : null}
+      </View>
+    );
+    if (!onPress && !onLongPress) {
+      return (
+        <View accessible accessibilityLabel={label} testID={`day-row-${index}`}>
+          {row}
+        </View>
+      );
+    }
+    return (
+      <Tap
+        onPress={onPress}
+        onLongPress={onLongPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        testID={`day-row-${index}`}
+      >
+        {row}
+      </Tap>
+    );
+  }
+
   return (
     <GroupedRow
       title={summary.title}
@@ -85,7 +161,7 @@ export function DayRow({
       accessory={showChevron ? 'chevron' : 'none'}
       onPress={onPress}
       onLongPress={onLongPress}
-      accessibilityLabel={`${dayTitle(index, today)}: ${summary.title}, ${summary.subtitle}`}
+      accessibilityLabel={label}
     />
   );
 }
@@ -107,4 +183,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
+  weekdayV2: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  dateV2: { fontSize: 20, lineHeight: 24, fontWeight: '600' },
+  rowV2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 61,
+    paddingVertical: 10,
+    paddingHorizontal: layoutV2.gutter,
+    gap: 12,
+  },
+  textV2: { flex: 1, minWidth: 0 },
 });

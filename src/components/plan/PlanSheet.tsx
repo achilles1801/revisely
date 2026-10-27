@@ -15,6 +15,7 @@ import {
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../GlassCard';
+import { Tap } from '../v2/Tap';
 import { useDesign } from '../../design/DesignContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useTheme } from '../../context/ThemeContext';
@@ -22,6 +23,10 @@ import { spacing } from '../../theme/spacing';
 
 /**
  * Themed @gorhom sheet with an iOS-style header: [Cancel]  Title  [Done].
+ *
+ * In the new design it takes v2/Sheet's frame: a solid sheet with 20pt
+ * corners, the v2 grab handle and backdrop, an 18pt centred title over a
+ * hairline, Cancel and the confirming action in ink.
  *
  * - Without `snapPoints` the sheet sizes itself to its content (wrapped in a
  *   BottomSheetView). Use for short forms.
@@ -69,13 +74,15 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
         {...props}
+        // The new design's overlay is a colour with its own alpha: shown whole.
+        style={isNew ? [props.style, { backgroundColor: palette.overlay }] : props.style}
         appearsOnIndex={0}
         disappearsOnIndex={-1}
-        opacity={0.35}
+        opacity={isNew ? 1 : 0.35}
         pressBehavior="close"
       />
     ),
-    [],
+    [isNew, palette.overlay],
   );
 
   const header = (
@@ -96,6 +103,7 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
     <BottomSheetModal
       ref={ref}
       snapPoints={snapPoints}
+      handleStyle={isNew ? styles.handleV2 : undefined}
       enableDynamicSizing={dynamic}
       stackBehavior={stackBehavior}
       onDismiss={onDismiss}
@@ -106,7 +114,12 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
       backgroundComponent={isNew ? SheetSolidBackground : SheetGlassBackground}
       handleIndicatorStyle={
         isNew
-          ? { backgroundColor: palette.handle, width: layoutV2.handle.width, height: layoutV2.handle.height }
+          ? {
+              backgroundColor: palette.handle,
+              width: layoutV2.handle.width,
+              height: layoutV2.handle.height,
+              borderRadius: layoutV2.handle.height / 2,
+            }
           : { backgroundColor: theme.textMuted, opacity: 0.4, width: 36 }
       }
       keyboardBehavior="interactive"
@@ -141,7 +154,13 @@ function SheetGlassBackground({ style }: BottomSheetBackgroundProps) {
 /** The new design's sheet: solid, 20pt corners. */
 function SheetSolidBackground({ style }: BottomSheetBackgroundProps) {
   const { palette } = useTheme();
-  return <View style={[style, styles.background, styles.backgroundV2, { backgroundColor: palette.sheet }]} pointerEvents="none" />;
+  return (
+    <View
+      style={[style, styles.background, styles.backgroundV2, { backgroundColor: palette.sheet }]}
+      pointerEvents="none"
+      testID="plan-sheet-background"
+    />
+  );
 }
 
 export function SheetHeader({
@@ -156,10 +175,35 @@ export function SheetHeader({
   PlanSheetProps,
   'title' | 'leftLabel' | 'onLeft' | 'rightLabel' | 'onRight' | 'rightDisabled' | 'rightLoading'
 >) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
   const { isNew } = useDesign();
+  if (isNew) {
+    // v2/Sheet's header.
+    return (
+      <View style={[styles.headerV2, { borderBottomColor: palette.separator }]}>
+        <View style={[styles.sideV2, styles.sideLeftV2]}>
+          {leftLabel && onLeft ? <HeaderButtonV2 label={leftLabel} onPress={onLeft} /> : null}
+        </View>
+        <Text
+          style={[typeV2.sheetTitle, styles.titleV2, { color: palette.text }]}
+          numberOfLines={2}
+          accessibilityRole="header"
+          maxFontSizeMultiplier={1.4}
+        >
+          {title}
+        </Text>
+        <View style={[styles.sideV2, styles.sideRightV2]}>
+          {rightLoading ? (
+            <ActivityIndicator size="small" color={palette.secondary} />
+          ) : rightLabel && onRight ? (
+            <HeaderButtonV2 label={rightLabel} onPress={onRight} disabled={rightDisabled} strong />
+          ) : null}
+        </View>
+      </View>
+    );
+  }
   return (
-    <View style={[styles.header, isNew && { borderBottomWidth: layoutV2.hairline, borderBottomColor: theme.border, marginBottom: 6 }]}>
+    <View style={styles.header}>
       <View style={[styles.side, styles.sideLeft]}>
         {leftLabel && onLeft ? (
           <HeaderButton label={leftLabel} onPress={onLeft} color={theme.accent} />
@@ -186,6 +230,40 @@ export function SheetHeader({
         ) : null}
       </View>
     </View>
+  );
+}
+
+/** v2/Sheet's header button: ink, semibold when it confirms, faded when it can't. */
+function HeaderButtonV2({
+  label,
+  onPress,
+  disabled,
+  strong,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  strong?: boolean;
+}) {
+  const { palette } = useTheme();
+  return (
+    <Tap
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      style={disabled && styles.disabled}
+    >
+      <Text
+        style={[typeV2.menu, strong && styles.strong, { color: palette.text }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.4}
+      >
+        {label}
+      </Text>
+    </Tap>
   );
 }
 
@@ -258,4 +336,19 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 22,
   },
+  handleV2: { paddingTop: 10, paddingBottom: 6 },
+  headerV2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: layoutV2.gutter,
+    borderBottomWidth: layoutV2.hairline,
+    marginBottom: 6,
+  },
+  sideV2: { width: 72, flexDirection: 'row', alignItems: 'center' },
+  sideLeftV2: { justifyContent: 'flex-start' },
+  sideRightV2: { justifyContent: 'flex-end' },
+  titleV2: { flex: 1, textAlign: 'center' },
+  strong: { fontWeight: '600' },
+  disabled: { opacity: 0.4 },
 });

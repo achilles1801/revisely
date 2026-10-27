@@ -74,6 +74,13 @@ export interface PaletteV2 extends AccentTokens {
   /** Destructive actions and errors. */
   red: string;
   /**
+   * A destructive action's fill (a swiped row's Delete) and the label on it
+   * (≥ 4.5:1 in both modes). Not `red`: dark mode's red is light enough to
+   * read on black, too light to carry white.
+   */
+  redFill: string;
+  onRedFill: string;
+  /**
    * Status "good" (a strong page, a positive figure): green whatever the
    * accent, as status colours never follow it (weak is `red`).
    */
@@ -96,6 +103,8 @@ const BASE_LIGHT: Base = {
   secondary: '#6B7280',
   separator: '#E5E7EB',
   red: '#DC2626',
+  redFill: '#DC2626',
+  onRedFill: '#FFFFFF',
   good: '#0E6B5A',
   fill: '#F7F7F8',
   sheet: '#FFFFFF',
@@ -109,6 +118,8 @@ const BASE_DARK: Base = {
   secondary: '#8A8A93',
   separator: '#1F1F1F',
   red: '#F87171',
+  redFill: '#DC2626',
+  onRedFill: '#FFFFFF',
   good: '#4DBA9F',
   fill: '#181818',
   sheet: '#101010',
