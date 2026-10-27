@@ -3,12 +3,16 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import type { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { formatRecordingTime } from '../../lib/recordingFormat';
+import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
+import { typeV2 } from '../../theme/v2';
+import { Tap } from '../v2/Tap';
 
 interface RecordButtonProps {
   recorder: ReturnType<typeof useVoiceRecorder>;
-  /** Icon colour when idle (screens use their own palettes). */
+  /** Icon colour when idle (screens use their own palettes; classic only). */
   color: string;
-  /** Background of the idle and paused controls. */
+  /** Background of the idle and paused controls (classic only). */
   background: string;
   border: string;
 }
@@ -24,14 +28,29 @@ export function recordedMs(baseMs: number, segmentStartedAt: number | null, now:
  * The session's recording control. Idle: a mic. Then one pill: the time (tap to
  * pause or resume) and a stop square that ends the recording.
  */
-export function RecordButton({ recorder, color, background, border }: RecordButtonProps) {
-  const { phase, baseMs, segmentStartedAt, interrupted } = recorder;
+export function RecordButton(props: RecordButtonProps) {
+  const { isNew } = useDesign();
+  return isNew ? <RecordButtonV2 recorder={props.recorder} /> : <RecordButtonClassic {...props} />;
+}
+
+/** Ticks while recording, for the time shown. */
+function useRecordingNow(phase: string): number {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (phase !== 'recording') return;
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, [phase]);
+  return now;
+}
+
+/** Whether the recording pill shows (not while a first start is under way). */
+const pillShown = (phase: string, baseMs: number, segmentStartedAt: number | null) =>
+  !(phase === 'idle' || (phase === 'starting' && baseMs === 0 && segmentStartedAt == null));
+
+function RecordButtonClassic({ recorder, color, background, border }: RecordButtonProps) {
+  const { phase, baseMs, segmentStartedAt, interrupted } = recorder;
+  const now = useRecordingNow(phase);
 
   if (phase === 'idle' || (phase === 'starting' && baseMs === 0 && segmentStartedAt == null)) {
     return (
@@ -103,6 +122,96 @@ export function RecordButton({ recorder, color, background, border }: RecordButt
   );
 }
 
+/**
+ * The new design: the same control in its tokens. Idle, a round mic like the
+ * timer's; recording, a solid red pill (`red`, its contents in the ground's
+ * colour, ≥ 4.5:1 both modes); paused, the pill outlined in red. Taps don't
+ * buzz; the recorder marks start and stop (design/haptics).
+ */
+function RecordButtonV2({ recorder }: { recorder: RecordButtonProps['recorder'] }) {
+  const { palette } = useTheme();
+  const { phase, baseMs, segmentStartedAt, interrupted } = recorder;
+  const now = useRecordingNow(phase);
+
+  if (!pillShown(phase, baseMs, segmentStartedAt)) {
+    return (
+      <Tap
+        onPress={recorder.start}
+        disabled={phase === 'starting'}
+        hitSlop={8}
+        style={[styles.round, { backgroundColor: palette.fill, borderColor: palette.separator }]}
+        accessibilityRole="button"
+        accessibilityLabel="Record your recitation"
+        accessibilityState={{ disabled: phase === 'starting', busy: phase === 'starting' }}
+        testID="record-start"
+      >
+        {phase === 'starting' ? (
+          <ActivityIndicator size="small" color={palette.secondary} />
+        ) : (
+          <Ionicons name="mic-outline" size={18} color={palette.text} />
+        )}
+      </Tap>
+    );
+  }
+
+  const time = formatRecordingTime(recordedMs(baseMs, segmentStartedAt, now));
+  const recording = phase === 'recording';
+  const busy = phase === 'starting' || phase === 'finishing';
+  const fg = recording ? palette.bg : palette.red;
+
+  return (
+    <View
+      style={[
+        styles.pill,
+        recording
+          ? { backgroundColor: palette.red }
+          : { backgroundColor: palette.fill, borderColor: palette.red, borderWidth: 1 },
+      ]}
+      testID={recording ? 'record-pill-recording' : 'record-pill-paused'}
+    >
+      <Tap
+        onPress={recording ? recorder.pause : recorder.resume}
+        disabled={busy}
+        hitSlop={{ top: 6, bottom: 6, left: 6 }}
+        style={styles.segment}
+        accessibilityRole="button"
+        accessibilityLabel={
+          recording
+            ? `Pause recording, ${time} recorded`
+            : `${interrupted ? 'Recording was paused by an interruption. ' : ''}Resume recording, ${time} recorded`
+        }
+        accessibilityState={{ disabled: busy, busy }}
+        testID="record-toggle"
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={fg} />
+        ) : recording ? (
+          <View style={[styles.dotV2, { backgroundColor: fg }]} />
+        ) : (
+          <Ionicons name="play" size={12} color={fg} />
+        )}
+        <Text style={[typeV2.numeral, styles.time, { color: fg }]} maxFontSizeMultiplier={1.2}>
+          {time}
+        </Text>
+        {recording && <Ionicons name="pause" size={13} color={fg} />}
+      </Tap>
+      <View style={[styles.divider, { backgroundColor: fg }, styles.dividerV2]} />
+      <Tap
+        onPress={recorder.finish}
+        disabled={busy}
+        hitSlop={{ top: 6, bottom: 6, right: 6 }}
+        style={styles.stopBtn}
+        accessibilityRole="button"
+        accessibilityLabel="Stop recording"
+        accessibilityState={{ disabled: busy }}
+        testID="record-stop"
+      >
+        <View style={[styles.stopSquare, { backgroundColor: fg }]} />
+      </Tap>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   round: {
     width: 34,
@@ -125,4 +234,7 @@ const styles = StyleSheet.create({
   stopSquare: { width: 11, height: 11, borderRadius: 2 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   time: { fontWeight: '700', fontVariant: ['tabular-nums'], fontSize: 14 },
+  // The new design.
+  dotV2: { width: 8, height: 8, borderRadius: 4 },
+  dividerV2: { opacity: 0.4 },
 });

@@ -14,6 +14,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { getAuth } from 'firebase/auth';
 import { logger } from './logger';
+import { cleanLevels } from './waveform';
 
 export type RecordingKind = 'revision' | 'reading';
 
@@ -33,6 +34,9 @@ export interface StoredSegment {
   sizeBytes?: number;
   /** An upload under way (resumable): where it carries on, and how far it got. */
   upload?: UploadSession;
+  /** Loudness over the segment, evenly spaced, 0–100 (lib/waveform). Kept on
+   *  this phone only: never in the backup's record, so a restored copy has none. */
+  levels?: number[];
 }
 
 export interface UploadSession {
@@ -86,6 +90,8 @@ export interface MetaSegment {
   fileName: string;
   /** On this phone; otherwise only in the backup (download before playing). */
   local: boolean;
+  /** Its waveform, when it was recorded here (StoredSegment.levels). */
+  levels?: number[];
 }
 
 export interface RecordingMeta extends Omit<StoredRecording, 'fileName' | 'storage' | 'segments'> {
@@ -170,6 +176,8 @@ export interface SegmentInfo {
   createdAt?: number;
   /** The session goes on after this segment (see StoredRecording.open). */
   open?: boolean;
+  /** The segment's waveform (lib/waveform), when the recorder reported levels. */
+  levels?: number[];
 }
 
 export interface AppendResult {
@@ -226,7 +234,12 @@ export function appendSegment(
     let target = new File(dir, `${id}-${n}${ext}`);
     while (target.exists) target = new File(dir, `${id}-${++n}${ext}`);
     temp.move(target);
-    const segment: StoredSegment = { fileName: target.name, durationMs: Math.round(info.segmentMs) };
+    const levels = cleanLevels(info.levels);
+    const segment: StoredSegment = {
+      fileName: target.name,
+      durationMs: Math.round(info.segmentMs),
+      ...(levels ? { levels } : {}),
+    };
     const segments = existing ? [...segmentsOf(existing), segment] : [segment];
     const entry: StoredRecording = {
       id,
@@ -306,12 +319,16 @@ function toMeta(dir: Directory, e: StoredRecording): RecordingMeta | null {
     .filter(({ sg, local }) => local || sg.uploaded);
   if (files.length === 0) return null;
   const { fileName: _f, storage: _s, segments: _g, ...rest } = e;
-  const segments = files.map(({ sg, file, local }) => ({
-    uri: file.uri,
-    durationMs: sg.durationMs,
-    fileName: sg.fileName,
-    local,
-  }));
+  const segments = files.map(({ sg, file, local }) => {
+    const levels = cleanLevels(sg.levels);
+    return {
+      uri: file.uri,
+      durationMs: sg.durationMs,
+      fileName: sg.fileName,
+      local,
+      ...(levels ? { levels } : {}),
+    };
+  });
   return {
     ...rest,
     durationMs: segments.reduce((sum, sg) => sum + sg.durationMs, 0),

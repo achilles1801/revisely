@@ -66,13 +66,20 @@ jest.mock('../../lib/audioFocus', () => ({
   },
 }));
 jest.mock('../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
+// Classic unless a test switches to the new design.
+const mockDesign = { isNew: false, hapticsOn: true };
+jest.mock('../../design/DesignContext', () => ({ useDesign: () => mockDesign }));
 
+import * as Haptics from 'expo-haptics';
 import { useVoiceRecorder, VOICE_PRESET } from '../useVoiceRecorder';
+import { LEVEL_SAMPLE_MS } from '../../lib/waveform';
 import { hasRecordingSession, isRecordingActive } from '../../lib/recordings';
 
 let appStateListeners: Array<(s: string) => void> = [];
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDesign.isNew = false;
+  mockDesign.hapticsOn = true;
   mockUri = 0;
   appStateListeners = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation((_e: any, l: any) => {
@@ -644,5 +651,101 @@ describe('a revision recording stays open until Stop', () => {
     await act(async () => unmount());
     await act(async () => resolveFind(OPEN));
     expect(mockClose).toHaveBeenCalledWith('open-1');
+  });
+});
+
+describe('waveform levels', () => {
+  it('meters while recording and keeps each stretch’s levels with it', async () => {
+    // Metering on: the recorder reports its level (it changes nothing recorded).
+    expect(VOICE_PRESET.isMeteringEnabled).toBe(true);
+    jest.useFakeTimers();
+    try {
+      const { result } = setup();
+      await act(() => result.current.start());
+      let db = -25; // half way up the voice range
+      mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true, metering: db }));
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS * 3);
+      });
+      db = 0;
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS * 2);
+      });
+      await act(() => result.current.pause());
+      expect(mockAppend.mock.calls[0][2].levels).toEqual([50, 50, 50, 100, 100]);
+
+      // While paused nothing is read; the next stretch starts afresh, and a
+      // recorder that reports no level leaves it without levels (drawn flat).
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS * 5);
+      });
+      mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true }));
+      await act(() => result.current.resume());
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS * 3);
+      });
+      await act(() => result.current.finish());
+      expect(mockAppend).toHaveBeenCalledTimes(2);
+      expect(mockAppend.mock.calls[1][2]).not.toHaveProperty('levels');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a recorder that throws when read (released) just stops adding levels', async () => {
+    jest.useFakeTimers();
+    try {
+      const { result } = setup();
+      await act(() => result.current.start());
+      mockRecorder.getStatus.mockImplementation(() => {
+        throw new Error('released');
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(LEVEL_SAMPLE_MS * 3);
+      });
+      expect(result.current.phase).toBe('recording');
+      mockRecorder.getStatus.mockImplementation(() => ({ isRecording: true }));
+      await act(() => result.current.finish());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('haptics', () => {
+  const run = async () => {
+    const { result } = setup();
+    await act(() => result.current.start());
+    const afterStart = (Haptics.impactAsync as jest.Mock).mock.calls.length;
+    await act(() => result.current.pause());
+    await act(() => result.current.resume());
+    const afterTaps = (Haptics.impactAsync as jest.Mock).mock.calls.length;
+    await act(() => result.current.finish());
+    return { afterStart, afterTaps };
+  };
+
+  it('classic: unchanged (medium on start, light on pause and resume, success on stop)', async () => {
+    const { afterStart, afterTaps } = await run();
+    expect(afterStart).toBe(1);
+    expect(afterTaps).toBe(3);
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
+  });
+
+  it('new design: one impact on start and on stop; pause and resume are taps, which do not buzz', async () => {
+    mockDesign.isNew = true;
+    const { afterStart, afterTaps } = await run();
+    expect(afterStart).toBe(1);
+    expect(afterTaps).toBe(1);
+    expect(mockAppend).toHaveBeenCalledTimes(2); // it really recorded both stretches
+    expect(Haptics.impactAsync).toHaveBeenCalledTimes(2);
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('new design with Settings → Haptics off: none', async () => {
+    mockDesign.isNew = true;
+    mockDesign.hapticsOn = false;
+    await run();
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
 });
