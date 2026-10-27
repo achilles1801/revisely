@@ -887,3 +887,73 @@ describe('backup bookkeeping', () => {
   });
 });
 
+
+describe('waveform levels (kept on this phone only)', () => {
+  const U = 'alice';
+  const seg = (segmentMs: number, extra: object = {}) => ({
+    kind: 'revision' as const,
+    day: '2026-10-20',
+    segmentMs,
+    pageMarks: [],
+    createdAt: 500,
+    ...extra,
+  });
+  const fileOf = (uri: string) => uri.split('/').pop() as string;
+
+  it('a stretch keeps the levels it was recorded with; one without has none', async () => {
+    const { id } = await appendSegment(null, temp('s1'), seg(4000, { levels: [10, 80.4, 120] }));
+    await appendSegment(id, temp('s2'), seg(2000));
+    const [rec] = await listRecordings();
+    expect(rec.segments[0].levels).toEqual([10, 80, 100]);
+    expect(rec.segments[1]).not.toHaveProperty('levels');
+  });
+
+  it('never go into the backup’s record, and survive the backup bookkeeping', async () => {
+    const { id } = await appendSegment(null, temp('s1'), seg(4000, { levels: [10, 50] }));
+    const [rec] = await listRecordings();
+    const name = fileOf(rec.uri);
+    await saveUploadSession(U, id!, name, { url: 'https://upload/s', offset: 0, sizeBytes: 11 });
+    await markSegmentUploaded(U, id!, name, 11);
+    // Exactly these fields: what the rules allow, nothing more.
+    expect((await cloudRecordingFor(U, id!))!.segments).toEqual([{ fileName: name, durationMs: 4000, sizeBytes: 11 }]);
+    // Listed again from the backup: the same file, still with its levels here.
+    await mergeCloudRecordings(U, {
+      live: [{ ...(await cloudRecordingFor(U, id!))! }],
+      deleted: [],
+    });
+    expect((await listRecordings())[0].segments[0].levels).toEqual([10, 50]);
+  });
+
+  it('a recording restored from the backup has none (drawn flat)', async () => {
+    await mergeCloudRecordings(U, {
+      live: [
+        {
+          id: 'r1',
+          kind: 'reading',
+          day: '2026-10-21',
+          createdAt: 5000,
+          durationMs: 3000,
+          pageMarks: [],
+          segments: [{ fileName: 'r1-0.m4a', durationMs: 3000, sizeBytes: 900, levels: [99] } as any],
+        },
+      ],
+      deleted: [],
+    });
+    const [rec] = await listRecordings();
+    expect(rec.restored).toBe(true);
+    expect(rec.segments[0]).not.toHaveProperty('levels');
+  });
+
+  it('levels that are not percentages are ignored', async () => {
+    const { id } = await appendSegment(null, temp('s1'), seg(4000, { levels: ['loud'] as any }));
+    const [rec] = await listRecordings();
+    expect(rec.id).toBe(id);
+    expect(rec.segments[0]).not.toHaveProperty('levels');
+    // A damaged index entry is read without them too.
+    const indexUri = 'doc/recordings/alice/index.json';
+    const entries = JSON.parse(mockFs.get(indexUri)!);
+    entries[0].segments[0].levels = [1, 'x'];
+    mockFs.set(indexUri, JSON.stringify(entries));
+    expect((await listRecordings())[0].segments[0]).not.toHaveProperty('levels');
+  });
+});

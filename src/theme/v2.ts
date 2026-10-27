@@ -93,6 +93,12 @@ export interface PaletteV2 extends AccentTokens {
   sheet: string;
   /** A sheet's grab handle. */
   handle: string;
+  /**
+   * What hasn't been reached yet on a progress track or a recording's waveform
+   * (the played part is `accentText`): ≥ 3:1 against every accent's
+   * `accentText`, so played and unplayed tell apart.
+   */
+  track: string;
   /** Dimmed backdrop behind a sheet. */
   overlay: string;
 }
@@ -112,6 +118,7 @@ const BASE_LIGHT: Base = {
   fill: '#F7F7F8',
   sheet: '#FFFFFF',
   handle: '#D1D5DB',
+  track: '#D1D5DB',
   overlay: 'rgba(0,0,0,0.4)',
 };
 
@@ -128,6 +135,7 @@ const BASE_DARK: Base = {
   fill: '#181818',
   sheet: '#101010',
   handle: '#3A3A3C',
+  track: '#333333',
   overlay: 'rgba(0,0,0,0.6)',
 };
 

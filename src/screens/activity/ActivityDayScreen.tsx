@@ -367,7 +367,8 @@ export default function ActivityDayScreen() {
                 </ThreadRow>
               );
             })}
-            <View onLayout={onRecordingsLayout} style={v2.recordings}>
+            {/* The rows keep the gutter themselves (hairlines run edge to edge). */}
+            <View onLayout={onRecordingsLayout}>
               <RecordingsList
                 day={date}
                 reloadKey={recordingsKey}
@@ -703,7 +704,6 @@ const makeStyles = (theme: ThemeColors) =>
 // The new design.
 const v2 = StyleSheet.create({
   section: { paddingTop: layoutV2.rowPad + 8, paddingBottom: 4 },
-  recordings: { paddingHorizontal: layoutV2.gutter },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

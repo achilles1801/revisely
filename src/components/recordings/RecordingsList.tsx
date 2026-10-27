@@ -25,6 +25,14 @@ import { formatRecordingTime } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
 import { downloadMissingSegments } from '../../lib/recordingBackup';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
+import { useDesign } from '../../design/DesignContext';
+import { useHaptics } from '../../design/haptics';
+import { playedFraction, waveformBars } from '../../lib/waveform';
+import { layoutV2, markV2, radiusV2, typeV2 } from '../../theme/v2';
+import { ThreadRow } from '../v2/ThreadRow';
+import { Tap } from '../v2/Tap';
+import { ActionSheet } from '../v2/ActionSheet';
+import { AudioWaveform } from '../v2/AudioWaveform';
 
 interface RecordingsListProps {
   day: string;
@@ -46,6 +54,10 @@ const KIND_LABEL: Record<RecordingKind, string> = {
 /**
  * A day's recordings: play / pause, a progress bar, the pages it covers (tap
  * one to play from there) and delete. Renders nothing when there are none.
+ *
+ * The new design: a row per recording on hairlines, the play button where a
+ * feed puts the avatar, the waveform with its progress (tap or drag to seek),
+ * the time, the pages as chips and a ⋯ menu (Delete). None: one quiet line.
  */
 export function RecordingsList({
   day,
@@ -55,9 +67,15 @@ export function RecordingsList({
   reloadKey,
   highlightId,
 }: RecordingsListProps) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [items, setItems] = useState<RecordingMeta[]>([]);
+  // Listed at least once (the new design says "none" only then).
+  const [loaded, setLoaded] = useState(false);
+  // The new design: the recording whose ⋯ menu is open.
+  const [menuFor, setMenuFor] = useState<RecordingMeta | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [paused, setPausedState] = useState(false);
   const pausedRef = useRef(false);
@@ -70,7 +88,10 @@ export function RecordingsList({
 
   const load = useCallback(() => {
     listRecordings()
-      .then((all) => setItems(all.filter((r) => r.day === day && (!kind || r.kind === kind))))
+      .then((all) => {
+        setItems(all.filter((r) => r.day === day && (!kind || r.kind === kind)));
+        setLoaded(true);
+      })
       .catch((err) => logger.warn('Could not list recordings', err));
   }, [day, kind]);
 
@@ -254,6 +275,7 @@ export function RecordingsList({
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (isNew) haptics.warning();
             if (playingId === r.id) stopPlayback();
             await deleteRecording(r.id);
             load();
@@ -266,6 +288,150 @@ export function RecordingsList({
 
   // Listening back without touching the screen: don't let it lock.
   useKeepScreenOn(playingId != null && !paused);
+
+  // Each recording's waveform (levels kept on this phone; none: flat).
+  const bars = useMemo(() => new Map(items.map((r) => [r.id, waveformBars(r.segments)])), [items]);
+
+  if (isNew) {
+    if (items.length === 0) {
+      if (!loaded) return null;
+      return (
+        <>
+          {header ? <View style={v2.gutter}>{header}</View> : null}
+          <Text style={[typeV2.body, v2.gutter, v2.none, { color: palette.secondary }]} testID="recordings-none">
+            No recordings on this day
+          </Text>
+        </>
+      );
+    }
+    return (
+      <>
+        {header ? <View style={v2.gutter}>{header}</View> : null}
+        {items.map((r) => {
+          const active = playingId === r.id;
+          const playing = active && !paused;
+          const downloading = downloadingId === r.id;
+          const at = active ? position : 0;
+          const currentPage = active ? pageAt(r.pageMarks, position) : null;
+          const time = new Date(r.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+          const allLocal = r.segments.every((sg) => sg.local);
+          const highlighted = r.id === highlightId;
+          return (
+            <View
+              key={r.id}
+              style={highlighted && { backgroundColor: palette.fill }}
+              testID={highlighted ? 'highlighted-recording' : undefined}
+            >
+              <ThreadRow
+                mark={
+                  <Tap
+                    onPress={() => togglePause(r)}
+                    style={[v2.play, { backgroundColor: palette.primary }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      downloading ? 'Downloading recording' : playing ? 'Pause recording' : 'Play recording'
+                    }
+                    testID={`recording-play-${r.id}`}
+                  >
+                    {downloading ? (
+                      <ActivityIndicator size="small" color={palette.onPrimary} />
+                    ) : (
+                      <Ionicons
+                        name={playing ? 'pause' : 'play'}
+                        size={18}
+                        color={palette.onPrimary}
+                        style={playing ? undefined : v2.playGlyph}
+                        testID={`recording-play-icon-${r.id}`}
+                      />
+                    )}
+                  </Tap>
+                }
+                name={KIND_LABEL[r.kind]}
+                meta={time}
+                onMenu={() => setMenuFor(r)}
+                menuLabel="Recording options"
+                testID={`recording-${r.id}`}
+                footer={
+                  r.pageMarks.length > 0
+                    ? r.pageMarks.map((m) => {
+                        const current = currentPage === m.page;
+                        return (
+                          <Tap
+                            key={`${m.atMs}-${m.page}`}
+                            onPress={() => play(r, m.atMs)}
+                            style={[v2.chip, { backgroundColor: current ? palette.primary : palette.fill }]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Play from page ${m.page}`}
+                            accessibilityState={{ selected: current }}
+                            testID={`recording-page-${r.id}-${m.page}`}
+                          >
+                            <Text
+                              style={[typeV2.meta, typeV2.numeral, { color: current ? palette.onPrimary : palette.secondary }]}
+                              maxFontSizeMultiplier={1.4}
+                            >
+                              p. {m.page}
+                            </Text>
+                          </Tap>
+                        );
+                      })
+                    : undefined
+                }
+              >
+                <View style={v2.wave}>
+                  <AudioWaveform
+                    bars={bars.get(r.id) ?? []}
+                    progress={playedFraction(at, r.durationMs)}
+                    onSeek={(f) => play(r, Math.round(f * r.durationMs))}
+                    valueText={`${formatRecordingTime(at)} of ${formatRecordingTime(r.durationMs)}`}
+                    testID={`recording-waveform-${r.id}`}
+                  />
+                </View>
+                <View style={v2.timeRow}>
+                  <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]} testID={`recording-time-${r.id}`}>
+                    {active ? `${formatRecordingTime(position)} / ` : ''}
+                    {formatRecordingTime(r.durationMs)}
+                  </Text>
+                  {r.backedUp && (
+                    <Ionicons
+                      name={allLocal ? 'cloud-done-outline' : 'cloud-download-outline'}
+                      size={13}
+                      color={palette.secondary}
+                      accessibilityLabel={allLocal ? 'Backed up' : 'In your backup; downloads when played'}
+                    />
+                  )}
+                </View>
+              </ThreadRow>
+              {highlighted ? <View style={[v2.highlight, { backgroundColor: palette.accentText }]} /> : null}
+            </View>
+          );
+        })}
+        <ActionSheet
+          visible={menuFor != null}
+          onClose={() => setMenuFor(null)}
+          title="Recording"
+          message={
+            menuFor
+              ? `${KIND_LABEL[menuFor.kind]} · ${formatRecordingTime(menuFor.durationMs)}`
+              : undefined
+          }
+          actions={
+            menuFor
+              ? [
+                  {
+                    key: 'delete',
+                    label: 'Delete recording',
+                    icon: 'trash-outline',
+                    destructive: true,
+                    onPress: () => confirmDelete(menuFor),
+                  },
+                ]
+              : []
+          }
+          testID="recording-menu"
+        />
+      </>
+    );
+  }
 
   if (items.length === 0) return null;
 
@@ -308,9 +474,9 @@ export function RecordingsList({
                   }
                 >
                   {downloadingId === r.id ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={theme.onAccent} />
                   ) : (
-                    <Ionicons name={active && !paused ? 'pause' : 'play'} size={16} color="#fff" />
+                    <Ionicons name={active && !paused ? 'pause' : 'play'} size={16} color={theme.onAccent} />
                   )}
                 </Pressable>
                 <View style={{ flex: 1 }}>
@@ -408,3 +574,28 @@ const makeStyles = (theme: ThemeColors) =>
       borderWidth: StyleSheet.hairlineWidth,
     },
   });
+
+// The new design.
+const v2 = StyleSheet.create({
+  gutter: { paddingHorizontal: layoutV2.gutter },
+  none: { paddingVertical: layoutV2.nestedPad },
+  play: {
+    width: markV2.top,
+    height: markV2.top,
+    borderRadius: markV2.top / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The play triangle looks centred a point to the right.
+  playGlyph: { marginLeft: 2 },
+  // The recording just saved ("Recording saved · View"): a mark at the edge.
+  highlight: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3 },
+  wave: { marginTop: 6 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  chip: {
+    minHeight: 26,
+    paddingHorizontal: 10,
+    borderRadius: radiusV2.chip,
+    justifyContent: 'center',
+  },
+});
