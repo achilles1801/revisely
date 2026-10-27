@@ -1,0 +1,10 @@
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: "today-carry-over"
+    timeout: 10000
+- pause: 2200
+- tapOn:
+    id: "today-carry-over"
+- pause: 3200

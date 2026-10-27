@@ -1,40 +1,319 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Revisely</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 36rem;
-      margin: 4rem auto;
-      padding: 0 1.5rem;
-      line-height: 1.6;
-      color: #1c1917;
-    }
-    @media (prefers-color-scheme: dark) {
-      body { background: #0c0a09; color: #fafaf9; }
-      a { color: #84cc16; }
-    }
-    h1 { font-size: 2rem; margin-bottom: 0.25rem; }
-    .tag { color: #78716c; margin-bottom: 2rem; }
-    a { color: #15803d; }
-    ul { padding-left: 1.25rem; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Revisely: Quran revision, on schedule</title>
+  <meta name="description" content="Revisely plans a little Quran revision every day across everything you’ve memorized, on the pages of the Madani mushaf. Free on iPhone.">
+  <link rel="canonical" href="https://revisely.app/">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="apple-itunes-app" content="app-id=6767990248">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Revisely">
+  <meta property="og:url" content="https://revisely.app/">
+  <meta property="og:title" content="Revisely: Quran revision, on schedule">
+  <meta property="og:description" content="A little revision every day across everything you’ve memorized, on real mushaf pages. Free on iPhone.">
+  <meta property="og:image" content="https://revisely.app/assets/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Revisely on an iPhone, showing today’s revision plan.">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/img/icon-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+  <link rel="preload" as="image" href="/assets/clips/plan.jpg" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/site.css">
+  <script>document.documentElement.classList.remove('no-js')</script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MobileApplication",
+    "name": "Revisely",
+    "operatingSystem": "iOS",
+    "applicationCategory": "EducationalApplication",
+    "description": "A Quran revision tracker that schedules your daily review on a cycle through everything you have memorized.",
+    "url": "https://revisely.app/",
+    "downloadUrl": "https://apps.apple.com/app/revisely/id6767990248",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
 </head>
 <body>
-  <h1>Revisely</h1>
-  <p class="tag">A Quran revision tracker that schedules your daily review on a cycle through everything you have memorized.</p>
+  <a class="skip" href="#main">Skip to content</a>
 
-  <h2>Legal</h2>
-  <ul>
-    <li><a href="/privacy/">Privacy Policy</a></li>
-    <li><a href="/terms/">Terms of Service</a></li>
-  </ul>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Revisely, home">
+        <img src="/assets/img/icon-64.png" width="30" height="30" alt="">
+        <span>Revisely</span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a class="hide-sm" href="#features">Features</a>
+        <a class="hide-sm" href="#faq">FAQ</a>
+        <a class="pill" href="https://apps.apple.com/app/revisely/id6767990248">Download</a>
+      </nav>
+    </div>
+  </header>
 
-  <h2>Contact</h2>
-  <p>For privacy questions or support: <a href="mailto:privacy@revisely.app">privacy@revisely.app</a></p>
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <div>
+          <h1 id="hero-title" class="display">Keep the Qur’an you’ve memorized.</h1>
+          <p class="lede">Revisely gives you a little revision every day, rotating through everything you’ve memorized, on the pages of the mushaf you learned from.</p>
+
+          <div class="get">
+            <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
+              <img class="badge-light" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store">
+              <img class="badge-dark" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" width="156" height="52" alt="Download on the App Store">
+            </a>
+            <p class="android"><strong>Android</strong> coming soon to Google Play</p>
+          </div>
+
+          <ul class="facts">
+            <li>Free, no ads</li>
+            <li>Syncs across devices</li>
+            <li>The 604-page Madani mushaf</li>
+          </ul>
+        </div>
+
+        <div class="phone" data-clip-frame>
+          <div class="screen">
+            <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+              poster="/assets/clips/plan.jpg"
+              aria-label="Revisely’s Home shows today’s pages, 517 to 536. Start revision opens page 517 of the mushaf; it is checked off and the next page swipes in.">
+              <source src="/assets/clips/plan.webm" type="video/webm; codecs=vp9">
+              <source src="/assets/clips/plan.mp4" type="video/mp4">
+            </video>
+          </div>
+          <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
+            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="verse" aria-label="A verse from Surah Al-Qamar">
+      <figure class="wrap">
+        <div class="arabic" aria-hidden="true"></div>
+        <p class="visually-hidden" lang="ar" dir="rtl">وَلَقَدْ يَسَّرْنَا ٱلْقُرْءَانَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍۢ</p>
+        <figcaption>
+          “And We have certainly made the Qur’an easy for remembrance, so is there any who will remember?”
+          <cite>Al-Qamar 54:17</cite>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="steps" aria-labelledby="steps-title">
+      <div class="wrap">
+        <div class="head">
+          <span class="label">How it works</span>
+          <h2 id="steps-title" class="title">Set it up once. Then just open the app.</h2>
+        </div>
+        <ol class="thread">
+          <li>
+            <span class="mark" aria-hidden="true">1</span>
+            <div>
+              <h3>Mark what you’ve memorized</h3>
+              <p>By surah, juz or page. Add more as you memorize it, and the cycle grows with you.</p>
+            </div>
+          </li>
+          <li>
+            <span class="mark" aria-hidden="true">2</span>
+            <div>
+              <h3>Choose how much to revise a day</h3>
+              <p>A number of pages, a juz or more, or a plan you build day by day, starting from any point.</p>
+            </div>
+          </li>
+          <li>
+            <span class="mark" aria-hidden="true">3</span>
+            <div>
+              <h3>Revise today’s pages</h3>
+              <p>Tap Start revision and go through them in the mushaf, checking off each page as you finish it.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <div id="features">
+      <section class="feature" aria-labelledby="f-reader">
+        <div class="wrap">
+          <div class="copy">
+            <span class="label">The mushaf</span>
+            <h2 id="f-reader" class="title">Revise on real pages, and hear them recited.</h2>
+            <p>Every page of the Madani mushaf, laid out as it is in print. Press and hold a verse to read its translation or to play the recitation from there.</p>
+            <ul class="points">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Saheeh International translation, verse by verse</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Al-Husary, Al-Minshawi, Abdul Basit, Alafasy and more</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>A teaching recitation that pauses after each verse for you to repeat</span></li>
+            </ul>
+          </div>
+          <div class="phone" data-clip-frame>
+            <div class="screen">
+              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="/assets/clips/reader.jpg"
+                aria-label="Holding a verse on page 518 opens a menu; Translation shows Qaf 50:4 in Arabic with its English translation, then the next verse. Back on the page, recitation plays from the first verse.">
+                <source src="/assets/clips/reader.webm" type="video/webm; codecs=vp9">
+                <source src="/assets/clips/reader.mp4" type="video/mp4">
+              </video>
+              <noscript><img src="/assets/clips/reader.jpg" alt="" loading="lazy"></noscript>
+            </div>
+            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
+              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature flip" aria-labelledby="f-carry">
+        <div class="wrap">
+          <div class="copy">
+            <span class="label">Carry-over</span>
+            <h2 id="f-carry" class="title">Didn’t finish yesterday? Pick up where you left off.</h2>
+            <p>If you stopped partway through yesterday’s pages, Home offers to add the ones you missed to today. Today keeps its usual size, and the rest of your plan moves back to make room.</p>
+            <p>Further behind? Move the whole plan back a day. The schedule never piles up.</p>
+          </div>
+          <div class="phone" data-clip-frame>
+            <div class="screen">
+              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="/assets/clips/carry.jpg"
+                aria-label="Home shows today’s pages, 523 to 542, and a button: Add 6 from yesterday. After tapping it, today becomes pages 517 to 536.">
+                <source src="/assets/clips/carry.webm" type="video/webm; codecs=vp9">
+                <source src="/assets/clips/carry.mp4" type="video/mp4">
+              </video>
+              <noscript><img src="/assets/clips/carry.jpg" alt="" loading="lazy"></noscript>
+            </div>
+            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
+              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature" aria-labelledby="f-activity">
+        <div class="wrap">
+          <div class="copy">
+            <span class="label">Activity</span>
+            <h2 id="f-activity" class="title">See your month at a glance.</h2>
+            <p>Each day you revise fills in on the calendar, darker the more you did. Tap a day to see what you covered and for how long, or switch to a week for the detail.</p>
+          </div>
+          <div class="phone" data-clip-frame>
+            <div class="screen">
+              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                data-poster="/assets/clips/activity.jpg"
+                aria-label="The Activity calendar for October, most days shaded in indigo. Tapping October 22 shows 40 pages revised in 1 hour 4 minutes; then a week view, then September.">
+                <source src="/assets/clips/activity.webm" type="video/webm; codecs=vp9">
+                <source src="/assets/clips/activity.mp4" type="video/mp4">
+              </video>
+              <noscript><img src="/assets/clips/activity.jpg" alt="" loading="lazy"></noscript>
+            </div>
+            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
+              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="more" aria-labelledby="more-title">
+      <div class="wrap">
+        <span class="label">Also in Revisely</span>
+        <h2 id="more-title" class="title">The rest of your hifz, in one place.</h2>
+        <ul class="rows">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+            <div><h3>Record your recitation</h3><p>Record yourself reciting a page, then listen back for what slipped.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 6.5V4M6.3 10.3 4.6 8.6M17.7 10.3l1.7-1.7"/></svg>
+            <div><h3>Start your day at fajr</h3><p>A late-night session still counts for the day it belongs to.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-7M10 20V5M15 20v-9M20 20V8"/></svg>
+            <div><h3>Insights</h3><p>Rate a page’s strength as you revise and see which pages are slipping.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>
+            <div><h3>A daily reminder</h3><p>One notification, at the time you choose.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg>
+            <div><h3>Daily log</h3><p>Note what you memorized and revised each day, in your own words.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M10 2.5h4M18.5 6.5 20 5"/></svg>
+            <div><h3>Reading timer</h3><p>Time your reading outside revision and keep a history of it.</p></div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="faq" id="faq" aria-labelledby="faq-title">
+      <div class="wrap">
+        <div class="head">
+          <span class="label">FAQ</span>
+          <h2 id="faq-title" class="title">Questions</h2>
+        </div>
+        <div class="list">
+          <details>
+            <summary>Is Revisely free?</summary>
+            <p>Yes. It’s free to download and use, and there are no ads.</p>
+          </details>
+          <details>
+            <summary>Is there an Android version?</summary>
+            <p>It’s coming to Google Play. For now, Revisely is on iPhone.</p>
+          </details>
+          <details>
+            <summary>Which mushaf does it use?</summary>
+            <p>The 604-page Madani mushaf, set in the King Fahd Complex script, with the same page layout as the printed copy many people memorize from.</p>
+          </details>
+          <details>
+            <summary>What happens if I miss a day?</summary>
+            <p>Your plan keeps moving, so missed pages don’t pile up. If you started yesterday’s revision but didn’t finish, Home offers to add the pages you missed to today, and you can always move the plan back a day.</p>
+          </details>
+          <details>
+            <summary>Do I need an account?</summary>
+            <p>Yes. Sign in with Apple, Google or email so your progress is saved and syncs between devices. You can delete your account and all of its data at any time in Settings.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" aria-labelledby="cta-title">
+      <div class="wrap">
+        <img class="icon" src="/assets/img/apple-touch-icon.png" width="72" height="72" alt="">
+        <h2 id="cta-title" class="title">Today’s pages are waiting.</h2>
+        <div class="get">
+          <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">
+            <img class="badge-light" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" width="156" height="52" alt="Download on the App Store" loading="lazy">
+            <img class="badge-dark" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us" width="156" height="52" alt="Download on the App Store" loading="lazy">
+          </a>
+          <p class="android"><strong>Android</strong> coming soon to Google Play</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© 2026 Majd Khawaldeh</p>
+      <nav aria-label="Footer">
+        <a href="/privacy/">Privacy</a>
+        <a href="/terms/">Terms</a>
+        <a href="/support/">Support</a>
+        <a href="mailto:privacy@revisely.app">privacy@revisely.app</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="/assets/site.js" defer></script>
 </body>
 </html>
