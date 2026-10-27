@@ -222,6 +222,8 @@ hard-coded token was deleted from the console on 2026-10-27.
 - **A native change raises `version`** (1.0.2, 1.0.3, ...) in the same PR. On `develop` that builds a new
   binary for TestFlight; promoted updates for its fingerprint reach App Store users only once that
   version is approved.
+  The exception is a version that hasn't gone to review yet: its builds share it. 1.0.2 was
+  unsubmitted when the new-icon build followed build 20.
 - A failed submission does not need a rebuild:
   `eas submit -p ios --id <build id>`. `eas submit:list --platform ios --json` shows the error.
 - Apple refuses uploads while an agreement is unaccepted ("A required agreement is missing or has
@@ -283,6 +285,15 @@ cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json nod
 The reviewer signs in as `applereview@revisely.app`; the password is stored in App Store Connect
 (App Review Information), not in this repository. `scripts/asc.js listing` keeps it unless
 `ASC_DEMO_PASSWORD` is set. Do not delete or change that account.
+
+**App icon and splash** (2026-10-27): the gradient cursive R (Indigo #624BD5 → Lavender #9789DA) on
+black. `assets/icon.png` is the opaque 1024 with no alpha. Android has an adaptive foreground and a
+monochrome layer on #000000. The splash is `assets/splash-icon.png` at `imageWidth: 200` on #000000,
+through the `expo-splash-screen` plugin; the top-level `splash` key would show it full screen. The splash
+has no `dark` variant: prebuild would then set `UIUserInterfaceStyle` to Automatic, overriding
+`userInterfaceStyle: "light"`. Sources (SVG masters, the Play 512) are in `assets/brand/`. Icon and
+splash are native, so they ship in a build. App Store users see the new icon only when the version
+carrying it is approved; App Store Connect takes the icon from the build, so `store/` holds none.
 
 **Screenshots** come from the `screenshots@revisely.app` account (password in
 `~/secrets/revisely-screenshots.txt`), seeded with `functions/scripts/seed-screenshots.js`, on an

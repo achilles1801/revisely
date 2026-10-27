@@ -15,14 +15,12 @@ export default {
       url: "https://u.expo.dev/32c71b6d-0a13-454c-916d-11d27f168fa8"
     },
     orientation: "portrait",
+    // The gradient cursive R on black (Oct 27 2026; sources in assets/brand/). Opaque
+    // 1024 with no alpha, as the App Store requires. The splash is the
+    // expo-splash-screen plugin below.
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
-    splash: {
-      image: "./assets/splash-icon.png",
-      resizeMode: "contain",
-      backgroundColor: "#03372A"
-    },
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.revisionbuddy.app",
@@ -54,7 +52,8 @@ export default {
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#03372A"
+        monochromeImage: "./assets/adaptive-icon-monochrome.png",
+        backgroundColor: "#000000"
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false
@@ -115,6 +114,19 @@ export default {
       ],
       "expo-font",
       "expo-web-browser",
+      // The launch screen: the R, 200 pt wide, on black (in light and dark mode
+      // alike). imageWidth needs this plugin: the top-level `splash` key shows the
+      // image full screen. No `dark` variant: it would set UIUserInterfaceStyle to
+      // Automatic, overriding userInterfaceStyle "light" above.
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#000000",
+        },
+      ],
       // Verse recitation (and, later, recording yourself reciting). The pod
       // ships recording APIs, so Apple's upload check requires a microphone
       // purpose string even before the app records.
