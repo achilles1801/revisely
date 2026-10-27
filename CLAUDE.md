@@ -152,6 +152,10 @@ Run this before and after any change to `app.config.js`, `fingerprint.config.js`
 a native dependency. If a change should not be native but the hash moved, find out why before
 merging. `eas fingerprint:generate --json` prints a banner before the JSON, so it does not pipe into `jq`.
 
+The root `.gitignore` is a fingerprint source: editing it changes the hash and starts a native build
+(a `coverage/` line did, Oct 26, and the build was cancelled). Ignore new paths with a `.gitignore`
+inside the directory instead, as `coverage/.gitignore` does.
+
 ## Config and secrets
 
 - App config (Firebase web keys, Google client ids, Sentry DSN, `GOOGLE_REVERSED_CLIENT_ID`) lives in
