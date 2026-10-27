@@ -147,13 +147,9 @@ a:hover { color: var(--accent); }
   height: 60px; gap: 16px;
 }
 
-.brand {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
-  text-decoration: none; color: var(--text);
-}
-.brand:hover { color: var(--text); }
-.brand img { width: 30px; height: 30px; border-radius: 7px; }
+/* The lockup: the gradient R and the wordmark (black on light, white on dark). */
+.brand { display: inline-flex; align-items: center; text-decoration: none; }
+.brand img { display: block; width: auto; height: 32px; }
 
 .site-nav { display: flex; align-items: center; gap: 22px; font-size: 15px; }
 .site-nav a { text-decoration: none; color: var(--secondary); }
@@ -426,6 +422,8 @@ h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 
 .cta { border-top: 0.5px solid var(--separator); padding: 88px 0 96px; text-align: center; }
 .cta .icon { width: 72px; height: 72px; border-radius: 16px; margin: 0 auto 24px; }
+/* The icon's tile is black: a hairline keeps its edge on the dark page. */
+@media (prefers-color-scheme: dark) { .cta .icon { box-shadow: 0 0 0 1px var(--separator); } }
 .cta .get { justify-content: center; flex-direction: column; gap: 14px; }
 
 /* ---------- Footer ---------- */
