@@ -318,7 +318,10 @@ the App Privacy answers in App Store Connect (no API; done by hand) together.
 **Verse positions and translations:** press-and-hold on a verse uses `src/data/ayahBounds.json`, built
 by `scripts/build-ayah-bounds.py` from Quran Android's `ayahinfo_1024.db`, the glyph bounds that
 quran.com-images records while drawing the same page images (coordinates are 1024-wide; the images are
-2600×4206, so one scale factor maps them). Translations: Saheeh International from api.alquran.cloud,
+2600×4206, so one scale factor maps them). The app's images are a mirror (GovarJabbar/Quran-PNG)
+that draws the decorated opening pages higher: pages 1 and 2 are shifted up by 61 and 57 units
+(`PAGE_Y_SHIFT` in the script; every other page matches). Check a page by drawing its rectangles
+on the image before trusting new bounds. Translations: Saheeh International from api.alquran.cloud,
 and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
 
 **The Clear Quran® (licensed):** the publisher (Al-Furqaan Foundation, info@theclearquran.org)
