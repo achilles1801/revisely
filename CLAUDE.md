@@ -229,8 +229,13 @@ hard-coded token was deleted from the console on 2026-10-27.
 - Apple refuses uploads while an agreement is unaccepted ("A required agreement is missing or has
   expired"); retries can then fail with no message at all. Check App Store Connect > Business: the
   Free Apps Agreement must be Active. The Paid Apps Agreement does not block a free app.
-- Auto-submit cannot add builds to the `Team (Expo)` TestFlight group (Apple 403); add a new build to
-  the group by hand in App Store Connect.
+- The internal TestFlight group `Team (Expo)` has access to all builds, so every processed build
+  reaches its testers with nothing to add (checked Oct 27 2026 with build 23). Auto-submit can't add
+  builds to a group (Apple 403), which no longer matters.
+- **A cancelled build can still reach TestFlight.** Cancelling `ios-build.yml` during `eas submit`
+  doesn't stop an upload that has started: build 22 (fingerprint `6bd27a63`, from a duplicate run on
+  Oct 27) arrived anyway. No update is ever published for such a runtime, so expire the build in App
+  Store Connect (TestFlight → the build → Expire) once the right build is out.
 
 ## App Store
 
@@ -265,8 +270,8 @@ it fundamentally is.
 1. In the same PR, raise `version` in `app.config.js` (e.g. `1.0.0` -> `1.0.1`). Every App Store
    version needs a higher version string, and the build must carry it. Raise it only with native
    changes: the version is part of the fingerprint, so a bump alone starts a build.
-2. Merge to `develop`. CI builds and submits the next build to TestFlight. Add it to the Team (Expo)
-   group by hand, test it.
+2. Merge to `develop`. CI builds and submits the next build to TestFlight, where Team (Expo) gets it
+   (see TestFlight). Test it.
 3. `node scripts/asc.js version 1.0.1`, `whats-new "..."`, `build <n>`, re-seed the reviewer (below),
    `submit`.
 4. Ship it promptly: once the native change is on `develop`, every later update targets the new
