@@ -56,6 +56,7 @@ import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
+import { HeroGlow } from '../../components/v2/HeroGlow';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
@@ -611,6 +612,7 @@ export default function DashboardScreen() {
         : null;
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+        <HeroGlow />
         <TopBar
           left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
           center={

@@ -17,7 +17,7 @@ import {
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
-import { layoutV2, typeV2 } from '../../theme/v2';
+import { ACCENT_LABELS, ACCENTS, AccentName, layoutV2, typeV2 } from '../../theme/v2';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
@@ -565,7 +565,7 @@ export default function SettingsScreen() {
             <Row
               icon="flask-outline"
               label="New design (preview)"
-              isLast
+              isLast={!design.isNew}
               rightSlot={
                 <SettingSwitch
                   value={design.isNew}
@@ -575,6 +575,21 @@ export default function SettingsScreen() {
                 />
               }
             />
+            {design.isNew && (
+              // A trial: the colour on actions, links, the active tab, "done"
+              // and the calendar (theme/v2 ACCENT_TOKENS).
+              <View style={[styles.row, { borderBottomWidth: 0 }]} testID="accent-row">
+                <SettingIcon name="color-filter-outline" tileStyle={styles.rowIcon} />
+                <View style={styles.rowText}>
+                  <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
+                </View>
+                <ThemeSegmentedControl<AccentName>
+                  value={design.accent}
+                  onChange={design.setAccent}
+                  options={ACCENTS.map((a) => ({ value: a, label: ACCENT_LABELS[a] }))}
+                />
+              </View>
+            )}
           </Section>
         )}
 

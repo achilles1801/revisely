@@ -11,11 +11,13 @@
 
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ACCENTS, AccentName } from '../theme/v2';
 
 export type DesignName = 'classic' | 'new';
 
 const DESIGN_KEY = '@revisely_design';
 const HAPTICS_KEY = '@revisely_haptics';
+const ACCENT_KEY = '@revisely_accent';
 
 export interface DesignState {
   /** The redesign is showing. */
@@ -29,6 +31,9 @@ export interface DesignState {
   /** Haptics on meaningful moments (new design; Settings → Haptics). */
   hapticsOn: boolean;
   setHapticsOn: (on: boolean) => void;
+  /** The new design's accent (Settings → Preview, a trial for testers). */
+  accent: AccentName;
+  setAccent: (accent: AccentName) => void;
 }
 
 const classic: DesignState = {
@@ -39,6 +44,8 @@ const classic: DesignState = {
   setAllowed: () => undefined,
   hapticsOn: true,
   setHapticsOn: () => undefined,
+  accent: 'jade',
+  setAccent: () => undefined,
 };
 
 // Without a provider (tests, isolated components): the classic design.
@@ -50,22 +57,24 @@ export function DesignProvider({
 }: {
   children: ReactNode;
   /** For tests: skip loading and start here. */
-  initial?: { chosen?: DesignName; allowed?: boolean; hapticsOn?: boolean };
+  initial?: { chosen?: DesignName; allowed?: boolean; hapticsOn?: boolean; accent?: AccentName };
 }) {
   const [loaded, setLoaded] = useState(initial != null);
   const [chosen, setChosenState] = useState<DesignName>(initial?.chosen ?? 'classic');
   const [allowed, setAllowed] = useState(initial?.allowed ?? false);
   const [hapticsOn, setHapticsState] = useState(initial?.hapticsOn ?? true);
+  const [accent, setAccentState] = useState<AccentName>(initial?.accent ?? 'jade');
 
   useEffect(() => {
     if (initial) return;
     let live = true;
     // Read before the first frame, so a tester's new design doesn't flash classic.
-    Promise.all([AsyncStorage.getItem(DESIGN_KEY), AsyncStorage.getItem(HAPTICS_KEY)])
-      .then(([design, haptics]) => {
+    Promise.all([AsyncStorage.getItem(DESIGN_KEY), AsyncStorage.getItem(HAPTICS_KEY), AsyncStorage.getItem(ACCENT_KEY)])
+      .then(([design, haptics, savedAccent]) => {
         if (!live) return;
         if (design === 'new' || design === 'classic') setChosenState(design);
         if (haptics === 'off') setHapticsState(false);
+        if (ACCENTS.includes(savedAccent as AccentName)) setAccentState(savedAccent as AccentName);
       })
       .catch(() => undefined)
       .finally(() => live && setLoaded(true));
@@ -82,19 +91,26 @@ export function DesignProvider({
     setHapticsState(on);
     AsyncStorage.setItem(HAPTICS_KEY, on ? 'on' : 'off').catch(() => undefined);
   }, []);
+  const setAccent = useCallback((next: AccentName) => {
+    setAccentState(next);
+    AsyncStorage.setItem(ACCENT_KEY, next).catch(() => undefined);
+  }, []);
 
-  const value = useMemo<DesignState>(
-    () => ({
-      isNew: allowed && chosen === 'new',
+  const value = useMemo<DesignState>(() => {
+    const isNew = allowed && chosen === 'new';
+    return {
+      isNew,
       chosen,
       allowed,
       setChosen,
       setAllowed,
       hapticsOn,
       setHapticsOn,
-    }),
-    [allowed, chosen, setChosen, hapticsOn, setHapticsOn],
-  );
+      // Only the new design has accents.
+      accent: isNew ? accent : 'jade',
+      setAccent,
+    };
+  }, [allowed, chosen, setChosen, hapticsOn, setHapticsOn, accent, setAccent]);
 
   if (!loaded) return null;
   return <DesignContext.Provider value={value}>{children}</DesignContext.Provider>;

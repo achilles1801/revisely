@@ -30,11 +30,12 @@ interface WeaknessModalProps {
   onClose: () => void;
 }
 
-// Maps a 1–5 rating to a semantic color from the theme.
-function ratingTone(rating: number, theme: ThemeColors): string {
+// Maps a 1–5 rating to a semantic color from the theme. `good` is the new
+// design's status green: strong stays green whatever the accent.
+function ratingTone(rating: number, theme: ThemeColors, good?: string): string {
   if (rating <= 2) return theme.error;
   if (rating === 3) return theme.warning;
-  return theme.accent;
+  return good ?? theme.accent;
 }
 
 export function WeaknessModal({
@@ -116,7 +117,7 @@ export function WeaknessModal({
               style={v2.row}
               testID={`rating-${rating.value}`}
             >
-              <View style={[v2.dot, { backgroundColor: ratingTone(rating.value, theme) }]} />
+              <View style={[v2.dot, { backgroundColor: ratingTone(rating.value, theme, palette.good) }]} />
               <Text style={[typeV2.menu, v2.label, { color: palette.text }, selected && v2.selected]}>{rating.label}</Text>
               {selected ? <Ionicons name="checkmark" size={20} color={palette.text} /> : null}
             </Tap>

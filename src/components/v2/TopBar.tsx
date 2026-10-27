@@ -108,7 +108,7 @@ export function Toggle({
       onValueChange={onValueChange}
       disabled={disabled}
       trackColor={{ false: isDark ? '#39393D' : '#E5E7EB', true: palette.primary }}
-      thumbColor={value && isDark ? '#000000' : '#FFFFFF'}
+      thumbColor={value ? palette.onPrimary : '#FFFFFF'}
       ios_backgroundColor={isDark ? '#39393D' : '#E5E7EB'}
       accessibilityLabel={accessibilityLabel}
       testID={testID}

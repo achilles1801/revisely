@@ -77,7 +77,7 @@ interface JuzRow {
 }
 
 export default function AlgorithmScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette } = useTheme();
   const { user, pages, logs, loadData } = useApp();
   const quranData = useMemo(() => getQuranData(), []);
 
@@ -305,7 +305,8 @@ export default function AlgorithmScreen() {
     if (rating <= 1) return theme.error;
     if (rating === 2) return theme.warning;
     if (rating === 3) return theme.gold;
-    return theme.accent;
+    // Strong is status green in the new design, whatever the accent.
+    return isNew ? palette.good : theme.accent;
   };
 
   const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
