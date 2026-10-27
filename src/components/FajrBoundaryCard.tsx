@@ -5,7 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { SettingIcon } from './settings/SettingIcon';
 import { SettingSwitch } from './settings/SettingSwitch';
 import { useDesign } from '../design/DesignContext';
+import { typeV2 } from '../theme/v2';
 import { ActionSheet } from './v2/ActionSheet';
+import { Tap } from './v2/Tap';
 import { GlassCard } from './GlassCard';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '../context/ThemeContext';
@@ -26,7 +28,7 @@ import {
  * time so the user can see the boundary they just configured.
  */
 export function FajrBoundaryCard() {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
   const { isNew } = useDesign();
   const styles = makeStyles(theme);
   const { user, saveUser } = useApp();
@@ -109,6 +111,65 @@ export function FajrBoundaryCard() {
     await saveUser({ ...user, fajrCalculationMethod: id });
   };
 
+  const method = user.fajrCalculationMethod || DEFAULT_FAJR_METHOD;
+
+  if (isNew) {
+    // Settings rows in the new design: the glyph, the label (and what it does
+    // now under it), the control; no dividers inside the group.
+    return (
+      <View testID="fajr-boundary-v2">
+        <View style={v2.row}>
+          <SettingIcon name="moon-outline" tileStyle={styles.rowIcon} />
+          <View style={v2.text}>
+            <Text style={[typeV2.body, { color: palette.text }]}>Start day at fajr</Text>
+            <Text style={[typeV2.meta, { color: palette.secondary }]} testID="fajr-resets-at">
+              Resets at {resetsAt}
+            </Text>
+          </View>
+          <SettingSwitch value={enabled} onValueChange={handleToggle} disabled={busy} accessibilityLabel="Start day at fajr" />
+        </View>
+        {enabled && (
+          <Tap
+            onPress={() => setMethodOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Method, ${currentMethodLabel}`}
+            testID="fajr-method"
+          >
+            <View style={v2.row}>
+              <SettingIcon name="calculator-outline" tileStyle={styles.rowIcon} />
+              <Text style={[typeV2.body, v2.label, { color: palette.text }]}>Method</Text>
+              <Text style={[typeV2.body, v2.value, { color: palette.secondary }]} numberOfLines={1}>
+                {currentMethodLabel}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+            </View>
+          </Tap>
+        )}
+        <ActionSheet
+          visible={methodOpen}
+          onClose={() => setMethodOpen(false)}
+          title="Calculation method"
+          actions={[
+            ...FAJR_CALCULATION_METHODS.map((m) => ({
+              key: m.id,
+              label: m.label,
+              selected: method === m.id,
+              onPress: () => handlePickMethod(m.id),
+            })),
+            {
+              key: 'location',
+              label: hasCoords ? 'Update location' : 'Set location',
+              icon: 'location-outline' as const,
+              section: 'Location',
+              onPress: handleRefreshLocation,
+            },
+          ]}
+          testID="fajr-method-sheet"
+        />
+      </View>
+    );
+  }
+
   return (
     <View>
       <View style={[styles.row, enabled && styles.rowDivider]}>
@@ -146,74 +207,51 @@ export function FajrBoundaryCard() {
         </PressableScale>
       )}
 
-      {isNew ? (
-        <ActionSheet
-          visible={methodOpen}
-          onClose={() => setMethodOpen(false)}
-          title="Calculation method"
-          actions={[
-            ...FAJR_CALCULATION_METHODS.map((m) => ({
-              key: m.id,
-              label: m.label,
-              selected: (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id,
-              onPress: () => handlePickMethod(m.id),
-            })),
-            {
-              key: 'location',
-              label: hasCoords ? 'Update location' : 'Set location',
-              icon: 'location-outline' as const,
-              section: 'Location',
-              onPress: handleRefreshLocation,
-            },
-          ]}
-        />
-      ) : (
-        <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
-          <Pressable style={styles.backdrop} onPress={() => setMethodOpen(false)}>
-            <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-              <GlassCard style={StyleSheet.absoluteFillObject} />
-              <Text style={[typography.titleMedium, { color: theme.textPrimary, marginBottom: spacing.sm }]}>
-                Calculation method
+      <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setMethodOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <Text style={[typography.titleMedium, { color: theme.textPrimary, marginBottom: spacing.sm }]}>
+              Calculation method
+            </Text>
+            <ScrollView>
+              {FAJR_CALCULATION_METHODS.map((m) => {
+                const selected =
+                  (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id;
+                return (
+                  <PressableScale key={m.id} onPress={() => handlePickMethod(m.id)} haptic="selection">
+                    <View
+                      style={[
+                        styles.methodRow,
+                        { borderBottomColor: theme.border },
+                        selected && { backgroundColor: theme.accent + '15' },
+                      ]}
+                    >
+                      <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
+                        {m.label}
+                      </Text>
+                      {selected && <Ionicons name="checkmark" size={18} color={theme.accent} />}
+                    </View>
+                  </PressableScale>
+                );
+              })}
+            </ScrollView>
+            <PressableScale
+              onPress={() => {
+                setMethodOpen(false);
+                handleRefreshLocation();
+              }}
+              haptic="light"
+              style={styles.locationBtn}
+            >
+              <Ionicons name="location-outline" size={16} color={theme.accent} />
+              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '600' }]}>
+                {hasCoords ? 'Update location' : 'Set location'}
               </Text>
-              <ScrollView>
-                {FAJR_CALCULATION_METHODS.map((m) => {
-                  const selected =
-                    (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id;
-                  return (
-                    <PressableScale key={m.id} onPress={() => handlePickMethod(m.id)} haptic="selection">
-                      <View
-                        style={[
-                          styles.methodRow,
-                          { borderBottomColor: theme.border },
-                          selected && { backgroundColor: theme.accent + '15' },
-                        ]}
-                      >
-                        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
-                          {m.label}
-                        </Text>
-                        {selected && <Ionicons name="checkmark" size={18} color={theme.accent} />}
-                      </View>
-                    </PressableScale>
-                  );
-                })}
-              </ScrollView>
-              <PressableScale
-                onPress={() => {
-                  setMethodOpen(false);
-                  handleRefreshLocation();
-                }}
-                haptic="light"
-                style={styles.locationBtn}
-              >
-                <Ionicons name="location-outline" size={16} color={theme.accent} />
-                <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '600' }]}>
-                  {hasCoords ? 'Update location' : 'Set location'}
-                </Text>
-              </PressableScale>
-            </Pressable>
+            </PressableScale>
           </Pressable>
-        </Modal>
-      )}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -269,3 +307,12 @@ const makeStyles = (theme: ThemeColors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
     },
   });
+
+// The new design: Settings' rows. SettingIcon brings 8pt after its glyph; 8
+// more makes the 16 of the other rows.
+const v2 = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingVertical: 12, paddingHorizontal: 16, gap: 8 },
+  text: { flex: 1, marginRight: 8 },
+  label: { flex: 1 },
+  value: { flexShrink: 1, maxWidth: '55%', textAlign: 'right', marginRight: 8 },
+});

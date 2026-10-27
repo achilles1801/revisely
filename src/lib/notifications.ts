@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
+import { NOTIFICATION_LIGHT_COLOR } from '../theme/colors';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -22,7 +23,7 @@ export async function ensureNotificationsPermission(): Promise<boolean> {
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#292524',
+      lightColor: NOTIFICATION_LIGHT_COLOR,
     });
   }
 

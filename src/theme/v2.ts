@@ -71,6 +71,8 @@ export interface PaletteV2 extends AccentTokens {
   secondary: string;
   /** Hairlines between rows (0.5pt) and the thread line. */
   separator: string;
+  /** A control's outline (an outline pill, an unchosen chip): firmer than the separator. */
+  outline: string;
   /** Destructive actions and errors. */
   red: string;
   /**
@@ -95,6 +97,7 @@ const BASE_LIGHT: Base = {
   text: '#1A1A1A',
   secondary: '#6B7280',
   separator: '#E5E7EB',
+  outline: '#D1D5DB',
   red: '#DC2626',
   good: '#0E6B5A',
   fill: '#F7F7F8',
@@ -108,6 +111,7 @@ const BASE_DARK: Base = {
   text: '#FFFFFF',
   secondary: '#8A8A93',
   separator: '#1F1F1F',
+  outline: '#333333',
   red: '#F87171',
   good: '#4DBA9F',
   fill: '#181818',
