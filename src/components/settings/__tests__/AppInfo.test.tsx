@@ -35,6 +35,7 @@ const base: ReleaseInput = {
   emergencyLaunchReason: null,
   updateCreatedAt: null,
   isDev: false,
+  isDevice: true,
 };
 const g = globalThis as { __DEV__?: boolean };
 const wrap = (ui: React.ReactElement) => render(<ThemeProvider>{ui}</ThemeProvider>);
@@ -73,7 +74,9 @@ describe('App info', () => {
     expect(mockNativeCrash).not.toHaveBeenCalled();
     buttons.find((b: any) => b.text === 'Crash').onPress();
     expect(mockNativeCrash).toHaveBeenCalled();
-    expect(showsTestActions(describeRelease({ ...base, isDev: true }))).toBe(true);
+    // Nothing reports from development or a simulator, so there is nothing to test there.
+    expect(showsTestActions(describeRelease({ ...base, channel: 'preview', isDev: true }))).toBe(false);
+    expect(showsTestActions(describeRelease({ ...base, channel: 'preview', isDevice: false }))).toBe(false);
   });
 
   it('warns when the last update could not start', async () => {
@@ -108,5 +111,37 @@ describe('checkForUpdateNow', () => {
     expect((await checkForUpdateNow()).result).toBe('downloaded');
     mockCheck.mockRejectedValueOnce(new Error('offline'));
     expect(await checkForUpdateNow()).toEqual({ result: 'error', error: 'offline' });
+  });
+});
+
+describe('AppInfo: The Clear Quran preview switch', () => {
+  const AsyncStorage = require('@react-native-async-storage/async-storage');
+  const { isClearQuranPreview, resetClearQuranPreviewForTests } = require('../../../lib/clearQuranPreview');
+  beforeEach(async () => {
+    resetClearQuranPreviewForTests();
+    await AsyncStorage.clear();
+  });
+
+  const open = async (release: Partial<ReleaseInput>, previewTester?: boolean) => {
+    wrap(<AppInfo release={describeRelease({ ...base, ...release })} previewTester={previewTester} />);
+    fireEvent.press(await screen.findByLabelText(/App info/));
+    await act(async () => {});
+  };
+
+  it('a tester on the preview channel can turn it on and off', async () => {
+    await open({ channel: 'preview' }, true);
+    fireEvent.press(screen.getByText('The Clear Quran preview: off'));
+    expect(await screen.findByText('The Clear Quran preview: on')).toBeTruthy();
+    expect(isClearQuranPreview()).toBe(true);
+    fireEvent.press(screen.getByText('The Clear Quran preview: on'));
+    expect(await screen.findByText('The Clear Quran preview: off')).toBeTruthy();
+  });
+
+  it('never on the App Store’s channel, and not for accounts that aren’t testers', async () => {
+    await open({ channel: 'production' }, true);
+    expect(screen.queryByText(/The Clear Quran preview/)).toBeNull();
+    screen.unmount();
+    await open({ channel: 'preview' }, false);
+    expect(screen.queryByText(/The Clear Quran preview/)).toBeNull();
   });
 });

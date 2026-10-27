@@ -7,10 +7,13 @@
 //
 // Translations are listed in TRANSLATIONS. One that is not `available` is shown
 // in the picker as unavailable: The Clear Quran (Dr. Mustafa Khattab) is licensed
-// content that the Quran Foundation API serves only to approved clients.
+// content that the Quran Foundation API serves only to approved clients. Its
+// publisher requires the credit line (`credit`) wherever it is shown. Until its
+// text arrives, testers can preview where that goes (lib/clearQuranPreview).
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { logger } from './logger';
+import { CLEAR_QURAN_PLACEHOLDER, isClearQuranPreview } from './clearQuranPreview';
 
 export interface TranslationInfo {
   id: string;
@@ -20,7 +23,11 @@ export interface TranslationInfo {
   /** alquran.cloud edition identifier. */
   edition: string | null;
   available: boolean;
+  /** Required attribution, shown with the text and in the picker. */
+  credit?: { text: string; linkLabel: string; url: string };
 }
+
+export const CLEAR_QURAN_ID = 'en.khattab';
 
 export const TRANSLATIONS: TranslationInfo[] = [
   {
@@ -32,21 +39,36 @@ export const TRANSLATIONS: TranslationInfo[] = [
     available: true,
   },
   {
-    id: 'en.khattab',
-    name: 'The Clear Quran',
+    id: CLEAR_QURAN_ID,
+    name: 'The Clear Quran®',
     author: 'Dr. Mustafa Khattab',
     language: 'English',
     edition: null,
     available: false,
+    credit: {
+      text: 'The Clear Quran® by Dr. Mustafa Khattab',
+      linkLabel: 'theclearquran.org',
+      url: 'https://theclearquran.org',
+    },
   },
 ];
 
 export const DEFAULT_TRANSLATION_ID = 'en.sahih';
 const ARABIC_EDITION = 'quran-uthmani';
 
+/** Can be chosen: available, or The Clear Quran in a tester's preview. */
+export function isTranslationAvailable(t: TranslationInfo): boolean {
+  return t.available || (t.id === CLEAR_QURAN_ID && isClearQuranPreview());
+}
+
+/** Shown in the picker: "The Clear Quran® — Dr. Mustafa Khattab". */
+export function pickerTitle(t: TranslationInfo): string {
+  return t.credit ? `${t.name} — ${t.author}` : t.name;
+}
+
 /** The translation to use for a saved choice, falling back to the default. */
 export function resolveTranslation(id: string | null | undefined): TranslationInfo {
-  const chosen = TRANSLATIONS.find((t) => t.id === id && t.available);
+  const chosen = TRANSLATIONS.find((t) => t.id === id && isTranslationAvailable(t));
   return chosen ?? (TRANSLATIONS.find((t) => t.id === DEFAULT_TRANSLATION_ID) as TranslationInfo);
 }
 
@@ -171,6 +193,8 @@ export interface VerseText {
   arabic: string;
   translation: string;
   translationName: string;
+  /** The translation's text isn't here yet: `translation` is a labelled placeholder. */
+  placeholder?: boolean;
 }
 
 /** The Arabic and the chosen translation of one verse. */
@@ -181,6 +205,19 @@ export async function getVerseText(
   translationId?: string | null,
 ): Promise<VerseText> {
   const t = resolveTranslation(translationId);
+  if (!t.available) {
+    // The preview: the Arabic, and a placeholder where the translation will be.
+    const arabic = await getAyahEdition(page, sura, ayah, ARABIC_EDITION);
+    return {
+      sura,
+      ayah,
+      surahName: arabic.surahName,
+      arabic: stripBismillah(arabic.text, sura, ayah),
+      translation: CLEAR_QURAN_PLACEHOLDER,
+      translationName: t.name,
+      placeholder: true,
+    };
+  }
   const [arabic, translated] = await Promise.all([
     getAyahEdition(page, sura, ayah, ARABIC_EDITION),
     getAyahEdition(page, sura, ayah, t.edition as string),

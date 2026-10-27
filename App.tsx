@@ -8,6 +8,9 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { RecordingBackupController } from './src/components/RecordingBackupController';
+import { ClearQuranPreviewGate } from './src/components/ClearQuranPreviewGate';
+import { DesignProvider } from './src/design/DesignContext';
+import { DesignGate } from './src/design/DesignGate';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
@@ -22,7 +25,14 @@ import { currentRelease, releaseTags } from './src/lib/releaseInfo';
 const release = currentRelease();
 
 Sentry.init({
-  dsn: 'https://4b773a246bc154edecad8310adec9d6e@o4511369474015232.ingest.us.sentry.io/4511369481945088',
+  // Only installed builds report (releaseInfo sentryReports): not development,
+  // simulators or dev clients. Without a DSN the native crash reporter doesn't
+  // start either; `enabled: false` alone would still start it, and native
+  // crashes never pass through beforeSend.
+  dsn: release.sentryEnabled
+    ? 'https://4b773a246bc154edecad8310adec9d6e@o4511369474015232.ingest.us.sentry.io/4511369481945088'
+    : undefined,
+  enabled: release.sentryEnabled,
   release: release.sentryRelease,
   dist: release.sentryDist,
   environment: release.sentryEnvironment,
@@ -82,19 +92,23 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <AppProvider>
-              {/* Sheets render into this provider's host, so it must sit
-                  inside the context providers — otherwise any sheet content
-                  calling useTheme()/useApp() throws when it opens. */}
-              <BottomSheetModalProvider>
-                <RootNavigator />
-                <RecordingBackupController />
-              </BottomSheetModalProvider>
-            </AppProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <DesignProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <AppProvider>
+                {/* Sheets render into this provider's host, so it must sit
+                    inside the context providers — otherwise any sheet content
+                    calling useTheme()/useApp() throws when it opens. */}
+                <BottomSheetModalProvider>
+                  <RootNavigator />
+                  <ClearQuranPreviewGate />
+                  <DesignGate />
+                  <RecordingBackupController />
+                </BottomSheetModalProvider>
+              </AppProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </DesignProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

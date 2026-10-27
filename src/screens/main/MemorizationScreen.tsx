@@ -501,7 +501,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodySmall,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });
@@ -688,7 +688,7 @@ const makeConfirmStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodyMedium,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });

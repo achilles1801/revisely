@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../GlassCard';
 import { PressableScale } from '../PressableScale';
 import { useTabBarFootprint } from '../LiquidGlassTabBar';
-import { TimerControls } from './TimerControls';
-import { alertSessionSaved } from './sessionSavedAlert';
+import { TimerSheet } from './TimerSheet';
 import { FLOATING_TIMER_SIZE, useFloatingTimerOffsets } from './floatingTimerOffset';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
@@ -28,6 +27,9 @@ export const FLOATING_TIMER_HIDDEN_ON = new Set([
 
 /** Screens without the tab bar; they own the bottom edge and set an offset. */
 const NO_TAB_BAR = new Set(['QuranReader', 'ActiveRevision']);
+
+/** Where the Quran is open: the controls don't offer to open it. */
+export const quranOpenOn = (routeName: string | undefined) => routeName === 'QuranReader';
 
 // ---------------------------------------------------------------------------
 // The button
@@ -103,7 +105,7 @@ export function FloatingTimer() {
 
   const close = () => setOpen(false);
   const openQuran =
-    name === 'QuranReader'
+    quranOpenOn(name)
       ? undefined
       : () => {
           close();
@@ -126,7 +128,7 @@ export function FloatingTimer() {
               hitSlop={6}
               accessibilityLabel={`${running ? 'Timer running' : 'Timer paused'}, ${clock}. Open timer controls`}
             >
-              <GlassCard
+              <GlassCard surface="chrome"
                 elevated
                 tintColor={running ? theme.accent + '22' : undefined}
                 style={[styles.pill, { borderColor: running ? theme.accent + '55' : theme.border }]}
@@ -149,7 +151,7 @@ export function FloatingTimer() {
               hitSlop={6}
               accessibilityLabel="Open timer"
             >
-              <GlassCard elevated style={styles.round}>
+              <GlassCard surface="chrome" elevated style={styles.round}>
                 <Ionicons name="stopwatch-outline" size={22} color={theme.textPrimary} />
               </GlassCard>
             </PressableScale>
@@ -157,37 +159,7 @@ export function FloatingTimer() {
         </View>
       )}
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
-        <Pressable style={styles.overlay} onPress={close}>
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
-          >
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <View style={styles.dragHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Timer</Text>
-              <PressableScale
-                onPress={close}
-                haptic="light"
-                hitSlop={10}
-                style={styles.closeBtn}
-                accessibilityLabel="Close timer"
-              >
-                <Ionicons name="close" size={18} color={theme.textSecondary} />
-              </PressableScale>
-            </View>
-            <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-              <TimerControls
-                visible={open}
-                onClose={close}
-                onSaved={(date, seconds) => alertSessionSaved(date, seconds)}
-                onOpenQuran={openQuran}
-              />
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <TimerSheet visible={open} onClose={close} onOpenQuran={openQuran} />
     </>
   );
 }
@@ -222,43 +194,5 @@ const makeStyles = (theme: ThemeColors) =>
       ...typography.bodyMedium,
       fontWeight: '600',
       fontVariant: ['tabular-nums'],
-    },
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      justifyContent: 'flex-end',
-    },
-    sheet: {
-      maxHeight: '90%',
-      borderTopLeftRadius: radius.lg,
-      borderTopRightRadius: radius.lg,
-      paddingTop: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      overflow: 'hidden',
-    },
-    dragHandle: {
-      alignSelf: 'center',
-      width: 40,
-      height: 4,
-      borderRadius: radius.full,
-      backgroundColor: theme.border,
-      marginBottom: spacing.sm,
-    },
-    sheetHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.sm,
-    },
-    sheetTitle: { ...typography.titleMedium, color: theme.textPrimary },
-    closeBtn: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.glass,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
     },
   });

@@ -349,7 +349,7 @@ export function QuranPageViewer({
             onPress={() => {}} // Prevent closing when tapping on popup
             style={styles.zoomPopup}
           >
-            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             {/* Header */}
             <View style={[styles.zoomHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.zoomPageNumber, { color: theme.textPrimary }]}>
@@ -429,7 +429,7 @@ export function QuranPageViewer({
             onPress={() => {}}
             style={styles.jumpSheet}
           >
-            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             <View style={[styles.jumpDragHandle, { backgroundColor: theme.border }]} />
             <Text style={[styles.jumpTitle, { color: theme.textPrimary }]}>
               Jump to page

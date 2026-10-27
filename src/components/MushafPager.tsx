@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
 import {
@@ -51,6 +52,8 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
+  /** The user turned the page by swiping (not a jump, nor a drag that snapped back). */
+  onUserSwipe?: () => void;
   /** Press and hold on a verse. Receives the verse under the finger and the
    *  screen point pressed (to place a menu beside it). */
   onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
@@ -129,7 +132,14 @@ const PageItem = React.memo(function PageItem({
   );
 
   return (
-    <Pressable style={[styles.page, { backgroundColor: bg }]} onPress={onTap}>
+    // The page is one element for VoiceOver (the image's pressable inside isn't).
+    <Pressable
+      style={[styles.page, { backgroundColor: bg }]}
+      onPress={onTap}
+      accessibilityRole="button"
+      accessibilityLabel={`Page ${pageNumber}`}
+      accessibilityHint={onTap ? 'Shows or hides the controls' : undefined}
+    >
       {(uri == null || (isRemote && loading)) && !error && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={tintColor} />
@@ -154,6 +164,7 @@ const PageItem = React.memo(function PageItem({
           onPress={onTap}
           onLongPress={onLongPressAyah ? handleLongPress : undefined}
           delayLongPress={350}
+          accessible={false}
         >
           {highlightRects.map((r, i) => (
             <View
@@ -210,6 +221,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     onPageChange,
     onAdvance,
     onTap,
+    onUserSwipe,
     onLongPressAyah,
     highlightedAyah,
     extraData,
@@ -217,7 +229,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   ref,
 ) {
   const { isDark, theme } = useTheme();
-  const palette = getReadPalette(isDark);
+  const { isNew: isNewDesign } = useDesign();
+  const palette = getReadPalette(isDark, isNewDesign);
   const listRef = useRef<FlatList>(null);
   const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_SIZE);
   const currentIndexRef = useRef(0);
@@ -300,9 +313,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       }
       currentIndexRef.current = newIndex;
       prefetchPages(pagesAround(pages, newIndex));
+      // The swipe first, so a screen reacting to the new page has the last word.
+      if (draggedRef.current) onUserSwipe?.();
       if (newPage != null) onPageChange?.(newPage, newIndex);
     },
-    [pages, onAdvance, onPageChange],
+    [pages, onAdvance, onPageChange, onUserSwipe],
   );
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;

@@ -35,9 +35,80 @@ file is the release mechanics and the traps behind them.
   and `preview.yml` treats a fingerprint with that tag (or an EAS build, i.e. build 11 and earlier) as built.
 - Never run `eas update` or `eas build` from a laptop to ship. Everything on a phone should trace to a
   commit on `develop` (TestFlight) or `main` (App Store, promoted).
-- Pushes that touch only docs, tests, `functions/`, Firestore rules or `.md` files publish nothing
-  (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
+- Pushes that touch only docs, tests, `functions/`, `scripts/`, workflows, Firestore rules or `.md`
+  files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
+
+## Health (Sentry → GitHub → Claude)
+
+- Every launch is a Sentry session labelled with the JavaScript it ran (`src/lib/releaseInfo.ts`):
+  release `com.revisionbuddy.app@<version>+<build>` for the built-in bundle and
+  `…+<build>.u<first 8 of the update group>` for an update; environment = the update channel
+  (`production`, `preview`); tags `update_id`, `update_group`, `channel`, `runtime`, `build`. No IP
+  addresses (`sendDefaultPii` off); events carry only the pseudonymous account id.
+- **Only installed builds report**: a real device on the `production` or `preview` channel, outside
+  `__DEV__` (`sentryReports()` in `src/lib/releaseInfo.ts`). Development, simulators (screenshots,
+  Maestro) and dev clients start Sentry without a DSN, so the native crash reporter stays off too:
+  `enabled: false` alone still starts it, and native crashes never pass through `beforeSend`. The
+  health scripts read issues and events from `production` and `preview` only (`SENTRY_ENVIRONMENTS`
+  in `scripts/sentry/api.js`). The Sentry alert rule "Send a notification for high priority issues"
+  has an action filter "environment is in production,preview"; keep any new alert rule to the same.
+- **Sentry data is untrusted.** The DSN ships in the app, so anyone can send events and sessions with
+  any text, and issues here are public. Everything from Sentry that reaches GitHub (or Claude) goes
+  through `sanitize()` in `scripts/sentry/logic.js`, which:
+  - redacts emails, `users/<id>`, uid-like ids and IP addresses;
+  - neutralizes mentions, `#` references, links, images and backticks;
+  - caps the length.
+
+  Rendered free text also sits in code spans or fenced blocks. Short values (release, update,
+  device) must match what the app sends.
+- `Sentry sync` (`.github/workflows/sentry.yml`, every 30 minutes, `scripts/sentry/sync.js`):
+  - New, regressed and escalating issues become GitHub issues labelled `sentry`: at most 5 a run, and
+    none while 25 are open.
+  - A closed issue reopens only if Sentry saw it again after it was closed.
+  - A production release under 99% crash-free sessions (≥50 sessions, 24 h) raises a `release-health`
+    issue mentioning the owner. Nothing rolls back by itself.
+  - Issues carry the error, in-app frames, release and update; never user ids, locations or
+    breadcrumbs. Problem reports (users' own words) are never copied out of Sentry.
+  - It never starts Claude.
+- `Claude fix` (`claude-fix.yml`): **the owner starts it** by adding the `claude-fix` label to an
+  issue, or by running it by hand with the issue number; nobody else can. Three jobs:
+  - `details` reads the issue, the owner's and collaborators' comments and the sanitized Sentry
+    event.
+  - `fix` runs Claude on develop. Its token is read-only; it has no Sentry token and no sudo, and
+    Claude's commands run with credentials scrubbed. Claude writes a failing test, fixes it and
+    commits locally.
+  - `pr` refuses patches that touch `.github/` or hold anything that looks like a credential. It
+    pushes `claude/issue-<n>` and opens the PR into `develop` as `github-actions`, then starts CI on
+    it with `workflow_dispatch`: PRs opened with the workflow token start no workflows by themselves.
+
+  It cannot merge, change workflows or publish. Review the PR like any other.
+- `Health report` (`health-report.yml`, daily 13:00 UTC, `scripts/sentry/report.js`): a comment on
+  the pinned "App health (daily report)" issue, mentioning the owner.
+- `Promote to production` refuses an update with fewer than 5 preview sessions or under 99%
+  crash-free (`scripts/sentry/gate.js`). A run by hand can change the bar or skip it. A bar that isn't
+  a number fails the check; it never passes it.
+- Secrets:
+  - `SENTRY_API_TOKEN`: a Sentry internal integration token with read access to Issue & Event,
+    Project and Organization. It is separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps.
+  - `ANTHROPIC_API_KEY`, from a dedicated Anthropic Console workspace with a monthly spend limit, so
+    a leak is bounded and revocable. `CLAUDE_CODE_OAUTH_TOKEN` (the subscription) also works, but it
+    can't be capped or scoped.
+  - No Claude GitHub App is needed.
+
+  Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
+  `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
+  hand. `main` and `develop` are protected: PRs only, CI green.
+- No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
+  `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
+  entry written by one run can be restored by another. Only CI, which holds no secrets, caches.
+- Scheduled and issue-triggered workflows run from `main`; they start, and change, once merged there.
+- `.u<group>` release names come from `src/lib/releaseInfo.ts` (PR #22); the promote gate needs them,
+  so #22 lands before this automation.
+
+**Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
+`group` = the previous production update group (`eas update:list --branch production`), `rollback` =
+true → approve. It republishes that exact update, the same way promotion does.
 
 ## Runtime version is a fingerprint
 
@@ -232,6 +303,55 @@ new user field needs `firebase deploy --only firestore:rules` first, or those wr
 Fahd Complex fonts (open-source quran.com-images). They are served from the Storage bucket at
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
+
+## The redesign (new design, preview)
+
+The plan is the doc "Revisely: Threads-style UI Migration" (Claude Docs). It replaced an earlier
+direction (paper/ink palette, Newsreader, glass on chrome), which was removed in PR #33. It ships
+screen by screen behind Settings → Preview → **New design (preview)**: testers only
+(`lib/testerTools`: dev builds, `previewTester` accounts on TestFlight; never the App Store or App
+Review), kept per device, switching the whole app live.
+- It is not a fork: `useDesign().isNew` (`src/design/DesignContext.tsx`) picks variants inside the
+  same screens and components. Tokens are `src/theme/v2.ts`; `ThemeContext` maps them onto the
+  classic token names (so unmoved screens take the new colours at once) and exposes `palette` for
+  moved ones. When a screen is moved, give it an `isNew` branch (or variant components) and leave the
+  classic path working until the switch is removed.
+- The look: white / black grounds, flat. Content is a feed of rows on 0.5pt separators with a
+  16pt gutter; each row has an avatar-size mark (40 top-level, 36 reply, 28 nested; `v2/Mark`),
+  a name (15/600), metadata (13) and a ⋯ menu, and rows of one thread are joined by a 2pt line
+  (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient, no
+  accent tint: the primary button is a solid black pill (white in dark, `v2/PillButton`); jade
+  only means "done". Every menu is `v2/ActionSheet` (ThreadMenu style: handle, 18/600 title, icon
+  rows, red destructive rows, a Cancel bar); its action runs after the sheet has gone. The tab bar
+  is flat and icon-only. No Threads/Meta names, logos or icons, no likes or reposts.
+- Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
+  in the new design is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar;
+  the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
+  `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
+- Moved so far: Home, Settings, tab bar, sheets and menus, the revision session and reader chrome
+  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity (a feed of
+  day posts; a day opens as a thread of its sessions and daily log).
+- Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
+  `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
+- Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
+  `src/design/__tests__`.
+- `theme.onAccent` is the text colour on an accent fill (white in classic; the ground in the new
+  design, where the accent is the ink). Use it instead of `'#fff'` on `theme.accent`.
+- Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
+  a native change for a versioned release. Until then "System" isn't offered and falls back to the
+  classic Light/Dark choice (`systemAppearanceAvailable()`); the new design offers Light and Dark.
+
+## UI traps
+
+- **Never wrap a scroll view in a Pressable.** On the new architecture (iOS), a ScrollView doesn't
+  scroll while any view above it holds the touch, and a Pressable (or a PanResponder) takes every
+  touch that starts inside it. A modal sheet's dimmed backdrop is `<Backdrop>`
+  (`src/components/Backdrop.tsx`), rendered as the sheet's sibling, before it. Layout tests can't
+  see this; `touchHandlingAncestor()` (`jest/scrollable.ts`) can. The long-verse fix of PR #20
+  bounded the height correctly and still didn't scroll on a phone for this reason.
+- Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
+  accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
+  rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
 
 ## Known-good reference
 

@@ -10,6 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
+import { useDesign } from '../design/DesignContext';
+import { PillTabs } from './v2/PillTabs';
 import { typography } from '../theme/typography';
 
 const NATIVE_GLASS = Platform.OS === 'ios' && isLiquidGlassAvailable();
@@ -33,7 +35,7 @@ type Props<T extends string> = {
   onChange: (value: T) => void;
 };
 
-export function LiquidGlassSegmentedControl<T extends string>({
+function ClassicLiquidGlassSegmentedControl<T extends string>({
   options,
   value,
   onChange,
@@ -212,3 +214,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 });
+
+/** The classic control, or pills in the new design. */
+export function LiquidGlassSegmentedControl<T extends string>(props: Props<T>) {
+  const { isNew } = useDesign();
+  return isNew ? <PillTabs {...props} /> : <ClassicLiquidGlassSegmentedControl {...props} />;
+}

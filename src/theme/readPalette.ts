@@ -11,6 +11,8 @@ export interface ReadPalette {
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  /** The reader's controls (buttons, the capsule): set off from the page. */
+  control: string;
   /** Tint applied to the (black-ink) page PNGs; null = render as-is. */
   pageTint: string | null;
 }
@@ -23,6 +25,7 @@ const DARK: ReadPalette = {
   textPrimary: '#FFFFFF',
   textSecondary: '#AEAEB2',
   textMuted: '#8E8E93',
+  control: '#1C1C1E',
   pageTint: '#FFFFFF',
 };
 
@@ -34,9 +37,37 @@ const LIGHT: ReadPalette = {
   textPrimary: '#000000',
   textSecondary: '#3C3C43',
   textMuted: '#8E8E93',
+  control: '#F2F2F7',
   pageTint: null,
 };
 
-export function getReadPalette(isDark: boolean): ReadPalette {
+// The new design: the same white and black pages, its own greys around them.
+const DARK_V2: ReadPalette = {
+  bg: '#000000',
+  pageBg: '#000000',
+  card: '#181818',
+  divider: '#1F1F1F',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#8A8A93',
+  textMuted: '#8A8A93',
+  control: '#181818',
+  pageTint: '#FFFFFF',
+};
+
+const LIGHT_V2: ReadPalette = {
+  bg: '#FFFFFF',
+  pageBg: '#FFFFFF',
+  card: '#FFFFFF',
+  divider: '#E5E7EB',
+  textPrimary: '#1A1A1A',
+  textSecondary: '#6B7280',
+  textMuted: '#6B7280',
+  control: '#F7F7F8',
+  pageTint: null,
+};
+
+/** `isNew`: the new design (design/DesignContext). */
+export function getReadPalette(isDark: boolean, isNew = false): ReadPalette {
+  if (isNew) return isDark ? DARK_V2 : LIGHT_V2;
   return isDark ? DARK : LIGHT;
 }

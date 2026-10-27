@@ -4,6 +4,12 @@ on:
   push:
     branches: [develop, main]
   pull_request:
+  # Claude's fix PRs (claude-fix.yml) are opened with the workflow token, which starts no workflows;
+  # that workflow starts CI on the branch this way.
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}

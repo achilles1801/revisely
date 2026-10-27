@@ -8,6 +8,8 @@ import { useTheme } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
+import { useDesign } from '../design/DesignContext';
+import { ActionSheet } from './v2/ActionSheet';
 
 export interface OptionSheetSection<T extends string> {
   title?: string;
@@ -34,7 +36,28 @@ export function OptionSheet<T extends string>({
   onClose: () => void;
 }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const insets = useSafeAreaInsets();
+
+  if (isNew) {
+    // The new design's menu: the choices as rows, the current one checked.
+    return (
+      <ActionSheet
+        visible={visible}
+        onClose={onClose}
+        title={title}
+        actions={sections.flatMap((section) =>
+          section.options.map((opt, i) => ({
+            key: opt.value,
+            label: opt.label,
+            selected: opt.value === value,
+            section: i === 0 ? section.title : undefined,
+            onPress: () => onSelect(opt.value),
+          })),
+        )}
+      />
+    );
+  }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -46,7 +69,7 @@ export function OptionSheet<T extends string>({
             { paddingBottom: insets.bottom + spacing.sm },
           ]}
         >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={[styles.grabber, { backgroundColor: theme.border }]} />
           <Text style={[styles.title, { color: theme.textPrimary }]}>{title}</Text>
           <ScrollView style={{ flexGrow: 0 }} showsVerticalScrollIndicator={false}>
