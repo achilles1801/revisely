@@ -325,18 +325,38 @@ and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are
 requires the credit "The Clear Quran® by Dr. Mustafa Khattab" + theclearquran.org wherever it is
 shown (pinned under the verse; in the picker), the text exactly as the API gives it (footnote markers
 `<footnote id number>` are shown as raised numbers, nothing else is changed), and never another
-translation under its name (errors show "Couldn't load translation" + retry). The app keeps it in
-memory for the launch only (`src/lib/clearQuran.ts`), never on disk. Plan: Basic, 10,000 requests a
-month, 5 a second; the docs also say 60 a minute and 1,000 an hour. The terms live in the developer
-agreement signed in their portal (theclearquran.org/developers). The public docs say nothing about
-caching or storing the text; ask Furqaan before keeping it on the device or raising
-`TCQ_EDGE_CACHE_SECONDS`.
+translation under its name (errors show "Couldn't load translation" + retry). Plan: Basic, 10,000
+requests a month, 5 a second; the docs also say 60 a minute and 1,000 an hour. The terms live in the
+developer agreement signed in their portal (theclearquran.org/developers).
+
+**Keeping its text (long-lived caches):** neither the terms nor the public docs address caching or
+storing the text. On 2026-10-27 the owner decided to cache it for a long time and accepted that risk.
+If Furqaan objects, dial back as below. Text is cached only as read (plus the next-block prefetch),
+never the whole Qur'an in advance, and always exactly as the API gave it, credit unchanged.
+- **Worker:** a block is fresh for `TCQ_EDGE_CACHE_SECONDS` (30 days), then served for
+  `TCQ_EDGE_STALE_SECONDS` more (30 days) while a background request refreshes it (one per isolate,
+  counted in the budgets). Cloudflare's Cache API keeps it per data centre and may evict it sooner.
+- **Phone:** `src/lib/clearQuran.ts` keeps each block in `Library/Caches/tcq/` (the app's private
+  cache folder: not backed up, not visible in Files, never shared; iOS may clear it). It is shown at
+  once while fresh (`TCQ_DEVICE_CACHE_SECONDS`, 30 days), then still shown, even offline, while it
+  is fetched again for `TCQ_DEVICE_STALE_SECONDS` more (30 days). The app asks the worker for these
+  (`GET /api/tcq/policy`, public) once a launch and every 6 hours; until it has an answer it uses
+  `CLEAR_QURAN_DEVICE_CACHE` (the same 30 + 30 days).
+- **To dial back:** change those vars in `wrangler.jsonc` (a PR into `main`; Workers Builds deploys
+  it) and they apply at once to everything already cached. 0 turns caching off, and phones delete
+  their copies at their next launch. In an emergency, change the vars in the dashboard (Workers &
+  Pages → revisely → Settings → Variables), then make the same change in `wrangler.jsonc`, or the
+  next deploy from `main` restores the old values.
+- **To delete every copy:** change `TCQ_CACHE_VERSION`. It is part of every edge cache key, and phones
+  delete theirs when they see the new version. `CLEAR_QURAN_DEVICE_CACHE.version` in the app does the
+  same for phones, once that update reaches them.
 
 **Its speed:** The Clear Quran answers a request in 1.6–5.3 s (Supabase edge functions in us-east-2;
 measured Oct 27 2026, ~95% of a verse's load time), so the text comes in blocks: the worker asks
 for 30 verses at once (the documented maximum), aligned 1–30, 31–60, … per surah, and the app
-keeps the block. A press and hold starts loading (before Translation is tapped), and the sheet
-fetches the next or previous block when the verse shown is two from its edge
+keeps the block (in memory, and on the phone as above). A press and hold starts loading (before
+Translation is tapped), and the sheet fetches the next or previous block when the verse shown is two
+from its edge
 (`prefetchClearQuranAround`), so ‹ › are instant and a block costs one request of the plan. A verse
 already in memory is shown in the first frame (`peekVerseText`), with no spinner.
 
@@ -419,8 +439,11 @@ from before blocks). Each:
   production API" (Oct 27 2026). No sandbox host is documented or resolvable, and the API answers 401
   on every path without a key, so it can't be found by probing. If they publish one, set
   `TCQ_API_BASE_SANDBOX` to it (a PR into `main`) and dev builds move to the sandbox key.
-- keeps a block in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
-  checked); answers the app with `Cache-Control: no-store`; logs never include a key (`redactKeys`).
+- keeps a block in the data centre's cache: fresh for `TCQ_EDGE_CACHE_SECONDS`, then served stale
+  for `TCQ_EDGE_STALE_SECONDS` while refreshed in the background (`X-Cache: HIT`, `STALE`, `MISS`).
+  Keys include `TCQ_CACHE_VERSION` (see "Keeping its text" above). It answers the app with
+  `Cache-Control: no-store`; logs never include a key (`redactKeys`).
+- `GET /api/tcq/policy` (no sign-in) gives the app its device cache times and the cache version.
 - says where the time went in `Server-Timing`: `auth`, `cache`, `budget`, `tcq-window` or
   `tcq-verse` (the request to The Clear Quran) and `tcq-server` (their own `X-Response-Time`).
   `wrangler tail` also logs each request to them with its time.
