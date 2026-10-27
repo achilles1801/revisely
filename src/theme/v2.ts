@@ -39,6 +39,14 @@ export interface PaletteV2 {
   /** The primary (solid) button. */
   primary: string;
   onPrimary: string;
+  /**
+   * Activity's contribution graph: an empty day, then four steps of jade,
+   * more activity reading darker (light) or brighter (dark). Checked as an
+   * ordinal ramp: one hue, monotone lightness, the first step ≥ 2:1 on the ground.
+   */
+  heat: readonly [string, string, string, string, string];
+  /** A day's number on each `heat` step (≥ 4.5:1). */
+  heatInk: readonly [string, string, string, string, string];
 }
 
 export const paletteLight: PaletteV2 = {
@@ -55,6 +63,8 @@ export const paletteLight: PaletteV2 = {
   overlay: 'rgba(0,0,0,0.4)',
   primary: '#1A1A1A',
   onPrimary: '#FFFFFF',
+  heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
+  heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
 };
 
 export const paletteDark: PaletteV2 = {
@@ -71,6 +81,8 @@ export const paletteDark: PaletteV2 = {
   overlay: 'rgba(0,0,0,0.6)',
   primary: '#FFFFFF',
   onPrimary: '#000000',
+  heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
+  heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
 };
 
 export function paletteV2(isDark: boolean): PaletteV2 {

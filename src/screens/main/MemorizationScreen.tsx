@@ -24,6 +24,7 @@ import {
 import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -40,6 +41,7 @@ export default function MemorizationScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, pages, updatePages, saveUser } = useApp();
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [markMode, setMarkMode] = useState(false);
@@ -54,11 +56,13 @@ export default function MemorizationScreen() {
   const [showGuide, setShowGuide] = useState(false);
   const [reviewPromptOpen, setReviewPromptOpen] = useState(false);
 
+  // The new design has no help screens.
   useEffect(() => {
+    if (isNew) return;
     AsyncStorage.getItem(MEMORIZATION_GUIDE_DISMISSED_KEY).then((v) => {
       if (v !== 'true') setShowGuide(true);
     });
-  }, []);
+  }, [isNew]);
 
   const dismissGuideForever = async () => {
     setShowGuide(false);
@@ -169,15 +173,17 @@ export default function MemorizationScreen() {
           </Text>
         </View>
 
-        <PressableScale
-          onPress={() => setShowGuide(true)}
-          haptic="light"
-          hitSlop={8}
-          style={styles.iconBtn}
-          accessibilityLabel="How memorization tracking works"
-        >
-          <Ionicons name="help" size={16} color={theme.textPrimary} />
-        </PressableScale>
+        {!isNew && (
+          <PressableScale
+            onPress={() => setShowGuide(true)}
+            haptic="light"
+            hitSlop={8}
+            style={styles.iconBtn}
+            accessibilityLabel="How memorization tracking works"
+          >
+            <Ionicons name="help" size={16} color={theme.textPrimary} />
+          </PressableScale>
+        )}
 
         <PressableScale
           onPress={() => {
@@ -284,7 +290,7 @@ export default function MemorizationScreen() {
       />
 
       <MemorizationGuideModal
-        visible={showGuide}
+        visible={showGuide && !isNew}
         onClose={dismissGuideForever}
         theme={theme}
       />

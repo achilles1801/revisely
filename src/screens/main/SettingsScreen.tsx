@@ -847,7 +847,7 @@ export default function SettingsScreen() {
               </Text>
             )}
           </View>
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />
+          {!design.isNew && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />}
           <CarryOverSetting
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}

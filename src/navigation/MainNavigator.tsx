@@ -15,9 +15,12 @@ import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
+import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
+import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { FloatingTimer } from '../components/timer/FloatingTimer';
 import { FloatingTimerProvider } from '../components/timer/floatingTimerOffset';
+import { useDesign } from '../design/DesignContext';
 import { useAppUsageTracking } from '../lib/appUsage';
 import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
@@ -46,6 +49,8 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. */
   ActivityDay: { date: string; focusRecordingId?: string };
+  // Everything done, searchable (new design's "See all"); kind preselects a filter.
+  ActivityAll: { kind?: ActivityKind } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string } | undefined;
@@ -87,6 +92,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
+      <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
     </HomeStack.Navigator>
   );
@@ -116,6 +122,7 @@ export function MainNavigator() {
   const glowInsightsTab = !smartTrackingEnabled && !hasSeenPreview;
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  const { isNew } = useDesign();
   useAppUsageTracking();
 
   return (
@@ -147,8 +154,10 @@ export function MainNavigator() {
             <Tab.Screen name="Read" component={ReadStackNavigator} />
             <Tab.Screen name="Insights" component={AlgorithmScreen} />
           </Tab.Navigator>
-          {/* The one timer entry point, over every tab (same state everywhere). */}
-          <FloatingTimer />
+          {/* The one timer entry point, over every tab (same state everywhere).
+              The new design has none: the timer is in the reader's and the
+              session's controls, and a running one shows on Home. */}
+          {!isNew && <FloatingTimer />}
         </View>
       </FloatingTimerProvider>
       <SmartTrackingPreviewScreen

@@ -25,12 +25,11 @@ import { CAPSULE_HEIGHT, PlayerCapsule } from '../../components/reader/PlayerCap
 import { useReaderChrome } from '../../components/reader/useReaderChrome';
 import { useTapHint } from '../../components/reader/useTapHint';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RoundButton } from '../../components/reader/RoundButton';
+import { ROUND_BUTTON_SIZE, RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { useDesign } from '../../design/DesignContext';
-import { GuideSheet } from '../../components/v2/GuideSheet';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -120,11 +119,13 @@ export default function QuranReaderScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
+  // The new design has no help screens: the reader explains itself.
   useEffect(() => {
+    if (isNewDesign) return;
     AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
       if (v !== 'true') setShowGuide(true);
     });
-  }, []);
+  }, [isNewDesign]);
 
   const dismissGuideForever = async () => {
     setShowGuide(false);
@@ -198,7 +199,12 @@ export default function QuranReaderScreen() {
                 Page {currentPage} · Juz {juz} · Hizb {hizb}
               </Text>
             </View>
-            <RoundButton icon="help" label="How the reader works" onPress={() => setShowGuide(true)} palette={palette} />
+            {isNewDesign ? (
+              // Keeps the title centred.
+              <View style={{ width: ROUND_BUTTON_SIZE }} />
+            ) : (
+              <RoundButton icon="help" label="How the reader works" onPress={() => setShowGuide(true)} palette={palette} />
+            )}
           </View>
         }
         footer={
@@ -268,7 +274,7 @@ export default function QuranReaderScreen() {
       {verseActions.overlay}
 
       <ReaderGuideModal
-        visible={showGuide}
+        visible={showGuide && !isNewDesign}
         onClose={dismissGuideForever}
         theme={theme}
       />
@@ -326,7 +332,6 @@ function ReaderGuideModal({
   onClose: () => void;
   theme: ThemeColors;
 }) {
-  const { isNew: isNewGuide } = useDesign();
   const styles = useMemo(() => makeGuideStyles(theme), [theme]);
   const steps: Array<{
     icon: keyof typeof Ionicons.glyphMap;
@@ -364,8 +369,6 @@ function ReaderGuideModal({
       body: 'The Read tab is for free reading — it doesn’t affect your revision schedule or strength ratings. Use the Home tab when you want a tracked session.',
     },
   ];
-
-  if (isNewGuide) return <GuideSheet visible={visible} onClose={onClose} title="How the reader works" steps={steps} />;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

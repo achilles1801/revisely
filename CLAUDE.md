@@ -371,8 +371,21 @@ Review), kept per device, switching the whole app live.
   the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
   `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
 - Moved so far: Home, Settings, tab bar, sheets and menus, the revision session and reader chrome
-  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity (a feed of
-  day posts; a day opens as a thread of its sessions and daily log).
+  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity, All
+  activity. The owner's rules from testing (Oct 26 2026), for every screen moved from now on:
+  - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
+    second card restating it. Lists show the **last 3** things (`RecentSection`) with "See all"
+    to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
+    "Earlier".
+  - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
+    and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
+    are `lib/activityHeatmap` levels in `palette.heat` (an ordinal jade ramp, ≥ 2:1 on the
+    ground) with `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month.
+    Things done are `lib/activityItems`.
+  - **No floating timer.** The timer is in the reader's and the session's controls; a running one
+    shows in Home's top bar (`RunningTimerChip`). Classic keeps `FloatingTimer`.
+  - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
+    what a control does (e.g. Keep daily amount).
 - Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
   `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
