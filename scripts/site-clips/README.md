@@ -1,7 +1,8 @@
 # Website clips
 
 The looping clips on revisely.app (`docs/assets/clips/`) are recordings of the dev client on an
-iPhone 17 Pro Max simulator, in the new design (Settings → Preview → New design), light appearance,
+iPhone 17 Pro Max simulator, in the new design (Settings → Preview → New design) with the Indigo accent
+(the default; Settings → Appearance → Accent), light appearance,
 signed in to the demo account `screenshots@revisely.app`. No real user's data appears in them.
 
 ## Recording

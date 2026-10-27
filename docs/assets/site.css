@@ -3,34 +3,43 @@
  * White / black grounds, flat, hairline separators, SF for Latin, Amiri for Arabic.
  */
 
+/*
+ * The accent is Indigo, the app's default (src/theme/v2.ts, ACCENT_TOKENS.indigo),
+ * with the same values:
+ *   --accent         text, links and small marks (v2 accentText / link, at least 4.5:1)
+ *   --primary        the primary action's fill; --on-primary is the text on it
+ *   --accent-subtle  a tinted ground
+ *   --glow           the glow behind the top of the page (v2 hero stops, drawn as
+ *                    the app's HeroGlow: a radial gradient from the top centre)
+ * Jade and Crimson stay below for comparison: <html data-accent="jade"> or "crimson".
+ */
 :root {
   color-scheme: light dark;
 
-  /* v2 palette, light */
+  /* v2 base, light */
   --bg: #ffffff;
   --text: #1a1a1a;
   --secondary: #6b7280;
   --separator: #e5e7eb;
   --fill: #f7f7f8;
-  --ink: #1a1a1a;      /* solid buttons */
+  --ink: #1a1a1a;
   --on-ink: #ffffff;
 
-  /* Accent presets: v2 accent text colours, each at least 4.5:1 on the ground. */
-  --jade: #0e6b5a;
-  --crimson: #dc1433;
-  --indigo: #624bd5;
-
-  /* The accent. Change this one line to var(--crimson) or var(--indigo). */
-  --accent: var(--jade);
+  /* Indigo, light */
+  --accent: #624bd5;
+  --primary: #624bd5;
+  --on-primary: #ffffff;
+  --accent-subtle: #efecfb;
+  --glow: radial-gradient(85% 100% at 50% 0%, rgb(98 75 213 / 0.1) 0%, rgb(98 75 213 / 0) 100%);
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --gutter: 16px;
   --max: 1080px;
-  --radius: 14px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* v2 base, dark */
     --bg: #000000;
     --text: #ffffff;
     --secondary: #8a8a93;
@@ -38,9 +47,29 @@
     --fill: #181818;
     --ink: #ffffff;
     --on-ink: #000000;
-    --jade: #4dba9f;
-    --crimson: #f03c56;
-    --indigo: #9789da;
+
+    /* Indigo, dark: lavender text on black, the electric-to-muted glow */
+    --accent: #9789da;
+    --primary: #624bd5;
+    --on-primary: #ffffff;
+    --accent-subtle: #16113a;
+    --glow: radial-gradient(85% 100% at 50% 0%, rgb(46 14 198 / 0.45) 0%, rgb(58 38 148 / 0.3) 50%, rgb(58 38 148 / 0) 100%);
+  }
+}
+
+/* The other accents, for comparison only. */
+html[data-accent="jade"] {
+  --accent: #0e6b5a; --primary: #1a1a1a; --on-primary: #ffffff; --accent-subtle: #f7f7f8; --glow: none;
+}
+html[data-accent="crimson"] {
+  --accent: #dc1433; --primary: #dc1433; --on-primary: #ffffff; --accent-subtle: #fce8eb;
+  --glow: radial-gradient(85% 100% at 50% 0%, rgb(220 20 51 / 0.1) 0%, rgb(220 20 51 / 0) 100%);
+}
+@media (prefers-color-scheme: dark) {
+  html[data-accent="jade"] { --accent: #4dba9f; --primary: #ffffff; --on-primary: #000000; --accent-subtle: #181818; }
+  html[data-accent="crimson"] {
+    --accent: #f03c56; --primary: #dc1433; --on-primary: #ffffff; --accent-subtle: #2e0e15;
+    --glow: radial-gradient(85% 100% at 50% 0%, rgb(62 8 18 / 1) 0%, rgb(51 8 14 / 0.6) 50%, rgb(46 14 21 / 0) 100%);
   }
 }
 
@@ -132,21 +161,15 @@ a:hover { color: var(--accent); }
 .site-nav .hide-sm { display: none; }
 @media (min-width: 640px) { .site-nav .hide-sm { display: inline; } }
 
-/* Solid pill, as v2/PillButton: ink on the ground, never tinted. */
+/* Solid pill, as v2/PillButton: the primary action in the accent. */
 .pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 36px; padding: 0 16px; border-radius: 999px;
-  background: var(--ink); color: var(--on-ink);
+  background: var(--primary); color: var(--on-primary);
   font-size: 15px; font-weight: 600; text-decoration: none; white-space: nowrap;
 }
-.site-nav .pill { color: var(--on-ink); }
-.pill:hover, .site-nav .pill:hover { color: var(--on-ink); opacity: 0.86; }
-
-.pill-outline {
-  background: transparent; color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--separator);
-}
-.pill-outline:hover { color: var(--text); background: var(--fill); opacity: 1; }
+.site-nav .pill { color: var(--on-primary); }
+.pill:hover, .site-nav .pill:hover { color: var(--on-primary); opacity: 0.88; }
 
 /* ---------- Type ---------- */
 
@@ -183,7 +206,14 @@ h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 
 /* ---------- Hero ---------- */
 
-.hero { padding: 56px 0 72px; }
+.hero { position: relative; isolation: isolate; padding: 56px 0 72px; }
+
+/* The accent's glow, as behind the top of Home in the app; it runs up under the header. */
+.hero::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  left: 0; right: 0; top: -61px; height: 640px;
+  background: var(--glow);
+}
 
 .hero .wrap {
   display: grid; gap: 56px; align-items: center;
@@ -326,7 +356,7 @@ h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 .mark {
   width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-items: center;
-  background: var(--fill); color: var(--text);
+  background: var(--accent-subtle); color: var(--accent);
   font-size: 15px; font-weight: 600;
 }
 .thread h3 { font-size: 17px; letter-spacing: -0.01em; margin-top: 8px; }
