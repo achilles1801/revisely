@@ -23,6 +23,8 @@ on:
       - 'docs/**'
       - 'tests/**'
       - 'functions/**'
+      - 'worker/**'
+      - 'wrangler.jsonc'
       - '.maestro/**'
       - 'store/**'
       - 'scripts/**'

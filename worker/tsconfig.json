@@ -1,0 +1,15 @@
+{
+  // The Cloudflare worker (wrangler.jsonc "main"): its own types, not the app's.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "webworker"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
+  },
+  "include": ["*.ts"]
+}
