@@ -25,7 +25,7 @@ import { TodayPost, juzLabel, memorizedText, todayText } from '../../components/
 import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { dayAgo } from '../../lib/dayAgo';
-import { paletteDark, paletteLight, v2ThemeColors } from '../../theme/v2';
+import { ACCENTS, AccentName, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
 import type { RevisionLog, UserPage } from '../../types';
 
 beforeEach(async () => {
@@ -150,26 +150,94 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(paletteDark.primary).toBe('#FFFFFF');
   });
 
-  it.each([
-    ['light', paletteLight, false],
-    ['dark', paletteDark, true],
-  ] as const)('%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets', (_name, p, isDark) => {
+  const combos = ACCENTS.flatMap((a) => [
+    [`${a}, light`, a, false],
+    [`${a}, dark`, a, true],
+  ]) as [string, AccentName, boolean][];
+
+  it.each(combos)('%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets', (_name, accent, isDark) => {
+    const p = paletteV2(isDark, accent);
     for (const ground of [p.bg, p.fill, p.sheet]) {
-      for (const ink of [p.text, p.secondary, p.red, p.done]) {
+      for (const ink of [p.text, p.secondary, p.red, p.good, p.doneText, p.accentText, p.link]) {
         expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
       }
     }
+    // Labels and glyphs on the accent's fills.
     expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.onAccentText, p.accentText)).toBeGreaterThanOrEqual(4.5);
+    // The fills themselves stand out from the ground (non-text, 3:1).
+    expect(contrast(p.primary, p.bg)).toBeGreaterThanOrEqual(3);
+    expect(contrast(p.done, p.bg)).toBeGreaterThanOrEqual(3);
     // A day's number on each shade of Activity's calendar.
     p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
     // Screens not moved yet get the same colours under the classic names.
-    const c = v2ThemeColors(isDark);
-    for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success]) {
+    const c = v2ThemeColors(isDark, accent);
+    for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success, c.accent]) {
       expect(contrast(ink, c.bg)).toBeGreaterThanOrEqual(4.5);
     }
     expect(contrast(c.onAccent, c.accent)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('Jade is the design as agreed: ink buttons, grey links, no glow', () => {
+    expect([paletteLight.primary, paletteLight.link, paletteLight.done, paletteLight.hero]).toEqual(['#1A1A1A', '#6B7280', '#0E6B5A', null]);
+    expect([paletteDark.primary, paletteDark.link, paletteDark.done, paletteDark.hero]).toEqual(['#FFFFFF', '#8A8A93', '#4DBA9F', null]);
+    // Classic names, as before the accents.
+    expect(v2ThemeColors(false).accent).toBe('#1A1A1A');
+    expect(v2ThemeColors(true).accent).toBe('#FFFFFF');
+  });
+
+  it('Crimson and Indigo start from the colours sampled off the reference apps', () => {
+    const crimson = paletteV2(true, 'crimson');
+    expect([crimson.primary, crimson.done, crimson.link, crimson.accentSubtle]).toEqual(['#DC1433', '#DC1433', '#F03C56', '#2E0E15']);
+    expect(crimson.hero?.map((s) => s.color)).toEqual(['#3E0812', '#33080E', '#2E0E15']);
+    expect(paletteV2(false, 'crimson').link).toBe('#DC1433');
+    const indigo = paletteV2(true, 'indigo');
+    expect([indigo.primary, indigo.done, indigo.link]).toEqual(['#624BD5', '#624BD5', '#9789DA']);
+    expect(indigo.hero?.[0].color).toBe('#2E0EC6');
+    expect(paletteV2(false, 'indigo').heat.slice(1, 4)).toEqual(['#9789DA', '#624BD5', '#2E0EC6']);
+  });
+});
+
+describe('the accent (Settings → Preview)', () => {
+  function AccentProbe() {
+    const { accent, setAccent } = useDesign();
+    const { palette, theme } = useTheme();
+    return (
+      <>
+        <Text testID="accent">{`${accent}|${palette.primary}|${theme.accent}`}</Text>
+        <Text onPress={() => setAccent('crimson')}>crimson</Text>
+      </>
+    );
+  }
+
+  it('switches the whole palette live and is kept on the device', async () => {
+    await AsyncStorage.setItem('@revisely_theme_v2', 'light');
+    render(
+      <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+        <ThemeProvider>
+          <AccentProbe />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('accent').props.children).toBe('jade|#1A1A1A|#1A1A1A');
+    fireEvent.press(screen.getByText('crimson'));
+    expect(screen.getByTestId('accent').props.children).toBe('crimson|#DC1433|#DC1433');
+    expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
+  });
+
+  it('is Jade outside the new design, whatever was chosen', async () => {
+    render(
+      <DesignProvider initial={{ allowed: true, chosen: 'classic', accent: 'indigo' }}>
+        <ThemeProvider>
+          <AccentProbe />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('accent').props.children).toMatch(/^jade\|/);
   });
 });
 

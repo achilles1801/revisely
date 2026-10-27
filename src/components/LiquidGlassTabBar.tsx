@@ -317,7 +317,7 @@ function FlatTab({
       style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.55 }]}
       testID={`tab-${routeName}`}
     >
-      <Ionicons name={focused ? icons.active : icons.inactive} size={26} color={focused ? palette.text : palette.secondary} />
+      <Ionicons name={focused ? icons.active : icons.inactive} size={26} color={focused ? palette.accentText : palette.secondary} />
     </Pressable>
   );
 }

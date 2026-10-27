@@ -85,7 +85,7 @@ export function RecentSection({
         </Text>
         {count > 0 ? (
           <Tap onPress={onSeeAll} hitSlop={10} accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} testID="see-all">
-            <Text style={[typeV2.body, { color: palette.secondary }]}>See all</Text>
+            <Text style={[typeV2.body, { color: palette.link }]}>See all</Text>
           </Tap>
         ) : null}
       </View>
