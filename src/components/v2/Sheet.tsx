@@ -96,7 +96,9 @@ export function Sheet({
         duration: 180,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-      }).start(() => {
+      }).start(({ finished }) => {
+        // Reopened before it had gone: the opening animation took over.
+        if (!finished) return;
         setShown(false);
         if (Platform.OS !== 'ios') hiddenRef.current?.();
       });

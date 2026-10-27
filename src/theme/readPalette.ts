@@ -60,8 +60,8 @@ const LIGHT_V2: ReadPalette = {
   card: '#FFFFFF',
   divider: '#E5E7EB',
   textPrimary: '#1A1A1A',
-  textSecondary: '#6B7280',
-  textMuted: '#6B7280',
+  textSecondary: '#616977',
+  textMuted: '#616977',
   control: '#F7F7F8',
   pageTint: null,
 };

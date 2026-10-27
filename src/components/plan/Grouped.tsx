@@ -137,9 +137,10 @@ export function SectionFooter({
   const { theme, palette } = useTheme();
   const { isNew } = useDesign();
   if (isNew) {
-    // A warning is a status: red, as weak pages are.
+    // A warning is advice, not an error (red is for errors and deleting):
+    // full ink, so it stands out from the grey footers.
     return (
-      <Text style={[typeV2.meta, v2.footer, { color: tone === 'warning' ? palette.red : palette.secondary }]}>
+      <Text style={[typeV2.meta, v2.footer, { color: tone === 'warning' ? palette.text : palette.secondary }]}>
         {children}
       </Text>
     );

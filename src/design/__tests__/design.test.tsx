@@ -139,7 +139,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect([paletteLight.bg, paletteLight.text, paletteLight.secondary, paletteLight.separator, paletteLight.red]).toEqual([
       '#FFFFFF',
       '#1A1A1A',
-      '#6B7280',
+      '#616977',
       '#E5E7EB',
       '#DC2626',
     ]);
@@ -167,6 +167,11 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
         expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
       }
     }
+    // The accent's tint marks a picked or running thing (a time, a drop slot,
+    // the timer chip); its labels are ink or grey.
+    for (const ink of [p.text, p.secondary]) {
+      expect(contrast(ink, p.accentSubtle)).toBeGreaterThanOrEqual(4.5);
+    }
     // Labels and glyphs on the accent's fills.
     expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
@@ -186,7 +191,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
   });
 
   it('Jade is the design as agreed: ink buttons, grey links; a jade glow in light only', () => {
-    expect([paletteLight.primary, paletteLight.link, paletteLight.done]).toEqual(['#1A1A1A', '#6B7280', '#0E6B5A']);
+    expect([paletteLight.primary, paletteLight.link, paletteLight.done]).toEqual(['#1A1A1A', '#616977', '#0E6B5A']);
     expect(paletteLight.hero?.[0].color).toBe('#3FA084');
     expect([paletteDark.primary, paletteDark.link, paletteDark.done, paletteDark.hero]).toEqual(['#FFFFFF', '#8A8A93', '#4DBA9F', null]);
     // Classic names, as before the accents.

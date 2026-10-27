@@ -101,15 +101,15 @@ export function Toggle({
   disabled?: boolean;
   testID?: string;
 }) {
-  const { palette, isDark } = useTheme();
+  const { palette } = useTheme();
   return (
     <Switch
       value={value}
       onValueChange={onValueChange}
       disabled={disabled}
-      trackColor={{ false: isDark ? '#39393D' : '#E5E7EB', true: palette.primary }}
-      thumbColor={value ? palette.onPrimary : '#FFFFFF'}
-      ios_backgroundColor={isDark ? '#39393D' : '#E5E7EB'}
+      trackColor={{ false: palette.switchOff, true: palette.primary }}
+      thumbColor={value ? palette.onPrimary : palette.switchThumb}
+      ios_backgroundColor={palette.switchOff}
       accessibilityLabel={accessibilityLabel}
       testID={testID}
     />

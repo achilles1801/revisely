@@ -547,7 +547,7 @@ export function VerseSheet({
                   </Text>
                 )}
                 <PressableScale onPress={() => setAttempt((a) => a + 1)} haptic="light" style={styles.retryBtn}>
-                  <Text style={[typography.bodySmall, { color: '#fff', fontWeight: '700' }]}>Try again</Text>
+                  <Text style={[typography.bodySmall, { color: theme.onAccent, fontWeight: '700' }]}>Try again</Text>
                 </PressableScale>
               </View>
             )}

@@ -36,7 +36,7 @@ export function PillButton({
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
-  const { palette, isDark } = useTheme();
+  const { palette } = useTheme();
   const solid = variant === 'solid';
   const fg = solid ? palette.onPrimary : palette.text;
   return (
@@ -51,7 +51,7 @@ export function PillButton({
         styles[size],
         solid
           ? { backgroundColor: palette.primary }
-          : { borderWidth: 1, borderColor: isDark ? '#333333' : '#D1D5DB' },
+          : { borderWidth: 1, borderColor: palette.outline },
         disabled && { opacity: 0.4 },
         style,
       ]}
