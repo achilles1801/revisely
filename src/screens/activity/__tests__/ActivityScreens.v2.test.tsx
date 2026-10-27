@@ -50,7 +50,7 @@ jest.mock('../../../context/ThemeContext', () => {
 });
 // The new design.
 jest.mock('../../../design/DesignContext', () => ({
-  useDesign: () => ({ isNew: true, chosen: 'new', allowed: true, hapticsOn: true }),
+  useDesign: () => ({ hapticsOn: true }),
 }));
 
 const mockApp: any = {};

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,10 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
-  Modal,
   Platform,
-  KeyboardAvoidingView,
   Linking,
   Share,
   TextInput,
-  Pressable,
   LayoutAnimation,
   AccessibilityState,
 } from 'react-native';
@@ -31,22 +28,16 @@ import { reportProblem } from '../../lib/sentry';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { GlassCard } from '../../components/GlassCard';
-import { PressableScale } from '../../components/PressableScale';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
-import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { useTabBarFootprint } from '../../navigation/TabBar';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
 import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { scheduleDailyReminder } from '../../lib/notifications';
 import * as firestoreService from '../../services/firestoreService';
@@ -80,239 +71,101 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // ---------------------------------------------------------------------------
 
 function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  if (isNew) {
-    // A flat list: a bold sentence-case header, rows on the ground, a hairline
-    // closing the group.
-    return (
-      <View style={[v2.section, { borderBottomColor: palette.separator }]}>
-        {title ? (
-          <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
-            {title}
-          </Text>
-        ) : null}
-        {children}
-        {footer ? <Text style={[typeV2.meta, v2.footer, { color: palette.secondary }]}>{footer}</Text> : null}
-      </View>
-    );
-  }
+  const { palette } = useTheme();
+  // A flat list: a bold sentence-case header, rows on the ground, a hairline
+  // closing the group.
   return (
-    <View style={{ marginBottom: spacing.lg }}>
-      {title && (
-        <Text
-          style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md }]}
-          accessibilityRole="header"
-        >
+    <View style={[v2.section, { borderBottomColor: palette.separator }]}>
+      {title ? (
+        <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
           {title}
         </Text>
-      )}
-      <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-        <GlassCard style={StyleSheet.absoluteFillObject} />
-        {children}
-      </View>
-      {footer ? (
-        <Text style={[typography.bodySmall, { color: theme.textMuted, marginTop: spacing.xs, paddingHorizontal: spacing.md }]}>
-          {footer}
-        </Text>
       ) : null}
+      {children}
+      {footer ? <Text style={[typeV2.meta, v2.footer, { color: palette.secondary }]}>{footer}</Text> : null}
     </View>
   );
 }
 
-/** A row's icon: a tinted tile (classic) or a plain 24pt glyph (new design). */
-function RowIcon({ name, color, destructive }: { name: IconName; color?: string; destructive?: boolean }) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  if (isNew) return <Ionicons name={name} size={24} color={destructive ? palette.red : palette.text} />;
-  return (
-    <View style={[styles.rowIcon, { backgroundColor: (color ?? theme.accent) + '20' }]}>
-      <Ionicons name={name} size={16} color={color ?? theme.accent} />
-    </View>
-  );
+/** A row's icon: a plain 24pt glyph. */
+function RowIcon({ name, destructive }: { name: IconName; destructive?: boolean }) {
+  const { palette } = useTheme();
+  return <Ionicons name={name} size={24} color={destructive ? palette.red : palette.text} />;
 }
 
 function Row({
   icon,
-  iconColor,
   label,
   value,
   rightSlot,
   onPress,
   destructive,
-  isLast,
   accessibilityState,
 }: {
   icon?: IconName;
-  iconColor?: string;
   label: string;
   value?: string;
   rightSlot?: React.ReactNode;
   onPress?: () => void;
   destructive?: boolean;
-  isLast?: boolean;
   accessibilityState?: AccessibilityState;
 }) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  const labelColor = destructive ? theme.error : theme.textPrimary;
-
-  if (isNew) {
-    const row = (
-      <View style={v2.row}>
-        {icon ? <RowIcon name={icon} destructive={destructive} /> : null}
-        <Text
-          style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
-        >
-          {label}
-        </Text>
-        {value !== undefined && (
-          <Text style={[typeV2.body, styles.rowValue, { color: palette.secondary }]} numberOfLines={1}>
-            {value}
-          </Text>
-        )}
-        {rightSlot}
-        {onPress && !rightSlot && <Ionicons name="chevron-forward" size={16} color={palette.secondary} />}
-      </View>
-    );
-    if (!onPress) return row;
-    return (
-      <Tap
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={value ? `${label}, ${value}` : label}
-        accessibilityState={accessibilityState}
+  const { palette } = useTheme();
+  const row = (
+    <View style={v2.row}>
+      {icon ? <RowIcon name={icon} destructive={destructive} /> : null}
+      <Text
+        style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
       >
-        {row}
-      </Tap>
-    );
-  }
-
-  const inner = (
-    <View
-      style={[
-        styles.row,
-        !isLast && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.border,
-        },
-      ]}
-    >
-      {icon && <RowIcon name={icon} color={iconColor} />}
-      <View style={styles.rowText}>
-        <Text style={[typography.bodyMedium, { color: labelColor }]}>{label}</Text>
-      </View>
+        {label}
+      </Text>
       {value !== undefined && (
-        // Shrinks (with an ellipsis) before the label does, and never takes
-        // more than about half the row, so a long name can't hide the label.
-        <Text
-          style={[typography.bodyMedium, styles.rowValue, { color: theme.textSecondary }]}
-          numberOfLines={1}
-        >
+        <Text style={[typeV2.body, styles.rowValue, { color: palette.secondary }]} numberOfLines={1}>
           {value}
         </Text>
       )}
       {rightSlot}
-      {onPress && !rightSlot && (
-        <Ionicons
-          name="chevron-forward"
-          size={18}
-          color={theme.textMuted}
-          style={{ marginLeft: spacing.xs }}
-        />
-      )}
+      {onPress && !rightSlot && <Ionicons name="chevron-forward" size={16} color={palette.secondary} />}
     </View>
   );
-
-  if (!onPress) return inner;
+  if (!onPress) return row;
   return (
-    <PressableScale
+    <Tap
       onPress={onPress}
-      haptic="light"
-      scale={0.99}
       accessibilityRole="button"
       accessibilityLabel={value ? `${label}, ${value}` : label}
       accessibilityState={accessibilityState}
     >
-      {inner}
-    </PressableScale>
+      {row}
+    </Tap>
   );
 }
 
-// Theme picker uses the legacy segmented control (LiquidGlassSegmentedControl
-// dropped Ionicon glyphs inside the glass surface — root cause unclear).
+/** The theme choice: a pill per option, the chosen one solid. */
 function ThemeSegmentedControl<T extends string>({
   options,
   value,
   onChange,
 }: {
-  options: Array<{ value: T; label: string; icon?: IconName }>;
+  options: Array<{ value: T; label: string }>;
   value: T;
   onChange: (v: T) => void;
 }) {
-  const { theme } = useTheme();
-  const { isNew } = useDesign();
-  if (isNew) {
-    return (
-      <View style={v2.pills}>
-        {options.map((opt) => (
-          <PillButton
-            key={opt.value}
-            title={opt.label}
-            size="sm"
-            variant={opt.value === value ? 'solid' : 'outline'}
-            onPress={() => onChange(opt.value)}
-            accessibilityLabel={`${opt.label}${opt.value === value ? ', selected' : ''}`}
-          />
-        ))}
-      </View>
-    );
-  }
   return (
-    <View style={styles.segmented}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
-      {options.map((opt) => {
-        const isSelected = opt.value === value;
-        return (
-          <PressableScale
-            key={opt.value}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onChange(opt.value);
-            }}
-            haptic="none"
-            scale={0.97}
-            style={[
-              styles.segment,
-              isSelected && [styles.segmentSelected, { backgroundColor: theme.surface, ...shadows.sm }],
-            ]}
-          >
-            {opt.icon && (
-              <Ionicons
-                name={opt.icon}
-                size={14}
-                color={isSelected ? theme.textPrimary : theme.textSecondary}
-                style={{ marginRight: 4 }}
-              />
-            )}
-            <Text
-              style={[
-                typography.bodySmall,
-                {
-                  color: isSelected ? theme.textPrimary : theme.textSecondary,
-                  fontWeight: '600',
-                },
-              ]}
-            >
-              {opt.label}
-            </Text>
-          </PressableScale>
-        );
-      })}
+    <View style={v2.pills}>
+      {options.map((opt) => (
+        <PillButton
+          key={opt.value}
+          title={opt.label}
+          size="sm"
+          variant={opt.value === value ? 'solid' : 'outline'}
+          onPress={() => onChange(opt.value)}
+          accessibilityLabel={`${opt.label}${opt.value === value ? ', selected' : ''}`}
+        />
+      ))}
     </View>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -322,10 +175,9 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, saveUser, resetOnboarding } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
-  const { theme, palette, themeMode, setThemeMode, isDark } = useTheme();
+  const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
   const tabFootprint = useTabBarFootprint();
-  const screenStyles = useMemo(() => makeStyles(theme), [theme]);
   const [localUser, setLocalUser] = useState(user);
 
   // Keep `localUser` in sync with the context user so we never persist a
@@ -402,8 +254,8 @@ export default function SettingsScreen() {
 
   if (!localUser) {
     return (
-      <SafeAreaView style={screenStyles.container}>
-        <View style={screenStyles.loadingContainer}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
           <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Loading…</Text>
         </View>
       </SafeAreaView>
@@ -563,70 +415,19 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={screenStyles.container}>
-      {design.isNew ? (
-        <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
-      ) : (
-        <View style={screenStyles.header}>
-          <PressableScale
-            onPress={() => navigation.goBack()}
-            haptic="light"
-            style={screenStyles.backButton}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
-          </PressableScale>
-          <Text style={screenStyles.headerTitle}>Settings</Text>
-          <View style={screenStyles.backButton} />
-        </View>
-      )}
+    <SafeAreaView style={styles.container}>
+      <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
 
-      <ScrollView
-        contentContainerStyle={design.isNew ? [v2.content, { paddingBottom: tabFootprint + spacing.lg }] : screenStyles.content}
-        testID="settings-scroll"
-      >
-        {design.allowed && (
-          // Testers only (lib/testerTools): switch the whole app to the redesign in
-          // progress and back, to compare. Kept on this device.
-          <Section title="Preview" footer="The redesign in progress, for testers. Switch back any time.">
-            <Row
-              icon="flask-outline"
-              label="New design (preview)"
-              isLast
-              rightSlot={
-                <SettingSwitch
-                  value={design.isNew}
-                  onValueChange={(on) => design.setChosen(on ? 'new' : 'classic')}
-                  accessibilityLabel="New design (preview)"
-                  testID="new-design-switch"
-                />
-              }
-            />
-          </Section>
-        )}
-
+      <ScrollView contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
         {firebaseUser && (
           <Section title="Account">
-            <View
-              style={[
-                design.isNew ? v2.profileRow : screenStyles.profileRow,
-                { borderBottomColor: theme.border },
-              ]}
-            >
-              {design.isNew ? (
-                <Mark label={avatarInitial(localUser.name, firebaseUser.email)} />
-              ) : (
-                <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
-                  <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
-                    {avatarInitial(localUser.name, firebaseUser.email)}
-                  </Text>
-                </View>
-              )}
-              <View style={{ flex: 1, minWidth: 0, marginLeft: design.isNew ? layoutV2.markGap : spacing.md }}>
+            <View style={v2.profileRow}>
+              <Mark label={avatarInitial(localUser.name, firebaseUser.email)} />
+              <View style={{ flex: 1, minWidth: 0, marginLeft: layoutV2.markGap }}>
                 {/* Long names wrap to a second line before shrinking or cutting. */}
                 {localUser.name?.trim() ? (
                   <Text
-                    style={[design.isNew ? typeV2.name : typography.titleMedium, { color: theme.textPrimary }]}
+                    style={[typeV2.name, { color: theme.textPrimary }]}
                     numberOfLines={2}
                     adjustsFontSizeToFit
                     minimumFontScale={0.8}
@@ -635,7 +436,7 @@ export default function SettingsScreen() {
                   </Text>
                 ) : null}
                 <Text
-                  style={[design.isNew ? typeV2.meta : typography.bodySmall, { color: theme.textSecondary }]}
+                  style={[typeV2.meta, { color: theme.textSecondary }]}
                   numberOfLines={1}
                   ellipsizeMode="middle"
                 >
@@ -651,7 +452,6 @@ export default function SettingsScreen() {
                 setTempName(localUser.name ?? '');
                 setShowNameModal(true);
               }}
-              isLast
             />
           </Section>
         )}
@@ -777,7 +577,6 @@ export default function SettingsScreen() {
             icon="book-outline"
             label="Memorized pages"
             onPress={() => navigation.navigate('Memorization')}
-            isLast
           />
         </Section>
 
@@ -800,12 +599,7 @@ export default function SettingsScreen() {
               onPress={toggleMetricsOpen}
               accessibilityState={{ expanded: metricsOpen }}
               rightSlot={
-                <Ionicons
-                  name={metricsOpen ? 'chevron-up' : 'chevron-down'}
-                  size={design.isNew ? 16 : 18}
-                  color={theme.textMuted}
-                  style={design.isNew ? undefined : { marginLeft: spacing.xs }}
-                />
+                <Ionicons name={metricsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textMuted} />
               }
             />
           ) : null}
@@ -832,7 +626,6 @@ export default function SettingsScreen() {
           <Row
             icon="book-outline"
             label="Friday Al-Kahf reminder"
-            isLast
             rightSlot={
               <SettingSwitch
                 value={homePrefs.fridayKahfReminder}
@@ -849,7 +642,6 @@ export default function SettingsScreen() {
           <Row
             icon="sunny-outline"
             label="Keep screen on while reading"
-            isLast
             rightSlot={
               <SettingSwitch
                 value={homePrefs.keepScreenOn}
@@ -865,58 +657,23 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Revision">
-          {design.isNew ? (
-            // Like Keep daily amount below: the line under the label says what it does.
-            <View style={v2.iconRow} testID="smart-tracking-row">
-              <SettingIcon name="analytics-outline" tileStyle={styles.rowIcon} />
-              <View style={v2.iconRowText}>
-                <Text style={[typeV2.body, { color: palette.text }]}>Smart Tracking</Text>
-                {!localUser.smartTrackingEnabled && (
-                  <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                    Turn on to rate pages from the session menu and see personalized insights.
-                  </Text>
-                )}
-              </View>
-              <SettingSwitch
-                value={localUser.smartTrackingEnabled}
-                onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
-                accessibilityLabel="Smart Tracking"
-              />
+          {/* Like Keep daily amount below: the line under the label says what it does. */}
+          <View style={v2.iconRow} testID="smart-tracking-row">
+            <SettingIcon name="analytics-outline" />
+            <View style={v2.iconRowText}>
+              <Text style={[typeV2.body, { color: palette.text }]}>Smart Tracking</Text>
+              {!localUser.smartTrackingEnabled && (
+                <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                  Turn on to rate pages from the session menu and see personalized insights.
+                </Text>
+              )}
             </View>
-          ) : (
-          <View
-            style={[
-              styles.row,
-              {
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: spacing.xs,
-              },
-            ]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', gap: spacing.sm }}>
-              <SettingIcon name="sparkles-outline" tileStyle={styles.rowIcon} />
-              <View style={styles.rowText}>
-                <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
-              </View>
-              <SettingSwitch
-                value={localUser.smartTrackingEnabled}
-                onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
-              />
-            </View>
-            {!localUser.smartTrackingEnabled && (
-              <Text
-                style={[
-                  typography.bodySmall,
-                  { color: theme.textSecondary, marginLeft: 36, marginRight: spacing.md },
-                ]}
-              >
-                Turn on to rate pages from the session menu and see personalized insights.
-              </Text>
-            )}
+            <SettingSwitch
+              value={localUser.smartTrackingEnabled}
+              onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
+              accessibilityLabel="Smart Tracking"
+            />
           </View>
-          )}
-          {!design.isNew && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border }} />}
           <CarryOverSetting
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}
@@ -949,69 +706,59 @@ export default function SettingsScreen() {
                   }
                 : undefined
             }
-            isLast
           />
         </Section>
 
         <Section title="Appearance">
-          <View style={design.isNew ? v2.iconRow : [styles.row, { borderBottomWidth: 0 }]}>
-            <SettingIcon name="color-palette-outline" tileStyle={styles.rowIcon} />
+          <View style={v2.iconRow}>
+            <SettingIcon name="color-palette-outline" />
             <View style={styles.rowText}>
-              <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
+              <Text style={[typeV2.body, { color: theme.textPrimary }]}>Theme</Text>
             </View>
             <ThemeSegmentedControl
               value={themeMode}
               onChange={setThemeMode}
               options={
-                design.isNew && systemAppearanceAvailable()
+                systemAppearanceAvailable()
                   ? [
-                      { value: 'system', label: 'System', icon: 'phone-portrait-outline' },
-                      { value: 'light', label: 'Light', icon: 'sunny-outline' },
-                      { value: 'dark', label: 'Dark', icon: 'moon-outline' },
+                      { value: 'system', label: 'System' },
+                      { value: 'light', label: 'Light' },
+                      { value: 'dark', label: 'Dark' },
                     ]
                   : [
-                      { value: 'light', label: 'Light', icon: 'sunny-outline' },
-                      { value: 'dark', label: 'Dark', icon: 'moon-outline' },
+                      { value: 'light', label: 'Light' },
+                      { value: 'dark', label: 'Dark' },
                     ]
               }
             />
           </View>
-          {design.isNew && (
-            // The new design only; kept with the account (DesignGate brings it to other devices).
-            <View style={v2.accentRow} testID="accent-row">
-              <View style={v2.accentHead}>
-                <SettingIcon name="color-filter-outline" tileStyle={styles.rowIcon} />
-                <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
-              </View>
-              <View style={v2.accentChips}>
-                <AccentPicker
-                  value={design.accent}
-                  onChange={(accent) => {
-                    design.setAccent(accent);
-                    updateUser({ accent });
-                  }}
-                />
-              </View>
+          {/* Kept with the account (DesignGate brings it to other devices). */}
+          <View style={v2.accentRow} testID="accent-row">
+            <View style={v2.accentHead}>
+              <SettingIcon name="color-filter-outline" />
+              <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
             </View>
-          )}
+            <View style={v2.accentChips}>
+              <AccentPicker
+                value={design.accent}
+                onChange={(accent) => {
+                  design.setAccent(accent);
+                  updateUser({ accent });
+                }}
+              />
+            </View>
+          </View>
         </Section>
 
-        {design.isNew && (
-          <Section title="Haptics" footer="Only for moments that matter: a page done, a session finished.">
-            <Row
-              icon="phone-portrait-outline"
-              label="Haptics"
-              isLast
-              rightSlot={
-                <SettingSwitch
-                  value={design.hapticsOn}
-                  onValueChange={design.setHapticsOn}
-                  accessibilityLabel="Haptics"
-                />
-              }
-            />
-          </Section>
-        )}
+        <Section title="Haptics" footer="Only for moments that matter: a page done, a session finished.">
+          <Row
+            icon="phone-portrait-outline"
+            label="Haptics"
+            rightSlot={
+              <SettingSwitch value={design.hapticsOn} onValueChange={design.setHapticsOn} accessibilityLabel="Haptics" />
+            }
+          />
+        </Section>
 
         <Section title="Support">
           <Row
@@ -1038,7 +785,6 @@ export default function SettingsScreen() {
             onPress={() =>
               Linking.openURL(supportMailto())
             }
-            isLast
           />
         </Section>
 
@@ -1065,19 +811,14 @@ export default function SettingsScreen() {
             />
             <Row
               icon="trash-outline"
-              iconColor={theme.error}
               label="Delete account"
               destructive
               onPress={handleDeleteAccount}
-              isLast
             />
           </Section>
         )}
 
-        <Text
-          style={design.isNew ? [typeV2.meta, v2.version, { color: palette.secondary }] : screenStyles.versionText}
-          maxFontSizeMultiplier={design.isNew ? 1.4 : undefined}
-        >
+        <Text style={[typeV2.meta, v2.version, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           Revisely · v{Constants.expoConfig?.version ?? '1.0.0'}
         </Text>
 
@@ -1087,316 +828,53 @@ export default function SettingsScreen() {
               icon="refresh-outline"
               label="Replay onboarding"
               onPress={handleReplayOnboarding}
-              isLast
             />
           </Section>
         )}
       </ScrollView>
 
-      {design.isNew ? (
-        <>
-          <ReminderTimeSheetV2
-            visible={showTimeModal}
-            hour={tempHour}
-            minute={tempMinute}
-            onHour={setTempHour}
-            onMinute={setTempMinute}
-            onCancel={() => setShowTimeModal(false)}
-            onSave={handleSaveTime}
-          />
-          <TextSheetV2
-            visible={showNameModal}
-            title="Display name"
-            message="How you'd like to be addressed in the app."
-            value={tempName}
-            onChange={setTempName}
-            placeholder="Your name"
-            maxLength={40}
-            inputRef={nameInputRef}
-            // Focus once the sheet is up, so the keyboard lifts a visible sheet.
-            onShow={() => nameInputRef.current?.focus()}
-            onCancel={() => setShowNameModal(false)}
-            save={{ label: 'Save', onPress: handleSaveName }}
-            testID="name-sheet"
-          />
-          <TextSheetV2
-            visible={showFeedbackModal}
-            title="Send feedback"
-            message="Found a bug or have an idea? Tell us anything. We read every note."
-            value={feedbackText}
-            onChange={setFeedbackText}
-            placeholder="What's on your mind?"
-            maxLength={2000}
-            multiline
-            onCancel={() => setShowFeedbackModal(false)}
-            save={{
-              label: feedbackSubmitting ? 'Sending…' : 'Submit',
-              onPress: handleSubmitFeedback,
-              disabled: feedbackSubmitting || feedbackText.trim().length === 0,
-            }}
-            testID="feedback-sheet"
-          />
-        </>
-      ) : (
-        <>
-        {/* Time picker sheet */}
-        <BottomSheetModal visible={showTimeModal} onClose={() => setShowTimeModal(false)}>
-          <View style={screenStyles.sheetHeader}>
-            <PressableScale
-              onPress={() => setShowTimeModal(false)}
-              haptic="light"
-              style={{ padding: spacing.xxs }}
-            >
-              <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-            </PressableScale>
-            <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Reminder time</Text>
-            <PressableScale
-              onPress={handleSaveTime}
-              haptic="medium"
-              style={{ padding: spacing.xxs }}
-            >
-              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
-            </PressableScale>
-          </View>
-
-          <View style={screenStyles.timePickerContainer}>
-            <View style={screenStyles.timeColumn}>
-              <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
-              <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
-                {HOURS.map((hour) => {
-                  const selected = tempHour === hour;
-                  return (
-                    <PressableScale
-                      key={hour}
-                      onPress={() => setTempHour(hour)}
-                      haptic="selection"
-                      scale={0.96}
-                      style={[
-                        screenStyles.timeOption,
-                        selected && { backgroundColor: theme.accentSoft },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          typography.titleMedium,
-                          {
-                            color: selected ? theme.accent : theme.textSecondary,
-                            fontWeight: selected ? '700' : '400',
-                            textAlign: 'center',
-                          },
-                        ]}
-                      >
-                        {hour.toString().padStart(2, '0')}
-                      </Text>
-                    </PressableScale>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            <Text style={[typography.displayLarge, { color: theme.textPrimary, marginHorizontal: spacing.xs }]}>:</Text>
-
-            <View style={screenStyles.timeColumn}>
-              <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
-              <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
-                {MINUTES.map((minute) => {
-                  const selected = tempMinute === minute;
-                  return (
-                    <PressableScale
-                      key={minute}
-                      onPress={() => setTempMinute(minute)}
-                      haptic="selection"
-                      scale={0.96}
-                      style={[
-                        screenStyles.timeOption,
-                        selected && { backgroundColor: theme.accentSoft },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          typography.titleMedium,
-                          {
-                            color: selected ? theme.accent : theme.textSecondary,
-                            fontWeight: selected ? '700' : '400',
-                            textAlign: 'center',
-                          },
-                        ]}
-                      >
-                        {minute.toString().padStart(2, '0')}
-                      </Text>
-                    </PressableScale>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          </View>
-        </BottomSheetModal>
-
-        {/* Display name sheet */}
-        <BottomSheetModal
-          visible={showNameModal}
-          onClose={() => setShowNameModal(false)}
-          // Focus once the sheet is up, so the keyboard lifts a visible sheet.
-          onShow={() => nameInputRef.current?.focus()}
-        >
-          <View style={screenStyles.sheetHeader}>
-            <PressableScale
-              onPress={() => setShowNameModal(false)}
-              haptic="light"
-              style={{ padding: spacing.xxs }}
-            >
-              <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-            </PressableScale>
-            <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Display name</Text>
-            <PressableScale
-              onPress={handleSaveName}
-              haptic="medium"
-              style={{ padding: spacing.xxs }}
-            >
-              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '700' }]}>Save</Text>
-            </PressableScale>
-          </View>
-
-          <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-            <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
-              How you'd like to be addressed in the app.
-            </Text>
-            <TextInput
-              ref={nameInputRef}
-              value={tempName}
-              onChangeText={setTempName}
-              placeholder="Your name"
-              placeholderTextColor={theme.textMuted}
-              maxLength={40}
-              returnKeyType="done"
-              onSubmitEditing={handleSaveName}
-              style={[
-                {
-                  ...typography.bodyLarge,
-                  color: theme.textPrimary,
-                  backgroundColor: isDark
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,0,0,0.06)',
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.sm,
-                  borderRadius: radius.sm,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                },
-              ]}
-            />
-          </View>
-        </BottomSheetModal>
-
-        <BottomSheetModal
-          visible={showFeedbackModal}
-          onClose={() => setShowFeedbackModal(false)}
-        >
-          <View style={screenStyles.sheetHeader}>
-            <PressableScale
-              onPress={() => setShowFeedbackModal(false)}
-              haptic="light"
-              style={{ padding: spacing.xxs }}
-            >
-              <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Cancel</Text>
-            </PressableScale>
-            <Text style={[typography.titleMedium, { color: theme.textPrimary }]}>Send feedback</Text>
-            <PressableScale
-              onPress={handleSubmitFeedback}
-              haptic="medium"
-              style={{ padding: spacing.xxs }}
-              disabled={feedbackSubmitting || feedbackText.trim().length === 0}
-            >
-              <Text
-                style={[
-                  typography.bodyMedium,
-                  {
-                    color:
-                      feedbackSubmitting || feedbackText.trim().length === 0
-                        ? theme.textMuted
-                        : theme.accent,
-                    fontWeight: '700',
-                  },
-                ]}
-              >
-                {feedbackSubmitting ? 'Sending…' : 'Submit'}
-              </Text>
-            </PressableScale>
-          </View>
-
-          <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-            <Text style={[typography.bodySmall, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
-              Found a bug or have an idea? Tell us anything — we read every note.
-            </Text>
-            <TextInput
-              value={feedbackText}
-              onChangeText={setFeedbackText}
-              placeholder="What's on your mind?"
-              placeholderTextColor={theme.textMuted}
-              multiline
-              maxLength={2000}
-              textAlignVertical="top"
-              style={[
-                {
-                  ...typography.bodyMedium,
-                  color: theme.textPrimary,
-                  backgroundColor: isDark
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,0,0,0.06)',
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.sm,
-                  borderRadius: radius.sm,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  minHeight: 140,
-                },
-              ]}
-            />
-          </View>
-        </BottomSheetModal>
-        </>
-      )}
+      <ReminderTimeSheetV2
+        visible={showTimeModal}
+        hour={tempHour}
+        minute={tempMinute}
+        onHour={setTempHour}
+        onMinute={setTempMinute}
+        onCancel={() => setShowTimeModal(false)}
+        onSave={handleSaveTime}
+      />
+      <TextSheetV2
+        visible={showNameModal}
+        title="Display name"
+        message="How you'd like to be addressed in the app."
+        value={tempName}
+        onChange={setTempName}
+        placeholder="Your name"
+        maxLength={40}
+        inputRef={nameInputRef}
+        // Focus once the sheet is up, so the keyboard lifts a visible sheet.
+        onShow={() => nameInputRef.current?.focus()}
+        onCancel={() => setShowNameModal(false)}
+        save={{ label: 'Save', onPress: handleSaveName }}
+        testID="name-sheet"
+      />
+      <TextSheetV2
+        visible={showFeedbackModal}
+        title="Send feedback"
+        message="Found a bug or have an idea? Tell us anything. We read every note."
+        value={feedbackText}
+        onChange={setFeedbackText}
+        placeholder="What's on your mind?"
+        maxLength={2000}
+        multiline
+        onCancel={() => setShowFeedbackModal(false)}
+        save={{
+          label: feedbackSubmitting ? 'Sending…' : 'Submit',
+          onPress: handleSubmitFeedback,
+          disabled: feedbackSubmitting || feedbackText.trim().length === 0,
+        }}
+        testID="feedback-sheet"
+      />
     </SafeAreaView>
-  );
-}
-
-// The classic design's modal-as-sheet. The KeyboardAvoidingView lifts the sheet above
-// the keyboard: without it, the auto-focused name field's keyboard covers the
-// whole (short) sheet the instant it opens, so it looks like nothing happened.
-function BottomSheetModal({
-  visible,
-  onClose,
-  onShow,
-  children,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onShow?: () => void;
-  children: React.ReactNode;
-}) {
-  const { theme } = useTheme();
-  const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      onShow={onShow}
-    >
-      <KeyboardAvoidingView
-        style={sheetStyles.fill}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <Pressable style={sheetStyles.overlay} onPress={onClose}>
-          <Pressable style={sheetStyles.sheet} onPress={() => {}}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <View style={sheetStyles.dragHandle} />
-            {children}
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
   );
 }
 
@@ -1550,48 +1028,22 @@ function TextSheetV2({
 }
 
 // ---------------------------------------------------------------------------
-// Styles (shared row/segmented + screen-scoped)
+// Styles
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    minHeight: 52,
-    gap: spacing.sm,
-  },
-  rowIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   rowText: {
     flex: 1,
   },
+  // A row's value shrinks (with an ellipsis) before the label does, and never
+  // takes more than about half the row, so a long name can't hide the label.
   rowValue: {
     flexShrink: 1,
     maxWidth: '55%',
     textAlign: 'right',
   },
-  segmented: {
-    flexDirection: 'row',
-    padding: 3,
-    borderRadius: radius.sm,
-    gap: 2,
-    overflow: 'hidden',
-  },
-  segment: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 6,
-    borderRadius: radius.xs,
-  },
-  segmentSelected: {},
 });
 
 // The new design: full-bleed rows with a 16pt gutter, no cards.
@@ -1648,98 +1100,3 @@ const v2 = StyleSheet.create({
   timeColon: { marginHorizontal: 8, marginTop: 28 },
 });
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-    },
-    backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { ...typography.titleLarge, color: theme.textPrimary },
-    content: {
-      paddingHorizontal: spacing.sm,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.xl,
-    },
-    profileRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    avatar: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    versionText: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      textAlign: 'center',
-      marginTop: spacing.lg,
-      marginBottom: spacing.lg,
-    },
-    sheetHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.lg,
-    },
-    capacityDisplay: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'center',
-      gap: spacing.xs,
-      marginBottom: spacing.sm,
-    },
-    sliderLabels: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: spacing.xxs,
-    },
-    timePickerContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'flex-start',
-      paddingVertical: spacing.sm,
-    },
-    timeColumn: { alignItems: 'center', width: 96 },
-    timeScroll: { maxHeight: 200, width: '100%' },
-    timeOption: {
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      borderRadius: radius.sm,
-      marginVertical: 2,
-    },
-  });
-
-const makeSheetStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    fill: { flex: 1 },
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-    sheet: {
-      borderTopLeftRadius: radius.lg,
-      borderTopRightRadius: radius.lg,
-      paddingTop: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xl,
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    dragHandle: {
-      width: 40,
-      height: 4,
-      backgroundColor: theme.border,
-      alignSelf: 'center',
-      marginBottom: spacing.md,
-      borderRadius: radius.full,
-    },
-  });

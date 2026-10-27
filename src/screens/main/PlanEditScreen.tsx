@@ -5,7 +5,6 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
-  Pressable,
   ActivityIndicator,
 } from 'react-native';
 import Animated, { useAnimatedRef, useScrollOffset, useSharedValue } from 'react-native-reanimated';
@@ -16,12 +15,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomSheetModal, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { GlassCard } from '../../components/GlassCard';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import {
   buildDefaultPlanDays,
   scheduledDaysFrom,
@@ -53,12 +49,10 @@ import {
   PlanBuilderHandle,
   PlanBuilderSheet,
 } from '../../components/plan/PlanBuilderSheet';
-import { LiquidGlassSegmentedControl } from '../../components/LiquidGlassSegmentedControl';
 import { TopBar } from '../../components/v2/TopBar';
 import { PillButton } from '../../components/v2/PillButton';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { ActionSheet } from '../../components/v2/ActionSheet';
-import { useDesign } from '../../design/DesignContext';
 import { useHaptics } from '../../design/haptics';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { getRevisionDateForUser } from '../../lib/fajrBoundary';
@@ -90,11 +84,9 @@ function sameDays(a: number[][], b: number[][]): boolean {
 export default function PlanEditScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  // Outcomes only (a save, a load); in the classic design the same calls as before.
+  const { palette } = useTheme();
+  // Outcomes only (a save, a load).
   const haptics = useHaptics();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user, pages, logs, saveUser } = useApp();
   // "Today" in the editor is the revision day (it starts at fajr when that is
   // on), fixed when the editor opens: the draft is rotated to that day, so it
@@ -103,7 +95,6 @@ export default function PlanEditScreen() {
 
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);
-  const timingSheetRef = useRef<BottomSheetModal>(null);
   const saveNameSheetRef = useRef<BottomSheetModal>(null);
   const nameInputRef = useRef<React.ComponentRef<typeof BottomSheetTextInput>>(null);
   const leavingRef = useRef(false);
@@ -168,8 +159,8 @@ export default function PlanEditScreen() {
   const [tempMode, setTempMode] = useState<QuotaMode>(user?.scheduleMode ?? 'pages');
   const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
   const [tempJuzCount, setTempJuzCount] = useState(user?.dailyJuzCount ?? 1);
-  // New design: menus are v2/ActionSheet (a saved plan's Load / Delete,
-  // Running behind?'s two shifts) instead of an alert and a form sheet.
+  // Menus are v2/ActionSheet: a saved plan's Load / Delete, Running behind?'s
+  // two shifts.
   const [menuPlan, setMenuPlan] = useState<SavedPlan | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [timingOpen, setTimingOpen] = useState(false);
@@ -361,25 +352,9 @@ export default function PlanEditScreen() {
   const savedPlanMessage = (plan: SavedPlan) =>
     `${plan.days.length}-day cycle${plan.direction === 'reverse' ? ', reverse order' : ''}. Loading it replaces the days above — tap Save to keep it.`;
 
-  // Android alerts support at most three buttons — this uses exactly three.
   const openSavedPlan = (plan: SavedPlan) => {
-    if (isNew) {
-      setMenuPlan(plan);
-      setPlanMenuOpen(true);
-      return;
-    }
-    Alert.alert(
-      plan.name,
-      savedPlanMessage(plan),
-      [
-        {
-          text: 'Load Plan',
-          onPress: () => loadSavedPlan(plan),
-        },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteSavedPlan(plan) },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+    setMenuPlan(plan);
+    setPlanMenuOpen(true);
   };
 
   // ---- Timing ------------------------------------------------------------------------
@@ -390,7 +365,6 @@ export default function PlanEditScreen() {
       saveUser(shiftScheduleAnchor(user, delta))
         .then(() => {
           haptics.success();
-          timingSheetRef.current?.dismiss();
           leave();
         })
         .catch(() => {
@@ -474,9 +448,9 @@ export default function PlanEditScreen() {
 
   if (!user) {
     return (
-      <SafeAreaView style={[styles.container, isNew && { backgroundColor: palette.bg }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingWrap}>
-          <ActivityIndicator color={isNew ? palette.secondary : theme.textMuted} />
+          <ActivityIndicator color={palette.secondary} />
         </View>
       </SafeAreaView>
     );
@@ -493,14 +467,6 @@ export default function PlanEditScreen() {
       ? `${user.dailyJuzCount ?? 1} juz`
       : pageCountLabel(user.dailyPageCapacity);
 
-  const heroSubtitle = !hasMemorized
-    ? 'Nothing to schedule yet'
-    : days.length === 0
-      ? 'No days in this cycle'
-      : `${user.customPlan || isDirty ? 'Custom plan' : 'Automatic'} · repeats every ${
-          days.length === 1 ? 'day' : `${days.length} days`
-        }`;
-
   const perDay =
     stats.minPerDay === stats.maxPerDay
       ? pageCountLabel(stats.maxPerDay)
@@ -513,8 +479,6 @@ export default function PlanEditScreen() {
     ? `A ${days.length}-day cycle is a long gap between revisions. Past about two weeks, pages usually need more reinforcement.`
     : 'Tap a day to change what’s on it. Touch and hold to move it to another date; swipe left to delete it.';
 
-  // The new design writes labels in sentence case.
-  const label = (classic: string, v2: string) => (isNew ? v2 : classic);
   const planKind = !hasMemorized
     ? 'Nothing to schedule yet'
     : days.length === 0
@@ -532,78 +496,28 @@ export default function PlanEditScreen() {
     : '';
 
   return (
-    <SafeAreaView style={[styles.container, isNew && { backgroundColor: palette.bg }]} testID="plan-edit">
-      {isNew ? (
-        <TopBar
-          title="Schedule"
-          onBack={() => navigation.goBack()}
-          right={
-            <PillButton
-              title="Save"
-              size="sm"
-              onPress={handleSave}
-              disabled={!canSave}
-              busy={saving}
-              accessibilityLabel="Save schedule"
-              testID="plan-save"
-            />
-          }
-          separator
-        />
-      ) : (
-        <View style={styles.navBar}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={styles.navSide}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            {({ pressed }) => (
-              <View style={[styles.navBack, { opacity: pressed ? 0.5 : 1 }]}>
-                <Ionicons name="chevron-back" size={24} color={theme.accent} />
-                <Text style={styles.navText} maxFontSizeMultiplier={1.4}>
-                  Back
-                </Text>
-              </View>
-            )}
-          </Pressable>
-          <View style={styles.navCenter} />
-          <View style={[styles.navSide, styles.navRight]}>
-            {saving ? (
-              <ActivityIndicator size="small" color={theme.accent} />
-            ) : (
-              <Pressable
-                onPress={handleSave}
-                disabled={!canSave}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Save schedule"
-                accessibilityState={{ disabled: !canSave }}
-              >
-                {({ pressed }) => (
-                  <Text
-                    style={[
-                      styles.navText,
-                      styles.navSave,
-                      !canSave && { color: theme.textMuted },
-                      pressed && { opacity: 0.5 },
-                    ]}
-                    maxFontSizeMultiplier={1.4}
-                  >
-                    Save
-                  </Text>
-                )}
-              </Pressable>
-            )}
-          </View>
-        </View>
-      )}
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="plan-edit">
+      <TopBar
+        title="Schedule"
+        onBack={() => navigation.goBack()}
+        right={
+          <PillButton
+            title="Save"
+            size="sm"
+            onPress={handleSave}
+            disabled={!canSave}
+            busy={saving}
+            accessibilityLabel="Save schedule"
+            testID="plan-save"
+          />
+        }
+        separator
+      />
 
       <Animated.ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={isNew ? styles.scrollContentV2 : styles.scrollContent}
+        contentContainerStyle={styles.scrollContentV2}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!dragging}
         scrollEventThrottle={16}
@@ -611,28 +525,18 @@ export default function PlanEditScreen() {
           contentHeight.value = h;
         }}
       >
-        {isNew ? (
-          // What the plan is, as the day screen shows what's on a day.
-          <View style={styles.heroV2} testID="plan-hero">
-            <Text style={[typeV2.title, { color: palette.text }]}>{planKind}</Text>
-            {hasMemorized && days.length > 0 ? (
-              <Text style={[typeV2.body, styles.heroLineV2, { color: palette.secondary }]}>{repeats}</Text>
-            ) : null}
-            {isDirty ? (
-              <Text style={[typeV2.meta, styles.heroLineV2, { color: palette.accentText }]} testID="plan-dirty">
-                Unsaved changes
-              </Text>
-            ) : null}
-          </View>
-        ) : (
-          <View style={styles.hero}>
-            <Text style={styles.heroTitle} accessibilityRole="header">
-              Schedule
+        {/* What the plan is, as the day screen shows what's on a day. */}
+        <View style={styles.heroV2} testID="plan-hero">
+          <Text style={[typeV2.title, { color: palette.text }]}>{planKind}</Text>
+          {hasMemorized && days.length > 0 ? (
+            <Text style={[typeV2.body, styles.heroLineV2, { color: palette.secondary }]}>{repeats}</Text>
+          ) : null}
+          {isDirty ? (
+            <Text style={[typeV2.meta, styles.heroLineV2, { color: palette.accentText }]} testID="plan-dirty">
+              Unsaved changes
             </Text>
-            <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
-            {isDirty ? <Text style={styles.heroDirty}>Unsaved changes</Text> : null}
-          </View>
-        )}
+          ) : null}
+        </View>
 
         {days.length > 0 ? (
           <GroupedSection
@@ -656,30 +560,26 @@ export default function PlanEditScreen() {
             />
             {!showAll ? (
               <GroupedRow
-                title={label(`Show All ${days.length} Days`, `Show all ${days.length} days`)}
-                tone={isNew ? 'link' : 'accent'}
+                title={`Show all ${days.length} days`}
+                tone="link"
                 onPress={() => setExpanded(true)}
-                // New design: in line with the days' content.
-                style={isNew ? styles.dayContentV2 : undefined}
+                // In line with the days' content.
+                style={styles.dayContentV2}
                 testID="plan-show-all"
               />
             ) : null}
-            {isNew ? (
-              // A new day: the + in the date column, the label where a day's content is.
-              <GroupedRow
-                title="Add rest day"
-                leading={
-                  <View style={styles.dateColumnV2}>
-                    <Ionicons name="add-circle-outline" size={24} color={palette.text} />
-                  </View>
-                }
-                onPress={addDay}
-                style={styles.dayRowV2}
-                testID="plan-add-day"
-              />
-            ) : (
-              <GroupedRow title="Add Rest Day" icon="add-circle" tone="accent" onPress={addDay} />
-            )}
+            {/* A new day: the + in the date column, the label where a day's content is. */}
+            <GroupedRow
+              title="Add rest day"
+              leading={
+                <View style={styles.dateColumnV2}>
+                  <Ionicons name="add-circle-outline" size={24} color={palette.text} />
+                </View>
+              }
+              onPress={addDay}
+              style={styles.dayRowV2}
+              testID="plan-add-day"
+            />
           </GroupedSection>
         ) : (
           <GroupedSection
@@ -702,7 +602,7 @@ export default function PlanEditScreen() {
             }
           >
             <GroupedRow
-              title={label('Create New Plan', 'Create new plan')}
+              title="Create new plan"
               icon="sparkles-outline"
               accessory="chevron"
               onPress={() => builderRef.current?.present()}
@@ -722,14 +622,13 @@ export default function PlanEditScreen() {
               value={`${plan.days.length} day${plan.days.length === 1 ? '' : 's'}`}
               onPress={() => openSavedPlan(plan)}
               onLongPress={() => deleteSavedPlan(plan)}
-              accessory={isNew ? 'chevron' : 'none'}
+              accessory="chevron"
               testID={`saved-plan-${plan.id}`}
             />
           ))}
           <GroupedRow
-            title={label('Save Current Plan…', 'Save current plan…')}
+            title="Save current plan…"
             icon="bookmark-outline"
-            tone="accent"
             onPress={openSaveName}
             disabled={days.length === 0}
             testID="plan-save-current"
@@ -745,16 +644,16 @@ export default function PlanEditScreen() {
           }
         >
           <GroupedRow
-            title={label('Running Behind?', 'Running behind?')}
+            title="Running behind?"
             subtitle={isDirty ? 'Save your changes first' : undefined}
             icon="time-outline"
             accessory="chevron"
             disabled={isDirty || days.length === 0}
-            onPress={() => (isNew ? setTimingOpen(true) : timingSheetRef.current?.present())}
+            onPress={() => setTimingOpen(true)}
             testID="plan-timing"
           />
           <GroupedRow
-            title={label('Daily Amount', 'Daily amount')}
+            title="Daily amount"
             icon="speedometer-outline"
             value={quotaSummary}
             accessory="chevron"
@@ -763,7 +662,7 @@ export default function PlanEditScreen() {
           />
           {user.customPlan ? (
             <GroupedRow
-              title={label('Use Automatic Schedule', 'Use automatic schedule')}
+              title="Use automatic schedule"
               icon="refresh-outline"
               tone="destructive"
               onPress={handleUseAutomatic}
@@ -797,118 +696,74 @@ export default function PlanEditScreen() {
         longCycleDays={LONG_CYCLE_DAYS}
       />
 
-      {isNew ? (
-        <>
-          <ActionSheet
-            visible={timingOpen}
-            onClose={() => setTimingOpen(false)}
-            title="Running behind?"
-            message="Only the timing changes; what's on each day stays the same."
-            actions={[
-              {
-                key: 'push-back',
-                label: 'Push back a day',
-                subtitle: "Today's revision moves to tomorrow",
-                icon: 'arrow-undo-outline',
-                disabled: saving || isDirty,
-                onPress: () => handleShift(1),
-              },
-              {
-                key: 'skip-ahead',
-                label: 'Skip ahead a day',
-                subtitle: "Start tomorrow's revision today",
-                icon: 'arrow-redo-outline',
-                disabled: saving || isDirty,
-                onPress: () => handleShift(-1),
-              },
-            ]}
-            testID="plan-timing-menu"
-          />
-          <ActionSheet
-            visible={planMenuOpen}
-            onClose={() => setPlanMenuOpen(false)}
-            title={menuPlan?.name}
-            message={menuPlan ? savedPlanMessage(menuPlan) : undefined}
-            actions={
-              menuPlan
-                ? [
-                    { key: 'load', label: 'Load plan', icon: 'download-outline', onPress: () => loadSavedPlan(menuPlan) },
-                    {
-                      key: 'delete',
-                      label: 'Delete plan',
-                      icon: 'trash-outline',
-                      destructive: true,
-                      onPress: () => deleteSavedPlan(menuPlan),
-                    },
-                  ]
-                : []
-            }
-            testID="saved-plan-menu"
-          />
-        </>
-      ) : (
-        <PlanSheet
-          ref={timingSheetRef}
-          title="Running Behind?"
-          leftLabel="Close"
-          onLeft={() => timingSheetRef.current?.dismiss()}
-        >
-          <View style={styles.sheetBody}>
-            <GroupedSection
-              style={styles.sheetFirstSection}
-              footer="Only the timing changes — what's on each day stays the same."
-            >
-              <GroupedRow
-                title="Push Back a Day"
-                subtitle="Today's revision moves to tomorrow"
-                icon="arrow-undo-outline"
-                onPress={() => handleShift(1)}
-                disabled={saving || isDirty}
-              />
-              <GroupedRow
-                title="Skip Ahead a Day"
-                subtitle="Start tomorrow's revision today"
-                icon="arrow-redo-outline"
-                onPress={() => handleShift(-1)}
-                disabled={saving || isDirty}
-              />
-            </GroupedSection>
-          </View>
-        </PlanSheet>
-      )}
+      <ActionSheet
+        visible={timingOpen}
+        onClose={() => setTimingOpen(false)}
+        title="Running behind?"
+        message="Only the timing changes; what's on each day stays the same."
+        actions={[
+          {
+            key: 'push-back',
+            label: 'Push back a day',
+            subtitle: "Today's revision moves to tomorrow",
+            icon: 'arrow-undo-outline',
+            disabled: saving || isDirty,
+            onPress: () => handleShift(1),
+          },
+          {
+            key: 'skip-ahead',
+            label: 'Skip ahead a day',
+            subtitle: "Start tomorrow's revision today",
+            icon: 'arrow-redo-outline',
+            disabled: saving || isDirty,
+            onPress: () => handleShift(-1),
+          },
+        ]}
+        testID="plan-timing-menu"
+      />
+      <ActionSheet
+        visible={planMenuOpen}
+        onClose={() => setPlanMenuOpen(false)}
+        title={menuPlan?.name}
+        message={menuPlan ? savedPlanMessage(menuPlan) : undefined}
+        actions={
+          menuPlan
+            ? [
+                { key: 'load', label: 'Load plan', icon: 'download-outline', onPress: () => loadSavedPlan(menuPlan) },
+                {
+                  key: 'delete',
+                  label: 'Delete plan',
+                  icon: 'trash-outline',
+                  destructive: true,
+                  onPress: () => deleteSavedPlan(menuPlan),
+                },
+              ]
+            : []
+        }
+        testID="saved-plan-menu"
+      />
 
       <PlanSheet
         ref={quotaSheetRef}
-        title={label('Daily Amount', 'Daily amount')}
+        title="Daily amount"
         leftLabel="Cancel"
         onLeft={() => quotaSheetRef.current?.dismiss()}
         rightLabel="Save"
         onRight={handleSaveQuota}
         rightLoading={saving}
       >
-        <View style={isNew ? styles.sheetBodyV2 : styles.sheetBody}>
-          {isNew ? (
-            <View style={styles.sheetPillsV2}>
-              <PillTabs<QuotaMode>
-                options={[
-                  { value: 'pages', label: 'Pages' },
-                  { value: 'juz', label: 'Juz' },
-                ]}
-                value={tempMode}
-                onChange={setTempMode}
-                testID="quota-mode"
-              />
-            </View>
-          ) : (
-            <LiquidGlassSegmentedControl<QuotaMode>
+        <View style={styles.sheetBodyV2}>
+          <View style={styles.sheetPillsV2}>
+            <PillTabs<QuotaMode>
               options={[
                 { value: 'pages', label: 'Pages' },
                 { value: 'juz', label: 'Juz' },
               ]}
               value={tempMode}
               onChange={setTempMode}
+              testID="quota-mode"
             />
-          )}
+          </View>
           <GroupedSection
             divider={false}
             footer={
@@ -950,7 +805,7 @@ export default function PlanEditScreen() {
 
       <PlanSheet
         ref={saveNameSheetRef}
-        title={label('Save Plan', 'Save plan')}
+        title="Save plan"
         leftLabel="Cancel"
         onLeft={() => saveNameSheetRef.current?.dismiss()}
         rightLabel="Save"
@@ -958,155 +813,52 @@ export default function PlanEditScreen() {
         rightDisabled={!nameDraft.trim()}
         onPresented={() => nameInputRef.current?.focus()}
       >
-        {isNew ? (
-          <View style={styles.sheetBodyV2}>
-            <View style={[styles.nameFieldV2, { backgroundColor: palette.fill }]}>
-              <BottomSheetTextInput
-                ref={nameInputRef}
-                value={nameDraft}
-                onChangeText={setNameDraft}
-                placeholder="Name, e.g. Ramadan rotation"
-                placeholderTextColor={palette.secondary}
-                style={[typeV2.body, styles.nameInputV2, { color: palette.text }]}
-                maxLength={40}
-                returnKeyType="done"
-                onSubmitEditing={confirmSavePlan}
-                accessibilityLabel="Plan name"
-                testID="plan-name"
-              />
-            </View>
-            <Text style={[typeV2.meta, styles.nameFooterV2, { color: palette.secondary }]}>
-              {`${stats.dayCount}-day cycle. You can load it again any time from this screen.`}
-            </Text>
+        <View style={styles.sheetBodyV2}>
+          <View style={[styles.nameFieldV2, { backgroundColor: palette.fill }]}>
+            <BottomSheetTextInput
+              ref={nameInputRef}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              placeholder="Name, e.g. Ramadan rotation"
+              placeholderTextColor={palette.secondary}
+              style={[typeV2.body, styles.nameInputV2, { color: palette.text }]}
+              maxLength={40}
+              returnKeyType="done"
+              onSubmitEditing={confirmSavePlan}
+              accessibilityLabel="Plan name"
+              testID="plan-name"
+            />
           </View>
-        ) : (
-          <View style={styles.sheetBody}>
-            <View style={styles.nameField}>
-              <GlassCard style={StyleSheet.absoluteFillObject} />
-              <BottomSheetTextInput
-                ref={nameInputRef}
-                value={nameDraft}
-                onChangeText={setNameDraft}
-                placeholder="Name, e.g. Ramadan rotation"
-                placeholderTextColor={theme.textMuted}
-                style={styles.nameInput}
-                maxLength={40}
-                returnKeyType="done"
-                onSubmitEditing={confirmSavePlan}
-                accessibilityLabel="Plan name"
-              />
-            </View>
-            <Text style={styles.nameFooter}>
-              {`${stats.dayCount}-day cycle. You can load it again any time from this screen.`}
-            </Text>
-          </View>
-        )}
+          <Text style={[typeV2.meta, styles.nameFooterV2, { color: palette.secondary }]}>
+            {`${stats.dayCount}-day cycle. You can load it again any time from this screen.`}
+          </Text>
+        </View>
       </PlanSheet>
     </SafeAreaView>
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
-    loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    navBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      height: 44,
-      paddingHorizontal: spacing.xs,
-    },
-    navSide: {
-      width: 96,
-      justifyContent: 'center',
-    },
-    navRight: {
-      alignItems: 'flex-end',
-      paddingRight: spacing.xs,
-    },
-    navCenter: { flex: 1 },
-    navBack: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    navText: {
-      fontSize: 17,
-      color: theme.accent,
-    },
-    navSave: {
-      fontWeight: '600',
-    },
-    scroll: { flex: 1 },
-    scrollContent: {
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.huge,
-    },
-    hero: {
-      paddingHorizontal: spacing.xxs,
-      paddingTop: spacing.xxs,
-    },
-    heroTitle: {
-      fontSize: 34,
-      lineHeight: 41,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-      color: theme.textPrimary,
-    },
-    heroSubtitle: {
-      fontSize: 15,
-      lineHeight: 20,
-      color: theme.textSecondary,
-      marginTop: 2,
-    },
-    heroDirty: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.accent,
-      marginTop: 2,
-    },
-    sheetBody: {
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.xs,
-    },
-    sheetFirstSection: {
-      marginTop: 0,
-    },
-    nameField: {
-      borderRadius: radius.md,
-      overflow: 'hidden',
-      paddingHorizontal: spacing.md,
-      minHeight: 48,
-      justifyContent: 'center',
-    },
-    nameInput: {
-      fontSize: 17,
-      color: theme.textPrimary,
-      paddingVertical: 12,
-    },
-    nameFooter: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.textMuted,
-      paddingHorizontal: spacing.md,
-      marginTop: 6,
-    },
-    // The new design: rows carry their own 16pt gutter, so the content is full width.
-    scrollContentV2: { paddingBottom: spacing.huge },
-    heroV2: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: 8 },
-    heroLineV2: { marginTop: 2 },
-    // A row in line with the cycle's days: past the date column (gutter, 40, 12).
-    dayContentV2: { paddingLeft: DAY_ROW_INSET },
-    dayRowV2: { gap: 12 },
-    dateColumnV2: { width: 40, alignItems: 'center' },
-    sheetBodyV2: { paddingTop: 4 },
-    sheetPillsV2: { paddingHorizontal: layoutV2.gutter, paddingBottom: 4 },
-    nameFieldV2: {
-      marginHorizontal: layoutV2.gutter,
-      paddingHorizontal: 12,
-      minHeight: 48,
-      justifyContent: 'center',
-      borderRadius: radiusV2.media,
-    },
-    nameInputV2: { paddingVertical: 12 },
-    nameFooterV2: { paddingHorizontal: layoutV2.gutter, marginTop: 8 },
-  });
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scroll: { flex: 1 },
+  // Rows carry their own 16pt gutter, so the content is full width.
+  scrollContentV2: { paddingBottom: spacing.huge },
+  heroV2: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: 8 },
+  heroLineV2: { marginTop: 2 },
+  // A row in line with the cycle's days: past the date column (gutter, 40, 12).
+  dayContentV2: { paddingLeft: DAY_ROW_INSET },
+  dayRowV2: { gap: 12 },
+  dateColumnV2: { width: 40, alignItems: 'center' },
+  sheetBodyV2: { paddingTop: 4 },
+  sheetPillsV2: { paddingHorizontal: layoutV2.gutter, paddingBottom: 4 },
+  nameFieldV2: {
+    marginHorizontal: layoutV2.gutter,
+    paddingHorizontal: 12,
+    minHeight: 48,
+    justifyContent: 'center',
+    borderRadius: radiusV2.media,
+  },
+  nameInputV2: { paddingVertical: 12 },
+  nameFooterV2: { paddingHorizontal: layoutV2.gutter, marginTop: 8 },
+});

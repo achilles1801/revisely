@@ -1,12 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { Backdrop } from '../../components/Backdrop';
-import { GlassCard } from '../../components/GlassCard';
-import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
@@ -17,7 +12,6 @@ import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useApp } from '../../context/AppContext';
-import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { TimerChip } from '../../components/timer/TimerChip';
 import { ReaderFrame } from '../../components/reader/ReaderFrame';
 import { ReaderActivity } from '../../components/reader/ReaderActivity';
@@ -28,13 +22,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROUND_BUTTON_SIZE, RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
-import { useDesign } from '../../design/DesignContext';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import {
   getHizbForPage,
   getJuzForPage,
@@ -51,19 +41,16 @@ const SETTLE_DEBOUNCE_MS = 1500;
 // Under the page, with the controls: the position track, then the capsule.
 const SCRUBBER_HEIGHT = 32;
 const FOOTER_HEIGHT = SCRUBBER_HEIGHT + spacing.xs + CAPSULE_HEIGHT + spacing.sm;
-const READER_GUIDE_DISMISSED_KEY = '@revisley_reader_guide_dismissed';
 
 export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { theme, isDark } = useTheme();
-  const { isNew: isNewDesign } = useDesign();
-  const palette = getReadPalette(isDark, isNewDesign);
+  const { isDark } = useTheme();
+  const palette = getReadPalette(isDark);
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const initialPage = route.params.pageNumber;
   const [currentPage, setCurrentPage] = useState(initialPage);
-  const [showGuide, setShowGuide] = useState(false);
 
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pagerRef = useRef<MushafPagerHandle>(null);
@@ -114,23 +101,8 @@ export default function QuranReaderScreen() {
     dismissHint();
     toggleChrome();
   }, [dismissHint, toggleChrome]);
-  // The timer is in the controls here, not floating over the page.
-  useFloatingTimerOffset('hidden');
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-
-  // The new design has no help screens: the reader explains itself.
-  useEffect(() => {
-    if (isNewDesign) return;
-    AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
-      if (v !== 'true') setShowGuide(true);
-    });
-  }, [isNewDesign]);
-
-  const dismissGuideForever = async () => {
-    setShowGuide(false);
-    await AsyncStorage.setItem(READER_GUIDE_DISMISSED_KEY, 'true');
-  };
 
   const handlePageChange = useCallback(
     (pageNumber: number) => {
@@ -199,12 +171,8 @@ export default function QuranReaderScreen() {
                 Page {currentPage} · Juz {juz} · Hizb {hizb}
               </Text>
             </View>
-            {isNewDesign ? (
-              // Keeps the title centred.
-              <View style={{ width: ROUND_BUTTON_SIZE }} />
-            ) : (
-              <RoundButton icon="help" label="How the reader works" onPress={() => setShowGuide(true)} palette={palette} />
-            )}
+            {/* Keeps the title centred. */}
+            <View style={{ width: ROUND_BUTTON_SIZE }} />
           </View>
         }
         footer={
@@ -215,14 +183,7 @@ export default function QuranReaderScreen() {
               page={currentPage}
               compact={compact}
               surface={{ background: palette.control, border: palette.divider }}
-              record={
-                <RecordButton
-                  recorder={recorder}
-                  color={palette.textSecondary}
-                  background={palette.control}
-                  border={palette.divider}
-                />
-              }
+              record={<RecordButton recorder={recorder} />}
               timer={<TimerChip compact={compact} />}
             />
           </View>
@@ -272,12 +233,6 @@ export default function QuranReaderScreen() {
       />
 
       {verseActions.overlay}
-
-      <ReaderGuideModal
-        visible={showGuide && !isNewDesign}
-        onClose={dismissGuideForever}
-        theme={theme}
-      />
     </View>
   );
 }
@@ -322,105 +277,6 @@ const surahStyles = StyleSheet.create({
   quiet: { ...typography.caption },
   arabic: { fontFamily: fonts.arabic },
 });
-
-function ReaderGuideModal({
-  visible,
-  onClose,
-  theme,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  theme: ThemeColors;
-}) {
-  const styles = useMemo(() => makeGuideStyles(theme), [theme]);
-  const steps: Array<{
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    body: string;
-  }> = [
-    {
-      icon: 'book-outline',
-      title: 'Swipe to turn pages',
-      body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book. Drag the bar at the bottom to jump anywhere — page 1 is at the right.',
-    },
-    {
-      icon: 'finger-print-outline',
-      title: 'Tap the page for the controls',
-      body: 'While you read there is only the page. Tap it to show the controls (play, record, the timer, the page bar); tap again, or turn the page, to put them away.',
-    },
-    {
-      icon: 'hand-left-outline',
-      title: 'Hold a verse',
-      body: 'Press and hold any verse to hear it recited or read its translation. ▶ in the controls recites from the top of the page.',
-    },
-    {
-      icon: 'mic-outline',
-      title: 'Record yourself',
-      body: 'Tap the mic in the controls to record your recitation. Tap the time to pause or resume, and ■ to stop. Find recordings in Activity.',
-    },
-    {
-      icon: 'time-outline',
-      title: 'Your place is remembered',
-      body: 'The last few pages you read show up under Recent on the Surahs index, so you can pick up where you left off.',
-    },
-    {
-      icon: 'shield-checkmark-outline',
-      title: 'Reading here doesn’t count as revision',
-      body: 'The Read tab is for free reading — it doesn’t affect your revision schedule or strength ratings. Use the Home tab when you want a tracked session.',
-    },
-  ];
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        {/* Behind the card, not around it, or its steps can't scroll (see Backdrop). */}
-        <Backdrop onPress={onClose} label="Dismiss" />
-        <View style={styles.card}>
-          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>How the reader works</Text>
-            <PressableScale
-              onPress={onClose}
-              haptic="light"
-              style={styles.closeBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Close"
-            >
-              <Ionicons name="close" size={20} color={theme.textSecondary} />
-            </PressableScale>
-          </View>
-
-          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-            <View style={styles.steps}>
-              {steps.map((s, i) => (
-                <View key={i} style={styles.step}>
-                  <View style={styles.stepIcon}>
-                    <Ionicons name={s.icon} size={18} color={theme.accent} />
-                  </View>
-                  <View style={styles.stepText}>
-                    <Text style={styles.stepTitle}>{s.title}</Text>
-                    <Text style={styles.stepBody}>{s.body}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <PressableScale
-              onPress={onClose}
-              haptic="medium"
-              scale={0.98}
-              style={styles.primaryBtn}
-            >
-              <Text style={styles.primaryBtnText}>Got it</Text>
-            </PressableScale>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
 
 const makeStyles = (palette: ReadPalette) =>
   StyleSheet.create({
@@ -468,72 +324,5 @@ const makeStyles = (palette: ReadPalette) =>
       fontWeight: '500',
       fontVariant: ['tabular-nums'],
       color: palette.textPrimary,
-    },
-  });
-
-const makeGuideStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: spacing.lg,
-    },
-    card: {
-      width: '100%',
-      maxWidth: 420,
-      maxHeight: '85%',
-      borderRadius: radius.lg,
-      padding: spacing.lg,
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    title: { ...typography.titleLarge, color: theme.textPrimary, flex: 1 },
-    closeBtn: {
-      width: 32,
-      height: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.full,
-    },
-    scroll: { marginBottom: spacing.md },
-    steps: { gap: spacing.md },
-    step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    stepIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent + '20',
-    },
-    stepText: { flex: 1 },
-    stepTitle: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-      marginBottom: 2,
-    },
-    stepBody: { ...typography.bodySmall, color: theme.textSecondary },
-    actions: { flexDirection: 'row', gap: spacing.sm },
-    primaryBtn: {
-      flex: 1,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent,
-    },
-    primaryBtnText: {
-      ...typography.bodySmall,
-      color: theme.onAccent,
-      fontWeight: '700',
     },
   });

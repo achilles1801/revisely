@@ -25,10 +25,6 @@ jest.mock('expo-linear-gradient', () => {
     LinearGradient: ({ colors }: { colors: string[] }) => <View testID="progress-gradient" accessibilityHint={colors.join(',')} />,
   };
 });
-jest.mock('../GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" />, GlassBackdrop: () => null };
-});
 jest.mock('../MushafPager', () => {
   const { View } = require('react-native');
   return { MushafPager: () => <View testID="mushaf" /> };
@@ -52,7 +48,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -97,16 +93,6 @@ describe('a progress bar in the new design', () => {
     expect(flat(screen.getByTestId('bar-track').props.style).backgroundColor).toBe(palette.separator);
     expect(screen.getByTestId('bar-fill')).toBeTruthy();
   });
-
-  it('classic is unchanged: no gradient', async () => {
-    render(
-      <ThemeProvider>
-        <ProgressBar progress={40} />
-      </ThemeProvider>,
-    );
-    await act(async () => {});
-    expect(screen.queryByTestId('progress-gradient')).toBeNull();
-  });
 });
 
 describe('editing a session in the new design', () => {
@@ -136,9 +122,8 @@ describe('editing a session in the new design', () => {
       ),
     );
     await act(async () => {});
-    const read = getReadPalette(false, true);
+    const read = getReadPalette(false);
     expect(flat(screen.getByTestId('edit-session').props.style).backgroundColor).toBe(read.pageBg);
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     // Page 1 was revised: the done check.
     expect(flat(screen.getByTestId('round-button-active').props.style).backgroundColor).toBe(palette.done);
     expect(flat(screen.getByLabelText('Session menu').props.style).backgroundColor).toBeUndefined();

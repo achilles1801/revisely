@@ -9,9 +9,7 @@ import {
   type RecordingOptions,
   type RecordingStatus,
 } from 'expo-audio';
-import * as Haptics from 'expo-haptics';
 import { getRecitation } from '../lib/recitation';
-import { useDesign } from '../design/DesignContext';
 import { useHaptics } from '../design/haptics';
 import { addLevel, createLevelBuffer, dbToLevel, finishLevels, LEVEL_SAMPLE_MS } from '../lib/waveform';
 import {
@@ -88,16 +86,12 @@ interface Options {
  * to the background, pause it; the user resumes when ready.
  */
 export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }: Options) {
-  // The new design marks a recording starting and stopping with one impact
-  // (design/haptics, off with Settings → Haptics); taps don't buzz. The
-  // classic design keeps its own.
-  const { isNew } = useDesign();
+  // A recording starting and stopping is marked with one impact
+  // (design/haptics, off with Settings → Haptics); taps don't buzz.
   const haptics = useHaptics();
-  const isNewRef = useRef(isNew);
-  isNewRef.current = isNew;
   const hapticsRef = useRef(haptics);
   hapticsRef.current = haptics;
-  /** The new design's start / stop impact; a haptics failure never stops a recording. */
+  /** The start / stop impact; a haptics failure never stops a recording. */
   const buzz = () => {
     try {
       hapticsRef.current.impact();
@@ -324,8 +318,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       baseRef.current = existing?.durationMs ?? 0;
       marksRef.current = existing ? [...existing.pageMarks] : [];
       await startSegment();
-      if (isNewRef.current) buzz();
-      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      buzz();
     } catch (err) {
       logger.error('Could not start recording', err);
       abandonStart();
@@ -356,7 +349,6 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       setSegmentStartedAt(null);
       // Playback (recitation, a recording) through the speaker while paused.
       setAudioMode(false);
-      if (!interruption && !isNewRef.current) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await saved;
     },
     [endSegment],
@@ -373,7 +365,6 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     setPhaseBoth('starting');
     try {
       await startSegment();
-      if (!isNewRef.current) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (err) {
       logger.error('Could not resume recording', err);
       abandonStart();
@@ -406,8 +397,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       }
       setAudioMode(false);
       if (savedAnyRef.current) {
-        if (isNewRef.current) buzz();
-        else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        buzz();
         const id = recordingIdRef.current;
         const savedDay = dayRef.current;
         if (id && savedDay && !unmountedRef.current) onFinishedRef.current?.({ day: savedDay, recordingId: id });

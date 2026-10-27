@@ -1,6 +1,6 @@
 // The schedule editor in the new design (Home → Today's ⋯ → Edit schedule):
 // the v2 top bar, flat sections, the day list's date column, v2 sheets and
-// menus, the snackbar. The classic path is checked to be as it was.
+// menus, the snackbar.
 import React from 'react';
 import { Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
@@ -25,10 +25,6 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // Glass, when it shows, is a marker: the new design must have none.
-jest.mock('../../../components/GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" /> };
-});
 jest.mock('expo-glass-effect', () => {
   const { View } = require('react-native');
   return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
@@ -150,16 +146,16 @@ const saved: SavedPlan = {
   createdAt: '2026-10-01T00:00:00Z',
 };
 
-function ui(el: React.ReactElement, design: 'new' | 'classic' = 'new') {
+function ui(el: React.ReactElement) {
   return (
-    <DesignProvider initial={{ allowed: design === 'new', chosen: design }}>
+    <DesignProvider initial={{}}>
       <ThemeProvider>{el}</ThemeProvider>
     </DesignProvider>
   );
 }
 
-async function mount(el: React.ReactElement, design: 'new' | 'classic' = 'new') {
-  render(ui(el, design));
+async function mount(el: React.ReactElement) {
+  render(ui(el));
   await act(async () => {});
 }
 
@@ -191,7 +187,6 @@ describe('the schedule in the new design', () => {
 
   it('flat: no glass anywhere, sections with bold headers, sentence-case rows', async () => {
     await mount(<PlanEditScreen />);
-    expect(screen.queryAllByTestId('glass-card')).toHaveLength(0);
     for (const header of ['Cycle', 'Saved plans', 'More']) {
       expect(flat(screen.getByText(header).props.style)).toMatchObject({ fontWeight: '600', color: palette.text });
     }
@@ -282,7 +277,6 @@ describe('the schedule in the new design', () => {
     expect(flat(within(sheet).getByText('Daily amount').props.style)).toMatchObject({ ...typeV2.sheetTitle, color: palette.text });
     expect(flat(within(sheet).getByText('Save').props.style)).toMatchObject({ fontWeight: '600', color: palette.text });
     expect(flat(within(sheet).getByTestId('pill-pages').props.style).backgroundColor).toBe(palette.primary);
-    expect(within(sheet).queryAllByTestId('glass-card')).toHaveLength(0);
 
     fireEvent.press(within(sheet).getByLabelText('Increase pages per day'));
     expect(within(sheet).getByText('4')).toBeTruthy();
@@ -328,7 +322,6 @@ describe('the schedule in the new design', () => {
     expect(flat(within(within(sheet).getByTestId('date-badge-0')).getByText('Today').props.style).color).toBe(
       palette.accentText,
     );
-    expect(within(sheet).queryAllByTestId('glass-card')).toHaveLength(0);
   });
 });
 
@@ -341,7 +334,6 @@ describe('a day in the new design', () => {
     await mount(<PlanDayEditScreen />);
     expect(screen.getByRole('header', { name: 'Today' })).toBeTruthy();
     expect(flat(screen.getByRole('header', { name: 'Juz 1' }).props.style)).toMatchObject({ ...typeV2.title, color: palette.text });
-    expect(screen.queryAllByTestId('glass-card')).toHaveLength(0);
     expect(screen.getByText('Add or remove content')).toBeTruthy();
     expect(flat(screen.getByText('Make rest day').props.style).color).toBe(palette.red);
     // Edit is a link; editing shows red remove buttons.
@@ -382,19 +374,5 @@ describe('the snackbar elsewhere (reader, session)', () => {
       borderRadius: radiusV2.media,
     });
     expect(flat(screen.getByText('Pages cleared').props.style).color).toBe(palette.bg);
-  });
-});
-
-describe('the classic design is unchanged', () => {
-  it('keeps its nav bar, glass cards and title-case rows', async () => {
-    await mount(<PlanEditScreen />, 'classic');
-    expect(screen.queryByTestId('back')).toBeNull();
-    expect(screen.getByLabelText('Save schedule')).toBeTruthy();
-    expect(screen.queryAllByTestId('glass-card').length).toBeGreaterThan(0);
-    for (const label of ['Show All 10 Days', 'Add Rest Day', 'Create New Plan', 'Running Behind?', 'Daily Amount']) {
-      expect(screen.getByText(label)).toBeTruthy();
-    }
-    expect(screen.getByText('TODAY')).toBeTruthy();
-    expect(screen.queryByTestId('undo-toast')).toBeNull();
   });
 });

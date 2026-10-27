@@ -4,9 +4,10 @@ import { act, render, screen } from '@testing-library/react-native';
 import { MushafPager, MushafPagerHandle } from '../MushafPager';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
-jest.mock('../../context/ThemeContext', () => ({
-  useTheme: () => ({ isDark: false, theme: { accent: '#0a7' } }),
-}));
+jest.mock('../../context/ThemeContext', () => {
+  const { paletteLight, v2ThemeColors } = require('../../theme/v2');
+  return { useTheme: () => ({ isDark: false, theme: v2ThemeColors(false), palette: paletteLight }) };
+});
 jest.mock('../../lib/pageCache', () => ({
   getCachedPageUri: () => 'file:///page.png',
   cachePage: () => Promise.resolve(null),

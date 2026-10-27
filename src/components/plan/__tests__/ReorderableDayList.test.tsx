@@ -87,7 +87,7 @@ function Harness({
 }
 
 const ui = (el: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{el}</ThemeProvider>
   </DesignProvider>
 );
@@ -245,7 +245,7 @@ describe('swiping a day', () => {
         expect(contrast(p.redFill, p.bg)).toBeGreaterThanOrEqual(3);
       }
     }
-    // The classic design keeps the white on #DC2626 it had.
+    // White on #DC2626, in both modes.
     expect([paletteV2(false).redFill, paletteV2(true).redFill, paletteV2(true).onRedFill]).toEqual([
       '#DC2626',
       '#DC2626',

@@ -9,9 +9,9 @@ import type { RevisionLog, User, UserPage } from '../../../types';
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('expo-haptics', () => ({
-  selectionAsync: jest.fn(),
-  impactAsync: jest.fn(),
-  notificationAsync: jest.fn(),
+  selectionAsync: jest.fn(async () => undefined),
+  impactAsync: jest.fn(async () => undefined),
+  notificationAsync: jest.fn(async () => undefined),
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's' },
 }));
@@ -61,8 +61,8 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 jest.mock('../../../context/ThemeContext', () => {
-  const { colors } = require('../../../theme/colors');
-  return { useTheme: () => ({ theme: colors, isDark: false }) };
+  const { paletteLight, v2ThemeColors } = require('../../../theme/v2');
+  return { useTheme: () => ({ theme: v2ThemeColors(false), isDark: false, palette: paletteLight }) };
 });
 
 const DAY_PAGES = [331, 332, 333, 334, 335, 336, 337, 338, 339, 340];
@@ -169,6 +169,23 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
 
 // The controls stay rendered (they fade); hidden, they are hidden from screen readers too.
 const byTestId = (id: string) => screen.getByTestId(id, { includeHiddenElements: true });
+
+describe('ActiveRevisionScreen — a failed load', () => {
+  it('shows the error with Try again, then the session once the data arrives', () => {
+    const log = setup([]);
+    const loaded = { ...mockApp };
+    Object.assign(mockApp, { user: null, pages: [], logs: [], error: 'Network error' });
+    const view = render(<ActiveRevisionScreen />);
+    expect(screen.getByText("Couldn't load your session")).toBeTruthy();
+    fireEvent.press(screen.getByText('Try again'));
+    expect(mockApp.loadData).toHaveBeenCalled();
+    // The retry succeeds: the same screen now has more to render (hooks included).
+    Object.assign(mockApp, { ...loaded, logs: [log] });
+    view.rerender(<ActiveRevisionScreen />);
+    expect(screen.queryByText("Couldn't load your session")).toBeNull();
+    expect(screen.getByTestId('reader-background')).toBeTruthy();
+  });
+});
 
 describe('ActiveRevisionScreen — reading and the controls', () => {
   it('opens on the page alone: its number, the juz and surah; the controls hidden', () => {

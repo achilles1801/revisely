@@ -5,7 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityItemRow } from '../../components/activity/ActivityItemRow';
 import { useActivitySources } from '../../components/activity/useActivitySources';
-import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { useTabBarFootprint } from '../../navigation/TabBar';
 import { OptionSheet } from '../../components/OptionSheet';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';

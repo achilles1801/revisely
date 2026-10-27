@@ -16,10 +16,6 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
-jest.mock('../../GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" /> };
-});
 jest.mock('expo-updates', () => ({
   isEnabled: true,
   useUpdates: () => ({ lastCheckForUpdateTimeSinceRestart: new Date('2026-10-25T05:00:00Z') }),
@@ -37,7 +33,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 import { AppInfo } from '../AppInfo';
 import { AccentPicker } from '../AccentPicker';
 import { FajrBoundaryCard } from '../../FajrBoundaryCard';
-import { KahfCard } from '../../home/KahfCard';
+import { KahfPost } from '../../home/feed/KahfPost';
 import { describeRelease } from '../../../lib/releaseInfo';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 
@@ -45,7 +41,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const flat = (style: unknown): Record<string, any> => StyleSheet.flatten(style as never) ?? {};
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -114,7 +110,6 @@ describe('Start day at fajr in the new design', () => {
     mockApp.user = { fajrBoundaryEnabled: true, locationCoords: { latitude: 51.5, longitude: -0.1 }, fajrCalculationMethod: 'MWL' };
     await renderV2(<FajrBoundaryCard />);
     expect(screen.getByTestId('fajr-boundary-v2')).toBeTruthy();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(screen.getByTestId('icon-moon-outline').props.children).toBe(palette.text);
     expect(flat(screen.getByTestId('fajr-resets-at').props.style).color).toBe(palette.secondary);
     fireEvent.press(screen.getByTestId('fajr-method'));
@@ -127,9 +122,8 @@ describe('Start day at fajr in the new design', () => {
 describe('the Friday Al-Kahf card in the new design', () => {
   it('is the feed post: no card, Read solid, Mark as read an outline pill', async () => {
     const onRead = jest.fn();
-    await renderV2(<KahfCard state="prompt" onRead={onRead} onMarkRead={jest.fn()} onDismiss={jest.fn()} />);
+    await renderV2(<KahfPost state="prompt" onRead={onRead} onMarkRead={jest.fn()} onDismiss={jest.fn()} />);
     expect(screen.getByTestId('kahf-post')).toBeTruthy();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(flat(screen.getByTestId('kahf-read').props.style).backgroundColor).toBe(palette.primary);
     expect(flat(screen.getByTestId('kahf-mark').props.style)).toMatchObject({ borderWidth: 1 });
     expect(flat(screen.getByTestId('kahf-mark').props.style).backgroundColor).toBeUndefined();

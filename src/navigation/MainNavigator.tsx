@@ -18,11 +18,8 @@ import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
-import { FloatingTimer } from '../components/timer/FloatingTimer';
-import { FloatingTimerProvider } from '../components/timer/floatingTimerOffset';
-import { useDesign } from '../design/DesignContext';
 import { useAppUsageTracking } from '../lib/appUsage';
-import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
+import { TabBar } from './TabBar';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
@@ -65,12 +62,13 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const ReadStack = createNativeStackNavigator<ReadStackParamList>();
 
-// Routes (within any tab's stack) where the floating glass tab bar should be
-// suppressed. These screens render their own bottom-edge chrome.
+// Routes (within any tab's stack) where the tab bar is hidden. These screens
+// are full screen or render their own bottom-edge chrome.
 const HIDE_TAB_BAR_ON = new Set([
   'PlanEdit',
   'PlanDayEdit',
   'ActiveRevision',
+  'Memorization',
   'QuranReader',
   'JournalEntry',
 ]);
@@ -122,44 +120,34 @@ export function MainNavigator() {
   const glowInsightsTab = !smartTrackingEnabled && !hasSeenPreview;
 
   const [previewOpen, setPreviewOpen] = useState(false);
-  const { isNew } = useDesign();
   useAppUsageTracking();
 
   return (
     <ReadingTimerProvider>
-      <FloatingTimerProvider>
-        <View style={{ flex: 1 }}>
-          <Tab.Navigator
-            tabBar={(props) => {
-              // Hide the tab bar on full-screen "deep" screens — they own the
-              // bottom edge (Done buttons, save bars, FABs) and would otherwise
-              // collide with the floating glass bar.
-              const tabRoute = props.state.routes[props.state.index];
-              const focused = getFocusedRouteNameFromRoute(tabRoute);
-              if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
-              return (
-                <LiquidGlassTabBar
-                  {...props}
-                  showInsightsTab={showInsightsTab}
-                  glowInsightsTab={glowInsightsTab}
-                  onInsightsTabPress={
-                    glowInsightsTab ? () => setPreviewOpen(true) : undefined
-                  }
-                />
-              );
-            }}
-            screenOptions={{ headerShown: false }}
-          >
-            <Tab.Screen name="Home" component={HomeStackNavigator} />
-            <Tab.Screen name="Read" component={ReadStackNavigator} />
-            <Tab.Screen name="Insights" component={AlgorithmScreen} />
-          </Tab.Navigator>
-          {/* The one timer entry point, over every tab (same state everywhere).
-              The new design has none: the timer is in the reader's and the
-              session's controls, and a running one shows on Home. */}
-          {!isNew && <FloatingTimer />}
-        </View>
-      </FloatingTimerProvider>
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          tabBar={(props) => {
+            // Hide the tab bar on full-screen "deep" screens: they own the
+            // bottom edge (Done buttons, save bars) and would otherwise
+            // collide with the bar.
+            const tabRoute = props.state.routes[props.state.index];
+            const focused = getFocusedRouteNameFromRoute(tabRoute);
+            if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
+            return (
+              <TabBar
+                {...props}
+                showInsightsTab={showInsightsTab}
+                onInsightsTabPress={glowInsightsTab ? () => setPreviewOpen(true) : undefined}
+              />
+            );
+          }}
+          screenOptions={{ headerShown: false }}
+        >
+          <Tab.Screen name="Home" component={HomeStackNavigator} />
+          <Tab.Screen name="Read" component={ReadStackNavigator} />
+          <Tab.Screen name="Insights" component={AlgorithmScreen} />
+        </Tab.Navigator>
+      </View>
       <SmartTrackingPreviewScreen
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}

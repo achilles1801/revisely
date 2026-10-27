@@ -25,7 +25,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { useDesign } from '../../design/DesignContext';
 import { useHaptics } from '../../design/haptics';
 import { summarizeDay } from '../../lib/planDisplay';
 import { moveDay, removeDay } from '../../lib/planBuilder';
@@ -38,10 +37,8 @@ import {
   slotAt,
   swipeOutcome,
 } from '../../lib/reorder';
-import { shadows } from '../../theme/shadows';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { DateBadge, DAY_ROW_INSET, dayTitle } from './DayRow';
-import { useGroupedStyles } from './Grouped';
 
 /** The scroll view the list sits in, for scrolling while a row is dragged near an edge. */
 export interface ScrollLink {
@@ -61,7 +58,7 @@ const LIFT_AFTER_MS = 350;
 /** Room between the dates and where swiped content disappears. */
 const CLIP_GAP = 8;
 const SPRING = { damping: 24, stiffness: 280, mass: 0.9 };
-/** How far a held row dims in the new design (v2/Tap's 0.55). */
+/** How far a held row dims (v2/Tap's 0.55). */
 const PRESS_DIM = 0.45;
 
 let keySeq = 0;
@@ -79,10 +76,9 @@ const makeKey = () => `day-${++keySeq}`;
  * `days` is the whole cycle; `limit` shows only the first few. Every change
  * goes to the parent (`onMove`, `onDelete`), which owns the days.
  *
- * The new design changes only the look: a day's content as a feed row's name
- * and meta, the dates in sentence case, a held row dims, the lifted row on
- * the quiet fill with an edge (no shadow), the drop date on the accent's
- * tint, Delete on `redFill`.
+ * The look: a day's content as a feed row's name and meta, the dates in
+ * sentence case, a held row dims, the lifted row on the quiet fill with an
+ * edge (no shadow), the drop date on the accent's tint, Delete on `redFill`.
  */
 export function ReorderableDayList({
   days,
@@ -104,7 +100,6 @@ export function ReorderableDayList({
   /** True while a row is lifted: the parent stops its scroll view scrolling by touch. */
   onDragChange?: (dragging: boolean) => void;
 }) {
-  const { theme } = useTheme();
   const haptics = useHaptics();
 
   // Row identities, so a day's content keeps its view (and its animation) as
@@ -394,8 +389,7 @@ function Slot({
   positions: SharedValue<Record<string, number>>;
   activeId: SharedValue<string>;
 }) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
+  const { palette } = useTheme();
   // Where the lifted content will land: its date lights up.
   const target = useAnimatedStyle(() => {
     const id = activeId.value;
@@ -405,22 +399,12 @@ function Slot({
   return (
     <View style={[styles.slot, { top: index * height, height }]} pointerEvents="none">
       <Animated.View
-        style={[
-          styles.target,
-          isNew ? { backgroundColor: palette.accentSubtle, borderRadius: radiusV2.media } : { backgroundColor: theme.accent + '24' },
-          target,
-        ]}
+        style={[styles.target, { backgroundColor: palette.accentSubtle }, target]}
         testID={`day-target-${index}`}
       />
       <DateBadge index={index} today={today} />
       {last ? null : (
-        <View
-          style={[
-            styles.separator,
-            isNew ? { backgroundColor: palette.separator, height: layoutV2.hairline } : { backgroundColor: theme.border },
-          ]}
-          testID={`day-separator-${index}`}
-        />
+        <View style={[styles.separator, { backgroundColor: palette.separator }]} testID={`day-separator-${index}`} />
       )}
     </View>
   );
@@ -455,13 +439,7 @@ function DayItem({
   onMeasure: (key: string, h: number) => void;
   onA11yMove: (from: number, to: number) => void;
 }) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  const grouped = useGroupedStyles();
-  // Lifted, the content rises above the list. New design: on the quiet fill
-  // with an edge, flat (a shadow is lost on black); classic: a raised card.
-  const liftFill = isNew ? palette.fill : theme.surface;
-  const liftEdge = isNew ? palette.handle : theme.border;
+  const { palette } = useTheme();
   const summary = summarizeDay(pages);
   const { positions, activeId, openId, dragTop, rowH, width } = shared;
 
@@ -594,8 +572,7 @@ function DayItem({
       transform: [{ scale: withSpring(on ? 1.02 : 1, SPRING) }],
     };
   });
-  const pressStyle = useAnimatedStyle(() => ({ opacity: pressed.value }));
-  // The new design dims what's held instead of tinting behind it (v2/Tap).
+  // What's held dims (v2/Tap).
   const dimStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value * PRESS_DIM }));
   const actionStyle = useAnimatedStyle(() => ({ width: Math.max(0, -x.value) }));
 
@@ -639,54 +616,34 @@ function DayItem({
           onAccessibilityAction={onAction}
           testID={`day-item-${index}`}
         >
+          {/* Lifted, the content rises above the list: on the quiet fill with
+              an edge, flat (a shadow is lost on black). */}
           <Animated.View
-            style={[
-              styles.lifted,
-              { backgroundColor: liftFill, borderColor: liftEdge },
-              isNew ? styles.liftedV2 : styles.liftedShadow,
-              liftStyle,
-            ]}
+            style={[styles.lifted, { backgroundColor: palette.fill, borderColor: palette.handle }, liftStyle]}
             pointerEvents="none"
             testID={`day-lifted-${index}`}
           />
-          {isNew ? null : (
-            <Animated.View
-              style={[styles.pressed, { backgroundColor: theme.accent + '22' }, pressStyle]}
-              pointerEvents="none"
-            />
-          )}
           {/* Swiped, the content slides under the edge of the dates, which stay. */}
-          <Animated.View style={[styles.clip, isNew && dimStyle]}>
+          <Animated.View style={[styles.clip, dimStyle]}>
             <Animated.View style={[styles.slide, slideStyle]}>
               <View
                 style={styles.text}
                 onLayout={(e) => onMeasure(id, e.nativeEvent.layout.height + PAD_V * 2)}
               >
                 <Text
-                  style={
-                    isNew
-                      ? [typeV2.name, { color: summary.isRest ? palette.secondary : palette.text }]
-                      : [grouped.title, { color: summary.isRest ? theme.textMuted : theme.textPrimary }]
-                  }
+                  style={[typeV2.name, { color: summary.isRest ? palette.secondary : palette.text }]}
                   numberOfLines={1}
                   testID={`day-title-${index}`}
                 >
                   {summary.title}
                 </Text>
                 {summary.subtitle ? (
-                  <Text
-                    style={isNew ? [typeV2.meta, { color: palette.secondary }] : grouped.subtitle}
-                    numberOfLines={2}
-                  >
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2}>
                     {summary.subtitle}
                   </Text>
                 ) : null}
               </View>
-              {isNew ? (
-                <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
-              ) : (
-                <Ionicons name="chevron-forward" size={17} color={theme.textMuted} style={grouped.chevron} />
-              )}
+              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Animated.View>
           </Animated.View>
         </Animated.View>
@@ -704,10 +661,7 @@ function DayItem({
             accessibilityLabel={`Delete ${dayTitle(index, today)}`}
             testID={`day-delete-${index}`}
           >
-            <Text
-              style={[isNew ? typeV2.button : styles.actionText, { color: palette.onRedFill }]}
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text style={[typeV2.button, { color: palette.onRedFill }]} maxFontSizeMultiplier={1.4}>
               Delete
             </Text>
           </Pressable>
@@ -733,14 +687,14 @@ const styles = StyleSheet.create({
     width: 52,
     top: 6,
     bottom: 6,
-    borderRadius: 10,
+    borderRadius: radiusV2.media,
   },
   separator: {
     position: 'absolute',
     left: DAY_ROW_INSET,
     right: 0,
     bottom: 0,
-    height: StyleSheet.hairlineWidth,
+    height: layoutV2.hairline,
   },
   item: { position: 'absolute', left: 0, right: 0, top: 0 },
   action: {
@@ -756,7 +710,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionText: { fontSize: 15, fontWeight: '600' },
   content: StyleSheet.absoluteFillObject,
   clip: {
     position: 'absolute',
@@ -780,11 +733,8 @@ const styles = StyleSheet.create({
     right: 6,
     top: 3,
     bottom: 3,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radiusV2.media,
+    borderWidth: layoutV2.hairline,
   },
-  liftedShadow: shadows.md,
-  liftedV2: { borderRadius: radiusV2.media, borderWidth: layoutV2.hairline },
-  pressed: { ...StyleSheet.absoluteFillObject, left: DAY_ROW_INSET - 10 },
   text: { flex: 1, minWidth: 0 },
 });

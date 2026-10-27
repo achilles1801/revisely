@@ -2,26 +2,26 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { colors, darkColors } from '../theme/colors';
 import { paletteV2, PaletteV2, v2ThemeColors } from '../theme/v2';
 import { useDesign } from '../design/DesignContext';
 
-/** Classic offers light and dark; the new design adds System (its default). */
+/** Light, dark, or following the system (offered once the binary can). */
 export type ThemeMode = 'system' | 'light' | 'dark';
 
 interface ThemeContextType {
+  /** What Settings shows as chosen. */
   themeMode: ThemeMode;
   isDark: boolean;
-  /** The classic token names (in the new design, the v2 palette under them). */
-  theme: typeof colors;
-  /** The v2 palette (with the chosen accent) for components moved to the new design. */
+  /** The palette under the older token names (textPrimary, accent, …). */
+  theme: ReturnType<typeof v2ThemeColors>;
+  /** The palette, with the chosen accent. */
   palette: PaletteV2;
   setThemeMode: (mode: ThemeMode) => void;
 }
 
-const THEME_STORAGE_KEY = '@revision_buddy_theme';
-// The new design's own choice, so trying it doesn't change the classic setting.
-const THEME_V2_STORAGE_KEY = '@revisely_theme_v2';
+const THEME_KEY = '@revisely_theme_v2';
+// The classic design's Light / Dark: people who chose one keep it.
+const CLASSIC_THEME_KEY = '@revision_buddy_theme';
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -34,53 +34,71 @@ export function systemAppearanceAvailable(): boolean {
   return Constants.expoConfig?.userInterfaceStyle === 'automatic';
 }
 
+/**
+ * The mode to show from what is stored: the choice made here; else the
+ * classic design's Light / Dark (its System became Dark); else, for a phone
+ * that has run the app before (it showed classic's default, dark), dark; else
+ * light (a fresh install), or System once the binary follows it. A stored
+ * System this binary can't follow falls back the same way.
+ */
+export function resolveThemeMode(
+  saved: string | null,
+  savedClassic: string | null,
+  systemAvailable: boolean,
+  existingInstall: boolean,
+): ThemeMode {
+  if (saved === 'light' || saved === 'dark') return saved;
+  if (saved === 'system' && systemAvailable) return 'system';
+  if (savedClassic === 'light' || savedClassic === 'dark') return savedClassic;
+  if (savedClassic === 'system' || existingInstall) return 'dark';
+  return systemAvailable ? 'system' : 'light';
+}
+
+/** Keys an earlier launch leaves behind: the sign-in, or the app's own settings. */
+export function isExistingInstall(keys: readonly string[]): boolean {
+  return keys.some(
+    (k) => k.startsWith('firebase:authUser:') || k.startsWith('@revisely_') || k.startsWith('@revision_buddy') || k.startsWith('@revisley_'),
+  );
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { isNew, accent } = useDesign();
+  const { accent } = useDesign();
   const system = useColorScheme();
-  const [classicMode, setClassicMode] = useState<'light' | 'dark'>('dark');
-  const [v2Mode, setV2Mode] = useState<ThemeMode>('system');
+  const [themeMode, setMode] = useState<ThemeMode>('light');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load saved theme preferences. Classic: migrate a legacy 'system' value to 'dark'.
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(THEME_STORAGE_KEY), AsyncStorage.getItem(THEME_V2_STORAGE_KEY)])
-      .then(([saved, savedV2]) => {
-        if (saved === 'light' || saved === 'dark') {
-          setClassicMode(saved);
-        } else if (saved === 'system') {
-          setClassicMode('dark');
-          AsyncStorage.setItem(THEME_STORAGE_KEY, 'dark');
-        }
-        if (savedV2 === 'system' || savedV2 === 'light' || savedV2 === 'dark') setV2Mode(savedV2);
-      })
+    (async () => {
+      const [saved, savedClassic, keys] = await Promise.all([
+        AsyncStorage.getItem(THEME_KEY),
+        AsyncStorage.getItem(CLASSIC_THEME_KEY),
+        AsyncStorage.getAllKeys(),
+      ]);
+      const mode = resolveThemeMode(saved, savedClassic, systemAppearanceAvailable(), isExistingInstall(keys));
+      setMode(mode);
+      // Decided once: from now on this phone has a choice, so a fresh install
+      // doesn't count as an existing one (and turn dark) on its next launch.
+      if (saved == null) await AsyncStorage.setItem(THEME_KEY, mode);
+    })()
       .catch(() => undefined)
       .finally(() => setIsLoaded(true));
   }, []);
 
   const setThemeMode = async (mode: ThemeMode) => {
-    if (isNew) {
-      setV2Mode(mode);
-      await AsyncStorage.setItem(THEME_V2_STORAGE_KEY, mode);
-      return;
-    }
-    const classic = mode === 'light' ? 'light' : 'dark';
-    setClassicMode(classic);
-    await AsyncStorage.setItem(THEME_STORAGE_KEY, classic);
+    setMode(mode);
+    await AsyncStorage.setItem(THEME_KEY, mode);
   };
 
-  // Until the binary follows the system, "System" in the new design means the
-  // classic choice, so nothing changes under the user.
-  const v2Effective: ThemeMode = v2Mode === 'system' && !systemAppearanceAvailable() ? classicMode : v2Mode;
-  const themeMode: ThemeMode = isNew ? v2Effective : classicMode;
   const isDark = themeMode === 'system' ? system === 'dark' : themeMode === 'dark';
-  const theme = isNew ? v2ThemeColors(isDark, accent) : isDark ? darkColors : colors;
 
   if (!isLoaded) {
-    return null; // or a loading screen
+    return null;
   }
 
   return (
-    <ThemeContext.Provider value={{ themeMode, isDark, theme, palette: paletteV2(isDark, accent), setThemeMode }}>
+    <ThemeContext.Provider
+      value={{ themeMode, isDark, theme: v2ThemeColors(isDark, accent), palette: paletteV2(isDark, accent), setThemeMode }}
+    >
       {children}
     </ThemeContext.Provider>
   );

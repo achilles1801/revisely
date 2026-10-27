@@ -1,7 +1,6 @@
 // Haptics for meaningful moments only (Apple HIG: don't overuse; make them
-// optional). In the new design taps don't buzz (PressableScale); these mark
-// outcomes, and Settings → Haptics turns them off. The classic design keeps
-// its own haptics, unchanged.
+// optional). Taps don't buzz (PressableScale, v2/Tap); these mark outcomes,
+// and Settings → Haptics turns them off.
 //
 //   page marked done, picker or rating change  → selection
 //   session or day complete                     → success
@@ -32,6 +31,6 @@ export function makeHaptics(on: boolean): HapticsApi {
 }
 
 export function useHaptics(): HapticsApi {
-  const { isNew, hapticsOn } = useDesign();
-  return useMemo(() => makeHaptics(!isNew || hapticsOn), [isNew, hapticsOn]);
+  const { hapticsOn } = useDesign();
+  return useMemo(() => makeHaptics(hapticsOn), [hapticsOn]);
 }

@@ -21,8 +21,7 @@ jest.mock('../../context/AppContext', () => ({ useApp: () => ({ user: mockAppUse
 
 import { DesignProvider, useDesign } from '../DesignContext';
 import { makeHaptics } from '../haptics';
-import { testerToolsAllowed } from '../../lib/testerTools';
-import { ThemeProvider, useTheme } from '../../context/ThemeContext';
+import { ThemeProvider, isExistingInstall, resolveThemeMode, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
 import { TodayPost, juzLabel, memorizedText, todayText } from '../../components/home/feed/TodayPost';
 import { revisionItem } from '../../lib/activityItems';
@@ -38,82 +37,68 @@ beforeEach(async () => {
   await AsyncStorage.clear();
 });
 
-describe('tester tools (the New design switch)', () => {
-  const never = () => false;
-  it('dev builds, and testers on TestFlight / the preview channel; never the App Store or App Review', () => {
-    expect(testerToolsAllowed({ isDev: true, channel: null }, undefined, never)).toBe(true);
-    expect(testerToolsAllowed({ isDev: false, channel: 'preview' }, true, never)).toBe(true);
-    // A tester's TestFlight install before the channel switch takes effect.
-    expect(testerToolsAllowed({ isDev: false, channel: 'production' }, true, () => true)).toBe(true);
-    // App Store: production, not TestFlight.
-    expect(testerToolsAllowed({ isDev: false, channel: 'production' }, true, never)).toBe(false);
-    // App Review (sandbox receipt, preview never reached) and other accounts: not testers.
-    expect(testerToolsAllowed({ isDev: false, channel: 'production' }, false, () => true)).toBe(false);
-    expect(testerToolsAllowed({ isDev: false, channel: 'preview' }, undefined, () => true)).toBe(false);
-  });
-});
-
 function Probe() {
   const d = useDesign();
   return (
     <>
-      <Text testID="state">{`${d.isNew ? 'new' : 'classic'}|${d.chosen}|${d.allowed}`}</Text>
-      <Text onPress={() => d.setChosen('new')}>choose new</Text>
-      <Text onPress={() => d.setAllowed(true)}>allow</Text>
+      <Text testID="state">{`${d.accent}|${d.hapticsOn}`}</Text>
+      <Text onPress={() => d.setAccent('crimson')}>crimson</Text>
+      <Text onPress={() => d.setHapticsOn(false)}>haptics off</Text>
     </>
   );
 }
 
 describe('DesignContext', () => {
-  it('is classic without a provider', () => {
+  it('is the new design, whatever a device stored before the switch was removed', async () => {
+    await AsyncStorage.setItem('@revisely_design', 'classic');
+    render(
+      <DesignProvider>
+        <Probe />
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('state').props.children).toBe('indigo|true');
+  });
+
+  it('keeps the accent and the Haptics setting on the device', async () => {
+    render(
+      <DesignProvider>
+        <Probe />
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    fireEvent.press(screen.getByText('crimson'));
+    fireEvent.press(screen.getByText('haptics off'));
+    expect(screen.getByTestId('state').props.children).toBe('crimson|false');
+    expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
+    expect(await AsyncStorage.getItem('@revisely_haptics')).toBe('off');
+    screen.unmount();
+    render(
+      <DesignProvider>
+        <Probe />
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('state').props.children).toBe('crimson|false');
+  });
+
+  it('without a provider: the new design, Indigo, haptics on', () => {
     render(<Probe />);
-    expect(screen.getByTestId('state').props.children).toBe('classic|classic|false');
-  });
-
-  it('shows the new design only where allowed, and keeps the choice on the device', async () => {
-    render(
-      <DesignProvider>
-        <Probe />
-      </DesignProvider>,
-    );
-    await act(async () => {});
-    fireEvent.press(screen.getByText('choose new'));
-    // Chosen but not allowed (not a tester): still classic.
-    expect(screen.getByTestId('state').props.children).toBe('classic|new|false');
-    fireEvent.press(screen.getByText('allow'));
-    expect(screen.getByTestId('state').props.children).toBe('new|new|true');
-    expect(await AsyncStorage.getItem('@revisely_design')).toBe('new');
-  });
-
-  it('reads the stored choice before the first frame', async () => {
-    await AsyncStorage.setItem('@revisely_design', 'new');
-    render(
-      <DesignProvider>
-        <Probe />
-      </DesignProvider>,
-    );
-    await act(async () => {});
-    expect(screen.getByTestId('state').props.children).toBe('classic|new|false');
+    expect(screen.getByTestId('state').props.children).toBe('indigo|true');
   });
 });
 
 describe('haptics', () => {
-  it('in the new design taps don’t buzz; the classic design keeps its taps', () => {
-    const tap = (allowed: boolean, chosen: 'new' | 'classic') => {
-      render(
-        <DesignProvider initial={{ allowed, chosen }}>
-          <PressableScale onPress={() => undefined} haptic="light" testID="btn">
-            <Text>Go</Text>
-          </PressableScale>
-        </DesignProvider>,
-      );
-      fireEvent.press(screen.getByTestId('btn'));
-      screen.unmount();
-    };
-    tap(true, 'new');
+  it('taps don’t buzz', () => {
+    render(
+      <DesignProvider initial={{}}>
+        <PressableScale onPress={() => undefined} testID="btn">
+          <Text>Go</Text>
+        </PressableScale>
+      </DesignProvider>,
+    );
+    fireEvent.press(screen.getByTestId('btn'));
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
-    tap(false, 'new'); // not allowed: classic
-    expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
   });
 
   it('meaningful haptics follow the Haptics setting', () => {
@@ -121,6 +106,69 @@ describe('haptics', () => {
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
     makeHaptics(true).success();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
+  });
+});
+
+describe('the theme (Light / Dark)', () => {
+  it('a fresh install starts in light; System once the binary follows it', () => {
+    expect(resolveThemeMode(null, null, false, false)).toBe('light');
+    expect(resolveThemeMode(null, null, true, false)).toBe('system');
+  });
+
+  it('a phone that ran the app before and never chose stays dark, as classic showed it', () => {
+    expect(resolveThemeMode(null, null, false, true)).toBe('dark');
+    expect(isExistingInstall(['firebase:authUser:key:[DEFAULT]'])).toBe(true);
+    expect(isExistingInstall(['@revisely_haptics', 'x'])).toBe(true);
+    expect(isExistingInstall(['@revisley_reader_guide_dismissed'])).toBe(true);
+    expect(isExistingInstall([])).toBe(false);
+  });
+
+  it('keeps what someone chose: here, or else in the classic design (its System was dark)', () => {
+    expect(resolveThemeMode('dark', 'light', false, true)).toBe('dark');
+    expect(resolveThemeMode('light', null, false, true)).toBe('light');
+    expect(resolveThemeMode(null, 'dark', false, false)).toBe('dark');
+    expect(resolveThemeMode(null, 'light', true, true)).toBe('light');
+    expect(resolveThemeMode(null, 'system', false, true)).toBe('dark');
+  });
+
+  it('a stored System this binary can’t follow falls back to the classic choice, else as above', () => {
+    expect(resolveThemeMode('system', 'dark', false, true)).toBe('dark');
+    expect(resolveThemeMode('system', null, false, false)).toBe('light');
+    expect(resolveThemeMode('system', 'dark', true, true)).toBe('system');
+  });
+
+  it('decides once: a fresh install stays light on its next launch, though it now has keys', async () => {
+    const Probe = () => <Text testID="mode">{useTheme().themeMode}</Text>;
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('mode').props.children).toBe('light');
+    expect(await AsyncStorage.getItem('@revisely_theme_v2')).toBe('light');
+    await AsyncStorage.setItem('@revisely_haptics', 'on');
+    screen.unmount();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('mode').props.children).toBe('light');
+  });
+
+  it('an existing install that never chose opens dark, and keeps it', async () => {
+    await AsyncStorage.setItem('firebase:authUser:key:[DEFAULT]', '{}');
+    const Probe = () => <Text testID="mode">{useTheme().themeMode}</Text>;
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('mode').props.children).toBe('dark');
+    expect(await AsyncStorage.getItem('@revisely_theme_v2')).toBe('dark');
   });
 });
 
@@ -273,7 +321,7 @@ describe('the accent (Settings → Appearance)', () => {
   it('switches the whole palette live and is kept on the device', async () => {
     await AsyncStorage.setItem('@revisely_theme_v2', 'light');
     render(
-      <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+      <DesignProvider initial={{}}>
         <ThemeProvider>
           <AccentProbe />
         </ThemeProvider>
@@ -287,23 +335,11 @@ describe('the accent (Settings → Appearance)', () => {
     expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
   });
 
-  it('is Jade outside the new design, whatever was chosen', async () => {
-    render(
-      <DesignProvider initial={{ allowed: true, chosen: 'classic', accent: 'indigo' }}>
-        <ThemeProvider>
-          <AccentProbe />
-        </ThemeProvider>
-      </DesignProvider>,
-    );
-    await act(async () => {});
-    expect(screen.getByTestId('accent').props.children).toMatch(/^jade\|/);
-  });
-
   it("follows the account: its choice once loaded, Indigo when it hasn't chosen", async () => {
     await AsyncStorage.setItem('@revisely_theme_v2', 'light');
     mockAppUser = { accent: 'crimson' };
     const ui = () => (
-      <DesignProvider initial={{ allowed: true, chosen: 'new', accent: 'jade' }}>
+      <DesignProvider initial={{ accent: 'jade' }}>
         <ThemeProvider>
           <DesignGateForAccent />
           <AccentProbe />
@@ -339,7 +375,7 @@ describe('ThemeContext in the new design', () => {
   }
   const renderTheme = async () => {
     render(
-      <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+      <DesignProvider initial={{}}>
         <ThemeProvider>
           <Mode />
         </ThemeProvider>
@@ -369,7 +405,7 @@ describe('ThemeContext in the new design', () => {
 });
 
 const wrap = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );

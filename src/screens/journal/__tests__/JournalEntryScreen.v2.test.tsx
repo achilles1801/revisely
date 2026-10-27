@@ -17,11 +17,6 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
-jest.mock('../../../components/GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" /> };
-});
-
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn(), dispatch: jest.fn() };
 const mockRoute: { key: string; params: { date?: string } } = { key: 'j1', params: { date: '2026-10-20' } };
 jest.mock('@react-navigation/native', () => ({
@@ -55,7 +50,7 @@ const flat = (style: unknown): Record<string, any> => StyleSheet.flatten(style a
 
 async function renderV2() {
   render(
-    <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+    <DesignProvider initial={{}}>
       <ThemeProvider>
         <JournalEntryScreen />
       </ThemeProvider>
@@ -77,7 +72,6 @@ describe('the daily log in the new design', () => {
   it('a thread being written: three rows joined by the line, no cards, the fields in ink', async () => {
     await renderV2();
     expect(screen.getByTestId('journal-v2')).toBeTruthy();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(screen.getByTestId('journal-memorization')).toBeTruthy();
     expect(screen.getByTestId('journal-revision')).toBeTruthy();
     expect(screen.getByTestId('journal-notes')).toBeTruthy();

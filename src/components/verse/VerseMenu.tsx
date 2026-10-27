@@ -1,19 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { GlassCard } from '../GlassCard';
-import { useTheme } from '../../context/ThemeContext';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
-import { useDesign } from '../../design/DesignContext';
+import React, { useRef } from 'react';
 import { ActionSheet } from '../v2/ActionSheet';
-
-import { MENU_HEIGHT, MENU_WIDTH, menuPosition } from '../../lib/verseMenu';
-
-/** The rows' text grows with Dynamic Type only this far, so the menu fits beside the verse. */
-const MENU_TEXT_SCALE = 1.4;
 
 interface VerseMenuProps {
   /** Screen point of the press; null hides the menu. */
@@ -23,110 +9,30 @@ interface VerseMenuProps {
   playSubtitle?: string;
   onTranslation: () => void;
   onClose: () => void;
-  /** The held verse ("Al-Baqarah 2:255"): the new design's menu title. */
+  /** The held verse ("Al-Baqarah 2:255"): the menu's title. */
   verseLabel?: string;
 }
 
 /**
- * The menu that opens on a held verse: Play and Translation. A plain overlay on
- * the screen, not a Modal: opening the verse sheet (a Modal) while a Modal is
- * still dismissing fails on iOS. Render it last in a full-screen container.
- *
- * In the new design every menu is the ActionSheet: its action runs once the
- * sheet has gone, so the verse sheet can open after it.
+ * The menu that opens on a held verse: Play and Translation. Like every menu it
+ * is the ActionSheet: its action runs once the sheet has gone, so the verse
+ * sheet can open after it.
  */
 export function VerseMenu({ point, onPlay, playSubtitle, onTranslation, onClose, verseLabel }: VerseMenuProps) {
-  const { theme } = useTheme();
-  const { isNew } = useDesign();
   // The title stays while the menu slides away (the selection clears as it closes).
   const lastLabel = useRef(verseLabel);
   if (verseLabel) lastLabel.current = verseLabel;
-  // Its height once laid out: large text makes it taller than MENU_HEIGHT, and it
-  // must still open on screen. Hidden until measured, so it doesn't jump.
-  const [height, setHeight] = useState<number | null>(null);
-  const pos = point
-    ? menuPosition(point, Dimensions.get('window'), undefined, undefined, height ?? MENU_HEIGHT)
-    : { left: 0, top: 0 };
 
-  const Row = ({
-    icon,
-    title,
-    subtitle,
-    onPress,
-  }: {
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    title: string;
-    subtitle?: string;
-    onPress: () => void;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.accent + '22' }]}
-      accessibilityRole="button"
-    >
-      <Ionicons name={icon} size={20} color={theme.textPrimary} />
-      <View style={{ flex: 1 }}>
-        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]} maxFontSizeMultiplier={MENU_TEXT_SCALE}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={[typography.caption, { color: theme.textMuted }]} maxFontSizeMultiplier={MENU_TEXT_SCALE}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-
-  if (isNew) {
-    return (
-      <ActionSheet
-        visible={point != null}
-        onClose={onClose}
-        title={lastLabel.current ?? 'Verse'}
-        actions={[
-          { key: 'play', label: 'Play', icon: 'play', subtitle: playSubtitle ?? 'to the end of the juz', onPress: onPlay },
-          { key: 'translation', label: 'Translation', icon: 'language-outline', onPress: onTranslation },
-        ]}
-        testID="verse-menu"
-      />
-    );
-  }
-
-  if (!point) return null;
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close menu" />
-      <View
-        style={[styles.menu, { left: pos.left, top: pos.top, opacity: height == null ? 0 : 1 }]}
-        onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
-        testID="verse-menu"
-      >
-        <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />
-        <Row icon="play" title="Play" subtitle={playSubtitle ?? 'to the end of the juz'} onPress={onPlay} />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <Row icon="language-outline" title="Translation" onPress={onTranslation} />
-      </View>
-    </View>
+    <ActionSheet
+      visible={point != null}
+      onClose={onClose}
+      title={lastLabel.current ?? 'Verse'}
+      actions={[
+        { key: 'play', label: 'Play', icon: 'play', subtitle: playSubtitle ?? 'to the end of the juz', onPress: onPlay },
+        { key: 'translation', label: 'Translation', icon: 'language-outline', onPress: onTranslation },
+      ]}
+      testID="verse-menu"
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  menu: {
-    position: 'absolute',
-    width: MENU_WIDTH,
-    minHeight: MENU_HEIGHT,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    ...shadows.lg,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    minHeight: 56,
-  },
-  divider: { height: StyleSheet.hairlineWidth },
-});

@@ -1,25 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassCard } from '../GlassCard';
 import { PressableScale } from '../PressableScale';
 import { summarizeRevisedPages } from '../../lib/journal';
 import { formatDuration, formatPageRanges, parsePageRanges } from '../../lib/readingTimer';
-import { ThemeColors } from '../../theme/colors';
+import { ThemeColors } from '../../theme/v2';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import type { ReadingSession } from '../../types';
-import { useDesign } from '../../design/DesignContext';
 import { Sheet } from '../v2/Sheet';
 
 /** Assign pages to a session: free-form ranges plus a one-tap suggestion. */
@@ -37,7 +26,6 @@ export function ReadingPagesSheet({
   theme: ThemeColors;
 }) {
   const styles = useMemo(() => makeSheetStyles(theme), [theme]);
-  const { isNew } = useDesign();
   const [text, setText] = useState('');
   const [lastId, setLastId] = useState<string | null>(null);
 
@@ -76,7 +64,7 @@ export function ReadingPagesSheet({
           onSubmitEditing={save}
         />
         {text.length > 0 && (
-          <PressableScale onPress={() => setText('')} haptic="light" hitSlop={8}>
+          <PressableScale onPress={() => setText('')} hitSlop={8}>
             <Ionicons name="close-circle" size={18} color={theme.textMuted} />
           </PressableScale>
         )}
@@ -92,7 +80,6 @@ export function ReadingPagesSheet({
       {suggestion !== '' && suggestion !== formatPageRanges(parsed ?? []) && (
         <PressableScale
           onPress={() => setText(suggestion)}
-          haptic="selection"
           style={styles.suggestion}
         >
           <Ionicons name="book-outline" size={16} color={theme.accent} />
@@ -105,7 +92,6 @@ export function ReadingPagesSheet({
 
       <PressableScale
         onPress={() => onDelete(session)}
-        haptic="light"
         style={styles.deleteBtn}
       >
         <Text style={styles.deleteText}>Delete session</Text>
@@ -113,75 +99,23 @@ export function ReadingPagesSheet({
     </>
   ) : null;
 
-  if (isNew) {
-    return (
-      <Sheet
-        visible={!!session}
-        onClose={onClose}
-        title="Pages read"
-        left={{ label: 'Cancel', onPress: onClose }}
-        right={{ label: 'Done', onPress: save, strong: true, disabled: !parsed }}
-        keyboard
-        testID="reading-pages-sheet"
-      >
-        {body}
-      </Sheet>
-    );
-  }
-
   return (
-    <Modal visible={!!session} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.backdrop}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        {session && (
-          <View style={styles.sheet}>
-            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
-            <View style={styles.sheetHeader}>
-              <PressableScale onPress={onClose} haptic="light" hitSlop={8}>
-                <Text style={styles.cancel}>Cancel</Text>
-              </PressableScale>
-              <Text style={styles.sheetTitle}>Pages read</Text>
-              <PressableScale
-                onPress={() => parsed && onSave(session, parsed)}
-                haptic="medium"
-                hitSlop={8}
-                disabled={!parsed}
-              >
-                <Text style={[styles.done, !parsed && { opacity: 0.4 }]}>Done</Text>
-              </PressableScale>
-            </View>
-
-            {body}
-          </View>
-        )}
-      </KeyboardAvoidingView>
-    </Modal>
+    <Sheet
+      visible={!!session}
+      onClose={onClose}
+      title="Pages read"
+      left={{ label: 'Cancel', onPress: onClose }}
+      right={{ label: 'Done', onPress: save, strong: true, disabled: !parsed }}
+      keyboard
+      testID="reading-pages-sheet"
+    >
+      {body}
+    </Sheet>
   );
 }
 
 const makeSheetStyles = (theme: ThemeColors) =>
   StyleSheet.create({
-    backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-    sheet: {
-      overflow: 'hidden',
-      borderTopLeftRadius: radius.lg,
-      borderTopRightRadius: radius.lg,
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.xxl,
-    },
-    sheetHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.xs,
-    },
-    sheetTitle: { ...typography.titleMedium, color: theme.textPrimary },
-    cancel: { ...typography.bodyLarge, color: theme.textSecondary },
-    done: { ...typography.bodyLarge, color: theme.accent, fontWeight: '600' },
     meta: {
       ...typography.caption,
       color: theme.textMuted,
@@ -219,7 +153,7 @@ const makeSheetStyles = (theme: ThemeColors) =>
       padding: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: radius.md,
-      backgroundColor: theme.accent + '22',
+      backgroundColor: theme.accentSoft,
     },
     suggestionText: { ...typography.bodySmall, color: theme.textPrimary, flex: 1 },
     suggestionUse: { ...typography.bodySmall, color: theme.accent, fontWeight: '700' },

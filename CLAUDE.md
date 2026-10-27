@@ -490,66 +490,71 @@ To rotate one (or after a leak: revoke the old key in the portal first):
    channel (App Store or TestFlight for live) and look for no `answered 401/403` lines.
 4. Revoke the old key in the portal.
 
-## The redesign (new design, preview)
+## The design
 
-The plan is the doc "Revisely: Threads-style UI Migration" (Claude Docs). It replaced an earlier
-direction (paper/ink palette, Newsreader, glass on chrome), which was removed in PR #33. It ships
-screen by screen behind Settings → Preview → **New design (preview)**: testers only
-(`lib/testerTools`: dev builds, `previewTester` accounts on TestFlight; never the App Store or App
-Review), kept per device, switching the whole app live.
-- It is not a fork: `useDesign().isNew` (`src/design/DesignContext.tsx`) picks variants inside the
-  same screens and components. Tokens are `src/theme/v2.ts`; `ThemeContext` maps them onto the
-  classic token names (so unmoved screens take the new colours at once) and exposes `palette` for
-  moved ones. When a screen is moved, give it an `isNew` branch (or variant components) and leave the
-  classic path working until the switch is removed.
+The app has one design, Threads-style (the plan was the doc "Revisely: Threads-style UI Migration",
+Claude Docs). It shipped screen by screen behind a tester switch; on 2026-10-27 the owner made it the
+app, and the classic design (glass, gradients, the LiquidGlass tab bar, the Mihrab palette) and the
+switch were removed. The theme is decided once per phone (`resolveThemeMode`): a Light/Dark
+chosen in either design is kept, a phone that had run the app without choosing stays dark (the
+classic default), and a fresh install starts in light.
+- Tokens are `src/theme/v2.ts` (`paletteV2(isDark, accent)`, `typeV2`, `layoutV2`, `radiusV2`,
+  `markV2`). `useTheme()` gives `palette` and, for older code, `theme`: the same colours under the
+  older names (`textPrimary`, `accent`, `glass`, …; `v2ThemeColors`). The reader's page colours are
+  `theme/readPalette` (`getReadPalette(isDark)`). **Colours live only in `src/theme`:** a hex,
+  `rgb()`/`rgba()`/`hsl()` in a string, or an alpha glued on (`+ '22'`), anywhere else in `src/`
+  fails `src/design/__tests__/noRawColours.test.ts` (Google's "G" is the one exemption, listed
+  there with the reason). A colour built some other way (a template from numbers) isn't caught.
 - The look: white / black grounds, flat. Content is a feed of rows on 0.5pt separators with a
   16pt gutter; each row has an avatar-size mark (40 top-level, 36 reply, 28 nested; `v2/Mark`),
   a name (15/600), metadata (13) and a ⋯ menu, and rows of one thread are joined by a 2pt line
-  (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient, no
-  accent tint: the primary button is a solid black pill (white in dark, `v2/PillButton`); jade
-  only means "done". Every menu is `v2/ActionSheet` (ThreadMenu style: handle, 18/600 title, icon
-  rows, red destructive rows, a Cancel bar); its action runs after the sheet has gone. The tab bar
-  is flat and icon-only. No Threads/Meta names, logos or icons, no likes or reposts.
+  (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient but
+  Home's glow and the accent's progress fill: the primary button is a solid pill
+  (`v2/PillButton`). Every menu is `v2/ActionSheet` (handle, 18/600 title, icon rows, red
+  destructive rows, a Cancel bar); its action runs after the sheet has gone. The tab bar
+  (`navigation/TabBar`) is flat and icon-only; `ActionBar` takes its place for a screen's own
+  actions. No Threads/Meta names, logos or icons, no likes or reposts.
 - Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
-  in the new design is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar;
-  the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
-  `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
-- Moved so far: Home, Settings, tab bar, sheets and menus, the revision session and reader chrome
-  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity, All
-  activity. The owner's rules from testing (Oct 26 2026), for every screen moved from now on:
+  is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar; the backdrop is its
+  sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
+  own frame (gorhom `PlanSheet`) take the same colours and corners.
+- The owner's rules from testing (Oct 26 2026):
   - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
     second card restating it. Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
     and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
-    are `lib/activityHeatmap` levels in `palette.heat` (an ordinal jade ramp, ≥ 2:1 on the
-    ground) with `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month.
-    Things done are `lib/activityItems`.
+    are `lib/activityHeatmap` levels in `palette.heat` (≥ 2:1 on the ground) with
+    `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month. Things done
+    are `lib/activityItems`.
   - **No floating timer.** The timer is in the reader's and the session's controls; a running one
-    shows in Home's top bar (`RunningTimerChip`). Classic keeps `FloatingTimer`.
+    shows in Home's top bar (`RunningTimerChip`).
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
     what a control does (e.g. Keep daily amount).
-- **Accents** (Settings → Appearance → Accent, new design only): **Indigo (the default)**, Crimson
-  and Jade. The choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it
-  follows the account. `DesignGate` applies it once the user loads, and Indigo applies when it's
-  unset; the device keeps a copy for the first frame. Crimson and Indigo put the accent on the
-  primary action, links, the active tab, "done", the calendar and a glow behind Home's top
-  (`v2/HeroGlow`); Jade keeps ink buttons, grey links and jade only for "done". An accent is a
+- **Accents** (Settings → Appearance → Accent): **Indigo (the default)**, Crimson and Jade. The
+  choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it follows the
+  account. `DesignGate` applies it once the user loads, and Indigo applies when it's unset; the
+  device keeps a copy for the first frame. Crimson and Indigo put the accent on the primary action,
+  links, the active tab, "done", the calendar and a glow behind Home's top (`v2/HeroGlow`); Jade
+  keeps ink buttons and grey links, with jade for "done" and a jade glow in light. An accent is a
   token set in `theme/v2` (`ACCENT_TOKENS`: `primary`, `done`/`doneText`, `accentText`, `link`,
   `accentSubtle`, `hero`, `progress`, `heat`/`heatInk`); never write an accent colour in a
-  component. Status colours don't follow it: weak is `red`, strong is `good` (green). Classic
-  screens get `accentText` as `theme.accent`, since they use it for text too. Every combination
-  is checked in `src/design/__tests__` (text 4.5:1, fills 3:1).
-- Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
-  `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
-- Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
-  `src/design/__tests__`.
-- `theme.onAccent` is the text colour on an accent fill (white in classic; the ground in the new
-  design, where the accent is the ink). Use it instead of `'#fff'` on `theme.accent`.
+  component. Status colours don't follow it: weak is `red`, strong is `good` (green); a warning
+  that is advice (a long cycle) is ink, not red. Every combination is checked in
+  `src/design/__tests__` (text 4.5:1, including ink and grey on `accentSubtle`; fills 3:1).
+- Taps don't buzz (`PressableScale` shrinks, `v2/Tap` dims); outcomes use `design/haptics`
+  (`useHaptics()`), which Settings → Haptics turns off.
+- Fonts: SF Pro for Latin, Amiri for all Arabic. In a line that mixes them, put the Latin first
+  and the Arabic last in a first-strong isolate (`⁨…⁩`): a line that starts with Arabic
+  is laid out right to left (Insights' juz rows did).
+- `theme.onAccent` is the text colour on an `accent` fill. Use it instead of `'#fff'`.
 - Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
-  a native change for a versioned release. Until then "System" isn't offered and falls back to the
-  classic Light/Dark choice (`systemAppearanceAvailable()`); the new design offers Light and Dark.
+  a native change for a versioned release. Until then Settings offers Light and Dark only
+  (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
+- `expo-blur` and `expo-glass-effect` are no longer imported. Removing them from `package.json`
+  changes the fingerprint, so do it with the next native change, along with the tests'
+  `jest.mock('expo-glass-effect')` / `jest.mock('expo-blur')` calls.
 
 ## UI traps
 

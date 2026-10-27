@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Share, StyleSheet, Text, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { useDesign } from '../../design/DesignContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
-import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { currentRelease, diagnosticLines, ReleaseInfo } from '../../lib/releaseInfo';
 import { sendTestError, triggerTestNativeCrash } from '../../lib/sentry';
@@ -51,8 +49,7 @@ export function showsTestActions(r: ReleaseInfo): boolean {
  * an update now. TestFlight (preview) builds also get test-crash actions.
  */
 export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo }) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
+  const { palette } = useTheme();
   const { lastCheckForUpdateTimeSinceRestart } = Updates.useUpdates();
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -92,92 +89,42 @@ export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo 
   ) : null;
   const share = () => Share.share({ message: lines.join('\n') }).catch(() => undefined);
 
-  if (isNew) {
-    // A Settings row (a 24pt glyph, the label, its summary under it); the
-    // details open under it, lined up with the label, the actions as pills.
-    return (
-      <View testID="app-info-v2">
-        <Tap
-          onPress={() => setOpen((o) => !o)}
-          onLongPress={check}
-          delayLongPress={450}
-          style={v2.row}
-          accessibilityRole="button"
-          accessibilityLabel={`App info: ${appInfoSummary(release)}`}
-          accessibilityHint="Double tap for details. Long press to check for an update."
-          accessibilityState={{ expanded: open }}
-        >
-          <Ionicons name="information-circle-outline" size={24} color={palette.text} />
-          <View style={styles.text}>
-            <Text style={[typeV2.body, { color: palette.text }]}>App info</Text>
-            <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
-              {appInfoSummary(release)}
-            </Text>
-          </View>
-          {checking ? (
-            <ActivityIndicator size="small" color={palette.secondary} />
-          ) : (
-            <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondary} />
-          )}
-        </Tap>
-        {release.isEmergencyLaunch && (
-          <Text style={[typeV2.meta, v2.indented, v2.warning, { color: palette.red }]}>
-            The last update couldn’t start, so the built-in version is running.
-          </Text>
-        )}
-        {open && (
-          <View style={[v2.indented, v2.details]} testID="app-info-details">
-            {lines.map((l) => (
-              <Text key={l} selectable style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
-                {l}
-              </Text>
-            ))}
-            <View style={styles.actions}>
-              <Action label="Check for updates" onPress={check} />
-              <Action label="Share" onPress={share} />
-            </View>
-            {testActions && <View style={styles.actions}>{testActions}</View>}
-          </View>
-        )}
-      </View>
-    );
-  }
-
+  // A Settings row (a 24pt glyph, the label, its summary under it); the
+  // details open under it, lined up with the label, the actions as pills.
   return (
-    <View>
-      <Pressable
+    <View testID="app-info-v2">
+      <Tap
         onPress={() => setOpen((o) => !o)}
         onLongPress={check}
         delayLongPress={450}
-        style={styles.row}
+        style={v2.row}
         accessibilityRole="button"
         accessibilityLabel={`App info: ${appInfoSummary(release)}`}
         accessibilityHint="Double tap for details. Long press to check for an update."
+        accessibilityState={{ expanded: open }}
       >
-        <View style={[styles.icon, { backgroundColor: theme.accent + '20' }]}>
-          <Ionicons name="information-circle-outline" size={16} color={theme.accent} />
-        </View>
+        <Ionicons name="information-circle-outline" size={24} color={palette.text} />
         <View style={styles.text}>
-          <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>App info</Text>
-          <Text style={[typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
+          <Text style={[typeV2.body, { color: palette.text }]}>App info</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
             {appInfoSummary(release)}
           </Text>
         </View>
         {checking ? (
-          <ActivityIndicator size="small" color={theme.accent} />
+          <ActivityIndicator size="small" color={palette.secondary} />
         ) : (
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textMuted} />
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondary} />
         )}
-      </Pressable>
+      </Tap>
       {release.isEmergencyLaunch && (
-        <Text style={[typography.caption, styles.warning, { color: theme.error }]}>
+        <Text style={[typeV2.meta, v2.indented, v2.warning, { color: palette.red }]}>
           The last update couldn’t start, so the built-in version is running.
         </Text>
       )}
       {open && (
-        <View style={styles.details}>
+        <View style={[v2.indented, v2.details]} testID="app-info-details">
           {lines.map((l) => (
-            <Text key={l} selectable style={[typography.caption, { color: theme.textSecondary }]}>
+            <Text key={l} selectable style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
               {l}
             </Text>
           ))}
@@ -193,30 +140,12 @@ export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo 
 }
 
 function Action({ label, onPress }: { label: string; onPress: () => void }) {
-  const { theme } = useTheme();
-  const { isNew } = useDesign();
-  if (isNew) return <PillButton title={label} onPress={onPress} variant="outline" size="sm" />;
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      style={[styles.action, { borderColor: theme.border, backgroundColor: theme.glass }]}
-      accessibilityRole="button"
-    >
-      <Text style={[typography.caption, { color: theme.textPrimary, fontWeight: '600' }]}>{label}</Text>
-    </Pressable>
-  );
+  return <PillButton title={label} onPress={onPress} variant="outline" size="sm" />;
 }
 
 const styles = StyleSheet.create({
-  // Matches the Settings rows.
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, minHeight: 52 },
-  icon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   text: { flex: 1 },
-  warning: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
-  details: { paddingHorizontal: spacing.md, paddingBottom: spacing.md, gap: 2 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  action: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
 });
 
 // The new design: the Settings rows' metrics (16pt gutter, a 24pt glyph, 16pt to the label).

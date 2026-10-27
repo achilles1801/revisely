@@ -31,10 +31,10 @@ import { DEFAULT_ACCENT, paletteV2 } from '../../theme/v2';
 const light = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
 
-async function show(isNew: boolean) {
+async function show() {
   await AsyncStorage.setItem('@revisely_theme_v2', 'light');
   render(
-    <DesignProvider initial={{ allowed: isNew, chosen: isNew ? 'new' : 'classic' }}>
+    <DesignProvider initial={{}}>
       <ThemeProvider>
         <RootNavigator />
       </ThemeProvider>
@@ -53,23 +53,14 @@ beforeEach(async () => {
 describe('<RootNavigator /> in the new design', () => {
   it('loading: a grey spinner on the ground, no accent', async () => {
     mockAuth.isLoading = true;
-    await show(true);
+    await show();
     expect(flat(screen.getByTestId('root-loading').props.style).backgroundColor).toBe(light.bg);
     expect(screen.UNSAFE_getByType(ActivityIndicator).props.color).toBe(light.secondary);
   });
 
   it('signed out: sign-in on the flat ground, no gradient', async () => {
-    await show(true);
+    await show();
     expect(screen.getByText('auth')).toBeTruthy();
     expect(screen.UNSAFE_queryAllByType(LinearGradient)).toHaveLength(0);
-  });
-
-  it('classic keeps its gradient and accent spinner', async () => {
-    await show(false);
-    expect(screen.UNSAFE_getAllByType(LinearGradient)).toHaveLength(1);
-    mockAuth.isLoading = true;
-    screen.unmount();
-    await show(false);
-    expect(screen.UNSAFE_getByType(ActivityIndicator).props.color).not.toBe(light.secondary);
   });
 });

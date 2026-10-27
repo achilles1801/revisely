@@ -1,17 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Modal, ScrollView, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { ThemeColors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { shadows } from '../theme/shadows';
-import { Button } from './Button';
-import { GlassCard } from './GlassCard';
-import { PressableScale } from './PressableScale';
 import { QuranPage } from '../types';
-import { useDesign } from '../design/DesignContext';
 import { Sheet } from './v2/Sheet';
 import { PillTabs } from './v2/PillTabs';
 import { PillButton } from './v2/PillButton';
@@ -48,9 +38,7 @@ export function BulkActionsModal({
   onMarkJuzComplete,
   onTogglePage,
 }: BulkActionsModalProps) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { palette } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('juz');
 
   const juzGroups = useMemo(() => {
@@ -67,285 +55,79 @@ export function BulkActionsModal({
   const allCompleted = pages.length > 0 && pages.every((p) => p.isCompleted);
   const completedCount = pages.filter((p) => p.isCompleted).length;
 
-  if (isNew) {
-    // One row per juz or page: its mark (jade once done), name and count.
-    const row = (key: string | number, mark: React.ReactNode, name: string, meta: string, done: boolean, onPress: () => void, label: string) => (
-      <Tap
-        key={key}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ checked: done }}
-        style={[v2.row, { borderBottomColor: palette.separator }]}
-      >
-        {mark}
-        <View style={v2.rowText}>
-          <Text style={[typeV2.name, { color: palette.text }]}>{name}</Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
-        </View>
-      </Tap>
-    );
-    return (
-      <Sheet
-        visible={visible}
-        onClose={onClose}
-        title="Manage pages"
-        message={`${completedCount} of ${pages.length} complete`}
-        right={{ label: 'Done', onPress: onClose, strong: true }}
-        contentStyle={v2.content}
-        testID="bulk-sheet"
-      >
-        <View style={v2.controls}>
-          <PillTabs<TabType>
-            options={[
-              { value: 'juz', label: 'By juz' },
-              { value: 'pages', label: 'All pages' },
-            ]}
-            value={activeTab}
-            onChange={setActiveTab}
-          />
-          <PillButton
-            title={allCompleted ? 'Unmark all' : 'Mark all done'}
-            variant={allCompleted ? 'outline' : 'solid'}
-            onPress={allCompleted ? onMarkAllIncomplete : onMarkAllComplete}
-          />
-        </View>
-        <ScrollView style={v2.list}>
-          {activeTab === 'juz'
-            ? Object.entries(juzGroups).map(([juzNum, juzPages]) => {
-                const completed = juzPages.filter((p) => p.isCompleted).length;
-                const full = completed === juzPages.length;
-                return row(
-                  juzNum,
-                  <Mark size="reply" label={juzNum} done={full} />,
-                  `Juz ${juzNum}`,
-                  `${completed} of ${juzPages.length} pages`,
-                  full,
-                  () => onMarkJuzComplete(parseInt(juzNum, 10)),
-                  `Juz ${juzNum}, ${completed} of ${juzPages.length} pages. Mark all done`,
-                );
-              })
-            : pages.map((page) => {
-                const surah = quranData.find((q) => q.pageNumber === page.pageNumber)?.surahName || 'Surah';
-                return row(
-                  page.pageNumber,
-                  <Mark size="reply" label={String(page.pageNumber)} done={page.isCompleted} />,
-                  `Page ${page.pageNumber}`,
-                  surah,
-                  page.isCompleted,
-                  () => onTogglePage(page.pageNumber),
-                  `Page ${page.pageNumber}, ${surah}${page.isCompleted ? ', revised' : ''}`,
-                );
-              })}
-        </ScrollView>
-      </Sheet>
-    );
-  }
-
+  // One row per juz or page: its mark (jade once done), name and count.
+  const row = (key: string | number, mark: React.ReactNode, name: string, meta: string, done: boolean, onPress: () => void, label: string) => (
+    <Tap
+      key={key}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: done }}
+      style={[v2.row, { borderBottomColor: palette.separator }]}
+    >
+      {mark}
+      <View style={v2.rowText}>
+        <Text style={[typeV2.name, { color: palette.text }]}>{name}</Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
+      </View>
+    </Tap>
+  );
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
-          <GlassCard surface="chrome" style={styles.sheetGlass} />
-          <View style={styles.dragHandle} />
-
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Manage pages</Text>
-              <Text style={styles.summaryText}>
-                {completedCount} of {pages.length} complete
-              </Text>
-            </View>
-            <PressableScale
-              onPress={onClose}
-              haptic="light"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <GlassCard style={styles.closeButton}>
-                <Ionicons name="close" size={20} color={theme.textPrimary} />
-              </GlassCard>
-            </PressableScale>
-          </View>
-
-          <View style={styles.quickActions}>
-            <Button
-              title={allCompleted ? 'Unmark all' : 'Mark all done'}
-              onPress={allCompleted ? onMarkAllIncomplete : onMarkAllComplete}
-              variant={allCompleted ? 'outline' : 'primary'}
-            />
-          </View>
-
-          <View style={styles.tabs}>
-            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
-            <PressableScale
-              onPress={() => setActiveTab('juz')}
-              haptic="selection"
-              scale={0.97}
-              style={[styles.tab, activeTab === 'juz' && styles.activeTab]}
-            >
-              <Text style={[styles.tabText, activeTab === 'juz' && styles.activeTabText]}>By juz</Text>
-            </PressableScale>
-            <PressableScale
-              onPress={() => setActiveTab('pages')}
-              haptic="selection"
-              scale={0.97}
-              style={[styles.tab, activeTab === 'pages' && styles.activeTab]}
-            >
-              <Text style={[styles.tabText, activeTab === 'pages' && styles.activeTabText]}>All pages</Text>
-            </PressableScale>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scrollView}>
-            {activeTab === 'juz'
-              ? Object.entries(juzGroups).map(([juzNum, juzPages]) => {
-                  const completed = juzPages.filter((p) => p.isCompleted).length;
-                  const isFull = completed === juzPages.length;
-                  return (
-                    <PressableScale
-                      key={juzNum}
-                      onPress={() => onMarkJuzComplete(parseInt(juzNum))}
-                      haptic="medium"
-                      scale={0.99}
-                      style={[styles.row, isFull && { backgroundColor: theme.accentSoft }]}
-                    >
-                      <View style={styles.rowInfo}>
-                        <Text style={styles.rowTitle}>Juz {juzNum}</Text>
-                        <Text style={styles.rowSubtitle}>
-                          {completed} / {juzPages.length} pages
-                        </Text>
-                      </View>
-                      <View style={[styles.checkbox, isFull && styles.checkboxChecked]}>
-                        {isFull && <Ionicons name="checkmark" size={16} color={theme.textInverse} />}
-                      </View>
-                    </PressableScale>
-                  );
-                })
-              : pages.map((page) => {
-                  const quranPage = quranData.find((q) => q.pageNumber === page.pageNumber);
-                  return (
-                    <PressableScale
-                      key={page.pageNumber}
-                      onPress={() => onTogglePage(page.pageNumber)}
-                      haptic="selection"
-                      scale={0.99}
-                      style={[styles.row, page.isCompleted && { backgroundColor: theme.accentSoft }]}
-                    >
-                      <View style={styles.rowInfo}>
-                        <Text style={styles.rowTitle}>Page {page.pageNumber}</Text>
-                        <Text style={styles.rowSubtitle}>{quranPage?.surahName || 'Surah'}</Text>
-                      </View>
-                      <View style={[styles.checkbox, page.isCompleted && styles.checkboxChecked]}>
-                        {page.isCompleted && <Ionicons name="checkmark" size={16} color={theme.textInverse} />}
-                      </View>
-                    </PressableScale>
-                  );
-                })}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Manage pages"
+      message={`${completedCount} of ${pages.length} complete`}
+      right={{ label: 'Done', onPress: onClose, strong: true }}
+      contentStyle={v2.content}
+      testID="bulk-sheet"
+    >
+      <View style={v2.controls}>
+        <PillTabs<TabType>
+          options={[
+            { value: 'juz', label: 'By juz' },
+            { value: 'pages', label: 'All pages' },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+        <PillButton
+          title={allCompleted ? 'Unmark all' : 'Mark all done'}
+          variant={allCompleted ? 'outline' : 'solid'}
+          onPress={allCompleted ? onMarkAllIncomplete : onMarkAllComplete}
+        />
+      </View>
+      <ScrollView style={v2.list}>
+        {activeTab === 'juz'
+          ? Object.entries(juzGroups).map(([juzNum, juzPages]) => {
+              const completed = juzPages.filter((p) => p.isCompleted).length;
+              const full = completed === juzPages.length;
+              return row(
+                juzNum,
+                <Mark size="reply" label={juzNum} done={full} />,
+                `Juz ${juzNum}`,
+                `${completed} of ${juzPages.length} pages`,
+                full,
+                () => onMarkJuzComplete(parseInt(juzNum, 10)),
+                `Juz ${juzNum}, ${completed} of ${juzPages.length} pages. Mark all done`,
+              );
+            })
+          : pages.map((page) => {
+              const surah = quranData.find((q) => q.pageNumber === page.pageNumber)?.surahName || 'Surah';
+              return row(
+                page.pageNumber,
+                <Mark size="reply" label={String(page.pageNumber)} done={page.isCompleted} />,
+                `Page ${page.pageNumber}`,
+                surah,
+                page.isCompleted,
+                () => onTogglePage(page.pageNumber),
+                `Page ${page.pageNumber}, ${surah}${page.isCompleted ? ', revised' : ''}`,
+              );
+            })}
+      </ScrollView>
+    </Sheet>
   );
 }
-
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      justifyContent: 'flex-end',
-    },
-    sheet: {
-      borderTopLeftRadius: radius.lg,
-      borderTopRightRadius: radius.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.xl,
-      maxHeight: '90%',
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    sheetGlass: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    dragHandle: {
-      width: 40,
-      height: 4,
-      backgroundColor: theme.border,
-      alignSelf: 'center',
-      marginBottom: spacing.md,
-      borderRadius: radius.full,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-    },
-    title: { ...typography.titleLarge, color: theme.textPrimary },
-    summaryText: { ...typography.bodySmall, color: theme.textSecondary, marginTop: 2 },
-    closeButton: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.full,
-      overflow: 'hidden',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    quickActions: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-    },
-    tabs: {
-      flexDirection: 'row',
-      marginHorizontal: spacing.lg,
-      marginBottom: spacing.sm,
-      borderRadius: radius.sm,
-      padding: 3,
-      gap: 2,
-      overflow: 'hidden',
-    },
-    tab: {
-      flex: 1,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-    },
-    activeTab: { backgroundColor: theme.surface },
-    tabText: { ...typography.bodySmall, color: theme.textSecondary, fontWeight: '600' },
-    activeTabText: { color: theme.textPrimary },
-    scrollView: { flexGrow: 0 },
-    scrollContent: {
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.xl,
-      gap: spacing.xxs,
-    },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.sm,
-    },
-    rowInfo: { flex: 1 },
-    rowTitle: { ...typography.titleSmall, color: theme.textPrimary },
-    rowSubtitle: { ...typography.bodySmall, color: theme.textSecondary, marginTop: 2 },
-    checkbox: {
-      width: 24,
-      height: 24,
-      borderRadius: radius.xs,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      backgroundColor: theme.bg,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    checkboxChecked: {
-      backgroundColor: theme.accent,
-      borderColor: theme.accent,
-    },
-  });
 
 const v2 = StyleSheet.create({
   content: { flexShrink: 1 },

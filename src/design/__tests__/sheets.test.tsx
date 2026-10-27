@@ -26,7 +26,7 @@ import { SectionFooter } from '../../components/plan/Grouped';
 import { DEFAULT_ACCENT, paletteLight, paletteV2 } from '../../theme/v2';
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -141,6 +141,35 @@ describe('sheets in the new design', () => {
       view.rerender(sheet(false));
       await act(async () => {
         ends[ends.length - 1]({ finished: true });
+      });
+      expect(screen.queryByText('Body')).toBeNull();
+    } finally {
+      timing.mockRestore();
+    }
+  });
+
+  it('a close stopped for another reason still closes it', async () => {
+    const ends: ((r: { finished: boolean }) => void)[] = [];
+    const timing = jest.spyOn(Animated, 'timing').mockImplementation(
+      () =>
+        ({
+          start: (cb?: (r: { finished: boolean }) => void) => ends.push(cb ?? (() => {})),
+          stop: () => {},
+          reset: () => {},
+        }) as unknown as Animated.CompositeAnimation,
+    );
+    try {
+      const sheet = (visible: boolean) =>
+        v2(
+          <Sheet visible={visible} onClose={() => {}}>
+            <Text>Body</Text>
+          </Sheet>,
+        );
+      const view = render(sheet(true));
+      await act(async () => {});
+      view.rerender(sheet(false));
+      await act(async () => {
+        ends[ends.length - 1]({ finished: false });
       });
       expect(screen.queryByText('Body')).toBeNull();
     } finally {

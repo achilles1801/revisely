@@ -3,8 +3,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 
-// The glass background needs the native view.
-jest.mock('../../GlassCard', () => ({ GlassCard: () => null }));
 jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 

@@ -1,6 +1,6 @@
 import React from 'react';
-import { StatusBar, StyleSheet, Text } from 'react-native';
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
+import { Animated, StatusBar, StyleSheet, Text } from 'react-native';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { PlayerCapsule, PlayerControls } from '../PlayerCapsule';
 import { ReaderActivity } from '../ReaderActivity';
@@ -59,10 +59,12 @@ const controls = (over: Partial<PlayerControls> = {}): PlayerControls => ({
   ...over,
 });
 
+const SURFACE = { background: '#F7F7F8', border: '#E5E7EB' };
+
 describe('<PlayerCapsule />', () => {
   it('idle: ▶ recites from the top of the page; the reciter opens the picker', async () => {
     const player = controls();
-    withTheme(<PlayerCapsule player={player} page={3} />);
+    withTheme(<PlayerCapsule surface={SURFACE} player={player} page={3} />);
     fireEvent.press(await screen.findByLabelText('Play from this page'));
     expect(player.onPlayPage).toHaveBeenCalledWith(3);
     expect(screen.getByText('Husary · Muallim')).toBeTruthy();
@@ -77,7 +79,7 @@ describe('<PlayerCapsule />', () => {
       onPrevious: jest.fn(),
       onNext: jest.fn(),
     });
-    withTheme(<PlayerCapsule player={player} page={3} />);
+    withTheme(<PlayerCapsule surface={SURFACE} player={player} page={3} />);
     expect(await screen.findByText(/2:57/)).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Pause'));
     expect(player.onPause).toHaveBeenCalled();
@@ -92,7 +94,7 @@ describe('<PlayerCapsule />', () => {
 
   it('paused: play resumes; at the edge of the range previous / next are disabled', async () => {
     const player = controls({ state: { status: 'paused', verse: { sura: 1, ayah: 1 } } });
-    withTheme(<PlayerCapsule player={player} page={1} />);
+    withTheme(<PlayerCapsule surface={SURFACE} player={player} page={1} />);
     fireEvent.press(await screen.findByLabelText('Play'));
     expect(player.onResume).toHaveBeenCalled();
     expect(screen.getByLabelText('Previous verse').props.accessibilityState).toMatchObject({ disabled: true });
@@ -100,7 +102,7 @@ describe('<PlayerCapsule />', () => {
 
   it('compact (a narrow phone with a recording or timer): no previous / next', async () => {
     const player = controls({ state: { status: 'playing', verse: { sura: 2, ayah: 57 } }, onNext: jest.fn() });
-    withTheme(<PlayerCapsule player={player} page={3} compact />);
+    withTheme(<PlayerCapsule surface={SURFACE} player={player} page={3} compact />);
     expect(await screen.findByLabelText('Pause')).toBeTruthy();
     expect(screen.queryByLabelText('Next verse')).toBeNull();
   });
@@ -108,6 +110,7 @@ describe('<PlayerCapsule />', () => {
   it('carries the record control, the timer and a trailing action', async () => {
     withTheme(
       <PlayerCapsule
+        surface={SURFACE}
         player={controls()}
         page={3}
         record={<Text>REC</Text>}
@@ -121,7 +124,7 @@ describe('<PlayerCapsule />', () => {
   });
 
   it('says when a recitation could not play', async () => {
-    withTheme(<PlayerCapsule player={controls({ state: { status: 'error', verse: { sura: 2, ayah: 1 } } })} page={2} />);
+    withTheme(<PlayerCapsule surface={SURFACE} player={controls({ state: { status: 'error', verse: { sura: 2, ayah: 1 } } })} page={2} />);
     expect(await screen.findByText(/Couldn’t play/)).toBeTruthy();
     expect(screen.getByLabelText('Retry')).toBeTruthy();
   });
@@ -310,12 +313,27 @@ describe('<TimerChip />', () => {
       date: '2026-10-26',
       pagesVisited: [],
     };
-    const onOpenQuran = jest.fn();
-    withTheme(<TimerChip onOpenQuran={onOpenQuran} />);
-    fireEvent.press(await screen.findByLabelText(/Timer running/));
-    fireEvent.press(await screen.findByText('Open the Quran'));
-    expect(onOpenQuran).toHaveBeenCalled();
-    expect(screen.queryByText('Open the Quran')).toBeNull();
+    // The sheet's slide finishes at once here, so this doesn't hang on how
+    // fast the machine runs animation frames.
+    const timing = jest.spyOn(Animated, 'timing').mockImplementation(
+      () =>
+        ({
+          start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }),
+          stop: () => {},
+          reset: () => {},
+        }) as unknown as Animated.CompositeAnimation,
+    );
+    try {
+      const onOpenQuran = jest.fn();
+      withTheme(<TimerChip onOpenQuran={onOpenQuran} />);
+      fireEvent.press(await screen.findByLabelText(/Timer running/));
+      fireEvent.press(await screen.findByText('Open the Quran'));
+      expect(onOpenQuran).toHaveBeenCalled();
+      // The sheet slides away.
+      await waitFor(() => expect(screen.queryByText('Open the Quran')).toBeNull());
+    } finally {
+      timing.mockRestore();
+    }
   });
 
   it('running: the live clock', async () => {

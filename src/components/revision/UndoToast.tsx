@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -7,13 +7,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
-import { useDesign } from '../../design/DesignContext';
-import { ThemeColors } from '../../theme/colors';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
-import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 
 interface UndoToastProps {
   visible: boolean;
@@ -29,9 +24,9 @@ interface UndoToastProps {
 }
 
 /**
- * A short-lived bar with an action ("Pages cleared · Undo"). In the new design
- * it is a flat snackbar in the inverse of the ground (ink on white, white on
- * black), no shadow, inside the gutters.
+ * A short-lived bar with an action ("Pages cleared · Undo"): a flat snackbar
+ * in the inverse of the ground (ink on white, white on black), no shadow,
+ * inside the gutters.
  */
 export function UndoToast({
   visible,
@@ -42,9 +37,7 @@ export function UndoToast({
   bottomInset = 0,
   actionLabel = 'Undo',
 }: UndoToastProps) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { palette } = useTheme();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
 
@@ -74,43 +67,21 @@ export function UndoToast({
 
   if (!visible) return null;
 
-  if (isNew) {
-    return (
-      <Animated.View
-        pointerEvents="box-none"
-        style={[v2.wrap, { bottom: bottomInset + spacing.md }, animStyle]}
-        testID="undo-toast"
-      >
-        <View style={[v2.toast, { backgroundColor: palette.text }]} accessibilityLiveRegion="polite" testID="undo-toast-bar">
-          <Text style={[typeV2.body, v2.message, { color: palette.bg }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
-            {message}
-          </Text>
-          <Tap onPress={onUndo} hitSlop={10} style={v2.action} accessibilityRole="button" testID="undo-toast-action">
-            <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>
-              {actionLabel}
-            </Text>
-          </Tap>
-        </View>
-      </Animated.View>
-    );
-  }
-
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[
-        styles.wrap,
-        { bottom: bottomInset + spacing.md },
-        animStyle,
-      ]}
+      style={[v2.wrap, { bottom: bottomInset + spacing.md }, animStyle]}
+      testID="undo-toast"
     >
-      <View style={styles.toast}>
-        <Text style={styles.message} numberOfLines={1}>
+      <View style={[v2.toast, { backgroundColor: palette.text }]} accessibilityLiveRegion="polite" testID="undo-toast-bar">
+        <Text style={[typeV2.body, v2.message, { color: palette.bg }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
           {message}
         </Text>
-        <Pressable onPress={onUndo} hitSlop={10} style={styles.undoBtn} accessibilityRole="button">
-          <Text style={styles.undoText}>{actionLabel}</Text>
-        </Pressable>
+        <Tap onPress={onUndo} hitSlop={10} style={v2.action} accessibilityRole="button" testID="undo-toast-action">
+          <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>
+            {actionLabel}
+          </Text>
+        </Tap>
       </View>
     </Animated.View>
   );
@@ -131,40 +102,3 @@ const v2 = StyleSheet.create({
   message: { flex: 1 },
   action: { paddingHorizontal: 12, paddingVertical: 8 },
 });
-
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    wrap: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
-    },
-    toast: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.surface,
-      borderRadius: radius.full,
-      paddingLeft: spacing.md,
-      paddingRight: spacing.xs,
-      paddingVertical: spacing.xs,
-      gap: spacing.sm,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-      ...shadows.md,
-    },
-    message: {
-      ...typography.bodySmall,
-      color: theme.textPrimary,
-    },
-    undoBtn: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: radius.full,
-    },
-    undoText: {
-      ...typography.bodySmall,
-      color: theme.accent,
-      fontWeight: '700',
-    },
-  });

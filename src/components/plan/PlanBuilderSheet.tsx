@@ -6,20 +6,16 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Platform, StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { PlanSheet } from './PlanSheet';
 import { ListPickerSheet, PickerItem, PickerTab } from './ListPickerSheet';
 import { GroupedRow, GroupedSection } from './Grouped';
 import { InlineStepper } from './InlineStepper';
 import { DayRow, DAY_ROW_INSET } from './DayRow';
-import { LiquidGlassSegmentedControl } from '../LiquidGlassSegmentedControl';
 import { PillTabs } from '../v2/PillTabs';
 import { Toggle } from '../v2/TopBar';
-import { useTheme } from '../../context/ThemeContext';
-import { useDesign } from '../../design/DesignContext';
 import { useHaptics } from '../../design/haptics';
 import { spacing } from '../../theme/spacing';
 import { layoutV2 } from '../../theme/v2';
@@ -87,8 +83,6 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
   },
   ref,
 ) {
-  const { theme } = useTheme();
-  const { isNew } = useDesign();
   const haptics = useHaptics();
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -186,8 +180,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
 
   const apply = () => {
     if (preview.length === 0) return;
-    if (isNew) haptics.success();
-    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     onApply(preview, mode === 'weakest' ? 'forward' : direction);
     sheetRef.current?.dismiss();
   };
@@ -271,7 +264,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
     <>
       <PlanSheet
         ref={sheetRef}
-        title={isNew ? 'New plan' : 'New Plan'}
+        title="New plan"
         leftLabel="Cancel"
         onLeft={() => sheetRef.current?.dismiss()}
         rightLabel="Apply"
@@ -280,26 +273,13 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
         snapPoints={['90%']}
       >
         <BottomSheetScrollView
-          contentContainerStyle={[
-            isNew ? styles.contentV2 : styles.content,
-            { paddingBottom: insets.bottom + spacing.xl },
-          ]}
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
           keyboardShouldPersistTaps="handled"
         >
           {modeOptions.length > 1 ? (
-            isNew ? (
-              <View style={styles.segmentV2}>
-                <PillTabs<BuilderMode> options={modeOptions} value={mode} onChange={setMode} testID="builder-mode" />
-              </View>
-            ) : (
-              <View style={styles.segment}>
-                <LiquidGlassSegmentedControl<BuilderMode>
-                  options={modeOptions}
-                  value={mode}
-                  onChange={setMode}
-                />
-              </View>
-            )
+            <View style={styles.segmentV2}>
+              <PillTabs<BuilderMode> options={modeOptions} value={mode} onChange={setMode} testID="builder-mode" />
+            </View>
           ) : null}
 
           <GroupedSection footer={modeFooter}>
@@ -345,28 +325,15 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
                 title="Reverse order"
                 subtitle={direction === 'reverse' ? 'An-Nas back to Al-Fatiha' : 'Al-Fatiha to An-Nas'}
                 trailing={
-                  isNew ? (
-                    <Toggle
-                      value={direction === 'reverse'}
-                      onValueChange={(v) => {
-                        haptics.selection();
-                        setDirection(v ? 'reverse' : 'forward');
-                      }}
-                      accessibilityLabel="Reverse order"
-                      testID="builder-reverse"
-                    />
-                  ) : (
-                    <Switch
-                      value={direction === 'reverse'}
-                      onValueChange={(v) => {
-                        Haptics.selectionAsync();
-                        setDirection(v ? 'reverse' : 'forward');
-                      }}
-                      trackColor={{ false: theme.border, true: theme.accent }}
-                      thumbColor={Platform.OS === 'android' ? theme.surface : undefined}
-                      accessibilityLabel="Reverse order"
-                    />
-                  )
+                  <Toggle
+                    value={direction === 'reverse'}
+                    onValueChange={(v) => {
+                      haptics.selection();
+                      setDirection(v ? 'reverse' : 'forward');
+                    }}
+                    accessibilityLabel="Reverse order"
+                    testID="builder-reverse"
+                  />
                 }
               />
             ) : null}
@@ -391,7 +358,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
                 <GroupedRow
                   title={`${preview.length - PREVIEW_DAYS} more day${preview.length - PREVIEW_DAYS === 1 ? '' : 's'}`}
                   tone="muted"
-                  style={isNew ? styles.moreV2 : undefined}
+                  style={styles.moreV2}
                 />
               ) : null}
             </GroupedSection>
@@ -405,7 +372,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
 
       <ListPickerSheet
         ref={startSheetRef}
-        title={isNew ? 'Today starts at' : 'Today Starts At'}
+        title="Today starts at"
         tabs={startTabs}
         activeTab={startTab}
         onTabChange={setStartTab}
@@ -420,13 +387,6 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
 });
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: spacing.md,
-  },
-  segment: {
-    marginTop: spacing.xs,
-  },
-  contentV2: {},
   segmentV2: { paddingHorizontal: layoutV2.gutter, paddingTop: 4, paddingBottom: 4 },
   // Lines up with the days' content, past the date column.
   moreV2: { paddingLeft: DAY_ROW_INSET },

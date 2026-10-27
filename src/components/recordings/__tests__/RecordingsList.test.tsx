@@ -4,8 +4,7 @@ import { RecordingsList } from '../RecordingsList';
 import { ThemeProvider } from '../../../context/ThemeContext';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
-jest.mock('expo-glass-effect', () => ({ GlassView: require('react-native').View, isLiquidGlassAvailable: () => false }));
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('@react-navigation/native', () => {
   const { useEffect } = require('react');
   return { useFocusEffect: (cb: () => void) => useEffect(cb, [cb]) };
@@ -197,7 +196,13 @@ describe('<RecordingsList /> recordings in the backup', () => {
     const { Alert } = require('react-native');
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await renderList();
-    fireEvent.press(screen.getByLabelText('Delete recording'));
+    fireEvent.press(screen.getByTestId('recording-r1-menu'));
+    fireEvent.press(screen.getByTestId('sheet-action-delete'));
+    // The menu's action runs once it has gone (iOS: onDismiss).
+    const { Modal } = jest.requireActual('react-native');
+    act(() => {
+      screen.UNSAFE_getAllByType(Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
+    });
     expect(alert).toHaveBeenCalledWith(
       'Delete this recording?',
       expect.stringContaining('from your backup'),

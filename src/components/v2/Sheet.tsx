@@ -80,6 +80,8 @@ export function Sheet({
   const progress = useRef(new Animated.Value(0)).current;
   const hiddenRef = useRef(onHidden);
   hiddenRef.current = onHidden;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
 
   useEffect(() => {
     if (visible) {
@@ -97,8 +99,10 @@ export function Sheet({
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
       }).start(({ finished }) => {
-        // Reopened before it had gone: the opening animation took over.
-        if (!finished) return;
+        // Reopened before it had gone: the opening animation took over. Any
+        // other interruption still closes it, so no invisible sheet is left
+        // holding the touches.
+        if (!finished && visibleRef.current) return;
         setShown(false);
         if (Platform.OS !== 'ios') hiddenRef.current?.();
       });

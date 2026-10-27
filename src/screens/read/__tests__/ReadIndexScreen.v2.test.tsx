@@ -38,7 +38,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );

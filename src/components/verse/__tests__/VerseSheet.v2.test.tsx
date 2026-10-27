@@ -4,10 +4,6 @@ import { Linking, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Any glass in the new design would show up here.
-jest.mock('../../GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" /> };
-});
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
   return { Ionicons: ({ name }: { name: string }) => <Text testID={`icon-${name}`} /> };
@@ -73,7 +69,7 @@ const { ClearQuranError } = jest.requireActual('../../../lib/clearQuran');
 // The new design, light, with the default accent (Indigo).
 const palette = paletteV2(false, DEFAULT_ACCENT);
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -115,7 +111,6 @@ describe('VerseSheet in the new design', () => {
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
     });
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     // The grab handle, in the sheets' handle colour.
     const handle = screen.getByLabelText('Expand the translation').children[0] as any;
     expect(StyleSheet.flatten(handle.props.style)).toMatchObject({ backgroundColor: palette.handle, width: 40, height: 4 });
@@ -179,7 +174,6 @@ describe('VerseSheet in the new design', () => {
     await screen.findByText('Saheeh text of the verse.', {}, { timeout: 10_000 });
     fireEvent.press(screen.getByLabelText('More'));
     expect(style('verse-menu-panel')).toMatchObject({ backgroundColor: palette.sheet, borderColor: palette.separator });
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     fireEvent.press(screen.getByText('Select translation'));
     expect(screen.getByText('English · theclearquran.org')).toBeTruthy();
     expect(flatText('theclearquran.org').color).toBe(palette.link);
@@ -238,7 +232,6 @@ describe('VerseMenu in the new design', () => {
     expect(screen.getByText('Al-Baqarah 2:6')).toBeTruthy();
     expect(screen.getByText('Husary · to the end of the juz')).toBeTruthy();
     expect(screen.getByTestId('sheet-action-translation')).toBeTruthy();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     fireEvent.press(screen.getByTestId('sheet-action-translation'));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onTranslation).not.toHaveBeenCalled();
@@ -284,6 +277,5 @@ describe('useVerseActions in the new design', () => {
     expect(screen.getByText('Reciter')).toBeTruthy();
     expect(screen.getByTestId('reciter-list')).toBeTruthy();
     expect(touchHandlingAncestor(screen.getByTestId('reciter-list'))).toBeNull();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
   });
 });

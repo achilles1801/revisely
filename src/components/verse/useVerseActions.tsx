@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, Modal, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects, versesOnPage } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
@@ -11,14 +11,7 @@ import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
 import type { PlayerControls } from '../reader/PlayerCapsule';
 import { ReciterList } from './ReciterList';
-import { Backdrop } from '../Backdrop';
-import { GlassCard } from '../GlassCard';
-import { useTheme } from '../../context/ThemeContext';
 import { resolveVoice, shortVoiceLabel } from '../../lib/recitation';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { useDesign } from '../../design/DesignContext';
 import { useHaptics } from '../../design/haptics';
 import { Sheet } from '../v2/Sheet';
 import { getSurahDisplay } from '../../lib/quranData';
@@ -41,10 +34,8 @@ interface Options {
  */
 export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   const { user, saveUser } = useApp();
-  const { theme } = useTheme();
-  const { isNew } = useDesign();
-  // A held verse is an outcome (it's selected): Medium, as before; the new
-  // design's Haptics setting can turn it off.
+  // A held verse is an outcome (it's selected): Medium; the Haptics setting
+  // can turn it off.
   const haptics = useHaptics();
   const recitation = getRecitation();
   const [playback, setPlayback] = useState<RecitationState>(recitation.getState());
@@ -140,8 +131,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
 
   const openTranslation = useCallback(() => {
     setSheetVerse(selected);
-    // The new design's menu clears the selection as it closes, before this runs:
-    // keep the verse highlighted under its sheet. (Unchanged in the classic one.)
+    // The menu clears the selection as it closes, before this runs: keep the
+    // verse highlighted under its sheet.
     setSelected(selected);
     setMenuPoint(null);
   }, [selected]);
@@ -237,30 +228,9 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         onNavigate={navigateSheet}
         onClose={closeSheet}
       />
-      {isNew ? (
-        <Sheet visible={reciterPickerOpen} onClose={closeReciters} title="Reciter" testID="reciter-sheet">
-          {reciterList}
-        </Sheet>
-      ) : (
-      <Modal
-        visible={reciterPickerOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setReciterPickerOpen(false)}
-      >
-        <View style={pickerStyles.overlay}>
-          {/* Behind the sheet, not around it, or the list can't scroll (see Backdrop). */}
-          <Backdrop onPress={() => setReciterPickerOpen(false)} label="Close reciters" />
-          <View style={pickerStyles.sheet}>
-            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
-            <SafeAreaView>
-              <Text style={[pickerStyles.title, { color: theme.textPrimary }]}>Reciter</Text>
-              {reciterList}
-            </SafeAreaView>
-          </View>
-        </View>
-      </Modal>
-      )}
+      <Sheet visible={reciterPickerOpen} onClose={closeReciters} title="Reciter" testID="reciter-sheet">
+        {reciterList}
+      </Sheet>
     </>
   );
 
@@ -277,15 +247,3 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
 function playerVisibleState(mine: boolean, playback: RecitationState): boolean {
   return mine && playback.status !== 'idle' && playback.verse != null;
 }
-
-const pickerStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'flex-end' },
-  sheet: {
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  title: { ...typography.titleLarge, paddingHorizontal: spacing.md, marginBottom: spacing.xs },
-});

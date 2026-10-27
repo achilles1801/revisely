@@ -48,8 +48,6 @@ jest.mock('../../../context/AuthContext', () => ({ useAuth: () => mockAuth }));
 import AuthScreen from '../AuthScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
-import { GlassCard } from '../../../components/GlassCard';
-import { Button } from '../../../components/Button';
 import { PillButton } from '../../../components/v2/PillButton';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 
@@ -60,7 +58,7 @@ const dark = paletteV2(true, DEFAULT_ACCENT);
 async function showV2(mode: 'light' | 'dark' = 'light') {
   await AsyncStorage.setItem('@revisely_theme_v2', mode);
   render(
-    <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+    <DesignProvider initial={{}}>
       <ThemeProvider>
         <AuthScreen />
       </ThemeProvider>
@@ -111,8 +109,6 @@ describe('<AuthScreen /> in the new design: sign in', () => {
     const pills = screen.UNSAFE_getAllByType(PillButton);
     expect(pills.map((p) => p.props.title)).toEqual(['Sign in']);
     expect(styleOf('auth-submit').backgroundColor).toBe(light.primary);
-    expect(screen.UNSAFE_queryAllByType(GlassCard)).toHaveLength(0);
-    expect(screen.UNSAFE_queryAllByType(Button)).toHaveLength(0);
 
     // Apple's own button in black on white; Google's on the ground with a stroke and ink text.
     const apple = screen.getByTestId('auth-apple').props;
@@ -247,21 +243,5 @@ describe('<AuthScreen /> in the new design: password reset', () => {
     fireEvent.press(screen.getByTestId('auth-forgot'));
     fireEvent.press(screen.getByText('Back to sign in'));
     expect(screen.getByTestId('auth-title').props.children).toBe('Welcome back');
-  });
-});
-
-describe('<AuthScreen /> classic', () => {
-  it('is unchanged: glass fields, the classic button, Apple in black', async () => {
-    render(
-      <ThemeProvider>
-        <AuthScreen />
-      </ThemeProvider>,
-    );
-    await act(async () => {});
-    expect(screen.queryByTestId('auth')).toBeNull();
-    expect(screen.UNSAFE_getAllByType(GlassCard)).toHaveLength(2);
-    expect(screen.UNSAFE_getAllByType(Button).map((b) => b.props.title)).toEqual(['Sign In']);
-    expect(screen.UNSAFE_queryAllByType(PillButton)).toHaveLength(0);
-    expect(screen.getByText("Don't have an account?", { exact: false })).toBeTruthy();
   });
 });

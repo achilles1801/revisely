@@ -1,7 +1,6 @@
 import React, { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassCard } from '../GlassCard';
 import { useTheme } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -41,8 +40,8 @@ interface PlayerCapsuleProps {
   trailing?: ReactNode;
   /** Narrow, or crowded: no previous / next. */
   compact?: boolean;
-  /** A solid surface (the reader's palette: glass disappears on a black page). */
-  surface?: { background: string; border: string };
+  /** Its surface, from the reader's palette. */
+  surface: { background: string; border: string };
 }
 
 /**
@@ -83,11 +82,10 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
     <View
       style={[
         styles.capsule,
-        surface && { backgroundColor: surface.background, borderColor: surface.border, borderWidth: StyleSheet.hairlineWidth },
+        { backgroundColor: surface.background, borderColor: surface.border, borderWidth: StyleSheet.hairlineWidth },
       ]}
       testID="player-capsule"
     >
-      {!surface && <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />}
       {active && iconBtn('stop', 'Stop', player.onStop, 15)}
       {!active && (
         <Pressable

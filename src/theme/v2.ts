@@ -1,18 +1,16 @@
-// Design v2 tokens: the new design's look, from "Revisely: Threads-style UI
-// Migration". Used when the new design is on (design/DesignContext).
+// The design's tokens ("Revisely: Threads-style UI Migration"; CLAUDE.md,
+// "The design"). The only place colours are written (noRawColours.test).
 //
-// - white (light) or black (dark) grounds, flat: no cards, no glass, no gradient;
+// - white (light) or black (dark) grounds, flat: no cards, no glass; the one
+//   gradient is Home's glow (and the accent's progress fill);
 // - content is a feed of rows on 0.5pt separators, with avatar-size marks;
-// - no accent tint: the primary button is solid black (white in dark). Revisely's
-//   jade appears only for "done";
+// - an accent (Indigo by default, Crimson, Jade) is a token set below;
 // - text pairs are checked against WCAG (src/design/__tests__): ≥ 4.5:1.
 //
-// `v2ThemeColors` maps the palette onto the classic ThemeColors names, so
-// screens not yet moved take the new colours at once; moved screens use the
-// palette names through useTheme().palette.
+// `v2ThemeColors` gives the same palette under the older names (textPrimary,
+// accent, …) that many screens read through useTheme().theme.
 
 import { TextStyle } from 'react-native';
-import type { ThemeColors } from './colors';
 
 /**
  * The new design's accent (Settings → Appearance → Accent, kept with the
@@ -305,11 +303,49 @@ export function paletteV2(isDark: boolean, accent: AccentName = 'jade'): Palette
   return PALETTES[`${accent}-${isDark ? 'dark' : 'light'}`];
 }
 
-/** Jade, the default. */
+/** With Jade (paletteV2's default argument; the app's default accent is DEFAULT_ACCENT). */
 export const paletteLight: PaletteV2 = paletteV2(false);
 export const paletteDark: PaletteV2 = paletteV2(true);
 
-/** The v2 palette under the classic token names, for screens not yet moved. */
+/**
+ * The palette under the older token names (textPrimary, accent, glass, …) that
+ * many screens still read through `useTheme().theme`.
+ */
+export interface ThemeColors {
+  bg: string;
+  bgAlt: string;
+  surface: string;
+  bgDark: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  textInverse: string;
+  /** Text-safe: the ink with Jade, the accent's text colour otherwise. */
+  accent: string;
+  accentSoft: string;
+  /** Text and glyphs on an `accent` fill. */
+  onAccent: string;
+  gold: string;
+  success: string;
+  successBg: string;
+  warning: string;
+  warningBg: string;
+  warningText: string;
+  error: string;
+  errorBg: string;
+  border: string;
+  borderLight: string;
+  /** The quiet fill (once a translucent glass fill). */
+  glass: string;
+}
+
+/**
+ * The notification light on Android (the channel's `lightColor`), outside any
+ * theme: the system draws it, whatever the app's appearance.
+ */
+export const NOTIFICATION_LIGHT_COLOR = '#292524';
+
+/** The palette under the older token names. */
 export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): ThemeColors {
   const p = paletteV2(isDark, accent);
   return {
@@ -321,8 +357,6 @@ export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): The
     textSecondary: p.secondary,
     textMuted: p.secondary,
     textInverse: p.bg,
-    // Classic screens use their accent for text as well as fills, so they get
-    // the text-safe one: the ink with Jade, the accent's text colour otherwise.
     accent: p.accentText,
     accentSoft: p.accentSubtle,
     onAccent: p.onAccentText,
@@ -336,7 +370,6 @@ export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): The
     errorBg: isDark ? '#2A1212' : '#FEF2F2',
     border: p.separator,
     borderLight: p.separator,
-    // Flat: what used to be a translucent fill is the quiet fill.
     glass: p.fill,
   };
 }
