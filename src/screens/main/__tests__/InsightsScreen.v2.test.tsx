@@ -34,7 +34,7 @@ jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
 import { ScrollView } from 'react-native';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
-import AlgorithmScreen from '../AlgorithmScreen';
+import AlgorithmScreen, { juzMeta } from '../AlgorithmScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
@@ -161,6 +161,14 @@ describe('Insights in the new design', () => {
     expect(screen.getByTestId('browse-page-582')).toBeTruthy();
     expect(screen.queryByTestId('browse-page-1')).toBeNull();
     expect(flat(screen.getByTestId('filter-juz').props.style).backgroundColor).toBe(palette.primary);
+  });
+
+  it('a juz row reads left to right: the numbers first, its Arabic name last and isolated', () => {
+    const meta = juzMeta(1, 1, 1);
+    expect(meta.startsWith('1 page · average 1.0 · ')).toBe(true);
+    // The name sits in a first-strong isolate, so it can't turn the line right to left.
+    expect(meta).toMatch(/\u2068[\u0600-\u06FF\s]+\u2069$/);
+    expect(juzMeta(22, 2, 1.5).startsWith('2 pages · average 1.5 · ')).toBe(true);
   });
 
   it('filters are menus: strength picks a rating, the list follows', async () => {

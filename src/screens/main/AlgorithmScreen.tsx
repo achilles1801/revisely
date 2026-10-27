@@ -95,6 +95,14 @@ interface JuzRow {
   pageCount: number;
 }
 
+/**
+ * A juz row's meta: the numbers, then the juz's Arabic name in an isolate.
+ * Arabic first would make the whole line right to left ("page · average 1.0 1 · الم").
+ */
+export function juzMeta(juz: number, pageCount: number, avgStrength: number): string {
+  return `${pageCount} page${pageCount === 1 ? '' : 's'} · average ${avgStrength.toFixed(1)} · \u2068${getJuzName(juz)}\u2069`;
+}
+
 export default function AlgorithmScreen() {
   const { theme, isDark, palette } = useTheme();
   const { user, pages, logs, loadData } = useApp();
@@ -505,7 +513,7 @@ export default function AlgorithmScreen() {
                         number={row.juzNumber}
                         name={`Juz ${row.juzNumber}`}
                         rating={Math.round(row.avgStrength)}
-                        text={`${getJuzName(row.juzNumber)} · ${row.pageCount} page${row.pageCount === 1 ? '' : 's'} · average ${row.avgStrength.toFixed(1)}`}
+                        text={juzMeta(row.juzNumber, row.pageCount, row.avgStrength)}
                         onPress={() => handleJuzRowTap(row.juzNumber)}
                         accessibilityLabel={`Juz ${row.juzNumber}, ${row.pageCount} pages, average strength ${row.avgStrength.toFixed(1)}. Shows its pages`}
                         testID={`browse-juz-${row.juzNumber}`}
