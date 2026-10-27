@@ -373,6 +373,29 @@ from its edge
 (`prefetchClearQuranAround`), so ‹ › are instant and a block costs one request of the plan. A verse
 already in memory is shown in the first frame (`peekVerseText`), with no spinner.
 
+**Recitation and Audio Options** (`components/reader/PlayerCapsule`, `verse/AudioOptionsSheet`,
+`reader/SpeedMenu`, `lib/recitation.ts`, `lib/playbackPlan.ts`, `lib/audioOptions.ts`):
+- While a verse plays, the bar is ■, the speed chip (a menu of 2× … 0.25×), ⏪ ⏸ ⏩ and the
+  options icon; idle, it is ▶ (the page), the reciter and the options icon. The verse playing is
+  highlighted on the page (no verse label in the bar) and the page turns with it.
+- Audio Options: reciter, speed, From and To (two wheels each; To is never before From), Play up to
+  (Page, Surah, Juz', Custom: where To lands), Repeat (Loop, 1–10×) and Pause after each verse (Off,
+  0.5–2× the verse's length at the current speed). There is deliberately no "Play set of verses".
+  ▶ in its header plays From–To. ⏪ ⏩ stay inside the range, and the range inside the screen's pages.
+- Speed, repeat, pause and Play up to are kept per account on the phone
+  (`@revisely_audio_options:<uid>`), not synced: a synced field needs the user-doc allowlist and a
+  rules deploy first. The reciter stays on the user doc. A Custom To lasts until the app restarts.
+- The rules are pure functions in `playbackPlan.ts`, tested there and in `recitation.test.ts` with
+  fake timers. A repeat replays the verse with `replace` (it may fetch it again). The pause waits
+  `duration / speed × factor`; Pause during it holds the next step, and leaving the app pauses as
+  before. Speed is `setPlaybackRate(speed, 'high')` with `shouldCorrectPitch`.
+- **No background or lock-screen playback**: recitation pauses when the app leaves the foreground.
+  Adding it needs `UIBackgroundModes: audio` and lock-screen controls, a native change for a build.
+- `v2/WheelPicker`'s `contentOffset` is where it starts, set once. Changing it after mount moved
+  the wheel a second row on a phone (a test covers it). Maestro can't tap a wheel's rows by id (the
+  wheel is one adjustable element for VoiceOver): tap by point. Maestro takes whole-number
+  percentages only; `"26.5%"` throws an exception that a grep for `FAILED` misses.
+
 **Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
 recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore
 `users/<uid>/recordings/<id>`. It's on unless `recordingBackup === false`, Wi-Fi only unless

@@ -15,6 +15,20 @@ import { resolveVoice, shortVoiceLabel } from '../../lib/recitation';
 import { useHaptics } from '../../design/haptics';
 import { Sheet } from '../v2/Sheet';
 import { getSurahDisplay } from '../../lib/quranData';
+import { updateAudioOptions, useAudioOptions } from '../../lib/audioOptions';
+import {
+  compareVerses,
+  nextInRange,
+  PLAY_UP_TO_LABELS,
+  previousInRange,
+  rangeEnd,
+  VerseRange,
+} from '../../lib/playbackPlan';
+import { AudioOptionsSheet, verseLabel } from './AudioOptionsSheet';
+import { Anchor, SpeedMenu } from '../reader/SpeedMenu';
+
+// The last To chosen by hand (Custom), for the next Play while it still fits.
+let lastCustomTo: VerseKey | null = null;
 
 interface Options {
   /** Pages this screen shows. Playback and verse navigation stay within them. */
@@ -54,6 +68,19 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   translationIdRef.current = user?.translationId;
 
   useEffect(() => recitation.subscribe(setPlayback), [recitation]);
+
+  // Audio Options (kept per account): speed, repeats and the pause drive the
+  // shared player; "Play up to" sets where a Play ends.
+  const audio = useAudioOptions(user?.id);
+  useEffect(() => {
+    recitation.setOptions({ speed: audio.speed, repeat: audio.repeat, pauseFactor: audio.pauseFactor });
+  }, [recitation, audio.speed, audio.repeat, audio.pauseFactor]);
+  // The ayahs this screen's recitation plays: From to To.
+  const rangeRef = useRef<VerseRange | null>(null);
+  const rangeFrom = useCallback(
+    (from: VerseKey): VerseRange => ({ from, to: rangeEnd(from, audio.playUpTo, lastCustomTo) }),
+    [audio.playUpTo],
+  );
   // Leaving the screen stops the recitation it started.
   useEffect(() => () => recitation.stop(owner), [recitation, owner]);
   const mine = playback.owner === owner;
@@ -90,13 +117,19 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     setSelected(null);
   }, []);
 
-  // Play continues to the end of the juz, within this screen's pages.
-  const advance = useCallback(
-    (v: VerseKey) => {
-      const next = nextVerseInJuz(v);
-      return next && allowed.has(pageOfVerse(next)) ? next : null;
+  // Play continues to the end of its range (Play up to; the juz by default),
+  // within this screen's pages.
+  const advance = useCallback((v: VerseKey) => {
+    const range = rangeRef.current;
+    const next = range ? nextInRange(range, v) : nextVerseInJuz(v);
+    return next && allowedRef.current.has(pageOfVerse(next)) ? next : null;
+  }, []);
+  const start = useCallback(
+    (range: VerseRange) => {
+      rangeRef.current = range;
+      recitation.play(range.from, advance, owner);
     },
-    [allowed],
+    [recitation, advance, owner],
   );
 
   const play = useCallback(() => {
@@ -108,10 +141,10 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
       Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
       return;
     }
-    recitation.play(selected, advance, owner);
+    start(rangeFrom(selected));
     setMenuPoint(null);
     setSelected(null);
-  }, [selected, advance, recitation, owner]);
+  }, [selected, start, rangeFrom]);
 
   /** ▶ in the controls: recite from the first verse that begins on a page (the
    *  one continuing from the page before is part of that page's reading). */
@@ -124,9 +157,9 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
         return;
       }
-      recitation.play(first, advance, owner);
+      start(rangeFrom(first));
     },
-    [allowed, advance, recitation, owner],
+    [allowed, start, rangeFrom],
   );
 
   const openTranslation = useCallback(() => {
@@ -178,10 +211,38 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     [user, saveUser],
   );
 
-  // Previous / next verse while playing, within this screen's pages.
+  // Previous / next verse while playing, within the range and this screen's pages.
   const playingVerse = playerVisibleState(mine, playback) ? playback.verse : null;
   const stepTo = (v: VerseKey | null) =>
     v && allowed.has(pageOfVerse(v)) ? () => recitation.play(v, advance, owner) : undefined;
+  const range = rangeRef.current;
+  const previous = playingVerse ? (range ? previousInRange(range, playingVerse) : previousVerse(playingVerse)) : null;
+  const next = playingVerse ? (range ? nextInRange(range, playingVerse) : nextVerse(playingVerse)) : null;
+
+  // The speed chip's menu, and Audio Options.
+  const [speedAnchor, setSpeedAnchor] = useState<Anchor | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsStart: VerseKey = useMemo(() => {
+    if (playingVerse) return playingVerse;
+    const page = currentPageRef.current ?? pages[0] ?? 1;
+    const verses = versesOnPage(page);
+    const first = verses.find((v) => pageOfVerse(v) === page) ?? verses[0];
+    return first ? { sura: first.sura, ayah: first.ayah } : { sura: 1, ayah: 1 };
+    // Recomputed when the sheet opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsOpen]);
+  const playWithOptions = useCallback(
+    (r: VerseRange) => {
+      setOptionsOpen(false);
+      if (audio.playUpTo === 'custom') lastCustomTo = r.to;
+      if (isRecordingActive()) {
+        Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
+        return;
+      }
+      start(r);
+    },
+    [audio.playUpTo, start],
+  );
 
   /** The recitation controls, for the screen's control capsule (PlayerCapsule). */
   const player: PlayerControls = {
@@ -191,9 +252,12 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     onPause: () => recitation.pause(),
     onResume: () => recitation.resume(),
     onStop: () => recitation.stop(owner),
-    onPrevious: playingVerse ? stepTo(previousVerse(playingVerse)) : undefined,
-    onNext: playingVerse ? stepTo(nextVerse(playingVerse)) : undefined,
+    speed: audio.speed,
+    onPrevious: stepTo(previous),
+    onNext: stepTo(next),
     onPickReciter: () => setReciterPickerOpen(true),
+    onSpeed: setSpeedAnchor,
+    onOptions: () => setOptionsOpen(true),
   };
 
   const selectedSurah = selected ? getSurahDisplay(selected.sura)?.nameDisplay : undefined;
@@ -214,7 +278,7 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
       <VerseMenu
         point={menuPoint}
         verseLabel={selected ? `${selectedSurah ? `${selectedSurah} ` : ''}${selected.sura}:${selected.ayah}` : undefined}
-        playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · to the end of the juz`}
+        playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · ${playUpToPhrase(selected, audio.playUpTo)}`}
         onPlay={play}
         onTranslation={openTranslation}
         onClose={closeMenu}
@@ -231,6 +295,22 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
       <Sheet visible={reciterPickerOpen} onClose={closeReciters} title="Reciter" testID="reciter-sheet">
         {reciterList}
       </Sheet>
+      <SpeedMenu
+        anchor={speedAnchor}
+        value={audio.speed}
+        onChange={(speed) => updateAudioOptions({ speed })}
+        onClose={() => setSpeedAnchor(null)}
+      />
+      <AudioOptionsSheet
+        visible={optionsOpen}
+        onClose={() => setOptionsOpen(false)}
+        start={optionsStart}
+        options={audio}
+        onChangeOptions={updateAudioOptions}
+        reciter={user?.reciter}
+        onChangeReciter={changeReciter}
+        onPlay={playWithOptions}
+      />
     </>
   );
 
@@ -242,6 +322,15 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     /** This screen's recitation is playing, paused or loading. */
     playerVisible: playingVerse != null,
   };
+}
+
+/** "to the end of the juz", "…of the surah", "…of the page", or "to Al-Baqarah 2:141". */
+function playUpToPhrase(from: AyahRef | null, upTo: keyof typeof PLAY_UP_TO_LABELS): string {
+  if (upTo === 'custom') {
+    const to = from && lastCustomTo && compareVerses(lastCustomTo, from) >= 0 ? lastCustomTo : null;
+    return to ? `to ${verseLabel(to)}` : 'to the end of the surah';
+  }
+  return `to the end of the ${upTo === 'juz' ? 'juz' : upTo}`;
 }
 
 function playerVisibleState(mine: boolean, playback: RecitationState): boolean {

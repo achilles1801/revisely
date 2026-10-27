@@ -26,6 +26,7 @@ const mockRecitation = {
   pause: jest.fn(),
   resume: jest.fn(),
   setVoice: jest.fn(),
+  setOptions: jest.fn(),
 };
 jest.mock('../../../lib/recitation', () => ({
   ...jest.requireActual('../../../lib/recitation'),
