@@ -10,6 +10,8 @@ jest.mock('expo-audio', () => ({
       replace: jest.fn((src: any) => (p.source = src)),
       play: jest.fn(),
       pause: jest.fn(),
+      setPlaybackRate: jest.fn(),
+      shouldCorrectPitch: false,
       remove: jest.fn(),
       addListener: jest.fn((_: string, l: (s: any) => void) => listeners.push(l)),
       opts: mockOpts,
@@ -235,5 +237,132 @@ describe('reciters', () => {
     expect(voiceLabel(resolveVoice('alafasy:murattal'))).toBe('Mishary Rashid Alafasy');
     expect(shortVoiceLabel(resolveVoice('husary:muallim'))).toBe("Al-Husary (Mu'allim)");
     expect(shortVoiceLabel(resolveVoice('alafasy:murattal'))).toBe('Alafasy');
+  });
+});
+
+describe('Audio Options: repeats, pauses, speed', () => {
+  const v = (sura: number, ayah: number) => ({ sura, ayah });
+  const uri = (p: any) => String(p.source?.uri ?? '');
+  /** The verse plays and ends, `seconds` long. */
+  function playThrough(p: any, seconds = 4) {
+    p.emit({ playing: true, duration: seconds });
+    p.emit({ didJustFinish: true, duration: seconds });
+  }
+
+  it('plays each verse as many times as asked, then the next', () => {
+    const r = new Recitation();
+    r.setOptions({ repeat: 3 });
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    playThrough(p);
+    playThrough(p);
+    expect(r.getState().verse).toEqual(v(2, 1));
+    expect(p.replace).toHaveBeenCalledTimes(3);
+    playThrough(p);
+    expect(r.getState().verse).toEqual(v(2, 2));
+    expect(uri(p)).toMatch(/002002\.mp3$/);
+  });
+
+  it('a loop keeps repeating the verse until stopped', () => {
+    const r = new Recitation();
+    r.setOptions({ repeat: Infinity });
+    r.play(v(1, 1));
+    const p = mockPlayers[0];
+    for (let i = 0; i < 12; i++) playThrough(p);
+    expect(r.getState()).toMatchObject({ status: 'loading', verse: v(1, 1) });
+    r.stop();
+    playThrough(p);
+    expect(r.getState().status).toBe('idle');
+  });
+
+  it('pauses after each verse for its own length times the setting, scaled by the speed', () => {
+    const r = new Recitation();
+    r.setOptions({ pauseFactor: 1, speed: 2 });
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    playThrough(p, 4); // 4 s of audio at 2x took 2 s: a 2 s pause
+    expect(r.getState()).toMatchObject({ status: 'playing', verse: v(2, 1) });
+    jest.advanceTimersByTime(1999);
+    expect(r.getState().verse).toEqual(v(2, 1));
+    jest.advanceTimersByTime(1);
+    expect(r.getState().verse).toEqual(v(2, 2));
+  });
+
+  it('the pause comes between repeats too', () => {
+    const r = new Recitation();
+    r.setOptions({ repeat: 2, pauseFactor: 0.5 });
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    playThrough(p, 6);
+    expect(p.replace).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(3000);
+    expect(p.replace).toHaveBeenCalledTimes(2);
+    expect(r.getState().verse).toEqual(v(2, 1));
+  });
+
+  it('speed changes at once and keeps the pitch; every new verse plays at it', () => {
+    const r = new Recitation();
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    r.setOptions({ speed: 1.5 });
+    expect(p.setPlaybackRate).toHaveBeenLastCalledWith(1.5, 'high');
+    expect(p.shouldCorrectPitch).toBe(true);
+    p.setPlaybackRate.mockClear();
+    playThrough(p);
+    expect(p.setPlaybackRate).toHaveBeenCalledWith(1.5, 'high');
+  });
+
+  it('Pause during the pause after a verse holds it; Play goes straight on', () => {
+    const r = new Recitation();
+    r.setOptions({ pauseFactor: 2 });
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    playThrough(p, 5);
+    r.pause();
+    expect(r.getState()).toMatchObject({ status: 'paused', verse: v(2, 1) });
+    jest.advanceTimersByTime(60_000);
+    expect(r.getState().verse).toEqual(v(2, 1));
+    r.resume();
+    expect(r.getState()).toMatchObject({ status: 'loading', verse: v(2, 2) });
+  });
+
+  it('an interruption between verses (the app goes to the background) pauses, and resumes on', () => {
+    const r = new Recitation();
+    r.setOptions({ pauseFactor: 1 });
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    playThrough(p, 3);
+    // The finished player reports it stopped: not an interruption.
+    p.emit({ playing: false });
+    expect(r.getState().status).toBe('playing');
+    mockAppState.forEach((l) => l('background'));
+    expect(r.getState().status).toBe('paused');
+    r.resume();
+    expect(r.getState().verse).toEqual(v(2, 2));
+  });
+
+  it('Stop during the pause after a verse ends it', () => {
+    const r = new Recitation();
+    r.setOptions({ pauseFactor: 1 });
+    r.play(v(2, 1));
+    playThrough(mockPlayers[0], 3);
+    r.stop();
+    jest.advanceTimersByTime(10_000);
+    expect(r.getState().status).toBe('idle');
+  });
+
+  it('a range ends after its last verse, repeats included', () => {
+    const r = new Recitation();
+    r.setOptions({ repeat: 2 });
+    const last = v(2, 3);
+    r.play(v(2, 2), (x) => (x.ayah < last.ayah ? v(2, x.ayah + 1) : null));
+    const p = mockPlayers[0];
+    playThrough(p);
+    playThrough(p);
+    expect(r.getState().verse).toEqual(last);
+    playThrough(p);
+    expect(r.getState().verse).toEqual(last);
+    playThrough(p);
+    expect(r.getState().status).toBe('idle');
   });
 });

@@ -12,6 +12,7 @@
 
 import { AppState } from 'react-native';
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
+import { afterVerse, pauseMs } from './playbackPlan';
 import { claimAudio, onAudioClaimed, setAudioMode } from './audioFocus';
 import { nextVerseInJuz, VerseKey } from './verses';
 import { logger } from './logger';
@@ -186,6 +187,15 @@ export interface RecitationState {
 
 export const LOAD_TIMEOUT_MS = 15_000;
 
+/** How each verse plays (Audio Options; lib/playbackPlan). */
+export interface RecitationOptions {
+  speed: number;
+  /** Plays of each verse; Infinity loops it until stopped. */
+  repeat: number;
+  /** Pause after each verse, as a share of its own length. */
+  pauseFactor: number;
+}
+
 type Listener = (state: RecitationState) => void;
 
 export class Recitation {
@@ -200,6 +210,15 @@ export class Recitation {
   private started = false;
 
   private voice: string = DEFAULT_VOICE;
+  private options: RecitationOptions = { speed: 1, repeat: 1, pauseFactor: 0 };
+  /** Which play of the current verse this is (from 1). */
+  private round = 1;
+  /** The current verse's length in seconds, for the pause after it. */
+  private duration = 0;
+  // The pause after a verse: what comes next waits here. A pause or an
+  // interruption keeps it for resume.
+  private gapTimer: ReturnType<typeof setTimeout> | null = null;
+  private pending: (() => void) | null = null;
 
   constructor() {
     AppState.addEventListener('change', (s) => {
@@ -228,6 +247,34 @@ export class Recitation {
 
   getState(): RecitationState {
     return this.state;
+  }
+
+  getOptions(): RecitationOptions {
+    return this.options;
+  }
+
+  /** Speed, repeats and the pause after each verse; the speed applies at once. */
+  setOptions(next: Partial<RecitationOptions>) {
+    this.options = { ...this.options, ...next };
+    if (next.speed !== undefined) this.applySpeed();
+  }
+
+  // Faster or slower without changing the reciter's pitch.
+  private applySpeed() {
+    const player = this.player;
+    if (!player) return;
+    try {
+      player.shouldCorrectPitch = true;
+      player.setPlaybackRate(this.options.speed, 'high');
+    } catch (err) {
+      logger.warn('Recitation speed not applied', err);
+    }
+  }
+
+  private clearGap() {
+    if (this.gapTimer) clearTimeout(this.gapTimer);
+    this.gapTimer = null;
+    this.pending = null;
   }
 
   subscribe(listener: Listener): () => void {
@@ -265,15 +312,24 @@ export class Recitation {
   ) {
     this.advance = advance;
     this.owner = owner;
+    this.start(verse, 1);
+  }
+
+  /** Load and play `verse`; `round` counts its repeats. */
+  private start(verse: VerseKey, round: number) {
     // Every time: recording or playing a recording may have changed the mode.
     setAudioMode(false);
-    claimAudio('recitation', owner ?? 'recitation');
+    claimAudio('recitation', this.owner ?? 'recitation');
     const player = this.ensurePlayer();
     this.clearLoadTimer();
+    this.clearGap();
+    this.round = round;
+    this.duration = 0;
     this.started = false;
     this.set({ status: 'loading', verse });
     try {
       player.replace({ uri: recitationUrl(verse, this.voice) });
+      this.applySpeed();
       player.play();
     } catch (err) {
       logger.warn('Recitation failed to start', err);
@@ -291,6 +347,11 @@ export class Recitation {
   pause() {
     if (this.state.status !== 'playing' && this.state.status !== 'loading') return;
     this.clearLoadTimer();
+    // In the pause after a verse: keep what comes next for resume.
+    if (this.gapTimer) {
+      clearTimeout(this.gapTimer);
+      this.gapTimer = null;
+    }
     this.player?.pause();
     this.set({ status: 'paused', verse: this.state.verse });
   }
@@ -298,9 +359,14 @@ export class Recitation {
   resume() {
     const { status, verse } = this.state;
     if (!verse) return;
-    if (status === 'error') return this.play(verse, this.advance);
+    if (status === 'error') return this.start(verse, this.round);
     if (status !== 'paused') return;
-    if (!this.started) return this.play(verse, this.advance);
+    if (this.pending) {
+      const go = this.pending;
+      this.pending = null;
+      return go();
+    }
+    if (!this.started) return this.start(verse, this.round);
     this.player?.play();
     this.set({ status: 'playing', verse });
   }
@@ -310,6 +376,7 @@ export class Recitation {
     if (owner !== undefined && this.state.owner !== owner) return;
     if (this.state.status === 'idle') return;
     this.clearLoadTimer();
+    this.clearGap();
     this.player?.pause();
     this.set({ status: 'idle', verse: null });
   }
@@ -317,15 +384,34 @@ export class Recitation {
   private onStatus(s: AudioStatus) {
     const { status, verse } = this.state;
     if (!verse || status === 'idle' || status === 'error') return;
+    if (s.duration > 0) this.duration = s.duration;
     if (s.didJustFinish) {
       // Only a verse that is playing moves on: a pause just before the end
       // stays paused.
-      if (status !== 'playing') return;
-      const next = this.advance(verse);
-      if (next) this.play(next, this.advance);
-      else this.stop();
+      if (status !== 'playing' || this.gapTimer || this.pending) return;
+      const again = afterVerse(this.round, this.options.repeat) === 'again';
+      const next = again ? verse : this.advance(verse);
+      if (!next) {
+        this.stop();
+        return;
+      }
+      const round = again ? this.round + 1 : 1;
+      const go = () => this.start(next, round);
+      const wait = pauseMs(this.duration, this.options.speed, this.options.pauseFactor);
+      if (wait <= 0) return go();
+      // The pause after the verse: still "playing" (Pause holds it).
+      this.pending = go;
+      this.gapTimer = setTimeout(() => {
+        this.gapTimer = null;
+        const run = this.pending;
+        this.pending = null;
+        run?.();
+      }, wait);
       return;
     }
+    // Between verses (the pause after one): the finished player's own updates
+    // say nothing about what comes next.
+    if (this.gapTimer || this.pending) return;
     if (s.playbackState === 'failed') {
       this.clearLoadTimer();
       this.set({ status: 'error', verse });

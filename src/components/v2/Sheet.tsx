@@ -18,10 +18,16 @@ import { useTheme } from '../../context/ThemeContext';
 import { Backdrop } from '../Backdrop';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
+import { Ionicons } from '@expo/vector-icons';
 
-/** A text button in a sheet's header ("Cancel", "Save"). */
+/** A button in a sheet's header: text ("Cancel", "Save") or an icon (✕, ▶). */
 export interface SheetHeaderAction {
+  /** Its text, or for an icon its accessibility label. */
   label: string;
+  /** Show this icon instead of the text. */
+  icon?: keyof typeof Ionicons.glyphMap;
+  /** The icon in a round primary button (the sheet's main action). */
+  round?: boolean;
   onPress: () => void;
   /** The confirming action: semibold. */
   strong?: boolean;
@@ -205,17 +211,29 @@ function HeaderButton({ action }: { action: SheetHeaderAction }) {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={action.label}
-      style={action.disabled && { opacity: 0.4 }}
+      style={[action.round && [styles.round, { backgroundColor: palette.primary }], action.disabled && { opacity: 0.4 }]}
       testID={action.testID}
     >
-      <Text style={[typeV2.menu, action.strong && styles.strong, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-        {action.label}
-      </Text>
+      {action.icon ? (
+        <Ionicons
+          name={action.icon}
+          size={action.round ? 18 : 24}
+          color={action.round ? palette.onPrimary : palette.text}
+          style={action.round && action.icon === 'play' ? styles.playNudge : undefined}
+        />
+      ) : (
+        <Text style={[typeV2.menu, action.strong && styles.strong, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+          {action.label}
+        </Text>
+      )}
     </Tap>
   );
 }
 
 const styles = StyleSheet.create({
+  round: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  // The play triangle looks centred a point to the right.
+  playNudge: { marginLeft: 2 },
   fill: { flex: 1 },
   bottom: { flex: 1, justifyContent: 'flex-end' },
   sheet: {

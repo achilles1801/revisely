@@ -51,18 +51,21 @@ const hidden = { includeHiddenElements: true };
 const controls = (over: Partial<PlayerControls> = {}): PlayerControls => ({
   state: { status: 'idle', verse: null },
   voiceName: 'Husary · Muallim',
+  speed: 1,
   onPlayPage: jest.fn(),
   onPause: jest.fn(),
   onResume: jest.fn(),
   onStop: jest.fn(),
   onPickReciter: jest.fn(),
+  onSpeed: jest.fn(),
+  onOptions: jest.fn(),
   ...over,
 });
 
 const SURFACE = { background: '#F7F7F8', border: '#E5E7EB' };
 
 describe('<PlayerCapsule />', () => {
-  it('idle: ▶ recites from the top of the page; the reciter opens the picker', async () => {
+  it('idle: ▶ recites from the top of the page; the reciter opens the picker; Audio Options', async () => {
     const player = controls();
     withTheme(<PlayerCapsule surface={SURFACE} player={player} page={3} />);
     fireEvent.press(await screen.findByLabelText('Play from this page'));
@@ -70,17 +73,23 @@ describe('<PlayerCapsule />', () => {
     expect(screen.getByText('Husary · Muallim')).toBeTruthy();
     fireEvent.press(screen.getByLabelText(/Choose reciter/));
     expect(player.onPickReciter).toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Audio options'));
+    expect(player.onOptions).toHaveBeenCalled();
     expect(screen.queryByLabelText('Stop')).toBeNull();
   });
 
-  it('reciting: the verse, stop, previous, pause, next', async () => {
+  it('reciting: stop, speed, previous, pause, next, Audio Options (the verse is highlighted on the page instead)', async () => {
     const player = controls({
       state: { status: 'playing', verse: { sura: 2, ayah: 57 } },
+      speed: 1.25,
       onPrevious: jest.fn(),
       onNext: jest.fn(),
     });
     withTheme(<PlayerCapsule surface={SURFACE} player={player} page={3} />);
-    expect(await screen.findByText(/2:57/)).toBeTruthy();
+    expect(await screen.findByText('1.25×')).toBeTruthy();
+    expect(screen.queryByText(/2:57/)).toBeNull();
+    fireEvent.press(screen.getByLabelText('Audio options'));
+    expect(player.onOptions).toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('Pause'));
     expect(player.onPause).toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('Previous verse'));

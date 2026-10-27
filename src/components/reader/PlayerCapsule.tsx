@@ -1,12 +1,13 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { getSurahDisplay } from '../../lib/quranData';
+import { speedLabel } from '../../lib/playbackPlan';
 import type { RecitationState } from '../../lib/recitation';
+import type { Anchor } from './SpeedMenu';
 
 /** Height of the capsule; the reader keeps this much free under the page. */
 export const CAPSULE_HEIGHT = 52;
@@ -17,6 +18,8 @@ export interface PlayerControls {
   state: RecitationState;
   /** Who recites (reciter and style). */
   voiceName: string;
+  /** Playback speed (1 = normal). */
+  speed: number;
   /** Recite from the top of a page. */
   onPlayPage: (page: number) => void;
   onPause: () => void;
@@ -26,6 +29,10 @@ export interface PlayerControls {
   onPrevious?: () => void;
   onNext?: () => void;
   onPickReciter: () => void;
+  /** The speed chip: its menu opens above `anchor`. */
+  onSpeed: (anchor: Anchor) => void;
+  /** Audio Options (reciter, speed, the ayahs to play, repeats, pauses). */
+  onOptions: () => void;
 }
 
 interface PlayerCapsuleProps {
@@ -45,10 +52,10 @@ interface PlayerCapsuleProps {
 }
 
 /**
- * The reader's one control capsule, under the page (never over it): the
- * recitation (▶ from the top of the page and the reciter, or, while reciting,
- * stop · the verse · previous · play/pause · next), then recording and the
- * timer.
+ * The reader's one control capsule, under the page (never over it). Idle: ▶
+ * from the top of the page, the reciter, and Audio Options. While reciting:
+ * stop · speed · previous · play/pause · next · Audio Options (the verse
+ * itself is highlighted on the page). Then recording and the timer.
  */
 export function PlayerCapsule({ player, page, record, timer, trailing, compact, surface }: PlayerCapsuleProps) {
   const { theme } = useTheme();
@@ -56,12 +63,14 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
   const active = state.status !== 'idle' && state.verse != null;
   const playing = state.status === 'playing';
   const failed = state.status === 'error';
+  const chip = useRef<View>(null);
 
   const iconBtn = (
     icon: keyof typeof Ionicons.glyphMap,
     label: string,
     onPress: (() => void) | undefined,
     size = 18,
+    testID?: string,
   ) => (
     <Pressable
       onPress={onPress}
@@ -71,12 +80,38 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !onPress }}
+      testID={testID}
     >
       <Ionicons name={icon} size={size} color={onPress ? theme.textPrimary : theme.textMuted} />
     </Pressable>
   );
 
-  const surah = active ? (getSurahDisplay(state.verse!.sura)?.nameDisplay ?? '') : '';
+  const openSpeed = () =>
+    chip.current?.measureInWindow((x, y, width, height) => player.onSpeed({ x, y, width, height }));
+
+  const playPause = (
+    <Pressable
+      onPress={playing ? player.onPause : player.onResume}
+      hitSlop={6}
+      style={[styles.playBtn, { backgroundColor: theme.accent }]}
+      accessibilityRole="button"
+      accessibilityLabel={playing ? 'Pause' : failed ? 'Retry' : 'Play'}
+      testID="player-play-pause"
+    >
+      {state.status === 'loading' ? (
+        <ActivityIndicator size="small" color={theme.onAccent} />
+      ) : (
+        <Ionicons
+          name={playing ? 'pause' : failed ? 'refresh' : 'play'}
+          size={18}
+          color={theme.onAccent}
+          style={!playing && !failed ? styles.playIcon : undefined}
+        />
+      )}
+    </Pressable>
+  );
+
+  const options = iconBtn('options-outline', 'Audio options', player.onOptions, 20, 'player-options');
 
   return (
     <View
@@ -86,69 +121,70 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
       ]}
       testID="player-capsule"
     >
-      {active && iconBtn('stop', 'Stop', player.onStop, 15)}
-      {!active && (
-        <Pressable
-          onPress={() => player.onPlayPage(page)}
-          hitSlop={6}
-          style={[styles.playBtn, { backgroundColor: theme.accent }]}
-          accessibilityRole="button"
-          accessibilityLabel="Play from this page"
-        >
-          <Ionicons name="play" size={18} color={theme.onAccent} style={styles.playIcon} />
-        </Pressable>
-      )}
-      <Pressable
-        style={styles.text}
-        onPress={player.onPickReciter}
-        accessibilityRole="button"
-        accessibilityLabel={`${active ? `${surah} ${state.verse!.sura}:${state.verse!.ayah}, ` : ''}${player.voiceName}. Choose reciter`}
-      >
-        {active && (
-          <Text
-            style={[typography.bodySmall, styles.verse, { color: theme.textPrimary }]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
-          >
-            {state.verse!.sura}:{state.verse!.ayah} · {surah}
-          </Text>
-        )}
-        <View style={styles.voiceRow}>
-          <Text
-            style={[
-              active ? typography.caption : typography.bodySmall,
-              { color: failed ? theme.error : active ? theme.textSecondary : theme.textPrimary, flexShrink: 1 },
-            ]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
-          >
-            {failed ? 'Couldn’t play. Check your connection.' : player.voiceName}
-          </Text>
-          {!failed && <Ionicons name="chevron-down" size={12} color={theme.textMuted} />}
-        </View>
-      </Pressable>
-      {active && !compact && iconBtn('play-skip-back', 'Previous verse', player.onPrevious)}
-      {active && (
-        <Pressable
-          onPress={playing ? player.onPause : player.onResume}
-          hitSlop={6}
-          style={[styles.playBtn, { backgroundColor: theme.accent }]}
-          accessibilityRole="button"
-          accessibilityLabel={playing ? 'Pause' : failed ? 'Retry' : 'Play'}
-        >
-          {state.status === 'loading' ? (
-            <ActivityIndicator size="small" color={theme.onAccent} />
+      {active ? (
+        <>
+          {iconBtn('stop', 'Stop', player.onStop, 15, 'player-stop')}
+          {failed ? (
+            <Text
+              style={[typography.caption, styles.text, { color: theme.error }]}
+              numberOfLines={2}
+              maxFontSizeMultiplier={1.2}
+              accessibilityLiveRegion="polite"
+            >
+              Couldn’t play. Check your connection.
+            </Text>
           ) : (
-            <Ionicons
-              name={playing ? 'pause' : failed ? 'refresh' : 'play'}
-              size={18}
-              color={theme.onAccent}
-              style={!playing && !failed ? styles.playIcon : undefined}
-            />
+            <>
+              <Pressable
+                ref={chip}
+                onPress={openSpeed}
+                hitSlop={6}
+                style={[styles.speed, { borderColor: theme.border }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Speed ${speedLabel(player.speed)}. Change speed`}
+                testID="player-speed"
+              >
+                <Text style={[typography.caption, styles.speedText, { color: theme.textPrimary }]} maxFontSizeMultiplier={1.2}>
+                  {speedLabel(player.speed)}
+                </Text>
+              </Pressable>
+              <View style={styles.spacer} />
+              {!compact && iconBtn('play-back', 'Previous verse', player.onPrevious, 20, 'player-previous')}
+            </>
           )}
-        </Pressable>
+          {playPause}
+          {!failed && !compact && iconBtn('play-forward', 'Next verse', player.onNext, 20, 'player-next')}
+          {!failed && <View style={styles.spacer} />}
+          {options}
+        </>
+      ) : (
+        <>
+          <Pressable
+            onPress={() => player.onPlayPage(page)}
+            hitSlop={6}
+            style={[styles.playBtn, { backgroundColor: theme.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel="Play from this page"
+            testID="player-play-page"
+          >
+            <Ionicons name="play" size={18} color={theme.onAccent} style={styles.playIcon} />
+          </Pressable>
+          <Pressable
+            style={styles.text}
+            onPress={player.onPickReciter}
+            accessibilityRole="button"
+            accessibilityLabel={`${player.voiceName}. Choose reciter`}
+          >
+            <View style={styles.voiceRow}>
+              <Text style={[typography.bodySmall, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+                {player.voiceName}
+              </Text>
+              <Ionicons name="chevron-down" size={12} color={theme.textMuted} />
+            </View>
+          </Pressable>
+          {options}
+        </>
       )}
-      {active && !compact && iconBtn('play-skip-forward', 'Next verse', player.onNext)}
       {(record || timer || trailing) && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
       {record}
       {timer}
@@ -168,7 +204,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   text: { flex: 1, paddingHorizontal: spacing.xs, justifyContent: 'center', minWidth: 0 },
-  verse: { fontWeight: '600' },
+  spacer: { flex: 1, minWidth: 0 },
+  speed: {
+    minWidth: 40,
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  speedText: { fontWeight: '600' },
   voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   iconBtn: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   playBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
