@@ -30,7 +30,7 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
 import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
-import { ACCENTS, AccentName, DEFAULT_ACCENT, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
+import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
 import type { RevisionLog, UserPage } from '../../types';
 
 beforeEach(async () => {
@@ -185,8 +185,9 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('Jade is the design as agreed: ink buttons, grey links, no glow', () => {
-    expect([paletteLight.primary, paletteLight.link, paletteLight.done, paletteLight.hero]).toEqual(['#1A1A1A', '#6B7280', '#0E6B5A', null]);
+  it('Jade is the design as agreed: ink buttons, grey links; a jade glow in light only', () => {
+    expect([paletteLight.primary, paletteLight.link, paletteLight.done]).toEqual(['#1A1A1A', '#6B7280', '#0E6B5A']);
+    expect(paletteLight.hero?.[0].color).toBe('#3FA084');
     expect([paletteDark.primary, paletteDark.link, paletteDark.done, paletteDark.hero]).toEqual(['#FFFFFF', '#8A8A93', '#4DBA9F', null]);
     // Classic names, as before the accents.
     expect(v2ThemeColors(false).accent).toBe('#1A1A1A');
@@ -202,6 +203,53 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect([indigo.primary, indigo.done, indigo.link]).toEqual(['#624BD5', '#624BD5', '#9789DA']);
     expect(indigo.hero?.[0].color).toBe('#2E0EC6');
     expect(paletteV2(false, 'indigo').heat.slice(1, 4)).toEqual(['#9789DA', '#624BD5', '#2E0EC6']);
+  });
+});
+
+describe('Home’s glow in light', () => {
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const f = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const channel = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+  /** The accent at `alpha` over the ground, as the screen composites it. */
+  const over = (color: string, alpha: number, ground: string) =>
+    '#' +
+    [0, 1, 2]
+      .map((i) => Math.round(channel(color, i) * alpha + channel(ground, i) * (1 - alpha)))
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('');
+  const alphaAt = (stops: readonly { offset: number; opacity: number }[], offset: number) => {
+    for (let i = 1; i < stops.length; i++) {
+      const a = stops[i - 1];
+      const b = stops[i];
+      if (offset <= b.offset) return a.opacity + ((offset - a.offset) / (b.offset - a.offset)) * (b.opacity - a.opacity);
+    }
+    return 0;
+  };
+
+  it.each(ACCENTS)('%s: clearly there behind the top bar, gone before the first grey text', (accent) => {
+    const p = paletteV2(false, accent);
+    expect(p.hero).not.toBeNull();
+    const stops = p.hero!;
+    // Visible: at least a fifth of the accent at the top.
+    expect(stops[0].opacity).toBeGreaterThanOrEqual(0.2);
+    // The top bar's ink and Home's first grey line stay readable over it.
+    expect(contrast(p.text, over(stops[0].color, stops[0].opacity, p.bg))).toBeGreaterThanOrEqual(4.5);
+    const atText = over(stops[0].color, alphaAt(stops, HERO_FIRST_TEXT_OFFSET), p.bg);
+    expect(contrast(p.secondary, atText)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.link, atText)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('dark is as it was', () => {
+    expect(paletteV2(true, 'indigo').hero?.[0]).toEqual({ offset: 0, color: '#2E0EC6', opacity: 0.45 });
+    expect(paletteV2(true, 'crimson').hero?.[0]).toEqual({ offset: 0, color: '#3E0812', opacity: 1 });
+    expect(paletteV2(true, 'jade').hero).toBeNull();
   });
 });
 
