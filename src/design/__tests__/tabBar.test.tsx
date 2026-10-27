@@ -7,6 +7,7 @@ jest.mock('@expo/vector-icons', () => {
   return { Ionicons: ({ name, color }: { name: string; color: string }) => <Text testID={`icon-${name}`}>{color}</Text> };
 });
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
+require('react-native-gesture-handler/jestSetup');
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn() }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
@@ -113,12 +114,12 @@ describe('tab presses', () => {
 describe('the tab bar in a real navigator', () => {
   // Required here so the mocks above apply.
   const { NavigationContainer, useScrollToTop } = require('@react-navigation/native');
-  const { createBottomTabNavigator } = require('@react-navigation/bottom-tabs');
+  const { createPagerTabNavigator } = require('../../navigation/PagerTabs');
   const { createNativeStackNavigator } = require('@react-navigation/native-stack');
   const { Text, Pressable, ScrollView } = require('react-native');
 
   it('re-tapping Read pops its stack to the first screen, then scrolls it to the top', async () => {
-    const Tab = createBottomTabNavigator();
+    const Tab = createPagerTabNavigator();
     const Stack = createNativeStackNavigator();
     const scrollTo = jest.fn();
 
@@ -153,7 +154,7 @@ describe('the tab bar in a real navigator', () => {
           <Tab.Navigator
             initialRouteName="Read"
             tabBar={(props: any) => <TabBar {...props} />}
-            screenOptions={{ headerShown: false }}
+            swipeableCount={3}
           >
             <Tab.Screen name="Home" component={Home} />
             <Tab.Screen name="Read" component={ReadStack} />

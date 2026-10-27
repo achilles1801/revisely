@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
 import DashboardScreen from '../screens/main/DashboardScreen';
@@ -20,7 +19,7 @@ import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
 import { TabBar } from './TabBar';
-import { withTabSwipe } from './TabSwipe';
+import { createPagerTabNavigator } from './PagerTabs';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
@@ -59,12 +58,9 @@ export type ReadStackParamList = {
   QuranReader: { pageNumber: number; source?: 'index' | 'recent' };
 };
 
-const Tab = createBottomTabNavigator<MainTabParamList>();
-
-// Each tab's main screen swipes sideways to the next tab (navigation/TabSwipe).
-const SwipeableDashboard = withTabSwipe('Home', DashboardScreen);
-const SwipeableReadIndex = withTabSwipe('Read', ReadIndexScreen);
-const SwipeableInsights = withTabSwipe('Insights', AlgorithmScreen);
+// The tabs are one pager: a sideways swipe on a tab's main screen moves to the
+// tab beside it, the incoming tab visible as it slides (navigation/PagerTabs).
+const Tab = createPagerTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const ReadStack = createNativeStackNavigator<ReadStackParamList>();
 
@@ -88,7 +84,7 @@ function HomeStackNavigator() {
         animation: 'slide_from_right',
       }}
     >
-      <HomeStack.Screen name="Dashboard" component={SwipeableDashboard} />
+      <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
       <HomeStack.Screen name="ActiveRevision" component={ActiveRevisionScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
@@ -111,7 +107,7 @@ function ReadStackNavigator() {
         animation: 'slide_from_right',
       }}
     >
-      <ReadStack.Screen name="ReadIndex" component={SwipeableReadIndex} />
+      <ReadStack.Screen name="ReadIndex" component={ReadIndexScreen} />
       <ReadStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </ReadStack.Navigator>
   );
@@ -147,12 +143,12 @@ export function MainNavigator() {
               />
             );
           }}
-          // Tabs slide sideways when they change, so a swipe reads as moving across.
-          screenOptions={{ headerShown: false, animation: 'shift' }}
+          // Insights is swiped to only while Smart Tracking is on.
+          swipeableCount={smartTrackingEnabled ? 3 : 2}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />
-          <Tab.Screen name="Insights" component={SwipeableInsights} />
+          <Tab.Screen name="Insights" component={AlgorithmScreen} />
         </Tab.Navigator>
       </View>
       <SmartTrackingPreviewScreen
