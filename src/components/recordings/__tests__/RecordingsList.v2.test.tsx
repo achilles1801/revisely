@@ -122,7 +122,7 @@ const contrast = (a: string, b: string) => {
 async function renderV2(ui: React.ReactElement, { dark = false, accent = 'indigo' as AccentName } = {}) {
   await AsyncStorage.setItem('@revisely_theme_v2', dark ? 'dark' : 'light');
   render(
-    <DesignProvider initial={{ allowed: true, chosen: 'new', accent }}>
+    <DesignProvider initial={{ accent }}>
       <ThemeProvider>{ui}</ThemeProvider>
     </DesignProvider>,
   );
@@ -149,8 +149,6 @@ describe('<RecordingsList /> in the new design', () => {
     expect(screen.getByTestId('recording-r1-menu')).toBeTruthy();
     expect(screen.getByText('Revision')).toBeTruthy();
     // No glass card in the new design.
-    const { GlassCard } = require('../../GlassCard');
-    expect(screen.UNSAFE_queryAllByType(GlassCard)).toHaveLength(0);
   });
 
   it('draws the recorded levels: bars of different heights, none played yet', async () => {
@@ -319,7 +317,7 @@ describe('recording controls in the new design', () => {
       finish: jest.fn(),
       ...extra,
     }) as any;
-  const button = (r: any) => <RecordButton recorder={r} color="#000000" background="#FFFFFF" border="#CCCCCC" />;
+  const button = (r: any) => <RecordButton recorder={r} />;
 
   it.each([false, true])('recording (dark %s): a solid red pill, its contents in the ground colour', async (dark) => {
     const p = paletteV2(dark, 'indigo');
@@ -346,7 +344,7 @@ describe('recording controls in the new design', () => {
     expect(r.resume).toHaveBeenCalled();
   });
 
-  it('idle: a round mic in the palette (the screen’s classic colours are not used)', async () => {
+  it('idle: a round mic in the palette', async () => {
     const p = paletteV2(true, 'indigo');
     const r = recorder('idle');
     await renderV2(button(r), { dark: true });

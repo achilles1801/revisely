@@ -66,8 +66,9 @@ jest.mock('../../lib/audioFocus', () => ({
   },
 }));
 jest.mock('../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
-// Classic unless a test switches to the new design.
-const mockDesign = { isNew: false, hapticsOn: true };
+// The design state: haptics on unless a test turns
+// them off (Settings → Haptics).
+const mockDesign = { hapticsOn: true };
 jest.mock('../../design/DesignContext', () => ({ useDesign: () => mockDesign }));
 
 import * as Haptics from 'expo-haptics';
@@ -78,7 +79,6 @@ import { hasRecordingSession, isRecordingActive } from '../../lib/recordings';
 let appStateListeners: Array<(s: string) => void> = [];
 beforeEach(() => {
   jest.clearAllMocks();
-  mockDesign.isNew = false;
   mockDesign.hapticsOn = true;
   mockUri = 0;
   appStateListeners = [];
@@ -724,15 +724,7 @@ describe('haptics', () => {
     return { afterStart, afterTaps };
   };
 
-  it('classic: unchanged (medium on start, light on pause and resume, success on stop)', async () => {
-    const { afterStart, afterTaps } = await run();
-    expect(afterStart).toBe(1);
-    expect(afterTaps).toBe(3);
-    expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
-  });
-
-  it('new design: one impact on start and on stop; pause and resume are taps, which do not buzz', async () => {
-    mockDesign.isNew = true;
+  it('one impact on start and on stop; pause and resume are taps, which do not buzz', async () => {
     const { afterStart, afterTaps } = await run();
     expect(afterStart).toBe(1);
     expect(afterTaps).toBe(1);
@@ -741,8 +733,7 @@ describe('haptics', () => {
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
 
-  it('new design with Settings → Haptics off: none', async () => {
-    mockDesign.isNew = true;
+  it('with Settings → Haptics off: none', async () => {
     mockDesign.hapticsOn = false;
     await run();
     expect(Haptics.impactAsync).not.toHaveBeenCalled();

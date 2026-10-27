@@ -29,7 +29,7 @@ const recorder = (phase: string, extra: object = {}) =>
 const renderButton = (r: any) =>
   render(
     <ThemeProvider>
-      <RecordButton recorder={r} color="#000" background="#fff" border="#ccc" />
+      <RecordButton recorder={r} />
     </ThemeProvider>,
   );
 

@@ -20,7 +20,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { useDesign } from '../design/DesignContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl } from '../lib/quranImages';
 import {
@@ -80,7 +79,7 @@ interface PageItemProps {
    *  run onto the next page). */
   highlight: AyahRef | null;
   highlightColor: string;
-  /** The highlight's opacity (the new design tints with a palette colour). */
+  /** The highlight's opacity (it tints with a palette colour). */
   highlightOpacity?: number;
   pageTint: string | null;
   tintColor: string;
@@ -232,9 +231,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   },
   ref,
 ) {
-  const { isDark, theme, palette: v2 } = useTheme();
-  const { isNew: isNewDesign } = useDesign();
-  const palette = getReadPalette(isDark, isNewDesign);
+  const { isDark, palette: v2 } = useTheme();
+  const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
   const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_SIZE);
   const currentIndexRef = useRef(0);
@@ -326,8 +324,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
-  // The verse a sheet is about is tinted: the accent's text colour at a
-  // quarter in the new design, the classic accent with alpha otherwise.
+  // The verse a sheet is about is tinted: the accent's text colour at a quarter.
   const renderItem = useCallback(
     ({ item }: { item: number }) => (
       <PageItem
@@ -335,15 +332,15 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         onTap={onTap}
         onLongPressAyah={onLongPressAyah}
         highlight={highlightedAyah ?? null}
-        highlightColor={isNewDesign ? v2.accentText : theme.accent + '40'}
-        highlightOpacity={isNewDesign ? 0.25 : undefined}
+        highlightColor={v2.accentText}
+        highlightOpacity={0.25}
         pageTint={palette.pageTint}
         tintColor={palette.textPrimary}
         bg={palette.pageBg}
         size={pageSize}
       />
     ),
-    [onTap, onLongPressAyah, highlightedAyah, theme.accent, isNewDesign, v2, palette, pageSize],
+    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize],
   );
 
   return (

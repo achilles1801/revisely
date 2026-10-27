@@ -26,7 +26,7 @@ import { SectionFooter } from '../../components/plan/Grouped';
 import { DEFAULT_ACCENT, paletteLight, paletteV2 } from '../../theme/v2';
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );

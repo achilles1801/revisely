@@ -1,36 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import { useTheme } from '../../context/ThemeContext';
-import { useDesign } from '../../design/DesignContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 
 interface RecordButtonProps {
   recorder: ReturnType<typeof useVoiceRecorder>;
-  /** Icon colour when idle (screens use their own palettes; classic only). */
-  color: string;
-  /** Background of the idle and paused controls (classic only). */
-  background: string;
-  border: string;
 }
-
-const RED = '#E5484D';
 
 /** Recorded time now: what was saved plus the stretch in progress. */
 export function recordedMs(baseMs: number, segmentStartedAt: number | null, now: number): number {
   return baseMs + (segmentStartedAt != null ? Math.max(0, now - segmentStartedAt) : 0);
-}
-
-/**
- * The session's recording control. Idle: a mic. Then one pill: the time (tap to
- * pause or resume) and a stop square that ends the recording.
- */
-export function RecordButton(props: RecordButtonProps) {
-  const { isNew } = useDesign();
-  return isNew ? <RecordButtonV2 recorder={props.recorder} /> : <RecordButtonClassic {...props} />;
 }
 
 /** Ticks while recording, for the time shown. */
@@ -48,87 +31,14 @@ function useRecordingNow(phase: string): number {
 const pillShown = (phase: string, baseMs: number, segmentStartedAt: number | null) =>
   !(phase === 'idle' || (phase === 'starting' && baseMs === 0 && segmentStartedAt == null));
 
-function RecordButtonClassic({ recorder, color, background, border }: RecordButtonProps) {
-  const { phase, baseMs, segmentStartedAt, interrupted } = recorder;
-  const now = useRecordingNow(phase);
-
-  if (phase === 'idle' || (phase === 'starting' && baseMs === 0 && segmentStartedAt == null)) {
-    return (
-      <Pressable
-        onPress={recorder.start}
-        disabled={phase === 'starting'}
-        hitSlop={8}
-        style={[styles.round, { backgroundColor: background, borderColor: border }]}
-        accessibilityRole="button"
-        accessibilityLabel="Record your recitation"
-      >
-        {phase === 'starting' ? (
-          <ActivityIndicator size="small" color={color} />
-        ) : (
-          <Ionicons name="mic-outline" size={18} color={color} />
-        )}
-      </Pressable>
-    );
-  }
-
-  const time = formatRecordingTime(recordedMs(baseMs, segmentStartedAt, now));
-  const recording = phase === 'recording';
-  const busy = phase === 'starting' || phase === 'finishing';
-  const fg = recording ? '#fff' : RED;
-
-  // One pill, visibly a recording control (red, a timer, a stop square) and
-  // never a check mark, so it can't be mistaken for the session's ✓.
-  return (
-    <View
-      style={[
-        styles.pill,
-        recording ? { backgroundColor: RED } : { backgroundColor: background, borderColor: RED, borderWidth: 1 },
-      ]}
-    >
-      <Pressable
-        onPress={recording ? recorder.pause : recorder.resume}
-        disabled={busy}
-        hitSlop={{ top: 6, bottom: 6, left: 6 }}
-        style={styles.segment}
-        accessibilityRole="button"
-        accessibilityLabel={
-          recording
-            ? `Pause recording, ${time} recorded`
-            : `${interrupted ? 'Recording was paused by an interruption. ' : ''}Resume recording, ${time} recorded`
-        }
-      >
-        {busy ? (
-          <ActivityIndicator size="small" color={fg} />
-        ) : recording ? (
-          <View style={styles.dot} />
-        ) : (
-          <Ionicons name="play" size={12} color={RED} />
-        )}
-        <Text style={[styles.time, { color: fg }]}>{time}</Text>
-        {recording && <Ionicons name="pause" size={13} color="#fff" />}
-      </Pressable>
-      <View style={[styles.divider, { backgroundColor: recording ? 'rgba(255,255,255,0.45)' : RED + '55' }]} />
-      <Pressable
-        onPress={recorder.finish}
-        disabled={busy}
-        hitSlop={{ top: 6, bottom: 6, right: 6 }}
-        style={styles.stopBtn}
-        accessibilityRole="button"
-        accessibilityLabel="Stop recording"
-      >
-        <View style={[styles.stopSquare, { backgroundColor: fg }]} />
-      </Pressable>
-    </View>
-  );
-}
-
 /**
- * The new design: the same control in its tokens. Idle, a round mic like the
- * timer's; recording, a solid red pill (`red`, its contents in the ground's
+ * The session's recording control. Idle: a round mic like the timer's. Then one
+ * pill: the time (tap to pause or resume) and a stop square that ends the
+ * recording. Recording, a solid red pill (`red`, its contents in the ground's
  * colour, ≥ 4.5:1 both modes); paused, the pill outlined in red. Taps don't
  * buzz; the recorder marks start and stop (design/haptics).
  */
-function RecordButtonV2({ recorder }: { recorder: RecordButtonProps['recorder'] }) {
+export function RecordButton({ recorder }: RecordButtonProps) {
   const { palette } = useTheme();
   const { phase, baseMs, segmentStartedAt, interrupted } = recorder;
   const now = useRecordingNow(phase);
@@ -232,9 +142,7 @@ const styles = StyleSheet.create({
   divider: { width: StyleSheet.hairlineWidth * 2, height: 18 },
   stopBtn: { height: 34, paddingLeft: 9, paddingRight: 12, justifyContent: 'center' },
   stopSquare: { width: 11, height: 11, borderRadius: 2 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   time: { fontWeight: '700', fontVariant: ['tabular-nums'], fontSize: 14 },
-  // The new design.
   dotV2: { width: 8, height: 8, borderRadius: 4 },
   dividerV2: { opacity: 0.4 },
 });

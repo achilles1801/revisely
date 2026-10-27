@@ -9,9 +9,9 @@ import type { RevisionLog, User, UserPage } from '../../../types';
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('expo-haptics', () => ({
-  selectionAsync: jest.fn(),
-  impactAsync: jest.fn(),
-  notificationAsync: jest.fn(),
+  selectionAsync: jest.fn(async () => undefined),
+  impactAsync: jest.fn(async () => undefined),
+  notificationAsync: jest.fn(async () => undefined),
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's' },
 }));
@@ -61,8 +61,8 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 jest.mock('../../../context/ThemeContext', () => {
-  const { colors } = require('../../../theme/colors');
-  return { useTheme: () => ({ theme: colors, isDark: false }) };
+  const { paletteLight, v2ThemeColors } = require('../../../theme/v2');
+  return { useTheme: () => ({ theme: v2ThemeColors(false), isDark: false, palette: paletteLight }) };
 });
 
 const DAY_PAGES = [331, 332, 333, 334, 335, 336, 337, 338, 339, 340];

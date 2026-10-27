@@ -17,11 +17,7 @@ jest.mock('expo-haptics', () => ({
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // Any glass left in the new design would show up as this.
-jest.mock('../../../components/GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" /> };
-});
-jest.mock('../../../components/LiquidGlassTabBar', () => ({ useTabBarFootprint: () => 0 }));
+jest.mock('../../../navigation/TabBar', () => ({ useTabBarFootprint: () => 0 }));
 jest.mock('../../../components/settings/AppInfo', () => ({ AppInfo: () => null }));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
@@ -76,7 +72,7 @@ const flat = (style: unknown): Record<string, any> => StyleSheet.flatten(style a
 
 async function renderV2() {
   render(
-    <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+    <DesignProvider initial={{}}>
       <ThemeProvider>
         <SettingsScreen />
       </ThemeProvider>
@@ -94,7 +90,6 @@ beforeEach(async () => {
 describe('Settings in the new design: its sheets and rows', () => {
   it('has no glass anywhere; Smart Tracking says what it does under its label; the version line is metadata', async () => {
     await renderV2();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(screen.getByTestId('smart-tracking-row')).toBeTruthy();
     expect(screen.getByText(/Turn on to rate pages/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: palette.secondary })]),

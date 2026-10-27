@@ -57,8 +57,8 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
 }));
 jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: null, saveUser: jest.fn() }) }));
 jest.mock('../../../context/ThemeContext', () => {
-  const { colors } = require('../../../theme/colors');
-  return { useTheme: () => ({ theme: colors, isDark: false }) };
+  const { paletteLight, v2ThemeColors } = require('../../../theme/v2');
+  return { useTheme: () => ({ theme: v2ThemeColors(false), isDark: false, palette: paletteLight }) };
 });
 jest.mock('../../../hooks/useVoiceRecorder', () => ({
   useVoiceRecorder: () => ({
@@ -80,8 +80,6 @@ const byTestId = (id: string) => screen.getByTestId(id, { includeHiddenElements:
 beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
-  // The guide was seen.
-  await AsyncStorage.setItem('@revisley_reader_guide_dismissed', 'true');
 });
 
 async function open() {

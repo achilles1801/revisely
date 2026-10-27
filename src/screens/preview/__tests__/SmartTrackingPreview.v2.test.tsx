@@ -19,14 +19,10 @@ jest.mock('expo-glass-effect', () => {
 });
 jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
-// The classic preview's backdrop; the new design must not draw it.
+// A gradient backdrop, which the preview must not draw.
 jest.mock('expo-linear-gradient', () => {
   const { View } = require('react-native');
   return { LinearGradient: ({ testID }: { testID?: string }) => <View testID={testID ?? 'linear-gradient'} /> };
-});
-jest.mock('../../../components/GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" />, GlassBackdrop: () => null };
 });
 jest.mock('../../../components/MushafPager', () => {
   const { View } = require('react-native');
@@ -46,7 +42,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -92,7 +88,6 @@ describe('the Smart Tracking preview in the new design', () => {
     expect(screen.getByText('Meet Smart Tracking')).toBeTruthy();
     expect(screen.queryByText('SMART TRACKING PREVIEW')).toBeNull();
     expect(screen.queryByTestId('linear-gradient')).toBeNull();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(flat(screen.getByTestId('preview-show-me').props.style).backgroundColor).toBe(palette.primary);
   });
 

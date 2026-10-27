@@ -2,25 +2,19 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   AppState,
-  Modal,
-  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { Button } from '../../components/Button';
-import { GlassCard } from '../../components/GlassCard';
+import { PillButton } from '../../components/v2/PillButton';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
-import { useDesign } from '../../design/DesignContext';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
 import { getReadPalette } from '../../theme/readPalette';
@@ -33,7 +27,6 @@ import { navigateToActivityDay, navigationRef } from '../../navigation/navigatio
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
-import { useFloatingTimerOffset } from '../../components/timer/floatingTimerOffset';
 import { TimerChip } from '../../components/timer/TimerChip';
 import { ReaderFrame } from '../../components/reader/ReaderFrame';
 import { ReaderActivity } from '../../components/reader/ReaderActivity';
@@ -46,10 +39,9 @@ import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
+import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import {
   getHizbForPage,
@@ -62,7 +54,6 @@ import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 const AUTO_SAVE_INTERVAL_MS = 5000;
 // Under the page, with the controls: the capsule.
 const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
-const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
 
@@ -70,7 +61,6 @@ export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
   const { theme, isDark } = useTheme();
-  const { isNew: isNewDesign } = useDesign();
   const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -127,7 +117,6 @@ export default function ActiveRevisionScreen() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
 
   // Hold a verse: highlight, Play (Husary), Translation. Playback stays within
@@ -191,14 +180,6 @@ export default function ActiveRevisionScreen() {
     page: number;
     message: string;
   } | null>(null);
-
-  // The new design has no help screens: the session explains itself.
-  useEffect(() => {
-    if (isNewDesign) return;
-    AsyncStorage.getItem(REVISION_GUIDE_DISMISSED_KEY).then((v) => {
-      if (v !== 'true') setShowGuide(true);
-    });
-  }, [isNewDesign]);
 
   const silentlySavedRef = useRef<Set<number>>(new Set(alreadyRevisedToday));
   const lastSaveTimeRef = useRef<number>(sessionStartTime);
@@ -312,9 +293,6 @@ export default function ActiveRevisionScreen() {
     if (added.length > 0) noteRevisedPages(added);
   }, [completedPages, noteRevisedPages]);
 
-  // The timer is in the controls here, not floating over the page.
-  useFloatingTimerOffset('hidden');
-
   if (!user || !assignment) {
     return (
       <SafeAreaView style={styles.container}>
@@ -323,10 +301,9 @@ export default function ActiveRevisionScreen() {
             <>
               <Text style={styles.errorTitle}>Couldn't load your session</Text>
               <Text style={styles.errorMessage}>{error}</Text>
-              <Button
+              <PillButton
                 title="Try again"
                 onPress={loadData}
-                variant="primary"
                 style={styles.retryButton}
               />
             </>
@@ -367,10 +344,9 @@ export default function ActiveRevisionScreen() {
 
   const markRevised = useCallback(
     (pageNumber: number) => {
-      // The new design: a page done is one of the moments that buzz (and the
-      // Haptics setting can turn it off).
-      if (isNewDesign) haptics.selection();
-      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // A page done is one of the moments that buzz (and the Haptics setting
+      // can turn it off).
+      haptics.selection();
       setCompletedPages((prev) => {
         if (prev.has(pageNumber)) return prev;
         const next = new Set(prev);
@@ -378,7 +354,7 @@ export default function ActiveRevisionScreen() {
         return next;
       });
     },
-    [isNewDesign, haptics],
+    [haptics],
   );
 
   const unmarkRevised = useCallback((pageNumber: number) => {
@@ -475,8 +451,7 @@ export default function ActiveRevisionScreen() {
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
-        if (isNewDesign) haptics.success();
-        else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
       }
 
       navigation.goBack();
@@ -494,7 +469,6 @@ export default function ActiveRevisionScreen() {
     user,
     navigation,
     finishRecording,
-    isNewDesign,
     haptics,
   ]);
 
@@ -518,17 +492,11 @@ export default function ActiveRevisionScreen() {
     setSaving(true);
     try {
       await commitPendingPages();
-      if (isNewDesign) haptics.success();
-      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } finally {
       setSaving(false);
       navigation.goBack();
     }
-  };
-
-  const dismissGuideForever = async () => {
-    setShowGuide(false);
-    await AsyncStorage.setItem(REVISION_GUIDE_DISMISSED_KEY, 'true');
   };
 
   // ===== Bulk-action handlers (used inside BulkActionsModal) =====
@@ -571,16 +539,6 @@ export default function ActiveRevisionScreen() {
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
-    ...(isNewDesign
-      ? []
-      : [
-          {
-            key: 'guide',
-            label: 'How revision works',
-            icon: 'help-circle-outline' as const,
-            onPress: () => setShowGuide(true),
-          },
-        ]),
     {
       key: 'save',
       label: saving ? 'Saving…' : 'Save and exit',
@@ -610,7 +568,7 @@ export default function ActiveRevisionScreen() {
     [completedPages],
   );
 
-  const palette = getReadPalette(isDark, isNewDesign);
+  const palette = getReadPalette(isDark);
   const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
   const compact = width < 430 && crowded;
 
@@ -645,13 +603,13 @@ export default function ActiveRevisionScreen() {
           <View style={styles.header}>
             <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
-              <Text style={[styles.title, isNewDesign && typeV2.name, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text style={[styles.title, typeV2.name, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Revising {scopeLabel}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
                   · {completedCount}/{totalPages}
                 </Text>
               </Text>
-              <Text style={[styles.subtitle, isNewDesign && typeV2.meta, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text style={[styles.subtitle, typeV2.meta, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
               </Text>
             </View>
@@ -672,14 +630,7 @@ export default function ActiveRevisionScreen() {
               page={displayPageNumber}
               compact={compact}
               surface={{ background: palette.control, border: palette.divider }}
-              record={
-                <RecordButton
-                  recorder={recorder}
-                  color={palette.textSecondary}
-                  background={palette.control}
-                  border={palette.divider}
-                />
-              }
+              record={<RecordButton recorder={recorder} />}
               timer={
                 <TimerChip
                   compact={compact}
@@ -692,7 +643,7 @@ export default function ActiveRevisionScreen() {
                 submitVisible ? (
                   <PressableScale
                     onPress={handleEndSession}
-                    haptic="medium"
+
                     style={[styles.submit, { backgroundColor: theme.accent }]}
                     accessibilityRole="button"
                     accessibilityLabel="Submit session"
@@ -782,12 +733,6 @@ export default function ActiveRevisionScreen() {
       />
 
       {verseActions.overlay}
-
-      <RevisionGuideModal
-        visible={showGuide && !isNewDesign}
-        onClose={dismissGuideForever}
-        theme={theme}
-      />
 
       {smartTrackingEnabled && showRating && (
         <WeaknessModal
@@ -895,174 +840,4 @@ const makeStyles = (theme: ThemeColors) =>
       justifyContent: 'center',
     },
     submitText: { color: theme.onAccent, fontWeight: '700', fontSize: 14 },
-  });
-
-function RevisionGuideModal({
-  visible,
-  onClose,
-  theme,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  theme: ThemeColors;
-}) {
-  const styles = useMemo(() => makeGuideStyles(theme), [theme]);
-  const steps: Array<{
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    body: string;
-  }> = [
-    {
-      icon: 'book-outline',
-      title: 'Swipe through pages',
-      body: 'Swipe right-to-left to advance to the next page in your session.',
-    },
-    {
-      icon: 'arrow-forward-circle-outline',
-      title: 'Swipe = done',
-      body: 'Swiping forward auto-credits the page you just left as revised. You can undo from the toast that appears, or tap the checkmark in the top bar to toggle the current page by hand.',
-    },
-    {
-      icon: 'finger-print-outline',
-      title: 'Tap the page for the controls',
-      body: 'While you revise there is only the page. Tap it to show the controls (✓, the menu, play, record, the timer); tap again, or turn the page, to put them away.',
-    },
-    {
-      icon: 'language-outline',
-      title: 'Hold a verse',
-      body: 'Press and hold any verse to hear it recited or read its translation. ▶ in the controls recites from the top of the page.',
-    },
-    {
-      icon: 'mic-outline',
-      title: 'Record yourself',
-      body: 'Tap the mic in the controls to record your recitation. Tap the time to pause or resume, and ■ to stop. Find recordings in Activity.',
-    },
-    {
-      icon: 'ellipsis-horizontal-circle-outline',
-      title: 'More in the menu',
-      body: 'Open (⋯) for bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
-    },
-    {
-      icon: 'stopwatch-outline',
-      title: 'Time your revision',
-      body: 'Tap the stopwatch in the controls to start the timer, and tap the time to pause or stop it. Pages you mark revised while it runs are saved with the session, in Activity.',
-    },
-    {
-      icon: 'save-outline',
-      title: 'Saved as you go',
-      body: 'Your marks save automatically every few seconds and when you leave the app, so nothing is lost if you exit mid-session.',
-    },
-  ];
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
-          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>How revision works</Text>
-            <PressableScale
-              onPress={onClose}
-              haptic="light"
-              style={styles.closeBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Close"
-            >
-              <Ionicons name="close" size={20} color={theme.textSecondary} />
-            </PressableScale>
-          </View>
-
-          <View style={styles.steps}>
-            {steps.map((s, i) => (
-              <View key={i} style={styles.step}>
-                <View style={styles.stepIcon}>
-                  <Ionicons name={s.icon} size={18} color={theme.accent} />
-                </View>
-                <View style={styles.stepText}>
-                  <Text style={styles.stepTitle}>{s.title}</Text>
-                  <Text style={styles.stepBody}>{s.body}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.actions}>
-            <PressableScale
-              onPress={onClose}
-              haptic="medium"
-              scale={0.98}
-              style={styles.primaryBtn}
-            >
-              <Text style={styles.primaryBtnText}>Got it</Text>
-            </PressableScale>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const makeGuideStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: spacing.lg,
-    },
-    card: {
-      width: '100%',
-      maxWidth: 420,
-      borderRadius: radius.lg,
-      padding: spacing.lg,
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    title: { ...typography.titleLarge, color: theme.textPrimary },
-    closeBtn: {
-      width: 32,
-      height: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.full,
-    },
-    steps: { gap: spacing.md, marginBottom: spacing.lg },
-    step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    stepIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent + '20',
-    },
-    stepText: { flex: 1 },
-    stepTitle: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-      marginBottom: 2,
-    },
-    stepBody: { ...typography.bodySmall, color: theme.textSecondary },
-    actions: { flexDirection: 'row', gap: spacing.sm },
-    primaryBtn: {
-      flex: 1,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent,
-    },
-    primaryBtnText: {
-      ...typography.bodySmall,
-      color: theme.onAccent,
-      fontWeight: '700',
-    },
   });

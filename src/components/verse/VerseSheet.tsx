@@ -14,16 +14,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Backdrop } from '../Backdrop';
-import { GlassCard } from '../GlassCard';
-import { PressableScale } from '../PressableScale';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
-import { fonts, typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
 import { arabicV2, layoutV2, PaletteV2, radiusV2, typeV2 } from '../../theme/v2';
-import { useDesign } from '../../design/DesignContext';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { getSurahDisplay } from '../../lib/quranData';
@@ -111,8 +105,8 @@ export function grabberSwipe(dy: number, expanded: boolean): 'expand' | 'shrink'
  * The dimmed backdrop sits behind the sheet, not around it: a scroll view inside
  * a Pressable doesn't scroll on iOS (see Backdrop).
  *
- * The new design keeps this frame (it does more than v2/Sheet) in the sheets'
- * colours and corners: bare icons in the header, the "…" menu as a flat panel.
+ * It keeps this frame (it does more than v2/Sheet) in the sheets' colours and
+ * corners: bare icons in the header, the "…" menu as a flat panel.
  */
 export function VerseSheet({
   verse,
@@ -123,12 +117,8 @@ export function VerseSheet({
   onNavigate,
   onClose,
 }: VerseSheetProps) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
-  const classicStyles = useMemo(() => makeStyles(theme), [theme]);
-  // Only in the new design: the classic path never reads the v2 palette.
-  const v2Styles = useMemo(() => (isNew ? makeStylesV2(palette) : null), [isNew, palette]);
-  const styles = v2Styles ?? classicStyles;
+  const { palette } = useTheme();
+  const styles = useMemo(() => makeStylesV2(palette), [palette]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
@@ -215,7 +205,6 @@ export function VerseSheet({
           onLayout={(e) => setSheetHeight(e.nativeEvent.layout.height)}
           testID="verse-sheet"
         >
-          {!isNew && <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />}
             {/* Grabber and header: swipe up to expand, down to shrink or close. */}
             <View
               {...grabberPan.panHandlers}
@@ -228,122 +217,71 @@ export function VerseSheet({
                 accessibilityRole="button"
                 accessibilityLabel={expanded ? 'Make the translation smaller' : 'Expand the translation'}
               >
-                <View style={[styles.grabber, !isNew && { backgroundColor: theme.border }]} />
+                <View style={styles.grabber} />
               </Pressable>
-              {isNew ? (
-                <View style={styles.headerRow}>
-                  <Tap
-                    onPress={onClose}
-                    hitSlop={8}
-                    style={styles.roundBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                  >
-                    <Ionicons name="close" size={24} color={palette.text} />
-                  </Tap>
-                  <View style={styles.titleBox}>
-                    <View style={styles.titleLine}>
-                      <Text style={styles.surahName} numberOfLines={1} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                        {surah?.nameDisplay ?? ''}
-                      </Text>
-                      {surah ? (
-                        <Text style={styles.surahArabic} maxFontSizeMultiplier={CHROME_TEXT_SCALE} accessibilityLanguage="ar">
-                          {surah.nameArabicVoweled}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Text style={styles.ayahLabel} accessibilityRole="header" maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                      Ayah {verse?.ayah}
-                    </Text>
-                  </View>
-                  <View style={styles.pill}>
-                    <Tap
-                      onPress={() => prev && onNavigate(prev)}
-                      disabled={!prev}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel="Previous verse"
-                      accessibilityState={{ disabled: !prev }}
-                      style={[styles.pillBtn, !prev && v2Only.disabled]}
-                    >
-                      <Ionicons name="chevron-back" size={22} color={prev ? palette.text : palette.secondary} />
-                    </Tap>
-                    <Tap
-                      onPress={() => next && onNavigate(next)}
-                      disabled={!next}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel="Next verse"
-                      accessibilityState={{ disabled: !next }}
-                      style={[styles.pillBtn, !next && v2Only.disabled]}
-                    >
-                      <Ionicons name="chevron-forward" size={22} color={next ? palette.text : palette.secondary} />
-                    </Tap>
-                  </View>
-                  <Tap
-                    onPress={() => setMenu(menu === 'closed' ? 'root' : 'closed')}
-                    hitSlop={8}
-                    style={styles.roundBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="More"
-                    accessibilityState={{ expanded: menu !== 'closed' }}
-                  >
-                    <Ionicons name="ellipsis-horizontal" size={22} color={palette.text} />
-                  </Tap>
-                </View>
-              ) : (
               <View style={styles.headerRow}>
-                <PressableScale onPress={onClose} haptic="light" style={styles.roundBtn} accessibilityLabel="Close">
-                  <Ionicons name="close" size={20} color={theme.textPrimary} />
-                </PressableScale>
+                <Tap
+                  onPress={onClose}
+                  hitSlop={8}
+                  style={styles.roundBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                >
+                  <Ionicons name="close" size={24} color={palette.text} />
+                </Tap>
                 <View style={styles.titleBox}>
                   <View style={styles.titleLine}>
                     <Text style={styles.surahName} numberOfLines={1} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                       {surah?.nameDisplay ?? ''}
                     </Text>
                     {surah ? (
-                      <Text style={styles.surahArabic} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                      <Text style={styles.surahArabic} maxFontSizeMultiplier={CHROME_TEXT_SCALE} accessibilityLanguage="ar">
                         {surah.nameArabicVoweled}
                       </Text>
                     ) : null}
                   </View>
-                  <Text style={styles.ayahLabel} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                  <Text style={styles.ayahLabel} accessibilityRole="header" maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                     Ayah {verse?.ayah}
                   </Text>
                 </View>
                 <View style={styles.pill}>
-                  <Pressable
+                  <Tap
                     onPress={() => prev && onNavigate(prev)}
                     disabled={!prev}
                     hitSlop={6}
+                    accessibilityRole="button"
                     accessibilityLabel="Previous verse"
-                    style={styles.pillBtn}
+                    accessibilityState={{ disabled: !prev }}
+                    style={[styles.pillBtn, !prev && v2Only.disabled]}
                   >
-                    <Ionicons name="chevron-back" size={18} color={prev ? theme.textPrimary : theme.textMuted} />
-                  </Pressable>
-                  <Pressable
+                    <Ionicons name="chevron-back" size={22} color={prev ? palette.text : palette.secondary} />
+                  </Tap>
+                  <Tap
                     onPress={() => next && onNavigate(next)}
                     disabled={!next}
                     hitSlop={6}
+                    accessibilityRole="button"
                     accessibilityLabel="Next verse"
-                    style={styles.pillBtn}
+                    accessibilityState={{ disabled: !next }}
+                    style={[styles.pillBtn, !next && v2Only.disabled]}
                   >
-                    <Ionicons name="chevron-forward" size={18} color={next ? theme.textPrimary : theme.textMuted} />
-                  </Pressable>
+                    <Ionicons name="chevron-forward" size={22} color={next ? palette.text : palette.secondary} />
+                  </Tap>
                 </View>
-                <PressableScale
+                <Tap
                   onPress={() => setMenu(menu === 'closed' ? 'root' : 'closed')}
-                  haptic="light"
+                  hitSlop={8}
                   style={styles.roundBtn}
+                  accessibilityRole="button"
                   accessibilityLabel="More"
+                  accessibilityState={{ expanded: menu !== 'closed' }}
                 >
-                  <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
-                </PressableScale>
+                  <Ionicons name="ellipsis-horizontal" size={22} color={palette.text} />
+                </Tap>
               </View>
-              )}
             </View>
 
-            {menu !== 'closed' && isNew && (
+            {menu !== 'closed' && (
               // A flat panel in the sheet, not a second modal (iOS can't stack one
               // over a sheet that is itself a modal).
               <View style={[styles.dropdown, { top: headerBottom }]} testID="verse-menu-panel">
@@ -440,78 +378,12 @@ export function VerseSheet({
                 )}
               </View>
             )}
-            {menu !== 'closed' && !isNew && (
-              <View style={[styles.dropdown, { top: headerBottom }]}>
-                <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />
-                {menu === 'root' ? (
-                  <>
-                    <Pressable style={styles.dropRow} onPress={() => setMenu('translations')}>
-                      <Text style={[typography.bodyMedium, { color: theme.textPrimary, flex: 1 }]}>
-                        Select translation
-                      </Text>
-                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                    </Pressable>
-                    <Pressable style={styles.dropRow} onPress={() => setMenu('reciters')}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Select reciter</Text>
-                        <Text style={[typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-                          {voiceLabel(resolveVoice(reciter))}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-                    </Pressable>
-                  </>
-                ) : menu === 'reciters' ? (
-                  <ReciterList
-                    value={reciter}
-                    onChange={(choice) => {
-                      onChangeReciter(choice);
-                    }}
-                    // Within the sheet, however short a short verse leaves it.
-                    maxHeight={Math.max(160, Math.min(320, sheetHeight - headerBottom - spacing.md))}
-                  />
-                ) : (
-                  TRANSLATIONS.map((t) => {
-                    const available = isTranslationAvailable(t);
-                    return (
-                      <Pressable
-                        key={t.id}
-                        style={[styles.dropRow, !available && { opacity: 0.5 }]}
-                        disabled={!available}
-                        onPress={() => {
-                          onChangeTranslation(t.id);
-                          setMenu('closed');
-                        }}
-                        accessibilityState={{ selected: t.id === translation.id, disabled: !available }}
-                      >
-                        <View style={{ flex: 1 }}>
-                          <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>{pickerTitle(t)}</Text>
-                          {t.credit ? (
-                            // Credited as in the sheet: the publisher's site.
-                            <Text style={styles.creditText}>
-                              {available ? `${t.language} · ` : 'Not available yet · '}
-                              <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
-                            </Text>
-                          ) : (
-                            <Text style={[typography.caption, { color: theme.textMuted }]}>
-                              {available ? `${t.language} · ${t.author}` : `${t.author} · not available yet`}
-                            </Text>
-                          )}
-                        </View>
-                        {t.id === translation.id && <Ionicons name="checkmark" size={18} color={theme.accent} />}
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            )}
-
             {view.status === 'loading' && (
               <View style={styles.center}>
-                <ActivityIndicator color={isNew ? palette.secondary : theme.accent} />
+                <ActivityIndicator color={palette.secondary} />
               </View>
             )}
-            {view.status === 'error' && isNew && (
+            {view.status === 'error' && (
               <View style={styles.center} testID="verse-error">
                 {translation.id === CLEAR_QURAN_ID ? (
                   // Only ever this, or its own text: never another translation under its name.
@@ -529,28 +401,6 @@ export function VerseSheet({
                 <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
               </View>
             )}
-            {view.status === 'error' && !isNew && (
-              <View style={styles.center} testID="verse-error">
-                {translation.id === CLEAR_QURAN_ID ? (
-                  // Only ever this, or its own text: never another translation under its name.
-                  <>
-                    <Text style={[typography.bodyMedium, { color: theme.textPrimary, fontWeight: '600' }]}>
-                      Couldn't load translation
-                    </Text>
-                    <Text style={[typography.bodySmall, { color: theme.textSecondary, textAlign: 'center' }]}>
-                      {clearQuranErrorHint(view.error)}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>
-                    Couldn't load this verse. Check your connection.
-                  </Text>
-                )}
-                <PressableScale onPress={() => setAttempt((a) => a + 1)} haptic="light" style={styles.retryBtn}>
-                  <Text style={[typography.bodySmall, { color: theme.onAccent, fontWeight: '700' }]}>Try again</Text>
-                </PressableScale>
-              </View>
-            )}
             {view.status === 'ready' && (
               <ScrollView
                 style={styles.scroll}
@@ -559,9 +409,9 @@ export function VerseSheet({
                 onScrollEndDrag={(e) => act(overscrollAction(e.nativeEvent.contentOffset.y, expanded))}
                 testID="verse-scroll"
               >
-                <View style={[styles.keyChip, !isNew && { borderColor: theme.border, backgroundColor: theme.glass }]}>
+                <View style={styles.keyChip}>
                   <Text
-                    style={isNew ? [typeV2.meta, typeV2.numeral, { color: palette.secondary }] : [typography.caption, { color: theme.textSecondary }]}
+                    style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
                   >
                     {view.text.sura}:{view.text.ayah}
@@ -591,7 +441,7 @@ export function VerseSheet({
             )}
             {view.status === 'ready' && translation.credit && (
               // Pinned under the verse, however long it is: always in view.
-              <View style={[styles.credit, !isNew && { borderTopColor: theme.border }]} testID="translation-credit">
+              <View style={styles.credit} testID="translation-credit">
                 <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                   {translation.credit.text}
                 </Text>
@@ -613,100 +463,7 @@ export function VerseSheet({
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'flex-end' },
-    sheet: {
-      minHeight: 240,
-      borderTopLeftRadius: radius.lg,
-      borderTopRightRadius: radius.lg,
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.md,
-      overflow: 'hidden',
-    },
-    grabberHit: { alignSelf: 'center', paddingTop: spacing.sm, paddingBottom: spacing.md, paddingHorizontal: spacing.lg },
-    grabber: { width: 40, height: 5, borderRadius: 3 },
-    headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-    roundBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.glass,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-    },
-    titleBox: { flex: 1 },
-    titleLine: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
-    surahName: { ...typography.bodyMedium, color: theme.textSecondary, flexShrink: 1 },
-    surahArabic: { fontFamily: fonts.arabic, fontSize: 16, color: theme.textSecondary },
-    ayahLabel: { ...typography.titleMedium, color: theme.textPrimary, fontWeight: '700' },
-    pill: {
-      flexDirection: 'row',
-      borderRadius: radius.full,
-      backgroundColor: theme.glass,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-    },
-    pillBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2 },
-    dropdown: {
-      position: 'absolute',
-      right: 0,
-      width: 280,
-      borderRadius: radius.md,
-      overflow: 'hidden',
-      zIndex: 10,
-    },
-    dropRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm + 2,
-    },
-    center: { paddingVertical: spacing.xl, alignItems: 'center', gap: spacing.md },
-    retryBtn: {
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      borderRadius: radius.full,
-      backgroundColor: theme.accent,
-    },
-    // Sized to the verse up to the room left between the header and the credit,
-    // then scrolls: without flexShrink a long verse grew past the sheet.
-    scroll: { flexGrow: 0, flexShrink: 1 },
-    scrollContent: { paddingBottom: spacing.lg },
-    keyChip: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-      borderRadius: radius.full,
-      borderWidth: StyleSheet.hairlineWidth,
-      marginBottom: spacing.md,
-    },
-    arabic: {
-      fontFamily: fonts.arabic,
-      fontSize: 28,
-      lineHeight: 54,
-      color: theme.textPrimary,
-      textAlign: 'right',
-      writingDirection: 'rtl',
-      marginBottom: spacing.md,
-    },
-    translation: { ...typography.bodyLarge, fontSize: 18, lineHeight: 27, color: theme.textPrimary },
-    source: { ...typography.caption, color: theme.textMuted, marginTop: spacing.md },
-    footnote: { color: theme.accent },
-    credit: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      paddingTop: spacing.sm,
-      marginTop: spacing.xs,
-      gap: 2,
-    },
-    creditText: { ...typography.caption, color: theme.textSecondary },
-    creditLink: { ...typography.caption, color: theme.accent, fontWeight: '600', alignSelf: 'flex-start' },
-  });
-
-/** The new design: the same keys as the classic styles, in the sheets' colours and corners. */
+/** The sheet's styles, in the sheets' colours and corners. */
 const makeStylesV2 = (p: PaletteV2) =>
   StyleSheet.create({
     overlay: { flex: 1, backgroundColor: p.overlay, justifyContent: 'flex-end' },
@@ -765,8 +522,8 @@ const makeStylesV2 = (p: PaletteV2) =>
       paddingVertical: 10,
     },
     center: { paddingVertical: spacing.xl, paddingHorizontal: layoutV2.gutter, alignItems: 'center', gap: 12 },
-    retryBtn: {},
-    // As the classic: sized to the verse up to the room left, then scrolls.
+    // Sized to the verse up to the room left between the header and the credit,
+    // then scrolls: without flexShrink a long verse grew past the sheet.
     scroll: { flexGrow: 0, flexShrink: 1 },
     scrollContent: { paddingBottom: spacing.lg },
     keyChip: {
@@ -777,7 +534,7 @@ const makeStylesV2 = (p: PaletteV2) =>
       backgroundColor: p.fill,
       marginBottom: layoutV2.gutter,
     },
-    // Amiri's stacked marks need the classic's line height on the longest verses.
+    // Amiri's stacked marks need this line height on the longest verses.
     arabic: {
       ...arabicV2(28),
       lineHeight: 54,

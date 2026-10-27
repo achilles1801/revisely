@@ -66,9 +66,6 @@ import JuzSelectionScreen from '../JuzSelectionScreen';
 import ScheduleScreen from '../ScheduleScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
-import { GlassCard } from '../../../components/GlassCard';
-import { Button } from '../../../components/Button';
-import { LiquidGlassSegmentedControl } from '../../../components/LiquidGlassSegmentedControl';
 import { PillButton } from '../../../components/v2/PillButton';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 import type { UserPage } from '../../../types';
@@ -77,11 +74,10 @@ import type { UserPage } from '../../../types';
 const light = paletteV2(false, DEFAULT_ACCENT);
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
-const classic = (ui: React.ReactElement) => <ThemeProvider>{ui}</ThemeProvider>;
 
 async function show(ui: React.ReactElement) {
   render(ui);
@@ -105,9 +101,6 @@ function page(pageNumber: number, status: UserPage['status'] = 'not_memorized'):
 
 /** No glass, no classic button or segmented control: the new design's pieces only. */
 function expectFlat() {
-  expect(screen.UNSAFE_queryAllByType(GlassCard)).toHaveLength(0);
-  expect(screen.UNSAFE_queryAllByType(Button)).toHaveLength(0);
-  expect(screen.UNSAFE_queryAllByType(LiquidGlassSegmentedControl)).toHaveLength(0);
 }
 
 /** The primary action: a solid pill in the accent's primary fill. */
@@ -151,7 +144,7 @@ describe('<WelcomeScreen /> in the new design', () => {
 
   it('Jade glows in light too (#62), its accent text in ink', async () => {
     render(
-      <DesignProvider initial={{ allowed: true, chosen: 'new', accent: 'jade' }}>
+      <DesignProvider initial={{ accent: 'jade' }}>
         <ThemeProvider>
           <WelcomeScreen />
         </ThemeProvider>
@@ -160,13 +153,6 @@ describe('<WelcomeScreen /> in the new design', () => {
     await act(async () => {});
     expect(screen.getByTestId('hero-glow')).toBeTruthy();
     expect(styleOf('welcome-accent').color).toBe(paletteV2(false, 'jade').accentText);
-  });
-
-  it('the classic screen is unchanged', async () => {
-    await show(classic(<WelcomeScreen />));
-    expect(screen.queryByTestId('welcome')).toBeNull();
-    expect(screen.UNSAFE_getAllByType(Button)).toHaveLength(1);
-    expect(screen.UNSAFE_queryAllByType(PillButton)).toHaveLength(0);
   });
 });
 
@@ -197,12 +183,6 @@ describe('<JourneySelectScreen /> in the new design', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('JuzSelection', { journeyStage: 'complete' });
     fireEvent.press(screen.getByTestId('back'));
     expect(mockNavigation.goBack).toHaveBeenCalled();
-  });
-
-  it('the classic screen keeps its glass cards', async () => {
-    await show(classic(<JourneySelectScreen />));
-    expect(screen.queryByTestId('journey-select')).toBeNull();
-    expect(screen.UNSAFE_getAllByType(GlassCard)).toHaveLength(2);
   });
 });
 
@@ -245,10 +225,19 @@ describe('<JuzSelectionScreen /> in the new design', () => {
     expect(screen.getByText('3')).toBeTruthy();
   });
 
-  it('the classic screen keeps its glass footer', async () => {
-    await show(classic(<JuzSelectionScreen />));
-    expect(screen.queryByTestId('juz-selection')).toBeNull();
-    expect(screen.UNSAFE_getAllByType(GlassCard)).toHaveLength(1);
+  it('the browser runs full width, as on the Memorization screen: its rows bring their own gutter', async () => {
+    await show(v2(<JuzSelectionScreen />));
+    // Nothing between the scroll view and the browser pads it in from the edges.
+    let node = screen.getByTestId('memorization-browser').parent;
+    while (node && node.props.testID !== 'juz-selection-scroll') {
+      const style = flat(node.props.style);
+      expect([style.padding, style.paddingHorizontal, style.paddingLeft, style.paddingRight].filter(Boolean)).toEqual([]);
+      expect([style.margin, style.marginHorizontal, style.marginLeft, style.marginRight].filter(Boolean)).toEqual([]);
+      node = node.parent;
+    }
+    expect(node).toBeTruthy();
+    const content = flat(screen.getByTestId('juz-selection-scroll').props.contentContainerStyle);
+    expect([content.padding, content.paddingHorizontal, content.paddingLeft, content.paddingRight].filter(Boolean)).toEqual([]);
   });
 });
 
@@ -323,7 +312,7 @@ describe('<ScheduleScreen /> in the new design', () => {
 
   it('haptics follow Settings → Haptics in the new design', async () => {
     render(
-      <DesignProvider initial={{ allowed: true, chosen: 'new', hapticsOn: false }}>
+      <DesignProvider initial={{ hapticsOn: false }}>
         <ThemeProvider>
           <ScheduleScreen />
         </ThemeProvider>
@@ -337,16 +326,5 @@ describe('<ScheduleScreen /> in the new design', () => {
     expect(Haptics.selectionAsync).not.toHaveBeenCalled();
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
     expect(mockApp.completeOnboarding).toHaveBeenCalled();
-  });
-
-  it('the classic screen keeps its segmented control and always buzzes', async () => {
-    await show(classic(<ScheduleScreen />));
-    expect(screen.queryByTestId('schedule')).toBeNull();
-    expect(screen.UNSAFE_getAllByType(LiquidGlassSegmentedControl)).toHaveLength(1);
-    expect(screen.getByTestId('icon-information-circle-outline')).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(screen.getByText('Start'));
-    });
-    expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
   });
 });

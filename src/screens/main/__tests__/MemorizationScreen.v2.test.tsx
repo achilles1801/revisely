@@ -21,12 +21,6 @@ jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 const mockNavigation = { navigate: jest.fn(), goBack: jest.fn() };
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => mockNavigation }));
-// The new design has no glass: any GlassCard rendered would show up here.
-jest.mock('../../../components/GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" />, GlassBackdrop: () => null };
-});
-
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
@@ -41,7 +35,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -88,7 +82,6 @@ describe('Memorization in the new design', () => {
     expect(screen.getByText('0 of 30 juz · 1 of 114 surahs')).toBeTruthy();
     expect(screen.getByTestId('memorization-progress')).toBeTruthy();
     expect(screen.getByTestId('memorization-list')).toBeTruthy();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(screen.queryByTestId('icon-help')).toBeNull();
     expect(touchHandlingAncestor(screen.getByTestId('memorization-v2'))).toBeNull();
     // Lenses are pills.

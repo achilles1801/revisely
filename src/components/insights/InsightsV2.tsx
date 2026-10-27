@@ -192,7 +192,7 @@ export function QuietLine({ children, testID }: { children: React.ReactNode; tes
  */
 export function PagePreviewSheet({ pageNumber, onClose }: { pageNumber: number | null; onClose: () => void }) {
   const { isDark } = useTheme();
-  const read = getReadPalette(isDark, true);
+  const read = getReadPalette(isDark);
   const { width, height } = useWindowDimensions();
   // Keep the page while the sheet slides away.
   const last = useRef<number | null>(pageNumber);

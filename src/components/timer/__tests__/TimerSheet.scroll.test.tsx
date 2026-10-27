@@ -3,13 +3,12 @@ import { render, screen } from '@testing-library/react-native';
 import { ScrollView } from 'react-native';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
 
-jest.mock('../../GlassCard', () => ({ GlassCard: () => null }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('../TimerControls', () => ({ TimerControls: () => null }));
 jest.mock('../../../context/ThemeContext', () => {
-  const { colors } = require('../../../theme/colors');
-  return { useTheme: () => ({ theme: colors, isDark: false }) };
+  const { paletteLight, v2ThemeColors } = require('../../../theme/v2');
+  return { useTheme: () => ({ theme: v2ThemeColors(false), isDark: false, palette: paletteLight }) };
 });
 
 import { TimerSheet } from '../TimerSheet';
@@ -25,7 +24,7 @@ describe('TimerSheet', () => {
     const onClose = jest.fn();
     render(<TimerSheet visible onClose={onClose} />);
     const { fireEvent } = require('@testing-library/react-native');
-    fireEvent.press(screen.getByLabelText('Dismiss timer'));
+    fireEvent.press(screen.getByLabelText('Close'));
     expect(onClose).toHaveBeenCalled();
   });
 });

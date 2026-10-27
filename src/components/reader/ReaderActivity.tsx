@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
@@ -8,11 +8,8 @@ import { recordedMs } from '../recordings/RecordButton';
 import { formatRecordingTime } from '../../lib/recordingFormat';
 import type { RecitationState } from '../../lib/recitation';
 import type { RecorderPhase } from '../../hooks/useVoiceRecorder';
-import { useDesign } from '../../design/DesignContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
-
-const RED = '#E5484D';
 
 interface ReaderActivityProps {
   recorder: { phase: RecorderPhase; baseMs: number; segmentStartedAt: number | null };
@@ -29,8 +26,7 @@ interface ReaderActivityProps {
  * Nothing otherwise.
  */
 export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityProps) {
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
+  const { palette } = useTheme();
   const { phase, baseMs, segmentStartedAt } = recorder;
   const recordingShown = phase !== 'idle' && (phase !== 'starting' || baseMs > 0 || segmentStartedAt != null);
   const capturing = phase === 'recording';
@@ -58,69 +54,27 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
     .filter(Boolean)
     .join('. ');
 
-  if (isNew) {
-    // The new design: a flat chip in its tokens (a red recording, the
-    // recitation in the accent, the timer secondary); it dims when held.
-    const text = [typeV2.numeral, styles.text];
-    return (
-      <Tap
-        onPress={onPress}
-        hitSlop={10}
-        style={[styles.pill, { backgroundColor: palette.fill, borderColor: palette.separator }]}
-        accessibilityRole="button"
-        accessibilityLabel={`${label}. Show the controls`}
-        testID="reader-activity"
-      >
-        {recordingShown && (
-          <View style={styles.item} testID="reader-activity-recording">
-            <View
-              style={[
-                styles.dot,
-                capturing ? { backgroundColor: palette.red } : { borderWidth: 1.5, borderColor: palette.red },
-              ]}
-            />
-            <Text style={[text, { color: palette.red }]} maxFontSizeMultiplier={1.2}>
-              {time}
-            </Text>
-          </View>
-        )}
-        {reciting && (
-          <View style={styles.item}>
-            <Ionicons
-              name={playback.status === 'playing' ? 'volume-medium' : 'pause'}
-              size={12}
-              color={palette.accentText}
-            />
-            <Text style={[text, { color: palette.accentText }]} maxFontSizeMultiplier={1.2}>
-              {playback.verse!.sura}:{playback.verse!.ayah}
-            </Text>
-          </View>
-        )}
-        {timer && (
-          <View style={styles.item}>
-            <Ionicons name={timing ? 'stopwatch-outline' : 'pause'} size={12} color={palette.secondary} />
-            <Text style={[text, { color: palette.secondary }]} maxFontSizeMultiplier={1.2}>
-              {clock}
-            </Text>
-          </View>
-        )}
-      </Tap>
-    );
-  }
-
+  // A flat chip in the design's tokens (a red recording, the recitation in the
+  // accent, the timer secondary); it dims when held.
+  const text = [typeV2.numeral, styles.text];
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       hitSlop={10}
-      style={[styles.pill, { backgroundColor: theme.glass, borderColor: theme.border }]}
+      style={[styles.pill, { backgroundColor: palette.fill, borderColor: palette.separator }]}
       accessibilityRole="button"
       accessibilityLabel={`${label}. Show the controls`}
       testID="reader-activity"
     >
       {recordingShown && (
-        <View style={styles.item}>
-          <View style={[styles.dot, capturing ? { backgroundColor: RED } : styles.dotPaused]} />
-          <Text style={[styles.text, { color: RED }]} maxFontSizeMultiplier={1.2}>
+        <View style={styles.item} testID="reader-activity-recording">
+          <View
+            style={[
+              styles.dot,
+              capturing ? { backgroundColor: palette.red } : { borderWidth: 1.5, borderColor: palette.red },
+            ]}
+          />
+          <Text style={[text, { color: palette.red }]} maxFontSizeMultiplier={1.2}>
             {time}
           </Text>
         </View>
@@ -130,22 +84,22 @@ export function ReaderActivity({ recorder, playback, onPress }: ReaderActivityPr
           <Ionicons
             name={playback.status === 'playing' ? 'volume-medium' : 'pause'}
             size={12}
-            color={theme.accent}
+            color={palette.accentText}
           />
-          <Text style={[styles.text, { color: theme.accent }]} maxFontSizeMultiplier={1.2}>
+          <Text style={[text, { color: palette.accentText }]} maxFontSizeMultiplier={1.2}>
             {playback.verse!.sura}:{playback.verse!.ayah}
           </Text>
         </View>
       )}
       {timer && (
         <View style={styles.item}>
-          <Ionicons name={timing ? 'stopwatch-outline' : 'pause'} size={12} color={theme.textSecondary} />
-          <Text style={[styles.text, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
+          <Ionicons name={timing ? 'stopwatch-outline' : 'pause'} size={12} color={palette.secondary} />
+          <Text style={[text, { color: palette.secondary }]} maxFontSizeMultiplier={1.2}>
             {clock}
           </Text>
         </View>
       )}
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -161,6 +115,5 @@ const styles = StyleSheet.create({
   },
   item: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
-  dotPaused: { borderWidth: 1.5, borderColor: RED },
   text: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

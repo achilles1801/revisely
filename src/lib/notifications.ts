@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
-import { NOTIFICATION_LIGHT_COLOR } from '../theme/colors';
+import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

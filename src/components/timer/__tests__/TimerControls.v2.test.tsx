@@ -23,10 +23,6 @@ jest.mock('expo-glass-effect', () => {
 jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // Any glass card the controls render shows up as this.
-jest.mock('../../GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" /> };
-});
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
 
 const mockTimer: { timer: ActiveReadingTimer | null } = { timer: null };
@@ -59,7 +55,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 
 const v2 = (ui: React.ReactElement) =>
   render(
-    <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+    <DesignProvider initial={{}}>
       <ThemeProvider>{ui}</ThemeProvider>
     </DesignProvider>,
   );
@@ -91,7 +87,6 @@ describe('<TimerControls /> in the new design', () => {
     expect(screen.getByTestId('timer-controls-v2')).toBeTruthy();
     expect(screen.getByTestId('pill-stopwatch')).toBeTruthy();
     expect(screen.getByTestId('pill-timer')).toBeTruthy();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     // The clock in ink.
     expect(screen.getByTestId('timer-clock').props.children).toBe(formatStopwatch(0));
     expect(flat(screen.getByTestId('timer-clock').props.style).color).toBe(palette.text);
@@ -121,7 +116,6 @@ describe('<TimerControls /> in the new design', () => {
     fireEvent.press(screen.getByTestId('pill-countUp'));
     fireEvent.press(screen.getByLabelText('Start timer'));
     expect(mockActions.start).toHaveBeenCalledWith('countUp', 50 * 60);
-    expect(screen.queryByTestId('glass-card')).toBeNull();
   });
 
   it('running: Pause (outline) and End (solid); End saves, marks it with a haptic and closes', async () => {

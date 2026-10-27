@@ -12,7 +12,6 @@
 // palette names through useTheme().palette.
 
 import { TextStyle } from 'react-native';
-import type { ThemeColors } from './colors';
 
 /**
  * The new design's accent (Settings → Appearance → Accent, kept with the
@@ -309,7 +308,45 @@ export function paletteV2(isDark: boolean, accent: AccentName = 'jade'): Palette
 export const paletteLight: PaletteV2 = paletteV2(false);
 export const paletteDark: PaletteV2 = paletteV2(true);
 
-/** The v2 palette under the classic token names, for screens not yet moved. */
+/**
+ * The palette under the older token names (textPrimary, accent, glass, …) that
+ * many screens still read through `useTheme().theme`.
+ */
+export interface ThemeColors {
+  bg: string;
+  bgAlt: string;
+  surface: string;
+  bgDark: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  textInverse: string;
+  /** Text-safe: the ink with Jade, the accent's text colour otherwise. */
+  accent: string;
+  accentSoft: string;
+  /** Text and glyphs on an `accent` fill. */
+  onAccent: string;
+  gold: string;
+  success: string;
+  successBg: string;
+  warning: string;
+  warningBg: string;
+  warningText: string;
+  error: string;
+  errorBg: string;
+  border: string;
+  borderLight: string;
+  /** The quiet fill (once a translucent glass fill). */
+  glass: string;
+}
+
+/**
+ * The notification light on Android (the channel's `lightColor`), outside any
+ * theme: the system draws it, whatever the app's appearance.
+ */
+export const NOTIFICATION_LIGHT_COLOR = '#292524';
+
+/** The palette under the older token names. */
 export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): ThemeColors {
   const p = paletteV2(isDark, accent);
   return {
@@ -321,8 +358,6 @@ export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): The
     textSecondary: p.secondary,
     textMuted: p.secondary,
     textInverse: p.bg,
-    // Classic screens use their accent for text as well as fills, so they get
-    // the text-safe one: the ink with Jade, the accent's text colour otherwise.
     accent: p.accentText,
     accentSoft: p.accentSubtle,
     onAccent: p.onAccentText,
@@ -336,7 +371,6 @@ export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): The
     errorBg: isDark ? '#2A1212' : '#FEF2F2',
     border: p.separator,
     borderLight: p.separator,
-    // Flat: what used to be a translucent fill is the quiet fill.
     glass: p.fill,
   };
 }

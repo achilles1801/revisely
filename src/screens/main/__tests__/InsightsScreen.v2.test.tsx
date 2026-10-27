@@ -23,12 +23,6 @@ jest.mock('@react-navigation/native', () => ({
   useScrollToTop: () => undefined,
   useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn() }),
 }));
-// The new design has no glass: any GlassCard rendered would show up here.
-jest.mock('../../../components/GlassCard', () => {
-  const { View } = require('react-native');
-  return { GlassCard: () => <View testID="glass-card" />, GlassBackdrop: () => null };
-});
-
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
@@ -44,7 +38,7 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -104,7 +98,6 @@ describe('Insights in the new design', () => {
     expect(screen.getByTestId('insights-v2')).toBeTruthy();
     const title = screen.getByText('Insights');
     expect(flat(title.props.style)).toMatchObject({ fontSize: 28, fontWeight: '700', color: palette.text });
-    expect(screen.queryByTestId('glass-card')).toBeNull();
     expect(screen.queryByTestId('icon-help')).toBeNull();
   });
 
@@ -116,7 +109,6 @@ describe('Insights in the new design', () => {
     expect(screen.getByText('1 of 3 so far')).toBeTruthy();
     expect(screen.getByTestId('insights-warming-progress').props.accessibilityValue).toMatchObject({ now: 33 });
     expect(screen.queryByText('Focus')).toBeNull();
-    expect(screen.queryByTestId('glass-card')).toBeNull();
   });
 
   it('strength: one bar, weak red and strong green, with the counts', async () => {

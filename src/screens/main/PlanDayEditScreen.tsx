@@ -5,19 +5,15 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { fonts } from '../../theme/typography';
 import { getSurahForPage } from '../../lib/quranData';
 import {
   memorizedJuzGroups,
@@ -44,7 +40,6 @@ import {
 import { dayTitle } from '../../components/plan/DayRow';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { Tap } from '../../components/v2/Tap';
-import { useDesign } from '../../design/DesignContext';
 import { useHaptics } from '../../design/haptics';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
@@ -63,10 +58,8 @@ interface SurahOnDay {
 export default function PlanDayEditScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { theme, palette } = useTheme();
-  const { isNew } = useDesign();
+  const { palette } = useTheme();
   const haptics = useHaptics();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { pages: allPages, user } = useApp();
   const { date: today } = useRevisionDay(user);
 
@@ -128,13 +121,12 @@ export default function PlanDayEditScreen() {
   const commit = useCallback(() => {
     committingRef.current = true;
     if (isDirty) {
-      if (isNew) haptics.success();
-      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       navigation.popTo('PlanEdit', { editedDay: { index: dayIndex, pages } }, { merge: true });
     } else {
       navigation.goBack();
     }
-  }, [isDirty, navigation, dayIndex, pages, isNew, haptics]);
+  }, [isDirty, navigation, dayIndex, pages, haptics]);
 
   // Swipe-back can't be intercepted on native-stack, so disable it while there
   // are edits; Android back / programmatic pops are routed through commit().
@@ -173,8 +165,7 @@ export default function PlanDayEditScreen() {
 
   const applyPicker = () => {
     setPages((prev) => applyGroupSelection(prev, selectable, initialChecked, draft));
-    if (isNew) haptics.success();
-    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     pickerRef.current?.dismiss();
   };
 
@@ -226,8 +217,7 @@ export default function PlanDayEditScreen() {
   // ---- Direct edits -----------------------------------------------------------
   const removeSurah = (s: SurahOnDay) => {
     const remove = new Set(s.pages);
-    if (isNew) haptics.selection();
-    else Haptics.selectionAsync();
+    haptics.selection();
     setPages((prev) => prev.filter((p) => !remove.has(p)));
   };
 
@@ -242,7 +232,7 @@ export default function PlanDayEditScreen() {
   const picker = (
     <ListPickerSheet
       ref={pickerRef}
-      title={dayIndex === 0 ? (isNew ? "Today's revision" : "Today's Revision") : title}
+      title={dayIndex === 0 ? "Today's revision" : title}
       tabs={pickerTabs}
       activeTab={pickerTab}
       onTabChange={(k) => setPickerTab(k as PickerTabKey)}
@@ -256,145 +246,32 @@ export default function PlanDayEditScreen() {
     />
   );
 
-  if (isNew) {
-    // The new design: a v2 top bar (back to the schedule, the date), what's on
-    // the day as the screen's title, then flat sections like v2 Settings.
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
-        <TopBar
-          left={
-            <IconButton icon="chevron-back" onPress={commit} label="Back to schedule" size={26} testID="back" />
-          }
-          title={title}
-          separator
-        />
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={v2.content}
-          showsVerticalScrollIndicator={false}
-          testID="plan-day-v2"
-        >
-          <View style={v2.hero}>
-            <Text
-              style={[typeV2.title, { color: summary.isRest ? palette.secondary : palette.text }]}
-              numberOfLines={2}
-              accessibilityRole="header"
-            >
-              {summary.title}
-            </Text>
-            <Text style={[typeV2.body, v2.heroSubtitle, { color: palette.secondary }]}>
-              {hasContent
-                ? `${pageCountLabel(pages.length)}${isDirty ? ' · Edited' : ''}`
-                : `Nothing to revise ${dayIndex === 0 ? 'today' : 'on this day'}`}
-            </Text>
-          </View>
-
-          {hasContent ? (
-            <GroupedSection
-              header="On this day"
-              headerRight={
-                <HeaderTextButton label={editing ? 'Done' : 'Edit'} bold={editing} onPress={() => setEditing((v) => !v)} />
-              }
-            >
-              {surahsOnDay.map((s) => (
-                <GroupedRow
-                  key={s.number}
-                  title={s.name}
-                  subtitle={`${pageRangeLabel(s.pages)} · ${pageCountLabel(s.pages.length)}`}
-                  leading={
-                    editing ? (
-                      <Tap
-                        onPress={() => removeSurah(s)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${s.name}`}
-                        testID={`remove-surah-${s.number}`}
-                      >
-                        <Ionicons name="remove-circle-outline" size={24} color={palette.red} />
-                      </Tap>
-                    ) : undefined
-                  }
-                  trailing={
-                    <Text style={[arabicV2(18), { color: palette.secondary }]} accessibilityLanguage="ar">
-                      {s.nameArabic}
-                    </Text>
-                  }
-                  testID={`surah-row-${s.number}`}
-                />
-              ))}
-            </GroupedSection>
-          ) : null}
-
-          <GroupedSection
-            footer={
-              !canPick
-                ? "You haven't marked any pages as memorized yet."
-                : hasContent
-                  ? 'Only content you have memorized is listed.'
-                  : 'This is a rest day. Add a surah or juz to revise on it.'
-            }
-          >
-            <GroupedRow
-              title={hasContent ? 'Add or remove content' : 'Add surahs or ajzaʼ'}
-              icon="add-circle-outline"
-              onPress={openPicker}
-              disabled={!canPick}
-              testID="day-pick"
-            />
-            {hasContent ? (
-              <GroupedRow
-                title="Make rest day"
-                icon="moon-outline"
-                tone="destructive"
-                onPress={makeRest}
-                testID="day-make-rest"
-              />
-            ) : null}
-          </GroupedSection>
-        </ScrollView>
-        {picker}
-      </SafeAreaView>
-    );
-  }
-
+  // A v2 top bar (back to the schedule, the date), what's on the day as the
+  // screen's title, then flat sections like v2 Settings.
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.navBar}>
-        <Pressable
-          onPress={commit}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={styles.navBack}
-          accessibilityRole="button"
-          accessibilityLabel="Back to schedule"
-        >
-          {({ pressed }) => (
-            <>
-              <Ionicons
-                name="chevron-back"
-                size={24}
-                color={theme.accent}
-                style={{ opacity: pressed ? 0.5 : 1 }}
-              />
-              <Text style={[styles.navBackText, { opacity: pressed ? 0.5 : 1 }]}>Schedule</Text>
-            </>
-          )}
-        </Pressable>
-        <Text style={styles.navTitle} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={styles.navSide} />
-      </View>
-
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      <TopBar
+        left={
+          <IconButton icon="chevron-back" onPress={commit} label="Back to schedule" size={26} testID="back" />
+        }
+        title={title}
+        separator
+      />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={v2.content}
         showsVerticalScrollIndicator={false}
+        testID="plan-day-v2"
       >
-        <View style={styles.hero}>
-          <Text style={[styles.heroTitle, summary.isRest && styles.heroTitleRest]} numberOfLines={2}>
+        <View style={v2.hero}>
+          <Text
+            style={[typeV2.title, { color: summary.isRest ? palette.secondary : palette.text }]}
+            numberOfLines={2}
+            accessibilityRole="header"
+          >
             {summary.title}
           </Text>
-          <Text style={styles.heroSubtitle}>
+          <Text style={[typeV2.body, v2.heroSubtitle, { color: palette.secondary }]}>
             {hasContent
               ? `${pageCountLabel(pages.length)}${isDirty ? ' · Edited' : ''}`
               : `Nothing to revise ${dayIndex === 0 ? 'today' : 'on this day'}`}
@@ -405,13 +282,8 @@ export default function PlanDayEditScreen() {
           <GroupedSection
             header="On this day"
             headerRight={
-              <HeaderTextButton
-                label={editing ? 'Done' : 'Edit'}
-                bold={editing}
-                onPress={() => setEditing((v) => !v)}
-              />
+              <HeaderTextButton label={editing ? 'Done' : 'Edit'} bold={editing} onPress={() => setEditing((v) => !v)} />
             }
-            separatorInset={editing ? spacing.md + 28 + spacing.sm : spacing.md}
           >
             {surahsOnDay.map((s) => (
               <GroupedRow
@@ -420,18 +292,23 @@ export default function PlanDayEditScreen() {
                 subtitle={`${pageRangeLabel(s.pages)} · ${pageCountLabel(s.pages.length)}`}
                 leading={
                   editing ? (
-                    <Pressable
+                    <Tap
                       onPress={() => removeSurah(s)}
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${s.name}`}
-                      style={styles.minusSlot}
+                      testID={`remove-surah-${s.number}`}
                     >
-                      <Ionicons name="remove-circle" size={24} color={theme.error} />
-                    </Pressable>
+                      <Ionicons name="remove-circle-outline" size={24} color={palette.red} />
+                    </Tap>
                   ) : undefined
                 }
-                trailing={<Text style={styles.arabic}>{s.nameArabic}</Text>}
+                trailing={
+                  <Text style={[arabicV2(18), { color: palette.secondary }]} accessibilityLanguage="ar">
+                    {s.nameArabic}
+                  </Text>
+                }
+                testID={`surah-row-${s.number}`}
               />
             ))}
           </GroupedSection>
@@ -447,23 +324,23 @@ export default function PlanDayEditScreen() {
           }
         >
           <GroupedRow
-            title={hasContent ? 'Add or Remove Content' : 'Add Surahs or Ajzaʼ'}
-            icon="add-circle"
-            tone="accent"
+            title={hasContent ? 'Add or remove content' : 'Add surahs or ajzaʼ'}
+            icon="add-circle-outline"
             onPress={openPicker}
             disabled={!canPick}
+            testID="day-pick"
           />
           {hasContent ? (
             <GroupedRow
-              title="Make Rest Day"
+              title="Make rest day"
               icon="moon-outline"
               tone="destructive"
               onPress={makeRest}
+              testID="day-make-rest"
             />
           ) : null}
         </GroupedSection>
       </ScrollView>
-
       {picker}
     </SafeAreaView>
   );
@@ -475,65 +352,7 @@ const v2 = StyleSheet.create({
   heroSubtitle: { marginTop: 2 },
 });
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent' },
-    navBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      height: 44,
-      paddingHorizontal: spacing.xs,
-    },
-    navBack: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      width: 110,
-    },
-    navBackText: {
-      fontSize: 17,
-      color: theme.accent,
-      marginLeft: -2,
-    },
-    navTitle: {
-      flex: 1,
-      textAlign: 'center',
-      fontSize: 17,
-      fontWeight: '600',
-      color: theme.textPrimary,
-    },
-    navSide: { width: 110 },
-    scroll: { flex: 1 },
-    scrollContent: {
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.huge,
-    },
-    hero: {
-      paddingHorizontal: spacing.xxs,
-      paddingTop: spacing.sm,
-    },
-    heroTitle: {
-      fontSize: 34,
-      lineHeight: 41,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-      color: theme.textPrimary,
-    },
-    heroTitleRest: {
-      color: theme.textMuted,
-    },
-    heroSubtitle: {
-      fontSize: 15,
-      lineHeight: 20,
-      color: theme.textSecondary,
-      marginTop: 2,
-    },
-    minusSlot: {
-      width: 28,
-      alignItems: 'center',
-    },
-    arabic: {
-      fontFamily: fonts.arabic,
-      fontSize: 18,
-      color: theme.textMuted,
-    },
-  });
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
+  scroll: { flex: 1 },
+});

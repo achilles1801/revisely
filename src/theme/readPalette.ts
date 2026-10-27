@@ -1,7 +1,7 @@
 /**
  * Neutral iOS-style palette for the Quran surfaces (Read tab + mushaf pages).
- * Deliberately separate from the Mihrab palette: the mushaf reads best on
- * pure black (OLED) in dark mode and on plain white paper in light mode.
+ * The mushaf reads best on pure black (OLED) in dark mode and on plain white
+ * paper in light mode.
  */
 export interface ReadPalette {
   bg: string;
@@ -17,32 +17,8 @@ export interface ReadPalette {
   pageTint: string | null;
 }
 
+// White and black pages, with the design's greys around them.
 const DARK: ReadPalette = {
-  bg: '#000000',
-  pageBg: '#000000',
-  card: '#1C1C1E',
-  divider: 'rgba(84, 84, 88, 0.35)',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#AEAEB2',
-  textMuted: '#8E8E93',
-  control: '#1C1C1E',
-  pageTint: '#FFFFFF',
-};
-
-const LIGHT: ReadPalette = {
-  bg: '#F2F2F7',
-  pageBg: '#FFFFFF',
-  card: '#FFFFFF',
-  divider: 'rgba(60, 60, 67, 0.2)',
-  textPrimary: '#000000',
-  textSecondary: '#3C3C43',
-  textMuted: '#8E8E93',
-  control: '#F2F2F7',
-  pageTint: null,
-};
-
-// The new design: the same white and black pages, its own greys around them.
-const DARK_V2: ReadPalette = {
   bg: '#000000',
   pageBg: '#000000',
   card: '#181818',
@@ -54,7 +30,7 @@ const DARK_V2: ReadPalette = {
   pageTint: '#FFFFFF',
 };
 
-const LIGHT_V2: ReadPalette = {
+const LIGHT: ReadPalette = {
   bg: '#FFFFFF',
   pageBg: '#FFFFFF',
   card: '#FFFFFF',
@@ -66,8 +42,6 @@ const LIGHT_V2: ReadPalette = {
   pageTint: null,
 };
 
-/** `isNew`: the new design (design/DesignContext). */
-export function getReadPalette(isDark: boolean, isNew = false): ReadPalette {
-  if (isNew) return isDark ? DARK_V2 : LIGHT_V2;
+export function getReadPalette(isDark: boolean): ReadPalette {
   return isDark ? DARK : LIGHT;
 }

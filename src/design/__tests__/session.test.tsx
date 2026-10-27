@@ -25,7 +25,7 @@ import { getQuranData } from '../../lib/quranData';
 import { DEFAULT_ACCENT, paletteDark, paletteLight, paletteV2 } from '../../theme/v2';
 
 const v2 = (ui: React.ReactElement) => (
-  <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
+  <DesignProvider initial={{}}>
     <ThemeProvider>{ui}</ThemeProvider>
   </DesignProvider>
 );
@@ -38,14 +38,12 @@ beforeEach(async () => {
 
 describe('the session and reader in the new design', () => {
   it('the page palette uses the new greys around the same white and black pages', () => {
-    expect(getReadPalette(false, true)).toMatchObject({ pageBg: '#FFFFFF', textSecondary: paletteLight.secondary, divider: paletteLight.separator });
-    expect(getReadPalette(true, true)).toMatchObject({ pageBg: '#000000', textSecondary: paletteDark.secondary, divider: paletteDark.separator });
-    // Classic untouched.
-    expect(getReadPalette(false)).toMatchObject({ bg: '#F2F2F7', textSecondary: '#3C3C43' });
+    expect(getReadPalette(false)).toMatchObject({ pageBg: '#FFFFFF', textSecondary: paletteLight.secondary, divider: paletteLight.separator });
+    expect(getReadPalette(true)).toMatchObject({ pageBg: '#000000', textSecondary: paletteDark.secondary, divider: paletteDark.separator });
   });
 
   it('header buttons are bare icons; a page marked revised is the jade done check', async () => {
-    const palette = getReadPalette(false, true);
+    const palette = getReadPalette(false);
     render(
       v2(
         <>
