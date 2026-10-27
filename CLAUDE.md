@@ -334,6 +334,15 @@ that draws the decorated opening pages higher: pages 1 and 2 are shifted up by 6
 on the image before trusting new bounds. Translations: Saheeh International from api.alquran.cloud,
 and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
 
+**Copy and Share** (the held-verse menu; `lib/verseShare.ts`): the verse's Arabic, the verse sheet's
+own (`getArabicVerse`, alquran.cloud `quran-uthmani`, basmala stripped as the sheet does), then
+`﴿ ٥ ﴾` (U+FD3F, Arabic-Indic digits, U+FD3E), all between U+202B and U+202C so it pastes right to
+left; a blank line; "Āli-'Imrān, Ayah 5" (the app's `nameDisplay`, which writes ʿayn and hamza as
+`'`). The hold has already started loading the text; never loaded and offline, it says so and copies
+nothing. Copy uses React Native's own Clipboard module through `TurboModuleRegistry`
+(`lib/clipboard.ts`): it is in every build, while `expo-clipboard` would be a native change. Every
+page of this mushaf ends at the end of a verse, so a held verse is always whole on its page.
+
 **The Clear Quran® (licensed):** the publisher (Al-Furqaan Foundation, info@theclearquran.org)
 requires the credit "The Clear Quran® by Dr. Mustafa Khattab" + theclearquran.org wherever it is
 shown (pinned under the verse; in the picker), the text exactly as the API gives it (footnote markers

@@ -6,6 +6,7 @@
 //   session or day complete                     → success
 //   destructive confirm                         → warning
 //   recording starts / stops                    → medium impact
+//   a verse copied                              → light impact
 
 import { useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +17,7 @@ export interface HapticsApi {
   success: () => void;
   warning: () => void;
   impact: () => void;
+  light: () => void;
 }
 
 export function makeHaptics(on: boolean): HapticsApi {
@@ -27,6 +29,7 @@ export function makeHaptics(on: boolean): HapticsApi {
     success: run(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
     warning: run(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
     impact: run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
+    light: run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
   };
 }
 

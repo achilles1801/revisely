@@ -13,7 +13,8 @@ import { spacing } from '../../theme/spacing';
 interface UndoToastProps {
   visible: boolean;
   message: string;
-  onUndo: () => void;
+  /** The action; without it the bar is only the message ("Copied"). */
+  onUndo?: () => void;
   onDismiss: () => void;
   /** Auto-dismiss after this many ms. Default 3000. */
   duration?: number;
@@ -24,7 +25,8 @@ interface UndoToastProps {
 }
 
 /**
- * A short-lived bar with an action ("Pages cleared · Undo"): a flat snackbar
+ * A short-lived bar, with an action ("Pages cleared · Undo") or without one
+ * ("Copied"): a flat snackbar
  * in the inverse of the ground (ink on white, white on black), no shadow,
  * inside the gutters.
  */
@@ -73,15 +75,17 @@ export function UndoToast({
       style={[v2.wrap, { bottom: bottomInset + spacing.md }, animStyle]}
       testID="undo-toast"
     >
-      <View style={[v2.toast, { backgroundColor: palette.text }]} accessibilityLiveRegion="polite" testID="undo-toast-bar">
+      <View style={[v2.toast, !onUndo && v2.plain, { backgroundColor: palette.text }]} accessibilityLiveRegion="polite" testID="undo-toast-bar">
         <Text style={[typeV2.body, v2.message, { color: palette.bg }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
           {message}
         </Text>
-        <Tap onPress={onUndo} hitSlop={10} style={v2.action} accessibilityRole="button" testID="undo-toast-action">
-          <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>
-            {actionLabel}
-          </Text>
-        </Tap>
+        {onUndo ? (
+          <Tap onPress={onUndo} hitSlop={10} style={v2.action} accessibilityRole="button" testID="undo-toast-action">
+            <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>
+              {actionLabel}
+            </Text>
+          </Tap>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -99,6 +103,7 @@ const v2 = StyleSheet.create({
     paddingVertical: 6,
     gap: 8,
   },
+  plain: { paddingRight: layoutV2.gutter },
   message: { flex: 1 },
   action: { paddingHorizontal: 12, paddingVertical: 8 },
 });
