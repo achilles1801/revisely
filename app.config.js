@@ -95,12 +95,24 @@ export default {
       // setup, and the Android client info from google-services.json — no
       // plugin options needed.
       "@react-native-google-signin/google-signin",
-      // Sentry: keep the bare plugin form — the configured @sentry/react-native/expo
-      // plugin (added by the wizard with org/project) does extra Podfile work
-      // that interacts badly with RNFirebase + static frameworks. The bare
-      // plugin still wires the SDK in. Source maps stay off via
-      // SENTRY_DISABLE_AUTO_UPLOAD=true on EAS env.
-      "@sentry/react-native",
+      // Sentry: no organization/project here — the wizard's configured form did
+      // extra Podfile work that interacts badly with RNFirebase + static
+      // frameworks; org and project come from SENTRY_ORG/SENTRY_PROJECT in the
+      // build (ios-build.yml). experimental_android only touches the Android
+      // project: the Sentry Android Gradle Plugin uploads the R8/ProGuard
+      // mapping and NDK symbols (with sources) when SENTRY_AUTH_TOKEN is set,
+      // for the Android launch. iOS is configured exactly as with the bare form.
+      [
+        "@sentry/react-native",
+        {
+          experimental_android: {
+            enableAndroidGradlePlugin: true,
+            autoUploadProguardMapping: true,
+            uploadNativeSymbols: true,
+            includeNativeSources: true,
+          },
+        },
+      ],
       "expo-font",
       "expo-web-browser",
       // Verse recitation (and, later, recording yourself reciting). The pod
