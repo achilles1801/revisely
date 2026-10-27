@@ -21,9 +21,10 @@
   <meta property="og:image:alt" content="Revisely on an iPhone, showing today’s revision plan.">
   <meta name="twitter:card" content="summary_large_image">
 
-  <link rel="icon" href="/favicon.ico" sizes="32x32">
-  <link rel="icon" href="/assets/img/icon-64.png" type="image/png">
-  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="preload" as="image" href="/assets/clips/plan.jpg" fetchpriority="high">
   <link rel="stylesheet" href="/assets/site.css">
   <script>document.documentElement.classList.remove('no-js')</script>
@@ -47,8 +48,10 @@
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="/" aria-label="Revisely, home">
-        <img src="/assets/img/icon-64.png" width="30" height="30" alt="">
-        <span>Revisely</span>
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
       </a>
       <nav class="site-nav" aria-label="Main">
         <a class="hide-sm" href="#features">Features</a>
@@ -289,7 +292,7 @@
 
     <section class="cta" aria-labelledby="cta-title">
       <div class="wrap">
-        <img class="icon" src="/assets/img/apple-touch-icon.png" width="72" height="72" alt="">
+        <img class="icon" src="/apple-touch-icon.png" width="72" height="72" alt="">
         <h2 id="cta-title" class="title">Today’s pages are waiting.</h2>
         <div class="get">
           <a class="badge-link" href="https://apps.apple.com/app/revisely/id6767990248">

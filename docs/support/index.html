@@ -15,9 +15,10 @@
   <meta property="og:description" content="Get help with Revisely, the Quran revision app.">
   <meta property="og:image" content="https://revisely.app/assets/img/og.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="/favicon.ico" sizes="32x32">
-  <link rel="icon" href="/assets/img/icon-64.png" type="image/png">
-  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
@@ -26,8 +27,10 @@
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="/" aria-label="Revisely, home">
-        <img src="/assets/img/icon-64.png" width="30" height="30" alt="">
-        <span>Revisely</span>
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="">
+        </picture>
       </a>
       <nav class="site-nav" aria-label="Main">
         <a class="hide-sm" href="/#features">Features</a>
