@@ -635,23 +635,6 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        <Section
-          title="Reading"
-          footer="On by default. The screen stays awake while you read, revise or play a recording."
-        >
-          <Row
-            icon="sunny-outline"
-            label="Keep screen on while reading"
-            rightSlot={
-              <SettingSwitch
-                value={homePrefs.keepScreenOn}
-                onValueChange={(v) => setHomePrefs({ keepScreenOn: v })}
-                accessibilityLabel="Keep screen on while reading, revising or listening"
-              />
-            }
-          />
-        </Section>
-
         <Section title="Day boundary">
           <FajrBoundaryCard />
         </Section>
