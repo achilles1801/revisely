@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions } from 'react-native';
+import { AccessibilityInfo, Alert, Dimensions, Share } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
 import { AyahRef, ayahRects, versesOnPage } from '../../lib/ayahBounds';
 import { getRecitation, RecitationState } from '../../lib/recitation';
@@ -26,6 +27,10 @@ import {
 } from '../../lib/playbackPlan';
 import { AudioOptionsSheet, verseLabel } from './AudioOptionsSheet';
 import { Anchor, SpeedMenu } from '../reader/SpeedMenu';
+import { UndoToast } from '../revision/UndoToast';
+import { copyText } from '../../lib/clipboard';
+import { verseShareText } from '../../lib/verseShare';
+import { spacing } from '../../theme/spacing';
 
 // The last To chosen by hand (Custom), for the next Play while it still fits.
 let lastCustomTo: VerseKey | null = null;
@@ -42,7 +47,8 @@ interface Options {
 
 /**
  * Press and hold a verse on a mushaf page: it is highlighted and a menu offers
- * Play (Husary, to the end of the juz) and Translation (the verse sheet). Shared
+ * Play (Husary, to the end of the juz), Translation (the verse sheet), Copy and
+ * Share (the verse's Arabic with its reference; lib/verseShare). Shared
  * by the Quran tab and revision sessions. Returns the props for MushafPager and
  * the overlay to render on top of it.
  */
@@ -170,6 +176,45 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
     setMenuPoint(null);
   }, [selected]);
 
+  // A short note at the bottom ("Copied"), also read out by VoiceOver.
+  const insets = useSafeAreaInsets();
+  const [note, setNote] = useState<string | null>(null);
+  const showNote = useCallback((text: string) => {
+    setNote(text);
+    AccessibilityInfo.announceForAccessibility(text);
+  }, []);
+
+  // Copy and Share run once the menu has gone, with the verse it was opened on.
+  const copyVerse = useCallback(() => {
+    const verse = selected;
+    setMenuPoint(null);
+    setSelected(null);
+    if (!verse) return;
+    verseShareText(verse.page, verse.sura, verse.ayah)
+      .then((text) => {
+        copyText(text);
+        haptics.light();
+        showNote('Copied');
+      })
+      .catch((err) => {
+        logger.warn('Could not copy the verse', err);
+        showNote('Couldn’t copy. Check your connection.');
+      });
+  }, [selected, haptics, showNote]);
+
+  const shareVerse = useCallback(() => {
+    const verse = selected;
+    setMenuPoint(null);
+    setSelected(null);
+    if (!verse) return;
+    verseShareText(verse.page, verse.sura, verse.ayah)
+      .then((message) => Share.share({ message }))
+      .catch((err) => {
+        logger.warn('Could not share the verse', err);
+        showNote('Couldn’t share. Check your connection.');
+      });
+  }, [selected, showNote]);
+
   const navigateSheet = useCallback(
     (v: VerseKey) => {
       const ref = toAyahRef(v);
@@ -281,6 +326,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         playSubtitle={`${resolveVoice(user?.reciter).reciter.short} · ${playUpToPhrase(selected, audio.playUpTo)}`}
         onPlay={play}
         onTranslation={openTranslation}
+        onCopy={copyVerse}
+        onShare={shareVerse}
         onClose={closeMenu}
       />
       <VerseSheet
@@ -310,6 +357,15 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
         reciter={user?.reciter}
         onChangeReciter={changeReciter}
         onPlay={playWithOptions}
+      />
+      <UndoToast
+        visible={note != null}
+        message={note ?? ''}
+        // "Copied" is a glance; a failure gets time to be read.
+        duration={note === 'Copied' ? 1500 : 3500}
+        onDismiss={() => setNote(null)}
+        // At the bottom of the room under the page, never over the text.
+        bottomInset={insets.bottom - spacing.sm}
       />
     </>
   );

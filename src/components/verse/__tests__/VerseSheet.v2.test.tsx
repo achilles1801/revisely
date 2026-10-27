@@ -213,9 +213,11 @@ describe('ReciterList in the new design', () => {
 });
 
 describe('VerseMenu in the new design', () => {
-  it('is the menu sheet: Play (who recites) and Translation; the choice runs once the sheet has gone', async () => {
+  it('is the menu sheet: Play (who recites), Translation, Copy and Share; the choice runs once the sheet has gone', async () => {
     const onPlay = jest.fn();
     const onTranslation = jest.fn();
+    const onCopy = jest.fn();
+    const onShare = jest.fn();
     const onClose = jest.fn();
     const ui = (point: { x: number; y: number } | null) =>
       v2(
@@ -225,6 +227,8 @@ describe('VerseMenu in the new design', () => {
           playSubtitle="Husary · to the end of the juz"
           onPlay={onPlay}
           onTranslation={onTranslation}
+          onCopy={onCopy}
+          onShare={onShare}
           onClose={onClose}
         />,
       );
@@ -233,6 +237,8 @@ describe('VerseMenu in the new design', () => {
     expect(screen.getByText('Al-Baqarah 2:6')).toBeTruthy();
     expect(screen.getByText('Husary · to the end of the juz')).toBeTruthy();
     expect(screen.getByTestId('sheet-action-translation')).toBeTruthy();
+    expect(screen.getByText('Copy')).toBeTruthy();
+    expect(screen.getByText('Share')).toBeTruthy();
     fireEvent.press(screen.getByTestId('sheet-action-translation'));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onTranslation).not.toHaveBeenCalled();
@@ -244,6 +250,8 @@ describe('VerseMenu in the new design', () => {
     act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
     expect(onTranslation).toHaveBeenCalledTimes(1);
     expect(onPlay).not.toHaveBeenCalled();
+    expect(onCopy).not.toHaveBeenCalled();
+    expect(onShare).not.toHaveBeenCalled();
   });
 });
 

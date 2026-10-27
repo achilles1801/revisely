@@ -237,6 +237,12 @@ export async function getVerseText(
   return compose(t, sura, ayah, arabic, translated.text, translated.surahName);
 }
 
+/** A verse's Arabic (Uthmani), exactly as the verse sheet shows it. */
+export async function getArabicVerse(page: number, sura: number, ayah: number): Promise<string> {
+  const arabic = await getAyahEdition(page, sura, ayah, ARABIC_EDITION);
+  return stripBismillah(arabic.text, sura, ayah);
+}
+
 /** One verse of an edition, if this launch already has it in memory. */
 function peekAyahEdition(page: number, sura: number, ayah: number, edition: string): TranslatedAyah | null {
   return (

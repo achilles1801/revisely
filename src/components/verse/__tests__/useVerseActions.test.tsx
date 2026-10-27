@@ -1,18 +1,26 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { AccessibilityInfo, Alert, Share } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 import { useVerseActions } from '../useVerseActions';
 import { AudioOptionsSheet } from '../AudioOptionsSheet';
 import { updateAudioOptions } from '../../../lib/audioOptions';
 import { DEFAULT_PLAYBACK } from '../../../lib/playbackPlan';
+import { VerseMenu } from '../VerseMenu';
+import { UndoToast } from '../../revision/UndoToast';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
-jest.mock('expo-haptics', () => ({ impactAsync: jest.fn(), ImpactFeedbackStyle: { Medium: 'm' } }));
+const mockImpact = jest.fn();
+jest.mock('expo-haptics', () => ({ impactAsync: (s: unknown) => mockImpact(s), ImpactFeedbackStyle: { Medium: 'm', Light: 'l' } }));
+const mockCopy = jest.fn();
+jest.mock('../../../lib/clipboard', () => ({ copyText: (t: string) => mockCopy(t) }));
+const mockShareText = jest.fn();
+jest.mock('../../../lib/verseShare', () => ({ verseShareText: (...a: unknown[]) => mockShareText(...a) }));
 jest.mock('expo-glass-effect', () => {
   const { View } = require('react-native');
   return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
 });
 jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('../VerseSheet', () => ({ VerseSheet: () => null }));
 jest.mock('../VerseMenu', () => ({ VerseMenu: () => null }));
 jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: null, saveUser: jest.fn() }) }));
@@ -39,6 +47,66 @@ jest.mock('../../../lib/recitation', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockCapturing = false;
+  mockImpact.mockResolvedValue(undefined);
+});
+
+describe('useVerseActions: Copy and Share', () => {
+  type Overlay = { props: { children: React.ReactNode } };
+  const find = <P,>(overlay: Overlay, type: unknown) =>
+    React.Children.toArray(overlay.props.children).find(
+      (c) => React.isValidElement(c) && c.type === type,
+    ) as React.ReactElement<P>;
+  const menu = (r: { current: ReturnType<typeof useVerseActions> }) =>
+    find<React.ComponentProps<typeof VerseMenu>>(r.current.overlay, VerseMenu);
+  const note = (r: { current: ReturnType<typeof useVerseActions> }) =>
+    find<React.ComponentProps<typeof UndoToast>>(r.current.overlay, UndoToast);
+  const hold = (r: { current: ReturnType<typeof useVerseActions> }) =>
+    act(() => r.current.onLongPressAyah({ page: 48, sura: 2, ayah: 282 }, { x: 10, y: 10 }));
+
+  it('Copy: the held verse’s text to the clipboard, a light tap, and “Copied”', async () => {
+    mockShareText.mockResolvedValue('TEXT');
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    const { result } = renderHook(() => useVerseActions({ pages: [47, 48], currentPage: 48 }));
+    hold(result);
+    mockImpact.mockClear();
+    await act(async () => menu(result).props.onCopy());
+    // The verse as held: on page 48, though it began on 47.
+    expect(mockShareText).toHaveBeenCalledWith(48, 2, 282);
+    expect(mockCopy).toHaveBeenCalledWith('TEXT');
+    expect(mockImpact).toHaveBeenCalledWith('l');
+    expect(note(result).props).toMatchObject({ visible: true, message: 'Copied', duration: 1500 });
+    expect(note(result).props.onUndo).toBeUndefined();
+    expect(announce).toHaveBeenCalledWith('Copied');
+    // The menu has closed and the verse is no longer held.
+    expect(menu(result).props.point).toBeNull();
+    expect(result.current.highlightedAyah).toBeNull();
+    act(() => note(result).props.onDismiss());
+    expect(note(result).props.visible).toBe(false);
+  });
+
+  it('Share: the same text to the share sheet', async () => {
+    mockShareText.mockResolvedValue('TEXT');
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const { result } = renderHook(() => useVerseActions({ pages: [48], currentPage: 48 }));
+    hold(result);
+    await act(async () => menu(result).props.onShare());
+    expect(share).toHaveBeenCalledWith({ message: 'TEXT' });
+    expect(mockCopy).not.toHaveBeenCalled();
+  });
+
+  it('no text (offline, never loaded): nothing copied or shared, and it says why', async () => {
+    mockShareText.mockRejectedValue(new Error('offline'));
+    const share = jest.spyOn(Share, 'share');
+    const { result } = renderHook(() => useVerseActions({ pages: [48], currentPage: 48 }));
+    hold(result);
+    await act(async () => menu(result).props.onCopy());
+    expect(mockCopy).not.toHaveBeenCalled();
+    expect(note(result).props).toMatchObject({ visible: true, message: 'Couldn’t copy. Check your connection.' });
+    hold(result);
+    await act(async () => menu(result).props.onShare());
+    expect(share).not.toHaveBeenCalled();
+    expect(note(result).props.message).toBe('Couldn’t share. Check your connection.');
+  });
 });
 
 describe('useVerseActions: Audio Options', () => {
