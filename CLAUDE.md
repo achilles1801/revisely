@@ -354,6 +354,65 @@ Fahd Complex fonts (open-source quran.com-images). They are served from the Stor
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
 
+## Worker (revisely.app/api)
+
+`wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs
+`/api/*` (nothing else reaches the code). `GET /api/tcq/verses/<surah>:<verse>`:
+- needs a Firebase ID token (`Authorization: Bearer`), verified in the worker against Google's keys
+  (`worker/auth.ts`; project `FIREBASE_PROJECT_ID`); every malformed token is a 401.
+- 30 requests a minute per user (`ratelimits`), and daily budgets for what reaches The Clear Quran
+  (`worker/budget.ts`, one Durable Object): `TCQ_DAILY_LIMIT_LIVE` for everyone on the live key (300 ×
+  30 days stays under the 10,000-a-month plan), `TCQ_DAILY_LIMIT_SANDBOX`, `TCQ_USER_DAILY_LIMIT` per
+  account; spent: 429 `DAILY_LIMIT` until midnight UTC. Anyone can make an account, so these are what
+  keep one user from spending the month for everyone. Raise them with the plan.
+- calls The Clear Quran API (`https://api.theclearquran.org/verses/<key>`, `Authorization: Bearer
+  <key>`) with `TCQ_API_KEY_LIVE` when the app sends `X-Revisely-Channel: production` (the App Store
+  app) and `TCQ_API_KEY_SANDBOX` otherwise (TestFlight, dev). Sandbox keys only work against the
+  sandbox API: `TCQ_API_BASE_SANDBOX` is its base URL.
+- keeps a verse in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
+  checked); answers the app with `Cache-Control: no-store`; logs never include a key (`redactKeys`).
+- maps their 429 to 429 (Retry-After), 404 to 404, anything else to 502; no key configured is 503;
+  anything unexpected is a JSON 500 (`worker/index.ts`).
+- `observability` is off: no stored request logs (they would say who read which verse). Watch live with
+  `npx wrangler@4.153.0 tail revisely`.
+
+**Deploying:** Cloudflare Workers Builds deploys `main` on every push (and runs `wrangler preview` for
+other branches, which is why `wrangler.jsonc` has a `previews` block: previews get no keys and answer
+503). So worker changes reach revisely.app through a PR into `main`: they are outside the app hash, so
+they don't hold up promotion, and the same files come back through develop unchanged. Never deploy the
+worker from a laptop except to recover. Secrets: `npx wrangler@4.153.0 login`, then `npx
+wrangler@4.153.0 secret put TCQ_API_KEY_LIVE` (and `…_SANDBOX`) from the repo root; they persist across
+deploys and never go in files. Workers Builds' non-production branch builds should stay off
+(Workers & Pages → revisely → Settings → Build → Branch control). With them on, every push to another
+branch uploads a newer version that isn't deployed, and both the dashboard's Variables and Secrets
+and `wrangler secret put` act on the newest version, so they refuse ("latest version … is not
+deployed"; Oct 27, while develop still lacked the worker, the dashboard said the Worker "only has
+static assets"). If they refuse anyway, redeploy main (merge to it, or Retry the last main build)
+and add the secret before anything else is pushed. The worker is its own TypeScript project (`npx tsc --noEmit -p worker`,
+in CI) and its tests run with the app's (`worker/__tests__`). Changes to it publish no app update, and
+`claude-fix` refuses patches that touch it.
+
+### The Clear Quran API keys (secrets, and rotating them)
+
+Two keys, issued in The Clear Quran developer portal (theclearquran.org/developers → API Keys), live
+only as secrets of the Cloudflare Worker `revisely` (dashboard: Workers & Pages → revisely →
+Settings → Variables and Secrets): `TCQ_API_KEY_LIVE` (prefix `tcq_eng_liv_`, used for the App Store
+app) and `TCQ_API_KEY_SANDBOX` (prefix `tcq_eng_sbx_`, TestFlight and dev). Never in the repo, `.env`,
+CI, PR text, Sentry or chat; Worker Previews get neither.
+
+To rotate one (or after a leak: revoke the old key in the portal first):
+1. In the portal, create a new key: product English, the same environment (Production or Sandbox).
+2. From the repo root, after `npx wrangler@4.153.0 login` if `npx wrangler@4.153.0 whoami` says so:
+   ```bash
+   npx wrangler@4.153.0 secret put TCQ_API_KEY_LIVE
+   ```
+   (or `TCQ_API_KEY_SANDBOX`), and paste the key at the hidden prompt; typed there, it never reaches
+   shell history. It takes effect at once: Wrangler deploys the current code with the new secret.
+3. Check: `npx wrangler@4.153.0 secret list` lists the names (never values); run
+   `npx wrangler@4.153.0 tail revisely` while opening a verse in The Clear Quran on a build of that
+   channel (App Store for live, TestFlight for sandbox) and look for no `answered 401/403` lines.
+4. Revoke the old key in the portal.
+
 ## The redesign (new design, preview)
 
 The plan is the doc "Revisely: Threads-style UI Migration" (Claude Docs). It replaced an earlier
