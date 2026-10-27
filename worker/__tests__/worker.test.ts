@@ -7,6 +7,7 @@
 import worker from '../index';
 import { resetKeyCache, verifyIdToken } from '../auth';
 import {
+  cacheVersion,
   handleTcq,
   parseWindow,
   redactKeys,
@@ -151,13 +152,14 @@ const ctx = () => {
 
 async function call(
   path: string,
-  { auth, channel, env = ENV, api = theClearQuran, cache = memoryCache(), method = 'GET' }: {
+  { auth, channel, env = ENV, api = theClearQuran, cache = memoryCache(), method = 'GET', now = NOW }: {
     auth?: string | null;
     channel?: string;
     env?: TcqEnv;
     api?: (url: string, init?: RequestInit) => Response | Promise<Response>;
     cache?: ReturnType<typeof memoryCache> | null;
     method?: string;
+    now?: number;
   } = {},
 ) {
   const headers: Record<string, string> = {};
@@ -169,7 +171,7 @@ async function call(
   const res = await handleTcq(new Request(`https://revisely.app${path}`, { method, headers }), env, c, {
     fetch: f.fn,
     cache,
-    now: NOW,
+    now,
   });
   await Promise.all(c.waits);
   return { res, body: (await res.json()) as any, upstream: f.calls, cache };
@@ -441,8 +443,8 @@ describe('edge cache', () => {
     const cache = memoryCache();
     const first = await call('/api/tcq/verses/2:255', { cache, channel: 'production' });
     expect(first.res.headers.get('X-Cache')).toBe('MISS');
-    expect([...cache.store.keys()]).toEqual(['https://revisely.app/__cache/tcq/live/windows/2:241-270']);
-    expect(cache.store.get('https://revisely.app/__cache/tcq/live/windows/2:241-270')!.headers.get('Cache-Control')).toBe(
+    expect([...cache.store.keys()]).toEqual(['https://revisely.app/__cache/tcq/v1/live/windows/2:241-270']);
+    expect(cache.store.get('https://revisely.app/__cache/tcq/v1/live/windows/2:241-270')!.headers.get('Cache-Control')).toBe(
       'public, max-age=3600',
     );
 
@@ -469,6 +471,103 @@ describe('edge cache', () => {
     const cache = memoryCache();
     await call('/api/tcq/verses/2:255', { cache, env: { ...ENV, TCQ_EDGE_CACHE_SECONDS: '0' } });
     expect(cache.store.size).toBe(0);
+  });
+});
+
+describe('long-lived edge cache (stale-while-revalidate)', () => {
+  const env = { ...ENV, TCQ_EDGE_CACHE_SECONDS: '100', TCQ_EDGE_STALE_SECONDS: '100' };
+  const KEY = 'https://revisely.app/__cache/tcq/v1/live/windows/2:241-270';
+  const stored = async (cache: ReturnType<typeof memoryCache>) => cache.store.get(KEY)!.clone().json();
+
+  it('fresh: from the cache; stale: from the cache at once, refreshed behind it; older: fetched', async () => {
+    const cache = memoryCache();
+    const first = await call('/api/tcq/windows/2:255', { env, cache, channel: 'production' });
+    expect(first.res.headers.get('X-Cache')).toBe('MISS');
+    // Kept for fresh + stale; the time it was fetched travels with it.
+    expect(cache.store.get(KEY)!.headers.get('Cache-Control')).toBe('public, max-age=200');
+    expect((await stored(cache)).fetchedAt).toBe(NOW);
+
+    const fresh = await call('/api/tcq/windows/2:255', { env, cache, channel: 'production', now: NOW + 100 });
+    expect(fresh.res.headers.get('X-Cache')).toBe('HIT');
+    expect(fresh.upstream).toHaveLength(0);
+
+    const stale = await call('/api/tcq/windows/2:255', { env, cache, channel: 'production', now: NOW + 150 });
+    expect(stale.res.headers.get('X-Cache')).toBe('STALE');
+    expect(stale.body.verses).toEqual(first.body.verses);
+    expect(stale.upstream).toHaveLength(1); // the refresh, after the answer
+    expect((await stored(cache)).fetchedAt).toBe(NOW + 150);
+
+    const later = await call('/api/tcq/windows/2:255', { env, cache, channel: 'production', now: NOW + 250 });
+    expect(later.res.headers.get('X-Cache')).toBe('HIT');
+
+    const tooOld = await call('/api/tcq/windows/2:255', { env, cache, channel: 'production', now: NOW + 351 });
+    expect(tooOld.res.headers.get('X-Cache')).toBe('MISS');
+  });
+
+  it('a refresh that fails keeps the cached copy', async () => {
+    const cache = memoryCache();
+    await call('/api/tcq/windows/2:255', { env, cache, channel: 'production' });
+    const down = () => new Response('oops', { status: 500 });
+    const stale = await call('/api/tcq/windows/2:255', { env, cache, api: down, channel: 'production', now: NOW + 150 });
+    expect(stale.res.status).toBe(200);
+    expect(stale.res.headers.get('X-Cache')).toBe('STALE');
+    expect((await stored(cache)).fetchedAt).toBe(NOW);
+  });
+
+  it('a refresh costs a budget like any request, and is skipped when it is spent', async () => {
+    const { ns, store } = fakeBudget();
+    const cache = memoryCache();
+    const limited = { ...env, TCQ_BUDGET: ns, TCQ_DAILY_LIMIT_LIVE: '1' };
+    await call('/api/tcq/windows/2:255', { env: limited, cache, channel: 'production' });
+    const stale = await call('/api/tcq/windows/2:255', { env: limited, cache, channel: 'production', now: NOW + 150 });
+    expect(stale.res.status).toBe(200);
+    expect(stale.upstream).toHaveLength(0);
+    expect(store.get('all:live')).toBe(1);
+  });
+
+  it('dialling the times down applies at once to what is cached', async () => {
+    const cache = memoryCache();
+    await call('/api/tcq/windows/2:255', { env, cache, channel: 'production' });
+    const shorter = { ...ENV, TCQ_EDGE_CACHE_SECONDS: '10', TCQ_EDGE_STALE_SECONDS: '0' };
+    const res = await call('/api/tcq/windows/2:255', { env: shorter, cache, channel: 'production', now: NOW + 50 });
+    expect(res.res.headers.get('X-Cache')).toBe('MISS');
+    const off = await call('/api/tcq/windows/2:255', { env: { ...ENV, TCQ_EDGE_CACHE_SECONDS: '0' }, cache, channel: 'production' });
+    expect(off.res.headers.get('X-Cache')).toBe('MISS');
+  });
+
+  it('a new TCQ_CACHE_VERSION drops every cached copy', async () => {
+    const cache = memoryCache();
+    await call('/api/tcq/windows/2:255', { env, cache, channel: 'production' });
+    const bumped = await call('/api/tcq/windows/2:255', { env: { ...env, TCQ_CACHE_VERSION: '2' }, cache, channel: 'production' });
+    expect(bumped.res.headers.get('X-Cache')).toBe('MISS');
+    expect([...cache.store.keys()]).toContain('https://revisely.app/__cache/tcq/v2/live/windows/2:241-270');
+    expect(cacheVersion({ ...ENV, TCQ_CACHE_VERSION: ' 7 ' })).toBe('7');
+    expect(cacheVersion({ ...ENV, TCQ_CACHE_VERSION: '../x' })).toBe('1');
+    expect(cacheVersion(ENV)).toBe('1');
+  });
+
+  it('an entry from before (no fetch time) is fetched again', async () => {
+    const cache = memoryCache();
+    const old = { verses: (await call('/api/tcq/windows/2:255', { channel: 'production' })).body.verses };
+    cache.store.set(KEY, new Response(JSON.stringify(old)));
+    const res = await call('/api/tcq/windows/2:255', { env: { ...env, TCQ_EDGE_STALE_SECONDS: '0' }, cache, channel: 'production' });
+    expect(res.res.headers.get('X-Cache')).toBe('MISS');
+  });
+});
+
+describe('the device cache policy', () => {
+  it('tells the app how long it may keep the text, and the cache version; no sign-in needed', async () => {
+    const env = { ...ENV, TCQ_DEVICE_CACHE_SECONDS: '2592000', TCQ_DEVICE_STALE_SECONDS: '604800', TCQ_CACHE_VERSION: '3' };
+    const { res, body, upstream } = await call('/api/tcq/policy', { env, auth: null });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(body).toEqual({ version: '3', device: { maxAgeSeconds: 2592000, staleSeconds: 604800 } });
+    expect(upstream).toHaveLength(0);
+  });
+
+  it('unset means keep nothing', async () => {
+    const { body } = await call('/api/tcq/policy', { auth: null });
+    expect(body).toEqual({ version: '1', device: { maxAgeSeconds: 0, staleSeconds: 0 } });
   });
 });
 
@@ -642,7 +741,7 @@ describe('robustness', () => {
 
   it('an unreadable cache entry is fetched again', async () => {
     const cache = memoryCache();
-    cache.store.set('https://revisely.app/__cache/tcq/sandbox/windows/2:241-270', new Response('not json'));
+    cache.store.set('https://revisely.app/__cache/tcq/v1/sandbox/windows/2:241-270', new Response('not json'));
     const { res, upstream } = await call('/api/tcq/verses/2:255', { cache });
     expect(res.status).toBe(200);
     expect(upstream).toHaveLength(1);

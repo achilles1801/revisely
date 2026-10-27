@@ -17,8 +17,13 @@
 //   and only once TCQ_API_BASE_SANDBOX names a sandbox host (empty now: dev
 //   builds use the live key too). See tcqEnvironment().
 // - The text goes back exactly as the API returns it (`text_english`).
-// - Blocks are kept in this data centre's cache for TCQ_EDGE_CACHE_SECONDS
-//   (short; 0 turns it off); the app keeps them in memory for one launch.
+// - Blocks are kept in this data centre's cache: fresh for TCQ_EDGE_CACHE_SECONDS
+//   (0 turns it off), then served for TCQ_EDGE_STALE_SECONDS more while a
+//   background request refreshes them. TCQ_CACHE_VERSION is part of every
+//   cache key: changing it drops them all.
+// - GET /api/tcq/policy tells the app how long it may keep text on the phone
+//   (TCQ_DEVICE_CACHE_SECONDS, TCQ_DEVICE_STALE_SECONDS) and the cache version;
+//   the app drops its copies when the version changes or the time is 0.
 // - Requests that reach The Clear Quran count against daily budgets, for
 //   everyone and per user (worker/budget.ts), so the plan can't be spent.
 // - If The Clear Quran refuses the range query, single verses are fetched
@@ -37,6 +42,13 @@ export interface TcqEnv {
   /** A sandbox host for development builds; empty or unset: none (live key). */
   TCQ_API_BASE_SANDBOX?: string;
   TCQ_EDGE_CACHE_SECONDS?: string;
+  /** After TCQ_EDGE_CACHE_SECONDS, how long a block is still served while it is refreshed. */
+  TCQ_EDGE_STALE_SECONDS?: string;
+  /** Part of every cache key, and the app's: changing it drops every cached copy. */
+  TCQ_CACHE_VERSION?: string;
+  /** How long the app may keep text on the phone, fresh and then stale (GET /api/tcq/policy). */
+  TCQ_DEVICE_CACHE_SECONDS?: string;
+  TCQ_DEVICE_STALE_SECONDS?: string;
   TCQ_API_KEY_LIVE?: string;
   TCQ_API_KEY_SANDBOX?: string;
   /** Per-user limit (wrangler.jsonc "ratelimits"); optional. */
@@ -125,13 +137,15 @@ export function errorResponse(status: number, code: ErrorCode, message: string, 
   });
 }
 
-function ok(body: unknown, cached: boolean, timing: Timing) {
+type CacheState = 'HIT' | 'STALE' | 'MISS';
+
+function ok(body: unknown, cache: CacheState, timing: Timing) {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',
-      'X-Cache': cached ? 'HIT' : 'MISS',
+      'X-Cache': cache,
       'Server-Timing': timing.header(),
     },
   });
@@ -162,7 +176,7 @@ export interface TcqVerse {
 }
 
 type Outcome =
-  | { ok: true; verses: TcqVerse[]; from: number; to: number; cached: boolean }
+  | { ok: true; verses: TcqVerse[]; from: number; to: number; cache: CacheState }
   | {
       ok: false;
       status: number;
@@ -206,15 +220,19 @@ export function parseWindow(body: unknown, win: VerseWindow): TcqVerse[] | null 
   return verses;
 }
 
-/** A cached block, if the entry holds all of it. */
-async function readCached(cache: Cache, key: Request, win: VerseWindow): Promise<TcqVerse[] | null> {
+/** A cached block with its age in seconds, if the entry holds all of it. */
+async function readCached(cache: Cache, key: Request, win: VerseWindow, now: number): Promise<{ verses: TcqVerse[]; age: number } | null> {
   try {
     const hit = await cache.match(key);
     if (!hit) return null;
-    const stored = ((await hit.json()) as { verses?: unknown }).verses;
-    if (!Array.isArray(stored)) return null;
-    const data = stored.map((v: { verse_key?: unknown; text?: unknown } | null) => ({ verse_key: v?.verse_key, text_english: v?.text }));
-    return parseWindow({ success: true, data }, win);
+    const stored = (await hit.json()) as { verses?: unknown; fetchedAt?: unknown };
+    if (!Array.isArray(stored.verses)) return null;
+    const data = stored.verses.map((v: { verse_key?: unknown; text?: unknown } | null) => ({ verse_key: v?.verse_key, text_english: v?.text }));
+    const verses = parseWindow({ success: true, data }, win);
+    if (!verses) return null;
+    // An entry without a time is from before stale-while-revalidate: due for a refresh.
+    const age = typeof stored.fetchedAt === 'number' ? Math.max(0, now - stored.fetchedAt) : Infinity;
+    return { verses, age };
   } catch (err) {
     console.warn('tcq: unreadable cache entry; fetching', err);
     return null;
@@ -222,10 +240,33 @@ async function readCached(cache: Cache, key: Request, win: VerseWindow): Promise
 }
 
 let rangeRefusedAt = -Infinity;
+/** Cache keys being refreshed in the background by this isolate (one refresh each). */
+const refreshing = new Set<string>();
 
 /** For tests: forget that the range query was refused. */
 export function resetRangeState(): void {
   rangeRefusedAt = -Infinity;
+  refreshing.clear();
+}
+
+/** The cache version: part of every cache key, here and in the app. */
+export function cacheVersion(env: TcqEnv): string {
+  const v = (env.TCQ_CACHE_VERSION ?? '').trim();
+  return /^[A-Za-z0-9._-]{1,32}$/.test(v) ? v : '1';
+}
+
+/** GET /api/tcq/policy: how long the app may keep the text, and the cache version. Public. */
+export function policyResponse(env: TcqEnv): Response {
+  return new Response(
+    JSON.stringify({
+      version: cacheVersion(env),
+      device: {
+        maxAgeSeconds: int(env.TCQ_DEVICE_CACHE_SECONDS, 0),
+        staleSeconds: int(env.TCQ_DEVICE_STALE_SECONDS, 0),
+      },
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } },
+  );
 }
 
 export async function handleTcq(
@@ -238,7 +279,9 @@ export async function handleTcq(
   },
 ): Promise<Response> {
   if (request.method !== 'GET') return errorResponse(405, 'METHOD_NOT_ALLOWED', 'GET only', { Allow: 'GET' });
-  const asked = route(new URL(request.url).pathname);
+  const pathname = new URL(request.url).pathname;
+  if (pathname === '/api/tcq/policy') return policyResponse(env);
+  const asked = route(pathname);
   if (!asked) {
     return errorResponse(400, 'BAD_REQUEST', 'Expected /api/tcq/verses/<surah>:<verse> or /api/tcq/windows/<surah>:<verse>');
   }
@@ -276,13 +319,20 @@ export async function handleTcq(
   }
 
   const now = deps.now ?? Math.floor(Date.now() / 1000);
-  const ttl = Math.max(0, Math.floor(Number(env.TCQ_EDGE_CACHE_SECONDS ?? '0')) || 0);
-  const cache = ttl > 0 ? deps.cache : null;
-  const origin = new URL(request.url).origin;
+  const fresh = int(env.TCQ_EDGE_CACHE_SECONDS, 0);
+  const stale = fresh > 0 ? int(env.TCQ_EDGE_STALE_SECONDS, 0) : 0;
+  const cache = fresh > 0 ? deps.cache : null;
+  const cachePrefix = `${new URL(request.url).origin}/__cache/tcq/v${cacheVersion(env)}/${which}/windows`;
 
   /** One request to The Clear Quran, if the budgets allow it. */
-  const upstream = async (label: string, url: string, read: (body: unknown) => TcqVerse[] | null, win: VerseWindow): Promise<Outcome> => {
-    const budget = await timing.time('budget', () =>
+  const upstream = async (
+    label: string,
+    url: string,
+    read: (body: unknown) => TcqVerse[] | null,
+    win: VerseWindow,
+    t: Timing,
+  ): Promise<Outcome> => {
+    const budget = await t.time('budget', () =>
       checkBudget(env.TCQ_BUDGET, {
         uid,
         env: which,
@@ -308,7 +358,7 @@ export async function handleTcq(
     const start = Date.now();
     let res: Response;
     try {
-      res = await timing.time(label, () =>
+      res = await t.time(label, () =>
         deps.fetch(url, {
           headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -319,7 +369,7 @@ export async function handleTcq(
       return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'Could not reach The Clear Quran; try again' };
     }
     const server = Number.parseFloat(res.headers.get('X-Response-Time') ?? '');
-    if (Number.isFinite(server)) timing.add(`tcq-server;dur=${server}`);
+    if (Number.isFinite(server)) t.add(`tcq-server;dur=${server}`);
     const warning = res.headers.get('X-Agreement-Warning');
     if (warning) console.warn(`tcq: agreement warning: ${warning}`);
 
@@ -343,15 +393,39 @@ export async function handleTcq(
       return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'The Clear Quran sent an unexpected answer', unsupported: true };
     }
     console.log(`tcq: ${label} ${win.sura}:${win.from}-${win.to} (${which}) in ${Date.now() - start} ms`);
-    return { ok: true, verses, from: win.from, to: win.to, cached: false };
+    return { ok: true, verses, from: win.from, to: win.to, cache: 'MISS' };
   };
 
   const remember = (key: Request, verses: TcqVerse[]) => {
     if (!cache) return;
-    const stored = new Response(JSON.stringify({ verses }), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttl}` },
+    const stored = new Response(JSON.stringify({ verses, fetchedAt: now }), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${fresh + stale}` },
     });
     ctx.waitUntil(cache.put(key, stored));
+  };
+
+  /**
+   * A block from this data centre's cache: fresh, or stale (served, and refreshed
+   * in the background, once per isolate). Older than both: as if not cached.
+   */
+  const fromCache = async (key: Request, win: VerseWindow, fetch: (t: Timing) => Promise<Outcome>): Promise<Outcome | null> => {
+    if (!cache) return null;
+    const entry = await timing.time('cache', () => readCached(cache, key, win, now));
+    if (!entry || entry.age > fresh + stale) return null;
+    if (entry.age <= fresh) return { ok: true, verses: entry.verses, from: win.from, to: win.to, cache: 'HIT' };
+    if (!refreshing.has(key.url)) {
+      refreshing.add(key.url);
+      ctx.waitUntil(
+        fetch(new Timing())
+          .then((out) => {
+            if (out.ok) remember(key, out.verses);
+            else console.warn(`tcq: refresh of ${win.sura}:${win.from}-${win.to} failed (${out.code}); keeping the cached copy`);
+          })
+          .catch((err) => console.error('tcq: refresh failed', err))
+          .finally(() => refreshing.delete(key.url)),
+      );
+    }
+    return { ok: true, verses: entry.verses, from: win.from, to: win.to, cache: 'STALE' };
   };
 
   const key = `${asked.sura}:${asked.ayah}`;
@@ -359,18 +433,18 @@ export async function handleTcq(
 
   // The block, from this data centre's cache or in one request.
   const win = windowOf(asked.sura, asked.ayah);
-  const winKey = new Request(`${origin}/__cache/tcq/${which}/windows/${win.sura}:${win.from}-${win.to}`);
-  const cachedWin = cache ? await timing.time('cache', () => readCached(cache, winKey, win)) : null;
-  if (cachedWin) {
-    result = { ok: true, verses: cachedWin, from: win.from, to: win.to, cached: true };
-  } else if (Date.now() - rangeRefusedAt >= RANGE_RETRY_AFTER_MS) {
-    const limit = win.to - win.from + 1;
-    result = await upstream(
+  const winKey = new Request(`${cachePrefix}/${win.sura}:${win.from}-${win.to}`);
+  const fetchWindow = (t: Timing) =>
+    upstream(
       'tcq-window',
-      `${base}/verses?surah=${win.sura}&from_verse=${win.from}&to_verse=${win.to}&limit=${limit}`,
+      `${base}/verses?surah=${win.sura}&from_verse=${win.from}&to_verse=${win.to}&limit=${win.to - win.from + 1}`,
       (body) => parseWindow(body, win),
       win,
+      t,
     );
+  result = await fromCache(winKey, win, fetchWindow);
+  if (!result && Date.now() - rangeRefusedAt >= RANGE_RETRY_AFTER_MS) {
+    result = await fetchWindow(timing);
     if (result.ok) remember(winKey, result.verses);
     else if (result.unsupported) {
       rangeRefusedAt = Date.now();
@@ -381,12 +455,9 @@ export async function handleTcq(
   // Single verses: when the range query isn't available.
   if (!result || (!result.ok && result.unsupported)) {
     const one: VerseWindow = { sura: asked.sura, from: asked.ayah, to: asked.ayah };
-    const oneKey = new Request(`${origin}/__cache/tcq/${which}/windows/${key}-${asked.ayah}`);
-    const cachedOne = cache ? await timing.time('cache', () => readCached(cache, oneKey, one)) : null;
-    if (cachedOne) {
-      result = { ok: true, verses: cachedOne, from: asked.ayah, to: asked.ayah, cached: true };
-    } else {
-      result = await upstream(
+    const oneKey = new Request(`${cachePrefix}/${key}-${asked.ayah}`);
+    const fetchOne = (t: Timing) =>
+      upstream(
         'tcq-verse',
         `${base}/verses/${key}`,
         (body) => {
@@ -395,7 +466,11 @@ export async function handleTcq(
           return parseWindow({ success: true, data: [{ verse_key: key, text_english: b.data?.text_english }] }, one);
         },
         one,
+        t,
       );
+    result = await fromCache(oneKey, one, fetchOne);
+    if (!result) {
+      result = await fetchOne(timing);
       if (result.ok) remember(oneKey, result.verses);
     }
   }
@@ -404,8 +479,8 @@ export async function handleTcq(
     return errorResponse(result.status, result.code, result.message, { ...result.headers, 'Server-Timing': timing.header() });
   }
   if (asked.kind === 'window') {
-    return ok({ surah: asked.sura, from: result.from, to: result.to, verses: result.verses }, result.cached, timing);
+    return ok({ surah: asked.sura, from: result.from, to: result.to, verses: result.verses }, result.cache, timing);
   }
   const verse = result.verses.find((v) => v.verse_key === key)!;
-  return ok({ verse_key: key, text: verse.text }, result.cached, timing);
+  return ok({ verse_key: key, text: verse.text }, result.cache, timing);
 }
