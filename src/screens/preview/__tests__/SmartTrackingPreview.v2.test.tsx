@@ -86,6 +86,7 @@ describe('the Smart Tracking preview in the new design', () => {
     expect(flat(screen.getByTestId('smart-preview').props.style).backgroundColor).toBe(palette.bg);
     expect(screen.getByText('Smart Tracking')).toBeTruthy();
     expect(screen.getByText('Meet Smart Tracking')).toBeTruthy();
+    expect(screen.queryByText(/try it out|nothing is saved/i)).toBeNull();
     expect(screen.queryByText('SMART TRACKING PREVIEW')).toBeNull();
     expect(screen.queryByTestId('linear-gradient')).toBeNull();
     expect(flat(screen.getByTestId('preview-show-me').props.style).backgroundColor).toBe(palette.primary);
@@ -107,7 +108,9 @@ describe('the Smart Tracking preview in the new design', () => {
     dismissSheets();
     expect(screen.getByTestId('sandbox-rating-sheet')).toBeTruthy();
     fireEvent.press(screen.getByTestId('sandbox-rating-2'));
-    expect(screen.getByText('Rated weak. Nothing is saved.')).toBeTruthy();
+    expect(screen.getByText('Rated weak.')).toBeTruthy();
+    // A demo, but no line saying nothing is saved next to a button that continues.
+    expect(screen.queryByText(/nothing is saved/i)).toBeNull();
 
     fireEvent.press(screen.getByTestId('preview-continue'));
     // The real Insights rows, the rated page in red.
