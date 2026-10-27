@@ -11,8 +11,6 @@ export interface HomePrefs {
   fridayKahfReminder: boolean;
   /** Revision day on which the Al-Kahf card was dismissed ("Not today"). */
   kahfDismissedDay: string | null;
-  /** Keep the screen from locking while reading, revising or listening. */
-  keepScreenOn: boolean;
 }
 
 export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
@@ -38,7 +36,6 @@ const DEFAULT_PREFS: HomePrefs = {
   metrics: ['juz', 'pages'],
   fridayKahfReminder: true,
   kahfDismissedDay: null,
-  keepScreenOn: true,
 };
 
 /** Saved prefs over the defaults; fields added later default for old installs. */
@@ -61,8 +58,6 @@ export function parseHomePrefs(raw: string | null): HomePrefs {
         : DEFAULT_PREFS.fridayKahfReminder,
     kahfDismissedDay:
       typeof saved.kahfDismissedDay === 'string' ? saved.kahfDismissedDay : null,
-    keepScreenOn:
-      typeof saved.keepScreenOn === 'boolean' ? saved.keepScreenOn : DEFAULT_PREFS.keepScreenOn,
   };
 }
 

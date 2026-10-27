@@ -4,10 +4,12 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
   RefreshControl,
   Alert,
 } from 'react-native';
+// Gesture Handler's, so a sideways swipe on it can move to the next tab
+// (navigation/TabSwipe): over React Native's own, the swipe never started.
+import { ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
@@ -18,6 +20,7 @@ import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
 import * as firestoreService from '../../services/firestoreService';
 import { logger } from '../../lib/logger';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
@@ -27,6 +30,8 @@ import { ThemeColors } from '../../theme/v2';
 import {
   generateDailyAssignment,
   shiftScheduleAnchor,
+  canPushScheduleBack,
+  scheduleStartingByToday,
 } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
@@ -62,6 +67,21 @@ export default function DashboardScreen() {
   const tabFootprint = useTabBarFootprint();
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+
+  // A schedule that starts after today (an earlier "back a day" on a schedule
+  // that started today) leaves today with nothing to revise: start it today.
+  const repairingStartRef = useRef(false);
+  useEffect(() => {
+    if (!user || repairingStartRef.current) return;
+    const repaired = scheduleStartingByToday(user, revisionDate);
+    if (!repaired) return;
+    repairingStartRef.current = true;
+    saveUser(repaired)
+      .catch((err) => logger.warn('Could not move the schedule start to today', err))
+      .finally(() => {
+        repairingStartRef.current = false;
+      });
+  }, [user, revisionDate, saveUser]);
   const carryingRef = useRef(false);
   // Tapping the Home tab while on Home scrolls back to the top (and from a
   // pushed screen, the stack pops back here first).
@@ -70,13 +90,7 @@ export default function DashboardScreen() {
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const quranData = getQuranData();
 
@@ -327,7 +341,7 @@ export default function DashboardScreen() {
   // review you missed instead of marching on. Pure anchor nudge — no per-day
   // edits — applied immediately so the Today post updates in place.
   const handlePushBack = async () => {
-    if (!user || shifting) return;
+    if (!user || shifting || !canPushScheduleBack(user, revisionDate)) return;
     setShifting(true);
     try {
       await saveUser(shiftScheduleAnchor(user, 1));
@@ -384,7 +398,10 @@ export default function DashboardScreen() {
         ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
+        refreshControl={
+          // Transparent: an opaque pull area cut Home's glow off in a hard line.
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
+        }
         testID="home-v2"
       >
         <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
@@ -404,6 +421,7 @@ export default function DashboardScreen() {
           onCarryOver={handleCarryOver}
           carrying={carrying}
           onPushBack={handlePushBack}
+          canPushBack={canPushScheduleBack(user, revisionDate)}
           shifting={shifting}
         />
 

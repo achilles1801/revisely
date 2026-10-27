@@ -1,13 +1,16 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+// Gesture Handler's, so a sideways swipe on it can move to the next tab
+// (navigation/TabSwipe).
+import { ScrollView } from 'react-native-gesture-handler';
 import { useScrollToTop } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -86,7 +89,6 @@ export default function AlgorithmScreen() {
   const { user, pages, logs, loadData } = useApp();
   const quranData = useMemo(() => getQuranData(), []);
 
-  const [refreshing, setRefreshing] = useState(false);
   const [juzFilter, setJuzFilter] = useState<number | null>(null);
   const [strengthFilter, setStrengthFilter] = useState<number | null>(null);
   const [browseMode, setBrowseMode] = useState<BrowseMode>('pages');
@@ -107,11 +109,7 @@ export default function AlgorithmScreen() {
     setExpandedLists((prev) => ({ ...prev, [mode]: !prev[mode] }));
   };
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const memorizedPages = useMemo(
     () => pages.filter((p) => p.status === 'memorized'),

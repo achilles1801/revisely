@@ -20,6 +20,7 @@ import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
 import { TabBar } from './TabBar';
+import { withTabSwipe } from './TabSwipe';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
@@ -59,6 +60,11 @@ export type ReadStackParamList = {
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+// Each tab's main screen swipes sideways to the next tab (navigation/TabSwipe).
+const SwipeableDashboard = withTabSwipe('Home', DashboardScreen);
+const SwipeableReadIndex = withTabSwipe('Read', ReadIndexScreen);
+const SwipeableInsights = withTabSwipe('Insights', AlgorithmScreen);
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const ReadStack = createNativeStackNavigator<ReadStackParamList>();
 
@@ -82,7 +88,7 @@ function HomeStackNavigator() {
         animation: 'slide_from_right',
       }}
     >
-      <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
+      <HomeStack.Screen name="Dashboard" component={SwipeableDashboard} />
       <HomeStack.Screen name="ActiveRevision" component={ActiveRevisionScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
@@ -105,7 +111,7 @@ function ReadStackNavigator() {
         animation: 'slide_from_right',
       }}
     >
-      <ReadStack.Screen name="ReadIndex" component={ReadIndexScreen} />
+      <ReadStack.Screen name="ReadIndex" component={SwipeableReadIndex} />
       <ReadStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </ReadStack.Navigator>
   );
@@ -141,11 +147,12 @@ export function MainNavigator() {
               />
             );
           }}
-          screenOptions={{ headerShown: false }}
+          // Tabs slide sideways when they change, so a swipe reads as moving across.
+          screenOptions={{ headerShown: false, animation: 'shift' }}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />
-          <Tab.Screen name="Insights" component={AlgorithmScreen} />
+          <Tab.Screen name="Insights" component={SwipeableInsights} />
         </Tab.Navigator>
       </View>
       <SmartTrackingPreviewScreen

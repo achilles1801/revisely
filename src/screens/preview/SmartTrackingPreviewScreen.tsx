@@ -204,7 +204,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
             >
               {demoRating === null
                 ? 'Tap ⋯, then Rate page strength'
-                : `Rated ${getRatingLabel(demoRating).toLowerCase()}. Nothing is saved.`}
+                : `Rated ${getRatingLabel(demoRating).toLowerCase()}.`}
             </Text>
             <View style={styles.viewerContainer}>
               <MushafPager pages={[demoPage.pageNumber]} initialPage={demoPage.pageNumber} />
@@ -238,7 +238,7 @@ export function SmartTrackingPreviewScreen({ visible, onClose }: Props) {
           {step === 'rate' && (
             <PillButton
               size="lg"
-              title={demoRating === null ? 'Rate the page to continue' : 'Save and continue'}
+              title={demoRating === null ? 'Rate the page to continue' : 'Continue'}
               onPress={() => setStep('insights')}
               disabled={demoRating === null}
               testID="preview-continue"
@@ -328,7 +328,7 @@ function IntroStepV2() {
     <View>
       <StepTitleV2
         title="Meet Smart Tracking"
-        body="An optional layer that learns your weak spots and shows what to focus on next. Try it out: nothing is saved."
+        body="An optional layer that learns your weak spots and shows what to focus on next."
       />
       <Hairline />
       <View style={v2.points}>
