@@ -370,14 +370,21 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
 - needs a Firebase ID token (`Authorization: Bearer`), verified in the worker against Google's keys
   (`worker/auth.ts`; project `FIREBASE_PROJECT_ID`); every malformed token is a 401.
 - 30 requests a minute per user (`ratelimits`), and daily budgets for what reaches The Clear Quran
-  (`worker/budget.ts`, one Durable Object): `TCQ_DAILY_LIMIT_LIVE` for everyone on the live key (300 ×
-  30 days stays under the 10,000-a-month plan), `TCQ_DAILY_LIMIT_SANDBOX`, `TCQ_USER_DAILY_LIMIT` per
-  account; spent: 429 `DAILY_LIMIT` until midnight UTC. Anyone can make an account, so these are what
+  (`worker/budget.ts`, one Durable Object): `TCQ_DAILY_LIMIT_LIVE` for everyone on the live key, App
+  Store, TestFlight and dev together (300 × 30 days stays under the 10,000-a-month plan),
+  `TCQ_DAILY_LIMIT_SANDBOX`, `TCQ_USER_DAILY_LIMIT` per account; spent: 429 `DAILY_LIMIT` until midnight UTC. Anyone can make an account, so these are what
   keep one user from spending the month for everyone. Raise them with the plan.
 - calls The Clear Quran API (`https://api.theclearquran.org/verses/<key>`, `Authorization: Bearer
-  <key>`) with `TCQ_API_KEY_LIVE` when the app sends `X-Revisely-Channel: production` (the App Store
-  app) and `TCQ_API_KEY_SANDBOX` otherwise (TestFlight, dev). Sandbox keys only work against the
-  sandbox API: `TCQ_API_BASE_SANDBOX` is its base URL.
+  <key>`) with `TCQ_API_KEY_LIVE` when the app sends `X-Revisely-Channel: production` or `preview`
+  (the App Store app, TestFlight). Development builds use `TCQ_API_KEY_SANDBOX` only if
+  `TCQ_API_BASE_SANDBOX` names a sandbox host; it is empty, so they use the live key too
+  (`tcqEnvironment()` in `worker/tcq.ts`).
+- **Sandbox keys don't work with the documented API.** The Clear Quran's docs
+  (theclearquran.org/developers/docs) give one base URL, `https://api.theclearquran.org`, and it
+  refuses `tcq_eng_sbx_` keys: 403 "This is a sandbox API key; it cannot be used against the
+  production API" (Oct 27 2026). No sandbox host is documented or resolvable, and the API answers 401
+  on every path without a key, so it can't be found by probing. If they publish one, set
+  `TCQ_API_BASE_SANDBOX` to it (a PR into `main`) and dev builds move to the sandbox key.
 - keeps a verse in the data centre's cache for `TCQ_EDGE_CACHE_SECONDS` (short until the agreement is
   checked); answers the app with `Cache-Control: no-store`; logs never include a key (`redactKeys`).
 - maps their 429 to 429 (Retry-After), 404 to 404, anything else to 502; no key configured is 503;
@@ -405,8 +412,9 @@ in CI) and its tests run with the app's (`worker/__tests__`). Changes to it publ
 
 Two keys, issued in The Clear Quran developer portal (theclearquran.org/developers → API Keys), live
 only as secrets of the Cloudflare Worker `revisely` (dashboard: Workers & Pages → revisely →
-Settings → Variables and Secrets): `TCQ_API_KEY_LIVE` (prefix `tcq_eng_liv_`, used for the App Store
-app) and `TCQ_API_KEY_SANDBOX` (prefix `tcq_eng_sbx_`, TestFlight and dev). Never in the repo, `.env`,
+Settings → Variables and Secrets): `TCQ_API_KEY_LIVE` (prefix `tcq_eng_liv_`, used by the App Store
+app, TestFlight and, for now, dev builds) and `TCQ_API_KEY_SANDBOX` (prefix `tcq_eng_sbx_`, unused
+until a sandbox host exists; see above). Never in the repo, `.env`,
 CI, PR text, Sentry or chat; Worker Previews get neither.
 
 To rotate one (or after a leak: revoke the old key in the portal first):
@@ -419,7 +427,7 @@ To rotate one (or after a leak: revoke the old key in the portal first):
    shell history. It takes effect at once: Wrangler deploys the current code with the new secret.
 3. Check: `npx wrangler@4.153.0 secret list` lists the names (never values); run
    `npx wrangler@4.153.0 tail revisely` while opening a verse in The Clear Quran on a build of that
-   channel (App Store for live, TestFlight for sandbox) and look for no `answered 401/403` lines.
+   channel (App Store or TestFlight for live) and look for no `answered 401/403` lines.
 4. Revoke the old key in the portal.
 
 ## The redesign (new design, preview)
@@ -462,14 +470,17 @@ Review), kept per device, switching the whole app live.
     shows in Home's top bar (`RunningTimerChip`). Classic keeps `FloatingTimer`.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
     what a control does (e.g. Keep daily amount).
-- **Accents** (a trial, Settings → Preview → Accent, per device, new design only): Jade (the
-  agreed look: ink buttons, grey links, jade only for "done"), Crimson and Indigo, which put the
-  accent on the primary action, links, the active tab, "done", the calendar and a glow behind
-  Home's top (`v2/HeroGlow`). An accent is a token set in `theme/v2` (`ACCENT_TOKENS`: `primary`,
-  `done`/`doneText`, `accentText`, `link`, `accentSubtle`, `hero`, `progress`, `heat`/`heatInk`);
-  never write an accent colour in a component. Status colours don't follow it: weak is `red`,
-  strong is `good` (green). Classic screens get `accentText` as `theme.accent`, since they use it
-  for text too. Every combination is checked in `src/design/__tests__` (text 4.5:1, fills 3:1).
+- **Accents** (Settings → Appearance → Accent, new design only): **Indigo (the default)**, Crimson
+  and Jade. The choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it
+  follows the account. `DesignGate` applies it once the user loads, and Indigo applies when it's
+  unset; the device keeps a copy for the first frame. Crimson and Indigo put the accent on the
+  primary action, links, the active tab, "done", the calendar and a glow behind Home's top
+  (`v2/HeroGlow`); Jade keeps ink buttons, grey links and jade only for "done". An accent is a
+  token set in `theme/v2` (`ACCENT_TOKENS`: `primary`, `done`/`doneText`, `accentText`, `link`,
+  `accentSubtle`, `hero`, `progress`, `heat`/`heatInk`); never write an accent colour in a
+  component. Status colours don't follow it: weak is `red`, strong is `good` (green). Classic
+  screens get `accentText` as `theme.accent`, since they use it for text too. Every combination
+  is checked in `src/design/__tests__` (text 4.5:1, fills 3:1).
 - Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
   `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in

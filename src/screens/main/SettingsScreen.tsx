@@ -17,7 +17,8 @@ import {
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
-import { ACCENT_LABELS, ACCENTS, AccentName, layoutV2, typeV2 } from '../../theme/v2';
+import { layoutV2, typeV2 } from '../../theme/v2';
+import { AccentPicker } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
@@ -565,7 +566,7 @@ export default function SettingsScreen() {
             <Row
               icon="flask-outline"
               label="New design (preview)"
-              isLast={!design.isNew}
+              isLast
               rightSlot={
                 <SettingSwitch
                   value={design.isNew}
@@ -575,21 +576,6 @@ export default function SettingsScreen() {
                 />
               }
             />
-            {design.isNew && (
-              // A trial: the colour on actions, links, the active tab, "done"
-              // and the calendar (theme/v2 ACCENT_TOKENS).
-              <View style={[styles.row, { borderBottomWidth: 0 }]} testID="accent-row">
-                <SettingIcon name="color-filter-outline" tileStyle={styles.rowIcon} />
-                <View style={styles.rowText}>
-                  <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
-                </View>
-                <ThemeSegmentedControl<AccentName>
-                  value={design.accent}
-                  onChange={design.setAccent}
-                  options={ACCENTS.map((a) => ({ value: a, label: ACCENT_LABELS[a] }))}
-                />
-              </View>
-            )}
           </Section>
         )}
 
@@ -922,6 +908,24 @@ export default function SettingsScreen() {
               }
             />
           </View>
+          {design.isNew && (
+            // The new design only; kept with the account (DesignGate brings it to other devices).
+            <View style={v2.accentRow} testID="accent-row">
+              <View style={v2.accentHead}>
+                <SettingIcon name="color-filter-outline" tileStyle={styles.rowIcon} />
+                <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
+              </View>
+              <View style={v2.accentChips}>
+                <AccentPicker
+                  value={design.accent}
+                  onChange={(accent) => {
+                    design.setAccent(accent);
+                    updateUser({ accent });
+                  }}
+                />
+              </View>
+            </View>
+          )}
         </Section>
 
         {design.isNew && (
@@ -1354,6 +1358,10 @@ const v2 = StyleSheet.create({
     paddingVertical: layoutV2.rowPad,
   },
   pills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  accentRow: { paddingHorizontal: layoutV2.gutter, paddingTop: 4, paddingBottom: 12 },
+  accentHead: { flexDirection: 'row', alignItems: 'center', minHeight: 32, gap: 8 },
+  // Under the label: the icon (24), its 8pt and the row's 8pt.
+  accentChips: { marginLeft: 40, marginTop: 8 },
 });
 
 const makeStyles = (theme: ThemeColors) =>

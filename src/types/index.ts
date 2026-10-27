@@ -72,6 +72,8 @@ export interface User {
   // "Keep daily amount"): 'shift' (default) slides the plan back by that many
   // pages, 'add' puts them on top of today's. See lib/carryOver.
   carryOverMode?: 'shift' | 'add';
+  // The new design's accent (Settings → Appearance → Accent); unset = Indigo.
+  accent?: 'indigo' | 'crimson' | 'jade';
   // Pages carried into one revision day. They go first that day and replace its
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.

@@ -15,6 +15,9 @@ jest.mock('expo-haptics', () => ({
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../../../modules/install-source', () => ({ __esModule: true, default: null }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
+// DesignGate reads the signed-in user.
+let mockAppUser: { accent?: string; previewTester?: boolean } | null = null;
+jest.mock('../../context/AppContext', () => ({ useApp: () => ({ user: mockAppUser }) }));
 
 import { DesignProvider, useDesign } from '../DesignContext';
 import { makeHaptics } from '../haptics';
@@ -24,8 +27,10 @@ import { PressableScale } from '../../components/PressableScale';
 import { TodayPost, juzLabel, memorizedText, todayText } from '../../components/home/feed/TodayPost';
 import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
+import { AccentPicker } from '../../components/settings/AccentPicker';
+import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
-import { ACCENTS, AccentName, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
+import { ACCENTS, AccentName, DEFAULT_ACCENT, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
 import type { RevisionLog, UserPage } from '../../types';
 
 beforeEach(async () => {
@@ -200,7 +205,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
   });
 });
 
-describe('the accent (Settings → Preview)', () => {
+describe('the accent (Settings → Appearance)', () => {
   function AccentProbe() {
     const { accent, setAccent } = useDesign();
     const { palette, theme } = useTheme();
@@ -222,7 +227,8 @@ describe('the accent (Settings → Preview)', () => {
       </DesignProvider>,
     );
     await act(async () => {});
-    expect(screen.getByTestId('accent').props.children).toBe('jade|#1A1A1A|#1A1A1A');
+    // Indigo until something else is chosen.
+    expect(screen.getByTestId('accent').props.children).toBe('indigo|#624BD5|#624BD5');
     fireEvent.press(screen.getByText('crimson'));
     expect(screen.getByTestId('accent').props.children).toBe('crimson|#DC1433|#DC1433');
     expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
@@ -238,6 +244,38 @@ describe('the accent (Settings → Preview)', () => {
     );
     await act(async () => {});
     expect(screen.getByTestId('accent').props.children).toMatch(/^jade\|/);
+  });
+
+  it("follows the account: its choice once loaded, Indigo when it hasn't chosen", async () => {
+    await AsyncStorage.setItem('@revisely_theme_v2', 'light');
+    mockAppUser = { accent: 'crimson' };
+    const ui = () => (
+      <DesignProvider initial={{ allowed: true, chosen: 'new', accent: 'jade' }}>
+        <ThemeProvider>
+          <DesignGateForAccent />
+          <AccentProbe />
+        </ThemeProvider>
+      </DesignProvider>
+    );
+    const { rerender } = render(ui());
+    await act(async () => {});
+    expect(screen.getByTestId('accent').props.children).toMatch(/^crimson\|/);
+    mockAppUser = {};
+    rerender(ui());
+    await act(async () => {});
+    expect(screen.getByTestId('accent').props.children).toMatch(/^indigo\|/);
+  });
+
+  it('the picker offers Indigo, Crimson and Jade with swatches, and reports a new choice', async () => {
+    await AsyncStorage.setItem('@revisely_theme_v2', 'light');
+    const onChange = jest.fn();
+    render(wrap(<AccentPicker value="indigo" onChange={onChange} />));
+    await act(async () => {});
+    expect(screen.getAllByRole('radio').map((r) => r.props.accessibilityLabel)).toEqual(['Indigo', 'Crimson', 'Jade']);
+    fireEvent.press(screen.getByTestId('accent-indigo'));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('accent-jade'));
+    expect(onChange).toHaveBeenCalledWith('jade');
   });
 });
 
@@ -359,11 +397,11 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.queryByTestId('today-memorized')).toBeNull();
   });
 
-  it('the primary button is solid ink; yesterday’s leftovers are an outline pill', async () => {
+  it('the primary button is solid in the accent (Indigo by default); yesterday’s leftovers are an outline pill', async () => {
     const props = post({ leftovers: 3 });
     await act(async () => {});
     const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
-    expect(flat('today-cta').backgroundColor).toBe(paletteLight.primary);
+    expect(flat('today-cta').backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).primary);
     expect(flat('today-carry-over').borderWidth).toBe(1);
     fireEvent.press(screen.getByText('Add 3 from yesterday'));
     expect(props.onCarryOver).toHaveBeenCalled();

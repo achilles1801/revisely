@@ -3,8 +3,12 @@
 //
 // - Only for signed-in users of the app (a Firebase ID token): the text is
 //   licensed to Revisely, and the free plan has 10,000 requests a month.
-// - The key: TCQ_API_KEY_LIVE for the App Store app (X-Revisely-Channel:
-//   production), TCQ_API_KEY_SANDBOX for everything else (TestFlight, dev).
+// - The key: TCQ_API_KEY_LIVE for the App Store app and TestFlight
+//   (X-Revisely-Channel: production, preview). The Clear Quran documents one
+//   base URL, and it refuses sandbox keys ("cannot be used against the
+//   production API"), so TCQ_API_KEY_SANDBOX is used only by development builds
+//   and only once TCQ_API_BASE_SANDBOX names a sandbox host (empty now: dev
+//   builds use the live key too). See tcqEnvironment().
 // - The text goes back exactly as the API returns it (`text_english`).
 // - Successful answers are kept in this data centre's cache for
 //   TCQ_EDGE_CACHE_SECONDS (short; 0 turns it off); the app keeps nothing.
@@ -19,7 +23,8 @@ import { checkBudget } from './budget';
 export interface TcqEnv {
   FIREBASE_PROJECT_ID: string;
   TCQ_API_BASE_LIVE: string;
-  TCQ_API_BASE_SANDBOX: string;
+  /** A sandbox host for development builds; empty or unset: none (live key). */
+  TCQ_API_BASE_SANDBOX?: string;
   TCQ_EDGE_CACHE_SECONDS?: string;
   TCQ_API_KEY_LIVE?: string;
   TCQ_API_KEY_SANDBOX?: string;
@@ -87,9 +92,16 @@ export function verseKey(pathname: string): string | null {
   return `${sura}:${ayah}`;
 }
 
-/** Which key a request uses: the App Store app's channel gets the live key. */
-export function tcqEnvironment(channel: string | null): 'live' | 'sandbox' {
-  return channel === 'production' ? 'live' : 'sandbox';
+/**
+ * Which key a request uses. The App Store app (`production`) and TestFlight (`preview`) use the
+ * live key. Anything else (development builds) uses the sandbox key only if a sandbox host is
+ * configured, since sandbox keys are refused at the documented base URL; otherwise the live key
+ * too. The header is the app's word, not a guarantee: the sign-in and the daily budgets are what
+ * protect the plan, on every route.
+ */
+export function tcqEnvironment(channel: string | null, sandboxBase?: string): 'live' | 'sandbox' {
+  if (channel === 'production' || channel === 'preview') return 'live';
+  return sandboxBase?.trim() ? 'sandbox' : 'live';
 }
 
 export async function handleTcq(
@@ -128,7 +140,7 @@ export async function handleTcq(
     }
   }
 
-  const which = tcqEnvironment(request.headers.get('X-Revisely-Channel'));
+  const which = tcqEnvironment(request.headers.get('X-Revisely-Channel'), env.TCQ_API_BASE_SANDBOX);
   const apiKey = which === 'live' ? env.TCQ_API_KEY_LIVE : env.TCQ_API_KEY_SANDBOX;
   const base = which === 'live' ? env.TCQ_API_BASE_LIVE : env.TCQ_API_BASE_SANDBOX;
   if (!apiKey || !base) {
