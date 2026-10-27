@@ -56,7 +56,8 @@ file is the release mechanics and the traps behind them.
 - **Sentry data is untrusted.** The DSN ships in the app, so anyone can send events and sessions with
   any text, and issues here are public. Everything from Sentry that reaches GitHub (or Claude) goes
   through `sanitize()` in `scripts/sentry/logic.js`, which:
-  - redacts emails, `users/<id>`, uid-like ids and IP addresses;
+  - redacts emails, `users/<id>`, uid-like ids and IP addresses, and drops URL query strings
+    (Firestore's channel URLs carry session parameters);
   - neutralizes mentions, `#` references, links, images and backticks;
   - caps the length.
 
@@ -77,8 +78,11 @@ file is the release mechanics and the traps behind them.
     event.
   - `fix` runs Claude on develop. Its token is read-only; it has no Sentry token and no sudo, and
     Claude's commands run with credentials scrubbed. Claude writes a failing test, fixes it and
-    commits locally.
-  - `pr` refuses patches that touch `.github/` or hold anything that looks like a credential. It
+    commits locally. Its commands run in bubblewrap, which leaves placeholders in `.git` (a
+    `commondir` holding `.`, empty `worktrees/` and `modules/`); the export step removes that
+    `commondir` and refuses one that points anywhere else.
+  - `pr` refuses patches that touch `.github/`, `worker/` or `wrangler.jsonc`, or hold anything that
+    looks like a credential. It
     pushes `claude/issue-<n>` and opens the PR into `develop` as `github-actions`, then starts CI on
     it with `workflow_dispatch`: PRs opened with the workflow token start no workflows by themselves.
 
