@@ -39,6 +39,7 @@ import {
   swipeOutcome,
 } from '../../lib/reorder';
 import { shadows } from '../../theme/shadows';
+import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { DateBadge, DAY_ROW_INSET, dayTitle } from './DayRow';
 import { useGroupedStyles } from './Grouped';
 
@@ -60,10 +61,8 @@ const LIFT_AFTER_MS = 350;
 /** Room between the dates and where swiped content disappears. */
 const CLIP_GAP = 8;
 const SPRING = { damping: 24, stiffness: 280, mass: 0.9 };
-/** A lifted day in the new design's dark mode: above the list's #181818. */
-const LIFT_DARK = '#2C2C2E';
-/** iOS-style destructive fill: white "Delete" on it is 4.8:1 in both themes. */
-export const DELETE_FILL = '#DC2626';
+/** How far a held row dims in the new design (v2/Tap's 0.55). */
+const PRESS_DIM = 0.45;
 
 let keySeq = 0;
 const makeKey = () => `day-${++keySeq}`;
@@ -79,6 +78,11 @@ const makeKey = () => `day-${++keySeq}`;
  *
  * `days` is the whole cycle; `limit` shows only the first few. Every change
  * goes to the parent (`onMove`, `onDelete`), which owns the days.
+ *
+ * The new design changes only the look: a day's content as a feed row's name
+ * and meta, the dates in sentence case, a held row dims, the lifted row on
+ * the quiet fill with an edge (no shadow), the drop date on the accent's
+ * tint, Delete on `redFill`.
  */
 export function ReorderableDayList({
   days,
@@ -390,7 +394,8 @@ function Slot({
   positions: SharedValue<Record<string, number>>;
   activeId: SharedValue<string>;
 }) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   // Where the lifted content will land: its date lights up.
   const target = useAnimatedStyle(() => {
     const id = activeId.value;
@@ -400,11 +405,23 @@ function Slot({
   return (
     <View style={[styles.slot, { top: index * height, height }]} pointerEvents="none">
       <Animated.View
-        style={[styles.target, { backgroundColor: theme.accent + '24' }, target]}
+        style={[
+          styles.target,
+          isNew ? { backgroundColor: palette.accentSubtle, borderRadius: radiusV2.media } : { backgroundColor: theme.accent + '24' },
+          target,
+        ]}
         testID={`day-target-${index}`}
       />
       <DateBadge index={index} today={today} />
-      {last ? null : <View style={[styles.separator, { backgroundColor: theme.border }]} />}
+      {last ? null : (
+        <View
+          style={[
+            styles.separator,
+            isNew ? { backgroundColor: palette.separator, height: layoutV2.hairline } : { backgroundColor: theme.border },
+          ]}
+          testID={`day-separator-${index}`}
+        />
+      )}
     </View>
   );
 }
@@ -438,13 +455,13 @@ function DayItem({
   onMeasure: (key: string, h: number) => void;
   onA11yMove: (from: number, to: number) => void;
 }) {
-  const { theme, palette, isDark } = useTheme();
+  const { theme, palette } = useTheme();
   const { isNew } = useDesign();
   const grouped = useGroupedStyles();
-  // Lifted, the content rises above the list: lighter than it (a shadow is
-  // lost on black), with an edge.
-  const liftFill = isNew ? (isDark ? LIFT_DARK : palette.sheet) : theme.surface;
-  const liftEdge = isNew ? (isDark ? palette.handle : palette.separator) : theme.border;
+  // Lifted, the content rises above the list. New design: on the quiet fill
+  // with an edge, flat (a shadow is lost on black); classic: a raised card.
+  const liftFill = isNew ? palette.fill : theme.surface;
+  const liftEdge = isNew ? palette.handle : theme.border;
   const summary = summarizeDay(pages);
   const { positions, activeId, openId, dragTop, rowH, width } = shared;
 
@@ -578,6 +595,8 @@ function DayItem({
     };
   });
   const pressStyle = useAnimatedStyle(() => ({ opacity: pressed.value }));
+  // The new design dims what's held instead of tinting behind it (v2/Tap).
+  const dimStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value * PRESS_DIM }));
   const actionStyle = useAnimatedStyle(() => ({ width: Math.max(0, -x.value) }));
 
   const name = `${dayTitle(index, today)}: ${summary.title}, ${summary.subtitle}`;
@@ -624,41 +643,60 @@ function DayItem({
             style={[
               styles.lifted,
               { backgroundColor: liftFill, borderColor: liftEdge },
+              isNew ? styles.liftedV2 : styles.liftedShadow,
               liftStyle,
             ]}
             pointerEvents="none"
+            testID={`day-lifted-${index}`}
           />
-          <Animated.View
-            style={[styles.pressed, { backgroundColor: theme.accent + '22' }, pressStyle]}
-            pointerEvents="none"
-          />
+          {isNew ? null : (
+            <Animated.View
+              style={[styles.pressed, { backgroundColor: theme.accent + '22' }, pressStyle]}
+              pointerEvents="none"
+            />
+          )}
           {/* Swiped, the content slides under the edge of the dates, which stay. */}
-          <View style={styles.clip}>
+          <Animated.View style={[styles.clip, isNew && dimStyle]}>
             <Animated.View style={[styles.slide, slideStyle]}>
               <View
                 style={styles.text}
                 onLayout={(e) => onMeasure(id, e.nativeEvent.layout.height + PAD_V * 2)}
               >
                 <Text
-                  style={[grouped.title, { color: summary.isRest ? theme.textMuted : theme.textPrimary }]}
+                  style={
+                    isNew
+                      ? [typeV2.name, { color: summary.isRest ? palette.secondary : palette.text }]
+                      : [grouped.title, { color: summary.isRest ? theme.textMuted : theme.textPrimary }]
+                  }
                   numberOfLines={1}
+                  testID={`day-title-${index}`}
                 >
                   {summary.title}
                 </Text>
                 {summary.subtitle ? (
-                  <Text style={grouped.subtitle} numberOfLines={2}>
+                  <Text
+                    style={isNew ? [typeV2.meta, { color: palette.secondary }] : grouped.subtitle}
+                    numberOfLines={2}
+                  >
                     {summary.subtitle}
                   </Text>
                 ) : null}
               </View>
-              <Ionicons name="chevron-forward" size={17} color={theme.textMuted} style={grouped.chevron} />
+              {isNew ? (
+                <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={17} color={theme.textMuted} style={grouped.chevron} />
+              )}
             </Animated.View>
-          </View>
+          </Animated.View>
         </Animated.View>
       </GestureDetector>
       {/* Over the row, as wide as the swipe has uncovered (nothing while closed). */}
       {canDelete ? (
-        <Animated.View style={[styles.action, { backgroundColor: DELETE_FILL }, actionStyle]}>
+        <Animated.View
+          style={[styles.action, { backgroundColor: palette.redFill }, actionStyle]}
+          testID={`day-delete-fill-${index}`}
+        >
           <Pressable
             onPress={deleteNow}
             style={styles.actionButton}
@@ -666,7 +704,10 @@ function DayItem({
             accessibilityLabel={`Delete ${dayTitle(index, today)}`}
             testID={`day-delete-${index}`}
           >
-            <Text style={styles.actionText} maxFontSizeMultiplier={1.4}>
+            <Text
+              style={[isNew ? typeV2.button : styles.actionText, { color: palette.onRedFill }]}
+              maxFontSizeMultiplier={1.4}
+            >
               Delete
             </Text>
           </Pressable>
@@ -715,7 +756,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  actionText: { fontSize: 15, fontWeight: '600' },
   content: StyleSheet.absoluteFillObject,
   clip: {
     position: 'absolute',
@@ -741,8 +782,9 @@ const styles = StyleSheet.create({
     bottom: 3,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    ...shadows.md,
   },
+  liftedShadow: shadows.md,
+  liftedV2: { borderRadius: radiusV2.media, borderWidth: layoutV2.hairline },
   pressed: { ...StyleSheet.absoluteFillObject, left: DAY_ROW_INSET - 10 },
   text: { flex: 1, minWidth: 0 },
 });

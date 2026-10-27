@@ -42,6 +42,11 @@ import {
   PickerTab,
 } from '../../components/plan/ListPickerSheet';
 import { dayTitle } from '../../components/plan/DayRow';
+import { IconButton, TopBar } from '../../components/v2/TopBar';
+import { Tap } from '../../components/v2/Tap';
+import { useDesign } from '../../design/DesignContext';
+import { useHaptics } from '../../design/haptics';
+import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -58,7 +63,9 @@ interface SurahOnDay {
 export default function PlanDayEditScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { pages: allPages, user } = useApp();
   const { date: today } = useRevisionDay(user);
@@ -121,12 +128,13 @@ export default function PlanDayEditScreen() {
   const commit = useCallback(() => {
     committingRef.current = true;
     if (isDirty) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (isNew) haptics.success();
+      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.popTo('PlanEdit', { editedDay: { index: dayIndex, pages } }, { merge: true });
     } else {
       navigation.goBack();
     }
-  }, [isDirty, navigation, dayIndex, pages]);
+  }, [isDirty, navigation, dayIndex, pages, isNew, haptics]);
 
   // Swipe-back can't be intercepted on native-stack, so disable it while there
   // are edits; Android back / programmatic pops are routed through commit().
@@ -165,7 +173,8 @@ export default function PlanDayEditScreen() {
 
   const applyPicker = () => {
     setPages((prev) => applyGroupSelection(prev, selectable, initialChecked, draft));
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (isNew) haptics.success();
+    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     pickerRef.current?.dismiss();
   };
 
@@ -217,7 +226,8 @@ export default function PlanDayEditScreen() {
   // ---- Direct edits -----------------------------------------------------------
   const removeSurah = (s: SurahOnDay) => {
     const remove = new Set(s.pages);
-    Haptics.selectionAsync();
+    if (isNew) haptics.selection();
+    else Haptics.selectionAsync();
     setPages((prev) => prev.filter((p) => !remove.has(p)));
   };
 
@@ -228,6 +238,124 @@ export default function PlanDayEditScreen() {
 
   const canPick = memorized.length > 0;
   const hasContent = pages.length > 0;
+
+  const picker = (
+    <ListPickerSheet
+      ref={pickerRef}
+      title={dayIndex === 0 ? (isNew ? "Today's revision" : "Today's Revision") : title}
+      tabs={pickerTabs}
+      activeTab={pickerTab}
+      onTabChange={(k) => setPickerTab(k as PickerTabKey)}
+      onSelect={toggleDraft}
+      onLeft={() => pickerRef.current?.dismiss()}
+      rightLabel="Done"
+      onRight={applyPicker}
+      rightDisabled={!draftChanged}
+      searchPlaceholder="Search surahs or ajzaʼ"
+      footer="Checked items are fully on this day. Unchecking one removes it."
+    />
+  );
+
+  if (isNew) {
+    // The new design: a v2 top bar (back to the schedule, the date), what's on
+    // the day as the screen's title, then flat sections like v2 Settings.
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+        <TopBar
+          left={
+            <IconButton icon="chevron-back" onPress={commit} label="Back to schedule" size={26} testID="back" />
+          }
+          title={title}
+          separator
+        />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={v2.content}
+          showsVerticalScrollIndicator={false}
+          testID="plan-day-v2"
+        >
+          <View style={v2.hero}>
+            <Text
+              style={[typeV2.title, { color: summary.isRest ? palette.secondary : palette.text }]}
+              numberOfLines={2}
+              accessibilityRole="header"
+            >
+              {summary.title}
+            </Text>
+            <Text style={[typeV2.body, v2.heroSubtitle, { color: palette.secondary }]}>
+              {hasContent
+                ? `${pageCountLabel(pages.length)}${isDirty ? ' · Edited' : ''}`
+                : `Nothing to revise ${dayIndex === 0 ? 'today' : 'on this day'}`}
+            </Text>
+          </View>
+
+          {hasContent ? (
+            <GroupedSection
+              header="On this day"
+              headerRight={
+                <HeaderTextButton label={editing ? 'Done' : 'Edit'} bold={editing} onPress={() => setEditing((v) => !v)} />
+              }
+            >
+              {surahsOnDay.map((s) => (
+                <GroupedRow
+                  key={s.number}
+                  title={s.name}
+                  subtitle={`${pageRangeLabel(s.pages)} · ${pageCountLabel(s.pages.length)}`}
+                  leading={
+                    editing ? (
+                      <Tap
+                        onPress={() => removeSurah(s)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${s.name}`}
+                        testID={`remove-surah-${s.number}`}
+                      >
+                        <Ionicons name="remove-circle-outline" size={24} color={palette.red} />
+                      </Tap>
+                    ) : undefined
+                  }
+                  trailing={
+                    <Text style={[arabicV2(18), { color: palette.secondary }]} accessibilityLanguage="ar">
+                      {s.nameArabic}
+                    </Text>
+                  }
+                  testID={`surah-row-${s.number}`}
+                />
+              ))}
+            </GroupedSection>
+          ) : null}
+
+          <GroupedSection
+            footer={
+              !canPick
+                ? "You haven't marked any pages as memorized yet."
+                : hasContent
+                  ? 'Only content you have memorized is listed.'
+                  : 'This is a rest day. Add a surah or juz to revise on it.'
+            }
+          >
+            <GroupedRow
+              title={hasContent ? 'Add or remove content' : 'Add surahs or ajzaʼ'}
+              icon="add-circle-outline"
+              onPress={openPicker}
+              disabled={!canPick}
+              testID="day-pick"
+            />
+            {hasContent ? (
+              <GroupedRow
+                title="Make rest day"
+                icon="moon-outline"
+                tone="destructive"
+                onPress={makeRest}
+                testID="day-make-rest"
+              />
+            ) : null}
+          </GroupedSection>
+        </ScrollView>
+        {picker}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -336,23 +464,16 @@ export default function PlanDayEditScreen() {
         </GroupedSection>
       </ScrollView>
 
-      <ListPickerSheet
-        ref={pickerRef}
-        title={dayIndex === 0 ? "Today's Revision" : title}
-        tabs={pickerTabs}
-        activeTab={pickerTab}
-        onTabChange={(k) => setPickerTab(k as PickerTabKey)}
-        onSelect={toggleDraft}
-        onLeft={() => pickerRef.current?.dismiss()}
-        rightLabel="Done"
-        onRight={applyPicker}
-        rightDisabled={!draftChanged}
-        searchPlaceholder="Search surahs or ajzaʼ"
-        footer="Checked items are fully on this day. Unchecking one removes it."
-      />
+      {picker}
     </SafeAreaView>
   );
 }
+
+const v2 = StyleSheet.create({
+  content: { paddingBottom: spacing.huge },
+  hero: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: 8 },
+  heroSubtitle: { marginTop: 2 },
+});
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
