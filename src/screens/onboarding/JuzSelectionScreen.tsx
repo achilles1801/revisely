@@ -15,6 +15,8 @@ import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { Stepper } from '../../components/Stepper';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
+import { PillButton } from '../../components/v2/PillButton';
+import { TopBar } from '../../components/v2/TopBar';
 import {
   PageStatus,
   applyPendingChanges,
@@ -23,9 +25,11 @@ import {
   buildInitialPendingSurahsForJourney,
 } from '../../lib/memorizationChanges';
 import { useTheme } from '../../context/ThemeContext';
+import { useDesign } from '../../design/DesignContext';
 import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JuzSelection'>;
@@ -34,7 +38,8 @@ type RouteProps = RouteProp<OnboardingStackParamList, 'JuzSelection'>;
 export default function JuzSelectionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { journeyStage } = route.params;
   const { user, pages, updatePages, saveUser } = useApp();
@@ -98,6 +103,81 @@ export default function JuzSelectionScreen() {
 
   const canContinue = effectiveMemorizedCount > 0;
 
+  // New design: the button shows it's saving, and a second tap waits.
+  const [saving, setSaving] = useState(false);
+  const continueV2 = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await handleContinue();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const subtext =
+    journeyStage === 'complete'
+      ? 'All marked as memorized — adjust if needed.'
+      : 'Mark your completed surahs and juz.';
+
+  if (isNew) {
+    // The title scrolls with the list, so the largest text sizes still leave
+    // room for it; the count and the action stay at the foot, over a hairline.
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="juz-selection">
+        <TopBar onBack={() => navigation.goBack()} center={<Stepper total={3} current={2} />} />
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={v2.scroll}
+          showsVerticalScrollIndicator={false}
+          testID="juz-selection-scroll"
+        >
+          <View style={v2.header}>
+            <Text
+              style={[typeV2.title, { color: palette.text }]}
+              accessibilityRole="header"
+              maxFontSizeMultiplier={1.6}
+            >
+              Select memorized portions
+            </Text>
+            <Text style={[typeV2.body, v2.subtext, { color: palette.secondary }]}>{subtext}</Text>
+          </View>
+          <View style={v2.browser}>
+            <MemorizationBrowser
+              pages={pages}
+              pendingChanges={pendingChanges}
+              onChange={setPendingChanges}
+              baseMemorizedSurahs={user?.memorizedSurahs ?? []}
+              pendingSurahChanges={pendingSurahChanges}
+              onSurahChange={setPendingSurahChanges}
+              markMode
+              hideMarkToggle
+            />
+          </View>
+        </ScrollView>
+
+        <View style={[v2.footer, { borderTopColor: palette.separator }]} testID="juz-selection-footer">
+          <Text
+            style={[typeV2.body, v2.summary, { color: palette.secondary }]}
+            maxFontSizeMultiplier={1.6}
+            testID="juz-selection-summary"
+          >
+            <Text style={[typeV2.name, typeV2.numeral, { color: palette.accentText }]}>{effectiveMemorizedCount}</Text>
+            {' of 604 pages memorized'}
+          </Text>
+          <PillButton
+            title="Continue"
+            size="lg"
+            onPress={continueV2}
+            disabled={!canContinue}
+            busy={saving}
+            testID="juz-continue"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -113,11 +193,7 @@ export default function JuzSelectionScreen() {
           <Stepper total={3} current={2} />
         </View>
         <Text style={styles.headline}>Select memorized portions</Text>
-        <Text style={styles.subtext}>
-          {journeyStage === 'complete'
-            ? 'All marked as memorized — adjust if needed.'
-            : 'Mark your completed surahs and juz.'}
-        </Text>
+        <Text style={styles.subtext}>{subtext}</Text>
       </View>
 
       <ScrollView
@@ -156,6 +232,21 @@ export default function JuzSelectionScreen() {
     </SafeAreaView>
   );
 }
+
+const v2 = StyleSheet.create({
+  scroll: { paddingBottom: 24 },
+  header: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16 },
+  subtext: { marginTop: 4 },
+  browser: { paddingHorizontal: layoutV2.gutter },
+  footer: {
+    paddingHorizontal: layoutV2.gutter,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 12,
+    borderTopWidth: layoutV2.hairline,
+  },
+  summary: { textAlign: 'center' },
+});
 
 const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
