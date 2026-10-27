@@ -1,4 +1,4 @@
-// The Insights tab's pieces in the new design (design/DesignContext), shared
+// The Insights tab's pieces, shared
 // by the tab itself (screens/main/AlgorithmScreen) and the Smart Tracking
 // preview's copy of it (screens/preview/SmartTrackingPreviewScreen).
 //

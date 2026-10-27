@@ -21,9 +21,7 @@ export function OnboardingNavigator() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        // Transparent so the app-wide gradient (set in RootNavigator) bleeds
-        // through and glass surfaces in onboarding screens have something to
-        // refract.
+        // Transparent: each screen paints the ground.
         contentStyle: { backgroundColor: 'transparent' },
         // `slide_from_right` exposes the outgoing screen through the
         // incoming one because both are transparent, which reads as choppy

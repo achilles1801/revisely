@@ -148,6 +148,35 @@ describe('sheets in the new design', () => {
     }
   });
 
+  it('a close stopped for another reason still closes it', async () => {
+    const ends: ((r: { finished: boolean }) => void)[] = [];
+    const timing = jest.spyOn(Animated, 'timing').mockImplementation(
+      () =>
+        ({
+          start: (cb?: (r: { finished: boolean }) => void) => ends.push(cb ?? (() => {})),
+          stop: () => {},
+          reset: () => {},
+        }) as unknown as Animated.CompositeAnimation,
+    );
+    try {
+      const sheet = (visible: boolean) =>
+        v2(
+          <Sheet visible={visible} onClose={() => {}}>
+            <Text>Body</Text>
+          </Sheet>,
+        );
+      const view = render(sheet(true));
+      await act(async () => {});
+      view.rerender(sheet(false));
+      await act(async () => {
+        ends[ends.length - 1]({ finished: false });
+      });
+      expect(screen.queryByText('Body')).toBeNull();
+    } finally {
+      timing.mockRestore();
+    }
+  });
+
   it('a warning under a section is advice in full ink, not an error in red', async () => {
     render(
       v2(

@@ -8,7 +8,6 @@ import { typeV2 } from '../theme/v2';
 import { ActionSheet } from './v2/ActionSheet';
 import { Tap } from './v2/Tap';
 import { useTheme } from '../context/ThemeContext';
-import { radius } from '../theme/radius';
 import { useApp } from '../context/AppContext';
 import {
   FAJR_CALCULATION_METHODS,
@@ -110,7 +109,7 @@ export function FajrBoundaryCard() {
   return (
     <View testID="fajr-boundary-v2">
       <View style={v2.row}>
-        <SettingIcon name="moon-outline" tileStyle={styles.rowIcon} />
+        <SettingIcon name="moon-outline" />
         <View style={v2.text}>
           <Text style={[typeV2.body, { color: palette.text }]}>Start day at fajr</Text>
           <Text style={[typeV2.meta, { color: palette.secondary }]} testID="fajr-resets-at">
@@ -127,7 +126,7 @@ export function FajrBoundaryCard() {
           testID="fajr-method"
         >
           <View style={v2.row}>
-            <SettingIcon name="calculator-outline" tileStyle={styles.rowIcon} />
+            <SettingIcon name="calculator-outline" />
             <Text style={[typeV2.body, v2.label, { color: palette.text }]}>Method</Text>
             <Text style={[typeV2.body, v2.value, { color: palette.secondary }]} numberOfLines={1}>
               {currentMethodLabel}
@@ -160,16 +159,6 @@ export function FajrBoundaryCard() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  rowIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 // Settings' rows. SettingIcon brings 8pt after its glyph; 8 more makes the 16
 // of the other rows.

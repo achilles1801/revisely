@@ -4,10 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHaptics } from '../../design/haptics';
 import { PillButton } from './PillButton';
 
-/**
- * The new design's segmented control: a row of pills, the chosen one solid.
- * Takes the place of the classic segmented controls in the new design.
- */
+/** The segmented control: a row of pills, the chosen one solid. */
 export function PillTabs<T extends string>({
   options,
   value,

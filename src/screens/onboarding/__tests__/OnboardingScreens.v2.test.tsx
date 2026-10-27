@@ -99,10 +99,6 @@ function page(pageNumber: number, status: UserPage['status'] = 'not_memorized'):
   };
 }
 
-/** No glass, no classic button or segmented control: the new design's pieces only. */
-function expectFlat() {
-}
-
 /** The primary action: a solid pill in the accent's primary fill. */
 function expectPrimary(testID: string, title: string) {
   const pill = screen.UNSAFE_getAllByType(PillButton).find((p) => p.props.testID === testID);
@@ -134,7 +130,6 @@ describe('<WelcomeScreen /> in the new design', () => {
     expect(screen.getByText(/Your Quran,/)).toBeTruthy();
     expect(styleOf('welcome-accent').color).toBe(light.accentText);
     expectPrimary('welcome-begin', 'Begin');
-    expectFlat();
 
     fireEvent.press(screen.getByTestId('welcome-begin'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('JourneySelect');
@@ -164,7 +159,6 @@ describe('<JourneySelectScreen /> in the new design', () => {
     expect(styleOf('step-1')).toMatchObject({ backgroundColor: light.primary, width: 24 });
     expect(styleOf('step-2')).toMatchObject({ backgroundColor: light.separator, width: 8 });
     expectPrimary('journey-continue', 'Continue');
-    expectFlat();
 
     // In progress is chosen to begin with: a check in the accent text colour.
     const inProgress = screen.getByTestId('journey-in_progress');
@@ -199,7 +193,6 @@ describe('<JuzSelectionScreen /> in the new design', () => {
     expect(screen.getByTestId('memorization-browser')).toBeTruthy();
     expect(styleOf('juz-selection-footer')).toMatchObject({ borderTopColor: light.separator, borderTopWidth: 0.5 });
     expectPrimary('juz-continue', 'Continue');
-    expectFlat();
 
     // In progress starts from page 1 alone.
     expect(screen.getByText('1')).toBeTruthy();
@@ -248,7 +241,6 @@ describe('<ScheduleScreen /> in the new design', () => {
     expect(screen.getByLabelText('Step 3 of 3')).toBeTruthy();
     expect(screen.getByText('Set your rhythm')).toBeTruthy();
     expectPrimary('schedule-start', 'Start');
-    expectFlat();
     // No ⓘ: a subtitle says it instead.
     expect(screen.queryByTestId('icon-information-circle-outline')).toBeNull();
     expect(screen.getByText('You can change any of these later in Settings.')).toBeTruthy();

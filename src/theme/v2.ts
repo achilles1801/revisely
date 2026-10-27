@@ -1,15 +1,14 @@
-// Design v2 tokens: the new design's look, from "Revisely: Threads-style UI
-// Migration". Used when the new design is on (design/DesignContext).
+// The design's tokens ("Revisely: Threads-style UI Migration"; CLAUDE.md,
+// "The design"). The only place colours are written (noRawColours.test).
 //
-// - white (light) or black (dark) grounds, flat: no cards, no glass, no gradient;
+// - white (light) or black (dark) grounds, flat: no cards, no glass; the one
+//   gradient is Home's glow (and the accent's progress fill);
 // - content is a feed of rows on 0.5pt separators, with avatar-size marks;
-// - no accent tint: the primary button is solid black (white in dark). Revisely's
-//   jade appears only for "done";
+// - an accent (Indigo by default, Crimson, Jade) is a token set below;
 // - text pairs are checked against WCAG (src/design/__tests__): ≥ 4.5:1.
 //
-// `v2ThemeColors` maps the palette onto the classic ThemeColors names, so
-// screens not yet moved take the new colours at once; moved screens use the
-// palette names through useTheme().palette.
+// `v2ThemeColors` gives the same palette under the older names (textPrimary,
+// accent, …) that many screens read through useTheme().theme.
 
 import { TextStyle } from 'react-native';
 
@@ -304,7 +303,7 @@ export function paletteV2(isDark: boolean, accent: AccentName = 'jade'): Palette
   return PALETTES[`${accent}-${isDark ? 'dark' : 'light'}`];
 }
 
-/** Jade, the default. */
+/** With Jade (paletteV2's default argument; the app's default accent is DEFAULT_ACCENT). */
 export const paletteLight: PaletteV2 = paletteV2(false);
 export const paletteDark: PaletteV2 = paletteV2(true);
 

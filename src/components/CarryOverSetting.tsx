@@ -4,7 +4,6 @@ import { SettingIcon } from './settings/SettingIcon';
 import { SettingSwitch } from './settings/SettingSwitch';
 import { typeV2 } from '../theme/v2';
 import { useTheme } from '../context/ThemeContext';
-import { radius } from '../theme/radius';
 import { CarryOverMode, DEFAULT_CARRY_OVER_MODE } from '../lib/carryOver';
 
 /**
@@ -25,7 +24,7 @@ export function CarryOverSetting({
   // is now set.
   return (
     <View style={styles.rowV2}>
-      <SettingIcon name="arrow-redo-outline" tileStyle={styles.rowIcon} />
+      <SettingIcon name="arrow-redo-outline" />
       <View style={styles.textV2}>
         <Text style={[typeV2.body, { color: palette.text }]}>Keep daily amount</Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} testID="carry-over-explainer">
@@ -47,11 +46,4 @@ const styles = StyleSheet.create({
   // SettingIcon brings 8pt after the glyph; 8 more makes the rows' 16.
   rowV2: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingVertical: 12, paddingHorizontal: 16, gap: 8 },
   textV2: { flex: 1, marginRight: 8 },
-  rowIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 });

@@ -170,6 +170,23 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
 // The controls stay rendered (they fade); hidden, they are hidden from screen readers too.
 const byTestId = (id: string) => screen.getByTestId(id, { includeHiddenElements: true });
 
+describe('ActiveRevisionScreen — a failed load', () => {
+  it('shows the error with Try again, then the session once the data arrives', () => {
+    const log = setup([]);
+    const loaded = { ...mockApp };
+    Object.assign(mockApp, { user: null, pages: [], logs: [], error: 'Network error' });
+    const view = render(<ActiveRevisionScreen />);
+    expect(screen.getByText("Couldn't load your session")).toBeTruthy();
+    fireEvent.press(screen.getByText('Try again'));
+    expect(mockApp.loadData).toHaveBeenCalled();
+    // The retry succeeds: the same screen now has more to render (hooks included).
+    Object.assign(mockApp, { ...loaded, logs: [log] });
+    view.rerender(<ActiveRevisionScreen />);
+    expect(screen.queryByText("Couldn't load your session")).toBeNull();
+    expect(screen.getByTestId('reader-background')).toBeTruthy();
+  });
+});
+
 describe('ActiveRevisionScreen — reading and the controls', () => {
   it('opens on the page alone: its number, the juz and surah; the controls hidden', () => {
     setup([332, 333]);

@@ -51,6 +51,8 @@ import {
 import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 
+const NO_PAGES: number[] = [];
+
 const AUTO_SAVE_INTERVAL_MS = 5000;
 // Under the page, with the controls: the capsule.
 const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
@@ -280,10 +282,10 @@ export default function ActiveRevisionScreen() {
   }, [commitPendingPages]);
 
   // ===== Timer =====
-  // The floating timer is the app's one timer: pages marked revised while it
-  // runs are credited to it. It is general, so unlike the old in-bar revision
-  // stopwatch, leaving this screen does not pause it and finishing today's
-  // pages does not stop it; the user ends it from the timer itself.
+  // The app has one timer (in the controls under the page, and Home's top bar
+  // while it runs): pages marked revised while it runs are credited to it.
+  // Leaving this screen doesn't pause it and finishing today's pages doesn't
+  // stop it; the user ends it from the timer itself.
   const { noteRevisedPages, timer } = useReadingTimer();
   const prevCompletedRef = useRef(completedPages);
   useEffect(() => {
@@ -293,52 +295,21 @@ export default function ActiveRevisionScreen() {
     if (added.length > 0) noteRevisedPages(added);
   }, [completedPages, noteRevisedPages]);
 
-  if (!user || !assignment) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          {error ? (
-            <>
-              <Text style={styles.errorTitle}>Couldn't load your session</Text>
-              <Text style={styles.errorMessage}>{error}</Text>
-              <PillButton
-                title="Try again"
-                onPress={loadData}
-                style={styles.retryButton}
-              />
-            </>
-          ) : (
-            <Text style={styles.loadingText}>Loading…</Text>
-          )}
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // Every hook runs before the loading / error return below: "Try again"
+  // after a failed load would otherwise render more hooks than before.
   const quranData = getQuranData();
-  const totalPages = assignment.pages.length;
-  const completedCount = completedPages.size;
-
-  const resumePage =
-    assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
-    assignment.pages[0];
-  const displayPageNumber = currentPageNumber || resumePage;
-  const currentJuz = quranData.find((q) => q.pageNumber === displayPageNumber)?.juzNumber || 1;
-  const currentHizb = getHizbForPage(displayPageNumber);
-  const firstSurahOnPage = getSurahsForPage(displayPageNumber)[0];
-
-  const isCurrentRevised = completedPages.has(displayPageNumber);
+  const assignedPages = assignment?.pages ?? NO_PAGES;
 
   const scopeLabel = useMemo(() => {
     // Prefer juz scope when the assignment fits one juz; otherwise show count.
     const juzes = new Set(
-      assignment.pages
+      assignedPages
         .map((p) => quranData.find((q) => q.pageNumber === p)?.juzNumber)
         .filter((j): j is number => typeof j === 'number'),
     );
     if (juzes.size === 1) return `Juz ${[...juzes][0]}`;
-    return `${assignment.pages.length} pages`;
-  }, [assignment.pages, quranData]);
+    return `${assignedPages.length} pages`;
+  }, [assignedPages, quranData]);
 
   // ===== Mark / unmark =====
 
@@ -366,16 +337,11 @@ export default function ActiveRevisionScreen() {
     });
   }, []);
 
-  const handleToggleCurrent = () => {
-    if (isCurrentRevised) unmarkRevised(displayPageNumber);
-    else markRevised(displayPageNumber);
-  };
-
   // ===== Swipe-to-credit =====
 
   const handleAdvance = useCallback(
     (leftPage: number, _currentPage: number) => {
-      if (!assignment.pages.includes(leftPage)) return;
+      if (!assignedPages.includes(leftPage)) return;
       if (completedPages.has(leftPage)) return;
       markRevised(leftPage);
       if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -384,14 +350,8 @@ export default function ActiveRevisionScreen() {
         message: `Page ${leftPage} marked as revised`,
       });
     },
-    [assignment.pages, completedPages, markRevised],
+    [assignedPages, completedPages, markRevised],
   );
-
-  const handleUndo = () => {
-    if (!undoState) return;
-    unmarkRevised(undoState.page);
-    setUndoState(null);
-  };
 
   // ===== End session =====
 
@@ -409,7 +369,7 @@ export default function ActiveRevisionScreen() {
       const pagesRevised = Array.from(completedPages).filter(
         (p) => !silentlySavedRef.current.has(p),
       );
-      const pagesSkipped = assignment.pages.filter(
+      const pagesSkipped = assignedPages.filter(
         (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
       );
       const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
@@ -442,8 +402,8 @@ export default function ActiveRevisionScreen() {
           ([page, rating]) => ({ page, rating }),
         );
         await addLog({
-          date: sessionDay ?? getCurrentRevisionDay(user),
-          assignedPages: assignment.pages,
+          date: sessionDay ?? getCurrentRevisionDay(user!),
+          assignedPages: assignedPages,
           pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,
@@ -461,7 +421,7 @@ export default function ActiveRevisionScreen() {
   }, [
     commitPendingPages,
     completedPages,
-    assignment.pages,
+    assignedPages,
     pages,
     updatePages,
     localRatings,
@@ -471,6 +431,68 @@ export default function ActiveRevisionScreen() {
     finishRecording,
     haptics,
   ]);
+
+  const viewerPages = useMemo(
+    () => assignedPages,
+    [assignedPages],
+  );
+
+  // Force re-render of the pager's extraData when revision state of any page
+  // changes (so any overlay can update). We don't actually render an overlay
+  // per page right now, but keeping this hook in place makes that cheap to
+  // add later.
+  const extraData = useMemo(
+    () => Array.from(completedPages).sort().join(','),
+    [completedPages],
+  );
+
+  if (!user || !assignment) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          {error ? (
+            <>
+              <Text style={styles.errorTitle}>Couldn't load your session</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+              <PillButton
+                title="Try again"
+                onPress={loadData}
+                style={styles.retryButton}
+              />
+            </>
+          ) : (
+            <Text style={styles.loadingText}>Loading…</Text>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const totalPages = assignment.pages.length;
+  const completedCount = completedPages.size;
+
+  const resumePage =
+    assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
+    assignment.pages[0];
+  const displayPageNumber = currentPageNumber || resumePage;
+  const currentJuz = quranData.find((q) => q.pageNumber === displayPageNumber)?.juzNumber || 1;
+  const currentHizb = getHizbForPage(displayPageNumber);
+  const firstSurahOnPage = getSurahsForPage(displayPageNumber)[0];
+
+  const isCurrentRevised = completedPages.has(displayPageNumber);
+
+  const handleToggleCurrent = () => {
+    if (isCurrentRevised) unmarkRevised(displayPageNumber);
+    else markRevised(displayPageNumber);
+  };
+
+  const handleUndo = () => {
+    if (!undoState) return;
+    unmarkRevised(undoState.page);
+    setUndoState(null);
+  };
+
+  // ===== End session =====
 
   const handleEndSession = () => {
     if (completedCount === 0) {
@@ -554,20 +576,6 @@ export default function ActiveRevisionScreen() {
     },
   ];
 
-  const viewerPages = useMemo(
-    () => assignment.pages,
-    [assignment.pages],
-  );
-
-  // Force re-render of the pager's extraData when revision state of any page
-  // changes (so any overlay can update). We don't actually render an overlay
-  // per page right now, but keeping this hook in place makes that cheap to
-  // add later.
-  const extraData = useMemo(
-    () => Array.from(completedPages).sort().join(','),
-    [completedPages],
-  );
-
   const palette = getReadPalette(isDark);
   const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
   const compact = width < 430 && crowded;
@@ -643,7 +651,6 @@ export default function ActiveRevisionScreen() {
                 submitVisible ? (
                   <PressableScale
                     onPress={handleEndSession}
-
                     style={[styles.submit, { backgroundColor: theme.accent }]}
                     accessibilityRole="button"
                     accessibilityLabel="Submit session"

@@ -495,14 +495,16 @@ To rotate one (or after a leak: revoke the old key in the portal first):
 The app has one design, Threads-style (the plan was the doc "Revisely: Threads-style UI Migration",
 Claude Docs). It shipped screen by screen behind a tester switch; on 2026-10-27 the owner made it the
 app, and the classic design (glass, gradients, the LiquidGlass tab bar, the Mihrab palette) and the
-switch were removed. Old device settings are read once: a Light/Dark chosen in the classic design
-is kept; a fresh install starts in light.
+switch were removed. The theme is decided once per phone (`resolveThemeMode`): a Light/Dark
+chosen in either design is kept, a phone that had run the app without choosing stays dark (the
+classic default), and a fresh install starts in light.
 - Tokens are `src/theme/v2.ts` (`paletteV2(isDark, accent)`, `typeV2`, `layoutV2`, `radiusV2`,
   `markV2`). `useTheme()` gives `palette` and, for older code, `theme`: the same colours under the
   older names (`textPrimary`, `accent`, `glass`, …; `v2ThemeColors`). The reader's page colours are
-  `theme/readPalette` (`getReadPalette(isDark)`). **Colours live only in `src/theme`:** a raw hex or
-  `rgba()` anywhere else fails `src/design/__tests__/noRawColours.test.ts` (Google's "G" is the one
-  exemption, listed there with the reason).
+  `theme/readPalette` (`getReadPalette(isDark)`). **Colours live only in `src/theme`:** a hex,
+  `rgb()`/`rgba()`/`hsl()` in a string, or an alpha glued on (`+ '22'`), anywhere else in `src/`
+  fails `src/design/__tests__/noRawColours.test.ts` (Google's "G" is the one exemption, listed
+  there with the reason). A colour built some other way (a template from numbers) isn't caught.
 - The look: white / black grounds, flat. Content is a feed of rows on 0.5pt separators with a
   16pt gutter; each row has an avatar-size mark (40 top-level, 36 reply, 28 nested; `v2/Mark`),
   a name (15/600), metadata (13) and a ⋯ menu, and rows of one thread are joined by a 2pt line
@@ -551,7 +553,8 @@ is kept; a fresh install starts in light.
   a native change for a versioned release. Until then Settings offers Light and Dark only
   (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
 - `expo-blur` and `expo-glass-effect` are no longer imported. Removing them from `package.json`
-  changes the fingerprint, so do it with the next native change.
+  changes the fingerprint, so do it with the next native change, along with the tests'
+  `jest.mock('expo-glass-effect')` / `jest.mock('expo-blur')` calls.
 
 ## UI traps
 

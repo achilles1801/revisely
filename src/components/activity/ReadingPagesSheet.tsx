@@ -80,7 +80,6 @@ export function ReadingPagesSheet({
       {suggestion !== '' && suggestion !== formatPageRanges(parsed ?? []) && (
         <PressableScale
           onPress={() => setText(suggestion)}
-
           style={styles.suggestion}
         >
           <Ionicons name="book-outline" size={16} color={theme.accent} />
@@ -93,7 +92,6 @@ export function ReadingPagesSheet({
 
       <PressableScale
         onPress={() => onDelete(session)}
-
         style={styles.deleteBtn}
       >
         <Text style={styles.deleteText}>Delete session</Text>
@@ -155,7 +153,7 @@ const makeSheetStyles = (theme: ThemeColors) =>
       padding: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: radius.md,
-      backgroundColor: theme.accent + '22',
+      backgroundColor: theme.accentSoft,
     },
     suggestionText: { ...typography.bodySmall, color: theme.textPrimary, flex: 1 },
     suggestionUse: { ...typography.bodySmall, color: theme.accent, fontWeight: '700' },

@@ -21,7 +21,7 @@ jest.mock('../../context/AppContext', () => ({ useApp: () => ({ user: mockAppUse
 
 import { DesignProvider, useDesign } from '../DesignContext';
 import { makeHaptics } from '../haptics';
-import { ThemeProvider, resolveThemeMode, useTheme } from '../../context/ThemeContext';
+import { ThemeProvider, isExistingInstall, resolveThemeMode, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
 import { TodayPost, juzLabel, memorizedText, todayText } from '../../components/home/feed/TodayPost';
 import { revisionItem } from '../../lib/activityItems';
@@ -111,20 +111,64 @@ describe('haptics', () => {
 
 describe('the theme (Light / Dark)', () => {
   it('a fresh install starts in light; System once the binary follows it', () => {
-    expect(resolveThemeMode(null, null, false)).toBe('light');
-    expect(resolveThemeMode(null, null, true)).toBe('system');
+    expect(resolveThemeMode(null, null, false, false)).toBe('light');
+    expect(resolveThemeMode(null, null, true, false)).toBe('system');
   });
 
-  it('keeps what someone chose: here, or else in the classic design', () => {
-    expect(resolveThemeMode('dark', 'light', false)).toBe('dark');
-    expect(resolveThemeMode(null, 'dark', false)).toBe('dark');
-    expect(resolveThemeMode(null, 'light', true)).toBe('light');
+  it('a phone that ran the app before and never chose stays dark, as classic showed it', () => {
+    expect(resolveThemeMode(null, null, false, true)).toBe('dark');
+    expect(isExistingInstall(['firebase:authUser:key:[DEFAULT]'])).toBe(true);
+    expect(isExistingInstall(['@revisely_haptics', 'x'])).toBe(true);
+    expect(isExistingInstall(['@revisley_reader_guide_dismissed'])).toBe(true);
+    expect(isExistingInstall([])).toBe(false);
   });
 
-  it('a stored System this binary can’t follow falls back to the classic choice, else light', () => {
-    expect(resolveThemeMode('system', 'dark', false)).toBe('dark');
-    expect(resolveThemeMode('system', null, false)).toBe('light');
-    expect(resolveThemeMode('system', 'dark', true)).toBe('system');
+  it('keeps what someone chose: here, or else in the classic design (its System was dark)', () => {
+    expect(resolveThemeMode('dark', 'light', false, true)).toBe('dark');
+    expect(resolveThemeMode('light', null, false, true)).toBe('light');
+    expect(resolveThemeMode(null, 'dark', false, false)).toBe('dark');
+    expect(resolveThemeMode(null, 'light', true, true)).toBe('light');
+    expect(resolveThemeMode(null, 'system', false, true)).toBe('dark');
+  });
+
+  it('a stored System this binary can’t follow falls back to the classic choice, else as above', () => {
+    expect(resolveThemeMode('system', 'dark', false, true)).toBe('dark');
+    expect(resolveThemeMode('system', null, false, false)).toBe('light');
+    expect(resolveThemeMode('system', 'dark', true, true)).toBe('system');
+  });
+
+  it('decides once: a fresh install stays light on its next launch, though it now has keys', async () => {
+    const Probe = () => <Text testID="mode">{useTheme().themeMode}</Text>;
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('mode').props.children).toBe('light');
+    expect(await AsyncStorage.getItem('@revisely_theme_v2')).toBe('light');
+    await AsyncStorage.setItem('@revisely_haptics', 'on');
+    screen.unmount();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('mode').props.children).toBe('light');
+  });
+
+  it('an existing install that never chose opens dark, and keeps it', async () => {
+    await AsyncStorage.setItem('firebase:authUser:key:[DEFAULT]', '{}');
+    const Probe = () => <Text testID="mode">{useTheme().themeMode}</Text>;
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId('mode').props.children).toBe('dark');
+    expect(await AsyncStorage.getItem('@revisely_theme_v2')).toBe('dark');
   });
 });
 
