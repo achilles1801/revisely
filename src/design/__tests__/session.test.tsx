@@ -22,7 +22,7 @@ import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { getReadPalette } from '../../theme/readPalette';
 import { getQuranData } from '../../lib/quranData';
-import { paletteDark, paletteLight } from '../../theme/v2';
+import { DEFAULT_ACCENT, paletteDark, paletteLight, paletteV2 } from '../../theme/v2';
 
 const v2 = (ui: React.ReactElement) => (
   <DesignProvider initial={{ allowed: true, chosen: 'new' }}>
@@ -56,7 +56,7 @@ describe('the session and reader in the new design', () => {
     );
     await act(async () => {});
     expect(flat(screen.getByLabelText('Session menu').props.style).backgroundColor).toBeUndefined();
-    expect(flat(screen.getByTestId('round-button-active').props.style).backgroundColor).toBe(paletteLight.done);
+    expect(flat(screen.getByTestId('round-button-active').props.style).backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).done);
     expect(screen.getByTestId('icon-checkmark').props.children).toBe(paletteLight.onDone);
   });
 

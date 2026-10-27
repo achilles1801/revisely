@@ -178,6 +178,19 @@ describe('users/{userId}', () => {
       await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { scheduleShiftPages: -1 }));
     });
 
+    it('owner can choose an accent', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      for (const accent of ['indigo', 'crimson', 'jade']) {
+        await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { accent }));
+      }
+    });
+
+    it('rejects an unknown accent', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { accent: 'teal' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { accent: 3 }));
+    });
+
     it('rejects an unknown carry-over mode', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { carryOverMode: 'double' }));

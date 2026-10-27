@@ -138,6 +138,8 @@ service cloud.firestore {
         'translationId', 'reciter',
         // Recording backup (on unless false) and whether it may use mobile data.
         'recordingBackup', 'recordingBackupCellular',
+        // The new design's accent (Settings → Appearance), kept with the account.
+        'accent',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -247,6 +249,8 @@ service cloud.firestore {
                        (!hasField('translationId') ||
                         (incomingData().translationId is string &&
                          incomingData().translationId.size() <= 40)) &&
+                       (!hasField('accent') ||
+                        incomingData().accent in ['indigo', 'crimson', 'jade']) &&
                        (!hasField('scheduleShiftPages') ||
                         (incomingData().scheduleShiftPages is int &&
                          isInRange(incomingData().scheduleShiftPages, 0, 1000000))) &&

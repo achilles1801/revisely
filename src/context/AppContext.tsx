@@ -59,6 +59,7 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     // the scheduler still produces a sensible cycle for them.
     scheduleAnchorDate: getScheduleAnchorDateFromFirestore(fsUser),
     carryOverMode: fsUser.carryOverMode,
+    accent: fsUser.accent,
     carryOver: fsUser.carryOver,
     scheduleShiftPages: fsUser.scheduleShiftPages,
     translationId: fsUser.translationId,
@@ -432,6 +433,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Sent only once set (null clears carryOver), so saving a user who never
         // used carry-over writes nothing new.
         ...(updatedUser.carryOverMode !== undefined && { carryOverMode: updatedUser.carryOverMode }),
+        ...(updatedUser.accent !== undefined && { accent: updatedUser.accent }),
         ...(updatedUser.carryOver !== undefined && { carryOver: updatedUser.carryOver }),
         ...(updatedUser.scheduleShiftPages !== undefined && {
           scheduleShiftPages: updatedUser.scheduleShiftPages,

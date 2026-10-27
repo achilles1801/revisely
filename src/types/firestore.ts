@@ -181,6 +181,8 @@ export interface FirestoreUser {
   scheduleAnchorDate?: string;
   /** How carrying over yesterday's unrevised pages makes room (lib/carryOver). */
   carryOverMode?: 'shift' | 'add';
+  /** The new design's accent; unset = Indigo. */
+  accent?: 'indigo' | 'crimson' | 'jade';
   /** Pages carried into one revision day (see User.carryOver). */
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   /** Pages the schedule has been moved back by carry-overs. */
@@ -237,6 +239,8 @@ export interface UpdateUserInput {
   fajrCalculationMethod?: string;
   scheduleAnchorDate?: string;
   carryOverMode?: 'shift' | 'add';
+  /** The new design's accent; unset = Indigo. */
+  accent?: 'indigo' | 'crimson' | 'jade';
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   scheduleShiftPages?: number;
   translationId?: string;

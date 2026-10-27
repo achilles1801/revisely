@@ -453,14 +453,17 @@ Review), kept per device, switching the whole app live.
     shows in Home's top bar (`RunningTimerChip`). Classic keeps `FloatingTimer`.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
     what a control does (e.g. Keep daily amount).
-- **Accents** (a trial, Settings → Preview → Accent, per device, new design only): Jade (the
-  agreed look: ink buttons, grey links, jade only for "done"), Crimson and Indigo, which put the
-  accent on the primary action, links, the active tab, "done", the calendar and a glow behind
-  Home's top (`v2/HeroGlow`). An accent is a token set in `theme/v2` (`ACCENT_TOKENS`: `primary`,
-  `done`/`doneText`, `accentText`, `link`, `accentSubtle`, `hero`, `progress`, `heat`/`heatInk`);
-  never write an accent colour in a component. Status colours don't follow it: weak is `red`,
-  strong is `good` (green). Classic screens get `accentText` as `theme.accent`, since they use it
-  for text too. Every combination is checked in `src/design/__tests__` (text 4.5:1, fills 3:1).
+- **Accents** (Settings → Appearance → Accent, new design only): **Indigo (the default)**, Crimson
+  and Jade. The choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it
+  follows the account. `DesignGate` applies it once the user loads, and Indigo applies when it's
+  unset; the device keeps a copy for the first frame. Crimson and Indigo put the accent on the
+  primary action, links, the active tab, "done", the calendar and a glow behind Home's top
+  (`v2/HeroGlow`); Jade keeps ink buttons, grey links and jade only for "done". An accent is a
+  token set in `theme/v2` (`ACCENT_TOKENS`: `primary`, `done`/`doneText`, `accentText`, `link`,
+  `accentSubtle`, `hero`, `progress`, `heat`/`heatInk`); never write an accent colour in a
+  component. Status colours don't follow it: weak is `red`, strong is `good` (green). Classic
+  screens get `accentText` as `theme.accent`, since they use it for text too. Every combination
+  is checked in `src/design/__tests__` (text 4.5:1, fills 3:1).
 - Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
   `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
