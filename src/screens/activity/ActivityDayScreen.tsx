@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import {
   ActivityIndicator,
   Alert,
@@ -88,7 +89,6 @@ export default function ActivityDayScreen() {
   const [readings, setReadings] = useState<ReadingSession[]>([]);
   const [journal, setJournal] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [editingReading, setEditingReading] = useState<ReadingSession | null>(null);
   const [recordingsKey, setRecordingsKey] = useState(0);
@@ -114,6 +114,7 @@ export default function ActivityDayScreen() {
     setLoadError(r.status === 'rejected' || j.status === 'rejected');
     setLoading(false);
   }, [date]);
+  const { refreshing, onRefresh } = usePullToRefresh(load);
 
   useActivityReload(load);
 
@@ -270,11 +271,7 @@ export default function ActivityDayScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={async () => {
-                setRefreshing(true);
-                await load();
-                setRefreshing(false);
-              }}
+              onRefresh={onRefresh}
               tintColor={palette.secondary}
             />
           }

@@ -18,6 +18,7 @@ import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
 import * as firestoreService from '../../services/firestoreService';
 import { logger } from '../../lib/logger';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
@@ -87,13 +88,7 @@ export default function DashboardScreen() {
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const quranData = getQuranData();
 
@@ -401,7 +396,10 @@ export default function DashboardScreen() {
         ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
+        refreshControl={
+          // Transparent: an opaque pull area cut Home's glow off in a hard line.
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
+        }
         testID="home-v2"
       >
         <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />

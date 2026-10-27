@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import {
   View,
   Text,
@@ -86,7 +87,6 @@ export default function AlgorithmScreen() {
   const { user, pages, logs, loadData } = useApp();
   const quranData = useMemo(() => getQuranData(), []);
 
-  const [refreshing, setRefreshing] = useState(false);
   const [juzFilter, setJuzFilter] = useState<number | null>(null);
   const [strengthFilter, setStrengthFilter] = useState<number | null>(null);
   const [browseMode, setBrowseMode] = useState<BrowseMode>('pages');
@@ -107,11 +107,7 @@ export default function AlgorithmScreen() {
     setExpandedLists((prev) => ({ ...prev, [mode]: !prev[mode] }));
   };
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const memorizedPages = useMemo(
     () => pages.filter((p) => p.status === 'memorized'),

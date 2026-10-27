@@ -567,6 +567,10 @@ classic default), and a fresh install starts in light.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
+- **Pull to refresh over Home's glow:** iOS paints the pull area opaque, so the glow ended in a
+  hard line under the header while pulling (and while a refresh hung). Home's `RefreshControl` has
+  `backgroundColor: 'transparent'`; refreshes go through `hooks/usePullToRefresh`, which always ends
+  the spinner (done, failed, or after 10 s).
 - **Drag and swipe rows** (`components/plan/ReorderableDayList`, the schedule's days) are
   react-native-gesture-handler and Reanimated, JS only. A row lifts after 350 ms with the finger
   still; moving 10pt first cancels the lift, so scrolling and swiping still work. While a row is
