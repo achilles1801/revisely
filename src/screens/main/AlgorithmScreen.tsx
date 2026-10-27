@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
-// (navigation/TabSwipe).
+// (navigation/PagerTabs).
 import { ScrollView } from 'react-native-gesture-handler';
 import { useScrollToTop } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';

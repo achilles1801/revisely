@@ -580,13 +580,21 @@ classic default), and a fresh install starts in light.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
-- **Swiping between tabs** (`navigation/TabSwipe`): a sideways swipe on a tab's main screen
-  (Home, the Read list, Insights when Smart Tracking is on) moves to the tab beside it, and tab
-  changes slide (`animation: 'shift'`). Screens opened from a tab keep their own sideways gestures
-  (the reader's page turns, the back swipe, swipe to delete, the calendar); vertical scrolling wins
-  (the pan fails after 12pt of vertical movement). Those three screens scroll with Gesture Handler's
-  `ScrollView` / `FlatList`: over React Native's own, the swipe never started and the row under the
-  finger got a tap instead.
+- **Tabs are a pager** (`navigation/PagerTabs`, a navigator on React Navigation's `TabRouter`, so
+  `navigate('Read')`, tab presses, pop-to-top and scroll-to-top work as with bottom tabs). The tab
+  screens sit side by side and move 1:1 with the finger on the UI thread: the incoming tab is drawn
+  beside the current one, rubber band at the ends, velocity snapping (one tab per swipe), and a swipe
+  or a tab press takes over an animation in flight. The tab bar's icons cross-fade with the
+  position. Tabs stay mounted once shown (and the neighbours of the focused one are mounted ahead),
+  so nothing reloads or blanks; the old bottom-tabs swipe blanked the mushaf after a quick
+  back-and-forth. Insights is swiped to only with Smart Tracking on (`swipeableCount`).
+  - Only on a tab's main screen: the gesture fails at touch-down while a pushed screen shows, so the
+    reader's page turns, the back swipe, swipe to delete and the calendar keep their gestures.
+    Vertical scrolling wins (the pan fails after 10pt vertically).
+  - The main screens scroll with Gesture Handler's `ScrollView` / `FlatList`: over React Native's
+    own, the pan never started and the row under the finger got a tap.
+  - The gesture is made once and reads what changes from shared values; in Jest, Reanimated's mock
+    makes a new shared value every render, so `PagerTabs.test` keeps them across renders.
 - **Pull to refresh over Home's glow:** iOS paints the pull area opaque, so the glow ended in a
   hard line under the header while pulling (and while a refresh hung). Home's `RefreshControl` has
   `backgroundColor: 'transparent'`; refreshes go through `hooks/usePullToRefresh`, which always ends

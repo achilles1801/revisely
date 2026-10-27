@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import type { PagerTabBarProps } from './PagerTabs';
 import { useTheme } from '../context/ThemeContext';
 import { layoutV2 } from '../theme/v2';
 
@@ -36,7 +37,9 @@ function isHidden(tabBarStyle: unknown): boolean {
   return flat?.display === 'none';
 }
 
-type TabBarProps = BottomTabBarProps & {
+type TabBarProps = Omit<PagerTabBarProps, 'position'> & {
+  /** The pager's position in pages, live while swiping: the icons follow it. */
+  position?: SharedValue<number>;
   /** Hide the Insights tab from the visible tab bar (it's still registered as a route). */
   showInsightsTab?: boolean;
   /** When set, tapping the Insights tab calls this instead of navigating to the route. */
@@ -46,9 +49,12 @@ type TabBarProps = BottomTabBarProps & {
 /**
  * The bottom bar: solid ground, a hairline on top, edge to edge, icon-only.
  */
-export function TabBar({ state, descriptors, navigation, showInsightsTab = true, onInsightsTabPress }: TabBarProps) {
+export function TabBar({ state, descriptors, navigation, position, showInsightsTab = true, onInsightsTabPress }: TabBarProps) {
   const { palette } = useTheme();
   const bottomGap = useBottomGap();
+  const still = useSharedValue(state.index);
+  still.value = state.index;
+  const progress = position ?? still;
 
   // Routes the user can actually see in the bar. The Insights route is still
   // registered in the navigator even when hidden; we just don't render its tab.
@@ -68,6 +74,8 @@ export function TabBar({ state, descriptors, navigation, showInsightsTab = true,
           key={route.key}
           routeName={route.name}
           routeKey={route.key}
+          page={state.routes.findIndex((r) => r.key === route.key)}
+          progress={progress}
           focused={route.key === focusedRoute.key}
           onPressOverride={route.name === 'Insights' ? onInsightsTabPress : undefined}
           navigation={navigation}
@@ -92,22 +100,32 @@ export function ActionBar({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A tab: no bubble, no buzz (the screen changing is the feedback). */
+/**
+ * A tab: no bubble, no buzz (the screen changing is the feedback). Its icon
+ * follows the pager: the filled, accent icon fades in as its page slides in,
+ * so the bar tracks a swipe as it happens.
+ */
 function Tab({
   routeName,
   routeKey,
+  page,
+  progress,
   focused,
   onPressOverride,
   navigation,
 }: {
   routeName: string;
   routeKey: string;
+  page: number;
+  progress: SharedValue<number>;
   focused: boolean;
   onPressOverride?: () => void;
-  navigation: BottomTabBarProps['navigation'];
+  navigation: PagerTabBarProps['navigation'];
 }) {
   const { palette } = useTheme();
   const icons = TAB_ICONS[routeName] ?? { active: 'ellipse', inactive: 'ellipse-outline' };
+  const on = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(progress.value - page)) }));
+  const off = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.abs(progress.value - page)) }));
   const onPress = () => {
     if (onPressOverride) {
       onPressOverride();
@@ -126,7 +144,14 @@ function Tab({
       style={({ pressed }) => [styles.tab, pressed && { opacity: 0.55 }]}
       testID={`tab-${routeName}`}
     >
-      <Ionicons name={focused ? icons.active : icons.inactive} size={26} color={focused ? palette.accentText : palette.secondary} />
+      <View style={styles.icon}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.iconLayer, off]}>
+          <Ionicons name={icons.inactive} size={26} color={palette.secondary} />
+        </Animated.View>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.iconLayer, on]}>
+          <Ionicons name={icons.active} size={26} color={palette.accentText} testID={focused ? `tab-${routeName}-active` : undefined} />
+        </Animated.View>
+      </View>
     </Pressable>
   );
 }
@@ -156,4 +181,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  icon: { width: 30, height: 30 },
+  iconLayer: { alignItems: 'center', justifyContent: 'center' },
 });
