@@ -26,6 +26,7 @@ export const colors = {
   // Accents
   accent: '#0E6B5A',       // jade — primary CTA + brand color
   accentSoft: '#E5F0EC',   // tinted bg for chips
+  onAccent: '#FFFFFF',     // text and glyphs on an accent fill
   gold: '#B8893E',         // streak / milestone highlight ONLY
 
   // Semantic
@@ -62,6 +63,7 @@ export const darkColors: typeof colors = {
   // Accents
   accent: '#34A88F',
   accentSoft: '#0E2A24',
+  onAccent: '#FFFFFF',
   gold: '#D4A968',
 
   // Semantic

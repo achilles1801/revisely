@@ -5,7 +5,6 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Switch,
   Alert,
   Modal,
   Platform,
@@ -17,6 +16,13 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
+import { useDesign } from '../../design/DesignContext';
+import { layoutV2, typeV2 } from '../../theme/v2';
+import { TopBar } from '../../components/v2/TopBar';
+import { Mark } from '../../components/v2/Mark';
+import { PillButton } from '../../components/v2/PillButton';
+import { Tap } from '../../components/v2/Tap';
+import { Sheet } from '../../components/v2/Sheet';
 import { reportProblem } from '../../lib/sentry';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,13 +32,16 @@ import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
+import { useTabBarFootprint } from '../../components/LiquidGlassTabBar';
+import { SettingSwitch } from '../../components/settings/SettingSwitch';
+import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
+import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { scheduleDailyReminder } from '../../lib/notifications';
@@ -61,16 +70,30 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Reusable bits — kept inline since they're tightly coupled to settings rows.
 // ---------------------------------------------------------------------------
 
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
-  const { theme } = useTheme();
+function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  if (isNew) {
+    // A flat list: a bold sentence-case header, rows on the ground, a hairline
+    // closing the group.
+    return (
+      <View style={[v2.section, { borderBottomColor: palette.separator }]}>
+        {title ? (
+          <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
+            {title}
+          </Text>
+        ) : null}
+        {children}
+        {footer ? <Text style={[typeV2.meta, v2.footer, { color: palette.secondary }]}>{footer}</Text> : null}
+      </View>
+    );
+  }
   return (
     <View style={{ marginBottom: spacing.lg }}>
       {title && (
         <Text
-          style={[
-            typography.label,
-            { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md },
-          ]}
+          style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs, paddingHorizontal: spacing.md }]}
+          accessibilityRole="header"
         >
           {title}
         </Text>
@@ -79,6 +102,23 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
         <GlassCard style={StyleSheet.absoluteFillObject} />
         {children}
       </View>
+      {footer ? (
+        <Text style={[typography.bodySmall, { color: theme.textMuted, marginTop: spacing.xs, paddingHorizontal: spacing.md }]}>
+          {footer}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** A row's icon: a tinted tile (classic) or a plain 24pt glyph (new design). */
+function RowIcon({ name, color, destructive }: { name: IconName; color?: string; destructive?: boolean }) {
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
+  if (isNew) return <Ionicons name={name} size={24} color={destructive ? palette.red : palette.text} />;
+  return (
+    <View style={[styles.rowIcon, { backgroundColor: (color ?? theme.accent) + '20' }]}>
+      <Ionicons name={name} size={16} color={color ?? theme.accent} />
     </View>
   );
 }
@@ -102,8 +142,35 @@ function Row({
   destructive?: boolean;
   isLast?: boolean;
 }) {
-  const { theme } = useTheme();
+  const { theme, palette } = useTheme();
+  const { isNew } = useDesign();
   const labelColor = destructive ? theme.error : theme.textPrimary;
+
+  if (isNew) {
+    const row = (
+      <View style={v2.row}>
+        {icon ? <RowIcon name={icon} destructive={destructive} /> : null}
+        <Text
+          style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
+        >
+          {label}
+        </Text>
+        {value !== undefined && (
+          <Text style={[typeV2.body, styles.rowValue, { color: palette.secondary }]} numberOfLines={1}>
+            {value}
+          </Text>
+        )}
+        {rightSlot}
+        {onPress && !rightSlot && <Ionicons name="chevron-forward" size={16} color={palette.secondary} />}
+      </View>
+    );
+    if (!onPress) return row;
+    return (
+      <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={value ? `${label}, ${value}` : label}>
+        {row}
+      </Tap>
+    );
+  }
 
   const inner = (
     <View
@@ -115,16 +182,7 @@ function Row({
         },
       ]}
     >
-      {icon && (
-        <View
-          style={[
-            styles.rowIcon,
-            { backgroundColor: (iconColor ?? theme.accent) + '20' },
-          ]}
-        >
-          <Ionicons name={icon} size={16} color={iconColor ?? theme.accent} />
-        </View>
-      )}
+      {icon && <RowIcon name={icon} color={iconColor} />}
       <View style={styles.rowText}>
         <Text style={[typography.bodyMedium, { color: labelColor }]}>{label}</Text>
       </View>
@@ -170,6 +228,23 @@ function ThemeSegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
+  if (isNew) {
+    return (
+      <View style={v2.pills}>
+        {options.map((opt) => (
+          <PillButton
+            key={opt.value}
+            title={opt.label}
+            size="sm"
+            variant={opt.value === value ? 'solid' : 'outline'}
+            onPress={() => onChange(opt.value)}
+            accessibilityLabel={`${opt.label}${opt.value === value ? ', selected' : ''}`}
+          />
+        ))}
+      </View>
+    );
+  }
   return (
     <View style={styles.segmented}>
       <GlassCard style={StyleSheet.absoluteFillObject} />
@@ -225,6 +300,8 @@ export default function SettingsScreen() {
   const { user, saveUser, resetOnboarding } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, themeMode, setThemeMode, isDark } = useTheme();
+  const design = useDesign();
+  const tabFootprint = useTabBarFootprint();
   const screenStyles = useMemo(() => makeStyles(theme), [theme]);
   const [localUser, setLocalUser] = useState(user);
 
@@ -434,38 +511,69 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={screenStyles.container}>
-      <View style={screenStyles.header}>
-        <PressableScale
-          onPress={() => navigation.goBack()}
-          haptic="light"
-          style={screenStyles.backButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
-        </PressableScale>
-        <Text style={screenStyles.headerTitle}>Settings</Text>
-        <View style={screenStyles.backButton} />
-      </View>
+      {design.isNew ? (
+        <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
+      ) : (
+        <View style={screenStyles.header}>
+          <PressableScale
+            onPress={() => navigation.goBack()}
+            haptic="light"
+            style={screenStyles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
+          </PressableScale>
+          <Text style={screenStyles.headerTitle}>Settings</Text>
+          <View style={screenStyles.backButton} />
+        </View>
+      )}
 
-      <ScrollView contentContainerStyle={screenStyles.content}>
+      <ScrollView
+        contentContainerStyle={design.isNew ? [v2.content, { paddingBottom: tabFootprint + spacing.lg }] : screenStyles.content}
+        testID="settings-scroll"
+      >
+        {design.allowed && (
+          // Testers only (lib/testerTools): switch the whole app to the redesign in
+          // progress and back, to compare. Kept on this device.
+          <Section title="Preview" footer="The redesign in progress, for testers. Switch back any time.">
+            <Row
+              icon="flask-outline"
+              label="New design (preview)"
+              isLast
+              rightSlot={
+                <SettingSwitch
+                  value={design.isNew}
+                  onValueChange={(on) => design.setChosen(on ? 'new' : 'classic')}
+                  accessibilityLabel="New design (preview)"
+                  testID="new-design-switch"
+                />
+              }
+            />
+          </Section>
+        )}
+
         {firebaseUser && (
           <Section title="Account">
             <View
               style={[
-                screenStyles.profileRow,
+                design.isNew ? v2.profileRow : screenStyles.profileRow,
                 { borderBottomColor: theme.border },
               ]}
             >
-              <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
-                <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
-                  {avatarInitial(localUser.name, firebaseUser.email)}
-                </Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0, marginLeft: spacing.md }}>
+              {design.isNew ? (
+                <Mark label={avatarInitial(localUser.name, firebaseUser.email)} />
+              ) : (
+                <View style={[screenStyles.avatar, { backgroundColor: theme.accent }]}>
+                  <Text style={[typography.titleLarge, { color: theme.textInverse }]}>
+                    {avatarInitial(localUser.name, firebaseUser.email)}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flex: 1, minWidth: 0, marginLeft: design.isNew ? layoutV2.markGap : spacing.md }}>
                 {/* Long names wrap to a second line before shrinking or cutting. */}
                 {localUser.name?.trim() ? (
                   <Text
-                    style={[typography.titleMedium, { color: theme.textPrimary }]}
+                    style={[design.isNew ? typeV2.name : typography.titleMedium, { color: theme.textPrimary }]}
                     numberOfLines={2}
                     adjustsFontSizeToFit
                     minimumFontScale={0.8}
@@ -474,7 +582,7 @@ export default function SettingsScreen() {
                   </Text>
                 ) : null}
                 <Text
-                  style={[typography.bodySmall, { color: theme.textSecondary }]}
+                  style={[design.isNew ? typeV2.meta : typography.bodySmall, { color: theme.textSecondary }]}
                   numberOfLines={1}
                   ellipsizeMode="middle"
                 >
@@ -559,11 +667,9 @@ export default function SettingsScreen() {
             icon="stats-chart-outline"
             label="Progress card"
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={homePrefs.showProgressCard}
                 onValueChange={(v) => setHomePrefs({ showProgressCard: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             }
           />
@@ -590,11 +696,9 @@ export default function SettingsScreen() {
             label="Friday Al-Kahf reminder"
             isLast
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={homePrefs.fridayKahfReminder}
                 onValueChange={(v) => setHomePrefs({ fridayKahfReminder: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             }
           />
@@ -606,11 +710,9 @@ export default function SettingsScreen() {
             label="Keep screen on while reading"
             isLast
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={homePrefs.keepScreenOn}
                 onValueChange={(v) => setHomePrefs({ keepScreenOn: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
                 accessibilityLabel="Keep screen on while reading, revising or listening"
               />
             }
@@ -633,17 +735,13 @@ export default function SettingsScreen() {
             ]}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', gap: spacing.sm }}>
-              <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-                <Ionicons name="sparkles-outline" size={16} color={theme.accent} />
-              </View>
+              <SettingIcon name={design.isNew ? 'analytics-outline' : 'sparkles-outline'} tileStyle={styles.rowIcon} />
               <View style={styles.rowText}>
-                <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
+                <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Smart Tracking</Text>
               </View>
-              <Switch
+              <SettingSwitch
                 value={localUser.smartTrackingEnabled}
                 onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             </View>
             {!localUser.smartTrackingEnabled && (
@@ -670,11 +768,9 @@ export default function SettingsScreen() {
             icon="notifications-outline"
             label="Enable notifications"
             rightSlot={
-              <Switch
+              <SettingSwitch
                 value={localUser.notificationsEnabled}
                 onValueChange={handleNotificationToggle}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
               />
             }
           />
@@ -698,22 +794,45 @@ export default function SettingsScreen() {
 
         <Section title="Appearance">
           <View style={[styles.row, { borderBottomWidth: 0 }]}>
-            <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-              <Ionicons name="color-palette-outline" size={16} color={theme.accent} />
-            </View>
+            <SettingIcon name="color-palette-outline" tileStyle={styles.rowIcon} />
             <View style={styles.rowText}>
-              <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
+              <Text style={[design.isNew ? typeV2.body : typography.bodyMedium, { color: theme.textPrimary }]}>Theme</Text>
             </View>
             <ThemeSegmentedControl
               value={themeMode}
               onChange={setThemeMode}
-              options={[
-                { value: 'light', label: 'Light', icon: 'sunny-outline' },
-                { value: 'dark', label: 'Dark', icon: 'moon-outline' },
-              ]}
+              options={
+                design.isNew && systemAppearanceAvailable()
+                  ? [
+                      { value: 'system', label: 'System', icon: 'phone-portrait-outline' },
+                      { value: 'light', label: 'Light', icon: 'sunny-outline' },
+                      { value: 'dark', label: 'Dark', icon: 'moon-outline' },
+                    ]
+                  : [
+                      { value: 'light', label: 'Light', icon: 'sunny-outline' },
+                      { value: 'dark', label: 'Dark', icon: 'moon-outline' },
+                    ]
+              }
             />
           </View>
         </Section>
+
+        {design.isNew && (
+          <Section title="Haptics" footer="Only for moments that matter: a page done, a session finished.">
+            <Row
+              icon="phone-portrait-outline"
+              label="Haptics"
+              isLast
+              rightSlot={
+                <SettingSwitch
+                  value={design.hapticsOn}
+                  onValueChange={design.setHapticsOn}
+                  accessibilityLabel="Haptics"
+                />
+              }
+            />
+          </Section>
+        )}
 
         <Section title="Support">
           <Row
@@ -814,7 +933,7 @@ export default function SettingsScreen() {
 
         <View style={screenStyles.timePickerContainer}>
           <View style={screenStyles.timeColumn}>
-            <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
+            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Hour</Text>
             <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
               {HOURS.map((hour) => {
                 const selected = tempHour === hour;
@@ -850,7 +969,7 @@ export default function SettingsScreen() {
           <Text style={[typography.displayLarge, { color: theme.textPrimary, marginHorizontal: spacing.xs }]}>:</Text>
 
           <View style={screenStyles.timeColumn}>
-            <Text style={[typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
+            <Text style={[design.isNew ? typeV2.meta : typography.label, { color: theme.textMuted, marginBottom: spacing.xs }]}>Minute</Text>
             <ScrollView style={screenStyles.timeScroll} showsVerticalScrollIndicator={false}>
               {MINUTES.map((minute) => {
                 const selected = tempMinute === minute;
@@ -1026,7 +1145,15 @@ function BottomSheetModal({
   children: React.ReactNode;
 }) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
+  if (isNew) {
+    return (
+      <Sheet visible={visible} onClose={onClose} onShow={onShow} keyboard>
+        <View style={{ paddingTop: spacing.sm }}>{children}</View>
+      </Sheet>
+    );
+  }
   return (
     <Modal
       visible={visible}
@@ -1094,6 +1221,32 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
   },
   segmentSelected: {},
+});
+
+// The new design: full-bleed rows with a 16pt gutter, no cards.
+const v2 = StyleSheet.create({
+  content: {},
+  section: { paddingTop: 8, paddingBottom: 8, borderBottomWidth: layoutV2.hairline },
+  sectionTitle: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4 },
+  footer: { paddingHorizontal: layoutV2.gutter, paddingTop: 4, paddingBottom: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingVertical: 12,
+    paddingHorizontal: layoutV2.gutter,
+    gap: 16,
+  },
+  rowLabel: { flex: 1 },
+  // A row without an icon lines up with the labels of those with one.
+  indent: { marginLeft: 40 },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: layoutV2.rowPad,
+  },
+  pills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
 });
 
 const makeStyles = (theme: ThemeColors) =>

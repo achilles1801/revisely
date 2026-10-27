@@ -14,6 +14,8 @@ import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
+import { useDesign } from '../../design/DesignContext';
+import { ActionSheet } from '../v2/ActionSheet';
 
 export interface SessionMenuAction {
   key: string;
@@ -35,7 +37,12 @@ export function SessionMenuSheet({
   onClose,
 }: SessionMenuSheetProps) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  if (isNew) {
+    return <ActionSheet visible={visible} onClose={onClose} title="Session" actions={actions} testID="session-menu" />;
+  }
 
   return (
     <Modal
@@ -49,7 +56,7 @@ export function SessionMenuSheet({
           onPress={(e) => e.stopPropagation()}
           style={styles.sheet}
         >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
           {actions.map((action, i) => (
             <PressableScale

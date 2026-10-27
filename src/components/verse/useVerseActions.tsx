@@ -218,7 +218,7 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
           {/* Behind the sheet, not around it, or the list can't scroll (see Backdrop). */}
           <Backdrop onPress={() => setReciterPickerOpen(false)} label="Close reciters" />
           <View style={pickerStyles.sheet}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
+            <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             <SafeAreaView>
               <Text style={[pickerStyles.title, { color: theme.textPrimary }]}>Reciter</Text>
               <ReciterList

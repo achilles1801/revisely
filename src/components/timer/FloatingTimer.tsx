@@ -128,7 +128,7 @@ export function FloatingTimer() {
               hitSlop={6}
               accessibilityLabel={`${running ? 'Timer running' : 'Timer paused'}, ${clock}. Open timer controls`}
             >
-              <GlassCard
+              <GlassCard surface="chrome"
                 elevated
                 tintColor={running ? theme.accent + '22' : undefined}
                 style={[styles.pill, { borderColor: running ? theme.accent + '55' : theme.border }]}
@@ -151,7 +151,7 @@ export function FloatingTimer() {
               hitSlop={6}
               accessibilityLabel="Open timer"
             >
-              <GlassCard elevated style={styles.round}>
+              <GlassCard surface="chrome" elevated style={styles.round}>
                 <Ionicons name="stopwatch-outline" size={22} color={theme.textPrimary} />
               </GlassCard>
             </PressableScale>

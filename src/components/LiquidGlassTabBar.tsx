@@ -28,6 +28,8 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute, RouteProp } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { useDesign } from '../design/DesignContext';
+import { layoutV2 } from '../theme/v2';
 import type { MainTabParamList } from '../navigation/MainNavigator';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -36,6 +38,12 @@ const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
   Read: { active: 'book', inactive: 'book-outline' },
   Insights: { active: 'sparkles', inactive: 'sparkles-outline' },
+};
+
+// The new design: icon-only, outline when idle, filled ink when selected.
+const TAB_ICONS_V2: Record<string, { active: IconName; inactive: IconName }> = {
+  ...TAB_ICONS,
+  Insights: { active: 'stats-chart', inactive: 'stats-chart-outline' },
 };
 
 const FULL_SCREEN_ROUTES = new Set<string>([
@@ -92,6 +100,7 @@ export function LiquidGlassTabBar({
 }: LiquidGlassTabBarProps) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
+  const { isNew } = useDesign();
   const [trackWidth, setTrackWidth] = useState(0);
 
   // Routes the user can actually see in the bar. The Insights route is still
@@ -142,6 +151,23 @@ export function LiquidGlassTabBar({
   }
 
   const bottomGap = insets.bottom > 0 ? insets.bottom : 14;
+
+  if (isNew) {
+    return (
+      <FlatBar bottomGap={bottomGap} testID="tab-bar-v2">
+        {visibleRoutes.map((route) => (
+          <FlatTab
+            key={route.key}
+            routeName={route.name}
+            routeKey={route.key}
+            focused={route.key === focusedRoute.key}
+            onPressOverride={route.name === 'Insights' ? onInsightsTabPress : undefined}
+            navigation={navigation}
+          />
+        ))}
+      </FlatBar>
+    );
+  }
 
   const renderTabs = () => (
     <View
@@ -234,6 +260,65 @@ export function LiquidGlassTabBar({
         </View>
       )}
     </Animated.View>
+  );
+}
+
+/**
+ * The new design's bottom bar: solid ground, a hairline on top, edge to edge.
+ * Same footprint as the floating pill, so content padding doesn't change.
+ */
+function FlatBar({ bottomGap, children, testID }: { bottomGap: number; children: React.ReactNode; testID?: string }) {
+  const { palette } = useTheme();
+  return (
+    <View
+      style={[
+        styles.wrapper,
+        styles.flatBar,
+        { backgroundColor: palette.bg, borderTopColor: palette.separator, paddingBottom: bottomGap },
+      ]}
+      testID={testID}
+    >
+      {children}
+    </View>
+  );
+}
+
+/** A tab in the new design: no bubble, no buzz (the screen changing is the feedback). */
+function FlatTab({
+  routeName,
+  routeKey,
+  focused,
+  onPressOverride,
+  navigation,
+}: {
+  routeName: string;
+  routeKey: string;
+  focused: boolean;
+  onPressOverride?: () => void;
+  navigation: BottomTabBarProps['navigation'];
+}) {
+  const { palette } = useTheme();
+  const icons = TAB_ICONS_V2[routeName] ?? { active: 'ellipse', inactive: 'ellipse-outline' };
+  const onPress = () => {
+    if (onPressOverride) {
+      onPressOverride();
+      return;
+    }
+    const event = navigation.emit({ type: 'tabPress', target: routeKey, canPreventDefault: true });
+    if (!focused && !event.defaultPrevented) navigation.navigate(routeName as never);
+  };
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={focused ? { selected: true } : {}}
+      accessibilityLabel={routeName}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.55 }]}
+      testID={`tab-${routeName}`}
+    >
+      <Ionicons name={focused ? icons.active : icons.inactive} size={26} color={focused ? palette.text : palette.secondary} />
+    </Pressable>
   );
 }
 
@@ -348,7 +433,16 @@ export function LiquidGlassActionBar({
 }) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const { isNew } = useDesign();
   const bottomGap = insets.bottom > 0 ? insets.bottom : 14;
+
+  if (isNew) {
+    return (
+      <FlatBar bottomGap={bottomGap}>
+        <View style={[styles.actionRow, { flex: 1 }]}>{children}</View>
+      </FlatBar>
+    );
+  }
 
   const content = (
     <>
@@ -406,6 +500,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     alignItems: 'stretch',
+  },
+  flatBar: {
+    flexDirection: 'row',
+    borderTopWidth: layoutV2.hairline,
+    height: undefined,
+    paddingHorizontal: 12,
   },
   pillSlot: {
     height: PILL_HEIGHT,

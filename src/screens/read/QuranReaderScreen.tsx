@@ -29,6 +29,8 @@ import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/colors';
+import { useDesign } from '../../design/DesignContext';
+import { GuideSheet } from '../../components/v2/GuideSheet';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -56,7 +58,8 @@ export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { theme, isDark } = useTheme();
-  const palette = getReadPalette(isDark);
+  const { isNew: isNewDesign } = useDesign();
+  const palette = getReadPalette(isDark, isNewDesign);
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const initialPage = route.params.pageNumber;
@@ -323,6 +326,7 @@ function ReaderGuideModal({
   onClose: () => void;
   theme: ThemeColors;
 }) {
+  const { isNew: isNewGuide } = useDesign();
   const styles = useMemo(() => makeGuideStyles(theme), [theme]);
   const steps: Array<{
     icon: keyof typeof Ionicons.glyphMap;
@@ -361,13 +365,15 @@ function ReaderGuideModal({
     },
   ];
 
+  if (isNewGuide) return <GuideSheet visible={visible} onClose={onClose} title="How the reader works" steps={steps} />;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         {/* Behind the card, not around it, or its steps can't scroll (see Backdrop). */}
         <Backdrop onPress={onClose} label="Dismiss" />
         <View style={styles.card}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.headerRow}>
             <Text style={styles.title}>How the reader works</Text>
             <PressableScale
@@ -524,7 +530,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodySmall,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });

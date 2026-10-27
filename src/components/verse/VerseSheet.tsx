@@ -189,7 +189,7 @@ export function VerseSheet({
           onLayout={(e) => setSheetHeight(e.nativeEvent.layout.height)}
           testID="verse-sheet"
         >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
             {/* Grabber and header: swipe up to expand, down to shrink or close. */}
             <View
               {...grabberPan.panHandlers}
@@ -256,7 +256,7 @@ export function VerseSheet({
 
             {menu !== 'closed' && (
               <View style={[styles.dropdown, { top: headerBottom }]}>
-                <GlassCard elevated style={StyleSheet.absoluteFillObject} />
+                <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />
                 {menu === 'root' ? (
                   <>
                     <Pressable style={styles.dropRow} onPress={() => setMenu('translations')}>

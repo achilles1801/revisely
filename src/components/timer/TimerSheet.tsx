@@ -12,6 +12,8 @@ import { ThemeColors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
+import { useDesign } from '../../design/DesignContext';
+import { Sheet } from '../v2/Sheet';
 
 interface TimerSheetProps {
   visible: boolean;
@@ -29,13 +31,36 @@ export function TimerSheet({ visible, onClose, onOpenQuran }: TimerSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const { isNew } = useDesign();
+  const controls = (
+    <TimerControls
+      visible={visible}
+      onClose={onClose}
+      onSaved={(date, seconds) => alertSessionSaved(date, seconds)}
+      onOpenQuran={onOpenQuran}
+    />
+  );
+  if (isNew) {
+    return (
+      <Sheet
+        visible={visible}
+        onClose={onClose}
+        title="Timer"
+        right={{ label: 'Done', onPress: onClose, strong: true, testID: 'timer-done' }}
+        scroll
+        testID="timer-sheet"
+      >
+        {controls}
+      </Sheet>
+    );
+  }
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         {/* Behind the sheet, not around it, or its controls can't scroll (see Backdrop). */}
         <Backdrop onPress={onClose} label="Dismiss timer" />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.dragHandle} />
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Timer</Text>
@@ -50,12 +75,7 @@ export function TimerSheet({ visible, onClose, onOpenQuran }: TimerSheetProps) {
             </PressableScale>
           </View>
           <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-            <TimerControls
-              visible={visible}
-              onClose={onClose}
-              onSaved={(date, seconds) => alertSessionSaved(date, seconds)}
-              onOpenQuran={onOpenQuran}
-            />
+            {controls}
           </ScrollView>
         </View>
       </View>

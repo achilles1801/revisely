@@ -5,6 +5,8 @@ import { spacing } from '../theme/spacing';
 import { radius } from '../theme/radius';
 import { shadows } from '../theme/shadows';
 import { GlassCard } from './GlassCard';
+import { useDesign } from '../design/DesignContext';
+import { layoutV2, radiusV2 } from '../theme/v2';
 
 type CardVariant = 'flat' | 'outlined' | 'elevated';
 
@@ -24,6 +26,26 @@ export function Card({
   noPadding = false,
 }: CardProps) {
   const { theme } = useTheme();
+  const { isNew } = useDesign();
+
+  if (isNew) {
+    // Flat: no shadow, no glass. A hairline box on the ground (outlined,
+    // elevated), or the quiet fill (flat).
+    return (
+      <View
+        style={[
+          styles.flat,
+          variant === 'flat'
+            ? { backgroundColor: theme.bgAlt }
+            : { backgroundColor: theme.bg, borderColor: theme.border, borderWidth: layoutV2.hairline },
+          !noPadding && styles.padding,
+          style,
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
 
   const outlineStyle: ViewStyle | null =
     variant === 'outlined'
@@ -53,5 +75,9 @@ const styles = StyleSheet.create({
   },
   padding: {
     padding: spacing.md,
+  },
+  flat: {
+    borderRadius: radiusV2.media,
+    overflow: 'hidden',
   },
 });

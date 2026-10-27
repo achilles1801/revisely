@@ -322,6 +322,43 @@ To rotate one (or after a leak: revoke the old key in the portal first):
    channel (App Store for live, TestFlight for sandbox) and look for no `answered 401/403` lines.
 4. Revoke the old key in the portal.
 
+## The redesign (new design, preview)
+
+The plan is the doc "Revisely: Threads-style UI Migration" (Claude Docs). It replaced an earlier
+direction (paper/ink palette, Newsreader, glass on chrome), which was removed in PR #33. It ships
+screen by screen behind Settings → Preview → **New design (preview)**: testers only
+(`lib/testerTools`: dev builds, `previewTester` accounts on TestFlight; never the App Store or App
+Review), kept per device, switching the whole app live.
+- It is not a fork: `useDesign().isNew` (`src/design/DesignContext.tsx`) picks variants inside the
+  same screens and components. Tokens are `src/theme/v2.ts`; `ThemeContext` maps them onto the
+  classic token names (so unmoved screens take the new colours at once) and exposes `palette` for
+  moved ones. When a screen is moved, give it an `isNew` branch (or variant components) and leave the
+  classic path working until the switch is removed.
+- The look: white / black grounds, flat. Content is a feed of rows on 0.5pt separators with a
+  16pt gutter; each row has an avatar-size mark (40 top-level, 36 reply, 28 nested; `v2/Mark`),
+  a name (15/600), metadata (13) and a ⋯ menu, and rows of one thread are joined by a 2pt line
+  (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient, no
+  accent tint: the primary button is a solid black pill (white in dark, `v2/PillButton`); jade
+  only means "done". Every menu is `v2/ActionSheet` (ThreadMenu style: handle, 18/600 title, icon
+  rows, red destructive rows, a Cancel bar); its action runs after the sheet has gone. The tab bar
+  is flat and icon-only. No Threads/Meta names, logos or icons, no likes or reposts.
+- Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
+  in the new design is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar;
+  the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls become
+  `v2/PillTabs`. Sheets with their own frame (gorhom `PlanSheet`) take the same colours and corners.
+- Moved so far: Home, Settings, tab bar, sheets and menus, the revision session and reader chrome
+  (`getReadPalette(isDark, isNew)`; a page marked revised is the jade done check), Activity (a feed of
+  day posts; a day opens as a thread of its sessions and daily log).
+- Taps don't buzz in the new design (`PressableScale`, `v2/Tap` dims instead); outcomes use
+  `design/haptics` (`useHaptics()`), which Settings → Haptics turns off.
+- Fonts: SF Pro for Latin, Amiri for all Arabic. Text colours are checked at ≥ 4.5:1 in
+  `src/design/__tests__`.
+- `theme.onAccent` is the text colour on an accent fill (white in classic; the ground in the new
+  design, where the accent is the ink). Use it instead of `'#fff'` on `theme.accent`.
+- Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
+  a native change for a versioned release. Until then "System" isn't offered and falls back to the
+  classic Light/Dark choice (`systemAppearanceAvailable()`); the new design offers Light and Dark.
+
 ## UI traps
 
 - **Never wrap a scroll view in a Pressable.** On the new architecture (iOS), a ScrollView doesn't

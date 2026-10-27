@@ -87,7 +87,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
       ]}
       testID="player-capsule"
     >
-      {!surface && <GlassCard elevated style={StyleSheet.absoluteFillObject} />}
+      {!surface && <GlassCard surface="chrome" elevated style={StyleSheet.absoluteFillObject} />}
       {active && iconBtn('stop', 'Stop', player.onStop, 15)}
       {!active && (
         <Pressable
@@ -97,7 +97,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
           accessibilityRole="button"
           accessibilityLabel="Play from this page"
         >
-          <Ionicons name="play" size={18} color="#fff" style={styles.playIcon} />
+          <Ionicons name="play" size={18} color={theme.onAccent} style={styles.playIcon} />
         </Pressable>
       )}
       <Pressable
@@ -139,12 +139,12 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
           accessibilityLabel={playing ? 'Pause' : failed ? 'Retry' : 'Play'}
         >
           {state.status === 'loading' ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={theme.onAccent} />
           ) : (
             <Ionicons
               name={playing ? 'pause' : failed ? 'refresh' : 'play'}
               size={18}
-              color="#fff"
+              color={theme.onAccent}
               style={!playing && !failed ? styles.playIcon : undefined}
             />
           )}

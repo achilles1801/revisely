@@ -20,6 +20,10 @@ import { Button } from '../../components/Button';
 import { GlassCard } from '../../components/GlassCard';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
+import { useDesign } from '../../design/DesignContext';
+import { GuideSheet } from '../../components/v2/GuideSheet';
+import { useHaptics } from '../../design/haptics';
+import { typeV2 } from '../../theme/v2';
 import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
@@ -67,6 +71,8 @@ export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
   const { theme, isDark } = useTheme();
+  const { isNew: isNewDesign } = useDesign();
+  const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
@@ -360,7 +366,10 @@ export default function ActiveRevisionScreen() {
 
   const markRevised = useCallback(
     (pageNumber: number) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // The new design: a page done is one of the moments that buzz (and the
+      // Haptics setting can turn it off).
+      if (isNewDesign) haptics.selection();
+      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setCompletedPages((prev) => {
         if (prev.has(pageNumber)) return prev;
         const next = new Set(prev);
@@ -368,7 +377,7 @@ export default function ActiveRevisionScreen() {
         return next;
       });
     },
-    [],
+    [isNewDesign, haptics],
   );
 
   const unmarkRevised = useCallback((pageNumber: number) => {
@@ -465,7 +474,8 @@ export default function ActiveRevisionScreen() {
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (isNewDesign) haptics.success();
+        else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
       navigation.goBack();
@@ -483,6 +493,8 @@ export default function ActiveRevisionScreen() {
     user,
     navigation,
     finishRecording,
+    isNewDesign,
+    haptics,
   ]);
 
   const handleEndSession = () => {
@@ -505,7 +517,8 @@ export default function ActiveRevisionScreen() {
     setSaving(true);
     try {
       await commitPendingPages();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (isNewDesign) haptics.success();
+      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } finally {
       setSaving(false);
       navigation.goBack();
@@ -592,7 +605,7 @@ export default function ActiveRevisionScreen() {
     [completedPages],
   );
 
-  const palette = getReadPalette(isDark);
+  const palette = getReadPalette(isDark, isNewDesign);
   const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
   const compact = width < 430 && crowded;
 
@@ -627,13 +640,13 @@ export default function ActiveRevisionScreen() {
           <View style={styles.header}>
             <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
-              <Text style={[styles.title, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text style={[styles.title, isNewDesign && typeV2.name, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Revising {scopeLabel}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
                   · {completedCount}/{totalPages}
                 </Text>
               </Text>
-              <Text style={[styles.subtitle, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text style={[styles.subtitle, isNewDesign && typeV2.meta, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
               </Text>
             </View>
@@ -876,7 +889,7 @@ const makeStyles = (theme: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    submitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    submitText: { color: theme.onAccent, fontWeight: '700', fontSize: 14 },
   });
 
 function RevisionGuideModal({
@@ -888,6 +901,7 @@ function RevisionGuideModal({
   onClose: () => void;
   theme: ThemeColors;
 }) {
+  const { isNew: isNewGuide } = useDesign();
   const styles = useMemo(() => makeGuideStyles(theme), [theme]);
   const steps: Array<{
     icon: keyof typeof Ionicons.glyphMap;
@@ -936,11 +950,13 @@ function RevisionGuideModal({
     },
   ];
 
+  if (isNewGuide) return <GuideSheet visible={visible} onClose={onClose} title="How revision works" steps={steps} />;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
+          <GlassCard surface="chrome" style={StyleSheet.absoluteFillObject} />
           <View style={styles.headerRow}>
             <Text style={styles.title}>How revision works</Text>
             <PressableScale
@@ -1044,7 +1060,7 @@ const makeGuideStyles = (theme: ThemeColors) =>
     },
     primaryBtnText: {
       ...typography.bodySmall,
-      color: '#fff',
+      color: theme.onAccent,
       fontWeight: '700',
     },
   });
