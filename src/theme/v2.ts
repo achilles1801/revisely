@@ -101,6 +101,9 @@ export interface PaletteV2 extends AccentTokens {
   track: string;
   /** Dimmed backdrop behind a sheet. */
   overlay: string;
+  /** A switch that is off: its track, and the thumb on it (on, the track is `primary`). */
+  switchOff: string;
+  switchThumb: string;
 }
 
 type Base = Omit<PaletteV2, keyof AccentTokens | 'accent'>;
@@ -108,7 +111,7 @@ type Base = Omit<PaletteV2, keyof AccentTokens | 'accent'>;
 const BASE_LIGHT: Base = {
   bg: '#FFFFFF',
   text: '#1A1A1A',
-  secondary: '#6B7280',
+  secondary: '#616977',
   separator: '#E5E7EB',
   outline: '#D1D5DB',
   red: '#DC2626',
@@ -120,6 +123,8 @@ const BASE_LIGHT: Base = {
   handle: '#D1D5DB',
   track: '#D1D5DB',
   overlay: 'rgba(0,0,0,0.4)',
+  switchOff: '#E5E7EB',
+  switchThumb: '#FFFFFF',
 };
 
 const BASE_DARK: Base = {
@@ -137,6 +142,8 @@ const BASE_DARK: Base = {
   handle: '#3A3A3C',
   track: '#333333',
   overlay: 'rgba(0,0,0,0.6)',
+  switchOff: '#39393D',
+  switchThumb: '#FFFFFF',
 };
 
 /**
@@ -165,8 +172,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       doneText: '#0E6B5A',
       accentText: '#1A1A1A',
       onAccentText: '#FFFFFF',
-      link: '#6B7280',
-      accentSubtle: '#F7F7F8',
+      link: '#616977',
+      accentSubtle: '#EDEDEF',
       hero: [
         { offset: 0, color: '#3FA084', opacity: 0.3 },
         { offset: 0.3, color: '#3FA084', opacity: 0.16 },
