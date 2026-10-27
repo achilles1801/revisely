@@ -116,6 +116,21 @@ const BASE_DARK: Base = {
   overlay: 'rgba(0,0,0,0.6)',
 };
 
+/**
+ * How far Home's accent glow (v2/HeroGlow) reaches from the top of the screen.
+ * In light it is a wide band behind the status bar and top bar, where text is
+ * ink, and has all but faded by Home's first line of grey text (about 136pt
+ * down: a radius offset of 0.65), so that text keeps 4.5:1. In dark, light text
+ * keeps its contrast over the glow, so it spreads further.
+ */
+export const HERO_SHAPE = {
+  light: { height: 210, rx: '130%' },
+  dark: { height: 360, rx: '85%' },
+} as const;
+
+/** Where Home's first grey text sits in the light glow (see HERO_SHAPE). */
+export const HERO_FIRST_TEXT_OFFSET = 0.62;
+
 const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentTokens }> = {
   // As agreed: ink buttons and links in grey; jade only means "done".
   jade: {
@@ -129,7 +144,13 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#6B7280',
       accentSubtle: '#F7F7F8',
-      hero: null,
+      hero: [
+        { offset: 0, color: '#3FA084', opacity: 0.3 },
+        { offset: 0.3, color: '#3FA084', opacity: 0.16 },
+        { offset: 0.55, color: '#3FA084', opacity: 0.055 },
+        { offset: 0.68, color: '#3FA084', opacity: 0.02 },
+        { offset: 1, color: '#3FA084', opacity: 0 },
+      ],
       progress: ['#0E6B5A', '#0E6B5A'],
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
@@ -166,7 +187,10 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       link: '#DC1433',
       accentSubtle: '#FCE8EB',
       hero: [
-        { offset: 0, color: '#DC1433', opacity: 0.1 },
+        { offset: 0, color: '#DC1433', opacity: 0.24 },
+        { offset: 0.3, color: '#DC1433', opacity: 0.13 },
+        { offset: 0.55, color: '#DC1433', opacity: 0.045 },
+        { offset: 0.68, color: '#DC1433', opacity: 0.015 },
         { offset: 1, color: '#DC1433', opacity: 0 },
       ],
       progress: ['#3E0812', '#DC1433'],
@@ -208,7 +232,10 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       link: '#624BD5',
       accentSubtle: '#EFECFB',
       hero: [
-        { offset: 0, color: '#624BD5', opacity: 0.1 },
+        { offset: 0, color: '#624BD5', opacity: 0.32 },
+        { offset: 0.3, color: '#624BD5', opacity: 0.18 },
+        { offset: 0.55, color: '#624BD5', opacity: 0.06 },
+        { offset: 0.68, color: '#624BD5', opacity: 0.02 },
         { offset: 1, color: '#624BD5', opacity: 0 },
       ],
       progress: ['#2E0EC6', '#9789DA'],
