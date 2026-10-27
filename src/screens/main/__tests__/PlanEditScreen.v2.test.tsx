@@ -295,6 +295,17 @@ describe('the schedule in the new design', () => {
     expect(within(menu).getByTestId('sheet-cancel')).toBeTruthy();
   });
 
+  it('Running behind? on a schedule that starts today: no Push back a day (nothing before today)', async () => {
+    const now = new Date().toISOString();
+    mockApp.user = { ...baseUser, createdAt: now, scheduleAnchorDate: now, savedPlans: [] };
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-timing'));
+    await act(async () => {});
+    const menu = screen.getByTestId('plan-timing-menu');
+    expect(within(menu).queryByText('Push back a day')).toBeNull();
+    expect(within(menu).getByText('Skip ahead a day')).toBeTruthy();
+  });
+
   it('a saved plan opens a v2 menu: Load plan replaces the days, Delete plan in red', async () => {
     await mount(<PlanEditScreen />);
     fireEvent.press(screen.getByTestId('saved-plan-p1'));

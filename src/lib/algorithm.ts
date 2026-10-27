@@ -474,6 +474,36 @@ export function shiftScheduleAnchor(user: User, deltaDays: number): User {
   };
 }
 
+/** The day the live schedule counts from: a custom plan's start, else the anchor. */
+export function scheduleStartDay(user: User): Date {
+  if (user.customPlan && user.customPlan.days.length > 0) {
+    return parseLocalDateString(user.customPlan.cycleStartDate);
+  }
+  return startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
+}
+
+/**
+ * "Behind? Move the plan back a day" makes today repeat yesterday's revision,
+ * which needs a yesterday: the schedule must have started before `today`. On a
+ * schedule that starts today (a new account, a plan saved today) there's
+ * nothing to go back to, and moving the start to tomorrow would leave today
+ * with nothing to revise.
+ */
+export function canPushScheduleBack(user: User, today: Date): boolean {
+  return calendarDaysBetween(scheduleStartDay(user), today) >= 1;
+}
+
+/**
+ * A schedule that starts after `today` gives today no pages, and nothing on
+ * Home can start a revision. Earlier versions let "back a day" do that on a
+ * schedule that started that day. Returns the user with the start moved back
+ * to `today` (today becomes its first day), or null when it starts by today.
+ */
+export function scheduleStartingByToday(user: User, today: Date): User | null {
+  const daysUntilToday = calendarDaysBetween(scheduleStartDay(user), today);
+  return daysUntilToday < 0 ? shiftScheduleAnchor(user, daysUntilToday) : null;
+}
+
 /**
  * Count how many times this page was scheduled and not revised since the
  * page's last successful revision (or since the user signed up, whichever

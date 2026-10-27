@@ -27,6 +27,8 @@ import { ThemeColors } from '../../theme/v2';
 import {
   generateDailyAssignment,
   shiftScheduleAnchor,
+  canPushScheduleBack,
+  scheduleStartingByToday,
 } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
@@ -62,6 +64,21 @@ export default function DashboardScreen() {
   const tabFootprint = useTabBarFootprint();
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+
+  // A schedule that starts after today (an earlier "back a day" on a schedule
+  // that started today) leaves today with nothing to revise: start it today.
+  const repairingStartRef = useRef(false);
+  useEffect(() => {
+    if (!user || repairingStartRef.current) return;
+    const repaired = scheduleStartingByToday(user, revisionDate);
+    if (!repaired) return;
+    repairingStartRef.current = true;
+    saveUser(repaired)
+      .catch((err) => logger.warn('Could not move the schedule start to today', err))
+      .finally(() => {
+        repairingStartRef.current = false;
+      });
+  }, [user, revisionDate, saveUser]);
   const carryingRef = useRef(false);
   // Tapping the Home tab while on Home scrolls back to the top (and from a
   // pushed screen, the stack pops back here first).
@@ -327,7 +344,7 @@ export default function DashboardScreen() {
   // review you missed instead of marching on. Pure anchor nudge — no per-day
   // edits — applied immediately so the Today post updates in place.
   const handlePushBack = async () => {
-    if (!user || shifting) return;
+    if (!user || shifting || !canPushScheduleBack(user, revisionDate)) return;
     setShifting(true);
     try {
       await saveUser(shiftScheduleAnchor(user, 1));
@@ -404,6 +421,7 @@ export default function DashboardScreen() {
           onCarryOver={handleCarryOver}
           carrying={carrying}
           onPushBack={handlePushBack}
+          canPushBack={canPushScheduleBack(user, revisionDate)}
           shifting={shifting}
         />
 

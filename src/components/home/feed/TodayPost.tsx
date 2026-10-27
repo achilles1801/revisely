@@ -90,6 +90,7 @@ export function TodayPost({
   onCarryOver,
   carrying,
   onPushBack,
+  canPushBack,
   shifting,
 }: {
   name: string;
@@ -108,6 +109,8 @@ export function TodayPost({
   onCarryOver: () => void;
   carrying: boolean;
   onPushBack: () => void;
+  /** There's a day before today to go back to (not on a schedule that starts today). */
+  canPushBack: boolean;
   shifting: boolean;
 }) {
   const { palette } = useTheme();
@@ -118,7 +121,7 @@ export function TodayPost({
 
   const actions: SheetAction[] = [
     { key: 'schedule', label: 'Edit schedule', icon: 'calendar-outline', onPress: onEditSchedule },
-    ...(status !== 'completed' && !empty
+    ...(status !== 'completed' && !empty && canPushBack
       ? [
           {
             key: 'pushback',

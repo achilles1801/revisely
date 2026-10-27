@@ -23,6 +23,7 @@ import {
   scheduledDaysFrom,
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
+  canPushScheduleBack,
   shiftScheduleAnchor,
 } from '../../lib/algorithm';
 import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
@@ -361,6 +362,7 @@ export default function PlanEditScreen() {
   const handleShift = useCallback(
     (delta: number) => {
       if (!user || saving || isDirty) return;
+      if (delta > 0 && !canPushScheduleBack(user, revisionDate)) return;
       setSaving(true);
       saveUser(shiftScheduleAnchor(user, delta))
         .then(() => {
@@ -372,7 +374,7 @@ export default function PlanEditScreen() {
           Alert.alert("Couldn't update", 'Please try again.');
         });
     },
-    [user, saving, isDirty, saveUser, leave, haptics],
+    [user, saving, isDirty, saveUser, leave, haptics, revisionDate],
   );
 
   // ---- Automatic schedule / quota ---------------------------------------------------
@@ -702,14 +704,20 @@ export default function PlanEditScreen() {
         title="Running behind?"
         message="Only the timing changes; what's on each day stays the same."
         actions={[
-          {
-            key: 'push-back',
-            label: 'Push back a day',
-            subtitle: "Today's revision moves to tomorrow",
-            icon: 'arrow-undo-outline',
-            disabled: saving || isDirty,
-            onPress: () => handleShift(1),
-          },
+          // Only with a day before today: on a schedule that starts today,
+          // pushing back would leave today with nothing to revise.
+          ...(user && canPushScheduleBack(user, revisionDate)
+            ? [
+                {
+                  key: 'push-back',
+                  label: 'Push back a day',
+                  subtitle: "Today's revision moves to tomorrow",
+                  icon: 'arrow-undo-outline' as const,
+                  disabled: saving || isDirty,
+                  onPress: () => handleShift(1),
+                },
+              ]
+            : []),
           {
             key: 'skip-ahead',
             label: 'Skip ahead a day',

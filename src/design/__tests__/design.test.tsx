@@ -457,6 +457,7 @@ describe('Home in the new design (a feed)', () => {
       onCarryOver: jest.fn(),
       carrying: false,
       onPushBack: jest.fn(),
+      canPushBack: true,
       shifting: false,
       ...over,
     };
@@ -503,6 +504,19 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.getByText('Edit schedule')).toBeTruthy();
     fireEvent.press(screen.getByText('Edit schedule'));
     expect(props.onEditSchedule).not.toHaveBeenCalled();
+  });
+
+  it('"back a day" only when there is a day before today to go back to', async () => {
+    post({ canPushBack: false });
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('today-post-menu'));
+    expect(screen.getByText('Edit schedule')).toBeTruthy();
+    expect(screen.queryByText(/back a day/)).toBeNull();
+    screen.unmount();
+    post({ canPushBack: true });
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('today-post-menu'));
+    expect(screen.getByText('Behind? Move the plan back a day')).toBeTruthy();
   });
 
   it('sessions read as what was done, then the pages and surahs', () => {
