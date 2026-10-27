@@ -63,6 +63,8 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     scheduleShiftPages: fsUser.scheduleShiftPages,
     translationId: fsUser.translationId,
     reciter: fsUser.reciter,
+    recordingBackup: fsUser.recordingBackup,
+    recordingBackupCellular: fsUser.recordingBackupCellular,
     previewTester: fsUser.previewTester === true,
   };
 }
@@ -436,6 +438,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }),
         ...(updatedUser.translationId !== undefined && { translationId: updatedUser.translationId }),
         ...(updatedUser.reciter !== undefined && { reciter: updatedUser.reciter }),
+        ...(updatedUser.recordingBackup !== undefined && { recordingBackup: updatedUser.recordingBackup }),
+        ...(updatedUser.recordingBackupCellular !== undefined && {
+          recordingBackupCellular: updatedUser.recordingBackupCellular,
+        }),
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore

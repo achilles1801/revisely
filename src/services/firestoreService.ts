@@ -29,12 +29,14 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp,
+  runTransaction,
   deleteField,
   increment,
   DocumentReference,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
+import type { BackupListing, CloudRecording } from '../lib/recordings';
 import {
   FirestoreUser,
   FirestorePage,
@@ -217,6 +219,8 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
   if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
   if (updates.translationId !== undefined) updateData.translationId = updates.translationId;
+  if (updates.recordingBackup !== undefined) updateData.recordingBackup = updates.recordingBackup;
+  if (updates.recordingBackupCellular !== undefined) updateData.recordingBackupCellular = updates.recordingBackupCellular;
   if (updates.reciter !== undefined) updateData.reciter = updates.reciter;
 
   if (updates.notifications) {
@@ -677,5 +681,66 @@ export async function submitFeedback(input: {
     appVersion: input.appVersion ?? null,
     platform: input.platform ?? null,
     createdAt: serverTimestamp(),
+  });
+}
+
+// ============================================================================
+// RECORDING BACKUP (lib/recordingBackup): what the backup holds about each
+// recording, users/<uid>/recordings/<id>. The audio is in Storage.
+// ============================================================================
+
+export async function listRecordingDocs(userId: string): Promise<BackupListing> {
+  const snap = await getDocsFromServer(collection(db, 'users', userId, 'recordings'));
+  const live: CloudRecording[] = [];
+  const deleted: BackupListing['deleted'] = [];
+  const ms = (v: unknown) => (v instanceof Timestamp ? v.toMillis() : undefined);
+  for (const d of snap.docs) {
+    const data = d.data() as Omit<CloudRecording, 'id' | 'updatedAt'> & { updatedAt?: unknown; deletedAt?: unknown };
+    if (data.deletedAt !== undefined) {
+      deleted.push({ id: d.id, at: ms(data.deletedAt) ?? 0 });
+      continue;
+    }
+    const { updatedAt, ...rest } = data;
+    live.push({ ...rest, id: d.id, updatedAt: ms(updatedAt) });
+  }
+  return { live, deleted };
+}
+
+/**
+ * Write a recording's record, unless the recording was deleted (its record is a
+ * tombstone; the rules refuse writing over one too): then 'deleted'.
+ */
+export async function putRecordingDoc(userId: string, rec: CloudRecording): Promise<'ok' | 'deleted'> {
+  const ref = doc(db, 'users', userId, 'recordings', rec.id);
+  const { id: _id, updatedAt: _u, ...data } = rec;
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists() && snap.data().deletedAt !== undefined) return 'deleted' as const;
+    tx.set(ref, { ...data, updatedAt: serverTimestamp() });
+    return 'ok' as const;
+  });
+}
+
+/**
+ * A deleted recording's record becomes a tombstone, so no phone with a copy
+ * uploads it again (the rules refuse writing over one). Written even when there
+ * is no record now: one may come later from a phone that still has a copy.
+ */
+export async function tombstoneRecordingDoc(userId: string, id: string): Promise<void> {
+  // A transaction rather than a plain write: offline it fails at once instead of
+  // waiting (and holding up the backup) until the connection is back.
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    tx.set(ref, { deletedAt: serverTimestamp() });
+  });
+}
+
+/** Delete a recording's record (the whole backup going). Tombstones stay. */
+export async function deleteLiveRecordingDoc(userId: string, id: string): Promise<void> {
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists() || snap.data().deletedAt !== undefined) return;
+    tx.delete(ref);
   });
 }

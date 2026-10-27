@@ -83,6 +83,10 @@ export interface User {
   translationId?: string;
   // Reciter and style for Play on a held verse: '<reciter>:<style>' (lib/recitation).
   reciter?: string;
+  // Back recordings up to the account (default on; lib/recordingBackup).
+  recordingBackup?: boolean;
+  // Let the backup use mobile data (default off: Wi-Fi only).
+  recordingBackupCellular?: boolean;
 }
 
 /** A user-edited schedule that overrides the default sequential plan. */

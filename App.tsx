@@ -7,6 +7,7 @@ import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { RecordingBackupController } from './src/components/RecordingBackupController';
 import { ClearQuranPreviewGate } from './src/components/ClearQuranPreviewGate';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
@@ -102,6 +103,7 @@ function App() {
                   <RootNavigator />
                   <ClearQuranPreviewGate />
                   <DesignGate />
+                  <RecordingBackupController />
                 </BottomSheetModalProvider>
               </AppProvider>
             </AuthProvider>

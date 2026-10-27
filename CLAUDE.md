@@ -252,6 +252,50 @@ quran.com-images records while drawing the same page images (coordinates are 102
 2600×4206, so one scale factor maps them). Translations are Saheeh International from api.alquran.cloud,
 disclosed in the privacy policy.
 
+**Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
+recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore
+`users/<uid>/recordings/<id>`. It's on unless `recordingBackup === false`, Wi-Fi only unless
+`recordingBackupCellular`, and a one-time notice comes before the first upload.
+
+These invariants must not be broken:
+- **Local audio** is only ever deleted by the user deleting it on that phone.
+- **Tombstones** (`{deletedAt}`) are permanent:
+  - The rules refuse writing a live record over one, and refuse deleting one (only `deleteUserAccount` removes them).
+  - A phone whose put meets a tombstone keeps its copy local-only (`backupDeleted`) and removes the files it uploaded.
+- **Live records** can be written only while the account's backup is on (the rules read the user doc).
+- **Storage objects are create-only** (`resource == null`): a name is one file, ever.
+- **Copies from another phone** (`restored`) are never continued here. They are uploaded only when `adopted`: the backup lost them without a tombstone and every part is on the phone.
+
+How it works:
+- **Deleting a recording** queues it in `Documents/recordings-sync/<uid>-deletes.json` and works offline. The run then:
+  1. Tombstones every queued recording, even one with no record yet.
+  2. Lists the files once and deletes every file named after those recordings.
+
+  Deletions run even with backup off, and are flushed on sign-out. "Delete all" first lists the backup (it refuses offline) so that recordings this phone hasn't seen go too.
+- **"Turn off and delete backups"** needs the connection:
+  1. Save "off" first.
+  2. List the backup and merge it into the phone.
+  3. Download everything that is only in the backup. A part that is already gone (404) is dropped; any other failure refuses.
+  4. Delete exactly the files and live records that were listed. Tombstones stay.
+
+  It refuses while an earlier wipe is pending, or if a record can't be read.
+- **Uploads:**
+  - The resumable protocol in 4 MB chunks on the foreground session (REST plus `createUploadTask`).
+  - The session is saved in the index, so an upload carries on after the app closes.
+  - The network is checked before every chunk.
+  - The chunk in flight is cancelled on leaving Wi-Fi, sign-out or account deletion.
+- **Listing:** the backup is listed on an account's first run, then at most every 15 minutes.
+- **Account deletion:** `deleteUserAccount` deletes the Storage prefix first.
+- **Known limits:**
+  - NetInfo reports an iPhone hotspot as Wi-Fi.
+  - File uploads aren't gated on the server. A phone that hasn't yet heard that backup is off, or that is still signed in to an account deleted elsewhere (its ID token lasts up to an hour), can leave files without a record. A Storage rule using `firestore.get` would close this. It needs the IAM role `roles/firebaserules.firestoreServiceAgent` for the Storage service agent (`firebase deploy --only storage` prompts to grant it), so it isn't in place yet.
+  - Two phones restored from one iCloud backup both own its open recording. Their name clash is reported and the file skipped, never overwritten.
+  - Tombstones accumulate, adding listing reads.
+- **Deploy order:** `firestore.rules` and `storage.rules` must be live before this reaches `develop`, which publishes to `preview` at once (`firebase deploy --only firestore:rules,storage`). Keep the profile-image rules that were live before.
+- **Release:** the client is JS-only but reaches App Store users only with 1.0.2 (develop's runtime is build 19's). The App Privacy answers (Audio Data: collected, linked, App Functionality) must be updated before 1.0.2 goes to review.
+- **Emulator check of the real requests:**
+  `firebase emulators:exec --only storage --project demo-revisely 'npx jest recordingCloud.emulator'`.
+
 **Firestore rules before features:** the user document has a field allowlist. A release that writes a
 new user field needs `firebase deploy --only firestore:rules` first, or those writes are refused.
 
