@@ -5,8 +5,10 @@
   // the assets. Cloudflare Workers Builds deploys it on each push to main.
   //
   // Secrets (never in this file; `npx wrangler@4.153.0 secret put <NAME>`):
-  //   TCQ_API_KEY_LIVE     The Clear Quran API production key (tcq_eng_liv_…), App Store app
-  //   TCQ_API_KEY_SANDBOX  The Clear Quran API sandbox key (tcq_eng_sbx_…), TestFlight and dev
+  //   TCQ_API_KEY_LIVE     The Clear Quran API production key (tcq_eng_liv_…): the App
+  //                        Store app, TestFlight and (for now) development builds
+  //   TCQ_API_KEY_SANDBOX  The Clear Quran API sandbox key (tcq_eng_sbx_…): unused until
+  //                        TCQ_API_BASE_SANDBOX names a sandbox host (worker/tcq.ts)
   // Both the dashboard (Settings → Variables and Secrets) and `secret put` act on
   // the newest version: they refuse if a branch build uploaded one after the last
   // deploy from main. Keep non-production branch builds off (CLAUDE.md, Worker).
@@ -23,9 +25,11 @@
     // Firebase project whose sign-in tokens the API accepts.
     "FIREBASE_PROJECT_ID": "revision-buddy-3a398",
     "TCQ_API_BASE_LIVE": "https://api.theclearquran.org",
-    // Sandbox keys "only work against the sandbox API": set this to the
-    // sandbox base URL from the developer portal if it differs.
-    "TCQ_API_BASE_SANDBOX": "https://api.theclearquran.org",
+    // Sandbox keys "only work against the sandbox API", and The Clear Quran
+    // documents no sandbox host (only the base URL above, which refuses them).
+    // Empty: development builds use the live key too. Set a sandbox host here
+    // to send development builds to it with TCQ_API_KEY_SANDBOX.
+    "TCQ_API_BASE_SANDBOX": "",
     // How long a data centre keeps a verse it fetched (0: not at all). Short
     // until the developer agreement says otherwise.
     "TCQ_EDGE_CACHE_SECONDS": "3600",
@@ -58,7 +62,7 @@
     "vars": {
       "FIREBASE_PROJECT_ID": "revision-buddy-3a398",
       "TCQ_API_BASE_LIVE": "https://api.theclearquran.org",
-      "TCQ_API_BASE_SANDBOX": "https://api.theclearquran.org",
+      "TCQ_API_BASE_SANDBOX": "",
       "TCQ_EDGE_CACHE_SECONDS": "0",
       "TCQ_DAILY_LIMIT_LIVE": "0",
       "TCQ_DAILY_LIMIT_SANDBOX": "0",

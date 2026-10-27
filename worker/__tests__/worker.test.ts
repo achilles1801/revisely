@@ -195,18 +195,35 @@ describe('sign-in', () => {
 });
 
 describe('The Clear Quran API', () => {
-  it('the App Store app uses the live key; TestFlight and dev the sandbox one', async () => {
+  it('the App Store app and TestFlight use the live key; dev the sandbox one only with a sandbox host', async () => {
     expect(tcqEnvironment('production')).toBe('live');
-    expect(tcqEnvironment('preview')).toBe('sandbox');
-    expect(tcqEnvironment(null)).toBe('sandbox');
+    expect(tcqEnvironment('preview')).toBe('live');
+    expect(tcqEnvironment('preview', 'https://sandbox.example')).toBe('live');
+    // Sandbox keys are refused at the documented base URL: without a sandbox host, dev uses live.
+    expect(tcqEnvironment('development')).toBe('live');
+    expect(tcqEnvironment(null, '')).toBe('live');
+    expect(tcqEnvironment('development', '  ')).toBe('live');
+    expect(tcqEnvironment('development', 'https://sandbox.example')).toBe('sandbox');
 
     const live = await call('/api/tcq/verses/2:255', { channel: 'production' });
     expect(live.upstream[0].url).toBe('https://api.theclearquran.org/verses/2:255');
     expect((live.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_liv_TEST');
 
     const preview = await call('/api/tcq/verses/2:255', { channel: 'preview' });
-    expect(preview.upstream[0].url).toBe('https://sandbox.example/verses/2:255');
-    expect((preview.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_sbx_TEST');
+    expect(preview.upstream[0].url).toBe('https://api.theclearquran.org/verses/2:255');
+    expect((preview.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_liv_TEST');
+
+    const dev = await call('/api/tcq/verses/2:255', { channel: 'development' });
+    expect(dev.upstream[0].url).toBe('https://sandbox.example/verses/2:255');
+    expect((dev.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_sbx_TEST');
+
+    // As configured today (no sandbox host): dev builds use the live key too.
+    const devNow = await call('/api/tcq/verses/2:255', {
+      channel: 'development',
+      env: { ...ENV, TCQ_API_BASE_SANDBOX: '' },
+    });
+    expect(devNow.upstream[0].url).toBe('https://api.theclearquran.org/verses/2:255');
+    expect((devNow.upstream[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer tcq_eng_liv_TEST');
   });
 
   it('returns the text exactly as given, and never the key', async () => {
@@ -271,8 +288,10 @@ describe('edge cache', () => {
     expect(second.res.headers.get('X-Cache')).toBe('HIT');
     expect(second.body).toEqual({ verse_key: '2:255', text: TEXT });
 
-    // The sandbox doesn't read the live entry.
-    const sandbox = await call('/api/tcq/verses/2:255', { cache, channel: 'preview' });
+    // TestFlight shares the live entry; the sandbox (dev, with a sandbox host) doesn't read it.
+    const preview = await call('/api/tcq/verses/2:255', { cache, channel: 'preview' });
+    expect(preview.upstream).toHaveLength(0);
+    const sandbox = await call('/api/tcq/verses/2:255', { cache, channel: 'development' });
     expect(sandbox.upstream).toHaveLength(1);
   });
 
