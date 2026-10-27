@@ -23,6 +23,15 @@ export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
 
 export const ALL_HOME_METRICS: HomeMetric[] = ['juz', 'pages', 'surahs'];
 
+const HOME_METRIC_SHORT: Record<HomeMetric, string> = { juz: 'Juz', pages: 'Pages', surahs: 'Surahs' };
+
+/** What the card shows, for the folded row in Settings: "Juz, Pages". */
+export function homeMetricsSummary(metrics: HomeMetric[]): string {
+  return ALL_HOME_METRICS.filter((m) => metrics.includes(m))
+    .map((m) => HOME_METRIC_SHORT[m])
+    .join(', ');
+}
+
 const STORAGE_KEY = '@revisely_home_prefs';
 const DEFAULT_PREFS: HomePrefs = {
   showProgressCard: true,
