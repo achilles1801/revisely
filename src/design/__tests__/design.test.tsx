@@ -188,14 +188,15 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     expect(v2ThemeColors(true).accent).toBe('#FFFFFF');
   });
 
-  it('Crimson and Indigo put the accent on the action, links, done and the calendar', () => {
+  it('Crimson and Indigo start from the colours sampled off the reference apps', () => {
     const crimson = paletteV2(true, 'crimson');
-    expect([crimson.primary, crimson.done, crimson.link]).toEqual(['#D92B3A', '#D92B3A', '#F0505C']);
-    expect(crimson.heat[4]).toBe('#F26B75');
-    expect(crimson.hero?.[0].color).toBe('#6E1E28');
+    expect([crimson.primary, crimson.done, crimson.link, crimson.accentSubtle]).toEqual(['#DC1433', '#DC1433', '#F03C56', '#2E0E15']);
+    expect(crimson.hero?.map((s) => s.color)).toEqual(['#3E0812', '#33080E', '#2E0E15']);
+    expect(paletteV2(false, 'crimson').link).toBe('#DC1433');
     const indigo = paletteV2(true, 'indigo');
-    expect([indigo.primary, indigo.done, indigo.link]).toEqual(['#6355C4', '#6355C4', '#8B7FE8']);
-    expect(paletteV2(false, 'indigo').heat[4]).toBe('#322B7A');
+    expect([indigo.primary, indigo.done, indigo.link]).toEqual(['#624BD5', '#624BD5', '#9789DA']);
+    expect(indigo.hero?.[0].color).toBe('#2E0EC6');
+    expect(paletteV2(false, 'indigo').heat.slice(1, 4)).toEqual(['#9789DA', '#624BD5', '#2E0EC6']);
   });
 });
 
@@ -223,7 +224,7 @@ describe('the accent (Settings → Preview)', () => {
     await act(async () => {});
     expect(screen.getByTestId('accent').props.children).toBe('jade|#1A1A1A|#1A1A1A');
     fireEvent.press(screen.getByText('crimson'));
-    expect(screen.getByTestId('accent').props.children).toBe('crimson|#D92B3A|#C8283A');
+    expect(screen.getByTestId('accent').props.children).toBe('crimson|#DC1433|#DC1433');
     expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
   });
 
