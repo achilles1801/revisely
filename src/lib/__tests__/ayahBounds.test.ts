@@ -24,6 +24,19 @@ describe('ayahBounds', () => {
     expect(ayahRects(3, 2, 6).length).toBeGreaterThan(0);
   });
 
+  // The opening pages, measured on the app's own images (1024-wide units):
+  // Al-Fatihah's lines are centred at y 203 (the Basmala), 281 (Al-Hamd), 372…;
+  // Al-Baqarah's first line at 280. Holding Al-Hamd used to pick the Basmala.
+  it('pages 1 and 2: a verse is found where the image draws it', () => {
+    expect(ayahAt(1, 512, 203)).toEqual({ page: 1, sura: 1, ayah: 1 });
+    expect(ayahAt(1, 512, 281)).toEqual({ page: 1, sura: 1, ayah: 2 });
+    expect(ayahAt(1, 700, 372)).toEqual({ page: 1, sura: 1, ayah: 3 });
+    expect(ayahAt(1, 512, 717)).toEqual({ page: 1, sura: 1, ayah: 7 });
+    expect(ayahAt(2, 740, 280)).toEqual({ page: 2, sura: 2, ayah: 1 });
+    // The surah header above stays empty.
+    expect(ayahAt(1, 512, 95)).toBeNull();
+  });
+
   it('lists the verses on a page in order, once each', () => {
     const p3 = versesOnPage(3);
     expect(p3[0]).toEqual({ page: 3, sura: 2, ayah: 6 });

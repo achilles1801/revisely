@@ -36,10 +36,18 @@ for page, line, sura, ayah, x0, x1, y0, y1 in rows:
     r = ayah_line[(page, line, sura, ayah)]
     r[0], r[1] = min(r[0], x0), max(r[1], x1)
 
+# The app's images (mushaf/*.png) draw the decorated opening pages higher than
+# quran.com-images does: every line of pages 1 and 2 sits this far above the
+# database's band (1024-wide units, measured line by line on the images; every
+# other page matches to within a few units). Without it, holding Al-Hamd picked
+# the Basmala.
+PAGE_Y_SHIFT = {1: -61, 2: -57}
+
 pages = defaultdict(list)
 for (page, line, sura, ayah), (x0, x1) in sorted(ayah_line.items()):
     y0, y1 = line_band[(page, line)]
-    pages[page].extend([sura, ayah, x0, y0, x1, y1])
+    dy = PAGE_Y_SHIFT.get(page, 0)
+    pages[page].extend([sura, ayah, x0, y0 + dy, x1, y1 + dy])
 
 assert len(pages) == 604, len(pages)
 out = Path(__file__).resolve().parent.parent / "src" / "data" / "ayahBounds.json"
