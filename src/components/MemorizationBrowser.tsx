@@ -787,7 +787,8 @@ function BaseRow({
           style={v2s.rowTap}
           testID={testID}
         >
-          <Mark size={nested ? 'nested' : 'reply'} label={String(number)} done={checkState === 'full'} />
+          {/* While marking, the box says memorized or not; the mark keeps the number. */}
+          <Mark size={nested ? 'nested' : 'reply'} label={String(number)} done={!markMode && checkState === 'full'} />
           <View style={v2s.main}>
             <Text style={[typeV2.name, { color: palette.text }]}>{englishTitle}</Text>
             {sub ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{sub}</Text> : null}

@@ -116,6 +116,10 @@ describe('Memorization in the new design', () => {
     const check = screen.getByTestId('surah-1-check');
     expect(check.props.accessibilityState).toMatchObject({ checked: true });
     expect(flat(check.props.style).backgroundColor).toBe(palette.primary);
+    // One check per row: while marking, the mark keeps the surah's number.
+    const hidden = { includeHiddenElements: true };
+    expect(within(screen.getByTestId('surah-1')).queryByTestId('mark-done', hidden)).toBeNull();
+    expect(within(screen.getByTestId('surah-1')).getByText('1', hidden)).toBeTruthy();
     expect(screen.getByText('No changes')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('surah-2'));
