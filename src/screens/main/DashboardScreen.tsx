@@ -4,10 +4,12 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
   RefreshControl,
   Alert,
 } from 'react-native';
+// Gesture Handler's, so a sideways swipe on it can move to the next tab
+// (navigation/TabSwipe): over React Native's own, the swipe never started.
+import { ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '../../navigation/MainNavigator';

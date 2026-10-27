@@ -1,11 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+// Gesture Handler's list, so a sideways swipe on it can move to the next tab
+// (navigation/TabSwipe): over React Native's own, the swipe never started.
+import { FlatList } from 'react-native-gesture-handler';
 import { useNavigation, useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../context/ThemeContext';

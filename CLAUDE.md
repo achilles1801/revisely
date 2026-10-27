@@ -567,6 +567,13 @@ classic default), and a fresh install starts in light.
 - Check sheets and menus at the largest Dynamic Type size (`xcrun simctl ui <udid> content_size
   accessibility-extra-extra-extra-large`) and on an SE-size simulator. Chrome text (headers, menu
   rows, credits) caps growth with `maxFontSizeMultiplier`; reading text doesn't.
+- **Swiping between tabs** (`navigation/TabSwipe`): a sideways swipe on a tab's main screen
+  (Home, the Read list, Insights when Smart Tracking is on) moves to the tab beside it, and tab
+  changes slide (`animation: 'shift'`). Screens opened from a tab keep their own sideways gestures
+  (the reader's page turns, the back swipe, swipe to delete, the calendar); vertical scrolling wins
+  (the pan fails after 12pt of vertical movement). Those three screens scroll with Gesture Handler's
+  `ScrollView` / `FlatList`: over React Native's own, the swipe never started and the row under the
+  finger got a tap instead.
 - **Pull to refresh over Home's glow:** iOS paints the pull area opaque, so the glow ended in a
   hard line under the header while pulling (and while a refresh hung). Home's `RefreshControl` has
   `backgroundColor: 'transparent'`; refreshes go through `hooks/usePullToRefresh`, which always ends
