@@ -361,7 +361,7 @@ export default function SettingsScreen() {
             // Second confirmation — Apple wants this kind of friction.
             Alert.alert(
               'Are you absolutely sure?',
-              'Type DELETE on the next screen to confirm. Once we delete your data, there is no recovery.',
+              'Your account, revision history and backed-up recordings will be deleted. There is no recovery.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {
