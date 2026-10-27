@@ -17,6 +17,18 @@ concurrency:
 
 jobs:
   # -----------------------------------------------------------------------
+  # The repository is public: fail if a tracked file holds something that
+  # looks like a secret (scripts/check-secrets.sh; no dependencies).
+  # -----------------------------------------------------------------------
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-secrets.sh --self-test
+      - run: bash scripts/check-secrets.sh
+
+  # -----------------------------------------------------------------------
   # Type-check the app code. functions/ and tests/firestore-rules/ have their
   # own dependencies and are checked by their own jobs.
   # -----------------------------------------------------------------------
