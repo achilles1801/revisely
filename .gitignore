@@ -69,6 +69,3 @@ docs/security-audit-2026-05-10.md
 docs/ui-redesign/
 
 firestore-debug.log
-
-# Jest coverage reports (CI uploads them as an artifact); they embed source.
-coverage/

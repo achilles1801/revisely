@@ -14,7 +14,7 @@ name: Claude fix
 #            commands it runs (CLAUDE_CODE_SUBPROCESS_ENV_SCRUB, isolated with bubblewrap). Claude can
 #            read, edit, run jest and tsc, and commit locally; its commits leave the job as a patch.
 #   pr       runs no repository code. It applies the patch to develop and refuses one that touches
-#            .github/ or holds anything that looks like a credential. Then it pushes claude/issue-<n>,
+#            .github/, worker/ or wrangler.jsonc, or holds anything that looks like a credential. Then it pushes claude/issue-<n>,
 #            opens a PR into develop, starts CI on it (PRs opened with the workflow token start no
 #            workflows by themselves) and links the PR on the issue.
 # Claude never merges: the PR goes through CI, review, preview and TestFlight like any other change.
@@ -196,14 +196,14 @@ jobs:
                with confidence, don't commit; write your findings there instead (they are posted on the
                issue).
 
-            Never: edit .github/, change Firestore/Storage rules or Cloud Functions, run eas or firebase
+            Never: edit .github/, worker/ or wrangler.jsonc, change Firestore/Storage rules or Cloud Functions, run eas or firebase
             commands, or put personal data (user ids, emails, IP addresses) or credentials in commits or
             the summary; this repository is public.
           claude_args: |
             --max-turns 80
             --add-dir ${{ runner.temp }}/claude-input ${{ runner.temp }}/claude-output
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npx jest),Bash(npx jest *),Bash(npx tsc *),Bash(git status*),Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git add *),Bash(git commit *)"
-            --disallowedTools "Read(//proc/**),Edit(./.github/**),Write(./.github/**)"
+            --disallowedTools "Read(//proc/**),Edit(./.github/**),Write(./.github/**),Edit(./worker/**),Write(./worker/**),Edit(./wrangler.jsonc),Write(./wrangler.jsonc)"
 
       # Claude's commands may have changed .git (config, hooks): read the commits with a fresh config
       # and the system git only.
@@ -219,8 +219,29 @@ jobs:
           export PATH=/usr/bin:/bin GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
           out="$RUNNER_TEMP/claude-patch"
           rm -rf "$out" && mkdir -p "$out"
-          if [ ! -d .git ] || [ -L .git ] || [ -e .git/commondir ]; then
-            echo "::error::.git was replaced; not exporting."
+          problem=""
+          if [ -L .git ]; then problem=".git is a symlink"
+          elif [ ! -d .git ]; then problem=".git is not a directory"
+          elif [ -e .git/commondir ] || [ -L .git/commondir ]; then
+            # Claude Code's sandbox leaves placeholders in .git for the paths it protects: a commondir
+            # holding "." (this .git itself) and empty worktrees/, modules/. Drop that commondir; one
+            # pointing anywhere else would make git read another config, so refuse it.
+            if [ -f .git/commondir ] && [ ! -L .git/commondir ]; then
+              case "$(head -c 64 .git/commondir | tr -d '\n')" in
+                ''|.) rm -f .git/commondir ;;
+                *) problem=".git/commondir points elsewhere" ;;
+              esac
+            else
+              problem=".git/commondir is not a plain file"
+            fi
+          fi
+          if [ -n "$problem" ]; then
+            echo "::error::.git was replaced ($problem); not exporting."
+            # Names, types and sizes only (.git/config holds the action's token in the remote URL).
+            ls -la .git | head -40 || true
+            if [ -f .git/commondir ]; then
+              echo "commondir: $(wc -c < .git/commondir) bytes: $(head -c 200 .git/commondir | tr -cd '[:print:]')"
+            fi
             exit 1
           fi
           rm -f .git/config
@@ -328,6 +349,11 @@ jobs:
           { git diff --no-ext-diff --no-textconv "$BASE" HEAD; git log --format=%B "$BASE..HEAD"; } > "$RUNNER_TEMP/added.txt"
           if grep -Eq '^\.github/' "$RUNNER_TEMP/paths.txt"; then
             comment "Refused: the patch changes .github/ (workflows can't be changed this way). Nothing was pushed ([run]($RUN_URL))."
+            exit 1
+          fi
+          # The Cloudflare worker holds the API keys' code path and deploys from main: not this way either.
+          if grep -Eq '^(worker/|wrangler\.jsonc$)' "$RUNNER_TEMP/paths.txt"; then
+            comment "Refused: the patch changes the Cloudflare worker (worker/, wrangler.jsonc). Nothing was pushed ([run]($RUN_URL))."
             exit 1
           fi
           if grep -Eq -- "$CRED" "$RUNNER_TEMP/added.txt"; then
