@@ -93,7 +93,23 @@ file is the release mechanics and the traps behind them.
     Project and Organization. It is separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps.
   - `ANTHROPIC_API_KEY`, from a dedicated Anthropic Console workspace with a monthly spend limit, so
     a leak is bounded and revocable. `CLAUDE_CODE_OAUTH_TOKEN` (the subscription) also works, but it
-    can't be capped or scoped.
+    can't be capped or scoped. **The current key expires on 2027-01-01.**
+  - Both are repository secrets (GitHub → Settings → Secrets and variables → Actions); neither is
+    ever printed. The daily report checks the Claude key (`scripts/sentry/claude-key.js`): if Anthropic
+    rejects it, it opens (or comments on) an `automation` issue mentioning the owner and the run fails;
+    from 30 days before `CLAUDE_KEY_EXPIRES` (in `health-report.yml`) it opens a reminder issue. A
+    `claude-fix` run checks it first too (the `key` job) and says so on the issue instead of failing
+    silently. A rejected `SENTRY_API_TOKEN` fails the report and sync runs, which GitHub emails.
+
+**Rotating the Claude key** (before it expires, or at once if it leaked or was rejected):
+1. Anthropic Console → the workspace used for this repository → API keys → Create key (name it after
+   the repository, set an expiry), copy it.
+2. GitHub → achilles1801/revisely → Settings → Secrets and variables → Actions → `ANTHROPIC_API_KEY`
+   → Update secret, paste, save.
+3. Set `CLAUDE_KEY_EXPIRES` in `.github/workflows/health-report.yml` to the new expiry (a PR to
+   `develop`, then `main`: the workflow runs from `main`), and close any open "Claude key" issue.
+4. Check: Actions → Health report → Run workflow; the "Check the Claude key" step says `ok`.
+5. Revoke the old key in the Console.
   - No Claude GitHub App is needed.
 
   Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
