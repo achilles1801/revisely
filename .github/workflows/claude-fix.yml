@@ -219,8 +219,29 @@ jobs:
           export PATH=/usr/bin:/bin GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
           out="$RUNNER_TEMP/claude-patch"
           rm -rf "$out" && mkdir -p "$out"
-          if [ ! -d .git ] || [ -L .git ] || [ -e .git/commondir ]; then
-            echo "::error::.git was replaced; not exporting."
+          problem=""
+          if [ -L .git ]; then problem=".git is a symlink"
+          elif [ ! -d .git ]; then problem=".git is not a directory"
+          elif [ -e .git/commondir ] || [ -L .git/commondir ]; then
+            # Claude Code's sandbox leaves placeholders in .git for the paths it protects: a commondir
+            # holding "." (this .git itself) and empty worktrees/, modules/. Drop that commondir; one
+            # pointing anywhere else would make git read another config, so refuse it.
+            if [ -f .git/commondir ] && [ ! -L .git/commondir ]; then
+              case "$(head -c 64 .git/commondir | tr -d '\n')" in
+                ''|.) rm -f .git/commondir ;;
+                *) problem=".git/commondir points elsewhere" ;;
+              esac
+            else
+              problem=".git/commondir is not a plain file"
+            fi
+          fi
+          if [ -n "$problem" ]; then
+            echo "::error::.git was replaced ($problem); not exporting."
+            # Names, types and sizes only (.git/config holds the action's token in the remote URL).
+            ls -la .git | head -40 || true
+            if [ -f .git/commondir ]; then
+              echo "commondir: $(wc -c < .git/commondir) bytes: $(head -c 200 .git/commondir | tr -cd '[:print:]')"
+            fi
             exit 1
           fi
           rm -f .git/config
