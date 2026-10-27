@@ -3,6 +3,7 @@ jest.mock('../releaseInfo', () => ({ currentRelease: () => ({ channel: 'preview'
 
 import {
   CLEAR_QURAN_API,
+  CLEAR_QURAN_DEVICE_CACHE,
   clearQuranBlock,
   ClearQuranDeps,
   ClearQuranError,
@@ -158,6 +159,173 @@ describe('getClearQuranVerse', () => {
     expect(clearQuranErrorHint(new ClearQuranError('NETWORK', ''))).toMatch(/connection/);
     expect(clearQuranErrorHint(new ClearQuranError('DAILY_LIMIT', ''))).toMatch(/tomorrow/);
     expect(clearQuranErrorHint(new Error('arabic failed'))).toMatch(/connection/);
+  });
+});
+
+const DAY = 86_400_000;
+const THIRTY_DAYS = 30 * 86_400;
+
+/** A phone: files that outlive a launch, a clock, and a worker with a cache policy. */
+function phone(policy: unknown = { version: '1', device: { maxAgeSeconds: THIRTY_DAYS, staleSeconds: THIRTY_DAYS } }) {
+  const files = new Map<string, string>();
+  let clock = Date.UTC(2026, 9, 27, 12);
+  let current = policy;
+  let failBlocks = false;
+  const urls: string[] = [];
+  const d: ClearQuranDeps = {
+    token: async () => 'id-token',
+    channel: () => 'preview',
+    fetch: (async (url: RequestInfo | URL) => {
+      urls.push(String(url));
+      if (String(url).endsWith('/policy')) return json(200, current);
+      if (failBlocks) throw new TypeError('Network request failed');
+      const [sura, ayah] = String(url).split('/windows/')[1].split(':').map(Number);
+      const b = clearQuranBlock(sura, ayah);
+      return block(sura, b.from, b.to);
+    }) as typeof globalThis.fetch,
+    store: {
+      read: async (name) => files.get(name) ?? null,
+      write: (name, text) => void files.set(name, text),
+      clear: () => files.clear(),
+    },
+    now: () => clock,
+  };
+  return {
+    d,
+    files,
+    blocks: () => urls.filter((u) => u.includes('/windows/')),
+    later: (days: number) => (clock += days * DAY),
+    setPolicy: (p: unknown) => (current = p),
+    offline: (yes: boolean) => (failBlocks = yes),
+    /** A new launch: memory goes, the files stay. */
+    relaunch: () => forgetClearQuranVerses(),
+  };
+}
+
+describe('kept on the phone', () => {
+  it('a block read once is kept, exactly as given, and the next launch shows it without a request', async () => {
+    const p = phone();
+    expect(await getClearQuranVerse(2, 45, p.d)).toBe('The text of 2:45');
+    await settle();
+    const kept = JSON.parse(p.files.get('block-2-31.json')!);
+    expect(kept.verses).toHaveLength(30);
+    expect(kept.verses[14]).toEqual({ verse_key: '2:45', text: 'The text of 2:45' });
+
+    p.relaunch();
+    p.later(29);
+    expect(await getClearQuranVerse(2, 50, p.d)).toBe('The text of 2:50');
+    await settle();
+    expect(p.blocks()).toHaveLength(1);
+  });
+
+  it('after 30 days: shown at once, and fetched again behind it', async () => {
+    const p = phone();
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    p.relaunch();
+    p.later(31);
+    expect(await getClearQuranVerse(2, 45, p.d)).toBe('The text of 2:45');
+    await settle();
+    expect(p.blocks()).toHaveLength(2);
+    expect(JSON.parse(p.files.get('block-2-31.json')!).fetchedAt).toBe(Date.UTC(2026, 9, 27, 12) + 31 * DAY);
+  });
+
+  it('a stale copy still shows offline; one past both times is not shown', async () => {
+    const p = phone();
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    p.relaunch();
+    p.offline(true);
+    p.later(45);
+    expect(await getClearQuranVerse(2, 45, p.d)).toBe('The text of 2:45');
+    p.relaunch();
+    p.later(20); // 65 days
+    await expect(getClearQuranVerse(2, 45, p.d)).rejects.toMatchObject({ code: 'NETWORK' });
+  });
+
+  it('the worker can shorten the time: it applies to what is kept', async () => {
+    const p = phone();
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    p.setPolicy({ version: '1', device: { maxAgeSeconds: 86_400, staleSeconds: 0 } });
+    p.relaunch();
+    p.later(2);
+    await getClearQuranVerse(2, 45, p.d); // the old policy is read first; the new one arrives behind
+    await settle();
+    p.relaunch();
+    p.later(2);
+    p.offline(true);
+    await expect(getClearQuranVerse(2, 45, p.d)).rejects.toMatchObject({ code: 'NETWORK' });
+  });
+
+  it('0 from the worker deletes every copy and keeps nothing more', async () => {
+    const p = phone();
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    p.setPolicy({ version: '1', device: { maxAgeSeconds: 0, staleSeconds: 0 } });
+    p.relaunch();
+    await getClearQuranVerse(3, 1, p.d);
+    await settle();
+    expect([...p.files.keys()]).toEqual(['policy.json']);
+    p.relaunch();
+    await getClearQuranVerse(4, 1, p.d);
+    await settle();
+    expect([...p.files.keys()]).toEqual(['policy.json']);
+  });
+
+  it("a new cache version from the worker, or in the app, deletes every copy", async () => {
+    const p = phone();
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    p.setPolicy({ version: '2', device: { maxAgeSeconds: THIRTY_DAYS, staleSeconds: THIRTY_DAYS } });
+    p.relaunch();
+    await getClearQuranVerse(3, 1, p.d); // this launch asks the worker, which has a new version
+    await settle();
+    expect(p.files.has('block-2-31.json')).toBe(false);
+
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    expect(p.files.has('block-2-31.json')).toBe(true);
+    // An update of the app with a new CLEAR_QURAN_DEVICE_CACHE.version starts clean.
+    const saved = JSON.parse(p.files.get('policy.json')!);
+    p.files.set('policy.json', JSON.stringify({ ...saved, app: CLEAR_QURAN_DEVICE_CACHE.version - 1 }));
+    p.relaunch();
+    await getClearQuranVerse(5, 1, p.d);
+    await settle();
+    expect(p.files.has('block-2-31.json')).toBe(false);
+  });
+
+  it('a damaged copy is ignored and fetched again; a single verse from an older worker is not kept', async () => {
+    const p = phone();
+    p.files.set('block-2-31.json', '{"surah":2,"from":31,"to":60,"fetchedAt":0,"verses":[{"verse_key":"2:31"}]}');
+    expect(await getClearQuranVerse(2, 45, p.d)).toBe('The text of 2:45');
+    expect(p.blocks()).toHaveLength(1);
+
+    const old = phone();
+    const fetch = old.d.fetch;
+    old.d.fetch = (async (url: RequestInfo | URL, init?: RequestInit) =>
+      String(url).includes('/windows/')
+        ? json(400, {})
+        : String(url).includes('/verses/')
+          ? json(200, { verse_key: '7:1', text: 'Alif-Lãm-Mĩm-Ṣãd.' })
+          : fetch(url, init)) as typeof globalThis.fetch;
+    forgetClearQuranVerses();
+    expect(await getClearQuranVerse(7, 1, old.d)).toBe('Alif-Lãm-Mĩm-Ṣãd.');
+    await settle();
+    expect([...old.files.keys()].filter((k) => k.startsWith('block-'))).toEqual([]);
+  });
+
+  it('without the worker’s policy (offline, or a worker from before): the app’s own times', async () => {
+    const p = phone({ nope: true });
+    await getClearQuranVerse(2, 45, p.d);
+    await settle();
+    expect(p.files.has('block-2-31.json')).toBe(true);
+    // And the next launch still has it (it isn't taken for a first run).
+    p.relaunch();
+    expect(await getClearQuranVerse(2, 46, p.d)).toBe('The text of 2:46');
+    await settle();
+    expect(p.blocks()).toHaveLength(1);
+    expect(CLEAR_QURAN_DEVICE_CACHE).toMatchObject({ maxAgeSeconds: THIRTY_DAYS, staleSeconds: THIRTY_DAYS });
   });
 });
 
