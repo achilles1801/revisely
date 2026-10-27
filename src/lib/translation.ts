@@ -13,7 +13,8 @@
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { logger } from './logger';
-import { getClearQuranVerse } from './clearQuran';
+import { getClearQuranVerse, peekClearQuranVerse, prefetchClearQuran, prefetchClearQuranAround } from './clearQuran';
+import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
 
 export interface TranslationInfo {
   id: string;
@@ -195,6 +196,24 @@ export interface VerseText {
   translationName: string;
 }
 
+function compose(
+  t: TranslationInfo,
+  sura: number,
+  ayah: number,
+  arabic: TranslatedAyah,
+  translation: string,
+  surahName: string,
+): VerseText {
+  return {
+    sura,
+    ayah,
+    surahName,
+    arabic: stripBismillah(arabic.text, sura, ayah),
+    translation,
+    translationName: t.name,
+  };
+}
+
 /** The Arabic and the chosen translation of one verse. */
 export async function getVerseText(
   page: number,
@@ -209,27 +228,60 @@ export async function getVerseText(
       getAyahEdition(page, sura, ayah, ARABIC_EDITION),
       getClearQuranVerse(sura, ayah),
     ]);
-    return {
-      sura,
-      ayah,
-      surahName: arabic.surahName,
-      arabic: stripBismillah(arabic.text, sura, ayah),
-      translation: text,
-      translationName: t.name,
-    };
+    return compose(t, sura, ayah, arabic, text, arabic.surahName);
   }
   const [arabic, translated] = await Promise.all([
     getAyahEdition(page, sura, ayah, ARABIC_EDITION),
     getAyahEdition(page, sura, ayah, t.edition as string),
   ]);
-  return {
-    sura,
-    ayah,
-    surahName: translated.surahName,
-    arabic: stripBismillah(arabic.text, sura, ayah),
-    translation: translated.text,
-    translationName: t.name,
-  };
+  return compose(t, sura, ayah, arabic, translated.text, translated.surahName);
+}
+
+/** One verse of an edition, if this launch already has it in memory. */
+function peekAyahEdition(page: number, sura: number, ayah: number, edition: string): TranslatedAyah | null {
+  return (
+    singleAyahs.get(`${edition}/${sura}:${ayah}`) ??
+    memory.get(`${edition}/${page}`)?.find((a) => a.surahNumber === sura && a.ayahNumber === ayah) ??
+    null
+  );
+}
+
+/** What getVerseText would give, if everything it needs is already in memory; else null. */
+export function peekVerseText(
+  page: number,
+  sura: number,
+  ayah: number,
+  translationId?: string | null,
+): VerseText | null {
+  const t = resolveTranslation(translationId);
+  const arabic = peekAyahEdition(page, sura, ayah, ARABIC_EDITION);
+  if (!arabic) return null;
+  if (t.id === CLEAR_QURAN_ID) {
+    const text = peekClearQuranVerse(sura, ayah);
+    return text === undefined ? null : compose(t, sura, ayah, arabic, text, arabic.surahName);
+  }
+  const translated = peekAyahEdition(page, sura, ayah, t.edition as string);
+  return translated ? compose(t, sura, ayah, arabic, translated.text, translated.surahName) : null;
+}
+
+/** Starts loading a verse's Arabic and translation (a press and hold on it). Never fails. */
+export function prefetchVerseText(page: number, sura: number, ayah: number, translationId?: string | null): void {
+  const t = resolveTranslation(translationId);
+  getAyahEdition(page, sura, ayah, ARABIC_EDITION).catch(() => undefined);
+  if (t.id === CLEAR_QURAN_ID) prefetchClearQuran(sura, ayah);
+  else getAyahEdition(page, sura, ayah, t.edition as string).catch(() => undefined);
+}
+
+/**
+ * The verses before and after `v`, loaded while it is shown, so previous / next
+ * shows at once. The Clear Quran looks two verses ahead (its next block takes
+ * seconds); the rest comes by page, so one verse is enough.
+ */
+export function prefetchVerseNeighbours(v: VerseKey, translationId?: string | null): void {
+  for (const n of [nextVerse(v), previousVerse(v)]) {
+    if (n) prefetchVerseText(pageOfVerse(n), n.sura, n.ayah, translationId);
+  }
+  if (resolveTranslation(translationId).id === CLEAR_QURAN_ID) prefetchClearQuranAround(v, 2);
 }
 
 // alquran.cloud prefixes the first verse of every surah (except Al-Fatihah,

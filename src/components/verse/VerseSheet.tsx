@@ -28,6 +28,8 @@ import {
   pickerTitle,
   CLEAR_QURAN_ID,
   resolveTranslation,
+  peekVerseText,
+  prefetchVerseNeighbours,
   TRANSLATIONS,
   VerseText,
 } from '../../lib/translation';
@@ -163,6 +165,13 @@ export function VerseSheet({
     }
     let live = true;
     const loadFor = `${translation.id}|${verse.sura}:${verse.ayah}`;
+    // The verses either side, so previous / next show at once.
+    prefetchVerseNeighbours(verse, translation.id);
+    const known = peekVerseText(verse.page, verse.sura, verse.ayah, translation.id);
+    if (known) {
+      setState({ status: 'ready', text: known, for: loadFor });
+      return;
+    }
     setState({ status: 'loading' });
     getVerseText(verse.page, verse.sura, verse.ayah, translation.id)
       .then((text) => live && setState({ status: 'ready', text, for: loadFor }))
@@ -176,7 +185,12 @@ export function VerseSheet({
   // What this render may show: a result for another translation or verse is
   // still loading as far as the reader can see.
   const current = verse ? `${translation.id}|${verse.sura}:${verse.ayah}` : '';
-  const view = visibleLoadState(state, current);
+  let view = visibleLoadState(state, current);
+  if (view.status === 'loading' && verse) {
+    // Fetched ahead (a neighbour): shown in this very frame, without a spinner.
+    const known = peekVerseText(verse.page, verse.sura, verse.ayah, translation.id);
+    if (known) view = { status: 'ready', text: known, for: current };
+  }
   const prev = verse ? previousVerse(verse) : null;
   const next = verse ? nextVerse(verse) : null;
 

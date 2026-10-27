@@ -7,6 +7,7 @@ import { getRecitation, RecitationState } from '../../lib/recitation';
 import { nextVerse, nextVerseInJuz, pageOfVerse, previousVerse, toAyahRef, VerseKey } from '../../lib/verses';
 import { logger } from '../../lib/logger';
 import { isRecordingActive } from '../../lib/recordings';
+import { prefetchVerseText } from '../../lib/translation';
 import { VerseMenu } from './VerseMenu';
 import { VerseSheet } from './VerseSheet';
 import type { PlayerControls } from '../reader/PlayerCapsule';
@@ -51,6 +52,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   allowedRef.current = allowed;
   const currentPageRef = useRef(currentPage);
   currentPageRef.current = currentPage;
+  const translationIdRef = useRef(user?.translationId);
+  translationIdRef.current = user?.translationId;
 
   useEffect(() => recitation.subscribe(setPlayback), [recitation]);
   // Leaving the screen stops the recitation it started.
@@ -77,6 +80,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
 
   const onLongPressAyah = useCallback((ayah: AyahRef, point?: { x: number; y: number }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // The menu offers Translation: its text starts loading now, not on the tap.
+    prefetchVerseText(ayah.page, ayah.sura, ayah.ayah, translationIdRef.current);
     setSelected(ayah);
     const { width, height } = Dimensions.get('window');
     setMenuPoint(point ?? { x: width / 2, y: height / 2 });

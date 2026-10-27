@@ -20,7 +20,11 @@ import {
 } from '../tcq';
 import { secondsToMidnight, spend, TcqBudget } from '../budget';
 import { getSurahDisplay } from '../../src/lib/quranData';
+import { clearQuranBlock } from '../../src/lib/clearQuran';
 
+// The app's module, for its block alignment only.
+jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
+jest.mock('../../src/lib/releaseInfo', () => ({ currentRelease: () => ({ channel: null }) }));
 
 const PROJECT = 'revision-buddy-3a398';
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -208,6 +212,14 @@ describe('blocks of verses', () => {
     expect(route('/api/tcq/verses/2:45')).toEqual({ kind: 'verse', sura: 2, ayah: 45 });
     expect(route('/api/tcq/windows/2:287')).toBeNull();
     expect(route('/api/tcq/windows/2:1-30')).toBeNull();
+  });
+
+  it('the app aligns blocks exactly as the worker does, for every verse', () => {
+    for (let sura = 1; sura <= 114; sura++) {
+      for (let ayah = 1; ayah <= VERSE_COUNTS[sura - 1]; ayah++) {
+        expect(clearQuranBlock(sura, ayah)).toEqual(windowOf(sura, ayah));
+      }
+    }
   });
 
   it('one request to The Clear Quran answers the whole block, exactly as given', async () => {
