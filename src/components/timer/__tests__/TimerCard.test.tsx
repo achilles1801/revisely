@@ -28,7 +28,7 @@ jest.mock('../../../context/ThemeContext', () => {
   return { useTheme: () => ({ theme: v2ThemeColors(false), isDark: false, palette: paletteLight }) };
 });
 
-import { TimerCard } from '../TimerCard';
+import { cardPlace, TimerCard } from '../TimerCard';
 
 const origin = { x: 380, y: 840, width: 36, height: 36 };
 
@@ -93,5 +93,31 @@ describe('TimerCard: the chip grown into a card', () => {
     rerender(false);
     expect(onHidden).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('timer-card')).toBeNull();
+  });
+});
+
+describe('where the card sits: grown out of the timer button, never over its bar', () => {
+  const screenSize = { width: 440, height: 956 };
+  const insets = { top: 62, bottom: 38 };
+  const width = 416;
+
+  it('the reader’s and the session’s bars: just above the button, its right edge near the button’s', () => {
+    // The stopwatch at the right end of the reader's controls.
+    const p = cardPlace({ x: 380, y: 878, width: 36, height: 36 }, screenSize, width, insets);
+    expect(p.above).toBe(true);
+    expect(p.edge).toBe(878 - 10);
+    expect(p.left + width).toBeLessThanOrEqual(440 - 12);
+    expect(p.left).toBeGreaterThanOrEqual(12);
+  });
+
+  it('Home’s top bar: it drops down from the chip, on the chip’s side', () => {
+    const p = cardPlace({ x: 16, y: 68, width: 65, height: 36 }, screenSize, width, insets);
+    expect(p.above).toBe(false);
+    expect(p.edge).toBe(68 + 36 + 10);
+    expect(p.left).toBe(12);
+  });
+
+  it('never higher than the status bar', () => {
+    expect(cardPlace({ x: 380, y: 878, width: 36, height: 36 }, screenSize, width, insets).minTop).toBe(62 + 12);
   });
 });
