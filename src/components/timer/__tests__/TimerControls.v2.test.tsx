@@ -46,7 +46,7 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
 import * as Haptics from 'expo-haptics';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
-import { TimerControls } from '../TimerControls';
+import { lengthLabel, stepLength, TimerControls } from '../TimerControls';
 import { TimerChip } from '../TimerChip';
 import { paletteV2, DEFAULT_ACCENT } from '../../../theme/v2';
 
@@ -96,26 +96,59 @@ describe('<TimerControls /> in the new design', () => {
     expect(mockActions.start).toHaveBeenCalledWith('stopwatch', null);
   });
 
-  it('a timer: presets as pills (the chosen one solid), a stepper, and the clock direction; Start passes them on', async () => {
+  it('small: the kind, the clock and one line under it, and Start; nothing else', async () => {
+    v2(<TimerControls onClose={jest.fn()} />);
+    await act(async () => {});
+    expect(screen.getByTestId('timer-caption').props.children).toBe('Runs until you end it');
+    // Light and large, but not the old 54pt in a 220pt ring.
+    const clock = flat(screen.getByTestId('timer-clock').props.style);
+    expect(clock.fontWeight).toBe('200');
+    expect(clock.fontSize).toBeLessThanOrEqual(48);
+    expect(screen.queryByTestId('timer-ring')).toBeNull();
+    expect(screen.queryByTestId('timer-setup')).toBeNull();
+    expect(screen.queryByText(/Sessions are saved to Activity/)).toBeNull();
+  });
+
+  it('a timer: one row with the length (− and +) and the direction; Start passes them on', async () => {
     v2(<TimerControls onClose={jest.fn()} />);
     await act(async () => {});
     fireEvent.press(screen.getByTestId('pill-timer'));
     expect(screen.getByTestId('timer-setup')).toBeTruthy();
-    expect(screen.getByText('Length')).toBeTruthy();
-    expect(screen.getByText('Clock')).toBeTruthy();
-    // 30 minutes is chosen to begin with.
-    expect(flat(screen.getByTestId('timer-preset-30').props.style).backgroundColor).toBe(palette.primary);
-    expect(flat(screen.getByTestId('timer-preset-45').props.style).backgroundColor).toBeUndefined();
-    expect(screen.getByText('1h 30m')).toBeTruthy();
-    // The ring: a separator track, the primary colour for progress.
-    expect(screen.getByTestId('timer-ring')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('timer-preset-45'));
-    fireEvent.press(screen.getByLabelText('5 minutes more'));
-    expect(screen.getByTestId('timer-minutes').props.children).toEqual([50, ' min']);
+    // 30 minutes to begin with, counting down.
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('30 min');
+    expect(screen.getByTestId('timer-clock').props.children).toBe('30:00');
+    expect(screen.getByTestId('timer-caption').props.children).toBe('Ends by itself and is saved');
     expect(flat(screen.getByTestId('timer-plus').props.style).borderColor).toBe(palette.outline);
+    for (let i = 0; i < 6; i++) fireEvent.press(screen.getByLabelText('Longer'));
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('1 h');
+    fireEvent.press(screen.getByLabelText('Longer'));
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('1 h 15 min');
+    fireEvent.press(screen.getByLabelText('Shorter'));
+    fireEvent.press(screen.getByLabelText('Shorter'));
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('55 min');
     fireEvent.press(screen.getByTestId('pill-countUp'));
     fireEvent.press(screen.getByLabelText('Start timer'));
-    expect(mockActions.start).toHaveBeenCalledWith('countUp', 50 * 60);
+    expect(mockActions.start).toHaveBeenCalledWith('countUp', 55 * 60);
+  });
+
+  it('lengths: 5 minutes at a time to an hour, then 15, then 30; 5 min to 8 h', () => {
+    expect(stepLength(30, 1)).toBe(35);
+    expect(stepLength(60, 1)).toBe(75);
+    expect(stepLength(120, 1)).toBe(150);
+    expect(stepLength(480, 1)).toBe(480);
+    expect(stepLength(150, -1)).toBe(120);
+    expect(stepLength(75, -1)).toBe(60);
+    expect(stepLength(5, -1)).toBe(5);
+    expect(lengthLabel(90)).toBe('1 h 30 min');
+    expect(lengthLabel(45)).toBe('45 min');
+  });
+
+  it('a running timer: how much is left under the clock, and a thin line of progress', async () => {
+    mockTimer.timer = running({ mode: 'countDown', targetSeconds: 30 * 60 });
+    v2(<TimerControls onClose={jest.fn()} />);
+    await act(async () => {});
+    expect(screen.getByTestId('timer-caption').props.children).toBe('remaining of 30 min');
+    expect(screen.getByTestId('timer-progress')).toBeTruthy();
   });
 
   it('running: Pause (outline) and End (solid); End saves, marks it with a haptic and closes', async () => {
@@ -129,7 +162,8 @@ describe('<TimerControls /> in the new design', () => {
     expect(flat(screen.getByTestId('timer-end').props.style).backgroundColor).toBe(palette.primary);
     expect(flat(screen.getByTestId('timer-pause').props.style).backgroundColor).toBeUndefined();
     expect(screen.getByText('Open the Quran')).toBeTruthy();
-    expect(flat(screen.getByText('Discard session').props.style).color).toBe(palette.red);
+    // Discard is a small red bin in the same row.
+    expect(flat(screen.getByTestId('icon-trash-outline').props.style).color).toBe(palette.red);
     fireEvent.press(screen.getByLabelText('Pause timer'));
     expect(mockActions.pause).toHaveBeenCalled();
     await act(async () => {

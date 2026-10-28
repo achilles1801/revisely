@@ -574,6 +574,15 @@ classic default), and a fresh install starts in light.
   is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar; the backdrop is its
   sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
   own frame (gorhom `PlanSheet`) take the same colours and corners.
+- A sheet closes by a tap on the backdrop, or by dragging its handle or header down (Oct 27 2026):
+  it follows the finger on the UI thread and the backdrop fades with it; past 120pt (or 30% of a
+  short sheet) or a downward fling over 800pt/s it goes, otherwise it springs back
+  (`shouldDismiss` in `v2/Sheet`). Only the handle and the header start the drag, so the content's
+  scroll views and pickers (Audio Options' wheels) keep theirs. For VoiceOver the handle is a
+  "Close" button and the escape gesture closes it. The gesture lives in the modal's own
+  `GestureHandlerRootView` (iOS needs one inside a native modal); `jest.setup.ts` loads Gesture
+  Handler's jest setup for every test. The verse sheet has its own grabber drag, and gorhom's
+  sheets pan down to close by themselves.
 - The owner's rules from testing (Oct 26 2026):
   - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
     second card restating it. A thin ring around the post's mark (`v2/ProgressRing`, the accent's
@@ -588,7 +597,11 @@ classic default), and a fresh install starts in light.
     `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month. Things done
     are `lib/activityItems`.
   - **No floating timer.** The timer is in the reader's and the session's controls; a running one
-    shows in Home's top bar (`RunningTimerChip`).
+    shows in Home's top bar (`RunningTimerChip`). Its sheet is small (Oct 27 2026; it had taken
+    half the screen): Stopwatch / Timer, the clock light at 48pt with one line under it (a thin
+    progress line while a timed session runs), and one row of controls: for a timer, − length +
+    (5-minute steps to an hour, then 15, then 30) and Down / Up; running, a red bin (Discard),
+    Pause and End. "Open the Quran" is a small link under them where it applies.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
     what a control does (e.g. Keep daily amount).
 - **Accents** (Settings → Appearance → Accent): **Indigo (the default)**, Crimson and Jade. The

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
 import {
@@ -11,11 +10,10 @@ import {
   formatPageRanges,
   formatStopwatch,
   MIN_SESSION_SECONDS,
-  TIMER_PRESET_MINUTES,
 } from '../../lib/readingTimer';
 import type { ReadingTimerMode } from '../../types';
 import { useHaptics } from '../../design/haptics';
-import { layoutV2, typeV2 } from '../../theme/v2';
+import { typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
@@ -23,8 +21,19 @@ import { Tap } from '../v2/Tap';
 type Kind = 'stopwatch' | 'timer';
 type Direction = 'countUp' | 'countDown';
 
-const RING_SIZE = 220;
-const RING_STROKE = 6;
+const PROGRESS_WIDTH = 160;
+
+/** A timer's length, a step longer or shorter: 5 minutes up to an hour, then 15, then 30 (5 min to 8 h). */
+export function stepLength(minutes: number, direction: 1 | -1): number {
+  if (direction === 1) return Math.min(480, minutes < 60 ? minutes + 5 : minutes < 120 ? minutes + 15 : minutes + 30);
+  return Math.max(5, minutes <= 60 ? minutes - 5 : minutes <= 120 ? minutes - 15 : minutes - 30);
+}
+
+/** "45 min", "1 h", "1 h 30 min". */
+export function lengthLabel(m: number): string {
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
+}
 
 interface TimerControlsProps {
   /** Close the surrounding sheet. */
@@ -116,20 +125,14 @@ function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsPro
   };
 }
 
-/** A preset's label: 45m, 1h, 1h 30m. */
-function presetLabel(m: number): string {
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}`;
-}
-
 /**
- * The one set of timer controls, in the timer sheet. iPhone Clock-inspired,
- * two kinds:
+ * The one set of timer controls, in the timer sheet: small, so the page stays
+ * in view. Two kinds:
  *  - Stopwatch: open-ended, ends when you tap End.
- *  - Timer: pick a length; it counts up or down and ends by itself.
+ *  - Timer: pick a length; it counts down or up and ends by itself.
  * Revised pages (revision screen) and opened pages (reader) are credited to
- * whatever timer is running. Flat on the sheet: the kind and the clock
- * direction as pills, the clock in a thin ring, and the actions as pills (the
- * one that saves solid).
+ * whatever timer is running. The clock light and large, a line under it, and
+ * one row of controls.
  */
 export function TimerControls(props: TimerControlsProps) {
   const { onOpenQuran } = props;
@@ -153,8 +156,21 @@ export function TimerControls(props: TimerControlsProps) {
     handleDiscard,
   } = useTimerControls(props);
 
-  const r = (RING_SIZE - RING_STROKE) / 2;
-  const circumference = 2 * Math.PI * r;
+  const mode = timer?.mode ?? (kind === 'stopwatch' ? 'stopwatch' : direction);
+  // One line under the clock: what it does, or where it is.
+  const caption = timer
+    ? !running
+      ? 'Paused'
+      : targetSeconds != null
+        ? `${mode === 'countDown' ? 'remaining of ' : 'of '}${lengthLabel(Math.round(targetSeconds / 60))}`
+        : (timer.pagesRevised?.length ?? 0) > 0
+          ? `Pages revised: ${formatPageRanges(timer.pagesRevised ?? [])}`
+          : timer.pagesVisited.length > 0
+            ? `Pages opened: ${formatPageRanges(timer.pagesVisited)}`
+            : 'Saved to Activity when you end it'
+    : kind === 'stopwatch'
+      ? 'Runs until you end it'
+      : 'Ends by itself and is saved';
 
   return (
     <View testID="timer-controls-v2">
@@ -172,35 +188,9 @@ export function TimerControls(props: TimerControlsProps) {
         </View>
       )}
 
-      <View style={v2.clockWrap}>
-        {targetSeconds != null && (
-          <Svg width={RING_SIZE} height={RING_SIZE} style={StyleSheet.absoluteFill} testID="timer-ring">
-            <Circle
-              cx={RING_SIZE / 2}
-              cy={RING_SIZE / 2}
-              r={r}
-              stroke={palette.separator}
-              strokeWidth={RING_STROKE}
-              fill="none"
-            />
-            <Circle
-              cx={RING_SIZE / 2}
-              cy={RING_SIZE / 2}
-              r={r}
-              stroke={palette.primary}
-              strokeWidth={RING_STROKE}
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={circumference * (1 - Math.min(1, progress))}
-              transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-              testID="timer-ring-progress"
-            />
-          </Svg>
-        )}
-        {/* A display, like the Clock app's: it fits the ring rather than growing with the text size. */}
+      <View style={v2.clockBlock}>
         <Text
-          style={[v2.clock, typeV2.numeral, { color: palette.text }, clockText.length > 8 && { fontSize: 44 }]}
+          style={[v2.clock, typeV2.numeral, { color: palette.text }]}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
@@ -209,25 +199,82 @@ export function TimerControls(props: TimerControlsProps) {
         >
           {clockText}
         </Text>
-        {targetSeconds != null && (
-          <Text style={[typeV2.meta, v2.clockSub, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {(timer?.mode ?? direction) === 'countDown' ? 'remaining of ' : 'of '}
-            {Math.round(targetSeconds / 60)} min
-          </Text>
-        )}
-        {timer && !running && (
-          <Text style={[typeV2.meta, v2.clockSub, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            Paused
-          </Text>
-        )}
+        <Text
+          style={[typeV2.meta, v2.centred, { color: palette.secondary }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.4}
+          testID="timer-caption"
+        >
+          {caption}
+        </Text>
+        {timer && targetSeconds != null ? (
+          <View style={[v2.track, { backgroundColor: palette.separator }]} testID="timer-progress">
+            <View
+              style={[v2.fill, { width: PROGRESS_WIDTH * Math.min(1, Math.max(0, progress)), backgroundColor: palette.primary }]}
+            />
+          </View>
+        ) : null}
       </View>
 
+      {!timer && kind === 'timer' ? (
+        <View style={v2.row} testID="timer-setup">
+          <Tap
+            onPress={() => setMinutes((m) => stepLength(m, -1))}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Shorter"
+            style={[v2.step, { borderColor: palette.outline }]}
+            testID="timer-minus"
+          >
+            <Ionicons name="remove" size={18} color={palette.text} />
+          </Tap>
+          <Text
+            style={[typeV2.body, typeV2.numeral, v2.length, { color: palette.text }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.4}
+            testID="timer-minutes"
+          >
+            {lengthLabel(minutes)}
+          </Text>
+          <Tap
+            onPress={() => setMinutes((m) => stepLength(m, 1))}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Longer"
+            style={[v2.step, { borderColor: palette.outline }]}
+            testID="timer-plus"
+          >
+            <Ionicons name="add" size={18} color={palette.text} />
+          </Tap>
+          <View style={v2.direction}>
+            <PillTabs<Direction>
+              options={[
+                { value: 'countDown', label: 'Down', icon: 'arrow-down' },
+                { value: 'countUp', label: 'Up', icon: 'arrow-up' },
+              ]}
+              value={direction}
+              onChange={setDirection}
+              testID="timer-direction"
+            />
+          </View>
+        </View>
+      ) : null}
+
       {timer ? (
-        <View style={v2.actions}>
+        <View style={v2.row}>
+          <Tap
+            onPress={handleDiscard}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Discard timer"
+            style={[v2.step, v2.discard, { borderColor: palette.outline }]}
+            testID="timer-discard"
+          >
+            <Ionicons name="trash-outline" size={17} color={palette.red} />
+          </Tap>
           <PillButton
             title={running ? 'Pause' : 'Resume'}
             variant="outline"
-            size="lg"
             icon={running ? 'pause' : 'play'}
             onPress={running ? pause : resume}
             accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
@@ -236,7 +283,6 @@ export function TimerControls(props: TimerControlsProps) {
           />
           <PillButton
             title="End"
-            size="lg"
             icon="stop"
             onPress={handleEnd}
             accessibilityLabel="Stop and save timer"
@@ -245,159 +291,57 @@ export function TimerControls(props: TimerControlsProps) {
           />
         </View>
       ) : (
-        <PillButton
-          title="Start"
-          size="lg"
-          icon="play"
-          onPress={handleStart}
-          accessibilityLabel="Start timer"
-          testID="timer-start"
-        />
-      )}
-
-      {timer ? (
-        <View style={v2.running}>
-          {onOpenQuran && (
-            <PillButton title="Open the Quran" variant="outline" icon="book-outline" onPress={onOpenQuran} testID="timer-open-quran" />
-          )}
-          <Text style={[typeV2.meta, v2.centred, { color: palette.secondary }]}>
-            {(timer.pagesRevised?.length ?? 0) > 0
-              ? `Pages revised so far: ${formatPageRanges(timer.pagesRevised ?? [])}`
-              : timer.pagesVisited.length > 0
-                ? `Pages opened so far: ${formatPageRanges(timer.pagesVisited)}`
-                : 'Keeps running while you read or revise. Saved sessions are in Activity, where you can add the pages.'}
-          </Text>
-          <Tap
-            onPress={handleDiscard}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Discard timer"
-            style={v2.discard}
-            testID="timer-discard"
-          >
-            <Text style={[typeV2.body, { color: palette.red }]}>Discard session</Text>
-          </Tap>
-        </View>
-      ) : kind === 'timer' ? (
-        <View testID="timer-setup">
-          <Text style={[typeV2.name, v2.header, { color: palette.text }]} accessibilityRole="header">
-            Length
-          </Text>
-          <View style={v2.presets}>
-            {TIMER_PRESET_MINUTES.map((m) => {
-              const selected = m === minutes;
-              const label = presetLabel(m);
-              return (
-                <PillButton
-                  key={m}
-                  title={label}
-                  size="sm"
-                  variant={selected ? 'solid' : 'outline'}
-                  onPress={() => setMinutes(m)}
-                  accessibilityLabel={`${m} minutes${selected ? ', selected' : ''}`}
-                  style={v2.preset}
-                  testID={`timer-preset-${m}`}
-                />
-              );
-            })}
-          </View>
-          <View style={[v2.stepRow, { borderTopColor: palette.separator, borderBottomColor: palette.separator }]}>
-            <Text style={[typeV2.body, v2.stepLabel, { color: palette.text }]}>Custom</Text>
-            <Tap
-              onPress={() => setMinutes((m) => Math.max(5, m - 5))}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel="5 minutes less"
-              style={[v2.stepBtn, { borderColor: palette.outline }]}
-              testID="timer-minus"
-            >
-              <Ionicons name="remove" size={18} color={palette.text} />
-            </Tap>
-            <Text style={[typeV2.body, typeV2.numeral, v2.stepValue, { color: palette.text }]} testID="timer-minutes">
-              {minutes} min
-            </Text>
-            <Tap
-              onPress={() => setMinutes((m) => Math.min(480, m + 5))}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel="5 minutes more"
-              style={[v2.stepBtn, { borderColor: palette.outline }]}
-              testID="timer-plus"
-            >
-              <Ionicons name="add" size={18} color={palette.text} />
-            </Tap>
-          </View>
-
-          <Text style={[typeV2.name, v2.header, { color: palette.text }]} accessibilityRole="header">
-            Clock
-          </Text>
-          <PillTabs<Direction>
-            options={[
-              { value: 'countDown', label: 'Count down' },
-              { value: 'countUp', label: 'Count up' },
-            ]}
-            value={direction}
-            onChange={setDirection}
-            testID="timer-direction"
+        <View style={v2.row}>
+          <PillButton
+            title="Start"
+            icon="play"
+            onPress={handleStart}
+            accessibilityLabel="Start timer"
+            style={v2.action}
+            testID="timer-start"
           />
-          <Text style={[typeV2.meta, v2.centred, v2.footnote, { color: palette.secondary }]}>
-            When time's up the session is saved by itself.
-          </Text>
         </View>
-      ) : (
-        <Text style={[typeV2.meta, v2.centred, v2.footnote, { color: palette.secondary }]}>
-          Runs until you tap End, wherever you are in the app. Sessions are saved to Activity.
-        </Text>
       )}
+
+      {timer && onOpenQuran ? (
+        <Tap
+          onPress={onOpenQuran}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Open the Quran"
+          style={v2.link}
+          testID="timer-open-quran"
+        >
+          <Ionicons name="book-outline" size={15} color={palette.link} />
+          <Text style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+            Open the Quran
+          </Text>
+        </Tap>
+      ) : null}
     </View>
   );
 }
 
 const v2 = StyleSheet.create({
-  tabs: { marginTop: 8 },
-  clockWrap: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: layoutV2.rowPad,
-  },
-  clock: {
-    fontSize: 54,
-    fontWeight: '200',
-    letterSpacing: -1,
-    maxWidth: RING_SIZE - 32,
-  },
-  clockSub: { marginTop: 4 },
-  actions: { flexDirection: 'row', gap: 12 },
-  action: { flex: 1 },
-  running: { alignItems: 'center', gap: layoutV2.rowPad, marginTop: layoutV2.rowPad, paddingBottom: 8 },
+  tabs: { marginTop: 4 },
+  clockBlock: { alignItems: 'center', paddingTop: 14, paddingBottom: 12, gap: 2 },
+  // Light and large, like the Clock app's, but no taller than the controls need.
+  clock: { fontSize: 48, fontWeight: '200', letterSpacing: -0.5 },
   centred: { textAlign: 'center' },
-  discard: { paddingVertical: 8 },
-  header: { marginTop: 20, marginBottom: 10 },
-  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  // Four to a row on a phone; they wrap rather than shrink with large text.
-  preset: { minWidth: 64, flexGrow: 1 },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 52,
-    paddingVertical: 8,
-    marginTop: 12,
-    gap: 12,
-    borderTopWidth: layoutV2.hairline,
-    borderBottomWidth: layoutV2.hairline,
-  },
-  stepLabel: { flex: 1 },
-  stepBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  track: { width: PROGRESS_WIDTH, height: 2, borderRadius: 1, marginTop: 8, overflow: 'hidden' },
+  fill: { height: 2, borderRadius: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 4 },
+  step: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepValue: { minWidth: 64, textAlign: 'center' },
-  footnote: { marginTop: 12, paddingHorizontal: 8, paddingBottom: 8 },
+  discard: { borderWidth: StyleSheet.hairlineWidth },
+  length: { minWidth: 76, textAlign: 'center' },
+  direction: { flex: 1, marginLeft: 4 },
+  action: { flex: 1 },
+  link: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingTop: 12, paddingBottom: 4 },
 });

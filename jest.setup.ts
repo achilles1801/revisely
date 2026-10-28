@@ -4,6 +4,9 @@
  * Expo modules that jest-expo does not stub out by default.
  */
 
+// Gesture Handler's native module: every sheet (v2/Sheet) has a drag gesture.
+require('react-native-gesture-handler/jestSetup');
+
 // Silence the noisy "useNativeDriver is not supported" warnings from RN Animated.
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({}), {
   virtual: true,
