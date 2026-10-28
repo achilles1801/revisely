@@ -166,8 +166,10 @@ export default {
       [
         "expo-location",
         {
-          locationAlwaysAndWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary.",
-          locationWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary."
+          // Fajr (the day boundary, saved to the account: docs/privacy) and the Qibla
+          // (worked out on the phone; the widget keeps only the bearing).
+          locationAlwaysAndWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking.",
+          locationWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking."
         }
       ]
     ],

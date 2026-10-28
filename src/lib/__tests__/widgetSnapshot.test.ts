@@ -176,3 +176,12 @@ describe('juzLabel', () => {
     expect(juzLabel([1, 3, 5, 7].map((juz) => ({ juz })))).toBe('4 juz');
   });
 });
+
+describe('the Qibla in the snapshot', () => {
+  it('from the position given, signed in or not; none without one', () => {
+    const london = { latitude: 51.5074, longitude: -0.1278 };
+    expect(buildWidgetSnapshot(inputs({ qiblaFrom: london })).qibla).toMatchObject({ bearing: 119, label: '119° SE' });
+    expect(buildWidgetSnapshot(inputs({ signedIn: false, user: null, qiblaFrom: london })).qibla?.bearing).toBe(119);
+    expect(buildWidgetSnapshot(inputs()).qibla).toBeNull();
+  });
+});

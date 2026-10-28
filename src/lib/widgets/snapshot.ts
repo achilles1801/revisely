@@ -11,6 +11,7 @@ import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary'
 import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
 import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
+import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export const WIDGET_APP_GROUP = 'group.com.revisionbuddy.app';
@@ -58,6 +59,8 @@ export interface WidgetSnapshot {
   accent: AccentName;
   colors: { light: WidgetColors; dark: WidgetColors };
   days: WidgetDay[];
+  /** The Qibla widget's bearing and distance; null until the phone has a position. */
+  qibla: WidgetQibla | null;
 }
 
 export interface WidgetInputs {
@@ -69,6 +72,10 @@ export interface WidgetInputs {
   quranData: QuranPage[];
   accent: AccentName;
   now: Date;
+  /** The phone's last known position (or the account's Fajr location). */
+  qiblaFrom?: Coords | null;
+  /** Cities for the Qibla widget's place line. */
+  cities?: readonly City[];
 }
 
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
@@ -126,7 +133,12 @@ export function aliveStreak(logDays: ReadonlySet<string>, day: string): number {
 }
 
 export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
-  const base = { v: 1 as const, accent: input.accent, colors: colorsFor(input.accent) };
+  const base = {
+    v: 1 as const,
+    accent: input.accent,
+    colors: colorsFor(input.accent),
+    qibla: widgetQibla(input.qiblaFrom ?? null, input.cities),
+  };
   if (!input.signedIn || !input.user) return { ...base, state: 'signedOut', days: [] };
   const user = input.user;
   const memorizedCount = input.pages.filter((p) => p.status === 'memorized').length;

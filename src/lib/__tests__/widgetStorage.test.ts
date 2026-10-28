@@ -11,6 +11,7 @@ const snapshot = (state: WidgetSnapshot['state'] = 'ready'): WidgetSnapshot => (
     dark: { accentText: '#9789DA', done: '#624BD5', onDone: '#FFFFFF', primary: '#624BD5', onPrimary: '#FFFFFF' },
   },
   days: [],
+  qibla: null,
 });
 
 function fakeStore() {

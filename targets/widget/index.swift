@@ -6,5 +6,6 @@ struct ReviselyWidgets: WidgetBundle {
   var body: some Widget {
     TodayWidget()
     VerseWidget()
+    QiblaWidget()
   }
 }
