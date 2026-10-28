@@ -15,23 +15,31 @@ export default {
       url: "https://u.expo.dev/32c71b6d-0a13-454c-916d-11d27f168fa8"
     },
     orientation: "portrait",
+    // The gradient cursive R on black (Oct 27 2026; sources in assets/brand/). Opaque
+    // 1024 with no alpha, as the App Store requires. The splash is the
+    // expo-splash-screen plugin below.
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
-    splash: {
-      image: "./assets/splash-icon.png",
-      resizeMode: "contain",
-      backgroundColor: "#03372A"
-    },
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.revisionbuddy.app",
+      // The team that signs the app and the widget extension (as in eas.json).
+      appleTeamId: "CH8N5V9MA6",
       // A fixed path: EAS copies its GOOGLE_SERVICES_INFO_PLIST file here before
       // install (eas-build-pre-install), so the path, and with it the fingerprint,
       // is the same on every machine.
       googleServicesFile: "./GoogleService-Info.plist",
+      // Shared with the widget extension (targets/widget): the app writes what the
+      // widgets show here (src/lib/widgets).
+      entitlements: {
+        "com.apple.security.application-groups": ["group.com.revisionbuddy.app"],
+      },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // Recitation goes on with the app in the background or the phone
+        // locked, with Now Playing on the lock screen (lib/recitation).
+        UIBackgroundModes: ["audio"],
         // Apple requires these strings whenever the binary contains photo
         // library API symbols, even if our app code never touches them.
         // Some SDKs (Sentry attachments, Google Sign-In profile picture
@@ -40,11 +48,16 @@ export default {
           "Allow Revisely to access your photos so you can attach screenshots when contacting support.",
         NSPhotoLibraryAddUsageDescription:
           "Allow Revisely to save images to your photo library.",
+        // Setting this makes Expo ignore `scheme` above, so revisely:// is listed
+        // here too: the widgets' links (src/lib/widgets/links.ts) open the app with it.
         CFBundleURLTypes: [
           {
             CFBundleURLSchemes: [
               process.env.GOOGLE_REVERSED_CLIENT_ID
             ]
+          },
+          {
+            CFBundleURLSchemes: ["revisely"]
           }
         ]
       }
@@ -54,7 +67,8 @@ export default {
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#03372A"
+        monochromeImage: "./assets/adaptive-icon-monochrome.png",
+        backgroundColor: "#000000"
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false
@@ -95,14 +109,39 @@ export default {
       // setup, and the Android client info from google-services.json — no
       // plugin options needed.
       "@react-native-google-signin/google-signin",
-      // Sentry: keep the bare plugin form — the configured @sentry/react-native/expo
-      // plugin (added by the wizard with org/project) does extra Podfile work
-      // that interacts badly with RNFirebase + static frameworks. The bare
-      // plugin still wires the SDK in. Source maps stay off via
-      // SENTRY_DISABLE_AUTO_UPLOAD=true on EAS env.
-      "@sentry/react-native",
+      // Sentry: no organization/project here — the wizard's configured form did
+      // extra Podfile work that interacts badly with RNFirebase + static
+      // frameworks; org and project come from SENTRY_ORG/SENTRY_PROJECT in the
+      // build (ios-build.yml). experimental_android only touches the Android
+      // project: the Sentry Android Gradle Plugin uploads the R8/ProGuard
+      // mapping and NDK symbols (with sources) when SENTRY_AUTH_TOKEN is set,
+      // for the Android launch. iOS is configured exactly as with the bare form.
+      [
+        "@sentry/react-native",
+        {
+          experimental_android: {
+            enableAndroidGradlePlugin: true,
+            autoUploadProguardMapping: true,
+            uploadNativeSymbols: true,
+            includeNativeSources: true,
+          },
+        },
+      ],
       "expo-font",
       "expo-web-browser",
+      // The launch screen: the R, 200 pt wide, on black (in light and dark mode
+      // alike). imageWidth needs this plugin: the top-level `splash` key shows the
+      // image full screen. No `dark` variant: it would set UIUserInterfaceStyle to
+      // Automatic, overriding userInterfaceStyle "light" above.
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#000000",
+        },
+      ],
       // Verse recitation (and, later, recording yourself reciting). The pod
       // ships recording APIs, so Apple's upload check requires a microphone
       // purpose string even before the app records.
@@ -120,11 +159,17 @@ export default {
       // Apple button ships with no entitlement and fails at runtime — an
       // automatic App Review rejection (Guideline 4.8).
       "expo-apple-authentication",
+      // The Home and Lock Screen widgets: links targets/widget into the generated
+      // Xcode project and registers it with EAS for signing (bundle id
+      // com.revisionbuddy.app.widget, same App Group).
+      "@bacons/apple-targets",
       [
         "expo-location",
         {
-          locationAlwaysAndWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary.",
-          locationWhenInUsePermission: "Allow Revisely to use your location to calculate accurate fajr times for your daily revision boundary."
+          // Fajr (the day boundary, saved to the account: docs/privacy) and the Qibla
+          // (worked out on the phone; the widget keeps only the bearing).
+          locationAlwaysAndWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking.",
+          locationWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking."
         }
       ]
     ],

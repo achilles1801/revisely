@@ -30,6 +30,7 @@ import {
   prefetchPages,
 } from '../lib/pageCache';
 import { AyahRef, ayahAt, ayahRects } from '../lib/ayahBounds';
+import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -40,6 +41,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DEFAULT_SIZE = fitPage(SCREEN_WIDTH, 0);
 // How long after scrollToPage a report of another page is taken as stale.
 const JUMP_SETTLE_MS = 500;
+// The end card's item in the list (page numbers are 1–604).
+const END = -1;
 
 interface MushafPagerProps {
   pages: number[];
@@ -51,14 +54,23 @@ interface MushafPagerProps {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   /** Tap anywhere on the page area — consumers use this to toggle chrome. */
   onTap?: () => void;
+  /** The user turned the page by swiping (not a jump, nor a drag that snapped back). */
+  onUserSwipe?: () => void;
   /** Press and hold on a verse. Receives the verse under the finger and the
    *  screen point pressed (to place a menu beside it). */
-  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
+  /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
   /** Verse to highlight (e.g. while its translation is open). */
   highlightedAyah?: AyahRef | null;
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
+  /** One more "page" after the last: swiping onto it is how the last page is
+   *  left (a revision session finishes there). */
+  endCard?: React.ReactNode;
+  /** The end card came on screen. `bySwipe`: the user swiped there from the
+   *  last page (a deliberate page turn, as for any page), not a jump. */
+  onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
 }
 
 export interface MushafPagerHandle {
@@ -72,11 +84,14 @@ export interface MushafPagerHandle {
 interface PageItemProps {
   pageNumber: number;
   onTap?: () => void;
-  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }) => void;
+  /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
+  onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
   /** The highlighted verse, drawn on every page it has lines on (a verse can
    *  run onto the next page). */
   highlight: AyahRef | null;
   highlightColor: string;
+  /** The highlight's opacity (it tints with a palette colour). */
+  highlightOpacity?: number;
   pageTint: string | null;
   tintColor: string;
   bg: string;
@@ -90,6 +105,7 @@ const PageItem = React.memo(function PageItem({
   onLongPressAyah,
   highlight,
   highlightColor,
+  highlightOpacity,
   pageTint,
   tintColor,
   bg,
@@ -120,7 +136,20 @@ const PageItem = React.memo(function PageItem({
     if (!onLongPressAyah) return;
     const { locationX, locationY, pageX, pageY } = e.nativeEvent;
     const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
-    if (ayah) onLongPressAyah(ayah, { x: pageX, y: pageY });
+    if (!ayah) return;
+    // The image's corner on screen, so the verse's lines can be placed there
+    // too (its menu goes beside them, not over them).
+    const ox = pageX - locationX;
+    const oy = pageY - locationY;
+    const verse = unionBox(
+      ayahRects(pageNumber, ayah.sura, ayah.ayah).map((r) => ({
+        x: ox + r.x0 * BOUNDS_SCALE,
+        y: oy + r.y0 * BOUNDS_SCALE,
+        width: (r.x1 - r.x0) * BOUNDS_SCALE,
+        height: (r.y1 - r.y0) * BOUNDS_SCALE,
+      })),
+    );
+    onLongPressAyah(ayah, { x: pageX, y: pageY }, verse);
   };
 
   const highlightRects = useMemo(
@@ -129,7 +158,14 @@ const PageItem = React.memo(function PageItem({
   );
 
   return (
-    <Pressable style={[styles.page, { backgroundColor: bg }]} onPress={onTap}>
+    // The page is one element for VoiceOver (the image's pressable inside isn't).
+    <Pressable
+      style={[styles.page, { backgroundColor: bg }]}
+      onPress={onTap}
+      accessibilityRole="button"
+      accessibilityLabel={`Page ${pageNumber}`}
+      accessibilityHint={onTap ? 'Shows or hides the controls' : undefined}
+    >
       {(uri == null || (isRemote && loading)) && !error && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={tintColor} />
@@ -154,15 +190,19 @@ const PageItem = React.memo(function PageItem({
           onPress={onTap}
           onLongPress={onLongPressAyah ? handleLongPress : undefined}
           delayLongPress={350}
+          accessible={false}
         >
+          {/* The verse's lines, in the image's own frame: bounds × the page's scale. */}
           {highlightRects.map((r, i) => (
             <View
               key={i}
+              testID="ayah-highlight"
               pointerEvents="none"
               style={[
                 styles.highlight,
                 {
                   backgroundColor: highlightColor,
+                  opacity: highlightOpacity,
                   left: r.x0 * BOUNDS_SCALE,
                   top: r.y0 * BOUNDS_SCALE,
                   width: (r.x1 - r.x0) * BOUNDS_SCALE,
@@ -172,6 +212,7 @@ const PageItem = React.memo(function PageItem({
             />
           ))}
           <Image
+            testID="page-image"
             source={{ uri }}
             style={[
               { width: size.width, height: size.height },
@@ -210,13 +251,16 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     onPageChange,
     onAdvance,
     onTap,
+    onUserSwipe,
     onLongPressAyah,
     highlightedAyah,
     extraData,
+    endCard,
+    onReachEnd,
   },
   ref,
 ) {
-  const { isDark, theme } = useTheme();
+  const { isDark, palette: v2 } = useTheme();
   const palette = getReadPalette(isDark);
   const listRef = useRef<FlatList>(null);
   const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_SIZE);
@@ -276,12 +320,26 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     [pages, onPageChange],
   );
 
+  const hasEnd = endCard != null;
+  const data = useMemo(() => (hasEnd ? [...pages, END] : pages), [pages, hasEnd]);
+
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length === 0) return;
       const first = viewableItems[0];
       if (first.index == null) return;
       const newIndex = first.index;
+      // The end card: leaving the last page by a swipe is how it is done.
+      if (hasEnd && newIndex === pages.length) {
+        const prevIndex = currentIndexRef.current;
+        if (prevIndex === newIndex) return;
+        jumpRef.current = null;
+        currentIndexRef.current = newIndex;
+        const lastPage = pages[pages.length - 1];
+        if (draggedRef.current) onUserSwipe?.();
+        if (lastPage != null) onReachEnd?.(lastPage, draggedRef.current && prevIndex === pages.length - 1);
+        return;
+      }
       // Right after a jump, ignore a stale report of the page we left. Any
       // other page is where the list really is (e.g. the user swiped meanwhile).
       const jump = jumpRef.current;
@@ -300,35 +358,44 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       }
       currentIndexRef.current = newIndex;
       prefetchPages(pagesAround(pages, newIndex));
+      // The swipe first, so a screen reacting to the new page has the last word.
+      if (draggedRef.current) onUserSwipe?.();
       if (newPage != null) onPageChange?.(newPage, newIndex);
     },
-    [pages, onAdvance, onPageChange],
+    [pages, hasEnd, onAdvance, onPageChange, onUserSwipe, onReachEnd],
   );
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
+  // The verse a sheet is about is tinted: the accent's text colour at a quarter.
   const renderItem = useCallback(
-    ({ item }: { item: number }) => (
-      <PageItem
-        pageNumber={item}
-        onTap={onTap}
-        onLongPressAyah={onLongPressAyah}
-        highlight={highlightedAyah ?? null}
-        highlightColor={theme.accent + '40'}
-        pageTint={palette.pageTint}
-        tintColor={palette.textPrimary}
-        bg={palette.pageBg}
-        size={pageSize}
-      />
-    ),
-    [onTap, onLongPressAyah, highlightedAyah, theme.accent, palette, pageSize],
+    ({ item }: { item: number }) =>
+      item === END ? (
+        <View style={[styles.page, { backgroundColor: palette.pageBg }]} testID="mushaf-end">
+          {endCard}
+        </View>
+      ) : (
+        <PageItem
+          pageNumber={item}
+          onTap={onTap}
+          onLongPressAyah={onLongPressAyah}
+          highlight={highlightedAyah ?? null}
+          highlightColor={v2.accentText}
+          highlightOpacity={0.25}
+          pageTint={palette.pageTint}
+          tintColor={palette.textPrimary}
+          bg={palette.pageBg}
+          size={pageSize}
+        />
+      ),
+    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard],
   );
 
   return (
     <FlatList
       ref={listRef}
-      data={pages}
-      keyExtractor={(p) => `mushaf-${p}`}
+      data={data}
+      keyExtractor={(p) => (p === END ? 'mushaf-end' : `mushaf-${p}`)}
       renderItem={renderItem}
       horizontal
       pagingEnabled

@@ -72,6 +72,8 @@ export interface User {
   // "Keep daily amount"): 'shift' (default) slides the plan back by that many
   // pages, 'add' puts them on top of today's. See lib/carryOver.
   carryOverMode?: 'shift' | 'add';
+  // The new design's accent (Settings → Appearance → Accent); unset = Indigo.
+  accent?: 'indigo' | 'crimson' | 'jade';
   // Pages carried into one revision day. They go first that day and replace its
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.
@@ -83,6 +85,10 @@ export interface User {
   translationId?: string;
   // Reciter and style for Play on a held verse: '<reciter>:<style>' (lib/recitation).
   reciter?: string;
+  // Back recordings up to the account (default on; lib/recordingBackup).
+  recordingBackup?: boolean;
+  // Let the backup use mobile data (default off: Wi-Fi only).
+  recordingBackupCellular?: boolean;
 }
 
 /** A user-edited schedule that overrides the default sequential plan. */

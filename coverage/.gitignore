@@ -1,0 +1,4 @@
+# Jest coverage reports (CI uploads them as an artifact); they embed source.
+# Ignored here, not in the root .gitignore: that file is part of the native fingerprint.
+*
+!.gitignore

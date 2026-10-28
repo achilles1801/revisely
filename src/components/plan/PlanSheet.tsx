@@ -1,11 +1,5 @@
 import React, { forwardRef, useCallback } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
   BottomSheetBackdrop,
   BottomSheetBackdropProps,
@@ -14,12 +8,17 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassCard } from '../GlassCard';
+import { Tap } from '../v2/Tap';
+import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
 
 /**
  * Themed @gorhom sheet with an iOS-style header: [Cancel]  Title  [Done].
+ *
+ * It takes v2/Sheet's frame: a solid sheet with 20pt corners, the v2 grab
+ * handle and backdrop, an 18pt centred title over a hairline, Cancel and the
+ * confirming action in ink.
  *
  * - Without `snapPoints` the sheet sizes itself to its content (wrapped in a
  *   BottomSheetView). Use for short forms.
@@ -59,20 +58,22 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
   },
   ref,
 ) {
-  const { theme } = useTheme();
+  const { palette } = useTheme();
   const insets = useSafeAreaInsets();
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
         {...props}
+        // The overlay is a colour with its own alpha: shown whole.
+        style={[props.style, { backgroundColor: palette.overlay }]}
         appearsOnIndex={0}
         disappearsOnIndex={-1}
-        opacity={0.35}
+        opacity={1}
         pressBehavior="close"
       />
     ),
-    [],
+    [palette.overlay],
   );
 
   const header = (
@@ -93,6 +94,7 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
     <BottomSheetModal
       ref={ref}
       snapPoints={snapPoints}
+      handleStyle={styles.handleV2}
       enableDynamicSizing={dynamic}
       stackBehavior={stackBehavior}
       onDismiss={onDismiss}
@@ -100,8 +102,13 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
         if (index >= 0) onPresented?.();
       }}
       backdropComponent={renderBackdrop}
-      backgroundComponent={SheetGlassBackground}
-      handleIndicatorStyle={{ backgroundColor: theme.textMuted, opacity: 0.4, width: 36 }}
+      backgroundComponent={SheetSolidBackground}
+      handleIndicatorStyle={{
+        backgroundColor: palette.handle,
+        width: layoutV2.handle.width,
+        height: layoutV2.handle.height,
+        borderRadius: layoutV2.handle.height / 2,
+      }}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
@@ -122,12 +129,15 @@ export const PlanSheet = forwardRef<BottomSheetModal, PlanSheetProps>(function P
   );
 });
 
-/** Glass sheet surface, matching the app's GlassCard look over the gradient. */
-function SheetGlassBackground({ style }: BottomSheetBackgroundProps) {
+/** The sheet: solid, 20pt corners. */
+function SheetSolidBackground({ style }: BottomSheetBackgroundProps) {
+  const { palette } = useTheme();
   return (
-    <View style={[style, styles.background]} pointerEvents="none">
-      <GlassCard style={StyleSheet.absoluteFillObject} />
-    </View>
+    <View
+      style={[style, styles.background, { backgroundColor: palette.sheet }]}
+      pointerEvents="none"
+      testID="plan-sheet-background"
+    />
   );
 }
 
@@ -143,104 +153,86 @@ export function SheetHeader({
   PlanSheetProps,
   'title' | 'leftLabel' | 'onLeft' | 'rightLabel' | 'onRight' | 'rightDisabled' | 'rightLoading'
 >) {
-  const { theme } = useTheme();
+  const { palette } = useTheme();
+  // v2/Sheet's header.
   return (
-    <View style={styles.header}>
-      <View style={[styles.side, styles.sideLeft]}>
-        {leftLabel && onLeft ? (
-          <HeaderButton label={leftLabel} onPress={onLeft} color={theme.accent} />
-        ) : null}
+    <View style={[styles.headerV2, { borderBottomColor: palette.separator }]}>
+      <View style={[styles.sideV2, styles.sideLeftV2]}>
+        {leftLabel && onLeft ? <HeaderButtonV2 label={leftLabel} onPress={onLeft} /> : null}
       </View>
       <Text
-        style={[styles.title, { color: theme.textPrimary }]}
-        numberOfLines={1}
+        style={[typeV2.sheetTitle, styles.titleV2, { color: palette.text }]}
+        numberOfLines={2}
         accessibilityRole="header"
+        maxFontSizeMultiplier={1.4}
       >
         {title}
       </Text>
-      <View style={[styles.side, styles.sideRight]}>
+      <View style={[styles.sideV2, styles.sideRightV2]}>
         {rightLoading ? (
-          <ActivityIndicator size="small" color={theme.accent} />
+          <ActivityIndicator size="small" color={palette.secondary} />
         ) : rightLabel && onRight ? (
-          <HeaderButton
-            label={rightLabel}
-            onPress={onRight}
-            color={rightDisabled ? theme.textMuted : theme.accent}
-            disabled={rightDisabled}
-            bold
-          />
+          <HeaderButtonV2 label={rightLabel} onPress={onRight} disabled={rightDisabled} strong />
         ) : null}
       </View>
     </View>
   );
 }
 
-function HeaderButton({
+/** v2/Sheet's header button: ink, semibold when it confirms, faded when it can't. */
+function HeaderButtonV2({
   label,
   onPress,
-  color,
   disabled,
-  bold,
+  strong,
 }: {
   label: string;
   onPress: () => void;
-  color: string;
   disabled?: boolean;
-  bold?: boolean;
+  strong?: boolean;
 }) {
+  const { palette } = useTheme();
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       disabled={disabled}
-      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      hitSlop={12}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
+      style={disabled && styles.disabled}
     >
-      {({ pressed }) => (
-        <Text
-          style={[
-            styles.headerButton,
-            { color, fontWeight: bold ? '600' : '400', opacity: pressed ? 0.5 : 1 },
-          ]}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      )}
-    </Pressable>
+      <Text
+        style={[typeV2.menu, strong && styles.strong, { color: palette.text }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.4}
+      >
+        {label}
+      </Text>
+    </Tap>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   background: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: radiusV2.sheet,
+    borderTopRightRadius: radiusV2.sheet,
     overflow: 'hidden',
   },
-  header: {
+  handleV2: { paddingTop: 10, paddingBottom: 6 },
+  headerV2: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xs,
+    paddingVertical: 12,
+    paddingHorizontal: layoutV2.gutter,
+    borderBottomWidth: layoutV2.hairline,
+    marginBottom: 6,
   },
-  side: {
-    width: 88,
-    justifyContent: 'center',
-  },
-  sideLeft: { alignItems: 'flex-start' },
-  sideRight: { alignItems: 'flex-end' },
-  title: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '600',
-  },
-  headerButton: {
-    fontSize: 17,
-    lineHeight: 22,
-  },
+  sideV2: { width: 72, flexDirection: 'row', alignItems: 'center' },
+  sideLeftV2: { justifyContent: 'flex-start' },
+  sideRightV2: { justifyContent: 'flex-end' },
+  titleV2: { flex: 1, textAlign: 'center' },
+  strong: { fontWeight: '600' },
+  disabled: { opacity: 0.4 },
 });

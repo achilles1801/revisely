@@ -1,20 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { GlassCard } from '../../components/GlassCard';
-import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
@@ -25,19 +12,19 @@ import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useApp } from '../../context/AppContext';
-import {
-  FLOATING_TIMER_SIZE,
-  useFloatingTimerOffset,
-} from '../../components/timer/floatingTimerOffset';
+import { TimerChip } from '../../components/timer/TimerChip';
+import { ReaderFrame } from '../../components/reader/ReaderFrame';
+import { ReaderActivity } from '../../components/reader/ReaderActivity';
+import { CAPSULE_HEIGHT, PlayerCapsule } from '../../components/reader/PlayerCapsule';
+import { useReaderChrome } from '../../components/reader/useReaderChrome';
+import { useTapHint } from '../../components/reader/useTapHint';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ROUND_BUTTON_SIZE, RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import {
   getHizbForPage,
   getJuzForPage,
@@ -51,26 +38,19 @@ type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
 
 const ALL_PAGES: number[] = Array.from({ length: 604 }, (_, i) => i + 1);
 const SETTLE_DEBOUNCE_MS = 1500;
-// Just above the scrubber and page number at the bottom.
-// The bottom bar: tall enough for the player, or the scrubber and page number.
-const FOOTER_CONTENT_HEIGHT = 56;
-const FOOTER_PADDING_BOTTOM = spacing.sm;
-const TIMER_SLOT_IDLE = FLOATING_TIMER_SIZE + spacing.md * 2;
-const TIMER_SLOT_RUNNING = 136;
-const READER_GUIDE_DISMISSED_KEY = '@revisley_reader_guide_dismissed';
+// Under the page, with the controls: the position track, then the capsule.
+const SCRUBBER_HEIGHT = 32;
+const FOOTER_HEIGHT = SCRUBBER_HEIGHT + spacing.xs + CAPSULE_HEIGHT + spacing.sm;
 
 export default function QuranReaderScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { theme, isDark } = useTheme();
+  const { isDark } = useTheme();
   const palette = getReadPalette(isDark);
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const initialPage = route.params.pageNumber;
   const [currentPage, setCurrentPage] = useState(initialPage);
-  const [showGuide, setShowGuide] = useState(false);
-  // The "?" only stays around until the guide has been seen once.
-  const [guideSeen, setGuideSeen] = useState(true);
 
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pagerRef = useRef<MushafPagerHandle>(null);
@@ -108,36 +88,22 @@ export default function QuranReaderScreen() {
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage,
+    focused: isScreenFocused,
   });
 
-  // The top bar and the bottom bar (player while reciting, otherwise the
-  // scrubber) have their own space; the page fits between them, so nothing
-  // covers a verse. Tapping the page hides or shows them (the page doesn't move).
-  const [chromeVisible, setChromeVisible] = useState(true);
-  const toggleChrome = useCallback(() => setChromeVisible((v) => !v), []);
+  // Reading: nothing but the page (its number, the juz and surah). A tap on
+  // the page brings the controls (they sit beside the page, never over it);
+  // another tap, or turning the page, puts them away.
+  const chrome = useReaderChrome();
+  const tapHint = useTapHint();
+  const dismissHint = tapHint.dismiss;
+  const toggleChrome = chrome.toggle;
+  const onTapPage = useCallback(() => {
+    dismissHint();
+    toggleChrome();
+  }, [dismissHint, toggleChrome]);
+  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // The floating timer docks in the bottom bar's right-hand slot; hidden with
-  // the controls.
-  useFloatingTimerOffset(
-    chromeVisible
-      ? insets.bottom + FOOTER_PADDING_BOTTOM + (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2
-      : 'hidden',
-  );
-
-  useEffect(() => {
-    AsyncStorage.getItem(READER_GUIDE_DISMISSED_KEY).then((v) => {
-      if (v !== 'true') {
-        setGuideSeen(false);
-        setShowGuide(true);
-      }
-    });
-  }, []);
-
-  const dismissGuideForever = async () => {
-    setShowGuide(false);
-    setGuideSeen(true);
-    await AsyncStorage.setItem(READER_GUIDE_DISMISSED_KEY, 'true');
-  };
 
   const handlePageChange = useCallback(
     (pageNumber: number) => {
@@ -176,57 +142,70 @@ export default function QuranReaderScreen() {
   const hizb = getHizbForPage(currentPage);
   const firstSurah = getSurahsForPage(currentPage)[0];
 
+  // Previous / next go when the capsule is crowded (a recording, a timer) on
+  // anything narrower than the largest phones.
+  const crowded = recorder.phase !== 'idle' || timer != null;
+  const compact = width < 430 && crowded;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      <View
-        style={[styles.topBar, !chromeVisible && styles.hidden]}
-        pointerEvents={chromeVisible ? 'box-none' : 'none'}
-      >
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={styles.backBtn}
-        >
-          <Ionicons name="chevron-back" size={22} color={palette.textSecondary} />
-        </Pressable>
-        <Text style={styles.crumbLeft} numberOfLines={1}>
-          Juz {juz} · Hizb {hizb}
-        </Text>
-        {/* While recording, the recording controls take the surah's place
-            (narrow phones have no room for both). */}
-        {recorder.phase === 'idle' && (
-          <View style={styles.crumbRight}>
-            <Text style={styles.crumbSurah} numberOfLines={1}>
-              {firstSurah?.name ?? ''}
+    <View style={styles.container}>
+      <ReaderFrame
+        chromeVisible={chrome.visible}
+        active={isScreenFocused}
+        onBackgroundPress={onTapPage}
+        background={palette.pageBg}
+        isDark={isDark}
+        quietHeader={
+          <View style={styles.quietHeader}>
+            <Text style={styles.quietText} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              Juz {juz}
             </Text>
-            {firstSurah?.nameArabic ? (
-              <Text style={styles.crumbArabic} numberOfLines={1}>
-                {firstSurah.nameArabic}
-              </Text>
-            ) : null}
+            <SurahName surah={firstSurah} palette={palette} quiet />
           </View>
-        )}
-        <RecordButton
-          recorder={recorder}
-          color={palette.textSecondary}
-          background={palette.card}
-          border={palette.divider}
-        />
-        {!guideSeen && recorder.phase === 'idle' && (
-          <Pressable
-            onPress={() => setShowGuide(true)}
-            hitSlop={12}
-            style={styles.helpBtn}
-            accessibilityLabel="How the reader works"
-          >
-            <Ionicons name="help" size={16} color={palette.textSecondary} />
-          </Pressable>
-        )}
-      </View>
-
-      <View style={styles.pageArea}>
+        }
+        header={
+          <View style={styles.header}>
+            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} />
+            <View style={styles.titleCol}>
+              <SurahName surah={firstSurah} palette={palette} />
+              <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                Page {currentPage} · Juz {juz} · Hizb {hizb}
+              </Text>
+            </View>
+            {/* Keeps the title centred. */}
+            <View style={{ width: ROUND_BUTTON_SIZE }} />
+          </View>
+        }
+        footer={
+          <View style={styles.footer}>
+            <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
+            <PlayerCapsule
+              player={verseActions.player}
+              page={currentPage}
+              compact={compact}
+              surface={{ background: palette.control, border: palette.divider }}
+              record={<RecordButton recorder={recorder} />}
+              timer={<TimerChip compact={compact} />}
+            />
+          </View>
+        }
+        footerHeight={FOOTER_HEIGHT}
+        pageLabel={
+          <Text style={styles.pageNum} maxFontSizeMultiplier={1.3}>
+            {currentPage}
+          </Text>
+        }
+        hint={
+          tapHint.shown ? (
+            <Text style={styles.hint} maxFontSizeMultiplier={1.3}>
+              Tap the page for the controls
+            </Text>
+          ) : null
+        }
+        activity={
+          <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+        }
+      >
         <MushafPager
           ref={pagerRef}
           pages={ALL_PAGES}
@@ -234,25 +213,10 @@ export default function QuranReaderScreen() {
           onPageChange={handlePageChange}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
-          onTap={toggleChrome}
+          onTap={onTapPage}
+          onUserSwipe={chrome.hide}
         />
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.footerContent} pointerEvents={chromeVisible ? 'box-none' : 'none'}>
-          {chromeVisible &&
-            (verseActions.player ?? (
-              <>
-                <MushafScrubber page={currentPage} onJump={handleJump} palette={palette} />
-                <Text style={styles.pageNum} pointerEvents="none">
-                  {currentPage}
-                </Text>
-              </>
-            ))}
-        </View>
-        {/* The floating timer docks here (wider while it shows a clock). */}
-        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
-      </View>
+      </ReaderFrame>
 
       <UndoToast
         visible={!!savedRecording}
@@ -265,111 +229,55 @@ export default function QuranReaderScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={FOOTER_CONTENT_HEIGHT + FOOTER_PADDING_BOTTOM + spacing.sm}
+        // At the bottom of the room under the page, never over the text.
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       {verseActions.overlay}
-
-      <ReaderGuideModal
-        visible={showGuide}
-        onClose={dismissGuideForever}
-        theme={theme}
-      />
-    </SafeAreaView>
+    </View>
   );
 }
 
-function ReaderGuideModal({
-  visible,
-  onClose,
-  theme,
+/** The surah on the page: its name, and its name in Arabic. */
+function SurahName({
+  surah,
+  palette,
+  quiet,
 }: {
-  visible: boolean;
-  onClose: () => void;
-  theme: ThemeColors;
+  surah: ReturnType<typeof getSurahsForPage>[number] | undefined;
+  palette: ReadPalette;
+  quiet?: boolean;
 }) {
-  const styles = useMemo(() => makeGuideStyles(theme), [theme]);
-  const steps: Array<{
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    body: string;
-  }> = [
-    {
-      icon: 'book-outline',
-      title: 'Swipe to turn pages',
-      body: 'Swipe right-to-left to advance through the Mushaf, just like a physical book. Drag the bar at the bottom to jump anywhere — page 1 is at the right.',
-    },
-    {
-      icon: 'hand-left-outline',
-      title: 'Hold a verse',
-      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
-    },
-    {
-      icon: 'mic-outline',
-      title: 'Record yourself',
-      body: 'Tap the mic to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
-    },
-    {
-      icon: 'time-outline',
-      title: 'Your place is remembered',
-      body: 'The last few pages you read show up under Recent on the Surahs index, so you can pick up where you left off.',
-    },
-    {
-      icon: 'shield-checkmark-outline',
-      title: 'Reading here doesn’t count as revision',
-      body: 'The Read tab is for free reading — it doesn’t affect your revision schedule or strength ratings. Use the Home tab when you want a tracked session.',
-    },
-  ];
-
+  if (!surah) return null;
+  const color = quiet ? palette.textSecondary : palette.textPrimary;
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>How the reader works</Text>
-            <PressableScale
-              onPress={onClose}
-              haptic="light"
-              style={styles.closeBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Close"
-            >
-              <Ionicons name="close" size={20} color={theme.textSecondary} />
-            </PressableScale>
-          </View>
-
-          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-            <View style={styles.steps}>
-              {steps.map((s, i) => (
-                <View key={i} style={styles.step}>
-                  <View style={styles.stepIcon}>
-                    <Ionicons name={s.icon} size={18} color={theme.accent} />
-                  </View>
-                  <View style={styles.stepText}>
-                    <Text style={styles.stepTitle}>{s.title}</Text>
-                    <Text style={styles.stepBody}>{s.body}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <PressableScale
-              onPress={onClose}
-              haptic="medium"
-              scale={0.98}
-              style={styles.primaryBtn}
-            >
-              <Text style={styles.primaryBtnText}>Got it</Text>
-            </PressableScale>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <View style={surahStyles.row}>
+      <Text
+        style={[quiet ? surahStyles.quiet : surahStyles.title, { color }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.3}
+      >
+        {surah.name}
+      </Text>
+      {surah.nameArabic ? (
+        <Text
+          style={[surahStyles.arabic, { color, fontSize: quiet ? 13 : 16 }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+        >
+          {surah.nameArabic}
+        </Text>
+      ) : null}
+    </View>
   );
 }
+
+const surahStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs, flexShrink: 1 },
+  title: { ...typography.titleSmall },
+  quiet: { ...typography.caption },
+  arabic: { fontFamily: fonts.arabic },
+});
 
 const makeStyles = (palette: ReadPalette) =>
   StyleSheet.create({
@@ -377,138 +285,45 @@ const makeStyles = (palette: ReadPalette) =>
       flex: 1,
       backgroundColor: palette.pageBg,
     },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      // SafeAreaView keeps it below the notch / Dynamic Island.
-      paddingTop: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.sm,
-      gap: spacing.sm,
-    },
-    backBtn: {
-      width: 32,
-      height: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    helpBtn: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    crumbLeft: {
-      ...typography.caption,
-      color: palette.textPrimary,
-      flex: 1,
-      minWidth: 60,
-    },
-    crumbRight: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: spacing.xs,
-      flexShrink: 1,
-    },
-    crumbSurah: {
-      ...typography.caption,
-      color: palette.textPrimary,
-    },
-    crumbArabic: {
-      fontFamily: fonts.arabic,
-      fontSize: 14,
-      color: palette.textPrimary,
-    },
-    hidden: { opacity: 0 },
-    pageArea: { flex: 1 },
-    footer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingLeft: spacing.md,
-      paddingBottom: FOOTER_PADDING_BOTTOM,
-      gap: spacing.xs,
-    },
-    footerContent: {
-      flex: 1,
-      height: FOOTER_CONTENT_HEIGHT,
-      justifyContent: 'center',
-      alignItems: 'stretch',
-    },
-
-    pageNum: {
-      textAlign: 'center',
-      // Smaller and brighter — matches the goal Mushaf page number which
-      // sits in the same ink color as the verse text, not muted-gray.
-      fontSize: 13,
-      fontWeight: '500',
-      color: palette.textPrimary,
-    },
-  });
-
-const makeGuideStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: spacing.lg,
-    },
-    card: {
-      width: '100%',
-      maxWidth: 420,
-      maxHeight: '85%',
-      borderRadius: radius.lg,
-      padding: spacing.lg,
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    headerRow: {
+    quietHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    title: { ...typography.titleLarge, color: theme.textPrimary, flex: 1 },
-    closeBtn: {
-      width: 32,
-      height: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.full,
-    },
-    scroll: { marginBottom: spacing.md },
-    steps: { gap: spacing.md },
-    step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    stepIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent + '20',
-    },
-    stepText: { flex: 1 },
-    stepTitle: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-      marginBottom: 2,
-    },
-    stepBody: { ...typography.bodySmall, color: theme.textSecondary },
-    actions: { flexDirection: 'row', gap: spacing.sm },
-    primaryBtn: {
-      flex: 1,
-      paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent,
+      gap: spacing.md,
     },
-    primaryBtnText: {
-      ...typography.bodySmall,
-      color: '#fff',
-      fontWeight: '700',
+    quietText: {
+      ...typography.caption,
+      color: palette.textSecondary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.sm,
+      gap: spacing.sm,
+    },
+    titleCol: { flex: 1, alignItems: 'center' },
+    subtitle: {
+      ...typography.caption,
+      color: palette.textSecondary,
+    },
+    footer: {
+      flex: 1,
+      paddingHorizontal: spacing.sm,
+      paddingBottom: spacing.sm,
+      gap: spacing.xs,
+      justifyContent: 'flex-end',
+    },
+    hint: {
+      ...typography.caption,
+      color: palette.textSecondary,
+    },
+    pageNum: {
+      textAlign: 'center',
+      // Small, in the page's ink colour, like the printed mushaf's number.
+      fontSize: 13,
+      fontWeight: '500',
+      fontVariant: ['tabular-nums'],
+      color: palette.textPrimary,
     },
   });

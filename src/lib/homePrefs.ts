@@ -11,8 +11,6 @@ export interface HomePrefs {
   fridayKahfReminder: boolean;
   /** Revision day on which the Al-Kahf card was dismissed ("Not today"). */
   kahfDismissedDay: string | null;
-  /** Keep the screen from locking while reading, revising or listening. */
-  keepScreenOn: boolean;
 }
 
 export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
@@ -23,13 +21,21 @@ export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
 
 export const ALL_HOME_METRICS: HomeMetric[] = ['juz', 'pages', 'surahs'];
 
+const HOME_METRIC_SHORT: Record<HomeMetric, string> = { juz: 'Juz', pages: 'Pages', surahs: 'Surahs' };
+
+/** What the card shows, for the folded row in Settings: "Juz, Pages". */
+export function homeMetricsSummary(metrics: HomeMetric[]): string {
+  return ALL_HOME_METRICS.filter((m) => metrics.includes(m))
+    .map((m) => HOME_METRIC_SHORT[m])
+    .join(', ');
+}
+
 const STORAGE_KEY = '@revisely_home_prefs';
 const DEFAULT_PREFS: HomePrefs = {
   showProgressCard: true,
   metrics: ['juz', 'pages'],
   fridayKahfReminder: true,
   kahfDismissedDay: null,
-  keepScreenOn: true,
 };
 
 /** Saved prefs over the defaults; fields added later default for old installs. */
@@ -52,8 +58,6 @@ export function parseHomePrefs(raw: string | null): HomePrefs {
         : DEFAULT_PREFS.fridayKahfReminder,
     kahfDismissedDay:
       typeof saved.kahfDismissedDay === 'string' ? saved.kahfDismissedDay : null,
-    keepScreenOn:
-      typeof saved.keepScreenOn === 'boolean' ? saved.keepScreenOn : DEFAULT_PREFS.keepScreenOn,
   };
 }
 

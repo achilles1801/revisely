@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
 import DashboardScreen from '../screens/main/DashboardScreen';
@@ -15,11 +14,17 @@ import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
+import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
+import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
-import { FloatingTimer } from '../components/timer/FloatingTimer';
-import { FloatingTimerProvider } from '../components/timer/floatingTimerOffset';
 import { useAppUsageTracking } from '../lib/appUsage';
-import { LiquidGlassTabBar } from '../components/LiquidGlassTabBar';
+import { TabBar, useTabBarHeight } from './TabBar';
+import type { PagerTabBarProps } from './PagerTabs';
+import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
+import { getRecitation } from '../lib/recitation';
+import { openReaderAt } from './openReader';
+import { createPagerTabNavigator } from './PagerTabs';
+import { swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
@@ -46,6 +51,8 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. */
   ActivityDay: { date: string; focusRecordingId?: string };
+  // Everything done, searchable (new design's "See all"); kind preselects a filter.
+  ActivityAll: { kind?: ActivityKind } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string } | undefined;
@@ -56,16 +63,19 @@ export type ReadStackParamList = {
   QuranReader: { pageNumber: number; source?: 'index' | 'recent' };
 };
 
-const Tab = createBottomTabNavigator<MainTabParamList>();
+// The tabs are one pager: a sideways swipe on a tab's main screen moves to the
+// tab beside it, the incoming tab visible as it slides (navigation/PagerTabs).
+const Tab = createPagerTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const ReadStack = createNativeStackNavigator<ReadStackParamList>();
 
-// Routes (within any tab's stack) where the floating glass tab bar should be
-// suppressed. These screens render their own bottom-edge chrome.
+// Routes (within any tab's stack) where the tab bar is hidden. These screens
+// are full screen or render their own bottom-edge chrome.
 const HIDE_TAB_BAR_ON = new Set([
   'PlanEdit',
   'PlanDayEdit',
   'ActiveRevision',
+  'Memorization',
   'QuranReader',
   'JournalEntry',
 ]);
@@ -87,6 +97,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
+      <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
     </HomeStack.Navigator>
   );
@@ -107,6 +118,20 @@ function ReadStackNavigator() {
   );
 }
 
+/**
+ * The mini player above the tab bar, while a recitation goes on somewhere the
+ * user isn't looking; › opens the reader at the verse.
+ */
+function MiniPlayerAboveTabs({ navigation }: { navigation: PagerTabBarProps['navigation'] }) {
+  const bottom = useTabBarHeight() + MINI_PLAYER_GAP;
+  return (
+    <MiniPlayer
+      bottom={bottom}
+      onOpen={(verse) => openReaderAt(navigation, verse)}
+    />
+  );
+}
+
 export function MainNavigator() {
   const { user } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
@@ -117,40 +142,39 @@ export function MainNavigator() {
 
   const [previewOpen, setPreviewOpen] = useState(false);
   useAppUsageTracking();
+  // Signing out leaves the app's screens: the recitation stops with them.
+  useEffect(() => () => getRecitation().stop(), []);
 
   return (
     <ReadingTimerProvider>
-      <FloatingTimerProvider>
-        <View style={{ flex: 1 }}>
-          <Tab.Navigator
-            tabBar={(props) => {
-              // Hide the tab bar on full-screen "deep" screens — they own the
-              // bottom edge (Done buttons, save bars, FABs) and would otherwise
-              // collide with the floating glass bar.
-              const tabRoute = props.state.routes[props.state.index];
-              const focused = getFocusedRouteNameFromRoute(tabRoute);
-              if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
-              return (
-                <LiquidGlassTabBar
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          tabBar={(props) => {
+            // Hide the tab bar on full-screen "deep" screens: they own the
+            // bottom edge (Done buttons, save bars) and would otherwise
+            // collide with the bar. The mini player goes with it (the reader
+            // and the session show the recitation in their own player bar).
+            const tabRoute = props.state.routes[props.state.index];
+            const focused = getFocusedRouteNameFromRoute(tabRoute);
+            if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
+            return (
+              <>
+                <MiniPlayerAboveTabs navigation={props.navigation} />
+                <TabBar
                   {...props}
                   showInsightsTab={showInsightsTab}
-                  glowInsightsTab={glowInsightsTab}
-                  onInsightsTabPress={
-                    glowInsightsTab ? () => setPreviewOpen(true) : undefined
-                  }
+                  onInsightsTabPress={glowInsightsTab ? () => setPreviewOpen(true) : undefined}
                 />
-              );
-            }}
-            screenOptions={{ headerShown: false }}
-          >
-            <Tab.Screen name="Home" component={HomeStackNavigator} />
-            <Tab.Screen name="Read" component={ReadStackNavigator} />
-            <Tab.Screen name="Insights" component={AlgorithmScreen} />
-          </Tab.Navigator>
-          {/* The one timer entry point, over every tab (same state everywhere). */}
-          <FloatingTimer />
-        </View>
-      </FloatingTimerProvider>
+              </>
+            );
+          }}
+          swipeableCount={swipeableTabCount(smartTrackingEnabled)}
+        >
+          <Tab.Screen name="Home" component={HomeStackNavigator} />
+          <Tab.Screen name="Read" component={ReadStackNavigator} />
+          <Tab.Screen name="Insights" component={AlgorithmScreen} />
+        </Tab.Navigator>
+      </View>
       <SmartTrackingPreviewScreen
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}

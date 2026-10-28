@@ -9,8 +9,9 @@ import {
   type RecordingOptions,
   type RecordingStatus,
 } from 'expo-audio';
-import * as Haptics from 'expo-haptics';
 import { getRecitation } from '../lib/recitation';
+import { useHaptics } from '../design/haptics';
+import { addLevel, createLevelBuffer, dbToLevel, finishLevels, LEVEL_SAMPLE_MS } from '../lib/waveform';
 import {
   acquireRecording,
   appendSegment,
@@ -37,7 +38,10 @@ import { logger } from '../lib/logger';
 // Close to Voice Memos: AAC at 48 kHz, mono (the phone's main microphone),
 // 96 kbps at the encoder's highest quality. About 43 MB an hour. (The first
 // version recorded 22 kHz at 32 kbps, which sounded thin and muffled.)
+// Metering: the recorder reports its level, sampled for the waveform
+// (lib/waveform); it doesn't change what is recorded.
 export const VOICE_PRESET: RecordingOptions = {
+  isMeteringEnabled: true,
   extension: '.m4a',
   sampleRate: 48000,
   numberOfChannels: 1,
@@ -82,6 +86,19 @@ interface Options {
  * to the background, pause it; the user resumes when ready.
  */
 export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }: Options) {
+  // A recording starting and stopping is marked with one impact
+  // (design/haptics); taps don't buzz.
+  const haptics = useHaptics();
+  const hapticsRef = useRef(haptics);
+  hapticsRef.current = haptics;
+  /** The start / stop impact; a haptics failure never stops a recording. */
+  const buzz = () => {
+    try {
+      hapticsRef.current.impact();
+    } catch {
+      // No haptics here.
+    }
+  };
   const [phase, setPhase] = useState<RecorderPhase>('idle');
   /** Time recorded before the current stretch (and before this visit). */
   const [baseMs, setBaseMs] = useState(0);
@@ -93,6 +110,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   const segStartRef = useRef(0);
   const uriRef = useRef<string | null>(null);
   const marksRef = useRef<PageMark[]>([]);
+  // The microphone's level over the stretch in progress (its waveform).
+  const levelsRef = useRef(createLevelBuffer());
   const dayRef = useRef(day);
   const recordingIdRef = useRef<string | null>(null);
   const createdAtRef = useRef(0);
@@ -152,6 +171,8 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     const uri = uriRef.current;
     const segmentMs = Date.now() - segStartRef.current;
     const segmentStartMs = baseRef.current;
+    const levels = finishLevels(levelsRef.current);
+    levelsRef.current = createLevelBuffer();
     const info = {
       kind,
       day: dayRef.current ?? '',
@@ -160,6 +181,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       segmentStartMs,
       createdAt: createdAtRef.current,
       open: keepsOpen,
+      ...(levels.length > 0 ? { levels } : {}),
     };
     uriRef.current = null;
     baseRef.current += segmentMs;
@@ -226,6 +248,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       await recorder.prepareToRecordAsync(VOICE_PRESET);
     }
     uriRef.current = recorder.uri;
+    levelsRef.current = createLevelBuffer();
     recorder.record();
     segStartRef.current = Date.now();
     setCapturing(true);
@@ -295,7 +318,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       baseRef.current = existing?.durationMs ?? 0;
       marksRef.current = existing ? [...existing.pageMarks] : [];
       await startSegment();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      buzz();
     } catch (err) {
       logger.error('Could not start recording', err);
       abandonStart();
@@ -326,7 +349,6 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       setSegmentStartedAt(null);
       // Playback (recitation, a recording) through the speaker while paused.
       setAudioMode(false);
-      if (!interruption) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await saved;
     },
     [endSegment],
@@ -343,7 +365,6 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     setPhaseBoth('starting');
     try {
       await startSegment();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (err) {
       logger.error('Could not resume recording', err);
       abandonStart();
@@ -376,7 +397,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       }
       setAudioMode(false);
       if (savedAnyRef.current) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        buzz();
         const id = recordingIdRef.current;
         const savedDay = dayRef.current;
         if (id && savedDay && !unmountedRef.current) onFinishedRef.current?.({ day: savedDay, recordingId: id });
@@ -459,6 +480,23 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       marks.push({ atMs: baseRef.current + (Date.now() - segStartRef.current), page: currentPage });
     }
   }, [currentPage, phase]);
+
+  // The level while recording, for the waveform (lib/waveform). iOS reports
+  // average power in dBFS when metering is on (VOICE_PRESET); without it
+  // nothing is kept, and the recording is drawn flat.
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    const id = setInterval(() => {
+      if (phaseRef.current !== 'recording') return;
+      try {
+        const db = recorder.getStatus().metering;
+        if (typeof db === 'number' && Number.isFinite(db)) addLevel(levelsRef.current, dbToLevel(db));
+      } catch {
+        // Released (the screen is closing): the stretch keeps what it has.
+      }
+    }, LEVEL_SAMPLE_MS);
+    return () => clearInterval(id);
+  }, [phase, recorder]);
 
   // An interruption that leaves the app active (an alarm, Siri) pauses the
   // recorder without an event: notice it and pause the session too.

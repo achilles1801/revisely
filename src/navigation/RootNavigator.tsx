@@ -1,6 +1,5 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -13,14 +12,9 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 export function RootNavigator() {
   const { loading, onboardingComplete } = useApp();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette } = useTheme();
 
-  // App-wide gradient gives glass surfaces something to refract. Nav theme bg
-  // is transparent so the gradient shows through every screen.
-  const gradientColors: readonly [string, string, string] = isDark
-    ? ['#0F1410', '#1F4538', '#0F1410']
-    : ['#FBF8F3', '#C6DDD3', '#FBF8F3'];
-
+  // Nav theme bg is transparent so the flat ground shows through every screen.
   const navigationTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -35,8 +29,9 @@ export function RootNavigator() {
 
   if (loading || authLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.bg }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
+      <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]} testID="root-loading">
+        {/* A plain grey spinner on the ground, no accent. */}
+        <ActivityIndicator size="large" color={palette.secondary} />
       </View>
     );
   }
@@ -50,13 +45,8 @@ export function RootNavigator() {
   );
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={gradientColors}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+    // A flat white or black ground.
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <View style={{ flex: 1 }}>{content}</View>
       </NavigationContainer>

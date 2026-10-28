@@ -1,21 +1,20 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 
 interface UndoToastProps {
   visible: boolean;
   message: string;
-  onUndo: () => void;
+  /** The action; without it the bar is only the message ("Copied"). */
+  onUndo?: () => void;
   onDismiss: () => void;
   /** Auto-dismiss after this many ms. Default 3000. */
   duration?: number;
@@ -25,6 +24,12 @@ interface UndoToastProps {
   actionLabel?: string;
 }
 
+/**
+ * A short-lived bar, with an action ("Pages cleared · Undo") or without one
+ * ("Copied"): a flat snackbar
+ * in the inverse of the ground (ink on white, white on black), no shadow,
+ * inside the gutters.
+ */
 export function UndoToast({
   visible,
   message,
@@ -34,8 +39,7 @@ export function UndoToast({
   bottomInset = 0,
   actionLabel = 'Undo',
 }: UndoToastProps) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { palette } = useTheme();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
 
@@ -68,57 +72,38 @@ export function UndoToast({
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[
-        styles.wrap,
-        { bottom: bottomInset + spacing.md },
-        animStyle,
-      ]}
+      style={[v2.wrap, { bottom: bottomInset + spacing.md }, animStyle]}
+      testID="undo-toast"
     >
-      <View style={styles.toast}>
-        <Text style={styles.message} numberOfLines={1}>
+      <View style={[v2.toast, !onUndo && v2.plain, { backgroundColor: palette.text }]} accessibilityLiveRegion="polite" testID="undo-toast-bar">
+        <Text style={[typeV2.body, v2.message, { color: palette.bg }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
           {message}
         </Text>
-        <Pressable onPress={onUndo} hitSlop={10} style={styles.undoBtn} accessibilityRole="button">
-          <Text style={styles.undoText}>{actionLabel}</Text>
-        </Pressable>
+        {onUndo ? (
+          <Tap onPress={onUndo} hitSlop={10} style={v2.action} accessibilityRole="button" testID="undo-toast-action">
+            <Text style={[typeV2.button, { color: palette.bg }]} maxFontSizeMultiplier={1.4}>
+              {actionLabel}
+            </Text>
+          </Tap>
+        ) : null}
       </View>
     </Animated.View>
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    wrap: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
-    },
-    toast: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.surface,
-      borderRadius: radius.full,
-      paddingLeft: spacing.md,
-      paddingRight: spacing.xs,
-      paddingVertical: spacing.xs,
-      gap: spacing.sm,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-      ...shadows.md,
-    },
-    message: {
-      ...typography.bodySmall,
-      color: theme.textPrimary,
-    },
-    undoBtn: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: radius.full,
-    },
-    undoText: {
-      ...typography.bodySmall,
-      color: theme.accent,
-      fontWeight: '700',
-    },
-  });
+const v2 = StyleSheet.create({
+  wrap: { position: 'absolute', left: layoutV2.gutter, right: layoutV2.gutter },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    borderRadius: radiusV2.media,
+    paddingLeft: layoutV2.gutter,
+    paddingRight: 4,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  plain: { paddingRight: layoutV2.gutter },
+  message: { flex: 1 },
+  action: { paddingHorizontal: 12, paddingVertical: 8 },
+});

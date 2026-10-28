@@ -1,10 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
-import { PressableScale } from '../PressableScale';
-import { GlassCard } from '../GlassCard';
-import { LiquidGlassSegmentedControl } from '../LiquidGlassSegmentedControl';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
 import {
@@ -14,19 +10,39 @@ import {
   formatPageRanges,
   formatStopwatch,
   MIN_SESSION_SECONDS,
-  TIMER_PRESET_MINUTES,
 } from '../../lib/readingTimer';
-import { ThemeColors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import type { ReadingTimerMode } from '../../types';
+import { useHaptics } from '../../design/haptics';
+import { typeV2 } from '../../theme/v2';
+import { PillButton } from '../v2/PillButton';
+import { PillTabs } from '../v2/PillTabs';
+import { Tap } from '../v2/Tap';
 
 type Kind = 'stopwatch' | 'timer';
 type Direction = 'countUp' | 'countDown';
 
-const RING_SIZE = 220;
-const RING_STROKE = 6;
+const PROGRESS_WIDTH = 160;
+
+/** A timer's length, a step longer or shorter: 5 minutes up to an hour, then 15, then 30 (5 min to 8 h). */
+export function stepLength(minutes: number, direction: 1 | -1): number {
+  if (direction === 1) return Math.min(480, minutes < 60 ? minutes + 5 : minutes < 120 ? minutes + 15 : minutes + 30);
+  return Math.max(5, minutes <= 60 ? minutes - 5 : minutes <= 120 ? minutes - 15 : minutes - 30);
+}
+
+/** Typed minutes: 1 to 480 (8 h, the longest a step reaches), or null. */
+export const MIN_TYPED = 1;
+export const MAX_TYPED = 480;
+export function parseMinutes(text: string): number | null {
+  if (!/^\d{1,3}$/.test(text.trim())) return null;
+  const n = Number(text.trim());
+  return n >= MIN_TYPED && n <= MAX_TYPED ? n : null;
+}
+
+/** "45 min", "1 h", "1 h 30 min". */
+export function lengthLabel(m: number): string {
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
+}
 
 interface TimerControlsProps {
   /** Close the surrounding sheet. */
@@ -40,21 +56,47 @@ interface TimerControlsProps {
 }
 
 /**
- * The one set of timer controls, shown by the floating timer. iPhone
- * Clock-inspired, two kinds:
- *  - Stopwatch: open-ended, ends when you tap End.
- *  - Timer: pick a length; it counts up or down and ends by itself.
- * Revised pages (revision screen) and opened pages (reader) are credited to
- * whatever timer is running.
+ * The state and actions behind the timer controls: what is chosen before
+ * starting, the clock, and Start, End and Discard.
  */
-export function TimerControls({ onClose, onSaved, onOpenQuran, visible = true }: TimerControlsProps) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsProps) {
+  const haptics = useHaptics();
   const { timer, start, pause, resume, finish, discard } = useReadingTimer();
 
   const [kind, setKind] = useState<Kind>('stopwatch');
   const [direction, setDirection] = useState<Direction>('countDown');
   const [minutes, setMinutes] = useState(30);
+  // Typing the length instead of stepping to it.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [entryError, setEntryError] = useState(false);
+  // Empty, the current length as its placeholder: typing starts afresh.
+  const beginEdit = () => {
+    setDraft('');
+    setEntryError(false);
+    setEditing(true);
+  };
+  /** The typed length, applied; false (and a hint) if it isn't 1 to 480. */
+  const commitEdit = (): number | null => {
+    const n = parseMinutes(draft);
+    if (n == null) {
+      setEntryError(true);
+      return null;
+    }
+    setMinutes(n);
+    setEditing(false);
+    setEntryError(false);
+    Keyboard.dismiss();
+    return n;
+  };
+  // Leaving the field: a valid length is kept, anything else goes back.
+  const endEdit = () => {
+    if (parseMinutes(draft) != null) commitEdit();
+    else {
+      setEditing(false);
+      setEntryError(false);
+    }
+  };
 
   const running = timer?.runningSince != null;
   const now = useNow(visible && running, timer?.mode === 'stopwatch' ? 50 : 250);
@@ -68,13 +110,21 @@ export function TimerControls({ onClose, onSaved, onOpenQuran, visible = true }:
       ? formatStopwatch(0)
       : formatClock(direction === 'countDown' ? minutes * 60_000 : 0);
 
+
   const targetSeconds = timer ? timer.targetSeconds : kind === 'timer' ? minutes * 60 : null;
   const progress =
     targetSeconds != null && timer ? elapsedMs(timer, now) / (targetSeconds * 1000) : 0;
 
   const handleStart = () => {
     const mode: ReadingTimerMode = kind === 'stopwatch' ? 'stopwatch' : direction;
-    start(mode, kind === 'timer' ? minutes * 60 : null);
+    // Start while typing: what was typed, if it's a length.
+    let length = minutes;
+    if (kind === 'timer' && editing) {
+      const typed = commitEdit();
+      if (typed == null) return;
+      length = typed;
+    }
+    start(mode, kind === 'timer' ? length * 60 : null);
   };
 
   const handleEnd = async () => {
@@ -82,6 +132,8 @@ export function TimerControls({ onClose, onSaved, onOpenQuran, visible = true }:
     const date = timer.date;
     const seconds = Math.round(elapsedMs(timer, Date.now()) / 1000);
     if (!(await finish())) return;
+    // The outcome is marked (taps don't buzz).
+    haptics.success();
     onClose();
     if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds);
   };
@@ -93,6 +145,7 @@ export function TimerControls({ onClose, onSaved, onOpenQuran, visible = true }:
         text: 'Discard',
         style: 'destructive',
         onPress: () => {
+          haptics.warning();
           discard();
           onClose();
         },
@@ -100,352 +153,322 @@ export function TimerControls({ onClose, onSaved, onOpenQuran, visible = true }:
     ]);
   };
 
-  const r = (RING_SIZE - RING_STROKE) / 2;
-  const circumference = 2 * Math.PI * r;
+  return {
+    timer,
+    running,
+    kind,
+    setKind,
+    direction,
+    setDirection,
+    minutes,
+    setMinutes,
+    editing,
+    draft,
+    setDraft,
+    entryError,
+    beginEdit,
+    commitEdit,
+    endEdit,
+    clockText,
+    targetSeconds,
+    progress,
+    pause,
+    resume,
+    handleStart,
+    handleEnd,
+    handleDiscard,
+  };
+}
+
+/**
+ * The one set of timer controls, in the timer sheet: small, so the page stays
+ * in view. Two kinds:
+ *  - Stopwatch: open-ended, ends when you tap End.
+ *  - Timer: pick a length; it counts down or up and ends by itself.
+ * Revised pages (revision screen) and opened pages (reader) are credited to
+ * whatever timer is running. The clock light and large, a line under it, and
+ * one row of controls.
+ */
+export function TimerControls(props: TimerControlsProps) {
+  const { onOpenQuran } = props;
+  const { palette } = useTheme();
+  const {
+    timer,
+    running,
+    kind,
+    setKind,
+    direction,
+    setDirection,
+    minutes,
+    setMinutes,
+    editing,
+    draft,
+    setDraft,
+    entryError,
+    beginEdit,
+    commitEdit,
+    endEdit,
+    clockText,
+    targetSeconds,
+    progress,
+    pause,
+    resume,
+    handleStart,
+    handleEnd,
+    handleDiscard,
+  } = useTimerControls(props);
+  // A timer not started yet: its length can be typed (tap the clock or the length).
+  const typeable = !timer && kind === 'timer';
+
+  const mode = timer?.mode ?? (kind === 'stopwatch' ? 'stopwatch' : direction);
+  // One line under the clock: what it does, or where it is.
+  const caption = timer
+    ? !running
+      ? 'Paused'
+      : targetSeconds != null
+        ? `${mode === 'countDown' ? 'remaining of ' : 'of '}${lengthLabel(Math.round(targetSeconds / 60))}`
+        : (timer.pagesRevised?.length ?? 0) > 0
+          ? `Pages revised: ${formatPageRanges(timer.pagesRevised ?? [])}`
+          : timer.pagesVisited.length > 0
+            ? `Pages opened: ${formatPageRanges(timer.pagesVisited)}`
+            : 'Saved to Activity when you end it'
+    : kind === 'stopwatch'
+      ? 'Runs until you end it'
+      : editing
+        ? entryError
+          ? `${MIN_TYPED} to ${MAX_TYPED} minutes`
+          : 'Type the minutes'
+        : 'Ends by itself and is saved';
 
   return (
-    <View>
+    <View testID="timer-controls-v2">
       {!timer && (
-        <LiquidGlassSegmentedControl<Kind>
-          options={[
-            { value: 'stopwatch', label: 'Stopwatch' },
-            { value: 'timer', label: 'Timer' },
-          ]}
-          value={kind}
-          onChange={setKind}
-        />
+        <View style={v2.tabs}>
+          <PillTabs<Kind>
+            options={[
+              { value: 'stopwatch', label: 'Stopwatch' },
+              { value: 'timer', label: 'Timer' },
+            ]}
+            value={kind}
+            onChange={setKind}
+            testID="timer-kind"
+          />
+        </View>
       )}
 
-      <View style={styles.clockWrap}>
-        {targetSeconds != null && (
-          <Svg width={RING_SIZE} height={RING_SIZE} style={StyleSheet.absoluteFill}>
-            <Circle
-              cx={RING_SIZE / 2}
-              cy={RING_SIZE / 2}
-              r={r}
-              stroke={theme.border}
-              strokeWidth={RING_STROKE}
-              fill="none"
+      <View style={v2.clockBlock}>
+        {typeable && editing ? (
+          <View style={v2.entry}>
+            <TextInput
+              value={draft}
+              onChangeText={(t) => setDraft(t.replace(/[^0-9]/g, '').slice(0, 3))}
+              onBlur={endEdit}
+              onSubmitEditing={() => commitEdit()}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              autoFocus
+              placeholder={String(minutes)}
+              placeholderTextColor={palette.secondary}
+              maxLength={3}
+              style={[v2.clock, v2.entryInput, typeV2.numeral, { color: palette.text, borderColor: entryError ? palette.red : palette.outline }]}
+              maxFontSizeMultiplier={1.2}
+              accessibilityLabel="Minutes"
+              accessibilityHint={`${MIN_TYPED} to ${MAX_TYPED}`}
+              testID="timer-minutes-input"
             />
-            <Circle
-              cx={RING_SIZE / 2}
-              cy={RING_SIZE / 2}
-              r={r}
-              stroke={theme.accent}
-              strokeWidth={RING_STROKE}
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={circumference * (1 - Math.min(1, progress))}
-              transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+            <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              min
+            </Text>
+            <PillButton
+              title="Set"
+              variant="outline"
+              onPress={() => commitEdit()}
+              accessibilityLabel="Set the length"
+              style={v2.set}
+              testID="timer-minutes-set"
             />
-          </Svg>
+          </View>
+        ) : (
+          <Tap
+            onPress={typeable ? beginEdit : undefined}
+            disabled={!typeable}
+            accessibilityRole={typeable ? 'button' : undefined}
+            accessibilityLabel={typeable ? `${clockText}. Type the length` : undefined}
+            testID="timer-clock-tap"
+          >
+            <Text
+              style={[v2.clock, typeV2.numeral, { color: palette.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              maxFontSizeMultiplier={1.2}
+              accessibilityRole="timer"
+              testID="timer-clock"
+            >
+              {clockText}
+            </Text>
+          </Tap>
         )}
         <Text
-          style={[styles.clock, clockText.length > 8 && { fontSize: 44 }]}
+          style={[typeV2.meta, v2.centred, { color: entryError ? palette.red : palette.secondary }]}
           numberOfLines={1}
-          adjustsFontSizeToFit
-          accessibilityRole="timer"
+          maxFontSizeMultiplier={1.4}
+          testID="timer-caption"
         >
-          {clockText}
+          {caption}
         </Text>
-        {targetSeconds != null && (
-          <Text style={styles.clockSub}>
-            {(timer?.mode ?? direction) === 'countDown' ? 'remaining of ' : 'of '}
-            {Math.round(targetSeconds / 60)} min
-          </Text>
-        )}
-        {timer && !running && <Text style={styles.pausedTag}>Paused</Text>}
+        {timer && targetSeconds != null ? (
+          <View style={[v2.track, { backgroundColor: palette.separator }]} testID="timer-progress">
+            <View
+              style={[v2.fill, { width: PROGRESS_WIDTH * Math.min(1, Math.max(0, progress)), backgroundColor: palette.primary }]}
+            />
+          </View>
+        ) : null}
       </View>
 
-      {/* Big round controls, like the iPhone stopwatch. */}
-      <View style={styles.controls}>
-        {timer ? (
-          <RoundButton
-            label={running ? 'Pause' : 'Resume'}
-            accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
-            onPress={running ? pause : resume}
-            fg={theme.textPrimary}
-            bg={theme.glass}
-            ring={theme.border}
-          />
-        ) : (
-          <View style={styles.roundPlaceholder} />
-        )}
-        <RoundButton
-          label={timer ? 'End' : 'Start'}
-          accessibilityLabel={timer ? 'Stop and save timer' : 'Start timer'}
-          onPress={timer ? handleEnd : handleStart}
-          fg={timer ? theme.error : theme.accent}
-          bg={(timer ? theme.error : theme.accent) + '26'}
-          ring={(timer ? theme.error : theme.accent) + '26'}
-        />
-      </View>
+      {!timer && kind === 'timer' ? (
+        <View style={v2.row} testID="timer-setup">
+          <Tap
+            onPress={() => setMinutes((m) => stepLength(m, -1))}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Shorter"
+            style={[v2.step, { borderColor: palette.outline }]}
+            testID="timer-minus"
+          >
+            <Ionicons name="remove" size={18} color={palette.text} />
+          </Tap>
+          <Tap
+            onPress={beginEdit}
+            accessibilityRole="button"
+            accessibilityLabel={`${lengthLabel(minutes)}. Type the length`}
+            style={v2.lengthTap}
+            testID="timer-minutes-tap"
+          >
+            <Text
+              style={[typeV2.body, typeV2.numeral, v2.length, { color: palette.text }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.4}
+              testID="timer-minutes"
+            >
+              {lengthLabel(minutes)}
+            </Text>
+          </Tap>
+          <Tap
+            onPress={() => setMinutes((m) => stepLength(m, 1))}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Longer"
+            style={[v2.step, { borderColor: palette.outline }]}
+            testID="timer-plus"
+          >
+            <Ionicons name="add" size={18} color={palette.text} />
+          </Tap>
+          <View style={v2.direction}>
+            <PillTabs<Direction>
+              options={[
+                { value: 'countDown', label: 'Down', icon: 'arrow-down' },
+                { value: 'countUp', label: 'Up', icon: 'arrow-up' },
+              ]}
+              value={direction}
+              onChange={setDirection}
+              testID="timer-direction"
+            />
+          </View>
+        </View>
+      ) : null}
 
       {timer ? (
-        <View style={styles.runningInfo}>
-          {onOpenQuran && (
-            <PressableScale onPress={onOpenQuran} haptic="light" style={styles.openQuran}>
-              <Ionicons name="book-outline" size={18} color={theme.accent} />
-              <Text style={styles.openQuranText}>Open the Quran</Text>
-            </PressableScale>
-          )}
-          <Text style={styles.hint}>
-            {(timer.pagesRevised?.length ?? 0) > 0
-              ? `Pages revised so far: ${formatPageRanges(timer.pagesRevised ?? [])}`
-              : timer.pagesVisited.length > 0
-                ? `Pages opened so far: ${formatPageRanges(timer.pagesVisited)}`
-                : 'Keeps running while you read or revise. Saved sessions are in Activity, where you can add the pages.'}
-          </Text>
-          <PressableScale
+        <View style={v2.row}>
+          <Tap
             onPress={handleDiscard}
-            haptic="light"
-            style={styles.discard}
+            hitSlop={6}
+            accessibilityRole="button"
             accessibilityLabel="Discard timer"
+            style={[v2.step, v2.discard, { borderColor: palette.outline }]}
+            testID="timer-discard"
           >
-            <Text style={styles.discardText}>Discard session</Text>
-          </PressableScale>
-        </View>
-      ) : kind === 'timer' ? (
-        <View style={styles.setup}>
-          <Text style={styles.groupLabel}>LENGTH</Text>
-          <View style={styles.group}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <View style={styles.presetGrid}>
-              {TIMER_PRESET_MINUTES.map((m) => {
-                const selected = m === minutes;
-                return (
-                  <PressableScale
-                    key={m}
-                    onPress={() => setMinutes(m)}
-                    haptic="selection"
-                    style={[
-                      styles.preset,
-                      selected
-                        ? { backgroundColor: theme.accent + '22', borderColor: theme.accent }
-                        : { backgroundColor: theme.glass, borderColor: theme.border },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.presetText,
-                        { color: selected ? theme.accent : theme.textPrimary },
-                      ]}
-                    >
-                      {m < 60 ? `${m}m` : `${m / 60}h${m % 60 ? ` ${m % 60}m` : ''}`}
-                    </Text>
-                  </PressableScale>
-                );
-              })}
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.stepRow}>
-              <Text style={styles.rowLabel}>Custom</Text>
-              <PressableScale
-                onPress={() => setMinutes((m) => Math.max(5, m - 5))}
-                haptic="selection"
-                style={styles.stepBtn}
-                accessibilityLabel="5 minutes less"
-              >
-                <Ionicons name="remove" size={18} color={theme.textPrimary} />
-              </PressableScale>
-              <Text style={styles.stepValue}>{minutes} min</Text>
-              <PressableScale
-                onPress={() => setMinutes((m) => Math.min(480, m + 5))}
-                haptic="selection"
-                style={styles.stepBtn}
-                accessibilityLabel="5 minutes more"
-              >
-                <Ionicons name="add" size={18} color={theme.textPrimary} />
-              </PressableScale>
-            </View>
-          </View>
-
-          <Text style={styles.groupLabel}>CLOCK</Text>
-          <LiquidGlassSegmentedControl<Direction>
-            options={[
-              { value: 'countDown', label: 'Count down' },
-              { value: 'countUp', label: 'Count up' },
-            ]}
-            value={direction}
-            onChange={setDirection}
+            <Ionicons name="trash-outline" size={17} color={palette.red} />
+          </Tap>
+          <PillButton
+            title={running ? 'Pause' : 'Resume'}
+            variant="outline"
+            icon={running ? 'pause' : 'play'}
+            onPress={running ? pause : resume}
+            accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
+            style={v2.action}
+            testID="timer-pause"
           />
-          <Text style={styles.footnote}>When time's up the session is saved by itself.</Text>
+          <PillButton
+            title="End"
+            icon="stop"
+            onPress={handleEnd}
+            accessibilityLabel="Stop and save timer"
+            style={v2.action}
+            testID="timer-end"
+          />
         </View>
       ) : (
-        <Text style={styles.footnote}>
-          Runs until you tap End, wherever you are in the app. Sessions are saved to Activity.
-        </Text>
+        <View style={v2.row}>
+          <PillButton
+            title="Start"
+            icon="play"
+            onPress={handleStart}
+            accessibilityLabel="Start timer"
+            style={v2.action}
+            testID="timer-start"
+          />
+        </View>
       )}
+
+      {timer && onOpenQuran ? (
+        <Tap
+          onPress={onOpenQuran}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Open the Quran"
+          style={v2.link}
+          testID="timer-open-quran"
+        >
+          <Ionicons name="book-outline" size={15} color={palette.link} />
+          <Text style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+            Open the Quran
+          </Text>
+        </Tap>
+      ) : null}
     </View>
   );
 }
 
-function RoundButton({
-  label,
-  accessibilityLabel,
-  onPress,
-  fg,
-  bg,
-  ring,
-}: {
-  label: string;
-  accessibilityLabel: string;
-  onPress: () => void;
-  fg: string;
-  bg: string;
-  ring: string;
-}) {
-  return (
-    <PressableScale
-      onPress={onPress}
-      haptic="medium"
-      scale={0.94}
-      accessibilityLabel={accessibilityLabel}
-    >
-      <View style={[roundStyles.outer, { borderColor: ring }]}>
-        <View style={[roundStyles.inner, { backgroundColor: bg }]}>
-          <Text style={[roundStyles.label, { color: fg }]}>{label}</Text>
-        </View>
-      </View>
-    </PressableScale>
-  );
-}
-
-const roundStyles = StyleSheet.create({
-  outer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    padding: 3,
+const v2 = StyleSheet.create({
+  tabs: { marginTop: 2 },
+  clockBlock: { alignItems: 'center', paddingTop: 22, paddingBottom: 20, gap: 4 },
+  // Light and large, like the Clock app's: the one big thing on the card.
+  clock: { fontSize: 60, fontWeight: '200', letterSpacing: -1 },
+  entry: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  entryInput: {
+    minWidth: 96,
+    textAlign: 'center',
+    paddingVertical: 0,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
   },
-  inner: {
-    flex: 1,
-    borderRadius: 38,
+  set: { marginLeft: 4, paddingHorizontal: 14 },
+  lengthTap: { paddingVertical: 6 },
+  centred: { textAlign: 'center' },
+  track: { width: PROGRESS_WIDTH, height: 2, borderRadius: 1, marginTop: 8, overflow: 'hidden' },
+  fill: { height: 2, borderRadius: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 6 },
+  step: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { fontSize: 17, fontWeight: '500' },
+  discard: { borderWidth: StyleSheet.hairlineWidth },
+  length: { minWidth: 76, textAlign: 'center' },
+  direction: { flex: 1, marginLeft: 4 },
+  action: { flex: 1 },
+  link: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingTop: 12, paddingBottom: 4 },
 });
-
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    clockWrap: {
-      width: RING_SIZE,
-      height: RING_SIZE,
-      alignSelf: 'center',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginVertical: spacing.md,
-    },
-    clock: {
-      fontSize: 54,
-      fontWeight: '200',
-      color: theme.textPrimary,
-      fontVariant: ['tabular-nums'],
-      letterSpacing: -1,
-      maxWidth: RING_SIZE - 32,
-    },
-    clockSub: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      marginTop: spacing.xxs,
-    },
-    pausedTag: {
-      ...typography.label,
-      color: theme.warning,
-      marginTop: spacing.xs,
-    },
-    controls: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: spacing.lg,
-    },
-    roundPlaceholder: { width: 80, height: 80 },
-    runningInfo: { alignItems: 'center', gap: spacing.md },
-    openQuran: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.full,
-      backgroundColor: theme.accent + '22',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.accent + '55',
-    },
-    openQuranText: { ...typography.titleSmall, color: theme.accent, fontWeight: '600' },
-    hint: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-      textAlign: 'center',
-      paddingHorizontal: spacing.md,
-    },
-    discard: { paddingVertical: spacing.xs },
-    discardText: { ...typography.bodyMedium, color: theme.error },
-    setup: { gap: spacing.xs },
-    groupLabel: {
-      ...typography.label,
-      color: theme.textMuted,
-      marginTop: spacing.sm,
-      paddingHorizontal: spacing.xs,
-    },
-    group: {
-      borderRadius: radius.md,
-      overflow: 'hidden',
-    },
-    presetGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-      padding: spacing.sm,
-    },
-    preset: {
-      width: '23%',
-      flexGrow: 1,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.sm,
-      borderWidth: StyleSheet.hairlineWidth,
-      alignItems: 'center',
-    },
-    presetText: { ...typography.bodyMedium, fontWeight: '600', fontVariant: ['tabular-nums'] },
-    divider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.border,
-      marginLeft: spacing.md,
-    },
-    stepRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      minHeight: 52,
-      gap: spacing.sm,
-    },
-    rowLabel: { ...typography.bodyMedium, color: theme.textPrimary, flex: 1 },
-    stepBtn: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.glass,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-    },
-    stepValue: {
-      ...typography.bodyMedium,
-      color: theme.textPrimary,
-      fontVariant: ['tabular-nums'],
-      minWidth: 64,
-      textAlign: 'center',
-    },
-    footnote: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      textAlign: 'center',
-      marginTop: spacing.sm,
-      paddingHorizontal: spacing.md,
-    },
-  });

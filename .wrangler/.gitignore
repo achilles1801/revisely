@@ -1,0 +1,4 @@
+# wrangler dev local state. Ignored here, not in the root .gitignore: that file is part of the
+# native fingerprint (CLAUDE.md, Runtime version).
+*
+!.gitignore

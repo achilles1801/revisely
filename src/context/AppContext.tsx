@@ -24,6 +24,7 @@ import {
 import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
 import { applyUpdateChannel } from '../lib/updateChannel';
+import { ensureOnServer, retryDelayMs } from '../lib/userDoc';
 import * as Sentry from '@sentry/react-native';
 import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 
@@ -58,10 +59,13 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     // the scheduler still produces a sensible cycle for them.
     scheduleAnchorDate: getScheduleAnchorDateFromFirestore(fsUser),
     carryOverMode: fsUser.carryOverMode,
+    accent: fsUser.accent,
     carryOver: fsUser.carryOver,
     scheduleShiftPages: fsUser.scheduleShiftPages,
     translationId: fsUser.translationId,
     reciter: fsUser.reciter,
+    recordingBackup: fsUser.recordingBackup,
+    recordingBackupCellular: fsUser.recordingBackupCellular,
     previewTester: fsUser.previewTester === true,
   };
 }
@@ -196,63 +200,99 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // FIRESTORE SUBSCRIPTIONS - Real-time data sync
   // ============================================================================
 
+  // Whether the server has told us about the user document (it exists, or it
+  // was missing and has been created). Until then the app keeps loading: an
+  // existing user offline on a fresh install must not see onboarding, whose
+  // defaults would be written over their account when they reconnect.
+  const [userResolved, setUserResolved] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
     setLoading(true);
+    setUserResolved(false);
     setError(null);
 
     // Subscribe to user document. If Firebase Auth says we're logged in but
     // the Firestore doc is missing (e.g. a dev wiped the users collection,
     // or first launch after re-creating an account), recreate the doc so
     // subsequent updates have something to land on.
-    let userRecreationInFlight = false;
-    const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser) => {
+    // Missing data is created only when the server confirms it (lib/userDoc);
+    // while offline, it is asked again on a backoff until it answers.
+    let active = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const ensuring = { user: false, pages: false };
+    const ensure = (
+      what: 'user' | 'pages',
+      fromCache: boolean,
+      attempt = 0,
+    ) => {
+      const fbUser = getAuth().currentUser;
+      if (!active || !fbUser) return;
+      const inFlight = what === 'user' ? ensuring.user : ensuring.pages;
+      if (inFlight) return;
+      if (what === 'user') ensuring.user = true;
+      else ensuring.pages = true;
+      ensureOnServer({
+        fromCache,
+        skip: () => !active || firestoreService.isDeletingAccount(fbUser.uid),
+        existsOnServer: () =>
+          what === 'user'
+            ? firestoreService.userDocExistsOnServer(fbUser.uid)
+            : firestoreService.pagesExistOnServer(fbUser.uid),
+        create: () =>
+          what === 'user'
+            ? firestoreService.createUser({
+                uid: fbUser.uid,
+                email: fbUser.email,
+                displayName: fbUser.displayName,
+                photoURL: fbUser.photoURL,
+              })
+            : firestoreService.initializeAllPages(fbUser.uid),
+        onLostRace: (err) => logger.warn(`User ${what} appeared while creating them`, err),
+        onError: (err) =>
+          logger.error(what === 'user' ? 'Failed to recreate missing user doc:' : 'Failed to initialize pages:', err),
+      })
+        .then((outcome) => {
+          if (what === 'user') ensuring.user = false;
+          else ensuring.pages = false;
+          if (!active) return;
+          // Created, or there after all: the listener refires with it.
+          if (outcome === 'wait') {
+            timers.push(setTimeout(() => ensure(what, false, attempt + 1), retryDelayMs(attempt)));
+          } else if (outcome === 'failed' && what === 'user') {
+            setUserResolved(true);
+            setUser(null);
+            setOnboardingComplete(false);
+          }
+          if (what === 'pages' && outcome !== 'created' && outcome !== 'exists') setLoading(false);
+        })
+        .catch(() => undefined);
+    };
+
+    const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser, { fromCache }) => {
       if (fsUser) {
-        userRecreationInFlight = false;
+        setUserResolved(true);
         setUser(firestoreUserToLocal(fsUser));
         setOnboardingComplete(fsUser.onboardingComplete);
         return;
       }
-
-      const currentAuth = getAuth();
-      const fbUser = currentAuth.currentUser;
-      if (fbUser && !userRecreationInFlight) {
-        userRecreationInFlight = true;
-        try {
-          await firestoreService.createUser({
-            uid: fbUser.uid,
-            email: fbUser.email,
-            displayName: fbUser.displayName,
-            photoURL: fbUser.photoURL,
-          });
-          // Subscription will refire with the new doc — fall through.
-          return;
-        } catch (err) {
-          logger.error('Failed to recreate missing user doc:', err);
-          userRecreationInFlight = false;
-        }
+      if (!getAuth().currentUser) {
+        setUserResolved(true);
+        setUser(null);
+        setOnboardingComplete(false);
+        return;
       }
-      setUser(null);
-      setOnboardingComplete(false);
+      ensure('user', fromCache);
     });
 
     // Subscribe to pages
-    const unsubscribePages = firestoreService.subscribeToPages(async (fsPages) => {
-      // If no pages exist, initialize them
+    const unsubscribePages = firestoreService.subscribeToPages(async (fsPages, { fromCache }) => {
+      // No pages: create the 604 defaults, but only once the server confirms
+      // there are none (an empty cache offline is not "no pages").
       if (fsPages.length === 0) {
-        try {
-          const currentAuth = getAuth();
-          const uid = currentAuth.currentUser?.uid;
-          if (uid) {
-            await firestoreService.initializeAllPages(uid);
-            // Subscription will fire again with new pages
-            return;
-          }
-        } catch (err) {
-          logger.error('Failed to initialize pages:', err);
-        }
-        setLoading(false);
+        ensure('pages', fromCache);
+        if (fromCache) setLoading(false);
         return;
       }
 
@@ -284,6 +324,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadSessions();
 
     return () => {
+      active = false;
+      timers.forEach(clearTimeout);
       unsubscribeUser();
       unsubscribePages();
     };
@@ -391,12 +433,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Sent only once set (null clears carryOver), so saving a user who never
         // used carry-over writes nothing new.
         ...(updatedUser.carryOverMode !== undefined && { carryOverMode: updatedUser.carryOverMode }),
+        ...(updatedUser.accent !== undefined && { accent: updatedUser.accent }),
         ...(updatedUser.carryOver !== undefined && { carryOver: updatedUser.carryOver }),
         ...(updatedUser.scheduleShiftPages !== undefined && {
           scheduleShiftPages: updatedUser.scheduleShiftPages,
         }),
         ...(updatedUser.translationId !== undefined && { translationId: updatedUser.translationId }),
         ...(updatedUser.reciter !== undefined && { reciter: updatedUser.reciter }),
+        ...(updatedUser.recordingBackup !== undefined && { recordingBackup: updatedUser.recordingBackup }),
+        ...(updatedUser.recordingBackupCellular !== undefined && {
+          recordingBackupCellular: updatedUser.recordingBackupCellular,
+        }),
       });
       // Also sync the Firebase Auth profile so screens that fall back to
       // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore
@@ -812,7 +859,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user,
         pages,
         logs,
-        loading,
+        loading: loading || (isAuthenticated && !userResolved),
         onboardingComplete,
         isAuthenticated,
         error,

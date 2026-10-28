@@ -221,7 +221,6 @@ describe('parseHomePrefs (Al-Kahf fields)', () => {
       metrics: ['juz'],
       fridayKahfReminder: true,
       kahfDismissedDay: null,
-      keepScreenOn: true,
     });
   });
 

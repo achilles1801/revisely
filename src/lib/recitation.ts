@@ -1,19 +1,27 @@
 // Verse-by-verse recitation for "Play" on a held verse.
 //
 // One player for the whole app: starting a verse stops whatever was playing.
-// Playback continues verse by verse to the end of the juz (the default `advance`),
-// pauses when the app leaves the foreground or iOS interrupts audio (a call,
-// another app), and gives up on a verse that does not start within
-// LOAD_TIMEOUT_MS (offline).
+// Playback continues verse by verse to the end of its range (Audio Options; the
+// juz by default) wherever the user goes in the app, and with the app in the
+// background or the phone locked (UIBackgroundModes audio), shown on the lock
+// screen and in Control Center (Now Playing). iOS pauses it for a call, Siri or
+// headphones unplugged, and resumes it after an interruption; a verse that does
+// not start within LOAD_TIMEOUT_MS (offline) gives up. The screens showing it
+// take it over in turn (`adopt`); elsewhere a mini player stands in
+// (components/player/MiniPlayer).
 //
 // Audio comes from EveryAyah (everyayah.com), one file per verse named
 // SSSAAA.mp3, in a folder per reciter and style. Every folder listed was checked
 // to have the first and last verse of all 114 surahs plus a random sample.
 
-import { AppState } from 'react-native';
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
+import { afterVerse, pauseMs, previousInRange } from './playbackPlan';
+import NowPlayingCommands from '../../modules/now-playing-commands';
 import { claimAudio, onAudioClaimed, setAudioMode } from './audioFocus';
-import { nextVerseInJuz, VerseKey } from './verses';
+import { nextVerseInJuz, previousVerse, VerseKey } from './verses';
+import type { VerseRange } from './playbackPlan';
+import { getSurahDisplay } from './quranData';
+import { lockScreenArtwork } from './nowPlayingArtwork';
 import { logger } from './logger';
 
 /**
@@ -159,6 +167,13 @@ export function voiceLabel(voice: Voice): string {
     : voice.reciter.name;
 }
 
+/** Short, for tight places (the reader's controls): "Al-Husary (Mu'allim)". */
+export function shortVoiceLabel(voice: Voice): string {
+  return voice.reciter.styles.length > 1
+    ? `${voice.reciter.short} (${STYLE_INFO[voice.style].label})`
+    : voice.reciter.short;
+}
+
 export function recitationUrl(
   v: VerseKey,
   choice: string | null | undefined = DEFAULT_VOICE,
@@ -169,6 +184,17 @@ export function recitationUrl(
 
 export type RecitationStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
+/** "Al-Baqarah 2:13": the mini player's and the lock screen's title. */
+export function verseTitle(v: VerseKey): string {
+  return `${getSurahDisplay(v.sura)?.nameDisplay ?? `Surah ${v.sura}`} ${v.sura}:${v.ayah}`;
+}
+
+// A second of silence, looped through the pause after a verse: with nothing
+// playing, iOS suspends an app in the background and the next verse never
+// comes.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const SILENCE = require('../../assets/audio/silence.m4a');
+
 export interface RecitationState {
   status: RecitationStatus;
   verse: VerseKey | null;
@@ -178,6 +204,15 @@ export interface RecitationState {
 }
 
 export const LOAD_TIMEOUT_MS = 15_000;
+
+/** How each verse plays (Audio Options; lib/playbackPlan). */
+export interface RecitationOptions {
+  speed: number;
+  /** Plays of each verse; Infinity loops it until stopped. */
+  repeat: number;
+  /** Pause after each verse, as a share of its own length. */
+  pauseFactor: number;
+}
 
 type Listener = (state: RecitationState) => void;
 
@@ -193,11 +228,23 @@ export class Recitation {
   private started = false;
 
   private voice: string = DEFAULT_VOICE;
+  private options: RecitationOptions = { speed: 1, repeat: 1, pauseFactor: 0 };
+  /** Which play of the current verse this is (from 1). */
+  private round = 1;
+  /** The current verse's length in seconds, for the pause after it. */
+  private duration = 0;
+  // The pause after a verse: what comes next waits here. A pause or an
+  // interruption keeps it for resume.
+  private gapTimer: ReturnType<typeof setTimeout> | null = null;
+  private pending: (() => void) | null = null;
+  /** The ayahs being played (From–To), so whoever shows it steps within them. */
+  private range: VerseRange | null = null;
+  private silence: AudioPlayer | null = null;
+  private onLockScreen = false;
 
   constructor() {
-    AppState.addEventListener('change', (s) => {
-      if (s !== 'active') this.pause();
-    });
+    // Previous and next on the lock screen and in Control Center.
+    NowPlayingCommands?.addListener('onRemoteCommand', ({ command }) => this.skip(command === 'next' ? 1 : -1));
     // A recording starting or playing takes over the audio.
     onAudioClaimed((activity) => {
       if (activity !== 'recitation') this.stop();
@@ -221,6 +268,118 @@ export class Recitation {
 
   getState(): RecitationState {
     return this.state;
+  }
+
+  getOptions(): RecitationOptions {
+    return this.options;
+  }
+
+  /** Speed, repeats and the pause after each verse; the speed applies at once. */
+  setOptions(next: Partial<RecitationOptions>) {
+    this.options = { ...this.options, ...next };
+    if (next.speed !== undefined) this.applySpeed();
+  }
+
+  // Faster or slower without changing the reciter's pitch.
+  private applySpeed() {
+    const player = this.player;
+    if (!player) return;
+    try {
+      player.shouldCorrectPitch = true;
+      player.setPlaybackRate(this.options.speed, 'high');
+    } catch (err) {
+      logger.warn('Recitation speed not applied', err);
+    }
+  }
+
+  private clearGap() {
+    if (this.gapTimer) clearTimeout(this.gapTimer);
+    this.gapTimer = null;
+    this.pending = null;
+    this.keepAlive(false);
+  }
+
+  // Silence through the pause after a verse (see SILENCE).
+  private keepAlive(on: boolean) {
+    try {
+      if (on) {
+        if (!this.silence) {
+          this.silence = createAudioPlayer(SILENCE, { keepAudioSessionActive: true });
+          this.silence.loop = true;
+          this.silence.volume = 0;
+        }
+        this.silence.play();
+      } else {
+        this.silence?.pause();
+      }
+    } catch (err) {
+      logger.warn('Recitation keep-alive failed', err);
+    }
+  }
+
+  /** The verse and the reciter on the lock screen and in Control Center. */
+  private showNowPlaying(verse: VerseKey) {
+    const player = this.player;
+    if (!player) return;
+    const metadata = {
+      title: verseTitle(verse),
+      artist: shortVoiceLabel(resolveVoice(this.voice)),
+      albumTitle: 'Revisely',
+      artworkUrl: lockScreenArtwork(),
+    };
+    try {
+      if (this.onLockScreen) {
+        player.updateLockScreenMetadata(metadata);
+      } else {
+        player.setActiveForLockScreen(true, metadata, { showSeekForward: false, showSeekBackward: false });
+        this.onLockScreen = true;
+        NowPlayingCommands?.setEnabled(true);
+      }
+    } catch (err) {
+      logger.warn('Now Playing not shown', err);
+    }
+  }
+
+  private hideNowPlaying() {
+    if (!this.onLockScreen) return;
+    this.onLockScreen = false;
+    NowPlayingCommands?.setEnabled(false);
+    try {
+      this.player?.setActiveForLockScreen(false);
+    } catch (err) {
+      logger.warn('Now Playing not cleared', err);
+    }
+  }
+
+  /**
+   * A verse back or on, as previous and next on the lock screen do: within the
+   * range it was started with (or the juz), and playing. Nothing past either end.
+   */
+  skip(direction: 1 | -1) {
+    const verse = this.state.verse;
+    if (!verse || this.state.status === 'idle') return;
+    const to =
+      direction > 0
+        ? this.advance(verse)
+        : this.range
+          ? previousInRange(this.range, verse)
+          : previousVerse(verse);
+    if (to) this.start(to, 1);
+  }
+
+  /** The ayahs being played, if a range was given. */
+  getRange(): VerseRange | null {
+    return this.range;
+  }
+
+  /**
+   * A screen now showing this recitation takes it over: its controls, its
+   * highlight and its page turns follow it. Playback carries on untouched.
+   */
+  adopt(owner: string) {
+    if (this.state.status === 'idle' || this.owner === owner) return;
+    this.owner = owner;
+    this.set({ ...this.state });
   }
 
   subscribe(listener: Listener): () => void {
@@ -255,19 +414,31 @@ export class Recitation {
     verse: VerseKey,
     advance: (v: VerseKey) => VerseKey | null = nextVerseInJuz,
     owner: string | undefined = this.owner,
+    range: VerseRange | null = null,
   ) {
     this.advance = advance;
     this.owner = owner;
+    this.range = range;
+    this.start(verse, 1);
+  }
+
+  /** Load and play `verse`; `round` counts its repeats. */
+  private start(verse: VerseKey, round: number) {
     // Every time: recording or playing a recording may have changed the mode.
     setAudioMode(false);
-    claimAudio('recitation', owner ?? 'recitation');
+    claimAudio('recitation', this.owner ?? 'recitation');
     const player = this.ensurePlayer();
     this.clearLoadTimer();
+    this.clearGap();
+    this.round = round;
+    this.duration = 0;
     this.started = false;
     this.set({ status: 'loading', verse });
     try {
       player.replace({ uri: recitationUrl(verse, this.voice) });
+      this.applySpeed();
       player.play();
+      this.showNowPlaying(verse);
     } catch (err) {
       logger.warn('Recitation failed to start', err);
       this.set({ status: 'error', verse });
@@ -284,6 +455,12 @@ export class Recitation {
   pause() {
     if (this.state.status !== 'playing' && this.state.status !== 'loading') return;
     this.clearLoadTimer();
+    // In the pause after a verse: keep what comes next for resume.
+    if (this.gapTimer) {
+      clearTimeout(this.gapTimer);
+      this.gapTimer = null;
+      this.keepAlive(false);
+    }
     this.player?.pause();
     this.set({ status: 'paused', verse: this.state.verse });
   }
@@ -291,9 +468,14 @@ export class Recitation {
   resume() {
     const { status, verse } = this.state;
     if (!verse) return;
-    if (status === 'error') return this.play(verse, this.advance);
+    if (status === 'error') return this.start(verse, this.round);
     if (status !== 'paused') return;
-    if (!this.started) return this.play(verse, this.advance);
+    if (this.pending) {
+      const go = this.pending;
+      this.pending = null;
+      return go();
+    }
+    if (!this.started) return this.start(verse, this.round);
     this.player?.play();
     this.set({ status: 'playing', verse });
   }
@@ -303,20 +485,50 @@ export class Recitation {
     if (owner !== undefined && this.state.owner !== owner) return;
     if (this.state.status === 'idle') return;
     this.clearLoadTimer();
+    this.clearGap();
     this.player?.pause();
+    this.hideNowPlaying();
+    this.range = null;
     this.set({ status: 'idle', verse: null });
   }
 
   private onStatus(s: AudioStatus) {
     const { status, verse } = this.state;
     if (!verse || status === 'idle' || status === 'error') return;
+    if (s.duration > 0) this.duration = s.duration;
     if (s.didJustFinish) {
       // Only a verse that is playing moves on: a pause just before the end
       // stays paused.
-      if (status !== 'playing') return;
-      const next = this.advance(verse);
-      if (next) this.play(next, this.advance);
-      else this.stop();
+      if (status !== 'playing' || this.gapTimer || this.pending) return;
+      const again = afterVerse(this.round, this.options.repeat) === 'again';
+      const next = again ? verse : this.advance(verse);
+      if (!next) {
+        this.stop();
+        return;
+      }
+      const round = again ? this.round + 1 : 1;
+      const go = () => this.start(next, round);
+      const wait = pauseMs(this.duration, this.options.speed, this.options.pauseFactor);
+      if (wait <= 0) return go();
+      // The pause after the verse: still "playing" (Pause holds it).
+      this.pending = go;
+      this.keepAlive(true);
+      this.gapTimer = setTimeout(() => {
+        this.gapTimer = null;
+        const run = this.pending;
+        this.pending = null;
+        run?.();
+      }, wait);
+      return;
+    }
+    // Between verses (the pause after one): the finished player's own updates
+    // say nothing about what comes next, unless ▶ on the lock screen asks to go
+    // on while that pause is held.
+    if (this.gapTimer || this.pending) {
+      if (s.playing && status === 'paused' && this.pending) {
+        this.player?.pause();
+        this.resume();
+      }
       return;
     }
     if (s.playbackState === 'failed') {
@@ -329,8 +541,12 @@ export class Recitation {
       this.clearLoadTimer();
       this.set({ status: 'playing', verse });
     } else if (!s.playing && status === 'playing' && !s.isBuffering) {
-      // Paused from outside: an interruption (call, Siri, another app).
+      // Paused from outside: an interruption (call, Siri, another app),
+      // headphones unplugged, or Pause on the lock screen.
       this.set({ status: 'paused', verse });
+    } else if (s.playing && status === 'paused' && this.started) {
+      // Playing again from outside: ▶ on the lock screen, or a call ended.
+      this.set({ status: 'playing', verse });
     }
   }
 }

@@ -181,6 +181,8 @@ export interface FirestoreUser {
   scheduleAnchorDate?: string;
   /** How carrying over yesterday's unrevised pages makes room (lib/carryOver). */
   carryOverMode?: 'shift' | 'add';
+  /** The new design's accent; unset = Indigo. */
+  accent?: 'indigo' | 'crimson' | 'jade';
   /** Pages carried into one revision day (see User.carryOver). */
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   /** Pages the schedule has been moved back by carry-overs. */
@@ -189,6 +191,10 @@ export interface FirestoreUser {
   translationId?: string;
   /** Reciter and style for Play: '<reciter>:<style>'. */
   reciter?: string;
+  /** Back recordings up to the account (absent = on). */
+  recordingBackup?: boolean;
+  /** Let the backup use mobile data (absent = off). */
+  recordingBackupCellular?: boolean;
 }
 
 /**
@@ -233,10 +239,14 @@ export interface UpdateUserInput {
   fajrCalculationMethod?: string;
   scheduleAnchorDate?: string;
   carryOverMode?: 'shift' | 'add';
+  /** The new design's accent; unset = Indigo. */
+  accent?: 'indigo' | 'crimson' | 'jade';
   carryOver?: { day: string; pages: number[]; skip?: number } | null;
   scheduleShiftPages?: number;
   translationId?: string;
   reciter?: string;
+  recordingBackup?: boolean;
+  recordingBackupCellular?: boolean;
 }
 
 // ============================================================================

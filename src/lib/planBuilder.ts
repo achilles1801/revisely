@@ -248,6 +248,24 @@ export function moveDay(days: number[][], from: number, to: number): number[][] 
   return next;
 }
 
+/**
+ * The cycle without the day at `index`: the days after it move up one date.
+ * A cycle keeps at least one day, so removing the last one changes nothing.
+ */
+export function removeDay(days: number[][], index: number): number[][] {
+  const next = days.map((d) => [...d]);
+  if (next.length <= 1 || index < 0 || index >= next.length) return next;
+  next.splice(index, 1);
+  return next;
+}
+
+/** Put a day back at `index` (clamped), as undoing a removal does. */
+export function insertDay(days: number[][], index: number, pages: number[]): number[][] {
+  const next = days.map((d) => [...d]);
+  next.splice(Math.max(0, Math.min(next.length, index)), 0, [...pages]);
+  return next;
+}
+
 export interface SelectableGroup {
   key: string;
   /** The memorized pages this group contributes. */

@@ -11,6 +11,10 @@ module.exports = {
   // `extra` is JS config (Firebase web keys, client ids, Sentry DSN) carried by every update, not
   // native code. Counting it also made the hash depend on whether a .env was present.
   sourceSkips: SourceSkips.ExpoConfigExtraSection,
+  // The widget extension (Swift, assets, font) lives outside ios/, where the fingerprint doesn't
+  // look by itself; a widget change must make a new build. Prebuild writes nothing into it
+  // (targets/widget/expo-target.config.js), so it hashes the same everywhere.
+  extraSources: [{ type: 'dir', filePath: 'targets', reasons: ['widgetExtension'] }],
   ignorePaths: [
     // Build and submit settings; counted whole, adding a store id would start a new build.
     'eas.json',

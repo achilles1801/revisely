@@ -15,7 +15,9 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
   updateDoc,
   deleteDoc,
   addDoc,
@@ -27,12 +29,14 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp,
+  runTransaction,
   deleteField,
   increment,
   DocumentReference,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
+import type { BackupListing, CloudRecording } from '../lib/recordings';
 import {
   FirestoreUser,
   FirestorePage,
@@ -134,7 +138,9 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
   };
 
   await setDoc(getUserRef(input.uid), userData);
-  await initializeAllPages(input.uid);
+  // Pages only where the server has none: a user document can go missing while
+  // its pages (a subcollection) remain, and those hold real progress.
+  if (!(await pagesExistOnServer(input.uid))) await initializeAllPages(input.uid);
 
   return userData;
 }
@@ -210,9 +216,12 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
   if (updates.fajrCalculationMethod !== undefined) updateData.fajrCalculationMethod = updates.fajrCalculationMethod;
   if (updates.scheduleAnchorDate !== undefined) updateData.scheduleAnchorDate = updates.scheduleAnchorDate;
   if (updates.carryOverMode !== undefined) updateData.carryOverMode = updates.carryOverMode;
+  if (updates.accent !== undefined) updateData.accent = updates.accent;
   if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
   if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
   if (updates.translationId !== undefined) updateData.translationId = updates.translationId;
+  if (updates.recordingBackup !== undefined) updateData.recordingBackup = updates.recordingBackup;
+  if (updates.recordingBackupCellular !== undefined) updateData.recordingBackupCellular = updates.recordingBackupCellular;
   if (updates.reciter !== undefined) updateData.reciter = updates.reciter;
 
   if (updates.notifications) {
@@ -228,12 +237,19 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
 }
 
 export function subscribeToUser(
-  callback: (user: FirestoreUser | null) => void,
+  callback: (user: FirestoreUser | null, meta: { fromCache: boolean }) => void,
   userId?: string,
 ): Unsubscribe {
   return onSnapshot(getUserRef(userId), (snapshot) => {
-    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null);
+    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
+      fromCache: snapshot.metadata.fromCache,
+    });
   });
+}
+
+/** Whether the user's document exists, asked of the server (not the local cache). */
+export async function userDocExistsOnServer(userId?: string): Promise<boolean> {
+  return (await getDocFromServer(getUserRef(userId))).exists();
 }
 
 // ============================================================================
@@ -305,15 +321,21 @@ export async function batchUpdatePages(
 }
 
 export function subscribeToPages(
-  callback: (pages: FirestorePage[]) => void,
+  callback: (pages: FirestorePage[], meta: { fromCache: boolean }) => void,
   userId?: string,
 ): Unsubscribe {
   const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
   return onSnapshot(
     q,
-    (snapshot) => callback(snapshot.docs.map((d) => d.data() as FirestorePage)),
+    (snapshot) =>
+      callback(snapshot.docs.map((d) => d.data() as FirestorePage), { fromCache: snapshot.metadata.fromCache }),
     (error) => logger.error('subscribeToPages failed', error),
   );
+}
+
+/** Whether the user has any page documents, asked of the server (not the local cache). */
+export async function pagesExistOnServer(userId?: string): Promise<boolean> {
+  return !(await getDocsFromServer(query(getPagesCollectionRef(userId), limit(1)))).empty;
 }
 
 // ============================================================================
@@ -577,9 +599,26 @@ export async function addAppUsageSeconds(seconds: number, userId?: string): Prom
  * cleans up the Firebase Auth user too). Required by App Store guideline
  * 5.1.1(v).
  */
+// The account being deleted: its listeners see its data vanish and must not
+// recreate it (lib/userDoc).
+let deletingUid: string | null = null;
+export function isDeletingAccount(uid: string | undefined | null): boolean {
+  return uid != null && uid === deletingUid;
+}
+
 export async function deleteAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
+  deletingUid = user.uid;
+  try {
+    await deleteAccountOnServer(user);
+  } catch (err) {
+    deletingUid = null;
+    throw err;
+  }
+}
+
+async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>): Promise<void> {
   const idToken = await user.getIdToken(/* forceRefresh */ true);
 
   let appCheckToken: string | null = null;
@@ -643,5 +682,66 @@ export async function submitFeedback(input: {
     appVersion: input.appVersion ?? null,
     platform: input.platform ?? null,
     createdAt: serverTimestamp(),
+  });
+}
+
+// ============================================================================
+// RECORDING BACKUP (lib/recordingBackup): what the backup holds about each
+// recording, users/<uid>/recordings/<id>. The audio is in Storage.
+// ============================================================================
+
+export async function listRecordingDocs(userId: string): Promise<BackupListing> {
+  const snap = await getDocsFromServer(collection(db, 'users', userId, 'recordings'));
+  const live: CloudRecording[] = [];
+  const deleted: BackupListing['deleted'] = [];
+  const ms = (v: unknown) => (v instanceof Timestamp ? v.toMillis() : undefined);
+  for (const d of snap.docs) {
+    const data = d.data() as Omit<CloudRecording, 'id' | 'updatedAt'> & { updatedAt?: unknown; deletedAt?: unknown };
+    if (data.deletedAt !== undefined) {
+      deleted.push({ id: d.id, at: ms(data.deletedAt) ?? 0 });
+      continue;
+    }
+    const { updatedAt, ...rest } = data;
+    live.push({ ...rest, id: d.id, updatedAt: ms(updatedAt) });
+  }
+  return { live, deleted };
+}
+
+/**
+ * Write a recording's record, unless the recording was deleted (its record is a
+ * tombstone; the rules refuse writing over one too): then 'deleted'.
+ */
+export async function putRecordingDoc(userId: string, rec: CloudRecording): Promise<'ok' | 'deleted'> {
+  const ref = doc(db, 'users', userId, 'recordings', rec.id);
+  const { id: _id, updatedAt: _u, ...data } = rec;
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists() && snap.data().deletedAt !== undefined) return 'deleted' as const;
+    tx.set(ref, { ...data, updatedAt: serverTimestamp() });
+    return 'ok' as const;
+  });
+}
+
+/**
+ * A deleted recording's record becomes a tombstone, so no phone with a copy
+ * uploads it again (the rules refuse writing over one). Written even when there
+ * is no record now: one may come later from a phone that still has a copy.
+ */
+export async function tombstoneRecordingDoc(userId: string, id: string): Promise<void> {
+  // A transaction rather than a plain write: offline it fails at once instead of
+  // waiting (and holding up the backup) until the connection is back.
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    tx.set(ref, { deletedAt: serverTimestamp() });
+  });
+}
+
+/** Delete a recording's record (the whole backup going). Tombstones stay. */
+export async function deleteLiveRecordingDoc(userId: string, id: string): Promise<void> {
+  const ref = doc(db, 'users', userId, 'recordings', id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists() || snap.data().deletedAt !== undefined) return;
+    tx.delete(ref);
   });
 }

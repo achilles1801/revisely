@@ -2,9 +2,9 @@
   "name": "revisley-firestore-rules-tests",
   "version": "1.0.0",
   "private": true,
-  "description": "Firestore security rules tests run against the Firebase emulator.",
+  "description": "Firestore and Storage security rules tests run against the Firebase emulators.",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project=revisley-rules-test 'jest --runInBand'",
+    "test": "firebase emulators:exec --only firestore,storage --project=revisley-rules-test 'jest --runInBand'",
     "test:local": "jest --runInBand"
   },
   "devDependencies": {

@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Switch, Alert, Modal, ScrollView, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassCard } from './GlassCard';
-import { PressableScale } from './PressableScale';
+import { SettingIcon } from './settings/SettingIcon';
+import { SettingSwitch } from './settings/SettingSwitch';
+import { typeV2 } from '../theme/v2';
+import { ActionSheet } from './v2/ActionSheet';
+import { Tap } from './v2/Tap';
 import { useTheme } from '../context/ThemeContext';
-import { ThemeColors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
 import { useApp } from '../context/AppContext';
 import {
   FAJR_CALCULATION_METHODS,
@@ -22,8 +21,7 @@ import {
  * time so the user can see the boundary they just configured.
  */
 export function FajrBoundaryCard() {
-  const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const { palette } = useTheme();
   const { user, saveUser } = useApp();
   const [busy, setBusy] = useState(false);
   const [methodOpen, setMethodOpen] = useState(false);
@@ -104,146 +102,69 @@ export function FajrBoundaryCard() {
     await saveUser({ ...user, fajrCalculationMethod: id });
   };
 
+  const method = user.fajrCalculationMethod || DEFAULT_FAJR_METHOD;
+
+  // Settings rows: the glyph, the label (and what it does now under it), the
+  // control; no dividers inside the group.
   return (
-    <View>
-      <View style={[styles.row, enabled && styles.rowDivider]}>
-        <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-          <Ionicons name="moon-outline" size={16} color={theme.accent} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
-            Start day at fajr
-          </Text>
-          <Text style={[typography.caption, { color: theme.textMuted }]}>
+    <View testID="fajr-boundary-v2">
+      <View style={v2.row}>
+        <SettingIcon name="moon-outline" />
+        <View style={v2.text}>
+          <Text style={[typeV2.body, { color: palette.text }]}>Start day at fajr</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]} testID="fajr-resets-at">
             Resets at {resetsAt}
           </Text>
         </View>
-        <Switch
-          value={enabled}
-          onValueChange={handleToggle}
-          disabled={busy}
-          trackColor={{ false: theme.border, true: theme.accent }}
-          thumbColor={Platform.OS === 'android' ? theme.bg : undefined}
-        />
+        <SettingSwitch value={enabled} onValueChange={handleToggle} disabled={busy} accessibilityLabel="Start day at fajr" />
       </View>
-
       {enabled && (
-        <PressableScale onPress={() => setMethodOpen(true)} haptic="light" scale={0.99}>
-          <View style={styles.row}>
-            <View style={[styles.rowIcon, { backgroundColor: theme.accent + '20' }]}>
-              <Ionicons name="calculator-outline" size={16} color={theme.accent} />
-            </View>
-            <Text style={[typography.bodyMedium, { color: theme.textPrimary, flex: 1 }]}>
-              Method
-            </Text>
-            <Text
-              style={[typography.bodyMedium, { color: theme.textSecondary, flexShrink: 1 }]}
-              numberOfLines={1}
-            >
+        <Tap
+          onPress={() => setMethodOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Method, ${currentMethodLabel}`}
+          testID="fajr-method"
+        >
+          <View style={v2.row}>
+            <SettingIcon name="calculator-outline" />
+            <Text style={[typeV2.body, v2.label, { color: palette.text }]}>Method</Text>
+            <Text style={[typeV2.body, v2.value, { color: palette.secondary }]} numberOfLines={1}>
               {currentMethodLabel}
             </Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+            <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
           </View>
-        </PressableScale>
+        </Tap>
       )}
-
-      <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setMethodOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <GlassCard style={StyleSheet.absoluteFillObject} />
-            <Text style={[typography.titleMedium, { color: theme.textPrimary, marginBottom: spacing.sm }]}>
-              Calculation method
-            </Text>
-            <ScrollView>
-              {FAJR_CALCULATION_METHODS.map((m) => {
-                const selected =
-                  (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD) === m.id;
-                return (
-                  <PressableScale key={m.id} onPress={() => handlePickMethod(m.id)} haptic="selection">
-                    <View
-                      style={[
-                        styles.methodRow,
-                        { borderBottomColor: theme.border },
-                        selected && { backgroundColor: theme.accent + '15' },
-                      ]}
-                    >
-                      <Text style={[typography.bodyMedium, { color: theme.textPrimary }]}>
-                        {m.label}
-                      </Text>
-                      {selected && <Ionicons name="checkmark" size={18} color={theme.accent} />}
-                    </View>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
-            <PressableScale
-              onPress={() => {
-                setMethodOpen(false);
-                handleRefreshLocation();
-              }}
-              haptic="light"
-              style={styles.locationBtn}
-            >
-              <Ionicons name="location-outline" size={16} color={theme.accent} />
-              <Text style={[typography.bodyMedium, { color: theme.accent, fontWeight: '600' }]}>
-                {hasCoords ? 'Update location' : 'Set location'}
-              </Text>
-            </PressableScale>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ActionSheet
+        visible={methodOpen}
+        onClose={() => setMethodOpen(false)}
+        title="Calculation method"
+        actions={[
+          ...FAJR_CALCULATION_METHODS.map((m) => ({
+            key: m.id,
+            label: m.label,
+            selected: method === m.id,
+            onPress: () => handlePickMethod(m.id),
+          })),
+          {
+            key: 'location',
+            label: hasCoords ? 'Update location' : 'Set location',
+            icon: 'location-outline' as const,
+            section: 'Location',
+            onPress: handleRefreshLocation,
+          },
+        ]}
+        testID="fajr-method-sheet"
+      />
     </View>
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      minHeight: 52,
-      gap: spacing.sm,
-    },
-    rowDivider: {
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border,
-    },
-    rowIcon: {
-      width: 28,
-      height: 28,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    locationBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.xs,
-      paddingTop: spacing.md,
-    },
-    backdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.lg,
-    },
-    modalCard: {
-      width: '100%',
-      maxHeight: '70%',
-      borderRadius: radius.md,
-      padding: spacing.md,
-      overflow: 'hidden',
-    },
-    methodRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.xs,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-  });
+// Settings' rows. SettingIcon brings 8pt after its glyph; 8 more makes the 16
+// of the other rows.
+const v2 = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingVertical: 12, paddingHorizontal: 16, gap: 8 },
+  text: { flex: 1, marginRight: 8 },
+  label: { flex: 1 },
+  value: { flexShrink: 1, maxWidth: '55%', textAlign: 'right', marginRight: 8 },
+});

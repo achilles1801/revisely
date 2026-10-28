@@ -8,19 +8,14 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
-import { GlassCard } from './GlassCard';
-import { PressableScale } from './PressableScale';
-import { SegmentedToggle } from './SegmentedToggle';
 import { useTheme } from '../context/ThemeContext';
-import { ThemeColors } from '../theme/colors';
-import { typography, fonts } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
+import { useHaptics } from '../design/haptics';
+import { ProgressBar } from './ProgressBar';
+import { Mark } from './v2/Mark';
+import { PillTabs } from './v2/PillTabs';
+import { Tap } from './v2/Tap';
+import { IconButton } from './v2/TopBar';
+import { arabicV2, layoutV2, markV2, radiusV2, typeV2 } from '../theme/v2';
 import {
   getAllHizbs,
   getAllSurahs,
@@ -67,8 +62,6 @@ interface MemorizationBrowserProps {
   hideMarkToggle?: boolean;
 }
 
-const CHECKBOX_COL_WIDTH = 36;
-
 export function MemorizationBrowser({
   pages,
   pendingChanges,
@@ -82,9 +75,6 @@ export function MemorizationBrowser({
   onMarkModeChange,
   hideMarkToggle = false,
 }: MemorizationBrowserProps) {
-  const { theme, isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(theme, isDark), [theme, isDark]);
-
   const [mode, setMode] = useState<BrowserMode>(initialMode);
   const [internalMarkMode, setInternalMarkMode] = useState(initialMarkMode);
   const markMode = controlledMarkMode ?? internalMarkMode;
@@ -237,52 +227,25 @@ export function MemorizationBrowser({
     setExpandedChildKey((curr) => (curr === key ? null : key));
   }, []);
 
+  const changeMode = (v: BrowserMode) => {
+    setMode(v);
+    setExpandedKey(null);
+    setExpandedChildKey(null);
+  };
+
   return (
     <View>
-      {/* Mode toggle + mark-mode toggle row */}
-      <View style={styles.controlRow}>
-        <View style={styles.toggleWrap}>
-          <SegmentedToggle
-            options={[
-              { value: 'chapter', label: 'Chapter', count: 114 },
-              { value: 'juz', label: 'Juz', count: 30 },
-              { value: 'hizb', label: 'Hizb', count: 60 },
-            ]}
-            value={mode}
-            onChange={(v) => {
-              setMode(v as BrowserMode);
-              setExpandedKey(null);
-              setExpandedChildKey(null);
-            }}
-          />
-        </View>
-        {!hideMarkToggle && (
-          <PressableScale
-            onPress={() => setMarkMode(!markMode)}
-            haptic="medium"
-            scale={0.92}
-            style={[
-              styles.markToggle,
-              markMode && { backgroundColor: theme.accent },
-            ]}
-            accessibilityLabel={
-              markMode ? 'Exit mark mode' : 'Enter mark mode to update memorized pages'
-            }
-          >
-            <Ionicons
-              name={markMode ? 'checkmark' : 'pencil-outline'}
-              size={18}
-              color={markMode ? theme.textInverse : theme.textPrimary}
-            />
-          </PressableScale>
-        )}
-      </View>
+      {/* Pills for the three lenses, then flat rows. */}
+      <ControlsV2
+        mode={mode}
+        onMode={changeMode}
+        markMode={markMode}
+        onMarkMode={hideMarkToggle ? undefined : () => setMarkMode(!markMode)}
+      />
 
       {/* List body */}
       {mode === 'chapter' && (
         <ChapterList
-          styles={styles}
-          theme={theme}
           markMode={markMode}
           expandedKey={expandedKey}
           onExpand={expand}
@@ -294,8 +257,6 @@ export function MemorizationBrowser({
       )}
       {mode === 'juz' && (
         <JuzList
-          styles={styles}
-          theme={theme}
           markMode={markMode}
           expandedKey={expandedKey}
           expandedChildKey={expandedChildKey}
@@ -310,8 +271,6 @@ export function MemorizationBrowser({
       )}
       {mode === 'hizb' && (
         <HizbList
-          styles={styles}
-          theme={theme}
           markMode={markMode}
           expandedKey={expandedKey}
           expandedChildKey={expandedChildKey}
@@ -330,64 +289,6 @@ export function MemorizationBrowser({
 
 // ===== Row helpers =====
 
-type Styles = ReturnType<typeof makeStyles>;
-
-interface CheckboxColumnProps {
-  visible: boolean;
-  state: 'empty' | 'partial' | 'full';
-  onPress?: () => void;
-  theme: ThemeColors;
-  styles: Styles;
-}
-
-function CheckboxColumn({ visible, state, onPress, theme, styles }: CheckboxColumnProps) {
-  const offset = useSharedValue(visible ? 0 : -CHECKBOX_COL_WIDTH);
-  const opacity = useSharedValue(visible ? 1 : 0);
-  React.useEffect(() => {
-    offset.value = withTiming(visible ? 0 : -CHECKBOX_COL_WIDTH, { duration: 220 });
-    opacity.value = withTiming(visible ? 1 : 0, { duration: 180 });
-  }, [visible, offset, opacity]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    width: visible ? CHECKBOX_COL_WIDTH : 0,
-    transform: [{ translateX: offset.value }],
-    opacity: opacity.value,
-  }));
-
-  if (!visible) return null;
-
-  const filled = state === 'full';
-  const partial = state === 'partial';
-
-  return (
-    <Animated.View style={[styles.checkboxCol, animStyle]}>
-      <PressableScale
-        onPress={onPress}
-        haptic="selection"
-        scale={0.9}
-        hitSlop={6}
-        disabled={!onPress}
-        style={[
-          styles.checkbox,
-          filled && {
-            backgroundColor: theme.accent,
-            borderColor: theme.accent,
-          },
-          partial && {
-            backgroundColor: theme.accentSoft,
-            borderColor: theme.accent,
-          },
-        ]}
-      >
-        {filled && (
-          <Ionicons name="checkmark" size={14} color={theme.textInverse} />
-        )}
-        {partial && <Ionicons name="remove" size={14} color={theme.accent} />}
-      </PressableScale>
-    </Animated.View>
-  );
-}
-
 interface BaseRowProps {
   number: number;
   englishTitle: string;
@@ -400,77 +301,14 @@ interface BaseRowProps {
   progress?: number; // 0..1
   onPress: () => void;
   onCheckPress?: () => void;
-  theme: ThemeColors;
-  styles: Styles;
-}
-
-function BaseRow({
-  number,
-  englishTitle,
-  englishSub,
-  englishSubAlt,
-  arabic,
-  expanded,
-  markMode,
-  checkState,
-  progress,
-  onPress,
-  onCheckPress,
-  theme,
-  styles,
-}: BaseRowProps) {
-  return (
-    <View style={styles.rowWrap}>
-      <PressableScale onPress={onPress} haptic="light" scale={0.99}>
-        <View style={styles.row}>
-          <CheckboxColumn
-            visible={markMode}
-            state={checkState}
-            onPress={onCheckPress}
-            theme={theme}
-            styles={styles}
-          />
-          <Text style={styles.rowNumber}>{number}</Text>
-          <View style={styles.rowMain}>
-            <Text style={styles.rowTitle}>{englishTitle}</Text>
-            {englishSub ? (
-              <Text style={styles.rowSub}>{englishSub}</Text>
-            ) : null}
-            {englishSubAlt ? (
-              <Text style={styles.rowSubAlt}>{englishSubAlt}</Text>
-            ) : null}
-          </View>
-          <Text style={styles.rowArabic}>{arabic}</Text>
-          <Ionicons
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={16}
-            color={theme.textMuted}
-            style={{ marginLeft: spacing.xs }}
-          />
-        </View>
-        {typeof progress === 'number' && progress > 0 && (
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${Math.min(100, progress * 100)}%`,
-                  backgroundColor: theme.accent,
-                },
-              ]}
-            />
-          </View>
-        )}
-      </PressableScale>
-    </View>
-  );
+  /** A surah inside a juz or hizb: indented, a smaller mark. */
+  nested?: boolean;
+  testID?: string;
 }
 
 // ===== Chapter mode =====
 
 function ChapterList({
-  styles,
-  theme,
   markMode,
   expandedKey,
   onExpand,
@@ -479,8 +317,6 @@ function ChapterList({
   toggleSurah,
   getStatus,
 }: {
-  styles: Styles;
-  theme: ThemeColors;
   markMode: boolean;
   expandedKey: string | null;
   onExpand: (key: string | null) => void;
@@ -491,8 +327,7 @@ function ChapterList({
 }) {
   const all = getAllSurahs();
   return (
-    <View style={styles.listGroup}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+    <ListGroup>
       {all.map((s) => {
         const surahPages = getPagesForSurah(s.number);
         const memorized = countMemorized(surahPages);
@@ -517,8 +352,7 @@ function ChapterList({
               progress={progress}
               onPress={() => onExpand(`surah-${s.number}`)}
               onCheckPress={() => toggleSurah(s.number, surahPages)}
-              theme={theme}
-              styles={styles}
+              testID={`surah-${s.number}`}
             />
             {isExpanded && (
               <PageGrid
@@ -526,22 +360,18 @@ function ChapterList({
                 getStatus={getStatus}
                 markMode={markMode}
                 togglePage={togglePage}
-                theme={theme}
-                styles={styles}
               />
             )}
           </View>
         );
       })}
-    </View>
+    </ListGroup>
   );
 }
 
 // ===== Juz mode =====
 
 function JuzList({
-  styles,
-  theme,
   markMode,
   expandedKey,
   expandedChildKey,
@@ -553,8 +383,6 @@ function JuzList({
   toggleScope,
   getStatus,
 }: {
-  styles: Styles;
-  theme: ThemeColors;
   markMode: boolean;
   expandedKey: string | null;
   expandedChildKey: string | null;
@@ -568,8 +396,7 @@ function JuzList({
 }) {
   const juzes = Array.from({ length: 30 }, (_, i) => i + 1);
   return (
-    <View style={styles.listGroup}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+    <ListGroup>
       {juzes.map((juzNumber) => {
         const range = getJuzRange(juzNumber);
         const juzPages = getPagesForJuz(juzNumber);
@@ -599,11 +426,10 @@ function JuzList({
               progress={progress}
               onPress={() => onExpand(`juz-${juzNumber}`)}
               onCheckPress={() => toggleScope(juzPages)}
-              theme={theme}
-              styles={styles}
+              testID={`juz-${juzNumber}`}
             />
             {isExpanded && (
-              <View style={styles.childGroup}>
+              <ChildGroup>
                 {getSurahsInJuz(juzNumber).map((s) => {
                   const sMemorized = countMemorized(s.pagesInJuz);
                   const sExpanded =
@@ -628,8 +454,8 @@ function JuzList({
                           onExpandChild(`juz-${juzNumber}-surah-${s.number}`)
                         }
                         onCheckPress={() => toggleSurah(s.number, s.pagesInJuz)}
-                        theme={theme}
-                        styles={styles}
+                        nested
+                        testID={`juz-${juzNumber}-surah-${s.number}`}
                       />
                       {sExpanded && (
                         <PageGrid
@@ -637,27 +463,24 @@ function JuzList({
                           getStatus={getStatus}
                           markMode={markMode}
                           togglePage={togglePage}
-                          theme={theme}
-                          styles={styles}
+                          nested
                         />
                       )}
                     </View>
                   );
                 })}
-              </View>
+              </ChildGroup>
             )}
           </View>
         );
       })}
-    </View>
+    </ListGroup>
   );
 }
 
 // ===== Hizb mode =====
 
 function HizbList({
-  styles,
-  theme,
   markMode,
   expandedKey,
   expandedChildKey,
@@ -669,8 +492,6 @@ function HizbList({
   toggleScope,
   getStatus,
 }: {
-  styles: Styles;
-  theme: ThemeColors;
   markMode: boolean;
   expandedKey: string | null;
   expandedChildKey: string | null;
@@ -684,8 +505,7 @@ function HizbList({
 }) {
   const hizbs: HizbInfo[] = getAllHizbs();
   return (
-    <View style={styles.listGroup}>
-      <GlassCard style={StyleSheet.absoluteFillObject} />
+    <ListGroup>
       {hizbs.map((h) => (
         <HizbRow
           key={`h-${h.number}`}
@@ -700,11 +520,9 @@ function HizbList({
           toggleSurah={toggleSurah}
           toggleScope={toggleScope}
           getStatus={getStatus}
-          theme={theme}
-          styles={styles}
         />
       ))}
-    </View>
+    </ListGroup>
   );
 }
 
@@ -720,8 +538,6 @@ function HizbRow({
   toggleSurah,
   toggleScope,
   getStatus,
-  theme,
-  styles,
 }: {
   hizb: HizbInfo;
   markMode: boolean;
@@ -734,8 +550,6 @@ function HizbRow({
   toggleSurah: (surah: number, pages: number[]) => void;
   toggleScope: (pages: number[]) => void;
   getStatus: (page: number) => PageStatus;
-  theme: ThemeColors;
-  styles: Styles;
 }) {
   const hizbPages = useMemo(() => getPagesForHizb(hizb.number), [hizb.number]);
   const startingSurah = useMemo(
@@ -772,11 +586,10 @@ function HizbRow({
         progress={progress}
         onPress={() => onExpand(`hizb-${hizb.number}`)}
         onCheckPress={() => toggleScope(hizbPages)}
-        theme={theme}
-        styles={styles}
+        testID={`hizb-${hizb.number}`}
       />
       {expanded && (
-        <View style={styles.childGroup}>
+        <ChildGroup>
           {surahsInside.map((s) => {
             const sMemorized = countMemorized(s.pagesInHizb);
             const sExpanded =
@@ -801,8 +614,8 @@ function HizbRow({
                     onExpandChild(`hizb-${hizb.number}-surah-${s.number}`)
                   }
                   onCheckPress={() => toggleSurah(s.number, s.pagesInHizb)}
-                  theme={theme}
-                  styles={styles}
+                  nested
+                  testID={`hizb-${hizb.number}-surah-${s.number}`}
                 />
                 {sExpanded && (
                   <PageGrid
@@ -810,14 +623,13 @@ function HizbRow({
                     getStatus={getStatus}
                     markMode={markMode}
                     togglePage={togglePage}
-                    theme={theme}
-                    styles={styles}
+                    nested
                   />
                 )}
               </View>
             );
           })}
-        </View>
+        </ChildGroup>
       )}
     </View>
   );
@@ -825,59 +637,225 @@ function HizbRow({
 
 // ===== Page grid (leaf level) =====
 
-function PageGrid({
-  pages,
-  getStatus,
-  markMode,
-  togglePage,
-  theme,
-  styles,
-}: {
+interface PageGridProps {
   pages: number[];
   getStatus: (page: number) => PageStatus;
   markMode: boolean;
   togglePage: (page: number) => void;
-  theme: ThemeColors;
-  styles: Styles;
+  nested?: boolean;
+}
+
+// ===== Groups =====
+
+/** A list of rows, straight on the ground. */
+function ListGroup({ children }: { children: React.ReactNode }) {
+  return <View testID="memorization-list">{children}</View>;
+}
+
+/** The surahs inside an open juz or hizb (each row indents itself). */
+function ChildGroup({ children }: { children: React.ReactNode }) {
+  return <View>{children}</View>;
+}
+
+// ===== Controls and rows =====
+
+const BROWSER_MODES_V2: { value: BrowserMode; label: string }[] = [
+  { value: 'chapter', label: 'Surahs' },
+  { value: 'juz', label: 'Juz' },
+  { value: 'hizb', label: 'Hizb' },
+];
+
+function ControlsV2({
+  mode,
+  onMode,
+  markMode,
+  onMarkMode,
+}: {
+  mode: BrowserMode;
+  onMode: (mode: BrowserMode) => void;
+  markMode: boolean;
+  /** Absent when the screen hosts the edit button itself. */
+  onMarkMode?: () => void;
 }) {
+  const { palette } = useTheme();
   return (
-    <View style={styles.pageGridWrap}>
-      <Text style={styles.pageGridHint}>
-        {markMode ? 'Tap a page to toggle' : 'Memorized pages shown in accent'}
+    <View style={[v2s.controls, { borderBottomColor: palette.separator }]}>
+      <View style={v2s.flex}>
+        <PillTabs<BrowserMode> options={BROWSER_MODES_V2} value={mode} onChange={onMode} testID="browser-modes" />
+      </View>
+      {onMarkMode ? (
+        <IconButton
+          icon={markMode ? 'checkmark' : 'create-outline'}
+          label={markMode ? 'Done marking' : 'Mark memorized pages'}
+          onPress={onMarkMode}
+          testID="browser-mark-toggle"
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/** Mark mode's checkbox: a ring, the primary fill with a check (all), or a dash (some). */
+function CheckV2({
+  state,
+  onPress,
+  label,
+  testID,
+}: {
+  state: 'empty' | 'partial' | 'full';
+  onPress?: () => void;
+  label: string;
+  testID?: string;
+}) {
+  const { palette } = useTheme();
+  const haptics = useHaptics();
+  const full = state === 'full';
+  const partial = state === 'partial';
+  return (
+    <Tap
+      onPress={
+        onPress
+          ? () => {
+              haptics.selection();
+              onPress();
+            }
+          : undefined
+      }
+      disabled={!onPress}
+      hitSlop={8}
+      accessibilityRole="checkbox"
+      accessibilityLabel={`${label} memorized`}
+      accessibilityState={{ checked: full ? true : partial ? 'mixed' : false }}
+      style={[
+        v2s.check,
+        { borderColor: full || partial ? palette.primary : palette.secondary },
+        full && { backgroundColor: palette.primary },
+      ]}
+      testID={testID}
+    >
+      {full ? (
+        <Ionicons name="checkmark" size={16} color={palette.onPrimary} />
+      ) : partial ? (
+        <Ionicons name="remove" size={16} color={palette.primary} />
+      ) : null}
+    </Tap>
+  );
+}
+
+/**
+ * A surah, juz or hizb: its number in a mark (the "done"
+ * check once every page is memorized), its name and details, the Arabic name,
+ * and a thin bar while partly memorized. In mark mode a checkbox leads.
+ */
+function BaseRow({
+  number,
+  englishTitle,
+  englishSub,
+  englishSubAlt,
+  arabic,
+  expanded,
+  markMode,
+  checkState,
+  progress,
+  onPress,
+  onCheckPress,
+  nested,
+  testID,
+}: BaseRowProps) {
+  const { palette } = useTheme();
+  const sub = [englishSub, englishSubAlt].filter(Boolean).join(' · ');
+  const partial = checkState === 'partial';
+  const state =
+    checkState === 'full'
+      ? 'memorized'
+      : partial
+        ? typeof progress === 'number'
+          ? `${Math.round(progress * 100)}% memorized`
+          : 'partly memorized'
+        : 'not memorized';
+  return (
+    <View style={[v2s.rowWrap, { borderBottomColor: palette.separator }]}>
+      <View style={[v2s.row, nested && v2s.nestedRow]}>
+        {markMode ? (
+          <CheckV2 state={checkState} onPress={onCheckPress} label={englishTitle} testID={testID ? `${testID}-check` : undefined} />
+        ) : null}
+        <Tap
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={[englishTitle, sub, state].filter(Boolean).join(', ')}
+          accessibilityState={{ expanded }}
+          style={v2s.rowTap}
+          testID={testID}
+        >
+          {/* While marking, the box says memorized or not; the mark keeps the number. */}
+          <Mark size={nested ? 'nested' : 'reply'} label={String(number)} done={!markMode && checkState === 'full'} />
+          <View style={v2s.main}>
+            <Text style={[typeV2.name, { color: palette.text }]}>{englishTitle}</Text>
+            {sub ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{sub}</Text> : null}
+            {partial && typeof progress === 'number' && progress > 0 ? (
+              <View style={v2s.progress}>
+                <ProgressBar progress={progress * 100} height={3} />
+              </View>
+            ) : null}
+          </View>
+          {arabic ? (
+            <Text style={[arabicV2(20), v2s.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+              {arabic}
+            </Text>
+          ) : null}
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondary} />
+        </Tap>
+      </View>
+    </View>
+  );
+}
+
+/** An open surah's pages: memorized ones filled ("done"); tappable in mark mode. */
+function PageGrid({ pages, getStatus, markMode, togglePage, nested }: PageGridProps) {
+  const { palette } = useTheme();
+  const haptics = useHaptics();
+  return (
+    <View style={[v2s.grid, nested && v2s.nestedGrid, { borderBottomColor: palette.separator }]}>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>
+        {markMode ? 'Tap a page to mark it memorized, or not' : 'Memorized pages are filled'}
       </Text>
-      <View style={styles.pageGrid}>
+      <View style={v2s.chips}>
         {pages.map((p) => {
-          const isMemorized = getStatus(p) === 'memorized';
-          const Wrapper = markMode ? PressableScale : View;
-          const props = markMode
-            ? {
-                onPress: () => togglePage(p),
-                haptic: 'selection' as const,
-                scale: 0.92,
-              }
-            : {};
-          return (
-            <Wrapper
-              key={`pg-${p}`}
-              {...(props as any)}
-              style={[
-                styles.pageChip,
-                isMemorized && { backgroundColor: theme.accent },
-              ]}
+          const on = getStatus(p) === 'memorized';
+          const style = [v2s.chip, { backgroundColor: on ? palette.done : palette.fill }];
+          const label = (
+            <Text
+              style={[typeV2.meta, typeV2.numeral, on && v2s.chipOn, { color: on ? palette.onDone : palette.text }]}
+              maxFontSizeMultiplier={1.6}
             >
-              <Text
-                style={[
-                  styles.pageChipText,
-                  { color: theme.textSecondary },
-                  isMemorized && {
-                    color: theme.textInverse,
-                    fontWeight: '700',
-                  },
-                ]}
-              >
-                {p}
-              </Text>
-            </Wrapper>
+              {p}
+            </Text>
+          );
+          return markMode ? (
+            <Tap
+              key={`pg-${p}`}
+              onPress={() => {
+                haptics.selection();
+                togglePage(p);
+              }}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`Page ${p}`}
+              accessibilityState={{ checked: on }}
+              style={style}
+              testID={`page-chip-${p}`}
+            >
+              {label}
+            </Tap>
+          ) : (
+            <View
+              key={`pg-${p}`}
+              style={style}
+              accessible
+              accessibilityLabel={`Page ${p}, ${on ? 'memorized' : 'not memorized'}`}
+              testID={`page-chip-${p}`}
+            >
+              {label}
+            </View>
           );
         })}
       </View>
@@ -885,135 +863,59 @@ function PageGrid({
   );
 }
 
-const makeStyles = (theme: ThemeColors, isDark: boolean) =>
-  StyleSheet.create({
-    controlRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      marginBottom: spacing.md,
-    },
-    toggleWrap: { flex: 1 },
-    markToggle: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.full,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: isDark
-        ? 'rgba(255,255,255,0.06)'
-        : 'rgba(0,0,0,0.04)',
-    },
-    listGroup: {
-      borderRadius: radius.md,
-      overflow: 'hidden',
-    },
-    rowWrap: {
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border,
-    },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      gap: spacing.xs,
-    },
-    checkboxCol: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingRight: spacing.xs,
-    },
-    checkbox: {
-      width: 24,
-      height: 24,
-      borderRadius: radius.xs,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      backgroundColor: isDark
-        ? 'rgba(255,255,255,0.06)'
-        : 'rgba(0,0,0,0.04)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    rowNumber: {
-      ...typography.titleSmall,
-      color: theme.textMuted,
-      width: 28,
-      textAlign: 'center',
-    },
-    rowMain: { flex: 1, marginLeft: spacing.xs },
-    rowTitle: {
-      ...typography.titleMedium,
-      color: theme.textPrimary,
-    },
-    rowSub: {
-      ...typography.caption,
-      color: theme.textSecondary,
-      marginTop: 2,
-    },
-    rowSubAlt: {
-      ...typography.caption,
-      color: theme.textMuted,
-      marginTop: 2,
-    },
-    rowArabic: {
-      fontFamily: fonts.arabic,
-      fontSize: 22,
-      lineHeight: 30,
-      color: theme.textPrimary,
-      maxWidth: 110,
-      textAlign: 'right',
-      marginHorizontal: spacing.xs,
-    },
-    progressTrack: {
-      height: 2,
-      marginHorizontal: spacing.md,
-      marginBottom: spacing.xs,
-      backgroundColor: theme.border,
-      borderRadius: radius.full,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      borderRadius: radius.full,
-    },
-    childGroup: {
-      paddingLeft: spacing.sm,
-      backgroundColor: isDark
-        ? 'rgba(255,255,255,0.02)'
-        : 'rgba(0,0,0,0.015)',
-    },
-    pageGridWrap: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.border,
-    },
-    pageGridHint: {
-      ...typography.caption,
-      color: theme.textMuted,
-      marginBottom: spacing.xs,
-    },
-    pageGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-    },
-    pageChip: {
-      width: 44,
-      height: 32,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: isDark
-        ? 'rgba(255,255,255,0.06)'
-        : 'rgba(0,0,0,0.04)',
-    },
-    pageChipText: {
-      ...typography.bodySmall,
-      fontWeight: '500',
-    },
-  });
+// Full-width rows with a 16pt gutter on hairlines; a surah inside a juz or
+// hizb is indented by a mark's width.
+const NESTED_INDENT = markV2.nested;
+
+const v2s = StyleSheet.create({
+  flex: { flex: 1 },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: 12,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  rowWrap: { borderBottomWidth: layoutV2.hairline },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: layoutV2.gutter },
+  nestedRow: { paddingLeft: layoutV2.gutter + NESTED_INDENT },
+  rowTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: layoutV2.markGap,
+    minHeight: 60,
+    paddingVertical: 10,
+    paddingRight: layoutV2.gutter,
+  },
+  check: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  main: { flex: 1, minWidth: 0 },
+  progress: { marginTop: 6 },
+  arabic: { maxWidth: 120, textAlign: 'right' },
+  grid: {
+    paddingHorizontal: layoutV2.gutter,
+    paddingTop: 10,
+    paddingBottom: 14,
+    gap: 8,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  nestedGrid: { paddingLeft: layoutV2.gutter + NESTED_INDENT },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    minWidth: 44,
+    minHeight: 32,
+    paddingHorizontal: 6,
+    borderRadius: radiusV2.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipOn: { fontWeight: '600' },
+});

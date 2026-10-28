@@ -25,3 +25,24 @@ export function identifyUser(uid: string | null) {
     Sentry.setUser(null);
   }
 }
+
+/**
+ * Settings → Report a problem: Sentry's report form (App.tsx configures it). The
+ * report carries this launch's release and tags (lib/releaseInfo), the recent
+ * breadcrumbs, and a screenshot if the user takes one.
+ */
+export function reportProblem() {
+  Sentry.showFeedbackWidget();
+}
+
+/**
+ * Checks that crashes reach Sentry readable, for TestFlight (preview) builds only
+ * (Settings → App info shows them there): a handled JavaScript error, and a
+ * native crash, whose stack only reads properly if the build's dSYMs were uploaded.
+ */
+export function sendTestError() {
+  Sentry.captureException(new Error('Test error from Settings → App info'));
+}
+export function triggerTestNativeCrash() {
+  Sentry.nativeCrash();
+}

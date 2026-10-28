@@ -41,7 +41,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       # Pinned so a runner image update cannot change the toolchain under us.
       # Apple requires the iOS 26 SDK (Xcode 26) for uploads.
@@ -59,6 +58,8 @@ jobs:
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       # Twice: at the fixed path for resolving the native config here, and outside
@@ -83,6 +84,29 @@ jobs:
           # A failed upload costs readable stack traces, not the release.
           SENTRY_ALLOW_FAILURE: 'true'
         run: eas build --local --profile production --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
+
+      # The Xcode build phase uploads dSYMs too, but its output is hidden and a
+      # failure there is allowed. This makes the upload explicit and visible:
+      # native crashes in Sentry need the dSYM whose UUID matches the binary.
+      # Like that phase, a failure here costs readable stack traces, not the
+      # release: on Oct 28 2026 Sentry's processing failed ("some symbols did
+      # not process correctly") after the files had uploaded, and the build
+      # never reached TestFlight. The step shows as failed; submit still runs.
+      - name: Upload dSYMs to Sentry
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: revisely
+          SENTRY_PROJECT: react-native
+          SENTRY_URL: https://sentry.io/
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::No SENTRY_AUTH_TOKEN secret: dSYMs not uploaded."
+            exit 0
+          fi
+          ARCHIVES="$HOME/Library/Developer/Xcode/Archives"
+          find "$ARCHIVES" -name '*.dSYM' -maxdepth 4 -print -exec dwarfdump --uuid {} \;
+          npx sentry-cli debug-files upload --include-sources --wait "$ARCHIVES"
 
       - name: eas submit (TestFlight)
         if: ${{ inputs.submit }}

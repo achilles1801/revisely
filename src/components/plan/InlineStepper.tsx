@@ -1,11 +1,15 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PressableScale } from '../PressableScale';
+import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
-import { radius } from '../../theme/radius';
+import { useHaptics } from '../../design/haptics';
+import { radiusV2, typeV2 } from '../../theme/v2';
 
-/** Compact iOS-style [ − | + ] stepper with the value shown to its left. */
+/**
+ * Compact iOS-style [ − | + ] stepper with the value shown to its left: a
+ * quiet pill (the fill, no edge); a change ticks.
+ */
 export function InlineStepper({
   value,
   min,
@@ -22,46 +26,47 @@ export function InlineStepper({
   label: string;
   formatValue?: (value: number) => string;
 }) {
-  const { theme } = useTheme();
+  const { palette } = useTheme();
+  const haptics = useHaptics();
   const canDec = value > min;
   const canInc = value < max;
 
+  const step = (delta: number) => {
+    haptics.selection();
+    onChange(value + delta);
+  };
   return (
     <View style={styles.wrap}>
       <Text
-        style={[styles.value, { color: theme.textPrimary }]}
+        style={[typeV2.body, typeV2.numeral, styles.valueV2, { color: palette.text }]}
         accessibilityLiveRegion="polite"
       >
         {formatValue ? formatValue(value) : value}
       </Text>
-      <View style={[styles.pill, { backgroundColor: theme.glass, borderColor: theme.border }]}>
-        <PressableScale
-          onPress={() => canDec && onChange(value - 1)}
+      <View style={[styles.pillV2, { backgroundColor: palette.fill }]}>
+        <Tap
+          onPress={() => canDec && step(-1)}
           disabled={!canDec}
-          haptic="selection"
-          scale={0.9}
           style={styles.btn}
           hitSlop={{ top: 8, bottom: 8 }}
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${label}`}
           accessibilityState={{ disabled: !canDec }}
         >
-          <Ionicons name="remove" size={20} color={canDec ? theme.textPrimary : theme.textMuted} />
-        </PressableScale>
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <PressableScale
-          onPress={() => canInc && onChange(value + 1)}
+          <Ionicons name="remove" size={20} color={canDec ? palette.text : palette.secondary} />
+        </Tap>
+        <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+        <Tap
+          onPress={() => canInc && step(1)}
           disabled={!canInc}
-          haptic="selection"
-          scale={0.9}
           style={styles.btn}
           hitSlop={{ top: 8, bottom: 8 }}
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label}`}
           accessibilityState={{ disabled: !canInc }}
         >
-          <Ionicons name="add" size={20} color={canInc ? theme.textPrimary : theme.textMuted} />
-        </PressableScale>
+          <Ionicons name="add" size={20} color={canInc ? palette.text : palette.secondary} />
+        </Tap>
       </View>
     </View>
   );
@@ -73,18 +78,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  value: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontVariant: ['tabular-nums'],
-    minWidth: 24,
-    textAlign: 'right',
-  },
-  pill: {
+  valueV2: { minWidth: 24, textAlign: 'right' },
+  pillV2: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radiusV2.pill,
     height: 32,
     overflow: 'hidden',
   },

@@ -1,18 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList, JourneyStage } from '../../navigation/OnboardingNavigator';
-import { Button } from '../../components/Button';
-import { GlassCard } from '../../components/GlassCard';
-import { PressableScale } from '../../components/PressableScale';
 import { Stepper } from '../../components/Stepper';
+import { Mark } from '../../components/v2/Mark';
+import { PillButton } from '../../components/v2/PillButton';
+import { Tap } from '../../components/v2/Tap';
+import { TopBar } from '../../components/v2/TopBar';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
+import { useHaptics } from '../../design/haptics';
+import { layoutV2, typeV2 } from '../../theme/v2';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JourneySelect'>;
 
@@ -23,8 +22,8 @@ const OPTIONS: Array<{ value: JourneyStage; title: string; description: string; 
 
 export default function JourneySelectScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { theme } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { palette } = useTheme();
+  const haptics = useHaptics();
   const [selectedStage, setSelectedStage] = useState<JourneyStage>('in_progress');
 
   // No pre-seeding here. JuzSelection initializes its local pendingChanges
@@ -36,164 +35,78 @@ export default function JourneySelectScreen() {
 
   const totalSteps = 3;
 
+  // The two answers are rows on hairlines, each with its mark; the chosen
+  // one carries a check. The one action sits at the foot.
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.topSection}>
-          <PressableScale
-            onPress={() => navigation.goBack()}
-            haptic="light"
-            style={styles.backButton}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={theme.textSecondary} />
-          </PressableScale>
-          <Stepper total={totalSteps} current={1} />
-        </View>
-
-        <View style={styles.headerSection}>
-          <Text style={styles.headline}>Where are you in your journey?</Text>
-        </View>
-
-        <View style={styles.cardsSection}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="journey-select">
+      <TopBar onBack={() => navigation.goBack()} center={<Stepper total={totalSteps} current={1} />} />
+      <ScrollView contentContainerStyle={v2.scroll}>
+        <Text
+          style={[typeV2.title, v2.headline, { color: palette.text }]}
+          accessibilityRole="header"
+          maxFontSizeMultiplier={1.6}
+        >
+          Where are you in your journey?
+        </Text>
+        <View
+          style={[v2.list, { borderTopColor: palette.separator }]}
+          accessibilityRole="radiogroup"
+        >
           {OPTIONS.map((option) => {
             const isSelected = selectedStage === option.value;
             return (
-              <PressableScale
+              <Tap
                 key={option.value}
-                onPress={() => setSelectedStage(option.value)}
-                haptic="selection"
-                style={[
-                  styles.cardOuter,
-                  isSelected && styles.cardSelected,
-                ]}
+                onPress={() => {
+                  if (isSelected) return;
+                  haptics.selection();
+                  setSelectedStage(option.value);
+                }}
+                accessibilityRole="radio"
+                accessibilityLabel={`${option.title}. ${option.description}`}
+                accessibilityState={{ checked: isSelected, selected: isSelected }}
+                style={[v2.row, { borderBottomColor: palette.separator }]}
+                testID={`journey-${option.value}`}
               >
-                <GlassCard
-                  style={StyleSheet.absoluteFillObject}
-                  tintColor={
-                    isSelected
-                      ? theme.accent + '33' // ~20% accent tint for selected
-                      : undefined
-                  }
-                />
-                <View style={styles.cardInner}>
-                  <View
-                    style={[
-                      styles.iconWrap,
-                      isSelected && { backgroundColor: theme.accent },
-                    ]}
-                  >
-                    <Ionicons
-                      name={option.icon}
-                      size={20}
-                      color={isSelected ? theme.textInverse : theme.accent}
-                    />
-                  </View>
-                  <View style={styles.cardText}>
-                    <Text style={styles.cardTitle}>{option.title}</Text>
-                    <Text style={styles.cardDescription}>{option.description}</Text>
-                  </View>
-                  {isSelected && (
-                    <Ionicons name="checkmark-circle" size={22} color={theme.accent} />
-                  )}
+                <Mark icon={option.icon} />
+                <View style={v2.rowText}>
+                  <Text style={[typeV2.name, { color: palette.text }]}>{option.title}</Text>
+                  <Text style={[typeV2.body, { color: palette.secondary }]}>{option.description}</Text>
                 </View>
-              </PressableScale>
+                <Ionicons
+                  name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={24}
+                  color={isSelected ? palette.accentText : palette.secondary}
+                  testID={isSelected ? `journey-${option.value}-checked` : undefined}
+                />
+              </Tap>
             );
           })}
         </View>
-
-        <View style={styles.bottomSection}>
-          <Button
-            title="Continue"
-            onPress={handleContinue}
-            variant="primary"
-            style={styles.button}
-          />
-        </View>
+      </ScrollView>
+      <View style={v2.footer}>
+        <PillButton title="Continue" size="lg" onPress={handleContinue} testID="journey-continue" />
       </View>
     </SafeAreaView>
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      // Transparent so the app-wide gradient shows through.
-      backgroundColor: 'transparent',
-    },
-    content: {
-      flex: 1,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.lg,
-    },
-    topSection: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.xl,
-    },
-    backButton: {
-      padding: spacing.xxs,
-    },
-    headerSection: {
-      marginBottom: spacing.xl,
-    },
-    headline: {
-      ...typography.displaySmall,
-      color: theme.textPrimary,
-      marginBottom: spacing.xs,
-    },
-    subtext: {
-      ...typography.bodyMedium,
-      color: theme.textSecondary,
-    },
-    cardsSection: {
-      flex: 1,
-      gap: spacing.sm,
-    },
-    cardOuter: {
-      borderWidth: 1.5,
-      borderColor: 'transparent',
-      borderRadius: radius.md,
-      minHeight: 76,
-      overflow: 'hidden',
-    },
-    cardInner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      padding: spacing.md,
-    },
-    cardSelected: {
-      borderColor: theme.accent,
-    },
-    iconWrap: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.full,
-      backgroundColor: 'transparent',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    cardText: {
-      flex: 1,
-    },
-    cardTitle: {
-      ...typography.titleMedium,
-      color: theme.textPrimary,
-      marginBottom: 2,
-    },
-    cardDescription: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-    },
-    bottomSection: {
-      width: '100%',
-      marginTop: spacing.lg,
-    },
-    button: {
-      width: '100%',
-    },
-  });
+const v2 = StyleSheet.create({
+  scroll: { paddingTop: 8, paddingBottom: 24 },
+  headline: { paddingHorizontal: layoutV2.gutter, marginBottom: 20 },
+  list: { borderTopWidth: layoutV2.hairline },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: layoutV2.markGap,
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: layoutV2.rowPad,
+    borderBottomWidth: layoutV2.hairline,
+  },
+  rowText: { flex: 1, minWidth: 0 },
+  footer: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16 },
+});
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+});

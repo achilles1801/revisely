@@ -5,12 +5,16 @@
 // the caches directory; a verse carried over from the previous page is listed
 // under that page by the API, so it is fetched on its own.
 //
-// Translations are listed in TRANSLATIONS. One that is not `available` is shown
-// in the picker as unavailable: The Clear Quran (Dr. Mustafa Khattab) is licensed
-// content that the Quran Foundation API serves only to approved clients.
+// Translations are listed in TRANSLATIONS. The Clear Quran® (Dr. Mustafa
+// Khattab) is licensed: its text comes from The Clear Quran API through our
+// worker (lib/clearQuran), is never stored on the device, and its publisher
+// requires the credit line (`credit`) wherever it is shown. One that is not
+// `available` is shown in the picker as unavailable.
 
 import { Directory, File, Paths } from 'expo-file-system';
 import { logger } from './logger';
+import { getClearQuranVerse, peekClearQuranVerse, prefetchClearQuran, prefetchClearQuranAround } from './clearQuran';
+import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
 
 export interface TranslationInfo {
   id: string;
@@ -20,7 +24,11 @@ export interface TranslationInfo {
   /** alquran.cloud edition identifier. */
   edition: string | null;
   available: boolean;
+  /** Required attribution, shown with the text and in the picker. */
+  credit?: { text: string; linkLabel: string; url: string };
 }
+
+export const CLEAR_QURAN_ID = 'en.khattab';
 
 export const TRANSLATIONS: TranslationInfo[] = [
   {
@@ -32,21 +40,36 @@ export const TRANSLATIONS: TranslationInfo[] = [
     available: true,
   },
   {
-    id: 'en.khattab',
-    name: 'The Clear Quran',
+    id: CLEAR_QURAN_ID,
+    name: 'The Clear Quran®',
     author: 'Dr. Mustafa Khattab',
     language: 'English',
     edition: null,
-    available: false,
+    available: true,
+    credit: {
+      text: 'The Clear Quran® by Dr. Mustafa Khattab',
+      linkLabel: 'theclearquran.org',
+      url: 'https://theclearquran.org',
+    },
   },
 ];
 
 export const DEFAULT_TRANSLATION_ID = 'en.sahih';
 const ARABIC_EDITION = 'quran-uthmani';
 
+/** Can be chosen. */
+export function isTranslationAvailable(t: TranslationInfo): boolean {
+  return t.available;
+}
+
+/** Shown in the picker: "The Clear Quran® — Dr. Mustafa Khattab". */
+export function pickerTitle(t: TranslationInfo): string {
+  return t.credit ? `${t.name} — ${t.author}` : t.name;
+}
+
 /** The translation to use for a saved choice, falling back to the default. */
 export function resolveTranslation(id: string | null | undefined): TranslationInfo {
-  const chosen = TRANSLATIONS.find((t) => t.id === id && t.available);
+  const chosen = TRANSLATIONS.find((t) => t.id === id && isTranslationAvailable(t));
   return chosen ?? (TRANSLATIONS.find((t) => t.id === DEFAULT_TRANSLATION_ID) as TranslationInfo);
 }
 
@@ -173,6 +196,24 @@ export interface VerseText {
   translationName: string;
 }
 
+function compose(
+  t: TranslationInfo,
+  sura: number,
+  ayah: number,
+  arabic: TranslatedAyah,
+  translation: string,
+  surahName: string,
+): VerseText {
+  return {
+    sura,
+    ayah,
+    surahName,
+    arabic: stripBismillah(arabic.text, sura, ayah),
+    translation,
+    translationName: t.name,
+  };
+}
+
 /** The Arabic and the chosen translation of one verse. */
 export async function getVerseText(
   page: number,
@@ -181,18 +222,72 @@ export async function getVerseText(
   translationId?: string | null,
 ): Promise<VerseText> {
   const t = resolveTranslation(translationId);
+  if (t.id === CLEAR_QURAN_ID) {
+    // Its own source; if it fails, the sheet says so (never another translation).
+    const [arabic, text] = await Promise.all([
+      getAyahEdition(page, sura, ayah, ARABIC_EDITION),
+      getClearQuranVerse(sura, ayah),
+    ]);
+    return compose(t, sura, ayah, arabic, text, arabic.surahName);
+  }
   const [arabic, translated] = await Promise.all([
     getAyahEdition(page, sura, ayah, ARABIC_EDITION),
     getAyahEdition(page, sura, ayah, t.edition as string),
   ]);
-  return {
-    sura,
-    ayah,
-    surahName: translated.surahName,
-    arabic: stripBismillah(arabic.text, sura, ayah),
-    translation: translated.text,
-    translationName: t.name,
-  };
+  return compose(t, sura, ayah, arabic, translated.text, translated.surahName);
+}
+
+/** A verse's Arabic (Uthmani), exactly as the verse sheet shows it. */
+export async function getArabicVerse(page: number, sura: number, ayah: number): Promise<string> {
+  const arabic = await getAyahEdition(page, sura, ayah, ARABIC_EDITION);
+  return stripBismillah(arabic.text, sura, ayah);
+}
+
+/** One verse of an edition, if this launch already has it in memory. */
+function peekAyahEdition(page: number, sura: number, ayah: number, edition: string): TranslatedAyah | null {
+  return (
+    singleAyahs.get(`${edition}/${sura}:${ayah}`) ??
+    memory.get(`${edition}/${page}`)?.find((a) => a.surahNumber === sura && a.ayahNumber === ayah) ??
+    null
+  );
+}
+
+/** What getVerseText would give, if everything it needs is already in memory; else null. */
+export function peekVerseText(
+  page: number,
+  sura: number,
+  ayah: number,
+  translationId?: string | null,
+): VerseText | null {
+  const t = resolveTranslation(translationId);
+  const arabic = peekAyahEdition(page, sura, ayah, ARABIC_EDITION);
+  if (!arabic) return null;
+  if (t.id === CLEAR_QURAN_ID) {
+    const text = peekClearQuranVerse(sura, ayah);
+    return text === undefined ? null : compose(t, sura, ayah, arabic, text, arabic.surahName);
+  }
+  const translated = peekAyahEdition(page, sura, ayah, t.edition as string);
+  return translated ? compose(t, sura, ayah, arabic, translated.text, translated.surahName) : null;
+}
+
+/** Starts loading a verse's Arabic and translation (a press and hold on it). Never fails. */
+export function prefetchVerseText(page: number, sura: number, ayah: number, translationId?: string | null): void {
+  const t = resolveTranslation(translationId);
+  getAyahEdition(page, sura, ayah, ARABIC_EDITION).catch(() => undefined);
+  if (t.id === CLEAR_QURAN_ID) prefetchClearQuran(sura, ayah);
+  else getAyahEdition(page, sura, ayah, t.edition as string).catch(() => undefined);
+}
+
+/**
+ * The verses before and after `v`, loaded while it is shown, so previous / next
+ * shows at once. The Clear Quran looks two verses ahead (its next block takes
+ * seconds); the rest comes by page, so one verse is enough.
+ */
+export function prefetchVerseNeighbours(v: VerseKey, translationId?: string | null): void {
+  for (const n of [nextVerse(v), previousVerse(v)]) {
+    if (n) prefetchVerseText(pageOfVerse(n), n.sura, n.ayah, translationId);
+  }
+  if (resolveTranslation(translationId).id === CLEAR_QURAN_ID) prefetchClearQuranAround(v, 2);
 }
 
 // alquran.cloud prefixes the first verse of every surah (except Al-Fatihah,

@@ -34,7 +34,7 @@ jest.mock('expo-file-system', () => {
       return dest;
     }
   }
-  return { Directory, File, Paths: { cache: 'cache' } };
+  return { Directory, File, Paths: { cache: 'cache', document: 'documents' } };
 });
 
 import {
@@ -60,6 +60,12 @@ describe('page cache', () => {
     expect(await cachePage(5)).toBe(a);
     expect(mockDownloads).toHaveLength(1);
     expect(getCachedPageUri(5)).toBe(a);
+  });
+
+  it('keeps pages in the caches directory, which iOS may empty (never documents or backups)', async () => {
+    const uri = await cachePage(8);
+    expect(uri).toBe('cache/mushaf/008.png');
+    expect(uri?.startsWith('documents')).toBe(false);
   });
 
   it('returns null when the download fails and leaves nothing cached', async () => {

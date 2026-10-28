@@ -8,17 +8,17 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { ThemeColors } from '../theme/colors';
 import { useApp } from '../context/AppContext';
-import { typography, fonts } from '../theme/typography';
 import { spacing } from '../theme/spacing';
-import { PressableScale } from './PressableScale';
 import { MushafPager } from './MushafPager';
 import { WeaknessModal } from './WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from './revision/SessionMenuSheet';
 import { RevisionLog, QuranPage } from '../types';
+import { useHaptics } from '../design/haptics';
+import { RoundButton } from './reader/RoundButton';
+import { getReadPalette } from '../theme/readPalette';
+import { arabicV2, layoutV2, typeV2 } from '../theme/v2';
 import {
   getHizbForPage,
   getJuzForPage,
@@ -44,8 +44,8 @@ export function EditSessionModal({
   onSave,
   onDelete,
 }: EditSessionModalProps) {
-  const { theme, isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { isDark } = useTheme();
+  const haptics = useHaptics();
   const { user, pages } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
 
@@ -94,6 +94,7 @@ export function EditSessionModal({
 
   const isCurrentRevised = revisedPages.has(currentPageNumber);
   const toggleCurrent = () => {
+    haptics.selection();
     setRevisedPages((prev) => {
       const next = new Set(prev);
       if (next.has(currentPageNumber)) next.delete(currentPageNumber);
@@ -131,6 +132,11 @@ export function EditSessionModal({
     return actions;
   }, [smartTrackingEnabled, currentPageNumber]);
 
+  // The session's page colours and its bare header icons
+  // (components/reader/RoundButton), the page marked revised the "done" check.
+  const read = getReadPalette(isDark);
+  const crumbText = [typeV2.meta, { color: read.textSecondary }];
+
   return (
     <Modal
       visible={visible}
@@ -138,51 +144,20 @@ export function EditSessionModal({
       presentationStyle="fullScreen"
       onRequestClose={handleCloseWithSave}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: read.pageBg }]} testID="edit-session">
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-        {/* Top bar — matches SessionBar's monochrome styling, no center text. */}
-        <View style={styles.topBar}>
-          <PressableScale
-            onPress={handleCloseWithSave}
-            haptic="light"
-            hitSlop={12}
-            style={styles.iconBtn}
-            accessibilityLabel="Close and save"
-          >
-            <Ionicons name="close" size={22} color={theme.textPrimary} />
-          </PressableScale>
-
+        <View style={[styles.topBar, { backgroundColor: read.pageBg }]}>
+          <RoundButton icon="close" label="Close and save" onPress={handleCloseWithSave} palette={read} />
           <View style={styles.spacer} />
-
-          <PressableScale
+          <RoundButton
+            icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
+            label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
             onPress={toggleCurrent}
-            haptic={isCurrentRevised ? 'light' : 'medium'}
-            hitSlop={12}
-            style={[
-              styles.iconBtn,
-              isCurrentRevised && { backgroundColor: theme.textPrimary },
-            ]}
-            accessibilityLabel={
-              isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'
-            }
-          >
-            <Ionicons
-              name={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
-              size={18}
-              color={isCurrentRevised ? theme.textInverse : theme.textPrimary}
-            />
-          </PressableScale>
-
-          <PressableScale
-            onPress={() => setMenuOpen(true)}
-            haptic="light"
-            hitSlop={12}
-            style={styles.iconBtn}
-            accessibilityLabel="Session menu"
-          >
-            <Ionicons name="ellipsis-horizontal" size={18} color={theme.textPrimary} />
-          </PressableScale>
+            palette={read}
+            active={isCurrentRevised}
+          />
+          <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={read} />
         </View>
 
         <View style={styles.viewerWrap}>
@@ -194,21 +169,31 @@ export function EditSessionModal({
           />
 
           <View style={styles.breadcrumb} pointerEvents="none">
-            <Text style={styles.crumbLeft}>
+            <Text style={crumbText} maxFontSizeMultiplier={1.3}>
               Juz {juz} · Hizb {hizb}
             </Text>
             <View style={styles.crumbRight}>
               {firstSurah?.name ? (
-                <Text style={styles.crumbSurah}>{firstSurah.name}</Text>
+                <Text style={crumbText} maxFontSizeMultiplier={1.3}>
+                  {firstSurah.name}
+                </Text>
               ) : null}
               {firstSurah?.nameArabic ? (
-                <Text style={styles.crumbArabic}>{firstSurah.nameArabic}</Text>
+                <Text style={[arabicV2(13), { color: read.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                  {firstSurah.nameArabic}
+                </Text>
               ) : null}
             </View>
           </View>
 
           <View style={styles.footer} pointerEvents="none">
-            <Text style={styles.pageNum}>{currentPageNumber}</Text>
+            <Text
+              style={[typeV2.meta, typeV2.numeral, { color: read.textPrimary }]}
+              maxFontSizeMultiplier={1.3}
+              testID="edit-session-page"
+            >
+              {currentPageNumber}
+            </Text>
           </View>
         </View>
 
@@ -258,63 +243,36 @@ export function EditSessionModal({
   );
 }
 
-const makeStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bg },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      backgroundColor: theme.bg,
-      gap: spacing.xs,
-    },
-    iconBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    spacer: { flex: 1 },
-    viewerWrap: { flex: 1 },
-    breadcrumb: {
-      position: 'absolute',
-      top: spacing.sm,
-      left: spacing.md,
-      right: spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    crumbLeft: {
-      ...typography.caption,
-      color: theme.textPrimary,
-    },
-    crumbRight: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: spacing.xs,
-    },
-    crumbSurah: {
-      ...typography.caption,
-      color: theme.textPrimary,
-    },
-    crumbArabic: {
-      fontFamily: fonts.arabic,
-      fontSize: 14,
-      color: theme.textPrimary,
-    },
-    footer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: spacing.md,
-      alignItems: 'center',
-    },
-    pageNum: {
-      fontSize: 13,
-      fontWeight: '500',
-      color: theme.textPrimary,
-    },
-  });
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: layoutV2.gutter - 6,
+    paddingVertical: spacing.xs,
+    gap: 8,
+  },
+  spacer: { flex: 1 },
+  viewerWrap: { flex: 1 },
+  breadcrumb: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: layoutV2.gutter,
+    right: layoutV2.gutter,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  crumbRight: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: spacing.md,
+    alignItems: 'center',
+  },
+});

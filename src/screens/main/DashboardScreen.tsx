@@ -4,51 +4,51 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
   RefreshControl,
-  Modal,
-  Pressable,
   Alert,
 } from 'react-native';
+// Gesture Handler's, so a sideways swipe on it can move to the next tab
+// (navigation/PagerTabs): over React Native's own, the swipe never started.
+import { ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { GlassCard } from '../../components/GlassCard';
-import { LiquidGlassActionBar } from '../../components/LiquidGlassTabBar';
-import { Button } from '../../components/Button';
-import { PressableScale } from '../../components/PressableScale';
+import { PillButton } from '../../components/v2/PillButton';
 import { EditSessionModal } from '../../components/EditSessionModal';
-import { FLOATING_TIMER_SIZE } from '../../components/timer/floatingTimerOffset';
-import { ProgressSummaryCard } from '../../components/home/ProgressSummaryCard';
-import { Greeting } from '../../components/home/Greeting';
-import { KahfCard } from '../../components/home/KahfCard';
 import { greetingName } from '../../lib/displayName';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
 import * as firestoreService from '../../services/firestoreService';
 import { logger } from '../../lib/logger';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
+import { ThemeColors } from '../../theme/v2';
 import {
   generateDailyAssignment,
   shiftScheduleAnchor,
+  canPushScheduleBack,
+  scheduleStartingByToday,
 } from '../../lib/algorithm';
-import {
-  getQuranData,
-  getJuzForPage,
-  getJuzName,
-  getSurahForPage,
-} from '../../lib/quranData';
-import { formatDateReadable } from '../../lib/utils';
+import { getQuranData } from '../../lib/quranData';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { useTabBarFootprint } from '../../navigation/TabBar';
+import { TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
+import { SessionPost } from '../../components/home/feed/SessionPost';
+import { KahfPost } from '../../components/home/feed/KahfPost';
+import { RecentSection } from '../../components/activity/ActivityItemRow';
+import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
+import { HeroGlow } from '../../components/v2/HeroGlow';
+import { QiblaSheet } from '../../components/qibla/QiblaSheet';
+import { onQiblaSheetRequest } from '../../lib/widgets/links';
+import { IconButton, TopBar } from '../../components/v2/TopBar';
+import { arabicV2, layoutV2 } from '../../theme/v2';
+import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
 
@@ -58,36 +58,44 @@ const COMPACT_SESSION_LIMIT = 3;
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { theme, isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(theme, isDark), [theme, isDark]);
+  const { theme, palette } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const { user, pages, logs, updateLog, deleteLog, deleteLogs, loadData, error, saveUser } = useApp();
+  const { user, pages, logs, updateLog, deleteLog, loadData, error, saveUser } = useApp();
   const { firebaseUser } = useAuth();
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
   const homePrefs = useHomePrefs();
+  const tabFootprint = useTabBarFootprint();
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+
+  // A schedule that starts after today (an earlier "back a day" on a schedule
+  // that started today) leaves today with nothing to revise: start it today.
+  const repairingStartRef = useRef(false);
+  useEffect(() => {
+    if (!user || repairingStartRef.current) return;
+    const repaired = scheduleStartingByToday(user, revisionDate);
+    if (!repaired) return;
+    repairingStartRef.current = true;
+    saveUser(repaired)
+      .catch((err) => logger.warn('Could not move the schedule start to today', err))
+      .finally(() => {
+        repairingStartRef.current = false;
+      });
+  }, [user, revisionDate, saveUser]);
   const carryingRef = useRef(false);
   // Tapping the Home tab while on Home scrolls back to the top (and from a
   // pushed screen, the stack pops back here first).
   const scrollRef = useRef<ScrollView>(null);
   useScrollToTop(scrollRef);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
+  const [qiblaOpen, setQiblaOpen] = useState(false);
+  // The Qibla widget's tap (revisely://qibla) opens the sheet here, also from a cold start.
+  useEffect(() => onQiblaSheetRequest(() => setQiblaOpen(true)), []);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [sessionsExpanded, setSessionsExpanded] = useState(false);
-  const [juzFilter, setJuzFilter] = useState<number | null>(null);
-  const [juzPickerOpen, setJuzPickerOpen] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const quranData = getQuranData();
 
@@ -138,19 +146,6 @@ export default function DashboardScreen() {
     registerForPushNotificationsAsync();
   }, []);
 
-  // Replace the tab bar with the selection action bar (Mail/Photos pattern).
-  // Targets the Home tab descriptor so the custom LiquidGlassTabBar hides itself.
-  useFocusEffect(
-    useCallback(() => {
-      navigation.getParent()?.setOptions({
-        tabBarStyle: selectionMode ? { display: 'none' } : undefined,
-      });
-      return () => {
-        navigation.getParent()?.setOptions({ tabBarStyle: undefined });
-      };
-    }, [selectionMode, navigation]),
-  );
-
   const calculatedStreak = useMemo(() => {
     if (logs.length === 0) return 0;
     // Log dates are revision days ('YYYY-MM-DD'), so count back from the
@@ -183,31 +178,12 @@ export default function DashboardScreen() {
     [logs],
   );
 
-  const filteredSessions = useMemo(() => {
-    if (juzFilter === null) return sessionLogs;
-    return sessionLogs.filter((log) =>
-      log.pagesRevised.some((p) => getJuzForPage(p) === juzFilter),
-    );
-  }, [sessionLogs, juzFilter]);
-
-  // Only a juz filter or bulk selection expands in place; otherwise "See all"
-  // opens Activity.
-  const expandInPlace = sessionsExpanded && (juzFilter !== null || selectionMode);
-  const visibleSessions = useMemo(
-    () =>
-      expandInPlace
-        ? filteredSessions
-        : filteredSessions.slice(0, COMPACT_SESSION_LIMIT),
-    [filteredSessions, expandInPlace],
-  );
-
-  const availableJuz = useMemo(() => {
-    const set = new Set<number>();
-    for (const log of sessionLogs) {
-      for (const p of log.pagesRevised) set.add(getJuzForPage(p));
-    }
-    return Array.from(set).sort((a, b) => a - b);
-  }, [sessionLogs]);
+  // Pages revised today: the Today post's page chips fill in as they're done.
+  const donePagesToday = useMemo(() => {
+    const done = new Set<number>();
+    logs.filter((log) => log.date === revisionDay).forEach((log) => log.pagesRevised.forEach((p) => done.add(p)));
+    return done;
+  }, [logs, revisionDay]);
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
@@ -260,10 +236,9 @@ export default function DashboardScreen() {
             <>
               <Text style={styles.errorTitle}>Couldn't load your data</Text>
               <Text style={styles.errorMessage}>{error}</Text>
-              <Button
+              <PillButton
                 title="Try again"
                 onPress={loadData}
-                variant="primary"
                 style={styles.retryButton}
               />
             </>
@@ -274,8 +249,6 @@ export default function DashboardScreen() {
       </SafeAreaView>
     );
   }
-
-  const today = revisionDate;
 
   const handleEditSession = (log: RevisionLog) => {
     // Prefer the day's actual assignedPages so the edit modal shows the
@@ -305,99 +278,6 @@ export default function DashboardScreen() {
       setSelectedSessionPages([]);
     }
   };
-
-  const enterSelectionMode = (initialId?: string) => {
-    setSelectionMode(true);
-    setSelectedSessionIds(initialId ? new Set([initialId]) : new Set());
-  };
-
-  const exitSelectionMode = () => {
-    setSelectionMode(false);
-    setSelectedSessionIds(new Set());
-  };
-
-  const toggleSessionSelection = (id: string) => {
-    setSelectedSessionIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleSessionPress = (log: RevisionLog) => {
-    if (selectionMode) {
-      toggleSessionSelection(log.id);
-    } else {
-      handleEditSession(log);
-    }
-  };
-
-  const handleSessionLongPress = (log: RevisionLog) => {
-    if (!selectionMode) enterSelectionMode(log.id);
-  };
-
-  const handleBulkDelete = () => {
-    const ids = Array.from(selectedSessionIds);
-    if (ids.length === 0) return;
-    Alert.alert(
-      `Delete ${ids.length} session${ids.length !== 1 ? 's' : ''}?`,
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteLogs(ids);
-            exitSelectionMode();
-          },
-        },
-      ],
-    );
-  };
-
-  const heroContent = (() => {
-    if (todayStatus.status === 'completed') {
-      return {
-        eyebrow: 'Today',
-        title: "You're done for today",
-        subtitle: `Revised ${todayStatus.pagesCompleted} page${
-          todayStatus.pagesCompleted !== 1 ? 's' : ''
-        } · come back tomorrow`,
-        ctaTitle: 'Review session',
-      };
-    }
-    if (todayStatus.status === 'partial') {
-      const remaining = Math.max(0, assignment.totalPages - todayStatus.pagesCompleted);
-      return {
-        eyebrow: 'In progress',
-        title: `${remaining} page${remaining !== 1 ? 's' : ''} to go`,
-        subtitle: `${todayStatus.pagesCompleted} of ${assignment.totalPages} done so far`,
-        ctaTitle: 'Continue revision',
-      };
-    }
-    if (assignment.totalPages === 0) {
-      return {
-        eyebrow: 'All caught up',
-        title: 'Nothing to revise yet',
-        subtitle: 'Mark the surahs, juz, or pages you’ve memorized and your daily revision will appear here.',
-        ctaTitle: 'Mark memorized pages',
-      };
-    }
-    const primaryJuz = assignment.juzBreakdown[0]?.juz;
-    const moreJuz = assignment.juzBreakdown.length - 1;
-    return {
-      eyebrow: "Today's revision",
-      title: primaryJuz
-        ? `Juz ${primaryJuz}${moreJuz > 0 ? ` + ${moreJuz} more` : ''}`
-        : 'Ready when you are',
-      subtitle: `${assignment.totalPages} page${
-        assignment.totalPages !== 1 ? 's' : ''
-      }`,
-      ctaTitle: 'Start revision',
-    };
-  })();
 
   const handleCtaPress = () => {
     if (todayStatus.status === 'completed') {
@@ -464,9 +344,9 @@ export default function DashboardScreen() {
 
   // Fell behind? Slide the whole schedule a day later so today reverts to the
   // review you missed instead of marching on. Pure anchor nudge — no per-day
-  // edits — applied immediately so the hero updates in place.
+  // edits — applied immediately so the Today post updates in place.
   const handlePushBack = async () => {
-    if (!user || shifting) return;
+    if (!user || shifting || !canPushScheduleBack(user, revisionDate)) return;
     setShifting(true);
     try {
       await saveUser(shiftScheduleAnchor(user, 1));
@@ -477,152 +357,88 @@ export default function DashboardScreen() {
     }
   };
 
-  const renderHeroContent = () => (
-    <>
-      <View style={styles.heroTopRow}>
-        <Text style={styles.heroEyebrow}>{heroContent.eyebrow}</Text>
-        <View style={styles.heroTopRight}>
-          {calculatedStreak > 0 && (
-            <View style={styles.streakBadge}>
-              <Ionicons name="flame" size={14} color={theme.gold} />
-              <Text style={styles.streakBadgeText}>{calculatedStreak}</Text>
-            </View>
-          )}
-          <PressableScale
-            onPress={() => navigation.navigate('PlanEdit')}
-            haptic="light"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Edit schedule"
-          >
-            <GlassCard
-              style={styles.heroEditButton}
-              tintColor={theme.accent + '33'}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={16}
-                color={theme.accent}
-              />
-            </GlassCard>
-          </PressableScale>
-        </View>
-      </View>
-
-      <Text style={styles.heroTitle}>{heroContent.title}</Text>
-      <Text style={styles.heroSubtitle}>{heroContent.subtitle}</Text>
-
-      {heroContent.ctaTitle && (
-        <PressableScale
-          onPress={handleCtaPress}
-          haptic="medium"
-          scale={0.97}
-          style={styles.heroCta}
-        >
-          <Text style={styles.heroCtaText}>{heroContent.ctaTitle}</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
-        </PressableScale>
-      )}
-
-      {leftovers.length > 0 && (
-        <PressableScale
-          onPress={handleCarryOver}
-          disabled={carrying}
-          haptic="light"
-          scale={0.98}
-          style={styles.pushBackLink}
-          accessibilityLabel={`Add ${leftovers.length} unrevised pages from yesterday to today`}
-        >
-          <Ionicons name="add" size={14} color={theme.accent} />
-          <Text style={styles.pushBackText}>
-            {carrying
-              ? 'Updating…'
-              : `Add ${leftovers.length} left from yesterday`}
-          </Text>
-        </PressableScale>
-      )}
-
-      {todayStatus.status !== 'completed' && assignment.totalPages > 0 && (
-        <PressableScale
-          onPress={handlePushBack}
-          disabled={shifting}
-          haptic="light"
-          scale={0.98}
-          style={styles.pushBackLink}
-          accessibilityLabel="Behind on revision? Move your schedule back a day"
-        >
-          <Ionicons name="arrow-back" size={13} color={theme.textSecondary} />
-          <Text style={styles.pushBackText}>
-            {shifting ? 'Updating…' : 'Behind? Go back a day'}
-          </Text>
-        </PressableScale>
-      )}
-    </>
+  const editModal = selectedLog && (
+    <EditSessionModal
+      visible={showEditModal}
+      onClose={() => {
+        setShowEditModal(false);
+        setSelectedLog(null);
+        setSelectedSessionPages([]);
+      }}
+      log={selectedLog}
+      quranData={quranData}
+      sessionPages={selectedSessionPages}
+      onSave={handleSaveSession}
+      onDelete={handleDeleteSession}
+    />
   );
 
-  // Show filter chip only when there's enough variety to make filtering useful.
-  const showFilterChip = availableJuz.length > 1;
-  const showSeeAllToggle = filteredSessions.length > COMPACT_SESSION_LIMIT;
-  const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
+  // A feed: Today in one post (its pages, the action, how much is memorized),
+  // Friday's Al-Kahf, then the last few sessions; the rest is behind "See
+  // all", searchable. A running timer shows in the top bar.
+  const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
+  const progress =
+    homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized')
+      ? memorizedText(pages, homePrefs.metrics)
+      : null;
+  const memorized = progress?.body ?? null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      <HeroGlow />
+      <TopBar
+        left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
+        center={
+          <Text style={[arabicV2(20), { color: palette.text }]} accessibilityLanguage="ar" testID="salam">
+            السلام عليكم
+          </Text>
+        }
+        right={
+          <>
+            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => setQiblaOpen(true)} testID="open-qibla" />
+            <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} />
+            <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} />
+          </>
+        }
+        // Three icons on the right: both sides widen so the salam stays centred.
+        sideWidth={120}
+      />
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.textSecondary}
-          />
+          // Transparent: an opaque pull area cut Home's glow off in a hard line.
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
         }
+        testID="home-v2"
       >
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.date}>{formatDateReadable(today)}</Text>
-            <Greeting name={userName} />
-          </View>
-          <PressableScale
-            onPress={() => navigation.navigate('Activity')}
-            haptic="light"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Open activity"
-          >
-            <GlassCard style={styles.settingsButton}>
-              <Ionicons
-                name="pulse-outline"
-                size={20}
-                color={theme.textPrimary}
-              />
-            </GlassCard>
-          </PressableScale>
-          <PressableScale
-            onPress={() => navigation.navigate('Settings')}
-            haptic="light"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Open settings"
-          >
-            <GlassCard style={styles.settingsButton}>
-              <Ionicons
-                name="settings-outline"
-                size={20}
-                color={theme.textPrimary}
-              />
-            </GlassCard>
-          </PressableScale>
-        </View>
-
-        {/* Hero — clear liquid glass lets the gradient lens through.
-            elevated/specular sell the floating wet-glass surface. */}
-        <View style={styles.heroCenter}>
-          <GlassCard elevated specular style={styles.heroSurface}>
-            {renderHeroContent()}
-          </GlassCard>
-        </View>
+        {/* No line under the header: one across the glow ended it in a hard
+            edge, at rest and while pulling (it read as a box). */}
+        <TodayPost
+          name={userName}
+          initial={avatarInitial(userName, firebaseUser?.email)}
+          status={todayStatus.status}
+          pages={assignment.pages}
+          juzBreakdown={assignment.juzBreakdown}
+          done={donePagesToday}
+          streak={calculatedStreak}
+          memorized={memorized}
+          memorizedFraction={progress?.fraction}
+          memorizedJuz={progress?.juz}
+          onPrimary={handleCtaPress}
+          onEditSchedule={() => navigation.navigate('PlanEdit')}
+          onMemorization={() => navigation.navigate('Memorization')}
+          leftovers={leftovers.length}
+          onCarryOver={handleCarryOver}
+          carrying={carrying}
+          onPushBack={handlePushBack}
+          canPushBack={canPushScheduleBack(user, revisionDate)}
+          shifting={shifting}
+        />
 
         {showKahfCard && (
-          <KahfCard
+          <KahfPost
             state={kahfState === 'done' ? 'done' : 'prompt'}
             saving={kahfSaving}
             onRead={openKahf}
@@ -631,381 +447,35 @@ export default function DashboardScreen() {
           />
         )}
 
-        {homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized') && (
-          <View style={styles.progressCardWrap}>
-            <ProgressSummaryCard
-              pages={pages}
-              metrics={homePrefs.metrics}
-              onPress={() => navigation.navigate('Memorization')}
+        <RecentSection
+          title="Recent sessions"
+          count={recent.length}
+          emptyText="No sessions yet. Start your first revision above."
+          onSeeAll={() => navigation.navigate('ActivityAll', { kind: 'revision' })}
+          testID="home-recent"
+        >
+          {recent.map((log, i) => (
+            <SessionPost
+              key={log.id}
+              log={log}
+              today={revisionDay}
+              onEdit={() => handleEditSession(log)}
+              onDelete={() => deleteLog(log.id)}
+              separator={i < recent.length - 1}
             />
-          </View>
-        )}
-
-        {/* Sessions — hidden entirely when the user has no sessions yet. */}
-        {sessionLogs.length > 0 && (
-          <View style={styles.sessionsSection}>
-            <View style={styles.sessionsHeader}>
-              <Text style={styles.sessionsLabel}>RECENT SESSIONS</Text>
-              <View style={styles.sessionsHeaderRight}>
-                {showFilterChip && !selectionMode && (
-                  <PressableScale
-                    onPress={() => setJuzPickerOpen(true)}
-                    haptic="light"
-                  >
-                    <GlassCard style={styles.filterChip}>
-                      <Ionicons
-                        name="filter-outline"
-                        size={12}
-                        color={theme.textSecondary}
-                      />
-                      <Text style={styles.filterChipText}>{filterLabel}</Text>
-                      <Ionicons
-                        name="chevron-down"
-                        size={12}
-                        color={theme.textMuted}
-                      />
-                    </GlassCard>
-                  </PressableScale>
-                )}
-                <PressableScale
-                  onPress={() =>
-                    selectionMode ? exitSelectionMode() : enterSelectionMode()
-                  }
-                  haptic="light"
-                  style={styles.selectChip}
-                >
-                  <Text style={styles.selectChipText}>
-                    {selectionMode ? 'Cancel' : 'Select'}
-                  </Text>
-                </PressableScale>
-              </View>
-            </View>
-
-            {visibleSessions.length === 0 ? (
-              <Text style={styles.emptySessions}>
-                No sessions match {filterLabel}
-              </Text>
-            ) : (
-              <GlassCard elevated specular style={styles.sessionList}>
-                {visibleSessions.map((log, idx, arr) => (
-                  <SessionRow
-                    key={log.id}
-                    log={log}
-                    isLast={idx === arr.length - 1}
-                    theme={theme}
-                    selectionMode={selectionMode}
-                    isSelected={selectedSessionIds.has(log.id)}
-                    onPress={() => handleSessionPress(log)}
-                    onLongPress={() => handleSessionLongPress(log)}
-                  />
-                ))}
-              </GlassCard>
-            )}
-
-            {/* The full history lives in Activity. A juz filter or bulk
-                selection still expands in place, since Activity has neither. */}
-            {showSeeAllToggle &&
-              (juzFilter === null && !selectionMode ? (
-                <PressableScale
-                  onPress={() => navigation.navigate('Activity')}
-                  haptic="light"
-                  scale={0.99}
-                  style={styles.seeAllBtn}
-                >
-                  <Text style={styles.seeAllText}>See all in Activity</Text>
-                  <Ionicons name="chevron-forward" size={16} color={theme.accent} />
-                </PressableScale>
-              ) : (
-                <PressableScale
-                  onPress={() => setSessionsExpanded((v) => !v)}
-                  haptic="light"
-                  scale={0.99}
-                  style={styles.seeAllBtn}
-                >
-                  <Text style={styles.seeAllText}>
-                    {expandInPlace
-                      ? 'Show less'
-                      : `See all ${filteredSessions.length}`}
-                  </Text>
-                  <Ionicons
-                    name={expandInPlace ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color={theme.accent}
-                  />
-                </PressableScale>
-              ))}
-          </View>
-        )}
+          ))}
+        </RecentSection>
       </ScrollView>
-
-      {selectionMode && (
-        <LiquidGlassActionBar>
-          <Text style={[styles.selectionCount, { textAlign: 'left' }]}>
-            {selectedSessionIds.size === 0
-              ? 'Select sessions'
-              : `${selectedSessionIds.size} selected`}
-          </Text>
-          <PressableScale
-            onPress={handleBulkDelete}
-            haptic="medium"
-            disabled={selectedSessionIds.size === 0}
-            style={[
-              styles.actionDestructive,
-              {
-                backgroundColor:
-                  selectedSessionIds.size === 0 ? 'transparent' : theme.error,
-                opacity: selectedSessionIds.size === 0 ? 0.5 : 1,
-              },
-            ]}
-          >
-            <Ionicons
-              name="trash-outline"
-              size={14}
-              color={selectedSessionIds.size === 0 ? theme.textMuted : '#fff'}
-            />
-            <Text
-              style={[
-                styles.actionDestructiveLabel,
-                {
-                  color:
-                    selectedSessionIds.size === 0 ? theme.textMuted : '#fff',
-                },
-              ]}
-            >
-              Delete
-            </Text>
-          </PressableScale>
-        </LiquidGlassActionBar>
-      )}
-
-      {selectedLog && (
-        <EditSessionModal
-          visible={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedLog(null);
-            setSelectedSessionPages([]);
-          }}
-          log={selectedLog}
-          quranData={quranData}
-          sessionPages={selectedSessionPages}
-          onSave={handleSaveSession}
-          onDelete={handleDeleteSession}
-        />
-      )}
-
-      <JuzPickerSheet
-        visible={juzPickerOpen}
-        onClose={() => setJuzPickerOpen(false)}
-        availableJuz={availableJuz}
-        currentValue={juzFilter}
-        onSelect={(juz) => {
-          setJuzFilter(juz);
-          setJuzPickerOpen(false);
-        }}
-        theme={theme}
-      />
+      {editModal}
+      <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
     </SafeAreaView>
   );
 }
 
-function SessionRow({
-  log,
-  isLast,
-  theme,
-  onPress,
-  onLongPress,
-  selectionMode = false,
-  isSelected = false,
-}: {
-  log: RevisionLog;
-  isLast: boolean;
-  theme: ThemeColors;
-  onPress: () => void;
-  onLongPress?: () => void;
-  selectionMode?: boolean;
-  isSelected?: boolean;
-}) {
-  // Show the whole session, not just the part the user finished. Prefer the
-  // assignedPages field (the day's actual assignment) and fall back to
-  // revised + skipped for legacy logs that don't carry it.
-  const sessionPages = useMemo(
-    () =>
-      log.assignedPages && log.assignedPages.length > 0
-        ? log.assignedPages
-        : [...log.pagesRevised, ...log.pagesSkipped],
-    [log.assignedPages, log.pagesRevised, log.pagesSkipped],
-  );
-  const juzNumbers = useMemo(
-    () =>
-      Array.from(new Set(sessionPages.map((p) => getJuzForPage(p)))).sort(
-        (a, b) => a - b,
-      ),
-    [sessionPages],
-  );
-  const surahNames = useMemo(() => {
-    const seen = new Set<number>();
-    const names: string[] = [];
-    for (const pageNum of sessionPages) {
-      const surah = getSurahForPage(pageNum);
-      if (!seen.has(surah.number)) {
-        seen.add(surah.number);
-        names.push(surah.name);
-      }
-    }
-    return names;
-  }, [sessionPages]);
-
-  const juzLabel = formatJuzLabel(juzNumbers);
-  const surahLabel = formatSurahLabel(surahNames);
-  // 'YYYY-MM-DD' parsed as a local date; new Date(log.date) is UTC midnight,
-  // which shows the previous day west of Greenwich.
-  const logDate = parseLocalDay(log.date);
-  const monthDay = logDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-  const year = logDate.getFullYear().toString();
-
-  const { isDark } = useTheme();
-  const styles = useMemo(() => makeRowStyles(theme, isDark), [theme, isDark]);
-
-  return (
-    <PressableScale
-      onPress={onPress}
-      onLongPress={onLongPress}
-      haptic="light"
-      scale={0.99}
-      style={[styles.row, !isLast && styles.divider]}
-    >
-      {selectionMode && (
-        <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
-          {isSelected && (
-            <Ionicons name="checkmark" size={14} color={theme.textInverse} />
-          )}
-        </View>
-      )}
-      <View style={styles.info}>
-        {juzLabel.length > 0 && <Text style={styles.primary}>{juzLabel}</Text>}
-        {surahLabel.length > 0 && (
-          <Text style={styles.secondary} numberOfLines={1}>
-            {surahLabel}
-          </Text>
-        )}
-      </View>
-      <View style={styles.dateBox}>
-        <Text style={styles.dateMonth}>{monthDay}</Text>
-        <Text style={styles.dateYear}>{year}</Text>
-      </View>
-    </PressableScale>
-  );
-}
-
-function parseLocalDay(date: string): Date {
-  const [y, m, d] = date.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function formatJuzLabel(juzNumbers: number[]): string {
-  if (juzNumbers.length === 0) return '';
-  const visible = juzNumbers.slice(0, 2).join(', ');
-  const more = juzNumbers.length > 2 ? ` +${juzNumbers.length - 2}` : '';
-  return `Juz ${visible}${more}`;
-}
-
-function formatSurahLabel(surahNames: string[]): string {
-  if (surahNames.length === 0) return '';
-  const visible = surahNames.slice(0, 2).join(', ');
-  const more = surahNames.length > 2 ? ` +${surahNames.length - 2}` : '';
-  return `${visible}${more}`;
-}
-
-function JuzPickerSheet({
-  visible,
-  onClose,
-  availableJuz,
-  currentValue,
-  onSelect,
-  theme,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  availableJuz: number[];
-  currentValue: number | null;
-  onSelect: (juz: number | null) => void;
-  theme: ThemeColors;
-}) {
-  const sheetStyles = useMemo(() => makeSheetStyles(theme), [theme]);
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={sheetStyles.overlay} onPress={onClose}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
-          style={sheetStyles.sheet}
-        >
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <View style={sheetStyles.dragHandle} />
-          <Text style={sheetStyles.title}>Filter by juz</Text>
-          <ScrollView style={sheetStyles.list}>
-            <PressableScale
-              onPress={() => onSelect(null)}
-              haptic="selection"
-              scale={0.99}
-              style={[
-                sheetStyles.option,
-                currentValue === null && sheetStyles.optionSelected,
-              ]}
-            >
-              <Text style={sheetStyles.optionText}>All juz</Text>
-              {currentValue === null && (
-                <Ionicons name="checkmark" size={18} color={theme.accent} />
-              )}
-            </PressableScale>
-            {availableJuz.map((juz) => (
-              <PressableScale
-                key={juz}
-                onPress={() => onSelect(juz)}
-                haptic="selection"
-                scale={0.99}
-                style={[
-                  sheetStyles.option,
-                  currentValue === juz && sheetStyles.optionSelected,
-                ]}
-              >
-                <View>
-                  <Text style={sheetStyles.optionText}>Juz {juz}</Text>
-                  <Text style={sheetStyles.optionMeta}>{getJuzName(juz)}</Text>
-                </View>
-                {currentValue === juz && (
-                  <Ionicons name="checkmark" size={18} color={theme.accent} />
-                )}
-              </PressableScale>
-            ))}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const makeStyles = (theme: ThemeColors, isDark: boolean) =>
+const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
-    content: {
-      flexGrow: 1,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.md,
-      // Clearance for the floating tab bar (~76px pill+gap) and the floating
-      // timer above it, so content scrolls behind them without being
-      // permanently hidden.
-      paddingBottom: 96 + FLOATING_TIMER_SIZE + spacing.sm,
-    },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
@@ -1026,323 +496,4 @@ const makeStyles = (theme: ThemeColors, isDark: boolean) =>
       textAlign: 'center',
     },
     retryButton: { minWidth: 160 },
-
-    header: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      marginBottom: spacing.xl,
-      gap: spacing.sm,
-    },
-    // minWidth 0 lets the text column shrink beside the fixed-size buttons
-    // instead of pushing them off screen.
-    headerText: { flex: 1, minWidth: 0, alignItems: 'stretch' },
-    date: {
-      ...typography.label,
-      color: theme.textMuted,
-      marginBottom: spacing.xxs,
-      textAlign: 'left',
-    },
-    settingsButton: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.full,
-      overflow: 'hidden',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-
-    heroCenter: {
-      flex: 1,
-      justifyContent: 'center',
-      marginVertical: spacing.lg,
-    },
-    heroSurface: {
-      borderRadius: radius.lg,
-      padding: spacing.xl,
-    },
-    heroTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    heroTopRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
-    heroEditButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      overflow: 'hidden',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    heroEyebrow: {
-      ...typography.label,
-      color: theme.accent,
-      letterSpacing: 0.8,
-    },
-    streakBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: radius.full,
-      backgroundColor: theme.gold + '1F',
-    },
-    streakBadgeText: {
-      ...typography.bodySmall,
-      color: theme.gold,
-      fontWeight: '700',
-    },
-    heroTitle: {
-      ...typography.displayMedium,
-      color: theme.textPrimary,
-      marginBottom: spacing.xs,
-    },
-    heroSubtitle: {
-      ...typography.bodyMedium,
-      color: theme.textSecondary,
-      marginBottom: spacing.xl,
-    },
-    heroCta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.xs,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      borderRadius: radius.full,
-      backgroundColor: theme.accent,
-    },
-    heroCtaText: {
-      ...typography.titleSmall,
-      fontWeight: '700',
-      letterSpacing: 0.2,
-      color: '#fff',
-    },
-    pushBackLink: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      marginTop: spacing.md,
-      alignSelf: 'center',
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      minHeight: 36,
-      borderRadius: radius.full,
-      backgroundColor: theme.accentSoft,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-    },
-    pushBackText: {
-      ...typography.bodySmall,
-      color: theme.accent,
-      fontWeight: '500',
-    },
-
-    progressCardWrap: { marginTop: -spacing.xs, marginBottom: spacing.md },
-    sessionsSection: { marginTop: spacing.sm },
-    sessionsHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.sm,
-      paddingHorizontal: spacing.xs,
-    },
-    sessionsHeaderRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
-    selectChip: {
-      paddingHorizontal: spacing.xs,
-      paddingVertical: 4,
-    },
-    selectChipText: {
-      ...typography.bodySmall,
-      fontSize: 14,
-      color: theme.accent,
-      fontWeight: '600',
-    },
-    selectionCount: {
-      ...typography.bodyMedium,
-      fontSize: 14,
-      color: theme.textPrimary,
-      fontWeight: '600',
-      flex: 1,
-      textAlign: 'center',
-    },
-    actionDestructive: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: radius.full,
-    },
-    actionDestructiveLabel: {
-      ...typography.bodySmall,
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    sessionsLabel: {
-      ...typography.label,
-      color: theme.textMuted,
-      letterSpacing: 0.8,
-    },
-    filterChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 4,
-      borderRadius: radius.full,
-      overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border,
-    },
-    filterChipText: {
-      ...typography.bodySmall,
-      fontSize: 11,
-      color: theme.textPrimary,
-      fontWeight: '600',
-    },
-    sessionList: {
-      borderRadius: radius.md,
-      overflow: 'hidden',
-    },
-    emptySessions: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      textAlign: 'center',
-      paddingVertical: spacing.lg,
-      paddingHorizontal: spacing.md,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      borderRadius: radius.md,
-    },
-    seeAllBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      paddingVertical: spacing.sm,
-      marginTop: spacing.xs,
-    },
-    seeAllText: {
-      ...typography.bodySmall,
-      color: theme.accent,
-      fontWeight: '600',
-    },
-  });
-
-const makeRowStyles = (theme: ThemeColors, isDark: boolean) =>
-  StyleSheet.create({
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-    },
-    divider: {
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border,
-    },
-    info: { flex: 1 },
-    primary: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-    },
-    secondary: {
-      ...typography.bodySmall,
-      color: theme.textSecondary,
-      marginTop: 2,
-    },
-    dateBox: {
-      alignItems: 'flex-end',
-      marginLeft: spacing.md,
-    },
-    dateMonth: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-      fontWeight: '700',
-    },
-    dateYear: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      marginTop: 2,
-    },
-    checkbox: {
-      width: 22,
-      height: 22,
-      borderRadius: radius.xs,
-      borderWidth: 1.5,
-      borderColor: 'transparent',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    checkboxChecked: {
-      backgroundColor: theme.accent,
-      borderColor: theme.accent,
-    },
-  });
-
-const makeSheetStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      justifyContent: 'flex-end',
-    },
-    sheet: {
-      borderTopLeftRadius: radius.lg,
-      borderTopRightRadius: radius.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.xl,
-      maxHeight: '75%',
-      overflow: 'hidden',
-    },
-    dragHandle: {
-      width: 40,
-      height: 4,
-      borderRadius: radius.full,
-      alignSelf: 'center',
-      marginBottom: spacing.md,
-      backgroundColor: theme.border,
-    },
-    title: {
-      ...typography.titleMedium,
-      color: theme.textPrimary,
-      paddingHorizontal: spacing.lg,
-      marginBottom: spacing.md,
-    },
-    list: { paddingHorizontal: spacing.lg },
-    option: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border,
-    },
-    optionSelected: { backgroundColor: theme.accentSoft },
-    optionText: {
-      ...typography.bodyMedium,
-      color: theme.textPrimary,
-      fontWeight: '600',
-    },
-    optionMeta: {
-      ...typography.bodySmall,
-      color: theme.textMuted,
-      marginTop: 2,
-    },
   });

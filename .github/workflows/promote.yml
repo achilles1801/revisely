@@ -14,8 +14,17 @@ name: Promote to production
 # deployments): the TestFlight sign-off. An update promoted for a runtime that the App Store doesn't
 # have yet (a new version in review) reaches App Store users when that version is released.
 #
+# Release health: before the approval, the candidate update must have run at least `min_sessions`
+# sessions on preview (TestFlight testers) at `min_crash_free` crash-free or better, read from Sentry
+# (scripts/sentry/gate.js; sessions are labelled per update, src/lib/releaseInfo.ts). Below that,
+# nothing is promoted. A run by hand can lower the bar or skip the check (`skip_health_check`).
+#
 # workflow_dispatch can promote a given update group instead (e.g. a fix for an older binary, published
 # to preview from a branch cut before a native change); it goes through the same approval.
+#
+# Rolling back: run it by hand with `group` = the previous production update group and `rollback` =
+# true. That group is looked up on production as well as preview, the health check is skipped (it
+# already ran in production), and the approval still applies.
 on:
   push:
     branches: [main]
@@ -36,9 +45,25 @@ on:
   workflow_dispatch:
     inputs:
       group:
-        description: Preview update group to promote (empty = the one with main's app hash)
+        description: Update group to promote (empty = the preview update with main's app hash)
         type: string
         required: false
+      rollback:
+        description: Roll back to an earlier production update (group required; skips the health check)
+        type: boolean
+        default: false
+      skip_health_check:
+        description: Promote without the preview crash-free check
+        type: boolean
+        default: false
+      min_sessions:
+        description: Preview sessions the update must have run
+        type: string
+        default: '5'
+      min_crash_free:
+        description: Crash-free sessions needed (0-1)
+        type: string
+        default: '0.99'
 
 concurrency:
   group: eas-promote
@@ -61,7 +86,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       # eas reads app.config.js, which needs the project's packages and the Firebase plist.
       - run: npm ci --legacy-peer-deps
@@ -69,6 +93,8 @@ jobs:
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Write the Firebase plist
@@ -80,9 +106,16 @@ jobs:
         id: find
         env:
           GROUP: ${{ inputs.group }}
+          ROLLBACK: ${{ inputs.rollback }}
         run: |
           APP=$(.github/scripts/app-hash.sh)
           eas update:list --branch preview --limit 50 --json --non-interactive > preview.json
+          if [ "$ROLLBACK" = "true" ]; then
+            if [ -z "$GROUP" ]; then echo "::error::A rollback needs the group to roll back to."; exit 1; fi
+            eas update:list --branch production --limit 50 --json --non-interactive > production.json
+            jq -s '{currentPage: (.[0].currentPage + .[1].currentPage)}' preview.json production.json > preview.json.tmp
+            mv preview.json.tmp preview.json
+          fi
           if [ -n "$GROUP" ]; then
             MATCH=$(jq -c --arg g "$GROUP" '[.currentPage[] | select(.group == $g)][0] // empty' preview.json)
             WHAT="update group $GROUP"
@@ -103,9 +136,36 @@ jobs:
           echo "### Ready to promote" >> "$GITHUB_STEP_SUMMARY"
           jq -r '"- group `\(.group)`\n- runtime `\(.runtimeVersion)`\n- \(.message)"' <<<"$MATCH" >> "$GITHUB_STEP_SUMMARY"
 
+  health:
+    name: Release health on preview
+    needs: find
+    if: ${{ !inputs.rollback && !inputs.skip_health_check }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Crash-free sessions of the candidate update
+        env:
+          SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
+          MIN_SESSIONS: ${{ inputs.min_sessions || '5' }}
+          MIN_CRASH_FREE: ${{ inputs.min_crash_free || '0.99' }}
+          GROUP: ${{ needs.find.outputs.group }}
+        run: |
+          if [ -z "$SENTRY_API_TOKEN" ]; then
+            echo "::error title=No release health::Add the SENTRY_API_TOKEN secret (read access to Sentry), or run this by hand with skip_health_check. Nothing was promoted."
+            exit 1
+          fi
+          node scripts/sentry/gate.js "$GROUP"
+
   promote:
     name: Promote (after TestFlight sign-off)
-    needs: find
+    needs: [find, health]
+    # The health check passed, or was skipped on purpose (a rollback or a run by hand that skips it).
+    if: ${{ !cancelled() && needs.find.result == 'success' && (needs.health.result == 'success' || needs.health.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -114,7 +174,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       # eas reads app.config.js, which needs the project's packages and the Firebase plist.
       - run: npm ci --legacy-peer-deps
@@ -122,6 +181,8 @@ jobs:
       - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Write the Firebase plist

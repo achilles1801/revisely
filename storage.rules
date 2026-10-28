@@ -1,0 +1,47 @@
+rules_version = '2';
+
+/**
+ * Firebase Storage rules for Revisely.
+ *
+ * - users/<uid>/profile/: the account's profile images (images, under 5 MB).
+ * - recordings/<uid>/: backed-up recordings (lib/recordingBackup): audio only,
+ *   at most 200 MB a file, readable, creatable and deletable only by the
+ *   account, never overwritten (a name is one file, ever). Account deletion
+ *   removes them on the server (functions deleteUserAccount).
+ * - The mushaf page images and the speech model are public objects served from
+ *   storage.googleapis.com, outside these rules.
+ * - Everything else is closed.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // User profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) &&
+                      request.resource.size < 5 * 1024 * 1024 &&
+                      request.resource.contentType.matches('image/.*');
+      allow delete: if isOwner(userId);
+    }
+
+    // Backed-up recordings: <id>-<n>.m4a. Created, never updated: a second file
+    // under a name already used is refused rather than replacing the first.
+    match /recordings/{userId}/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       resource == null &&
+                       fileName.matches('[A-Za-z0-9._-]+') &&
+                       request.resource.size < 200 * 1024 * 1024 &&
+                       request.resource.contentType.matches('audio/.*');
+    }
+
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

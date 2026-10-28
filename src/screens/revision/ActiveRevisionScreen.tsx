@@ -1,49 +1,49 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Alert,
   AppState,
-  Modal,
-  Pressable,
   SafeAreaView,
-  StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { Button } from '../../components/Button';
-import { GlassCard } from '../../components/GlassCard';
+import { PillButton } from '../../components/v2/PillButton';
 import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
+import { useHaptics } from '../../design/haptics';
+import { typeV2 } from '../../theme/v2';
 import { getReadPalette } from '../../theme/readPalette';
 import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
-import { SessionBar } from '../../components/revision/SessionBar';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { useVerseActions } from '../../components/verse/useVerseActions';
-import { navigateToActivityDay } from '../../navigation/navigationRef';
+import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
-import {
-  FLOATING_TIMER_SIZE,
-  useFloatingTimerOffset,
-} from '../../components/timer/floatingTimerOffset';
+import { TimerChip } from '../../components/timer/TimerChip';
+import { ReaderFrame } from '../../components/reader/ReaderFrame';
+import { ReaderActivity } from '../../components/reader/ReaderActivity';
+import { CAPSULE_HEIGHT, PlayerCapsule } from '../../components/reader/PlayerCapsule';
+import { useReaderChrome } from '../../components/reader/useReaderChrome';
+import { useTapHint } from '../../components/reader/useTapHint';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
-import { shadows } from '../../theme/shadows';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../theme/colors';
+import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import {
   getHizbForPage,
@@ -53,17 +53,11 @@ import {
 import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 
+const NO_PAGES: number[] = [];
+
 const AUTO_SAVE_INTERVAL_MS = 5000;
-// Where the now-playing bar sits, and roughly how tall the "Submit session"
-// bar is: the floating timer is raised above whichever is showing.
-// The bottom bar: tall enough for the player (otherwise the page number).
-const FOOTER_CONTENT_HEIGHT = 56;
-const FOOTER_PADDING_BOTTOM = spacing.xs;
-const TIMER_SLOT_IDLE = FLOATING_TIMER_SIZE + spacing.md * 2;
-const TIMER_SLOT_RUNNING = 136;
-const SUBMIT_BAR_HEIGHT = 74;
-const UNDO_TOAST_TOP = spacing.xl + spacing.md + 56;
-const REVISION_GUIDE_DISMISSED_KEY = '@revisley_revision_guide_dismissed';
+// Under the page, with the controls: the capsule.
+const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
 
@@ -71,6 +65,7 @@ export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
   const { theme, isDark } = useTheme();
+  const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
@@ -126,7 +121,6 @@ export default function ActiveRevisionScreen() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
   const [showRating, setShowRating] = useState(false);
 
   // Hold a verse: highlight, Play (Husary), Translation. Playback stays within
@@ -158,24 +152,33 @@ export default function ActiveRevisionScreen() {
     pages: sessionPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
+    focused: isScreenFocused,
   });
-  // The player sits in the bottom bar, under the page (never over it).
-  // Tapping the page hides or shows it; a new recitation shows it again.
-  const [playerShown, setPlayerShown] = useState(true);
-  useEffect(() => {
-    if (verseActions.playerVisible) setPlayerShown(true);
-  }, [verseActions.playerVisible]);
-  const togglePlayer = useCallback(() => setPlayerShown((v) => !v), []);
+  // Reading: nothing but the page (its number, the juz and surah). A tap on
+  // the page brings the controls (beside the page, never over it); another
+  // tap, or turning the page, puts them away.
+  // Every page revised: the controls stay up, with Submit.
+  const submitVisible =
+    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
+  const chrome = useReaderChrome({ locked: submitVisible });
+  const tapHint = useTapHint();
+  const dismissHint = tapHint.dismiss;
+  const toggleChrome = chrome.toggle;
+  const onTapPage = useCallback(() => {
+    dismissHint();
+    toggleChrome();
+  }, [dismissHint, toggleChrome]);
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Arriving on a page marks nothing; swiping off it does (the last page: onto
+  // the end card after it).
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPageNumber(page);
+  }, []);
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
   } | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem(REVISION_GUIDE_DISMISSED_KEY).then((v) => {
-      if (v !== 'true') setShowGuide(true);
-    });
-  }, []);
 
   const silentlySavedRef = useRef<Set<number>>(new Set(alreadyRevisedToday));
   const lastSaveTimeRef = useRef<number>(sessionStartTime);
@@ -276,12 +279,11 @@ export default function ActiveRevisionScreen() {
   }, [commitPendingPages]);
 
   // ===== Timer =====
-  // The floating timer is the app's one timer: pages marked revised while it
-  // runs are credited to it. It is general, so unlike the old in-bar revision
-  // stopwatch, leaving this screen does not pause it and finishing today's
-  // pages does not stop it; the user ends it from the timer itself.
+  // The app has one timer (in the controls under the page, and Home's top bar
+  // while it runs): pages marked revised while it runs are credited to it.
+  // Leaving this screen doesn't pause it and finishing today's pages doesn't
+  // stop it; the user ends it from the timer itself.
   const { noteRevisedPages, timer } = useReadingTimer();
-  const insets = useSafeAreaInsets();
   const prevCompletedRef = useRef(completedPages);
   useEffect(() => {
     const prev = prevCompletedRef.current;
@@ -290,70 +292,29 @@ export default function ActiveRevisionScreen() {
     if (added.length > 0) noteRevisedPages(added);
   }, [completedPages, noteRevisedPages]);
 
-  // The floating timer docks in the bottom bar's right-hand slot (above the
-  // submit bar when it shows), and moves above the undo toast while it shows.
-  const submitVisible =
-    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
-  const docked =
-    insets.bottom +
-    (submitVisible ? SUBMIT_BAR_HEIGHT : 0) +
-    FOOTER_PADDING_BOTTOM +
-    (FOOTER_CONTENT_HEIGHT - FLOATING_TIMER_SIZE) / 2;
-  useFloatingTimerOffset(Math.max(docked, undoState ? UNDO_TOAST_TOP : 0));
-
-  if (!user || !assignment) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          {error ? (
-            <>
-              <Text style={styles.errorTitle}>Couldn't load your session</Text>
-              <Text style={styles.errorMessage}>{error}</Text>
-              <Button
-                title="Try again"
-                onPress={loadData}
-                variant="primary"
-                style={styles.retryButton}
-              />
-            </>
-          ) : (
-            <Text style={styles.loadingText}>Loading…</Text>
-          )}
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // Every hook runs before the loading / error return below: "Try again"
+  // after a failed load would otherwise render more hooks than before.
   const quranData = getQuranData();
-  const totalPages = assignment.pages.length;
-  const completedCount = completedPages.size;
-
-  const resumePage =
-    assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
-    assignment.pages[0];
-  const displayPageNumber = currentPageNumber || resumePage;
-  const currentJuz = quranData.find((q) => q.pageNumber === displayPageNumber)?.juzNumber || 1;
-  const currentHizb = getHizbForPage(displayPageNumber);
-  const firstSurahOnPage = getSurahsForPage(displayPageNumber)[0];
-
-  const isCurrentRevised = completedPages.has(displayPageNumber);
+  const assignedPages = assignment?.pages ?? NO_PAGES;
 
   const scopeLabel = useMemo(() => {
     // Prefer juz scope when the assignment fits one juz; otherwise show count.
     const juzes = new Set(
-      assignment.pages
+      assignedPages
         .map((p) => quranData.find((q) => q.pageNumber === p)?.juzNumber)
         .filter((j): j is number => typeof j === 'number'),
     );
     if (juzes.size === 1) return `Juz ${[...juzes][0]}`;
-    return `${assignment.pages.length} pages`;
-  }, [assignment.pages, quranData]);
+    return `${assignedPages.length} pages`;
+  }, [assignedPages, quranData]);
 
   // ===== Mark / unmark =====
 
   const markRevised = useCallback(
     (pageNumber: number) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // A page done is one of the moments that buzz (and the Haptics setting
+      // can turn it off).
+      haptics.selection();
       setCompletedPages((prev) => {
         if (prev.has(pageNumber)) return prev;
         const next = new Set(prev);
@@ -361,7 +322,7 @@ export default function ActiveRevisionScreen() {
         return next;
       });
     },
-    [],
+    [haptics],
   );
 
   const unmarkRevised = useCallback((pageNumber: number) => {
@@ -373,16 +334,11 @@ export default function ActiveRevisionScreen() {
     });
   }, []);
 
-  const handleToggleCurrent = () => {
-    if (isCurrentRevised) unmarkRevised(displayPageNumber);
-    else markRevised(displayPageNumber);
-  };
-
   // ===== Swipe-to-credit =====
 
   const handleAdvance = useCallback(
     (leftPage: number, _currentPage: number) => {
-      if (!assignment.pages.includes(leftPage)) return;
+      if (!assignedPages.includes(leftPage)) return;
       if (completedPages.has(leftPage)) return;
       markRevised(leftPage);
       if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -391,14 +347,41 @@ export default function ActiveRevisionScreen() {
         message: `Page ${leftPage} marked as revised`,
       });
     },
-    [assignment.pages, completedPages, markRevised],
+    [assignedPages, completedPages, markRevised],
   );
 
-  const handleUndo = () => {
-    if (!undoState) return;
-    unmarkRevised(undoState.page);
-    setUndoState(null);
-  };
+  // ===== The end card, after the last page =====
+  // Swiping off the last page onto it marks that page done, as for any page.
+  // When that finishes the session: a success buzz, confetti on the card, and
+  // the session saved at once. A jump there, or a page already done, marks
+  // nothing (so coming back to it later doesn't celebrate again).
+  const [celebrate, setCelebrate] = useState(0);
+  const handleReachEnd = useCallback(
+    (lastPage: number, bySwipe: boolean) => {
+      // The header names the page just left, not where the session would resume.
+      setCurrentPageNumber(lastPage);
+      if (!bySwipe || !assignedPages.includes(lastPage) || completedPages.has(lastPage)) return;
+      const finishes = assignedPages.every((p) => p === lastPage || completedPages.has(p));
+      if (!finishes) {
+        handleAdvance(lastPage, lastPage);
+        return;
+      }
+      setCompletedPages((prev) => new Set(prev).add(lastPage));
+      setUndoState(null);
+      haptics.success();
+      setCelebrate((c) => c + 1);
+      AccessibilityInfo.announceForAccessibility(
+        `Revision complete. ${assignedPages.length} ${assignedPages.length === 1 ? 'page' : 'pages'} revised.`,
+      );
+    },
+    [assignedPages, completedPages, handleAdvance, haptics],
+  );
+  // Saved as soon as the last page is in (the render after the swipe).
+  useEffect(() => {
+    if (celebrate > 0) commitPendingPages();
+    // Only when a swipe finishes the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrate]);
 
   // ===== End session =====
 
@@ -416,7 +399,7 @@ export default function ActiveRevisionScreen() {
       const pagesRevised = Array.from(completedPages).filter(
         (p) => !silentlySavedRef.current.has(p),
       );
-      const pagesSkipped = assignment.pages.filter(
+      const pagesSkipped = assignedPages.filter(
         (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
       );
       const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
@@ -449,8 +432,8 @@ export default function ActiveRevisionScreen() {
           ([page, rating]) => ({ page, rating }),
         );
         await addLog({
-          date: sessionDay ?? getCurrentRevisionDay(user),
-          assignedPages: assignment.pages,
+          date: sessionDay ?? getCurrentRevisionDay(user!),
+          assignedPages: assignedPages,
           pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,
@@ -458,7 +441,7 @@ export default function ActiveRevisionScreen() {
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
       }
 
       navigation.goBack();
@@ -468,7 +451,7 @@ export default function ActiveRevisionScreen() {
   }, [
     commitPendingPages,
     completedPages,
-    assignment.pages,
+    assignedPages,
     pages,
     updatePages,
     localRatings,
@@ -476,7 +459,70 @@ export default function ActiveRevisionScreen() {
     user,
     navigation,
     finishRecording,
+    haptics,
   ]);
+
+  const viewerPages = useMemo(
+    () => assignedPages,
+    [assignedPages],
+  );
+
+  // Force re-render of the pager's extraData when revision state of any page
+  // changes (so any overlay can update). We don't actually render an overlay
+  // per page right now, but keeping this hook in place makes that cheap to
+  // add later.
+  const extraData = useMemo(
+    () => Array.from(completedPages).sort().join(','),
+    [completedPages],
+  );
+
+  if (!user || !assignment) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          {error ? (
+            <>
+              <Text style={styles.errorTitle}>Couldn't load your session</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+              <PillButton
+                title="Try again"
+                onPress={loadData}
+                style={styles.retryButton}
+              />
+            </>
+          ) : (
+            <Text style={styles.loadingText}>Loading…</Text>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const totalPages = assignment.pages.length;
+  const completedCount = completedPages.size;
+
+  const resumePage =
+    assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
+    assignment.pages[0];
+  const displayPageNumber = currentPageNumber || resumePage;
+  const currentJuz = quranData.find((q) => q.pageNumber === displayPageNumber)?.juzNumber || 1;
+  const currentHizb = getHizbForPage(displayPageNumber);
+  const firstSurahOnPage = getSurahsForPage(displayPageNumber)[0];
+
+  const isCurrentRevised = completedPages.has(displayPageNumber);
+
+  const handleToggleCurrent = () => {
+    if (isCurrentRevised) unmarkRevised(displayPageNumber);
+    else markRevised(displayPageNumber);
+  };
+
+  const handleUndo = () => {
+    if (!undoState) return;
+    unmarkRevised(undoState.page);
+    setUndoState(null);
+  };
+
+  // ===== End session =====
 
   const handleEndSession = () => {
     if (completedCount === 0) {
@@ -498,16 +544,11 @@ export default function ActiveRevisionScreen() {
     setSaving(true);
     try {
       await commitPendingPages();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
     } finally {
       setSaving(false);
       navigation.goBack();
     }
-  };
-
-  const dismissGuideForever = async () => {
-    setShowGuide(false);
-    await AsyncStorage.setItem(REVISION_GUIDE_DISMISSED_KEY, 'true');
   };
 
   // ===== Bulk-action handlers (used inside BulkActionsModal) =====
@@ -551,12 +592,6 @@ export default function ActiveRevisionScreen() {
       onPress: () => setShowBulkActions(true),
     },
     {
-      key: 'guide',
-      label: 'How revision works',
-      icon: 'help-circle-outline',
-      onPress: () => setShowGuide(true),
-    },
-    {
       key: 'save',
       label: saving ? 'Saving…' : 'Save and exit',
       icon: 'save-outline',
@@ -571,97 +606,134 @@ export default function ActiveRevisionScreen() {
     },
   ];
 
-  const viewerPages = useMemo(
-    () => assignment.pages,
-    [assignment.pages],
-  );
-
-  // Force re-render of the pager's extraData when revision state of any page
-  // changes (so any overlay can update). We don't actually render an overlay
-  // per page right now, but keeping this hook in place makes that cheap to
-  // add later.
-  const extraData = useMemo(
-    () => Array.from(completedPages).sort().join(','),
-    [completedPages],
-  );
+  const palette = getReadPalette(isDark);
+  const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
+  const compact = width < 430 && crowded;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: getReadPalette(isDark).pageBg }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      <SessionBar
-        scopeLabel={scopeLabel}
-        revisedCount={completedCount}
-        totalCount={totalPages}
-        isCurrentPageRevised={isCurrentRevised}
-        onBack={handleSaveAndBack}
-        onToggleCurrent={handleToggleCurrent}
-        onOverflow={() => setMenuOpen(true)}
-        recordSlot={
-          <RecordButton
-            recorder={recorder}
-            color={theme.textPrimary}
-            background={theme.glass}
-            border={theme.border}
-          />
-        }
-      />
-
-      <View style={styles.breadcrumb} pointerEvents="none">
-        <Text style={styles.crumbLeft} numberOfLines={1}>
-          Juz {currentJuz} · Hizb {currentHizb}
-        </Text>
-        <View style={styles.crumbRight}>
-          {firstSurahOnPage?.name ? (
-            <Text style={styles.crumbSurah} numberOfLines={1}>
-              {firstSurahOnPage.name}
+    <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
+      <ReaderFrame
+        chromeVisible={chrome.visible}
+        active={isScreenFocused}
+        onBackgroundPress={onTapPage}
+        background={palette.pageBg}
+        isDark={isDark}
+        quietHeader={
+          <View style={styles.quietHeader}>
+            <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              Juz {currentJuz} · {completedCount}/{totalPages}
             </Text>
-          ) : null}
-          {firstSurahOnPage?.nameArabic ? (
-            <Text style={styles.crumbArabic}>{firstSurahOnPage.nameArabic}</Text>
-          ) : null}
-        </View>
-      </View>
-
-      {/* The page fits between the breadcrumb and the bottom bar. */}
-      <View style={styles.viewerWrap}>
+            {firstSurahOnPage ? (
+              <View style={styles.crumbRight}>
+                <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                  {firstSurahOnPage.name}
+                </Text>
+                {firstSurahOnPage.nameArabic ? (
+                  <Text style={[styles.crumbArabic, { color: palette.textSecondary, fontSize: 13 }]}>
+                    {firstSurahOnPage.nameArabic}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        }
+        header={
+          <View style={styles.header}>
+            <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
+            <View style={styles.titleCol}>
+              <Text style={[styles.title, typeV2.name, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                Revising {scopeLabel}{' '}
+                <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
+                  · {completedCount}/{totalPages}
+                </Text>
+              </Text>
+              <Text style={[styles.subtitle, typeV2.meta, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
+              </Text>
+            </View>
+            <RoundButton
+              icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
+              label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+              onPress={handleToggleCurrent}
+              palette={palette}
+              active={isCurrentRevised}
+            />
+            <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={palette} />
+          </View>
+        }
+        footer={
+          <View style={styles.footer}>
+            <PlayerCapsule
+              player={verseActions.player}
+              page={displayPageNumber}
+              compact={compact}
+              surface={{ background: palette.control, border: palette.divider }}
+              record={<RecordButton recorder={recorder} />}
+              timer={
+                <TimerChip
+                  compact={compact}
+                  onOpenQuran={() => {
+                    if (navigationRef.isReady()) navigationRef.navigate('Read');
+                  }}
+                />
+              }
+              trailing={
+                submitVisible ? (
+                  <PressableScale
+                    onPress={handleEndSession}
+                    style={[styles.submit, { backgroundColor: theme.accent }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Submit session"
+                  >
+                    <Text style={styles.submitText}>Submit</Text>
+                  </PressableScale>
+                ) : undefined
+              }
+            />
+          </View>
+        }
+        footerHeight={FOOTER_HEIGHT}
+        pageLabel={
+          <View style={styles.pageLabel}>
+            <Text style={[styles.pageNum, { color: palette.textPrimary }]} maxFontSizeMultiplier={1.3}>
+              {displayPageNumber}
+            </Text>
+            {isCurrentRevised && <Ionicons name="checkmark" size={12} color={palette.textSecondary} />}
+          </View>
+        }
+        activity={
+          <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+        }
+        hint={
+          tapHint.shown ? (
+            <Text style={[styles.quietText, { color: palette.textSecondary }]} maxFontSizeMultiplier={1.3}>
+              Tap the page for the controls
+            </Text>
+          ) : null
+        }
+      >
         <MushafPager
           ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}
-          onPageChange={setCurrentPageNumber}
+          onPageChange={handlePageChange}
           onAdvance={handleAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
-          onTap={togglePlayer}
+          onTap={onTapPage}
+          onUserSwipe={chrome.hide}
           extraData={extraData}
+          endCard={
+            <SessionEndCard
+              total={totalPages}
+              done={completedCount}
+              celebrate={celebrate}
+              onEnd={handleEndSession}
+            />
+          }
+          onReachEnd={handleReachEnd}
         />
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.footerContent}>
-          {verseActions.player && playerShown ? (
-            verseActions.player
-          ) : (
-            <Text style={styles.pageNum}>{displayPageNumber}</Text>
-          )}
-        </View>
-        {/* The floating timer docks here (wider while it shows a clock). */}
-        <View style={{ width: timer ? TIMER_SLOT_RUNNING : TIMER_SLOT_IDLE }} />
-      </View>
-
-      {/* All revised → submit button slides up */}
-      {completedCount === totalPages && totalPages > 0 && (
-        <View style={styles.submitWrap}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <Button
-            title="Submit session"
-            onPress={handleEndSession}
-            variant="primary"
-            style={{ width: '100%' }}
-          />
-        </View>
-      )}
+      </ReaderFrame>
 
       <UndoToast
         visible={!!savedRecording}
@@ -674,7 +746,7 @@ export default function ActiveRevisionScreen() {
           if (saved) navigateToActivityDay(saved.day, saved.recordingId);
         }}
         onDismiss={() => setSavedRecording(null)}
-        bottomInset={spacing.xl}
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       <UndoToast
@@ -682,7 +754,7 @@ export default function ActiveRevisionScreen() {
         message={undoState?.message ?? ''}
         onUndo={handleUndo}
         onDismiss={() => setUndoState(null)}
-        bottomInset={spacing.xl}
+        bottomInset={insets.bottom - spacing.sm}
       />
 
       <SessionMenuSheet
@@ -707,12 +779,6 @@ export default function ActiveRevisionScreen() {
       />
 
       {verseActions.overlay}
-
-      <RevisionGuideModal
-        visible={showGuide}
-        onClose={dismissGuideForever}
-        theme={theme}
-      />
 
       {smartTrackingEnabled && showRating && (
         <WeaknessModal
@@ -745,7 +811,7 @@ export default function ActiveRevisionScreen() {
           onClose={() => setShowRating(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -772,221 +838,52 @@ const makeStyles = (theme: ThemeColors) =>
       textAlign: 'center',
     },
     retryButton: { minWidth: 160 },
-    viewerWrap: { flex: 1 },
-    breadcrumb: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      gap: spacing.sm,
+    quietHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      gap: spacing.md,
     },
-    crumbLeft: {
-      ...typography.caption,
-      color: theme.textPrimary,
-    },
+    quietText: { ...typography.caption },
     crumbRight: {
       flexDirection: 'row',
       alignItems: 'baseline',
       gap: spacing.xs,
-    },
-    crumbSurah: {
-      ...typography.caption,
-      color: theme.textPrimary,
+      flexShrink: 1,
     },
     crumbArabic: {
       fontFamily: fonts.arabic,
       fontSize: 14,
-      color: theme.textPrimary,
     },
-    footer: {
+    header: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingLeft: spacing.md,
-      paddingBottom: FOOTER_PADDING_BOTTOM,
-      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      gap: spacing.sm,
     },
-    footerContent: {
+    titleCol: { flex: 1, alignItems: 'center' },
+    title: { ...typography.titleSmall },
+    subtitle: { ...typography.caption },
+    footer: {
       flex: 1,
-      height: FOOTER_CONTENT_HEIGHT,
-      justifyContent: 'center',
-      alignItems: 'stretch',
+      paddingHorizontal: spacing.sm,
+      paddingBottom: spacing.sm,
+      justifyContent: 'flex-end',
     },
+    pageLabel: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     pageNum: {
       textAlign: 'center',
       fontSize: 13,
       fontWeight: '500',
-      color: theme.textPrimary,
+      fontVariant: ['tabular-nums'],
     },
-    submitWrap: {
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
-      overflow: 'hidden',
-    },
-  });
-
-function RevisionGuideModal({
-  visible,
-  onClose,
-  theme,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  theme: ThemeColors;
-}) {
-  const styles = useMemo(() => makeGuideStyles(theme), [theme]);
-  const steps: Array<{
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    body: string;
-  }> = [
-    {
-      icon: 'book-outline',
-      title: 'Swipe through pages',
-      body: 'Swipe right-to-left to advance to the next page in your session.',
-    },
-    {
-      icon: 'arrow-forward-circle-outline',
-      title: 'Swipe = done',
-      body: 'Swiping forward auto-credits the page you just left as revised. You can undo from the toast that appears, or tap the checkmark in the top bar to toggle the current page by hand.',
-    },
-    {
-      icon: 'language-outline',
-      title: 'Hold a verse',
-      body: 'Press and hold any verse to hear it recited (Al-Husary) or read its translation.',
-    },
-    {
-      icon: 'mic-outline',
-      title: 'Record yourself',
-      body: 'Tap the mic in the top bar to record your recitation. Tap the time to pause or resume, and ■ to stop. Recordings stay on this phone; find them in Activity.',
-    },
-    {
-      icon: 'ellipsis-horizontal-circle-outline',
-      title: 'More in the menu',
-      body: 'Open (⋮) for bulk marking, and — if Smart Tracking is on — rating page strength. End session lives there too.',
-    },
-    {
-      icon: 'stopwatch-outline',
-      title: 'Time your revision',
-      body: 'Tap the stopwatch button in the corner to start the timer, and tap the time to pause or stop it. Pages you mark revised while it runs are saved with the session, in Activity.',
-    },
-    {
-      icon: 'save-outline',
-      title: 'Saved as you go',
-      body: 'Your marks save automatically every few seconds and when you leave the app, so nothing is lost if you exit mid-session.',
-    },
-  ];
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()} style={styles.card}>
-          <GlassCard style={StyleSheet.absoluteFillObject} />
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>How revision works</Text>
-            <PressableScale
-              onPress={onClose}
-              haptic="light"
-              style={styles.closeBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Close"
-            >
-              <Ionicons name="close" size={20} color={theme.textSecondary} />
-            </PressableScale>
-          </View>
-
-          <View style={styles.steps}>
-            {steps.map((s, i) => (
-              <View key={i} style={styles.step}>
-                <View style={styles.stepIcon}>
-                  <Ionicons name={s.icon} size={18} color={theme.accent} />
-                </View>
-                <View style={styles.stepText}>
-                  <Text style={styles.stepTitle}>{s.title}</Text>
-                  <Text style={styles.stepBody}>{s.body}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.actions}>
-            <PressableScale
-              onPress={onClose}
-              haptic="medium"
-              scale={0.98}
-              style={styles.primaryBtn}
-            >
-              <Text style={styles.primaryBtnText}>Got it</Text>
-            </PressableScale>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const makeGuideStyles = (theme: ThemeColors) =>
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: spacing.lg,
-    },
-    card: {
-      width: '100%',
-      maxWidth: 420,
-      borderRadius: radius.lg,
-      padding: spacing.lg,
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    title: { ...typography.titleLarge, color: theme.textPrimary },
-    closeBtn: {
-      width: 32,
-      height: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.full,
-    },
-    steps: { gap: spacing.md, marginBottom: spacing.lg },
-    step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    stepIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.xs,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.accent + '20',
-    },
-    stepText: { flex: 1 },
-    stepTitle: {
-      ...typography.titleSmall,
-      color: theme.textPrimary,
-      marginBottom: 2,
-    },
-    stepBody: { ...typography.bodySmall, color: theme.textSecondary },
-    actions: { flexDirection: 'row', gap: spacing.sm },
-    primaryBtn: {
-      flex: 1,
-      paddingVertical: spacing.sm,
+    submit: {
+      height: 36,
       paddingHorizontal: spacing.md,
       borderRadius: radius.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.accent,
     },
-    primaryBtnText: {
-      ...typography.bodySmall,
-      color: '#fff',
-      fontWeight: '700',
-    },
+    submitText: { color: theme.onAccent, fontWeight: '700', fontSize: 14 },
   });
