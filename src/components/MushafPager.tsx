@@ -184,9 +184,11 @@ const PageItem = React.memo(function PageItem({
           delayLongPress={350}
           accessible={false}
         >
+          {/* The verse's lines, in the image's own frame: bounds × the page's scale. */}
           {highlightRects.map((r, i) => (
             <View
               key={i}
+              testID="ayah-highlight"
               pointerEvents="none"
               style={[
                 styles.highlight,
@@ -202,6 +204,7 @@ const PageItem = React.memo(function PageItem({
             />
           ))}
           <Image
+            testID="page-image"
             source={{ uri }}
             style={[
               { width: size.width, height: size.height },

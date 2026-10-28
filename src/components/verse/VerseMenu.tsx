@@ -57,8 +57,8 @@ interface Row {
 /**
  * The menu on a held verse: Play, Translation, Copy and Share, in a small card
  * next to the verse (below it, or above it near the bottom) rather than a sheet
- * over half the page. The page stays readable behind it and the verse stays
- * highlighted. A touch anywhere else closes it.
+ * over half the page. Nothing is dimmed: the page stays as it is and the verse
+ * stays highlighted. A touch anywhere else closes it.
  *
  * It is a view in the screen, not a native modal, so a choice can open the
  * verse sheet or the share sheet at once (iOS can't present one modal while
@@ -151,7 +151,6 @@ export function VerseMenu({
     opacity: interpolate(progress.value, [0, 0.35], [0, 1], 'clamp'),
     transform: reduceMotion ? [] : [{ scale: interpolate(progress.value, [0, 1], [0.6, 1]) }],
   }));
-  const scrim = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0, 1], [0, 1], 'clamp') }));
 
   if (!mounted) return null;
 
@@ -185,9 +184,10 @@ export function VerseMenu({
       onAccessibilityEscape={onClose}
       testID="verse-menu"
     >
-      {/* Any touch outside closes it at once: a tap, or the start of a swipe. */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { backgroundColor: palette.scrim }, scrim]}
+      {/* No dimming: the page stays as it is. Any touch outside closes the
+          menu at once: a tap, or the start of a swipe. */}
+      <View
+        style={StyleSheet.absoluteFill}
         onStartShouldSetResponder={() => true}
         onResponderGrant={onClose}
         accessible={false}

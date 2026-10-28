@@ -329,9 +329,15 @@ the App Privacy answers in App Store Connect (no API; done by hand) together.
 by `scripts/build-ayah-bounds.py` from Quran Android's `ayahinfo_1024.db`, the glyph bounds that
 quran.com-images records while drawing the same page images (coordinates are 1024-wide; the images are
 2600×4206, so one scale factor maps them). The app's images are a mirror (GovarJabbar/Quran-PNG)
-that draws the decorated opening pages higher: pages 1 and 2 are shifted up by 61 and 57 units
-(`PAGE_Y_SHIFT` in the script; every other page matches). Check a page by drawing its rectangles
-on the image before trusting new bounds. Translations: Saheeh International from api.alquran.cloud,
+that doesn't match the glyph data on three pages, so `PAGE_FIT` in the script maps those:
+pages 1 and 2 (the decorated openings) are shifted up by 61 and 57 units, and page 3 (a different
+rendering, 4.3 MB; its text 7% wider and 3% taller) is x 1.070x − 41, y 1.032y − 9. Without it,
+every highlight on page 3 sat high, the words' lower halves below it (fixed Oct 27 2026; the
+mistake-detection branch had found the same fit). All 604 pages were measured against their
+images; the rest match within a few units. After regenerating, run `scripts/check-ayah-bounds.py`
+on the images (its header says how to fetch them): it fails on a page whose boxes miss its ink.
+`ayahBounds.test` holds measured ink for pages 3, 4, 50, 300 and 604, and `MushafPager.test` that
+a box is the bounds × the page's scale, drawn in the image's own frame, at any phone size. Translations: Saheeh International from api.alquran.cloud,
 and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
 
 **Copy and Share** (the held-verse menu; `lib/verseShare.ts`): the verse's Arabic, the verse sheet's
@@ -559,7 +565,7 @@ classic default), and a fresh install starts in light.
   destructive rows, a Cancel bar); its action runs after the sheet has gone. The one exception is
   the held verse's menu (`verse/VerseMenu`, Oct 27 2026): a small card beside the verse
   (`verse/menuPlacement`: below it, above it near the bottom, beside the finger for a verse that
-  fills the page), a scrim of 4% (`palette.scrim`), no title or Cancel; any touch outside closes it.
+  fills the page), nothing dimmed behind it, no title or Cancel; any touch outside closes it.
   It is a view in the screen, not a Modal, so its action runs at once and the verse sheet or the
   share sheet can open straight after. The tab bar (`navigation/TabBar`) is flat and icon-only,
   with a small accent dot under the current tab that follows a swipe (below); `ActionBar` takes
