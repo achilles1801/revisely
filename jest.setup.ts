@@ -61,8 +61,11 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
   scheduleNotificationAsync: jest.fn(),
+  cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+  getAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve([])),
   cancelAllScheduledNotificationsAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
+  SchedulableTriggerInputTypes: { DAILY: 'daily', DATE: 'date' },
 }));
 
 // expo-audio is a native module; tests that exercise playback mock it themselves.
