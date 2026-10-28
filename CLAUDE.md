@@ -627,8 +627,9 @@ classic default), and a fresh install starts in light.
     are `lib/activityItems`.
   - **No floating timer.** The timer is in the reader's and the session's controls; a running one
     shows in Home's top bar (`RunningTimerChip`), with a thin progress line for a timed one. The
-    chip is the "bubble": tapping it grows it into the timer card (`timer/TimerCard`, Oct 28 2026),
-    a rounded card in the bottom-right corner, its controls fading in as it lands; a tap outside,
+    button itself grows into the timer card (`timer/TimerCard`, Oct 28 2026; there is no separate
+    floating button): in a bottom bar (reader, session) the card rises from it and sits just above
+    the bar (`cardPlace`), from Home's top-bar chip it drops down; its controls fade in as it lands; a tap outside,
     a drag down (`shouldDismiss`, as sheets) or VoiceOver's escape shrinks it back into the chip.
     With Reduce Motion it fades. In the card: Stopwatch / Timer, the clock light at 60pt with one
     line under it, and one row of controls: for a timer, − length + (5-minute steps to an hour,

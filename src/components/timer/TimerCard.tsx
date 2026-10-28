@@ -31,17 +31,47 @@ export interface Frame {
 }
 
 const MARGIN = 12;
+const GAP = 10;
+
+/**
+ * Where the card sits for a button at `from`: above it if the button is in the
+ * lower half of the screen (a bottom bar), below it otherwise (a top bar); its
+ * right edge near the button's for a bottom bar, its left edge near the chip's
+ * for a top bar; inside the screen's margins.
+ */
+export function cardPlace(
+  from: Frame,
+  screen: { width: number; height: number },
+  width: number,
+  insets: { top: number; bottom: number },
+): { left: number; above: boolean; edge: number; minTop: number } {
+  const above = from.y + from.height / 2 > screen.height / 2;
+  const maxLeft = screen.width - MARGIN - width;
+  const left = above
+    ? Math.min(maxLeft, Math.max(MARGIN, from.x + from.width + 8 - width))
+    : Math.min(maxLeft, Math.max(MARGIN, from.x - 8));
+  return {
+    left,
+    above,
+    // The card's bottom (above) or top (below).
+    edge: above ? from.y - GAP : from.y + from.height + GAP,
+    minTop: insets.top + MARGIN,
+  };
+}
 const MAX_WIDTH = 420;
 const RADIUS = 28;
 const OPEN = { damping: 22, stiffness: 240, mass: 0.9 };
 const CLOSE = { duration: 220, easing: Easing.inOut(Easing.cubic) };
 
 /**
- * The timer's controls in a card that grows out of the chip that was tapped:
- * the bubble widens and rises into a rounded card in the bottom-right corner,
- * its controls fading in as it lands, and shrinks back into the chip when
- * closed (a tap outside, a drag down, or VoiceOver's escape). With Reduce
- * Motion it simply fades. While a length is typed it rises above the keyboard.
+ * The timer's controls in a card that grows out of the timer button that was
+ * tapped (no button of its own: the timer lives in the reader's and the
+ * session's control bars, and Home's top bar while one runs). In a bottom bar
+ * the card rises from the button and sits just above the bar, its right edge
+ * near the button's; from Home's top bar it drops down from the chip. Its
+ * controls fade in as it lands, and it shrinks back into the button when closed
+ * (a tap outside, a drag down, or VoiceOver's escape). With Reduce Motion it
+ * simply fades. While a length is typed it rises above the keyboard.
  */
 export function TimerCard({
   visible,
@@ -71,10 +101,11 @@ export function TimerCard({
   const [measured, setMeasured] = useState(false);
 
   const width = Math.min(screen.width - MARGIN * 2, MAX_WIDTH);
-  const left = screen.width - MARGIN - width;
   const bottom = Math.max(insets.bottom, MARGIN) + 4;
-  // No chip measured (it never is in tests): grow from the corner.
+  // No button measured (it never is in tests): grow from the corner.
   const from = origin ?? { x: screen.width - MARGIN - 44, y: screen.height - bottom - 44, width: 44, height: 44 };
+  const place = cardPlace(from, { width: screen.width, height: screen.height }, width, { top: insets.top, bottom });
+  const left = place.left;
 
   const hiddenRef = useRef(onHidden);
   hiddenRef.current = onHidden;
@@ -137,9 +168,12 @@ export function TimerCard({
   const card = useAnimatedStyle(() => {
     const p = progress.value;
     const h1 = contentHeight.value;
-    // Above the keyboard while a length is typed.
-    const lift = Math.max(0, keyboard.height.value - bottom + 12);
-    const top1 = screen.height - bottom - h1 - lift;
+    // Above the bar (bottom anchor) or under the chip (top anchor), never off
+    // screen, and above the keyboard while a length is typed.
+    const anchored = place.above ? place.edge - h1 : place.edge;
+    const highest = place.minTop;
+    const lowest = screen.height - bottom - h1 - Math.max(0, keyboard.height.value - bottom + 12);
+    const top1 = Math.max(highest, Math.min(anchored, lowest));
     if (reduceMotion) {
       return {
         left,
