@@ -36,18 +36,28 @@ for page, line, sura, ayah, x0, x1, y0, y1 in rows:
     r = ayah_line[(page, line, sura, ayah)]
     r[0], r[1] = min(r[0], x0), max(r[1], x1)
 
-# The app's images (mushaf/*.png) draw the decorated opening pages higher than
-# quran.com-images does: every line of pages 1 and 2 sits this far above the
-# database's band (1024-wide units, measured line by line on the images; every
-# other page matches to within a few units). Without it, holding Al-Hamd picked
-# the Basmala.
-PAGE_Y_SHIFT = {1: -61, 2: -57}
+# Pages whose image (mushaf/*.png) doesn't draw the text where quran.com-images
+# does, as x' = ax * x + bx, y' = ay * y + by in the database's 1024-wide units,
+# measured line by line on the images (scripts/check-ayah-bounds.py):
+#   1, 2  the decorated opening pages sit higher (without it, holding Al-Hamd
+#         picked the Basmala);
+#   3     a different rendering (4.3 MB against ~0.3 MB for the others), its
+#         text block 7% wider and 3% taller: every highlight sat high, the words'
+#         lower halves below it, and the line ends outside it (Oct 27 2026; the
+#         same fit as feature/mistake-detection's PAGE_FIX, found there Oct 20).
+# Every other page matches to within a few units (the check measures all 604).
+PAGE_FIT = {
+    1: (1, 0, 1, -61),
+    2: (1, 0, 1, -57),
+    3: (1.070, -41, 1.032, -9),
+}
 
 pages = defaultdict(list)
 for (page, line, sura, ayah), (x0, x1) in sorted(ayah_line.items()):
     y0, y1 = line_band[(page, line)]
-    dy = PAGE_Y_SHIFT.get(page, 0)
-    pages[page].extend([sura, ayah, x0, y0 + dy, x1, y1 + dy])
+    ax, bx, ay, by = PAGE_FIT.get(page, (1, 0, 1, 0))
+    fit = lambda v, a, b: round(v * a + b, 1) if (a, b) != (1, 0) else v
+    pages[page].extend([sura, ayah, fit(x0, ax, bx), fit(y0, ay, by), fit(x1, ax, bx), fit(y1, ay, by)])
 
 assert len(pages) == 604, len(pages)
 out = Path(__file__).resolve().parent.parent / "src" / "data" / "ayahBounds.json"

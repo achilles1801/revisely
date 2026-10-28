@@ -105,8 +105,6 @@ export interface PaletteV2 extends AccentTokens {
   track: string;
   /** Dimmed backdrop behind a sheet. */
   overlay: string;
-  /** Behind a small floating menu (the held verse's): barely there, so the page stays readable. */
-  scrim: string;
   /** A floating menu's shadow (light only shows it; dark relies on the outline). */
   shadow: string;
   /** A switch that is off: its track, and the thumb on it (on, the track is `primary`). */
@@ -131,7 +129,6 @@ const BASE_LIGHT: Base = {
   handle: '#D1D5DB',
   track: '#D1D5DB',
   overlay: 'rgba(0,0,0,0.4)',
-  scrim: 'rgba(0,0,0,0.04)',
   shadow: '#000000',
   switchOff: '#E5E7EB',
   switchThumb: '#FFFFFF',
@@ -152,7 +149,6 @@ const BASE_DARK: Base = {
   handle: '#3A3A3C',
   track: '#333333',
   overlay: 'rgba(0,0,0,0.6)',
-  scrim: 'rgba(0,0,0,0.2)',
   shadow: '#000000',
   switchOff: '#39393D',
   switchThumb: '#FFFFFF',

@@ -1,7 +1,9 @@
 import React, { createRef } from 'react';
-import { FlatList } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 import { MushafPager, MushafPagerHandle } from '../MushafPager';
+import { ayahRects } from '../../lib/ayahBounds';
+import { fitPage } from '../../lib/pageFit';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../../context/ThemeContext', () => {
@@ -189,5 +191,46 @@ describe('<MushafPager /> turning the page by swiping', () => {
     render(<MushafPager pages={[3]} onTap={jest.fn()} />);
     const page = screen.getByLabelText('Page 3');
     expect(page.props.accessibilityHint).toBe('Shows or hides the controls');
+  });
+});
+
+describe('<MushafPager /> a verse’s highlight', () => {
+  // The pager's own measured frame decides the page's size; the image and the
+  // boxes are drawn in one frame of exactly that size, so a box is the verse's
+  // bounds × the page's scale whatever the phone or the controls around it.
+  it.each([
+    ['an SE, controls showing', 375, 560],
+    ['a Pro, full screen', 393, 760],
+    ['a Pro Max, full screen', 440, 860],
+  ])('on %s (%i × %i): each line’s box is its bounds × the scale, in the image’s frame', (_name, width, height) => {
+    render(<MushafPager pages={[3]} highlightedAyah={{ page: 3, sura: 2, ayah: 13 }} onLongPressAyah={jest.fn()} />);
+    const list = screen.UNSAFE_getByType(FlatList);
+    act(() => list.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height } } }));
+    const size = fitPage(width, height);
+    const rects = ayahRects(3, 2, 13);
+    const boxes = screen.getAllByTestId('ayah-highlight');
+    expect(boxes).toHaveLength(rects.length);
+    boxes.forEach((box, i) => {
+      const r = rects[i];
+      expect(StyleSheet.flatten(box.props.style)).toMatchObject({
+        left: r.x0 * size.scale,
+        top: r.y0 * size.scale,
+        width: (r.x1 - r.x0) * size.scale,
+        height: (r.y1 - r.y0) * size.scale,
+      });
+    });
+    // The image fills that same frame exactly, at the images' own aspect.
+    const image = screen.getByTestId('page-image');
+    expect(StyleSheet.flatten(image.props.style)).toMatchObject({ width: size.width, height: size.height });
+    // Both are drawn by the same native view (the pressable that is exactly the image).
+    type Node = { type: unknown; parent: Node | null };
+    const frameOf = (el: Node) => {
+      let p = el.parent;
+      while (p && typeof p.type !== 'string') p = p.parent;
+      return p;
+    };
+    const frame = frameOf(image as unknown as Node);
+    expect(frame).not.toBeNull();
+    expect(boxes.every((box) => frameOf(box as unknown as Node) === frame)).toBe(true);
   });
 });

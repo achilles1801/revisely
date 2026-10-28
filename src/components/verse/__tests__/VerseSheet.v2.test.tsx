@@ -256,7 +256,7 @@ describe('VerseMenu: a small card beside the verse', () => {
     expect(p.onClose).not.toHaveBeenCalled();
   });
 
-  it('beside the verse, in the sheets’ colour with an outline; the page behind barely dimmed', async () => {
+  it('beside the verse, in the sheets’ colour with an outline; the page behind not dimmed', async () => {
     render(v2(<VerseMenu point={{ x: 200, y: 330 }} anchor={{ x: 20, y: 300, width: 400, height: 60 }} {...props()} />));
     await act(async () => {});
     layout('verse-menu', 440, 956);
@@ -265,7 +265,8 @@ describe('VerseMenu: a small card beside the verse', () => {
     expect(card).toMatchObject({ backgroundColor: palette.sheet, borderColor: palette.outline, top: 368 });
     // Centred on the finger (x 200).
     expect(card.left).toBe(200 - 264 / 2);
-    expect(style('verse-menu-backdrop')).toMatchObject({ backgroundColor: palette.scrim });
+    // Nothing behind it is dimmed.
+    expect(style('verse-menu-backdrop').backgroundColor).toBeUndefined();
   });
 
   it('a touch outside (a tap, or a swipe starting) closes it; so does VoiceOver’s escape', async () => {
