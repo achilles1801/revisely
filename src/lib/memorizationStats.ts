@@ -10,6 +10,8 @@ export interface MemorizationStats {
   fractionalJuz: number;
   /** Fully memorized surahs (0–114). */
   surahs: number;
+  /** Each juz's memorized share (0–1), juz 1 first: 30 numbers. */
+  juzFractions: number[];
 }
 
 export function computeMemorizationStats(pages: UserPage[]): MemorizationStats {
@@ -18,6 +20,7 @@ export function computeMemorizationStats(pages: UserPage[]): MemorizationStats {
   );
   let completeJuz = 0;
   let fractionalJuz = 0;
+  const juzFractions: number[] = [];
   const surahs = new Set<number>();
   // A surah can span juz; it's complete only if every page in every juz is.
   const incompleteSurahs = new Set<number>();
@@ -25,7 +28,9 @@ export function computeMemorizationStats(pages: UserPage[]): MemorizationStats {
   for (let juz = 1; juz <= 30; juz++) {
     const juzPages = getPagesForJuz(juz);
     const count = juzPages.filter((pn) => memorized.has(pn)).length;
-    if (juzPages.length > 0) fractionalJuz += count / juzPages.length;
+    const share = juzPages.length > 0 ? count / juzPages.length : 0;
+    juzFractions.push(share);
+    fractionalJuz += share;
     if (juzPages.length > 0 && count === juzPages.length) completeJuz++;
 
     for (const surah of getSurahsInJuz(juz)) {
@@ -35,7 +40,7 @@ export function computeMemorizationStats(pages: UserPage[]): MemorizationStats {
   }
   for (const n of incompleteSurahs) surahs.delete(n);
 
-  return { pages: memorized.size, completeJuz, fractionalJuz, surahs: surahs.size };
+  return { pages: memorized.size, completeJuz, fractionalJuz, surahs: surahs.size, juzFractions };
 }
 
 export function formatFractional(value: number): string {

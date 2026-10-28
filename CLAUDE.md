@@ -579,7 +579,13 @@ classic default), and a fresh install starts in light.
     second card restating it. A thin ring around the post's mark (`v2/ProgressRing`, the accent's
     `palette.ring`, both ends ≥ 3:1 on the ground) fills with memorized pages / 604: no words,
     "Memorized 27% of the Quran" for VoiceOver, shown and hidden with the Memorized line (Settings →
-    Progress card). It draws in once Home has settled (350 ms), at once with Reduce Motion. Lists show the **last 3** things (`RecentSection`) with "See all"
+    Progress card). It draws in once Home has settled (350 ms), at once with Reduce Motion.
+    **For now a tester-only choice** (Oct 27 2026, until the user picks; then remove the setting
+    and the losers): Settings → Home screen → Progress style, Ring / Hairline (`v2/ProgressHairline`,
+    a line under the post filling with the ring colours) / Juz dots (`v2/JuzDots`, 30 dots lit by
+    each juz's share, `juzFractions`), kept per phone in `homePrefs.progressStyle`. Testers are
+    `lib/tester`'s `isTester`: development builds, or a TestFlight install with a `previewTester`
+    account (as for the preview channel); never the App Store or App Review. Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,

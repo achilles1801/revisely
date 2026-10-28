@@ -218,6 +218,7 @@ describe('parseHomePrefs (Al-Kahf fields)', () => {
     const old = parseHomePrefs(JSON.stringify({ showProgressCard: false, metrics: ['juz'] }));
     expect(old).toEqual({
       showProgressCard: false,
+      progressStyle: 'ring',
       metrics: ['juz'],
       fridayKahfReminder: true,
       kahfDismissedDay: null,

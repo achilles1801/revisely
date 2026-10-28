@@ -448,3 +448,14 @@ export const layoutV2 = {
 
 /** Pills 16–20, sheets 20, media 12. */
 export const radiusV2 = { chip: 8, media: 12, cancel: 16, pill: 18, sheet: 20, full: 999 } as const;
+
+/**
+ * A colour `t` (0–1) of the way from `a` to `b` (both #RRGGBB): a step along an
+ * accent gradient, e.g. the juz dots stepping along `palette.ring`.
+ */
+export function mixColors(a: string, b: string, t: number): string {
+  const k = Math.min(1, Math.max(0, t));
+  const ch = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+  const out = [0, 1, 2].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k));
+  return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}
