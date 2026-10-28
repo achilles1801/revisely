@@ -27,7 +27,7 @@ import {
   shiftScheduleAnchor,
 } from '../../lib/algorithm';
 import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
-import { settleCarryOverForNewPlan } from '../../lib/carryOver';
+import { holdsToday, planScheduleChange, ScheduleChange, scheduleFromTomorrow } from '../../lib/planChange';
 import {
   defaultStartPage,
   effectiveDailyPages,
@@ -39,7 +39,7 @@ import {
   rotateCustomPlanToToday,
 } from '../../lib/planBuilder';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
-import { CustomPlan, SavedPlan } from '../../types';
+import { CustomPlan, SavedPlan, User } from '../../types';
 import { GroupedRow, GroupedSection } from '../../components/plan/Grouped';
 import { PlanSheet } from '../../components/plan/PlanSheet';
 import { InlineStepper } from '../../components/plan/InlineStepper';
@@ -93,6 +93,15 @@ export default function PlanEditScreen() {
   // on), fixed when the editor opens: the draft is rotated to that day, so it
   // must not move while the editor is open.
   const [revisionDate] = useState(() => getRevisionDateForUser(user));
+  // A plan saved after today was revised can start tomorrow, today held as it
+  // was (lib/planChange): the days are shown, and saved, from tomorrow. Fixed
+  // when the editor opens, like the day.
+  const [heldToday] = useState(() => holdsToday(user, revisionDate));
+  const startsIn = heldToday ? 1 : 0;
+  const firstDay = useMemo(
+    () => new Date(revisionDate.getFullYear(), revisionDate.getMonth(), revisionDate.getDate() + startsIn),
+    [revisionDate, startsIn],
+  );
 
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);
@@ -125,18 +134,18 @@ export default function PlanEditScreen() {
       return {
         days: shifted
           ? scheduledDaysFrom(user, memorizedPages, revisionDate, plan.days.length)
-          : rotateCustomPlanToToday(plan, revisionDate),
+          : rotateCustomPlanToToday(plan, firstDay),
         direction: plan.direction as PlanDirection,
       };
     }
     if (isJuzMode && user) {
-      return { days: buildJuzCycleDays(user, memorizedPages, revisionDate), direction: 'forward' as PlanDirection };
+      return { days: buildJuzCycleDays(user, memorizedPages, firstDay), direction: 'forward' as PlanDirection };
     }
     return {
-      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward', revisionDate) : [],
+      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward', firstDay) : [],
       direction: 'forward' as PlanDirection,
     };
-  }, [user, memorizedPages, isJuzMode, revisionDate]);
+  }, [user, memorizedPages, isJuzMode, revisionDate, firstDay]);
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
@@ -165,6 +174,9 @@ export default function PlanEditScreen() {
   const [menuPlan, setMenuPlan] = useState<SavedPlan | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [timingOpen, setTimingOpen] = useState(false);
+  // A new plan after part of today was revised: start it today or tomorrow?
+  const [startChange, setStartChange] = useState<ScheduleChange | null>(null);
+  const [startMenuOpen, setStartMenuOpen] = useState(false);
 
   const savedPlans = useMemo(
     () => [...(user?.savedPlans ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -228,26 +240,50 @@ export default function PlanEditScreen() {
   }, [navigation]);
 
   // ---- Save ------------------------------------------------------------------
-  const handleSave = async () => {
-    if (!user || saving || !isDirty || days.length === 0) return;
+  // Saves the new schedule and leaves. `startsTomorrow`: today was done, so the
+  // plan waits for tomorrow; say so.
+  const commitSchedule = async (next: User, startsTomorrow: boolean) => {
     setSaving(true);
     try {
-      const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
-      // After "push back a day" the live anchor sits in the future and the
-      // draft wasn't rotated (see rotateCustomPlanToToday) — keep that anchor
-      // so saving an edit doesn't silently undo the push-back.
-      const liveStart = user.customPlan?.cycleStartDate;
-      if (liveStart && liveStart > plan.cycleStartDate) plan.cycleStartDate = liveStart;
-      await saveUser({
-        ...settleCarryOverForNewPlan(user, dateToLocalISODay(revisionDate)),
-        customPlan: plan,
-      });
+      await saveUser(next);
       haptics.success();
       leave();
+      if (startsTomorrow) {
+        Alert.alert('Your new plan starts tomorrow', 'You’ve finished today’s revision, so today stays as it is.');
+      }
     } catch {
       setSaving(false);
       Alert.alert("Couldn't save", 'Please try again.');
     }
+  };
+
+  // A new schedule (a plan, or null for the automatic one) and today: today
+  // becomes its first day if nothing is revised yet, tomorrow once today is
+  // done; part of today revised, the user chooses (lib/planChange).
+  const saveSchedule = (customPlan: CustomPlan | null) => {
+    if (!user) return;
+    const change = planScheduleChange(user, { customPlan }, { revisionDate, memorized: memorizedPages, logs });
+    if (change.defaultStart) {
+      commitSchedule(change.apply(change.defaultStart), change.changesToday && change.defaultStart === 'tomorrow');
+      return;
+    }
+    setStartChange(change);
+    setStartMenuOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!user || saving || !isDirty || days.length === 0) return;
+    const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
+    if (heldToday) {
+      // Shown from tomorrow: it starts tomorrow, today stays held.
+      commitSchedule(scheduleFromTomorrow(user, { customPlan: plan }, { revisionDate, memorized: memorizedPages }), false);
+      return;
+    }
+    // A plan that starts after today (from an older version's "push back a
+    // day") keeps that start, so saving an edit doesn't move it.
+    const liveStart = user.customPlan?.cycleStartDate;
+    if (liveStart && liveStart > plan.cycleStartDate) plan.cycleStartDate = liveStart;
+    saveSchedule(plan);
   };
 
   // ---- Day actions -------------------------------------------------------------
@@ -402,9 +438,9 @@ export default function PlanEditScreen() {
       if (!user.customPlan && !isDirty) {
         if (tempMode === 'juz') {
           setDirection('forward');
-          setDays(buildJuzCycleDays(updatedUser, memorizedPages, revisionDate));
+          setDays(buildJuzCycleDays(updatedUser, memorizedPages, firstDay));
         } else {
-          setDays(buildDefaultPlanDays(updatedUser, memorizedPages, direction, revisionDate));
+          setDays(buildDefaultPlanDays(updatedUser, memorizedPages, direction, firstDay));
         }
       }
       quotaSheetRef.current?.dismiss();
@@ -414,7 +450,7 @@ export default function PlanEditScreen() {
     } finally {
       setSaving(false);
     }
-  }, [user, saving, tempCapacity, tempMode, tempJuzCount, saveUser, isDirty, memorizedPages, direction, haptics]);
+  }, [user, saving, tempCapacity, tempMode, tempJuzCount, saveUser, isDirty, memorizedPages, direction, haptics, firstDay]);
 
   const handleUseAutomatic = () => {
     if (!user || saving) return;
@@ -426,20 +462,7 @@ export default function PlanEditScreen() {
         {
           text: 'Use Automatic',
           style: 'destructive',
-          onPress: async () => {
-            setSaving(true);
-            try {
-              await saveUser({
-                ...settleCarryOverForNewPlan(user, dateToLocalISODay(revisionDate)),
-                customPlan: null,
-              });
-              haptics.success();
-              leave();
-            } catch {
-              setSaving(false);
-              Alert.alert("Couldn't save", 'Please try again.');
-            }
-          },
+          onPress: () => saveSchedule(null),
         },
       ],
     );
@@ -554,6 +577,7 @@ export default function PlanEditScreen() {
               days={days}
               limit={showAll ? undefined : COLLAPSED_DAYS}
               today={today}
+              startsIn={startsIn}
               scroll={scrollLink}
               onPressDay={goToDayEditor}
               onMove={moveDayTo}
@@ -647,10 +671,12 @@ export default function PlanEditScreen() {
         >
           <GroupedRow
             title="Running behind?"
-            subtitle={isDirty ? 'Save your changes first' : undefined}
+            subtitle={
+              isDirty ? 'Save your changes first' : heldToday ? 'Your new plan starts tomorrow' : undefined
+            }
             icon="time-outline"
             accessory="chevron"
-            disabled={isDirty || days.length === 0}
+            disabled={isDirty || days.length === 0 || heldToday}
             onPress={() => setTimingOpen(true)}
             testID="plan-timing"
           />
@@ -749,6 +775,33 @@ export default function PlanEditScreen() {
             : []
         }
         testID="saved-plan-menu"
+      />
+      <ActionSheet
+        visible={startMenuOpen}
+        onClose={() => setStartMenuOpen(false)}
+        title="Start the new plan"
+        message="You’ve revised part of today’s pages."
+        actions={
+          startChange
+            ? [
+                {
+                  key: 'today',
+                  label: 'Start today',
+                  subtitle: 'Today becomes its first day; what you’ve revised stays done',
+                  icon: 'today-outline' as const,
+                  onPress: () => commitSchedule(startChange.apply('today'), false),
+                },
+                {
+                  key: 'tomorrow',
+                  label: 'Start tomorrow',
+                  subtitle: 'Finish today’s pages as they are',
+                  icon: 'play-forward-outline' as const,
+                  onPress: () => commitSchedule(startChange.apply('tomorrow'), false),
+                },
+              ]
+            : []
+        }
+        testID="plan-start-menu"
       />
 
       <PlanSheet

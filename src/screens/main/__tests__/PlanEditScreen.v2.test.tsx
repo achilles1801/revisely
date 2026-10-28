@@ -382,3 +382,115 @@ describe('the snackbar elsewhere (reader, session)', () => {
     expect(flat(screen.getByText('Pages cleared').props.style).color).toBe(palette.bg);
   });
 });
+
+// Saving a new plan and today's revision (the 1.0.2 report: "I created a new plan
+// and loaded it but it didn't update my revision for today").
+describe('a new plan and today', () => {
+  const { applyCarryOver } = require('../../../lib/carryOver');
+  const { generateDailyAssignment } = require('../../../lib/algorithm');
+  const { dateToLocalISODay } = require('../../../lib/schedulePlans');
+  const { Alert } = require('react-native');
+  const revisionDate = new Date();
+  revisionDate.setHours(0, 0, 0, 0);
+  const TODAY = dateToLocalISODay(revisionDate);
+  const tomorrow = new Date(revisionDate.getFullYear(), revisionDate.getMonth(), revisionDate.getDate() + 1);
+  const yesterday = new Date(revisionDate.getFullYear(), revisionDate.getMonth(), revisionDate.getDate() - 1);
+  const todayOf = (u: User, date = revisionDate) => generateDailyAssignment(memorized, [], u, date).pages;
+  const sessionLog = (date: string, assignedPages: number[], pagesRevised: number[]) => ({
+    id: date,
+    date,
+    assignedPages,
+    pagesRevised,
+    pagesSkipped: [],
+    weaknessUpdates: [],
+    durationMinutes: 5,
+  });
+  // Yesterday's pages 28 and 29 weren't finished and were added to today.
+  const withLeftovers = (): User =>
+    applyCarryOver({ ...baseUser, savedPlans: [saved] }, memorized, [28, 29], revisionDate);
+
+  async function loadSavedPlanAndSave() {
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('saved-plan-p1'));
+    await act(async () => {});
+    fireEvent.press(within(screen.getByTestId('saved-plan-menu')).getByTestId('sheet-action-load'));
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+  }
+  // A menu's action runs once its modal has gone (iOS: the modal's dismissal).
+  const dismissMenus = () => screen.UNSAFE_getAllByType(Modal).forEach((m) => m.props.onDismiss?.());
+  const savedUser = (): User => (mockApp.saveUser as jest.Mock).mock.calls.at(-1)[0];
+
+  it('nothing revised today: today becomes the plan’s first day, without yesterday’s leftovers on top', async () => {
+    mockApp.user = withLeftovers();
+    expect(todayOf(mockApp.user as User).slice(0, 2)).toEqual([28, 29]);
+    mockApp.logs = [sessionLog(dateToLocalISODay(yesterday), [28, 29, 30], [30])];
+    await loadSavedPlanAndSave();
+    expect(todayOf(savedUser())).toEqual([1, 2]);
+    expect(todayOf(savedUser(), tomorrow)).toEqual([3, 4]);
+  });
+
+  it('part of today revised: asks whether to start today or tomorrow', async () => {
+    mockApp.user = withLeftovers();
+    const before = todayOf(mockApp.user as User);
+    mockApp.logs = [sessionLog(TODAY, before, [28])];
+    await loadSavedPlanAndSave();
+    expect(mockApp.saveUser).not.toHaveBeenCalled();
+    const menu = screen.getByTestId('plan-start-menu');
+    expect(within(menu).getByText('Start today')).toBeTruthy();
+    fireEvent.press(within(menu).getByTestId('sheet-action-tomorrow'));
+    await act(async () => {
+      dismissMenus();
+    });
+    expect(todayOf(savedUser())).toEqual(before);
+    expect(todayOf(savedUser(), tomorrow)).toEqual([1, 2]);
+  });
+
+  it('part of today revised, start today: the revised page stays on today, then the first day', async () => {
+    mockApp.user = withLeftovers();
+    mockApp.logs = [sessionLog(TODAY, todayOf(mockApp.user as User), [28])];
+    await loadSavedPlanAndSave();
+    fireEvent.press(within(screen.getByTestId('plan-start-menu')).getByTestId('sheet-action-today'));
+    await act(async () => {
+      dismissMenus();
+    });
+    expect(todayOf(savedUser())).toEqual([28, 1, 2]);
+  });
+
+  it('today already done: the new plan starts tomorrow, and says so', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockApp.user = withLeftovers();
+    const before = todayOf(mockApp.user as User);
+    mockApp.logs = [sessionLog(TODAY, before, before)];
+    await loadSavedPlanAndSave();
+    expect(todayOf(savedUser())).toEqual(before);
+    expect(todayOf(savedUser(), tomorrow)).toEqual([1, 2]);
+    expect(alert).toHaveBeenCalledWith('Your new plan starts tomorrow', expect.any(String));
+    alert.mockRestore();
+  });
+
+  it('a plan that starts tomorrow (today held) is shown, and saved, from tomorrow', async () => {
+    mockApp.user = {
+      ...baseUser,
+      // Starts today with its last day first: tomorrow is [1, 2].
+      customPlan: { days: [[3, 4], [1, 2]], cycleStartDate: TODAY, direction: 'forward' },
+      carryOver: { day: TODAY, pages: [28, 29], skip: 2 },
+    };
+    expect(todayOf(mockApp.user as User)).toEqual([28, 29]);
+    await mount(<PlanEditScreen />);
+    expect(within(screen.getByTestId('date-badge-0')).queryByText('Today')).toBeNull();
+    expect(screen.getByTestId('day-item-0').props.accessibilityLabel).toMatch(/^Tomorrow: /);
+    // Shifting a day would skip the new plan's first day.
+    expect(screen.getByText('Your new plan starts tomorrow')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('plan-add-day'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+    expect(todayOf(savedUser())).toEqual([28, 29]);
+    expect(todayOf(savedUser(), tomorrow)).toEqual([1, 2]);
+  });
+});
