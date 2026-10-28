@@ -4,8 +4,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 /** What the optional progress card on Home shows. Per-device preference. */
 export type HomeMetric = 'juz' | 'pages' | 'surahs';
 
+/**
+ * How Today's post shows how much is memorized. Tester-only while the user
+ * compares them (Settings → Home screen, lib/tester); the winner stays.
+ */
+export type ProgressStyle = 'ring' | 'hairline' | 'dots';
+export const PROGRESS_STYLES: ProgressStyle[] = ['ring', 'hairline', 'dots'];
+export const PROGRESS_STYLE_LABELS: Record<ProgressStyle, string> = {
+  ring: 'Ring',
+  hairline: 'Hairline',
+  dots: 'Juz dots',
+};
+
 export interface HomePrefs {
   showProgressCard: boolean;
+  /** Ring (around the mark), Hairline or Juz dots (under the post). */
+  progressStyle: ProgressStyle;
   metrics: HomeMetric[];
   /** Friday card suggesting Surah Al-Kahf. */
   fridayKahfReminder: boolean;
@@ -33,6 +47,7 @@ export function homeMetricsSummary(metrics: HomeMetric[]): string {
 const STORAGE_KEY = '@revisely_home_prefs';
 const DEFAULT_PREFS: HomePrefs = {
   showProgressCard: true,
+  progressStyle: 'ring',
   metrics: ['juz', 'pages'],
   fridayKahfReminder: true,
   kahfDismissedDay: null,
@@ -49,6 +64,9 @@ export function parseHomePrefs(raw: string | null): HomePrefs {
   }
   return {
     showProgressCard: saved.showProgressCard ?? DEFAULT_PREFS.showProgressCard,
+    progressStyle: PROGRESS_STYLES.includes(saved.progressStyle as ProgressStyle)
+      ? (saved.progressStyle as ProgressStyle)
+      : DEFAULT_PREFS.progressStyle,
     metrics: (Array.isArray(saved.metrics) ? saved.metrics : DEFAULT_PREFS.metrics).filter(
       (m) => ALL_HOME_METRICS.includes(m),
     ),

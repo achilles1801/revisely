@@ -29,7 +29,9 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
 import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
-import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
+import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, mixColors, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
+import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
+import { DOT } from '../../components/v2/JuzDots';
 import type { RevisionLog, UserPage } from '../../types';
 
 beforeEach(async () => {
@@ -227,8 +229,10 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     // The fills themselves stand out from the ground (non-text, 3:1).
     expect(contrast(p.primary, p.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(p.done, p.bg)).toBeGreaterThanOrEqual(3);
-    // The memorized ring around Today's mark, at both ends of its gradient.
+    // The memorized ring around Today's mark, at both ends of its gradient,
+    // and every juz dot stepping along it.
     for (const stop of p.ring) expect(contrast(stop, p.bg)).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < 30; i++) expect(contrast(mixColors(p.ring[0], p.ring[1], i / 29), p.bg)).toBeGreaterThanOrEqual(3);
     // A day's number on each shade of Activity's calendar.
     p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
     // Screens not moved yet get the same colours under the classic names.
@@ -503,6 +507,91 @@ describe('Home in the new design (a feed)', () => {
     expect(ring.props.style).toMatchObject({ width: 40, height: 40 });
     expect(screen.getByTestId('mark', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByText(/27%/)).toBeNull();
+  });
+
+  it('Hairline: a line under the post fills with the share, no words, read by VoiceOver; no ring', async () => {
+    post({ memorizedFraction: 166 / 604, progressStyle: 'hairline' });
+    await act(async () => {});
+    const line = screen.getByTestId('today-hairline');
+    expect(line.props.accessibilityRole).toBe('progressbar');
+    expect(line.props.accessibilityLabel).toBe('Memorized 27% of the Quran');
+    expect(line.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 27 });
+    expect(screen.queryByTestId('today-ring')).toBeNull();
+    expect(screen.queryByText(/27%/)).toBeNull();
+  });
+
+  it('Juz dots: thirty, each lit by its juz’s share (half a juz, half a dot); no words; no ring', async () => {
+    const juz = Array(30).fill(0);
+    juz[29] = 1;
+    juz[1] = 0.5;
+    post({ memorizedFraction: 30 / 604, memorizedJuz: juz, progressStyle: 'dots' });
+    await act(async () => {});
+    const row = screen.getByTestId('today-dots');
+    expect(row.props.accessibilityLabel).toBe('Memorized 5% of the Quran');
+    expect(row.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 5 });
+    for (let i = 1; i <= 30; i++) expect(screen.getByTestId(`today-dots-${i}`)).toBeTruthy();
+    const width = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean)).width;
+    expect(width('today-dots-30-lit')).toBe(DOT);
+    expect(width('today-dots-2-lit')).toBe(DOT / 2);
+    expect(screen.queryByTestId('today-dots-1-lit')).toBeNull();
+    expect(screen.queryByTestId('today-ring')).toBeNull();
+  });
+
+  it('every style goes with the Memorized line', async () => {
+    for (const progressStyle of ['ring', 'hairline', 'dots'] as const) {
+      post({ memorized: null, memorizedFraction: 0.27, memorizedJuz: Array(30).fill(0.3), progressStyle });
+      await act(async () => {});
+      expect(screen.queryByTestId('today-ring')).toBeNull();
+      expect(screen.queryByTestId('today-hairline')).toBeNull();
+      expect(screen.queryByTestId('today-dots')).toBeNull();
+      screen.unmount();
+    }
+  });
+
+  it('switches at once when Settings changes it (the per-phone preference)', async () => {
+    function Live() {
+      const { progressStyle } = useHomePrefs();
+      return (
+        <TodayPost
+          name="Karim"
+          initial="K"
+          status="partial"
+          pages={[520]}
+          juzBreakdown={[{ juz: 26, pages: [520] }]}
+          done={new Set()}
+          streak={0}
+          memorized="8.1 of 30 juz"
+          memorizedFraction={0.27}
+          memorizedJuz={Array(30).fill(0.27)}
+          progressStyle={progressStyle}
+          onPrimary={jest.fn()}
+          onEditSchedule={jest.fn()}
+          onMemorization={jest.fn()}
+          leftovers={0}
+          onCarryOver={jest.fn()}
+          carrying={false}
+          onPushBack={jest.fn()}
+          canPushBack={false}
+          shifting={false}
+        />
+      );
+    }
+    render(wrap(<Live />));
+    await act(async () => {});
+    expect(screen.getByTestId('today-ring')).toBeTruthy();
+    act(() => setHomePrefs({ progressStyle: 'dots' }));
+    expect(screen.getByTestId('today-dots')).toBeTruthy();
+    expect(screen.queryByTestId('today-ring')).toBeNull();
+    act(() => setHomePrefs({ progressStyle: 'hairline' }));
+    expect(screen.getByTestId('today-hairline')).toBeTruthy();
+    act(() => setHomePrefs({ progressStyle: 'ring' }));
+  });
+
+  it('mixColors steps between two colours', () => {
+    expect(mixColors('#000000', '#FFFFFF', 0)).toBe('#000000');
+    expect(mixColors('#000000', '#FFFFFF', 1)).toBe('#FFFFFF');
+    expect(mixColors('#000000', '#FFFFFF', 0.5)).toBe('#808080');
+    expect(mixColors('#2E0EC6', '#9789DA', 2)).toBe('#9789DA');
   });
 
   it('the percentage: whole numbers, “<1%” for a page or two', () => {

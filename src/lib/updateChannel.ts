@@ -30,7 +30,8 @@ export function channelOverride(channel: Channel): Record<string, string> | null
   return channel === PREVIEW_CHANNEL ? { 'expo-channel-name': PREVIEW_CHANNEL } : null;
 }
 
-function installedFromTestFlight(): boolean {
+/** Installed from TestFlight (a sandbox receipt); false when unsure. */
+export function installedFromTestFlight(): boolean {
   try {
     return InstallSource?.isTestFlight() === true;
   } catch (err) {
