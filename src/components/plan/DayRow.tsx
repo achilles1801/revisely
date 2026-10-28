@@ -12,15 +12,11 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
-/**
- * "Today", "Tomorrow", "Thursday, 3 Oct". `startsIn`: days from today to the
- * first day (1 for a plan that starts tomorrow).
- */
-export function dayTitle(index: number, today: Date, startsIn = 0): string {
-  const offset = index + startsIn;
-  if (offset === 0) return 'Today';
-  if (offset === 1) return 'Tomorrow';
-  return addDays(today, offset).toLocaleDateString(undefined, {
+/** "Today", "Tomorrow", "Thursday, 3 Oct" */
+export function dayTitle(index: number, today: Date): string {
+  if (index === 0) return 'Today';
+  if (index === 1) return 'Tomorrow';
+  return addDays(today, index).toLocaleDateString(undefined, {
     weekday: 'long',
     day: 'numeric',
     month: 'short',
@@ -31,10 +27,10 @@ export function dayTitle(index: number, today: Date, startsIn = 0): string {
  * Leading calendar-style column: weekday over date number. The weekday is in
  * sentence case ("Today", "Tue"), today in the accent.
  */
-export function DateBadge({ index, today, startsIn = 0 }: { index: number; today: Date; startsIn?: number }) {
+export function DateBadge({ index, today }: { index: number; today: Date }) {
   const { palette } = useTheme();
-  const date = addDays(today, index + startsIn);
-  const isToday = index + startsIn === 0;
+  const date = addDays(today, index);
+  const isToday = index === 0;
   const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
   return (
     <View style={styles.badge} testID={`date-badge-${index}`}>

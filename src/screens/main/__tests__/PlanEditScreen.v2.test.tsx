@@ -421,8 +421,6 @@ describe('a new plan and today', () => {
       fireEvent.press(screen.getByTestId('plan-save'));
     });
   }
-  // A menu's action runs once its modal has gone (iOS: the modal's dismissal).
-  const dismissMenus = () => screen.UNSAFE_getAllByType(Modal).forEach((m) => m.props.onDismiss?.());
   const savedUser = (): User => (mockApp.saveUser as jest.Mock).mock.calls.at(-1)[0];
 
   it('nothing revised today: today becomes the plan’s first day, without yesterday’s leftovers on top', async () => {
@@ -434,63 +432,39 @@ describe('a new plan and today', () => {
     expect(todayOf(savedUser(), tomorrow)).toEqual([3, 4]);
   });
 
-  it('part of today revised: asks whether to start today or tomorrow', async () => {
-    mockApp.user = withLeftovers();
-    const before = todayOf(mockApp.user as User);
-    mockApp.logs = [sessionLog(TODAY, before, [28])];
-    await loadSavedPlanAndSave();
-    expect(mockApp.saveUser).not.toHaveBeenCalled();
-    const menu = screen.getByTestId('plan-start-menu');
-    expect(within(menu).getByText('Start today')).toBeTruthy();
-    fireEvent.press(within(menu).getByTestId('sheet-action-tomorrow'));
-    await act(async () => {
-      dismissMenus();
-    });
-    expect(todayOf(savedUser())).toEqual(before);
-    expect(todayOf(savedUser(), tomorrow)).toEqual([1, 2]);
-  });
-
-  it('part of today revised, start today: the revised page stays on today, then the first day', async () => {
+  it('part of today revised: no question; today switches, the revised page stays on it (counted)', async () => {
     mockApp.user = withLeftovers();
     mockApp.logs = [sessionLog(TODAY, todayOf(mockApp.user as User), [28])];
     await loadSavedPlanAndSave();
-    fireEvent.press(within(screen.getByTestId('plan-start-menu')).getByTestId('sheet-action-today'));
-    await act(async () => {
-      dismissMenus();
-    });
+    expect(screen.queryByTestId('plan-start-menu')).toBeNull();
     expect(todayOf(savedUser())).toEqual([28, 1, 2]);
+    expect(todayOf(savedUser(), tomorrow)).toEqual([3, 4]);
   });
 
-  it('today already done: the new plan starts tomorrow, and says so', async () => {
+  it('today already done: today still switches to the new plan, nothing deferred, nothing asked', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockApp.user = withLeftovers();
     const before = todayOf(mockApp.user as User);
     mockApp.logs = [sessionLog(TODAY, before, before)];
     await loadSavedPlanAndSave();
-    expect(todayOf(savedUser())).toEqual(before);
-    expect(todayOf(savedUser(), tomorrow)).toEqual([1, 2]);
-    expect(alert).toHaveBeenCalledWith('Your new plan starts tomorrow', expect.any(String));
+    expect(todayOf(savedUser())).toEqual([...before, 1, 2].filter((p, i, a) => a.indexOf(p) === i));
+    expect(todayOf(savedUser(), tomorrow)).toEqual([3, 4]);
+    expect(alert).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 
-  it('a plan that starts tomorrow (today held) is shown, and saved, from tomorrow', async () => {
-    mockApp.user = {
-      ...baseUser,
-      // Starts today with its last day first: tomorrow is [1, 2].
-      customPlan: { days: [[3, 4], [1, 2]], cycleStartDate: TODAY, direction: 'forward' },
-      carryOver: { day: TODAY, pages: [28, 29], skip: 2 },
-    };
-    expect(todayOf(mockApp.user as User)).toEqual([28, 29]);
+  it('Use automatic schedule: today switches to the automatic day (leftovers go)', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    mockApp.user = { ...withLeftovers(), customPlan: { days: [[1, 2], [3, 4]], cycleStartDate: TODAY, direction: 'forward' } };
+    mockApp.logs = [];
     await mount(<PlanEditScreen />);
-    expect(within(screen.getByTestId('date-badge-0')).queryByText('Today')).toBeNull();
-    expect(screen.getByTestId('day-item-0').props.accessibilityLabel).toMatch(/^Tomorrow: /);
-    // Shifting a day would skip the new plan's first day.
-    expect(screen.getByText('Your new plan starts tomorrow')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('plan-add-day'));
+    fireEvent.press(screen.getByTestId('plan-automatic'));
+    const buttons = alert.mock.calls.at(-1)![2] as { text: string; onPress?: () => void }[];
     await act(async () => {
-      fireEvent.press(screen.getByTestId('plan-save'));
+      buttons.find((b) => b.text === 'Use Automatic')!.onPress!();
     });
-    expect(todayOf(savedUser())).toEqual([28, 29]);
-    expect(todayOf(savedUser(), tomorrow)).toEqual([1, 2]);
+    const automatic = { ...baseUser, customPlan: null };
+    expect(todayOf(savedUser())).toEqual(todayOf(automatic));
+    alert.mockRestore();
   });
 });
