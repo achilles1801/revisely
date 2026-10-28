@@ -24,7 +24,7 @@ describe('TimerSheet', () => {
     const onClose = jest.fn();
     render(<TimerSheet visible onClose={onClose} />);
     const { fireEvent } = require('@testing-library/react-native');
-    fireEvent.press(screen.getByLabelText('Close'));
+    fireEvent.press(screen.getByTestId('backdrop'));
     expect(onClose).toHaveBeenCalled();
   });
 });
