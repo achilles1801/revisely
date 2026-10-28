@@ -66,10 +66,6 @@ jest.mock('../../lib/audioFocus', () => ({
   },
 }));
 jest.mock('../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
-// The design state: haptics on unless a test turns
-// them off (Settings → Haptics).
-const mockDesign = { hapticsOn: true };
-jest.mock('../../design/DesignContext', () => ({ useDesign: () => mockDesign }));
 
 import * as Haptics from 'expo-haptics';
 import { useVoiceRecorder, VOICE_PRESET } from '../useVoiceRecorder';
@@ -79,7 +75,6 @@ import { hasRecordingSession, isRecordingActive } from '../../lib/recordings';
 let appStateListeners: Array<(s: string) => void> = [];
 beforeEach(() => {
   jest.clearAllMocks();
-  mockDesign.hapticsOn = true;
   mockUri = 0;
   appStateListeners = [];
   jest.spyOn(AppState, 'addEventListener').mockImplementation((_e: any, l: any) => {
@@ -733,10 +728,4 @@ describe('haptics', () => {
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
 
-  it('with Settings → Haptics off: none', async () => {
-    mockDesign.hapticsOn = false;
-    await run();
-    expect(Haptics.impactAsync).not.toHaveBeenCalled();
-    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
-  });
 });

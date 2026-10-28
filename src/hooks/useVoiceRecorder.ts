@@ -87,7 +87,7 @@ interface Options {
  */
 export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }: Options) {
   // A recording starting and stopping is marked with one impact
-  // (design/haptics, off with Settings → Haptics); taps don't buzz.
+  // (design/haptics); taps don't buzz.
   const haptics = useHaptics();
   const hapticsRef = useRef(haptics);
   hapticsRef.current = haptics;

@@ -45,7 +45,7 @@ jest.mock('../../../context/ThemeContext', () => {
 });
 // The new design.
 jest.mock('../../../design/DesignContext', () => ({
-  useDesign: () => ({ hapticsOn: true }),
+  useDesign: () => ({ accent: 'indigo' }),
 }));
 
 const mockApp: any = {};

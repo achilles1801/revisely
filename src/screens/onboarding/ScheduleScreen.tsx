@@ -31,7 +31,7 @@ export default function ScheduleScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { palette } = useTheme();
-  // Settings → Haptics decides.
+  // An outcome (design/haptics).
   const haptics = useHaptics();
   const { journeyStage } = route.params;
   const { pages, createDefaultUser, saveUser, completeOnboarding } = useApp();

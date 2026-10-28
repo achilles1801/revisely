@@ -155,3 +155,26 @@ describe('Settings: no Progress style any more (the juz dots won)', () => {
     expect(screen.getByText('Progress card')).toBeTruthy();
   });
 });
+
+describe('Settings: Appearance and haptics (Oct 28)', () => {
+  it('Accent is a row like Theme: the label on the left, the three choices on its right', async () => {
+    await renderV2();
+    const row = screen.getByTestId('accent-row');
+    expect(flat(row.props.style).flexDirection).toBe('row');
+    // The picker sits in the row itself, after the label, pushed to the right.
+    const picker = screen.getByTestId('accent-picker');
+    expect(flat(picker.props.style)).toMatchObject({ flexDirection: 'row', justifyContent: 'flex-end' });
+    let parent = picker.parent;
+    while (parent && parent.props.testID !== 'accent-row') parent = parent.parent;
+    expect(parent).toBeTruthy();
+    // The same pill size as Theme's Light and Dark.
+    expect(flat(screen.getByTestId('accent-indigo').props.style).minHeight).toBe(30);
+    expect(screen.getByLabelText('Indigo').props.accessibilityState).toMatchObject({ checked: true });
+  });
+
+  it('no Haptics switch: haptics are always on for the moments that matter', async () => {
+    await renderV2();
+    expect(screen.queryByText('Haptics')).toBeNull();
+    expect(screen.queryByLabelText('Haptics')).toBeNull();
+  });
+});
