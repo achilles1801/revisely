@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
@@ -27,6 +27,15 @@ const PROGRESS_WIDTH = 160;
 export function stepLength(minutes: number, direction: 1 | -1): number {
   if (direction === 1) return Math.min(480, minutes < 60 ? minutes + 5 : minutes < 120 ? minutes + 15 : minutes + 30);
   return Math.max(5, minutes <= 60 ? minutes - 5 : minutes <= 120 ? minutes - 15 : minutes - 30);
+}
+
+/** Typed minutes: 1 to 480 (8 h, the longest a step reaches), or null. */
+export const MIN_TYPED = 1;
+export const MAX_TYPED = 480;
+export function parseMinutes(text: string): number | null {
+  if (!/^\d{1,3}$/.test(text.trim())) return null;
+  const n = Number(text.trim());
+  return n >= MIN_TYPED && n <= MAX_TYPED ? n : null;
 }
 
 /** "45 min", "1 h", "1 h 30 min". */
@@ -57,6 +66,37 @@ function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsPro
   const [kind, setKind] = useState<Kind>('stopwatch');
   const [direction, setDirection] = useState<Direction>('countDown');
   const [minutes, setMinutes] = useState(30);
+  // Typing the length instead of stepping to it.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [entryError, setEntryError] = useState(false);
+  // Empty, the current length as its placeholder: typing starts afresh.
+  const beginEdit = () => {
+    setDraft('');
+    setEntryError(false);
+    setEditing(true);
+  };
+  /** The typed length, applied; false (and a hint) if it isn't 1 to 480. */
+  const commitEdit = (): number | null => {
+    const n = parseMinutes(draft);
+    if (n == null) {
+      setEntryError(true);
+      return null;
+    }
+    setMinutes(n);
+    setEditing(false);
+    setEntryError(false);
+    Keyboard.dismiss();
+    return n;
+  };
+  // Leaving the field: a valid length is kept, anything else goes back.
+  const endEdit = () => {
+    if (parseMinutes(draft) != null) commitEdit();
+    else {
+      setEditing(false);
+      setEntryError(false);
+    }
+  };
 
   const running = timer?.runningSince != null;
   const now = useNow(visible && running, timer?.mode === 'stopwatch' ? 50 : 250);
@@ -70,13 +110,21 @@ function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsPro
       ? formatStopwatch(0)
       : formatClock(direction === 'countDown' ? minutes * 60_000 : 0);
 
+
   const targetSeconds = timer ? timer.targetSeconds : kind === 'timer' ? minutes * 60 : null;
   const progress =
     targetSeconds != null && timer ? elapsedMs(timer, now) / (targetSeconds * 1000) : 0;
 
   const handleStart = () => {
     const mode: ReadingTimerMode = kind === 'stopwatch' ? 'stopwatch' : direction;
-    start(mode, kind === 'timer' ? minutes * 60 : null);
+    // Start while typing: what was typed, if it's a length.
+    let length = minutes;
+    if (kind === 'timer' && editing) {
+      const typed = commitEdit();
+      if (typed == null) return;
+      length = typed;
+    }
+    start(mode, kind === 'timer' ? length * 60 : null);
   };
 
   const handleEnd = async () => {
@@ -114,6 +162,13 @@ function useTimerControls({ onClose, onSaved, visible = true }: TimerControlsPro
     setDirection,
     minutes,
     setMinutes,
+    editing,
+    draft,
+    setDraft,
+    entryError,
+    beginEdit,
+    commitEdit,
+    endEdit,
     clockText,
     targetSeconds,
     progress,
@@ -146,6 +201,13 @@ export function TimerControls(props: TimerControlsProps) {
     setDirection,
     minutes,
     setMinutes,
+    editing,
+    draft,
+    setDraft,
+    entryError,
+    beginEdit,
+    commitEdit,
+    endEdit,
     clockText,
     targetSeconds,
     progress,
@@ -155,6 +217,8 @@ export function TimerControls(props: TimerControlsProps) {
     handleEnd,
     handleDiscard,
   } = useTimerControls(props);
+  // A timer not started yet: its length can be typed (tap the clock or the length).
+  const typeable = !timer && kind === 'timer';
 
   const mode = timer?.mode ?? (kind === 'stopwatch' ? 'stopwatch' : direction);
   // One line under the clock: what it does, or where it is.
@@ -170,7 +234,11 @@ export function TimerControls(props: TimerControlsProps) {
             : 'Saved to Activity when you end it'
     : kind === 'stopwatch'
       ? 'Runs until you end it'
-      : 'Ends by itself and is saved';
+      : editing
+        ? entryError
+          ? `${MIN_TYPED} to ${MAX_TYPED} minutes`
+          : 'Type the minutes'
+        : 'Ends by itself and is saved';
 
   return (
     <View testID="timer-controls-v2">
@@ -189,18 +257,59 @@ export function TimerControls(props: TimerControlsProps) {
       )}
 
       <View style={v2.clockBlock}>
+        {typeable && editing ? (
+          <View style={v2.entry}>
+            <TextInput
+              value={draft}
+              onChangeText={(t) => setDraft(t.replace(/[^0-9]/g, '').slice(0, 3))}
+              onBlur={endEdit}
+              onSubmitEditing={() => commitEdit()}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              autoFocus
+              placeholder={String(minutes)}
+              placeholderTextColor={palette.secondary}
+              maxLength={3}
+              style={[v2.clock, v2.entryInput, typeV2.numeral, { color: palette.text, borderColor: entryError ? palette.red : palette.outline }]}
+              maxFontSizeMultiplier={1.2}
+              accessibilityLabel="Minutes"
+              accessibilityHint={`${MIN_TYPED} to ${MAX_TYPED}`}
+              testID="timer-minutes-input"
+            />
+            <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              min
+            </Text>
+            <PillButton
+              title="Set"
+              variant="outline"
+              onPress={() => commitEdit()}
+              accessibilityLabel="Set the length"
+              style={v2.set}
+              testID="timer-minutes-set"
+            />
+          </View>
+        ) : (
+          <Tap
+            onPress={typeable ? beginEdit : undefined}
+            disabled={!typeable}
+            accessibilityRole={typeable ? 'button' : undefined}
+            accessibilityLabel={typeable ? `${clockText}. Type the length` : undefined}
+            testID="timer-clock-tap"
+          >
+            <Text
+              style={[v2.clock, typeV2.numeral, { color: palette.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              maxFontSizeMultiplier={1.2}
+              accessibilityRole="timer"
+              testID="timer-clock"
+            >
+              {clockText}
+            </Text>
+          </Tap>
+        )}
         <Text
-          style={[v2.clock, typeV2.numeral, { color: palette.text }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={1.2}
-          accessibilityRole="timer"
-          testID="timer-clock"
-        >
-          {clockText}
-        </Text>
-        <Text
-          style={[typeV2.meta, v2.centred, { color: palette.secondary }]}
+          style={[typeV2.meta, v2.centred, { color: entryError ? palette.red : palette.secondary }]}
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
           testID="timer-caption"
@@ -228,14 +337,22 @@ export function TimerControls(props: TimerControlsProps) {
           >
             <Ionicons name="remove" size={18} color={palette.text} />
           </Tap>
-          <Text
-            style={[typeV2.body, typeV2.numeral, v2.length, { color: palette.text }]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.4}
-            testID="timer-minutes"
+          <Tap
+            onPress={beginEdit}
+            accessibilityRole="button"
+            accessibilityLabel={`${lengthLabel(minutes)}. Type the length`}
+            style={v2.lengthTap}
+            testID="timer-minutes-tap"
           >
-            {lengthLabel(minutes)}
-          </Text>
+            <Text
+              style={[typeV2.body, typeV2.numeral, v2.length, { color: palette.text }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.4}
+              testID="timer-minutes"
+            >
+              {lengthLabel(minutes)}
+            </Text>
+          </Tap>
           <Tap
             onPress={() => setMinutes((m) => stepLength(m, 1))}
             hitSlop={6}
@@ -323,14 +440,24 @@ export function TimerControls(props: TimerControlsProps) {
 }
 
 const v2 = StyleSheet.create({
-  tabs: { marginTop: 4 },
-  clockBlock: { alignItems: 'center', paddingTop: 14, paddingBottom: 12, gap: 2 },
-  // Light and large, like the Clock app's, but no taller than the controls need.
-  clock: { fontSize: 48, fontWeight: '200', letterSpacing: -0.5 },
+  tabs: { marginTop: 2 },
+  clockBlock: { alignItems: 'center', paddingTop: 22, paddingBottom: 20, gap: 4 },
+  // Light and large, like the Clock app's: the one big thing on the card.
+  clock: { fontSize: 60, fontWeight: '200', letterSpacing: -1 },
+  entry: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  entryInput: {
+    minWidth: 96,
+    textAlign: 'center',
+    paddingVertical: 0,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+  },
+  set: { marginLeft: 4, paddingHorizontal: 14 },
+  lengthTap: { paddingVertical: 6 },
   centred: { textAlign: 'center' },
   track: { width: PROGRESS_WIDTH, height: 2, borderRadius: 1, marginTop: 8, overflow: 'hidden' },
   fill: { height: 2, borderRadius: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 4 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 6 },
   step: {
     width: 36,
     height: 36,
