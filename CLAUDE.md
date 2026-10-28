@@ -699,6 +699,15 @@ classic default), and a fresh install starts in light.
   hard line under the header while pulling (and while a refresh hung). Home's `RefreshControl` has
   `backgroundColor: 'transparent'`; refreshes go through `hooks/usePullToRefresh`, which always ends
   the spinner (done, failed, or after 10 s).
+- **Home's glow must never end in an edge** (users saw a "box" twice). It is one full-bleed layer
+  (`v2/HeroGlow`) behind the top bar and the content, from under the status bar to 340pt in light,
+  fading as (1 − t)^2.8 (`lightGlow` in `theme/v2`) so it ends flat, faint enough by the first grey
+  text for 4.5:1 with every accent (design.test checks the whole band). Nothing above it is opaque,
+  and nothing draws a line across it: the hairline that sat under Home's header was removed (Oct 28
+  2026; the glow faded just above it and the tinted header read as a box, at rest and stretching
+  while pulling). After touching Home's top, screenshot it in light (at rest and mid-pull, each
+  accent) and run `python3 scripts/check-home-glow.py <png…>`: it fails on a step or a line inside
+  the glow.
 - **Drag and swipe rows** (`components/plan/ReorderableDayList`, the schedule's days) are
   react-native-gesture-handler and Reanimated, JS only. A row lifts after 350 ms with the finger
   still; moving 10pt first cancels the lift, so scrolling and swiping still work. While a row is

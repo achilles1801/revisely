@@ -162,12 +162,27 @@ const BASE_DARK: Base = {
  * keeps its contrast over the glow, so it spreads further.
  */
 export const HERO_SHAPE = {
-  light: { height: 210, rx: '130%' },
+  light: { height: 340, rx: '130%' },
   dark: { height: 360, rx: '85%' },
 } as const;
 
-/** Where Home's first grey text sits in the light glow (see HERO_SHAPE). */
-export const HERO_FIRST_TEXT_OFFSET = 0.62;
+/** Where Home's first grey text sits in the light glow (about 136pt down; see HERO_SHAPE). */
+export const HERO_FIRST_TEXT_OFFSET = 0.4;
+
+/**
+ * The light glow's stops: `top` opacity at the top, easing to nothing as
+ * (1 − t)^2.8, so it reaches well past the header and fades out with no edge
+ * (the curve ends flat). Faint enough by the first grey text (offset 0.4) for
+ * 4.5:1 with every accent (design.test). It used to fade out just above the
+ * hairline under the header, and the tinted header read as a box (Oct 28 2026).
+ */
+function lightGlow(color: string, top: number): HeroStops {
+  return [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((offset) => ({
+    offset,
+    color,
+    opacity: Math.round(top * (1 - offset) ** 2.8 * 10000) / 10000,
+  }));
+}
 
 const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentTokens }> = {
   // As agreed: ink buttons and links in grey; jade only means "done".
@@ -182,13 +197,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#616977',
       accentSubtle: '#EDEDEF',
-      hero: [
-        { offset: 0, color: '#3FA084', opacity: 0.3 },
-        { offset: 0.3, color: '#3FA084', opacity: 0.16 },
-        { offset: 0.55, color: '#3FA084', opacity: 0.055 },
-        { offset: 0.68, color: '#3FA084', opacity: 0.02 },
-        { offset: 1, color: '#3FA084', opacity: 0 },
-      ],
+      hero: lightGlow('#3FA084', 0.3),
       progress: ['#0E6B5A', '#0E6B5A'],
       ring: ['#0E6B5A', '#0E6B5A'],
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
@@ -226,13 +235,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#DC1433',
       accentSubtle: '#FCE8EB',
-      hero: [
-        { offset: 0, color: '#DC1433', opacity: 0.24 },
-        { offset: 0.3, color: '#DC1433', opacity: 0.13 },
-        { offset: 0.55, color: '#DC1433', opacity: 0.045 },
-        { offset: 0.68, color: '#DC1433', opacity: 0.015 },
-        { offset: 1, color: '#DC1433', opacity: 0 },
-      ],
+      hero: lightGlow('#DC1433', 0.24),
       progress: ['#3E0812', '#DC1433'],
       ring: ['#3E0812', '#DC1433'],
       heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
@@ -251,6 +254,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       hero: [
         { offset: 0, color: '#3E0812', opacity: 1 },
         { offset: 0.5, color: '#33080E', opacity: 0.6 },
+        { offset: 0.7, color: '#2E0E15', opacity: 0.27 },
+        { offset: 0.85, color: '#2E0E15', opacity: 0.07 },
         { offset: 1, color: '#2E0E15', opacity: 0 },
       ],
       progress: ['#3E0812', '#DC1433'],
@@ -273,13 +278,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#624BD5',
       accentSubtle: '#EFECFB',
-      hero: [
-        { offset: 0, color: '#624BD5', opacity: 0.32 },
-        { offset: 0.3, color: '#624BD5', opacity: 0.18 },
-        { offset: 0.55, color: '#624BD5', opacity: 0.06 },
-        { offset: 0.68, color: '#624BD5', opacity: 0.02 },
-        { offset: 1, color: '#624BD5', opacity: 0 },
-      ],
+      hero: lightGlow('#624BD5', 0.32),
       progress: ['#2E0EC6', '#9789DA'],
       ring: ['#2E0EC6', '#9789DA'],
       heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
@@ -298,6 +297,8 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       hero: [
         { offset: 0, color: '#2E0EC6', opacity: 0.45 },
         { offset: 0.5, color: '#3A2694', opacity: 0.3 },
+        { offset: 0.7, color: '#3A2694', opacity: 0.135 },
+        { offset: 0.85, color: '#3A2694', opacity: 0.035 },
         { offset: 1, color: '#3A2694', opacity: 0 },
       ],
       progress: ['#2E0EC6', '#9789DA'],

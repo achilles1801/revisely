@@ -29,7 +29,7 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
 import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
-import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, mixColors, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
+import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, HERO_SHAPE, mixColors, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
 import { DOT } from '../../components/v2/JuzDots';
 import type { RevisionLog, UserPage } from '../../types';
 
@@ -255,7 +255,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
   it('Crimson and Indigo start from the colours sampled off the reference apps', () => {
     const crimson = paletteV2(true, 'crimson');
     expect([crimson.primary, crimson.done, crimson.link, crimson.accentSubtle]).toEqual(['#DC1433', '#DC1433', '#F03C56', '#2E0E15']);
-    expect(crimson.hero?.map((s) => s.color)).toEqual(['#3E0812', '#33080E', '#2E0E15']);
+    expect([...new Set(crimson.hero?.map((s) => s.color))]).toEqual(['#3E0812', '#33080E', '#2E0E15']);
     expect(paletteV2(false, 'crimson').link).toBe('#DC1433');
     const indigo = paletteV2(true, 'indigo');
     expect([indigo.primary, indigo.done, indigo.link]).toEqual(['#624BD5', '#624BD5', '#9789DA']);
@@ -291,17 +291,43 @@ describe('Home’s glow in light', () => {
     return 0;
   };
 
-  it.each(ACCENTS)('%s: clearly there behind the top bar, gone before the first grey text', (accent) => {
+  it.each(ACCENTS)('%s: clearly there behind the top bar; grey text and links readable wherever it reaches', (accent) => {
     const p = paletteV2(false, accent);
     expect(p.hero).not.toBeNull();
     const stops = p.hero!;
     // Visible: at least a fifth of the accent at the top.
     expect(stops[0].opacity).toBeGreaterThanOrEqual(0.2);
-    // The top bar's ink and Home's first grey line stay readable over it.
+    // The top bar's ink stays readable over it.
     expect(contrast(p.text, over(stops[0].color, stops[0].opacity, p.bg))).toBeGreaterThanOrEqual(4.5);
-    const atText = over(stops[0].color, alphaAt(stops, HERO_FIRST_TEXT_OFFSET), p.bg);
-    expect(contrast(p.secondary, atText)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.link, atText)).toBeGreaterThanOrEqual(4.5);
+    // From Home's first grey line down, every grey text and link over it.
+    for (let t = HERO_FIRST_TEXT_OFFSET; t <= 1; t += 0.02) {
+      const ground = over(stops[0].color, alphaAt(stops, t), p.bg);
+      expect(contrast(p.secondary, ground)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.link, ground)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it.each(ACCENTS)('%s: reaches past the header and fades out with no edge (the box users saw)', (accent) => {
+    const stops = paletteV2(false, accent).hero!;
+    // Still there just under the header (~110pt of 340), not gone above it.
+    expect(alphaAt(stops, 110 / HERO_SHAPE.light.height)).toBeGreaterThanOrEqual(0.06);
+    // Never brighter further down, and nothing at the end.
+    for (let i = 1; i < stops.length; i++) expect(stops[i].opacity).toBeLessThanOrEqual(stops[i - 1].opacity);
+    expect(stops[stops.length - 1].opacity).toBe(0);
+    // It ends flat: the last tenth changes by under 0.2% of the accent.
+    expect(alphaAt(stops, 0.9)).toBeLessThan(0.002);
+    // Steps between stops small enough not to band.
+    for (let i = 1; i < stops.length; i++) expect(stops[i - 1].opacity - stops[i].opacity).toBeLessThan(0.08);
+  });
+
+  it.each([
+    ['indigo', true],
+    ['crimson', true],
+  ] as const)('%s in dark: eases out too (no straight drop to nothing)', (accent, isDark) => {
+    const stops = paletteV2(isDark, accent).hero!;
+    expect(stops.length).toBeGreaterThanOrEqual(5);
+    expect(stops[stops.length - 1].opacity).toBe(0);
+    expect(stops[stops.length - 2].opacity).toBeLessThan(0.08);
   });
 
   it('dark is as it was', () => {
