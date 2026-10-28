@@ -24,10 +24,17 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.revisionbuddy.app",
+      // The team that signs the app and the widget extension (as in eas.json).
+      appleTeamId: "CH8N5V9MA6",
       // A fixed path: EAS copies its GOOGLE_SERVICES_INFO_PLIST file here before
       // install (eas-build-pre-install), so the path, and with it the fingerprint,
       // is the same on every machine.
       googleServicesFile: "./GoogleService-Info.plist",
+      // Shared with the widget extension (targets/widget): the app writes what the
+      // widgets show here (src/lib/widgets).
+      entitlements: {
+        "com.apple.security.application-groups": ["group.com.revisionbuddy.app"],
+      },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         // Recitation goes on with the app in the background or the phone
@@ -41,11 +48,16 @@ export default {
           "Allow Revisely to access your photos so you can attach screenshots when contacting support.",
         NSPhotoLibraryAddUsageDescription:
           "Allow Revisely to save images to your photo library.",
+        // Setting this makes Expo ignore `scheme` above, so revisely:// is listed
+        // here too: the widgets' links (src/lib/widgets/links.ts) open the app with it.
         CFBundleURLTypes: [
           {
             CFBundleURLSchemes: [
               process.env.GOOGLE_REVERSED_CLIENT_ID
             ]
+          },
+          {
+            CFBundleURLSchemes: ["revisely"]
           }
         ]
       }
@@ -147,6 +159,10 @@ export default {
       // Apple button ships with no entitlement and fails at runtime — an
       // automatic App Review rejection (Guideline 4.8).
       "expo-apple-authentication",
+      // The Home and Lock Screen widgets: links targets/widget into the generated
+      // Xcode project and registers it with EAS for signing (bundle id
+      // com.revisionbuddy.app.widget, same App Group).
+      "@bacons/apple-targets",
       [
         "expo-location",
         {
