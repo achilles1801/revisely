@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Alert,
   AppState,
   SafeAreaView,
@@ -22,6 +23,7 @@ import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
 import { RecordButton } from '../../components/recordings/RecordButton';
@@ -168,17 +170,11 @@ export default function ActiveRevisionScreen() {
   }, [dismissHint, toggleChrome]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // Arriving on the session's last page, not yet revised: the controls come up
-  // (✓ is there; there is no next page to swipe it done).
-  const showChrome = chrome.show;
-  const lastSessionPage = assignment?.pages[assignment.pages.length - 1];
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setCurrentPageNumber(page);
-      if (page === lastSessionPage && !completedPages.has(page)) showChrome();
-    },
-    [lastSessionPage, completedPages, showChrome],
-  );
+  // Arriving on a page marks nothing; swiping off it does (the last page: onto
+  // the end card after it).
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPageNumber(page);
+  }, []);
   const [undoState, setUndoState] = useState<{
     page: number;
     message: string;
@@ -353,6 +349,39 @@ export default function ActiveRevisionScreen() {
     },
     [assignedPages, completedPages, markRevised],
   );
+
+  // ===== The end card, after the last page =====
+  // Swiping off the last page onto it marks that page done, as for any page.
+  // When that finishes the session: a success buzz, confetti on the card, and
+  // the session saved at once. A jump there, or a page already done, marks
+  // nothing (so coming back to it later doesn't celebrate again).
+  const [celebrate, setCelebrate] = useState(0);
+  const handleReachEnd = useCallback(
+    (lastPage: number, bySwipe: boolean) => {
+      // The header names the page just left, not where the session would resume.
+      setCurrentPageNumber(lastPage);
+      if (!bySwipe || !assignedPages.includes(lastPage) || completedPages.has(lastPage)) return;
+      const finishes = assignedPages.every((p) => p === lastPage || completedPages.has(p));
+      if (!finishes) {
+        handleAdvance(lastPage, lastPage);
+        return;
+      }
+      setCompletedPages((prev) => new Set(prev).add(lastPage));
+      setUndoState(null);
+      haptics.success();
+      setCelebrate((c) => c + 1);
+      AccessibilityInfo.announceForAccessibility(
+        `Revision complete. ${assignedPages.length} ${assignedPages.length === 1 ? 'page' : 'pages'} revised.`,
+      );
+    },
+    [assignedPages, completedPages, handleAdvance, haptics],
+  );
+  // Saved as soon as the last page is in (the render after the swipe).
+  useEffect(() => {
+    if (celebrate > 0) commitPendingPages();
+    // Only when a swipe finishes the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrate]);
 
   // ===== End session =====
 
@@ -694,6 +723,15 @@ export default function ActiveRevisionScreen() {
           onTap={onTapPage}
           onUserSwipe={chrome.hide}
           extraData={extraData}
+          endCard={
+            <SessionEndCard
+              total={totalPages}
+              done={completedCount}
+              celebrate={celebrate}
+              onEnd={handleEndSession}
+            />
+          }
+          onReachEnd={handleReachEnd}
         />
       </ReaderFrame>
 
