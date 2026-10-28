@@ -626,11 +626,15 @@ classic default), and a fresh install starts in light.
     `palette.heatInk` numbers (≥ 4.5:1); the picked day is one line under the month. Things done
     are `lib/activityItems`.
   - **No floating timer.** The timer is in the reader's and the session's controls; a running one
-    shows in Home's top bar (`RunningTimerChip`). Its sheet is small (Oct 27 2026; it had taken
-    half the screen): Stopwatch / Timer, the clock light at 48pt with one line under it (a thin
-    progress line while a timed session runs), and one row of controls: for a timer, − length +
-    (5-minute steps to an hour, then 15, then 30) and Down / Up; running, a red bin (Discard),
-    Pause and End. "Open the Quran" is a small link under them where it applies.
+    shows in Home's top bar (`RunningTimerChip`), with a thin progress line for a timed one. The
+    chip is the "bubble": tapping it grows it into the timer card (`timer/TimerCard`, Oct 28 2026),
+    a rounded card in the bottom-right corner, its controls fading in as it lands; a tap outside,
+    a drag down (`shouldDismiss`, as sheets) or VoiceOver's escape shrinks it back into the chip.
+    With Reduce Motion it fades. In the card: Stopwatch / Timer, the clock light at 60pt with one
+    line under it, and one row of controls: for a timer, − length + (5-minute steps to an hour,
+    then 15, then 30) and Down / Up; running, a red bin (Discard), Pause and End. A timer's length
+    can be typed: tap the clock or the length, a number pad, 1–480 minutes (`parseMinutes`); the
+    card rises above the keyboard. "Open the Quran" is a small link where it applies.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
     what a control does (e.g. Keep daily amount).
 - **Accents** (Settings → Appearance → Accent): **Indigo (the default)**, Crimson and Jade. The

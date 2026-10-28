@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TimerSheet } from './TimerSheet';
+import { Frame, TimerCard } from './TimerCard';
 import { useTheme } from '../../context/ThemeContext';
 import { useNow, useReadingTimer } from '../../context/ReadingTimerContext';
-import { displayMs, formatClock } from '../../lib/readingTimer';
+import { displayMs, elapsedMs, formatClock } from '../../lib/readingTimer';
 import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -22,16 +22,32 @@ interface TimerChipProps {
 
 /**
  * The timer inside the reader's and the session's controls: a stopwatch while
- * idle, the live clock while a session runs or is paused. Tapping opens the
- * timer's controls (TimerSheet).
+ * idle, the live clock while a session runs or is paused (with a thin line of
+ * progress for a timed one). Tapping grows it into the timer's card
+ * (TimerCard), which shrinks back into it when closed: the chip is the bubble.
  */
 export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
   const { palette } = useTheme();
   const { timer } = useReadingTimer();
   const [open, setOpen] = useState(false);
+  // While the card is out (or shrinking back) the chip is hidden: the card is it.
+  const [away, setAway] = useState(false);
+  const [origin, setOrigin] = useState<Frame | null>(null);
+  const anchor = useRef<View>(null);
   const running = timer?.runningSince != null;
   const now = useNow(running && !open, 1000);
   const clock = timer ? formatClock(displayMs(timer, now)) : '';
+  const progress =
+    timer && timer.targetSeconds ? Math.min(1, elapsedMs(timer, now) / (timer.targetSeconds * 1000)) : null;
+
+  const openCard = () => {
+    // Where the chip is on screen, for the card to grow from.
+    anchor.current?.measureInWindow?.((x, y, width, height) => {
+      if (width > 0 && height > 0) setOrigin({ x, y, width, height });
+    });
+    setAway(true);
+    setOpen(true);
+  };
 
   const label = `${running ? 'Timer running' : 'Timer paused'}, ${clock}. Open timer controls`;
 
@@ -39,7 +55,7 @@ export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
   // (running) or the quiet fill (paused). Taps don't buzz.
   const chip = timer ? (
     <Tap
-      onPress={() => setOpen(true)}
+      onPress={openCard}
       hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -66,10 +82,15 @@ export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
       >
         {clock}
       </Text>
+      {progress != null ? (
+        <View style={styles.track} pointerEvents="none" testID="timer-chip-progress">
+          <View style={[styles.fill, { width: `${progress * 100}%`, backgroundColor: running ? palette.accentText : palette.secondary }]} />
+        </View>
+      ) : null}
     </Tap>
   ) : (
     <Tap
-      onPress={() => setOpen(true)}
+      onPress={openCard}
       hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel="Open timer"
@@ -82,14 +103,18 @@ export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
 
   return (
     <>
-      {chip}
-      <TimerSheet
+      <View ref={anchor} collapsable={false} style={away && styles.away}>
+        {chip}
+      </View>
+      <TimerCard
         visible={open}
+        origin={origin}
         onClose={() => setOpen(false)}
+        onHidden={() => setAway(false)}
         onOpenQuran={
           onOpenQuran
             ? () => {
-                // The sheet closes first, or it would stay open over the Quran.
+                // The card closes first, or it would stay open over the Quran.
                 setOpen(false);
                 onOpenQuran();
               }
@@ -116,6 +141,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pillV2: { borderWidth: layoutV2.hairline },
+  pillV2: { borderWidth: layoutV2.hairline, overflow: 'hidden' },
+  away: { opacity: 0 },
+  track: { position: 'absolute', left: 10, right: 10, bottom: 3, height: 2, borderRadius: 1, opacity: 0.35 },
+  fill: { height: 2, borderRadius: 1 },
   clockV2: { ...typeV2.button, fontSize: 14, lineHeight: 18 },
 });

@@ -41,7 +41,7 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
 import * as Haptics from 'expo-haptics';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
-import { lengthLabel, stepLength, TimerControls } from '../TimerControls';
+import { lengthLabel, parseMinutes, stepLength, TimerControls } from '../TimerControls';
 import { TimerChip } from '../TimerChip';
 import { paletteV2, DEFAULT_ACCENT } from '../../../theme/v2';
 
@@ -98,7 +98,9 @@ describe('<TimerControls /> in the new design', () => {
     // Light and large, but not the old 54pt in a 220pt ring.
     const clock = flat(screen.getByTestId('timer-clock').props.style);
     expect(clock.fontWeight).toBe('200');
-    expect(clock.fontSize).toBeLessThanOrEqual(48);
+    // Large and light: the one big thing on the card.
+    expect(clock.fontSize).toBeLessThanOrEqual(64);
+    expect(clock.fontWeight).toBe('200');
     expect(screen.queryByTestId('timer-ring')).toBeNull();
     expect(screen.queryByTestId('timer-setup')).toBeNull();
     expect(screen.queryByText(/Sessions are saved to Activity/)).toBeNull();
@@ -124,6 +126,69 @@ describe('<TimerControls /> in the new design', () => {
     fireEvent.press(screen.getByTestId('pill-countUp'));
     fireEvent.press(screen.getByLabelText('Start timer'));
     expect(mockActions.start).toHaveBeenCalledWith('countUp', 55 * 60);
+  });
+
+  it('a timer’s length can be typed: tap the clock (or the length), type the minutes, Set', async () => {
+    v2(<TimerControls onClose={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('pill-timer'));
+    fireEvent.press(screen.getByLabelText('30 min. Type the length'));
+    const input = screen.getByTestId('timer-minutes-input');
+    expect(input.props.keyboardType).toBe('number-pad');
+    // Empty, the length so far as a hint: typing starts afresh.
+    expect(input.props.value).toBe('');
+    expect(input.props.placeholder).toBe('30');
+    expect(screen.getByTestId('timer-caption').props.children).toBe('Type the minutes');
+    fireEvent.changeText(input, '4a5');
+    expect(screen.getByTestId('timer-minutes-input').props.value).toBe('45');
+    fireEvent.press(screen.getByTestId('timer-minutes-set'));
+    expect(screen.queryByTestId('timer-minutes-input')).toBeNull();
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('45 min');
+    expect(screen.getByTestId('timer-clock').props.children).toBe('45:00');
+    // The steppers still work from there.
+    fireEvent.press(screen.getByLabelText('Longer'));
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('50 min');
+  });
+
+  it('out of range (0, over 480): it says so and keeps the field; leaving it puts back the last length', async () => {
+    v2(<TimerControls onClose={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('pill-timer'));
+    fireEvent.press(screen.getByTestId('timer-minutes-tap'));
+    fireEvent.changeText(screen.getByTestId('timer-minutes-input'), '0');
+    fireEvent.press(screen.getByTestId('timer-minutes-set'));
+    expect(screen.getByTestId('timer-caption').props.children).toBe('1 to 480 minutes');
+    expect(screen.getByTestId('timer-minutes-input')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('timer-minutes-input'), '600'.slice(0, 3));
+    fireEvent.press(screen.getByTestId('timer-minutes-set'));
+    expect(screen.getByTestId('timer-caption').props.children).toBe('1 to 480 minutes');
+    fireEvent(screen.getByTestId('timer-minutes-input'), 'blur');
+    expect(screen.queryByTestId('timer-minutes-input')).toBeNull();
+    expect(screen.getByTestId('timer-minutes').props.children).toBe('30 min');
+    // Nothing typed: Set says so; leaving keeps the length.
+    fireEvent.press(screen.getByTestId('timer-minutes-tap'));
+    fireEvent.press(screen.getByTestId('timer-minutes-set'));
+    expect(screen.getByTestId('timer-caption').props.children).toBe('1 to 480 minutes');
+  });
+
+  it('Start while typing starts with what was typed', async () => {
+    v2(<TimerControls onClose={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('pill-timer'));
+    fireEvent.press(screen.getByTestId('timer-clock-tap'));
+    fireEvent.changeText(screen.getByTestId('timer-minutes-input'), '12');
+    fireEvent.press(screen.getByLabelText('Start timer'));
+    expect(mockActions.start).toHaveBeenCalledWith('countDown', 12 * 60);
+  });
+
+  it('typed minutes: whole numbers from 1 to 480', () => {
+    expect(parseMinutes('1')).toBe(1);
+    expect(parseMinutes(' 90 ')).toBe(90);
+    expect(parseMinutes('480')).toBe(480);
+    expect(parseMinutes('0')).toBeNull();
+    expect(parseMinutes('481')).toBeNull();
+    expect(parseMinutes('')).toBeNull();
+    expect(parseMinutes('1.5')).toBeNull();
   });
 
   it('lengths: 5 minutes at a time to an hour, then 15, then 30; 5 min to 8 h', () => {
