@@ -1,6 +1,6 @@
 import React, { createRef } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { MushafPager, MushafPagerHandle } from '../MushafPager';
 import { ayahRects } from '../../lib/ayahBounds';
 import { fitPage } from '../../lib/pageFit';
@@ -297,5 +297,53 @@ describe('<MushafPager /> end card', () => {
   it('without an end card the pages are the list', () => {
     render(<MushafPager pages={PAGES} />);
     expect(screen.UNSAFE_getByType(FlatList).props.data).toEqual(PAGES);
+  });
+});
+
+describe('<MushafPager /> page overlay and taps on verses', () => {
+  const { View } = require('react-native');
+  it('draws the overlay over each page, with the page’s scale', () => {
+    const scales: number[] = [];
+    render(
+      <MushafPager
+        pages={PAGES}
+        pageOverlay={(page, scale) => {
+          scales.push(scale);
+          return <View testID={`overlay-${page}`} />;
+        }}
+      />,
+    );
+    expect(screen.getByTestId('overlay-1')).toBeTruthy();
+    expect(scales[0]).toBeGreaterThan(0);
+  });
+
+  it('a tap on a verse goes to onTapVerse first; taken, the controls don’t toggle', () => {
+    let scale = 0;
+    const onTap = jest.fn();
+    const onTapVerse = jest.fn(() => true);
+    render(
+      <MushafPager
+        pages={[1]}
+        onTap={onTap}
+        onTapVerse={onTapVerse}
+        pageOverlay={(_p, s) => {
+          scale = s;
+          return null;
+        }}
+      />,
+    );
+    // The middle of 1:1 on page 1, in the image's frame.
+    const [x0, y0, x1, y1] = [336, 163, 691, 226];
+    fireEvent.press(screen.getByTestId('page-image'), {
+      nativeEvent: { locationX: ((x0 + x1) / 2) * scale, locationY: ((y0 + y1) / 2) * scale },
+    });
+    expect(onTapVerse).toHaveBeenCalledWith({ page: 1, sura: 1, ayah: 1 });
+    expect(onTap).not.toHaveBeenCalled();
+    // Not taken: the controls toggle as before.
+    onTapVerse.mockReturnValueOnce(false);
+    fireEvent.press(screen.getByTestId('page-image'), {
+      nativeEvent: { locationX: ((x0 + x1) / 2) * scale, locationY: ((y0 + y1) / 2) * scale },
+    });
+    expect(onTap).toHaveBeenCalledTimes(1);
   });
 });

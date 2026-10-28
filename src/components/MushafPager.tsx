@@ -68,6 +68,11 @@ interface MushafPagerProps {
   /** One more "page" after the last: swiping onto it is how the last page is
    *  left (a revision session finishes there). */
   endCard?: React.ReactNode;
+  /** Drawn over each page image, in its frame (bounds × `scale`), e.g. the
+   *  hidden recite mode's covers. */
+  pageOverlay?: (pageNumber: number, scale: number) => React.ReactNode;
+  /** A tap on a verse: return true to take it (the controls don't toggle). */
+  onTapVerse?: (ayah: AyahRef) => boolean;
   /** The end card came on screen. `bySwipe`: the user swiped there from the
    *  last page (a deliberate page turn, as for any page), not a jump. */
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
@@ -97,6 +102,9 @@ interface PageItemProps {
   bg: string;
   /** The page as drawn: fits the pager, so controls never cover it. */
   size: PageSize;
+  /** Over the image (pageOverlay). */
+  overlay?: React.ReactNode;
+  onTapVerse?: (ayah: AyahRef) => boolean;
 }
 
 const PageItem = React.memo(function PageItem({
@@ -110,6 +118,8 @@ const PageItem = React.memo(function PageItem({
   tintColor,
   bg,
   size,
+  overlay,
+  onTapVerse,
 }: PageItemProps) {
   const BOUNDS_SCALE = size.scale;
   // A cached page renders from disk on the first frame. Otherwise it is
@@ -152,6 +162,16 @@ const PageItem = React.memo(function PageItem({
     onLongPressAyah(ayah, { x: pageX, y: pageY }, verse);
   };
 
+  // A tap on the image: the verse under it first, if a screen wants taps on verses.
+  const handlePress = (e: GestureResponderEvent) => {
+    if (onTapVerse) {
+      const { locationX, locationY } = e.nativeEvent;
+      const ayah = ayahAt(pageNumber, locationX / BOUNDS_SCALE, locationY / BOUNDS_SCALE);
+      if (ayah && onTapVerse(ayah)) return;
+    }
+    onTap?.();
+  };
+
   const highlightRects = useMemo(
     () => (highlight ? ayahRects(pageNumber, highlight.sura, highlight.ayah) : []),
     [highlight, pageNumber],
@@ -187,7 +207,7 @@ const PageItem = React.memo(function PageItem({
         // coordinates.
         <Pressable
           style={{ width: size.width, height: size.height }}
-          onPress={onTap}
+          onPress={handlePress}
           onLongPress={onLongPressAyah ? handleLongPress : undefined}
           delayLongPress={350}
           accessible={false}
@@ -232,6 +252,7 @@ const PageItem = React.memo(function PageItem({
               }
             }}
           />
+          {overlay}
         </Pressable>
       ) : null}
     </Pressable>
@@ -257,6 +278,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     extraData,
     endCard,
     onReachEnd,
+    pageOverlay,
+    onTapVerse,
   },
   ref,
 ) {
@@ -386,9 +409,11 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           tintColor={palette.textPrimary}
           bg={palette.pageBg}
           size={pageSize}
+          overlay={pageOverlay ? pageOverlay(item, pageSize.scale) : null}
+          onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard],
+    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard, pageOverlay, onTapVerse],
   );
 
   return (
