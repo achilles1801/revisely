@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -20,7 +20,7 @@ let mockAppUser: { accent?: string; previewTester?: boolean } | null = null;
 jest.mock('../../context/AppContext', () => ({ useApp: () => ({ user: mockAppUser }) }));
 
 import { DesignProvider, useDesign } from '../DesignContext';
-import { makeHaptics } from '../haptics';
+import { makeHaptics, useHaptics } from '../haptics';
 import { ThemeProvider, isExistingInstall, resolveThemeMode, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
 import { TodayPost, juzLabel, memorizedText, percentOfQuran, todayText } from '../../components/home/feed/TodayPost';
@@ -42,9 +42,8 @@ function Probe() {
   const d = useDesign();
   return (
     <>
-      <Text testID="state">{`${d.accent}|${d.hapticsOn}`}</Text>
+      <Text testID="state">{d.accent}</Text>
       <Text onPress={() => d.setAccent('crimson')}>crimson</Text>
-      <Text onPress={() => d.setHapticsOn(false)}>haptics off</Text>
     </>
   );
 }
@@ -58,10 +57,11 @@ describe('DesignContext', () => {
       </DesignProvider>,
     );
     await act(async () => {});
-    expect(screen.getByTestId('state').props.children).toBe('indigo|true');
+    expect(screen.getByTestId('state').props.children).toBe('indigo');
   });
 
-  it('keeps the accent and the Haptics setting on the device', async () => {
+  it('keeps the accent on the device; the old Haptics switch’s value is cleared', async () => {
+    await AsyncStorage.setItem('@revisely_haptics', 'off');
     render(
       <DesignProvider>
         <Probe />
@@ -69,10 +69,9 @@ describe('DesignContext', () => {
     );
     await act(async () => {});
     fireEvent.press(screen.getByText('crimson'));
-    fireEvent.press(screen.getByText('haptics off'));
-    expect(screen.getByTestId('state').props.children).toBe('crimson|false');
+    expect(screen.getByTestId('state').props.children).toBe('crimson');
     expect(await AsyncStorage.getItem('@revisely_accent')).toBe('crimson');
-    expect(await AsyncStorage.getItem('@revisely_haptics')).toBe('off');
+    expect(await AsyncStorage.getItem('@revisely_haptics')).toBeNull();
     screen.unmount();
     render(
       <DesignProvider>
@@ -80,12 +79,12 @@ describe('DesignContext', () => {
       </DesignProvider>,
     );
     await act(async () => {});
-    expect(screen.getByTestId('state').props.children).toBe('crimson|false');
+    expect(screen.getByTestId('state').props.children).toBe('crimson');
   });
 
-  it('without a provider: the new design, Indigo, haptics on', () => {
+  it('without a provider: the new design, Indigo', () => {
     render(<Probe />);
-    expect(screen.getByTestId('state').props.children).toBe('indigo|true');
+    expect(screen.getByTestId('state').props.children).toBe('indigo');
   });
 });
 
@@ -102,11 +101,12 @@ describe('haptics', () => {
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
   });
 
-  it('meaningful haptics follow the Haptics setting', () => {
-    makeHaptics(false).success();
-    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
-    makeHaptics(true).success();
+  it('meaningful moments always buzz: there is no setting for them', () => {
+    const { result } = renderHook(() => useHaptics());
+    result.current.success();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
+    makeHaptics(false).success();
+    expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
   });
 });
 

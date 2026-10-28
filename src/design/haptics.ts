@@ -1,6 +1,7 @@
-// Haptics for meaningful moments only (Apple HIG: don't overuse; make them
-// optional). Taps don't buzz (PressableScale, v2/Tap); these mark outcomes,
-// and Settings → Haptics turns them off.
+// Haptics for meaningful moments only (Apple HIG: don't overuse). Taps don't
+// buzz (PressableScale, v2/Tap); these mark outcomes. There is no setting for
+// them (removed Oct 28 2026, to keep Settings short); iOS's own System Haptics
+// switch still silences them.
 //
 //   page marked done, picker or rating change  → selection
 //   session or day complete                     → success
@@ -8,9 +9,7 @@
 //   recording starts / stops                    → medium impact
 //   a verse copied                              → light impact
 
-import { useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
-import { useDesign } from './DesignContext';
 
 export interface HapticsApi {
   selection: () => void;
@@ -33,7 +32,8 @@ export function makeHaptics(on: boolean): HapticsApi {
   };
 }
 
+const HAPTICS = makeHaptics(true);
+
 export function useHaptics(): HapticsApi {
-  const { hapticsOn } = useDesign();
-  return useMemo(() => makeHaptics(hapticsOn), [hapticsOn]);
+  return HAPTICS;
 }

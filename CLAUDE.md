@@ -637,7 +637,8 @@ classic default), and a fresh install starts in light.
     card rises above the keyboard. "Open the Quran" is a small link where it applies.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
     what a control does (e.g. Keep daily amount).
-- **Accents** (Settings → Appearance → Accent): **Indigo (the default)**, Crimson and Jade. The
+- **Accents** (Settings → Appearance → Accent, a row like Theme: label on the left, the three pills
+  on the right, swatches only on narrow screens or large text): **Indigo (the default)**, Crimson and Jade. The
   choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it follows the
   account. `DesignGate` applies it once the user loads, and Indigo applies when it's unset; the
   device keeps a copy for the first frame. Crimson and Indigo put the accent on the primary action,
@@ -649,7 +650,8 @@ classic default), and a fresh install starts in light.
   that is advice (a long cycle) is ink, not red. Every combination is checked in
   `src/design/__tests__` (text 4.5:1, including ink and grey on `accentSubtle`; fills 3:1).
 - Taps don't buzz (`PressableScale` shrinks, `v2/Tap` dims); outcomes use `design/haptics`
-  (`useHaptics()`), which Settings → Haptics turns off.
+  (`useHaptics()`). There is no Haptics setting (removed Oct 28 2026 to keep Settings short; the
+  old stored value is cleared): they are only on outcomes, and iOS's System Haptics silences them.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. In a line that mixes them, put the Latin first
   and the Arabic last in a first-strong isolate (`⁨…⁩`): a line that starts with Arabic
   is laid out right to left (Insights' juz rows did).

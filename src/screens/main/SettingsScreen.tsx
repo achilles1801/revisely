@@ -716,32 +716,21 @@ export default function SettingsScreen() {
               }
             />
           </View>
-          {/* Kept with the account (DesignGate brings it to other devices). */}
-          <View style={v2.accentRow} testID="accent-row">
-            <View style={v2.accentHead}>
-              <SettingIcon name="color-filter-outline" />
+          {/* Like Theme: the label on the left, the choices on the right.
+              Kept with the account (DesignGate brings it to other devices). */}
+          <View style={v2.iconRow} testID="accent-row">
+            <SettingIcon name="color-filter-outline" />
+            <View style={styles.rowText}>
               <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
             </View>
-            <View style={v2.accentChips}>
-              <AccentPicker
-                value={design.accent}
-                onChange={(accent) => {
-                  design.setAccent(accent);
-                  updateUser({ accent });
-                }}
-              />
-            </View>
+            <AccentPicker
+              value={design.accent}
+              onChange={(accent) => {
+                design.setAccent(accent);
+                updateUser({ accent });
+              }}
+            />
           </View>
-        </Section>
-
-        <Section title="Haptics" footer="Only for moments that matter: a page done, a session finished.">
-          <Row
-            icon="phone-portrait-outline"
-            label="Haptics"
-            rightSlot={
-              <SettingSwitch value={design.hapticsOn} onValueChange={design.setHapticsOn} accessibilityLabel="Haptics" />
-            }
-          />
         </Section>
 
         <Section title="Support">
@@ -1054,10 +1043,6 @@ const v2 = StyleSheet.create({
     paddingVertical: layoutV2.rowPad,
   },
   pills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  accentRow: { paddingHorizontal: layoutV2.gutter, paddingTop: 4, paddingBottom: 12 },
-  accentHead: { flexDirection: 'row', alignItems: 'center', minHeight: 32, gap: 8 },
-  // Under the label: the icon (24), its 8pt and the row's 8pt.
-  accentChips: { marginLeft: 40, marginTop: 8 },
   // A row built around SettingIcon, which brings 8pt after its glyph: 8 more
   // makes the 16 of the other rows.
   iconRow: {

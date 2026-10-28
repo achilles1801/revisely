@@ -165,7 +165,7 @@ describe('<JourneySelectScreen /> in the new design', () => {
     fireEvent.press(screen.getByTestId('journey-complete'));
     expect(screen.getByTestId('journey-complete').props.accessibilityState).toMatchObject({ checked: true });
     expect(screen.getByTestId('journey-in_progress').props.accessibilityState).toMatchObject({ checked: false });
-    // A choice is an outcome: a selection tick (Settings → Haptics allows it).
+    // A choice is an outcome: a selection tick.
     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
 
     fireEvent.press(screen.getByTestId('journey-continue'));
@@ -297,9 +297,9 @@ describe('<ScheduleScreen /> in the new design', () => {
     expect(screen.getByTestId('schedule-amount').props.children).toBe(20);
   });
 
-  it('haptics follow Settings → Haptics in the new design', async () => {
+  it('the schedule’s outcomes buzz (there is no Haptics setting to turn them off)', async () => {
     render(
-      <DesignProvider initial={{ hapticsOn: false }}>
+      <DesignProvider initial={{}}>
         <ThemeProvider>
           <ScheduleScreen />
         </ThemeProvider>
@@ -310,8 +310,6 @@ describe('<ScheduleScreen /> in the new design', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('schedule-start'));
     });
-    expect(Haptics.selectionAsync).not.toHaveBeenCalled();
-    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
     expect(mockApp.completeOnboarding).toHaveBeenCalled();
   });
 });
