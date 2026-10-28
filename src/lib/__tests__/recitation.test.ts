@@ -32,6 +32,19 @@ jest.mock('react-native', () => ({
 }));
 
 jest.mock('../logger', () => ({ logger: { warn: jest.fn(), error: jest.fn(), log: jest.fn() } }));
+// The lock screen's previous and next (a local native module).
+const mockRemote: Array<(e: { command: 'next' | 'previous' }) => void> = [];
+const mockSetEnabled = jest.fn();
+jest.mock('../../../modules/now-playing-commands', () => ({
+  __esModule: true,
+  default: {
+    addListener: (_: string, l: (e: { command: 'next' | 'previous' }) => void) => {
+      mockRemote.push(l);
+      return { remove() {} };
+    },
+    setEnabled: (on: boolean) => mockSetEnabled(on),
+  },
+}));
 
 import {
   LOAD_TIMEOUT_MS,
@@ -46,6 +59,8 @@ import {
 beforeEach(() => {
   mockPlayers.length = 0;
   mockAppState.length = 0;
+  mockRemote.length = 0;
+  mockSetEnabled.mockClear();
   jest.useFakeTimers();
 });
 afterEach(() => jest.useRealTimers());
@@ -115,6 +130,43 @@ describe('recitation', () => {
     expect(p.setActiveForLockScreen).toHaveBeenCalledTimes(1);
     r.stop();
     expect(p.setActiveForLockScreen).toHaveBeenLastCalledWith(false);
+  });
+
+  it('lock screen previous and next: shown while it plays, a verse back or on within its range, hidden on stop', () => {
+    const r = new Recitation();
+    const range = { from: { sura: 2, ayah: 5 }, to: { sura: 2, ayah: 7 } };
+    const advance = (v: { sura: number; ayah: number }) =>
+      v.ayah < 7 ? { sura: 2, ayah: v.ayah + 1 } : null;
+    r.play({ sura: 2, ayah: 5 }, advance, 'reader', range);
+    expect(mockSetEnabled).toHaveBeenLastCalledWith(true);
+    const press = (command: 'next' | 'previous') => mockRemote.forEach((l) => l({ command }));
+    mockPlayers[0].emit({ playing: true });
+    press('next');
+    expect(r.getState()).toMatchObject({ status: 'loading', verse: { sura: 2, ayah: 6 } });
+    press('next');
+    expect(r.getState().verse).toEqual({ sura: 2, ayah: 7 });
+    // Past the end of the range: nothing.
+    press('next');
+    expect(r.getState().verse).toEqual({ sura: 2, ayah: 7 });
+    press('previous');
+    press('previous');
+    expect(r.getState().verse).toEqual({ sura: 2, ayah: 5 });
+    // Before its start: nothing.
+    press('previous');
+    expect(r.getState().verse).toEqual({ sura: 2, ayah: 5 });
+    r.stop();
+    expect(mockSetEnabled).toHaveBeenLastCalledWith(false);
+    // Stopped: the buttons do nothing.
+    press('next');
+    expect(r.getState()).toEqual({ status: 'idle', verse: null });
+  });
+
+  it('without a range (the juz): previous is the verse before', () => {
+    const r = new Recitation();
+    r.play({ sura: 2, ayah: 10 });
+    mockPlayers[0].emit({ playing: true });
+    mockRemote.forEach((l) => l({ command: 'previous' }));
+    expect(r.getState().verse).toEqual({ sura: 2, ayah: 9 });
   });
 
   it('keeps the range it was started with; a screen showing it takes it over without a restart', () => {
