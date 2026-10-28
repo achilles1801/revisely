@@ -405,7 +405,8 @@ export default function DashboardScreen() {
         }
         testID="home-v2"
       >
-        <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
+        {/* No line under the header: one across the glow ended it in a hard
+            edge, at rest and while pulling (it read as a box). */}
         <TodayPost
           name={userName}
           initial={avatarInitial(userName, firebaseUser?.email)}

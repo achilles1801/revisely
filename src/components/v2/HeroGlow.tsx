@@ -6,8 +6,11 @@ import { HERO_SHAPE } from '../../theme/v2';
 
 /**
  * A soft glow of the accent at the top of a screen, fading into the ground
- * (the RedotPay header): behind Home's top bar. In light it's a band that has
- * faded before the first grey text; in dark it reaches further (HERO_SHAPE).
+ * (the RedotPay header): a full-bleed layer behind Home's top bar and content,
+ * from under the status bar to well past the header, easing out with no edge
+ * (HERO_SHAPE, the accent's `hero` stops). Nothing above it may be opaque or
+ * draw a line across it (Home's scroll view, its refresh control and its
+ * first row are transparent).
  * Nothing where an accent's `hero` is null (Jade in dark). Draws behind the
  * content and takes no touches.
  */
