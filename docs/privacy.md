@@ -8,7 +8,7 @@ permalink: /privacy/
 **Effective date: 2026-05-11**
 **Last updated: 2026-10-27**
 
-This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
+This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
 Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `support@revisely.app`.
 
@@ -37,6 +37,11 @@ Revisely is a mobile application that helps users track and review their Quran m
 - When you sign in with **Apple** or **Google**, we receive the profile information you authorize them to share (typically name and email).
 - We do not buy data from data brokers, scrape it from public sources, or import contacts from your device.
 
+### Donations
+If you donate on revisely.app, you pay on a checkout page run by **Stripe**, which processes your card or other payment details; Revisely never receives your full card number. From Stripe we receive your **full name**, **email address**, the **amount** you gave and the **payment's status** (for example, whether it succeeded or was refunded), along with the limited payment details Stripe shows the businesses it serves, such as the card brand, the last four digits of the card or bank account, and the country. We use this information only to send your receipt, to thank you, and to keep our financial records. If you pay with a service offered on Stripe's checkout page, such as Apple Pay, Link, Cash App Pay or Amazon Pay, that service also processes the payment, under its own privacy policy. How Stripe handles your information is described in the [Stripe Privacy Policy](https://stripe.com/privacy).
+
+Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely is not a charity, so donations are not tax-deductible.
+
 ## 3. How we use information
 
 We use the information described above to:
@@ -44,6 +49,7 @@ We use the information described above to:
 - Operate the app — store your account, sync your revision data across devices, generate your daily revision schedule.
 - Send you the revision reminders you've enabled.
 - Respond to support requests you send us.
+- Process donations — send your receipt, thank you, and keep financial records.
 - Detect and fix bugs and crashes.
 - Prevent abuse — verify that requests come from a genuine install of the app.
 - Comply with legal obligations.
@@ -57,9 +63,9 @@ We do **not**:
 
 If you are in the European Economic Area, the United Kingdom, or Switzerland, we process your information on the following bases:
 
-- **Performance of a contract** — to create and operate your account, sync your data, and provide the core memorization-tracking service.
+- **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, and process a donation you make.
 - **Consent** — for push notifications, location (when you enable the fajr-aligned day boundary), and Apple/Google sign-in (you consent through the system permission prompts).
-- **Legitimate interests** — to detect crashes, prevent abuse, and improve the app. We balance this against your right to privacy and have minimized what we collect.
+- **Legitimate interests** — to detect crashes, prevent abuse, improve the app, and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
 ## 5. Third-party services we use
@@ -76,6 +82,7 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
 | **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
 | **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
+| **Stripe, Inc.** | Payment processing for donations on revisely.app | United States |
 
 When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
 
@@ -85,7 +92,7 @@ We do not transfer your data to any party not listed above for any other purpose
 
 ## 6. International data transfers
 
-Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, and Expo maintain comparable safeguards.
+Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, Expo, and Stripe maintain comparable safeguards.
 
 ## 7. Data retention
 
@@ -95,6 +102,7 @@ Our processors are located in the United States. If you are in the European Econ
 - **Push notification tokens** — kept until you uninstall the app or revoke notification permission.
 - **Crash logs** — kept for 90 days.
 - **Support email correspondence** — kept for 2 years.
+- **Donation records** — kept for 7 years after the donation, as financial records. Stripe keeps its own records, as its privacy policy describes.
 - **Aggregated, de-identified usage statistics** may be retained indefinitely; these cannot be linked back to you.
 
 If you delete your account, we will delete or de-identify your personal information within 30 days, except where we are required to retain it to comply with legal obligations, resolve disputes, or enforce our agreements.
@@ -137,7 +145,7 @@ No method of transmission over the Internet or electronic storage is 100% secure
 
 ## 11. Cookies and tracking technologies
 
-Revisely is a mobile app and does not use browser cookies. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
+Revisely is a mobile app and does not use browser cookies, and our website doesn't set any either. If you donate, Stripe's checkout page uses Stripe's own cookies, as its privacy policy describes. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
 
 ## 12. Do-Not-Track signals
 
