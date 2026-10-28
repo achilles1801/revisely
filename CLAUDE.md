@@ -418,8 +418,11 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
     Signing out stops it. The range (From–To) lives in the engine (`getRange`).
   - Lock screen and Control Center: Now Playing (verse, reciter, "Revisely", the app icon via
     `lib/nowPlayingArtwork`) with play/pause and the scrubber, through expo-audio's
-    `setActiveForLockScreen`. expo-audio 1.1 has no next/previous-track commands; adding them would
-    be a small native patch to its `MediaController`, so a build.
+    `setActiveForLockScreen`. Previous and next come from a local module,
+    `modules/now-playing-commands` (expo-audio 1.1 has no track commands): it enables
+    `MPRemoteCommandCenter`'s previous/next track while the recitation is on the lock screen and sends
+    `onRemoteCommand`; the engine's `skip` steps a verse back or on within the range (or the juz). It is
+    null on binaries without it, so the JS is safe on older builds.
   - iOS pauses it for a call, Siri or unplugged headphones and resumes it after an interruption;
     the engine follows the player (`onStatus`: paused and playing from outside). The pause after a
     verse plays a looped second of silence (`assets/audio/silence.m4a`): with nothing playing, iOS
