@@ -8,9 +8,9 @@ permalink: /privacy/
 **Effective date: 2026-05-11**
 **Last updated: 2026-10-28**
 
-This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application.
+This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
-Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `privacy@revisely.app`.
+Revisely is operated by `Majd Khawaldeh`, a sole developer. You can reach us at `support@revisely.app`.
 
 ## 1. What this app does
 
@@ -37,6 +37,11 @@ Revisely is a mobile application that helps users track and review their Quran m
 - When you sign in with **Apple** or **Google**, we receive the profile information you authorize them to share (typically name and email).
 - We do not buy data from data brokers, scrape it from public sources, or import contacts from your device.
 
+### Donations
+If you donate on revisely.app, you pay on a checkout page run by **Stripe**, which processes your card or other payment details; Revisely never receives your full card number. From Stripe we receive your **full name**, **email address**, the **amount** you gave and the **payment's status** (for example, whether it succeeded or was refunded), along with the limited payment details Stripe shows the businesses it serves, such as the card brand, the last four digits of the card or bank account, and the country. We use this information only to send your receipt, to thank you, and to keep our financial records. If you pay with a service offered on Stripe's checkout page, such as Apple Pay, Link, Cash App Pay or Amazon Pay, that service also processes the payment, under its own privacy policy. How Stripe handles your information is described in the [Stripe Privacy Policy](https://stripe.com/privacy).
+
+Donation records are not linked to a Revisely account, and deleting your account doesn't delete them (see Data retention). Revisely is not a charity, so donations are not tax-deductible.
+
 ## 3. How we use information
 
 We use the information described above to:
@@ -44,6 +49,7 @@ We use the information described above to:
 - Operate the app — store your account, sync your revision data across devices, generate your daily revision schedule.
 - Send you the revision reminders you've enabled.
 - Respond to support requests you send us.
+- Process donations — send your receipt, thank you, and keep financial records.
 - Detect and fix bugs and crashes.
 - Prevent abuse — verify that requests come from a genuine install of the app.
 - Comply with legal obligations.
@@ -57,9 +63,9 @@ We do **not**:
 
 If you are in the European Economic Area, the United Kingdom, or Switzerland, we process your information on the following bases:
 
-- **Performance of a contract** — to create and operate your account, sync your data, and provide the core memorization-tracking service.
+- **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, and process a donation you make.
 - **Consent** — for push notifications, location (when you enable the fajr-aligned day boundary), and Apple/Google sign-in (you consent through the system permission prompts).
-- **Legitimate interests** — to detect crashes, prevent abuse, and improve the app. We balance this against your right to privacy and have minimized what we collect.
+- **Legitimate interests** — to detect crashes, prevent abuse, improve the app, and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
 ## 5. Third-party services we use
@@ -76,16 +82,17 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
 | **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
 | **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
+| **Stripe, Inc.** | Payment processing for donations on revisely.app | United States |
 
 When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
 
-If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only the verse number, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. Our server may keep a verse's text for up to an hour so it isn't requested again; The Clear Quran® text is not stored on your device.
+If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse, with the verses around it, from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only verse numbers, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. So that text isn't requested again, our server keeps The Clear Quran® text it has fetched for up to 60 days, and the app keeps the text of verses you have read on your device for up to 60 days, in its private cache folder (not backed up or shared; deleting the app removes it). This is the translation's text only, nothing about you.
 
 We do not transfer your data to any party not listed above for any other purpose.
 
 ## 6. International data transfers
 
-Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, and Expo maintain comparable safeguards.
+Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, Expo, and Stripe maintain comparable safeguards.
 
 ## 7. Data retention
 
@@ -95,6 +102,7 @@ Our processors are located in the United States. If you are in the European Econ
 - **Push notification tokens** — kept until you uninstall the app or revoke notification permission.
 - **Crash logs** — kept for 90 days.
 - **Support email correspondence** — kept for 2 years.
+- **Donation records** — kept for 7 years after the donation, as financial records. Stripe keeps its own records, as its privacy policy describes.
 - **Aggregated, de-identified usage statistics** may be retained indefinitely; these cannot be linked back to you.
 
 If you delete your account, we will delete or de-identify your personal information within 30 days, except where we are required to retain it to comply with legal obligations, resolve disputes, or enforce our agreements.
@@ -105,7 +113,7 @@ Depending on where you live, you have some or all of the following rights:
 
 - **Access** the personal information we hold about you.
 - **Correct** information that's inaccurate or incomplete.
-- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `privacy@revisely.app`.
+- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `support@revisely.app`.
 - **Export** your data in a portable format.
 - **Withdraw consent** for processing based on consent (e.g., push notifications, location).
 - **Object** to processing based on legitimate interests.
@@ -114,14 +122,14 @@ Depending on where you live, you have some or all of the following rights:
 We will respond to verifiable requests within 30 days. We do not discriminate against users who exercise their rights.
 
 ### California, Virginia, Colorado, Connecticut, Utah, Texas, and other US state residents
-You have additional rights under your state's privacy law, including the right to know what categories of personal information we collect, to opt out of any "sale" or "sharing" (we do neither), and to limit the use of sensitive personal information. To exercise these rights, contact `privacy@revisely.app`.
+You have additional rights under your state's privacy law, including the right to know what categories of personal information we collect, to opt out of any "sale" or "sharing" (we do neither), and to limit the use of sensitive personal information. To exercise these rights, contact `support@revisely.app`.
 
 ### Quebec residents (Law 25)
-You have the right to access, correct, and request deletion of your personal information. You may also withdraw consent for any consent-based processing. Contact `privacy@revisely.app`.
+You have the right to access, correct, and request deletion of your personal information. You may also withdraw consent for any consent-based processing. Contact `support@revisely.app`.
 
 ## 9. Children
 
-Revisely is not directed to children. It is intended for users 13 and older, or older where the age of digital consent in your country is higher (16 in some EU countries). We do not knowingly collect personal information from children under 13. If we learn that we have, we will delete that information and the associated account promptly. If you believe a child has provided us with personal data, please contact us at `privacy@revisely.app`.
+Revisely is not directed to children. It is intended for users 13 and older, or older where the age of digital consent in your country is higher (16 in some EU countries). We do not knowingly collect personal information from children under 13. If we learn that we have, we will delete that information and the associated account promptly. If you believe a child has provided us with personal data, please contact us at `support@revisely.app`.
 
 ## 10. Security
 
@@ -137,7 +145,7 @@ No method of transmission over the Internet or electronic storage is 100% secure
 
 ## 11. Cookies and tracking technologies
 
-Revisely is a mobile app and does not use browser cookies. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
+Revisely is a mobile app and does not use browser cookies, and our website doesn't set any either. If you donate, Stripe's checkout page uses Stripe's own cookies, as its privacy policy describes. Our backend services (Firebase) use device identifiers, installation IDs, and similar technologies to manage your session, deliver push notifications, and detect abuse. We do not use any advertising or behavioral-tracking technologies.
 
 ## 12. Do-Not-Track signals
 
@@ -151,6 +159,6 @@ We may update this Privacy Policy from time to time. The updated version will be
 
 For privacy questions, data requests, or to report a concern, contact:
 
-- **Email:** `privacy@revisely.app`
+- **Email:** `support@revisely.app`
 
 If you are in the EU or UK and we have not designated a local representative, you may contact us directly at the email above. We will respond to your request within 30 days.

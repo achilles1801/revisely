@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-10-03**
+**Last updated: 2026-10-27**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
@@ -22,7 +22,7 @@ When you create an account, you are responsible for:
 - Keeping your password confidential.
 - All activity that occurs under your account.
 
-You may not share your account with other people. You must notify us immediately at `privacy@revisely.app` if you suspect unauthorized access.
+You may not share your account with other people. You must notify us immediately at `support@revisely.app` if you suspect unauthorized access.
 
 We may suspend or terminate accounts that violate these Terms, are used to abuse the service, or are inactive for extended periods. We will give reasonable notice where practical.
 
@@ -106,4 +106,4 @@ If you are a consumer in the European Union, you may also bring proceedings in t
 
 For questions about these Terms, contact:
 
-- **Email:** `privacy@revisely.app`
+- **Email:** `support@revisely.app`
