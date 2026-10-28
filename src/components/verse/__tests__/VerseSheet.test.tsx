@@ -4,6 +4,20 @@ import { StyleSheet } from 'react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 
 jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
+// Shared values that last across renders, as on a device (the stock mock makes a
+// new one every render, and the sheet re-renders as its verse loads).
+jest.mock('react-native-reanimated', () => {
+  const mock = require('react-native-reanimated/mock');
+  const { useRef } = require('react');
+  return {
+    ...mock,
+    useSharedValue: (init: unknown) => {
+      const ref = useRef(null);
+      if (!ref.current) ref.current = mock.useSharedValue(init);
+      return ref.current;
+    },
+  };
+});
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 // 2:282, the longest verse: far taller than any sheet.
@@ -31,8 +45,11 @@ jest.mock('../../../lib/translation', () => {
 });
 
 import { Dimensions } from 'react-native';
+import { State } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
-import { grabberSwipe, overscrollAction, sheetMaxHeight, VerseSheet, visibleLoadState } from '../VerseSheet';
+import { sheetMaxHeight, VerseSheet, verseSheetRelease, visibleLoadState } from '../VerseSheet';
+import { DISMISS_DISTANCE, DISMISS_VELOCITY } from '../../v2/Sheet';
 
 // The safe-area mock has no insets (react-native-safe-area-context/jest/mock).
 const TOP = 0;
@@ -136,40 +153,99 @@ describe('the sheet', () => {
     expect(p.onClose).toHaveBeenCalled();
   });
 
-  it('pulling the verse down past its top shrinks an expanded sheet, then closes it', async () => {
+  /** A drag the way Gesture Handler reports it: the header's or the verse's. */
+  async function drag(id: 'verse-sheet-drag' | 'verse-sheet-body-drag', translationY: number, velocityY = 0) {
+    act(() => {
+      fireGestureHandler(getByGestureTestId(id), [
+        { state: State.BEGAN, translationY: 0 },
+        { state: State.ACTIVE, translationY: Math.sign(translationY) * 12 },
+        { state: State.ACTIVE, translationY },
+        { state: State.END, translationY, velocityY },
+      ]);
+    });
+    // runOnJS hands the result back to the JS thread a moment later.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+  const open = async () => {
     const p = props({ page: 48, sura: 2, ayah: 282 });
     render(wrap(<VerseSheet {...p} />));
     await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
-    const pull = (y: number) =>
-      fireEvent(screen.getByTestId('verse-scroll'), 'scrollEndDrag', { nativeEvent: { contentOffset: { x: 0, y } } });
-    fireEvent.press(screen.getByLabelText('Expand the translation'));
-    pull(-30); // a small bounce: nothing
+    return p;
+  };
+
+  it('dragging the grabber or the header down past the threshold closes it, as every sheet', async () => {
+    const p = await open();
+    await drag('verse-sheet-drag', DISMISS_DISTANCE + 40);
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('a short drag springs back; a short fling down closes it', async () => {
+    const p = await open();
+    await drag('verse-sheet-drag', 50, 200);
+    expect(p.onClose).not.toHaveBeenCalled();
+    await drag('verse-sheet-drag', 40, DISMISS_VELOCITY + 400);
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('dragging up expands it; expanded, a drag down brings it back to normal height, a long one closes it', async () => {
+    const p = await open();
+    await drag('verse-sheet-drag', -80);
     expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.expanded });
-    pull(-120);
+    await drag('verse-sheet-drag', DISMISS_DISTANCE + 20);
     expect(style('verse-sheet')).toMatchObject({ maxHeight: HEIGHT.normal });
     expect(p.onClose).not.toHaveBeenCalled();
-    pull(-120);
-    expect(p.onClose).toHaveBeenCalled();
+    await drag('verse-sheet-drag', -80);
+    await drag('verse-sheet-drag', 2000);
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('the verse drags the sheet down only from its top: scrolled into it, the drag scrolls it back first', async () => {
+    const p = await open();
+    const verse = screen.getByTestId('verse-scroll');
+    fireEvent.scroll(verse, { nativeEvent: { contentOffset: { x: 0, y: 300 } } });
+    await drag('verse-sheet-body-drag', DISMISS_DISTANCE + 60);
+    expect(p.onClose).not.toHaveBeenCalled();
+    fireEvent.scroll(verse, { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
+    await drag('verse-sheet-body-drag', DISMISS_DISTANCE + 60);
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+    // The verse doesn't bounce at its top: the drag moves the sheet instead.
+    expect(verse.props.bounces).toBe(false);
+  });
+
+  it('VoiceOver: the grabber has a Close action, and the escape gesture closes it', async () => {
+    const p = await open();
+    const handle = screen.getByTestId('verse-sheet-handle');
+    expect(handle.props.accessibilityActions).toEqual(expect.arrayContaining([{ name: 'close', label: 'Close' }]));
+    fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'close' } });
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+    fireEvent(screen.getByTestId('verse-sheet'), 'accessibilityEscape');
+    expect(p.onClose).toHaveBeenCalledTimes(2);
   });
 
   it('is at most 70% of the screen, or everything below the status bar expanded', () => {
     expect(sheetMaxHeight(667, 20, false)).toBe(467);
     expect(sheetMaxHeight(667, 20, true)).toBe(639);
     expect(sheetMaxHeight(956, 62, true)).toBe(886);
-    expect(overscrollAction(-10, false)).toBeNull();
-    expect(overscrollAction(-100, true)).toBe('shrink');
-    expect(overscrollAction(-100, false)).toBe('close');
   });
 });
 
-describe('grabberSwipe', () => {
-  it('up expands, down shrinks an expanded sheet or closes a normal one; small moves do nothing', () => {
-    expect(grabberSwipe(-60, false)).toBe('expand');
-    expect(grabberSwipe(-60, true)).toBeNull();
-    expect(grabberSwipe(60, true)).toBe('shrink');
-    expect(grabberSwipe(60, false)).toBe('close');
-    expect(grabberSwipe(10, false)).toBeNull();
-    expect(grabberSwipe(-10, true)).toBeNull();
+describe('verseSheetRelease', () => {
+  it('normal height: closes like every sheet (past 120pt or 30% of it, or flung); up expands', () => {
+    expect(verseSheetRelease(130, 0, 600, false)).toBe('close');
+    expect(verseSheetRelease(100, 0, 600, false)).toBe('back');
+    expect(verseSheetRelease(30, DISMISS_VELOCITY + 100, 600, false)).toBe('close');
+    expect(verseSheetRelease(-60, 0, 600, false)).toBe('expand');
+    expect(verseSheetRelease(10, 0, 600, false)).toBe('back');
+  });
+
+  it('expanded: a drag past the threshold shrinks it, half the sheet (or a quarter flung) closes it', () => {
+    expect(verseSheetRelease(130, 0, 800, true)).toBe('shrink');
+    expect(verseSheetRelease(420, 0, 800, true)).toBe('close');
+    expect(verseSheetRelease(220, DISMISS_VELOCITY + 100, 800, true)).toBe('close');
+    expect(verseSheetRelease(60, 0, 800, true)).toBe('back');
+    expect(verseSheetRelease(-60, 0, 800, true)).toBe('back');
   });
 });
 

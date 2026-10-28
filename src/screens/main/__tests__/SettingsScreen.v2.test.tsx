@@ -60,14 +60,11 @@ jest.mock('../../../lib/recordingBackupUi', () => ({
   useBackupStatus: () => ({}),
 }));
 jest.mock('../../../lib/sentry', () => ({ reportProblem: jest.fn() }));
-let mockTester = true;
-jest.mock('../../../lib/tester', () => ({ isTester: () => mockTester }));
 
 import SettingsScreen from '../SettingsScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
-import { setHomePrefs } from '../../../lib/homePrefs';
 
 const palette = paletteV2(false, DEFAULT_ACCENT);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,35 +146,12 @@ describe('Settings in the new design: its sheets and rows', () => {
   });
 });
 
-describe('Settings: Progress style (testers only, while the user compares them)', () => {
-  afterEach(() => {
-    mockTester = true;
-    act(() => setHomePrefs({ progressStyle: 'ring', showProgressCard: true }));
-  });
-
-  it('a tester sees Ring, Hairline and Juz dots under the progress card; a choice is kept on this phone', async () => {
-    await renderV2();
-    expect(screen.getByTestId('progress-style-row')).toBeTruthy();
-    expect(screen.getByText('Ring')).toBeTruthy();
-    expect(screen.getByText('Hairline')).toBeTruthy();
-    expect(screen.getByText('Juz dots')).toBeTruthy();
-    const setItem = jest.spyOn(AsyncStorage, 'setItem');
-    fireEvent.press(screen.getByTestId('pill-dots'));
-    await act(async () => {});
-    const saved = setItem.mock.calls.filter(([key]) => key === '@revisely_home_prefs').pop();
-    expect(saved && JSON.parse(saved[1] as string).progressStyle).toBe('dots');
-  });
-
-  it('nobody else sees it (the App Store, App Review)', async () => {
-    mockTester = false;
+describe('Settings: no Progress style any more (the juz dots won)', () => {
+  it('the row is gone, the progress card’s own rows stay', async () => {
     await renderV2();
     expect(screen.queryByTestId('progress-style-row')).toBeNull();
+    expect(screen.queryByText('Progress style')).toBeNull();
     expect(screen.queryByText('Juz dots')).toBeNull();
-  });
-
-  it('gone while the progress card is off', async () => {
-    act(() => setHomePrefs({ showProgressCard: false }));
-    await renderV2();
-    expect(screen.queryByTestId('progress-style-row')).toBeNull();
+    expect(screen.getByText('Progress card')).toBeTruthy();
   });
 });

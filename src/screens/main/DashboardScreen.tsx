@@ -417,7 +417,6 @@ export default function DashboardScreen() {
           memorized={memorized}
           memorizedFraction={progress?.fraction}
           memorizedJuz={progress?.juz}
-          progressStyle={homePrefs.progressStyle}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization')}
