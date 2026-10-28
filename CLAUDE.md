@@ -306,9 +306,11 @@ iPhone 17 Pro Max simulator: the dev client, with Metro started with `--no-dev -
 overlays; use another port if 8081 is taken) and `xcrun simctl status_bar booted override --time
 9:41 --batteryState discharging --batteryLevel 100 ...` (discharging: no charging bolt). Reopen the
 app from the home screen to clear the back-link in the status bar.
-- The 1.0.2 set (Oct 27 2026), light, Indigo, 1320×2868 (the 6.9" set; no iPad, `supportsTablet`
-  is false): Home, the reader holding Al-Hamd with Saheeh International (not The Clear Quran, whose
-  licence covers the app), a revision session, the Activity month, a day with recordings, Insights.
+- The 1.0.2 set (retaken Oct 28 2026 on develop c350b1e: Juz dots, the new glow, the Qibla icon),
+  light, Indigo, 1320×2868 RGB (the 6.9" set; no iPad, `supportsTablet` is false): Home, the reader
+  holding Al-Hamd with Saheeh International (not The Clear Quran, whose licence covers the app), a
+  revision session, the Activity month, a day with recordings (the revision one paused at 2:01 by
+  tapping its waveform 42% in), Insights.
   `store/screenshots/dark/` holds the same in dark; `asc.js screenshots` uploads only the top-level
   PNGs, so move a dark one up to use it.
 - The recordings are demo audio (a synthesized tone), placed on the simulator: two `.m4a` files and
