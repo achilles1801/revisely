@@ -22,6 +22,8 @@ const mockPager: {
   onUserSwipe?: () => void;
   onPageChange?: (p: number) => void;
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
+  pageOverlay?: (page: number, scale: number) => React.ReactNode;
+  onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
 } = {};
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable, View } = require('react-native');
@@ -32,10 +34,14 @@ jest.mock('../../../components/MushafPager', () => {
       onPageChange?: (p: number) => void;
       onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
       endCard?: React.ReactNode;
+      pageOverlay?: (page: number, scale: number) => React.ReactNode;
+      onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
     }) => {
       mockPager.onUserSwipe = props.onUserSwipe;
       mockPager.onPageChange = props.onPageChange;
       mockPager.onReachEnd = props.onReachEnd;
+      mockPager.pageOverlay = props.pageOverlay;
+      mockPager.onTapVerse = props.onTapVerse;
       return (
         <View>
           <Pressable accessibilityLabel="The page" onPress={props.onTap} />
@@ -47,6 +53,21 @@ jest.mock('../../../components/MushafPager', () => {
 });
 let mockReduceMotion = false;
 jest.mock('../../../design/motion', () => ({ useReduceMotion: () => mockReduceMotion }));
+// The hidden mode's listening: the test sets what it reports and sees how it's used.
+const mockListener = {
+  active: false,
+  onPause: undefined as undefined | (() => void),
+  status: 'listening' as string,
+  yieldMic: jest.fn(async () => undefined),
+  resume: jest.fn(),
+};
+jest.mock('../../../components/recite/usePauseListener', () => ({
+  usePauseListener: (opts: { active: boolean; onPause: () => void }) => {
+    mockListener.active = opts.active;
+    mockListener.onPause = opts.onPause;
+    return { status: mockListener.status, hearing: false, yieldMic: mockListener.yieldMic, resume: mockListener.resume };
+  },
+}));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => ({
@@ -143,6 +164,10 @@ function setup(revised: number[], dayPages: number[] = DAY_PAGES) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockReduceMotion = false;
+  mockListener.status = 'listening';
+  mockListener.active = false;
+  mockPager.pageOverlay = undefined;
+  mockPager.onTapVerse = undefined;
 });
 
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
@@ -368,5 +393,110 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
     expect(mockApp.updatePages).toHaveBeenLastCalledWith(expect.any(Array), [336, 337, 338, 339]);
     expect(mockNavigation.goBack).toHaveBeenCalled();
+  });
+});
+
+// Hidden pages (the recite mode), for testers: the eye covers the page; a verse
+// shows when tapped, with Next verse, or after a pause in the reciter's voice.
+describe('ActiveRevisionScreen — hidden pages (testers)', () => {
+  const tester = () => {
+    setup([]);
+    mockApp.user = { ...mockApp.user, previewTester: true };
+  };
+  const hide = () => fireEvent.press(screen.getByLabelText('Hide the page'));
+
+  it('not a tester: no eye, and nothing listens', () => {
+    setup([]);
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(screen.queryByLabelText('Hide the page')).toBeNull();
+    expect(mockListener.active).toBe(false);
+    expect(mockPager.pageOverlay).toBeUndefined();
+  });
+
+  it('the eye hides the page: covers over it, the recite panel in the player’s place, listening', () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    hide();
+    expect(mockListener.active).toBe(true);
+    expect(screen.getByTestId('recite-panel')).toBeTruthy();
+    expect(screen.queryByTestId('player-capsule')).toBeNull();
+    // The quiet row (hidden from VoiceOver while the controls are up).
+    expect(screen.getByText('Hidden · 0/10', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByText('Pause after a verse to see it', { includeHiddenElements: true })).toBeTruthy();
+    render(<>{mockPager.pageOverlay?.(331, 0.5)}</>);
+    expect(screen.getAllByTestId('hidden-cover').length).toBeGreaterThan(5);
+  });
+
+  it('a tap on a hidden verse shows it (and doesn’t toggle the controls); on shown text it does', () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    hide();
+    const { versesOnPage } = require('../../../lib/ayahBounds');
+    const [first] = versesOnPage(331);
+    let taken = false;
+    act(() => {
+      taken = mockPager.onTapVerse!(first);
+    });
+    expect(taken).toBe(true);
+    expect(mockPager.onTapVerse!(first)).toBe(false);
+  });
+
+  it('a pause after a verse shows the next one, in order; Next verse too', () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    hide();
+    const { versesOnPage } = require('../../../lib/ayahBounds');
+    const [v1, v2, v3] = versesOnPage(331);
+    act(() => mockListener.onPause?.());
+    // Shown now: a tap on it isn't taken.
+    expect(mockPager.onTapVerse!(v1)).toBe(false);
+    expect(mockPager.onTapVerse!(v3)).toBe(true);
+    fireEvent.press(screen.getByLabelText('Show the next verse'));
+    expect(mockPager.onTapVerse!(v2)).toBe(false);
+  });
+
+  it('Record while hidden: the listener gives the microphone up first', async () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    hide();
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Record your recitation'));
+    });
+    expect(mockListener.yieldMic).toHaveBeenCalled();
+  });
+
+  it('the mic switches listening off and on', () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    hide();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    expect(mockListener.active).toBe(false);
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    expect(mockListener.active).toBe(true);
+    expect(mockListener.resume).toHaveBeenCalled();
+  });
+
+  it('showing the page again: the player is back, nothing listens, and the next hide starts covered', () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    hide();
+    const { versesOnPage } = require('../../../lib/ayahBounds');
+    const [v1] = versesOnPage(331);
+    act(() => {
+      mockPager.onTapVerse!(v1);
+    });
+    fireEvent.press(screen.getByLabelText('Show the page'));
+    expect(mockListener.active).toBe(false);
+    expect(screen.getByTestId('player-capsule')).toBeTruthy();
+    expect(mockPager.pageOverlay).toBeUndefined();
+    hide();
+    expect(mockPager.onTapVerse!(v1)).toBe(true);
   });
 });

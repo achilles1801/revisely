@@ -523,8 +523,21 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     return () => sub.remove();
   }, []);
 
+  /** The microphone's level now (dBFS) while recording, else null: the hidden
+   *  recite mode listens through it instead of opening the microphone again. */
+  const level = useCallback((): number | null => {
+    if (phaseRef.current !== 'recording') return null;
+    try {
+      const db = recorder.getStatus().metering;
+      return typeof db === 'number' && Number.isFinite(db) ? db : null;
+    } catch {
+      return null;
+    }
+  }, [recorder]);
+
   return {
     phase,
+    level,
     recording: phase === 'recording',
     paused: phase === 'paused',
     /** Paused by a call, an alarm, Siri or leaving the app (not by the user). */
