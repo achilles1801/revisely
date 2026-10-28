@@ -601,20 +601,23 @@ classic default), and a fresh install starts in light.
   scroll views and pickers (Audio Options' wheels) keep theirs. For VoiceOver the handle is a
   "Close" button and the escape gesture closes it. The gesture lives in the modal's own
   `GestureHandlerRootView` (iOS needs one inside a native modal); `jest.setup.ts` loads Gesture
-  Handler's jest setup for every test. The verse sheet has its own grabber drag, and gorhom's
-  sheets pan down to close by themselves.
+  Handler's jest setup for every test. Gorhom's sheets pan down to close by themselves.
+- The verse (translation) sheet keeps its own frame (`verse/VerseSheet`: it expands to nearly the
+  whole screen from the grabber) and drags the same way: the grabber and the header follow the
+  finger down, the backdrop fades, and `verseSheetRelease` decides (at normal height `shouldDismiss`;
+  expanded, the same threshold brings it back to normal height and half the sheet, or a quarter
+  flung, closes it; up expands). The verse drags the sheet down too, but only from its top: its
+  ScrollView doesn't bounce, and a pan running alongside its own scroll (`Gesture.Native`) waits
+  until the offset is 0. Before (Oct 28 2026) it acted only on release and closed on an 80pt
+  bounce, so it never followed the finger.
 - The owner's rules from testing (Oct 26 2026):
   - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
-    second card restating it. A thin ring around the post's mark (`v2/ProgressRing`, the accent's
-    `palette.ring`, both ends ≥ 3:1 on the ground) fills with memorized pages / 604: no words,
-    "Memorized 27% of the Quran" for VoiceOver, shown and hidden with the Memorized line (Settings →
-    Progress card). It draws in once Home has settled (350 ms), at once with Reduce Motion.
-    **For now a tester-only choice** (Oct 27 2026, until the user picks; then remove the setting
-    and the losers): Settings → Home screen → Progress style, Ring / Hairline (`v2/ProgressHairline`,
-    a line under the post filling with the ring colours) / Juz dots (`v2/JuzDots`, 30 dots lit by
-    each juz's share, `juzFractions`), kept per phone in `homePrefs.progressStyle`. Testers are
-    `lib/tester`'s `isTester`: development builds, or a TestFlight install with a `previewTester`
-    account (as for the preview channel); never the App Store or App Review. Lists show the **last 3** things (`RecentSection`) with "See all"
+    second card restating it. Under the Memorized line, **juz dots** (`v2/JuzDots`): thirty, one per
+    juz, each lit by that juz's memorized share (`juzFractions`; half a juz, half a dot) in the
+    accent's `palette.ring` colours (both ends ≥ 3:1 on the ground): no words, "Memorized 27% of
+    the Quran" for VoiceOver, shown and hidden with the Memorized line (Settings → Progress card),
+    Reduce Motion respected. The user chose them on Oct 28 2026 over a ring around the mark and a
+    hairline (both removed, with the tester-only setting that compared them). Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,

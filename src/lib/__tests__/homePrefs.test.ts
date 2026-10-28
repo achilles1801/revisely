@@ -8,12 +8,12 @@ describe('homeMetricsSummary', () => {
   });
 });
 
-describe('the progress style (tester-only for now)', () => {
-  it('the ring by default, for new and older installs; a saved style kept; an unknown one back to the ring', () => {
-    expect(parseHomePrefs(null).progressStyle).toBe('ring');
-    expect(parseHomePrefs(JSON.stringify({ showProgressCard: true })).progressStyle).toBe('ring');
-    expect(parseHomePrefs(JSON.stringify({ progressStyle: 'hairline' })).progressStyle).toBe('hairline');
-    expect(parseHomePrefs(JSON.stringify({ progressStyle: 'dots' })).progressStyle).toBe('dots');
-    expect(parseHomePrefs(JSON.stringify({ progressStyle: 'bar' })).progressStyle).toBe('ring');
+describe('the progress style (removed: the juz dots are the only one)', () => {
+  it('a style saved while testers compared them is ignored', () => {
+    for (const progressStyle of ['ring', 'hairline', 'dots', 'bar']) {
+      const prefs = parseHomePrefs(JSON.stringify({ showProgressCard: true, progressStyle }));
+      expect(prefs).not.toHaveProperty('progressStyle');
+      expect(prefs.showProgressCard).toBe(true);
+    }
   });
 });

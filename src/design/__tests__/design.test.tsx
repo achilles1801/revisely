@@ -30,7 +30,6 @@ import { AccentPicker } from '../../components/settings/AccentPicker';
 import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
 import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, mixColors, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
-import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { DOT } from '../../components/v2/JuzDots';
 import type { RevisionLog, UserPage } from '../../types';
 
@@ -487,46 +486,22 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onMemorization).toHaveBeenCalled();
   });
 
-  it('leaves memorized out when Settings turns it off', async () => {
-    post({ memorized: null, memorizedFraction: 0.27 });
+  it('leaves memorized out when Settings turns it off; the dots go with it', async () => {
+    post({ memorized: null, memorizedFraction: 0.27, memorizedJuz: Array(30).fill(0.3) });
     await act(async () => {});
     expect(screen.queryByTestId('today-memorized')).toBeNull();
-    // The ring goes with it.
-    expect(screen.queryByTestId('today-ring')).toBeNull();
+    expect(screen.queryByTestId('today-dots')).toBeNull();
     expect(screen.getByTestId('mark', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('a ring around the mark fills with how much of the Quran is memorized: no words, read by VoiceOver', async () => {
-    post({ memorizedFraction: 166 / 604 });
-    await act(async () => {});
-    const ring = screen.getByTestId('today-ring');
-    expect(ring.props.accessibilityRole).toBe('progressbar');
-    expect(ring.props.accessibilityLabel).toBe('Memorized 27% of the Quran');
-    expect(ring.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 27 });
-    // The mark keeps its size, so the row doesn't move; the ring is drawn just outside it.
-    expect(ring.props.style).toMatchObject({ width: 40, height: 40 });
-    expect(screen.getByTestId('mark', { includeHiddenElements: true })).toBeTruthy();
-    expect(screen.queryByText(/27%/)).toBeNull();
-  });
-
-  it('Hairline: a line under the post fills with the share, no words, read by VoiceOver; no ring', async () => {
-    post({ memorizedFraction: 166 / 604, progressStyle: 'hairline' });
-    await act(async () => {});
-    const line = screen.getByTestId('today-hairline');
-    expect(line.props.accessibilityRole).toBe('progressbar');
-    expect(line.props.accessibilityLabel).toBe('Memorized 27% of the Quran');
-    expect(line.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 27 });
-    expect(screen.queryByTestId('today-ring')).toBeNull();
-    expect(screen.queryByText(/27%/)).toBeNull();
-  });
-
-  it('Juz dots: thirty, each lit by its juz’s share (half a juz, half a dot); no words; no ring', async () => {
+  it('juz dots: thirty, each lit by its juz’s share (half a juz, half a dot); no words, read by VoiceOver', async () => {
     const juz = Array(30).fill(0);
     juz[29] = 1;
     juz[1] = 0.5;
-    post({ memorizedFraction: 30 / 604, memorizedJuz: juz, progressStyle: 'dots' });
+    post({ memorizedFraction: 30 / 604, memorizedJuz: juz });
     await act(async () => {});
     const row = screen.getByTestId('today-dots');
+    expect(row.props.accessibilityRole).toBe('progressbar');
     expect(row.props.accessibilityLabel).toBe('Memorized 5% of the Quran');
     expect(row.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 5 });
     for (let i = 1; i <= 30; i++) expect(screen.getByTestId(`today-dots-${i}`)).toBeTruthy();
@@ -534,57 +509,15 @@ describe('Home in the new design (a feed)', () => {
     expect(width('today-dots-30-lit')).toBe(DOT);
     expect(width('today-dots-2-lit')).toBe(DOT / 2);
     expect(screen.queryByTestId('today-dots-1-lit')).toBeNull();
-    expect(screen.queryByTestId('today-ring')).toBeNull();
+    expect(screen.queryByText(/5%/)).toBeNull();
   });
 
-  it('every style goes with the Memorized line', async () => {
-    for (const progressStyle of ['ring', 'hairline', 'dots'] as const) {
-      post({ memorized: null, memorizedFraction: 0.27, memorizedJuz: Array(30).fill(0.3), progressStyle });
-      await act(async () => {});
-      expect(screen.queryByTestId('today-ring')).toBeNull();
-      expect(screen.queryByTestId('today-hairline')).toBeNull();
-      expect(screen.queryByTestId('today-dots')).toBeNull();
-      screen.unmount();
-    }
-  });
-
-  it('switches at once when Settings changes it (the per-phone preference)', async () => {
-    function Live() {
-      const { progressStyle } = useHomePrefs();
-      return (
-        <TodayPost
-          name="Karim"
-          initial="K"
-          status="partial"
-          pages={[520]}
-          juzBreakdown={[{ juz: 26, pages: [520] }]}
-          done={new Set()}
-          streak={0}
-          memorized="8.1 of 30 juz"
-          memorizedFraction={0.27}
-          memorizedJuz={Array(30).fill(0.27)}
-          progressStyle={progressStyle}
-          onPrimary={jest.fn()}
-          onEditSchedule={jest.fn()}
-          onMemorization={jest.fn()}
-          leftovers={0}
-          onCarryOver={jest.fn()}
-          carrying={false}
-          onPushBack={jest.fn()}
-          canPushBack={false}
-          shifting={false}
-        />
-      );
-    }
-    render(wrap(<Live />));
+  it('the dots are the only style: no ring around the mark, no hairline', async () => {
+    post({ memorizedFraction: 166 / 604, memorizedJuz: Array(30).fill(0.27) });
     await act(async () => {});
-    expect(screen.getByTestId('today-ring')).toBeTruthy();
-    act(() => setHomePrefs({ progressStyle: 'dots' }));
     expect(screen.getByTestId('today-dots')).toBeTruthy();
     expect(screen.queryByTestId('today-ring')).toBeNull();
-    act(() => setHomePrefs({ progressStyle: 'hairline' }));
-    expect(screen.getByTestId('today-hairline')).toBeTruthy();
-    act(() => setHomePrefs({ progressStyle: 'ring' }));
+    expect(screen.queryByTestId('today-hairline')).toBeNull();
   });
 
   it('mixColors steps between two colours', () => {

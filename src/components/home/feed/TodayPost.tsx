@@ -8,10 +8,7 @@ import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
-import { ProgressRing } from '../../v2/ProgressRing';
-import { ProgressHairline } from '../../v2/ProgressHairline';
 import { JuzDots } from '../../v2/JuzDots';
-import type { ProgressStyle } from '../../../lib/homePrefs';
 import { PillButton } from '../../v2/PillButton';
 import { RowText, ThreadRow } from '../../v2/ThreadRow';
 import { Tap } from '../../v2/Tap';
@@ -39,7 +36,7 @@ export function memorizedText(pages: UserPage[], metrics: HomeMetric[]) {
   return {
     body: shown.join(' · '),
     meta: percentOfQuran(fraction),
-    /** Of the 604 pages: the ring around Today's mark (or the hairline). */
+    /** Of the 604 pages (the dots' VoiceOver label). */
     fraction,
     /** Each juz's memorized share, juz 1 first (the juz dots). */
     juz: stats.juzFractions,
@@ -99,7 +96,6 @@ export function TodayPost({
   memorized,
   memorizedFraction,
   memorizedJuz,
-  progressStyle = 'ring',
   onPrimary,
   onEditSchedule,
   onMemorization,
@@ -119,12 +115,10 @@ export function TodayPost({
   streak: number;
   /** "8.1 of 30 juz · 166 of 604 pages" (Settings → Home screen), or null to leave it out. */
   memorized: string | null;
-  /** How much of the Quran is memorized (0–1): a ring around the mark, shown with `memorized`. */
+  /** How much of the Quran is memorized (0–1), for the dots' VoiceOver label. */
   memorizedFraction?: number;
-  /** Each juz's memorized share, juz 1 first: for the juz dots. */
+  /** Each juz's memorized share, juz 1 first: one dot each, shown with `memorized`. */
   memorizedJuz?: number[];
-  /** How the amount shows (a tester-only choice for now; the ring by default). */
-  progressStyle?: ProgressStyle;
   onPrimary: () => void;
   onEditSchedule: () => void;
   onMemorization: () => void;
@@ -141,7 +135,7 @@ export function TodayPost({
   const text = todayText(status, pages, done, juzBreakdown);
   const empty = pages.length === 0;
   const meta = streak > 0 ? `Today · ${streak}-day streak` : 'Today';
-  // How much is memorized, in the chosen style; only with the Memorized line.
+  // How much is memorized, as a dot per juz; only with the Memorized line.
   const progress = memorized != null && memorizedFraction != null ? memorizedFraction : null;
   const progressLabel = progress != null ? `Memorized ${percentOfQuran(progress)}` : '';
 
@@ -164,15 +158,7 @@ export function TodayPost({
   return (
     <View testID="today-thread">
       <ThreadRow
-        mark={
-          progress != null && progressStyle === 'ring' ? (
-            <ProgressRing progress={progress} label={progressLabel} testID="today-ring">
-              <Mark label={initial} />
-            </ProgressRing>
-          ) : (
-            <Mark label={initial} />
-          )
-        }
+        mark={<Mark label={initial} />}
         name={name || 'Today'}
         meta={name ? meta : undefined}
         onMenu={() => setMenuOpen(true)}
@@ -210,10 +196,7 @@ export function TodayPost({
                 </Text>
               </Tap>
             ) : null}
-            {progress != null && progressStyle === 'hairline' ? (
-              <ProgressHairline progress={progress} label={progressLabel} testID="today-hairline" />
-            ) : null}
-            {progress != null && progressStyle === 'dots' ? (
+            {progress != null ? (
               <JuzDots juz={memorizedJuz ?? []} progress={progress} label={progressLabel} testID="today-dots" />
             ) : null}
           </>

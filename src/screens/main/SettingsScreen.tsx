@@ -52,15 +52,12 @@ import {
   ALL_HOME_METRICS,
   HOME_METRIC_LABELS,
   homeMetricsSummary,
-  PROGRESS_STYLE_LABELS,
-  PROGRESS_STYLES,
   setHomePrefs,
   toggleHomeMetric,
   useHomePrefs,
 } from '../../lib/homePrefs';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { supportMailto } from '../../lib/contact';
-import { isTester } from '../../lib/tester';
 import { PillTabs } from '../../components/v2/PillTabs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
@@ -627,23 +624,6 @@ export default function SettingsScreen() {
                 );
               })
             : null}
-          {homePrefs.showProgressCard && isTester(user) ? (
-            // Testers only, while the user compares them; the winner stays.
-            <View style={v2.accentRow} testID="progress-style-row">
-              <View style={v2.accentHead}>
-                <SettingIcon name="ellipse-outline" />
-                <Text style={[typeV2.body, { color: theme.textPrimary }]}>Progress style</Text>
-              </View>
-              <View style={v2.accentChips}>
-                <PillTabs
-                  options={PROGRESS_STYLES.map((s) => ({ value: s, label: PROGRESS_STYLE_LABELS[s] }))}
-                  value={homePrefs.progressStyle}
-                  onChange={(progressStyle) => setHomePrefs({ progressStyle })}
-                  testID="progress-style"
-                />
-              </View>
-            </View>
-          ) : null}
           <Row
             icon="book-outline"
             label="Friday Al-Kahf reminder"
