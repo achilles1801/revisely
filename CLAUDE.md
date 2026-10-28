@@ -588,6 +588,45 @@ To rotate one (or after a leak: revoke the old key in the portal first):
    channel (App Store or TestFlight for live) and look for no `answered 401/403` lines.
 4. Revoke the old key in the portal.
 
+## Widgets (Home Screen, Lock Screen)
+
+`targets/widget/` (SwiftUI, WidgetKit), linked into the generated Xcode project on prebuild by
+`@bacons/apple-targets`, pinned at 4.0.7 (5.x pulls in SDK 55's prebuild-config). Bundle id
+`com.revisionbuddy.app.widget`, deployment target 16.0 (the app stays at 15.1).
+- **Today** (small, medium; Lock Screen rectangular, circular, inline): today's pages, juz and
+  surahs, pages left or done, the streak. Tap: `revisely://today` (the session), or `revisely://home`
+  once done. **Verse of the day** (small, medium): a short verse from `verses.json`, the same for
+  everyone on a date, Arabic (Amiri, bundled in the extension) and the reference only (Saheeh
+  International isn't licensed, #80; The Clear Quran® is API-only). Tap: `revisely://read?page=N`.
+  `scripts/widget-verses.ts` builds the list from api.alquran.cloud, as the verse sheet shows it.
+- **Data:** the App Group `group.com.revisionbuddy.app` (both targets' entitlements).
+  `src/components/WidgetSync.tsx` rebuilds the snapshot (`src/lib/widgets/snapshot.ts`) from what
+  Home shows (sessions, carry-over, plan, accent, the revision day at fajr or midnight, the app coming
+  back) and writes it, one JSON under `widget.snapshot`, only when it changed; then WidgetKit reloads.
+  It holds 7 revision days ahead with their boundaries, so the widget rolls over with the app closed;
+  after the last it asks to open Revisely. Signed out or no plan: "Open Revisely to set up your plan".
+  The streak is "alive": through today, or through yesterday until today ends. Home shows a streak
+  only once today has a session.
+- **Links:** `revisely` is listed in `ios.infoPlist.CFBundleURLTypes`. Setting that key makes Expo
+  ignore `scheme`, so before Oct 28 2026 revisely:// wasn't registered at all.
+- **Look:** the new design's grounds, ink and hairlines, the accent's colours from the snapshot.
+  Tinted and clear Home Screens use the system's hierarchy and `widgetAccentable` (an outlined
+  pill, a cut-out check): a filled accent shape would hide its own label.
+- **Fingerprint:** `targets` is an `extraSources` entry in `fingerprint.config.js`, so a widget
+  change is native (a new build). Prebuild writes only `widget.entitlements` into the folder, from
+  `expo-target.config.js`, and it is committed exactly as written; keep `colors`/`images` out of the
+  target config (they would generate files there) and edit `Assets.xcassets` by hand.
+- **Signing:** EAS signs the extension with its own provisioning profile; the plugin lists it under
+  `extra.eas.build.experimental.ios.appExtensions`. CI builds are non-interactive, so the profiles
+  (and the App Group on both bundle ids) must exist first: once, from a laptop on a branch with the
+  widget, `eas credentials:configure-build -p ios -e production`, signing in with the Apple account
+  when asked. It builds nothing.
+- **Local builds:** Xcode 27 refuses the pods' old deployment targets; a simulator build needs
+  `IPHONEOS_DEPLOYMENT_TARGET=16.0` and `SENTRY_DISABLE_AUTO_UPLOAD=true` on the `xcodebuild` line.
+  Prebuild over an existing `ios/` fails in the plugin (`removeFromProject`): use `--clean`.
+- **Simulator:** a reinstall doesn't make WidgetKit re-read; the app's own write does. An App Group
+  plist edited by hand is seen only after a simulator reboot (cfprefsd keeps a copy).
+
 ## The design
 
 The app has one design, Threads-style (the plan was the doc "Revisely: Threads-style UI Migration",
