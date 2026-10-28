@@ -108,15 +108,13 @@ export function applyCarryOver(
 /**
  * The user after saving a new plan in the editor. The editor showed the shifted
  * schedule, so the shift is now part of the plan; pages carried into today stay
- * today, on top of the new plan's first day. A `skip` without a shift is a day
- * held for a plan that starts tomorrow (lib/planChange) and stays.
+ * today, on top of the new plan's first day.
  */
 export function settleCarryOverForNewPlan(user: User, today: string): User {
   const carry = user.carryOver;
-  const shifted = (user.scheduleShiftPages ?? 0) > 0;
   return {
     ...user,
-    ...(shifted ? { scheduleShiftPages: 0 } : {}),
-    ...(shifted && carry && carry.day === today && carry.skip ? { carryOver: { ...carry, skip: 0 } } : {}),
+    ...(user.scheduleShiftPages ? { scheduleShiftPages: 0 } : {}),
+    ...(carry && carry.day === today && carry.skip ? { carryOver: { ...carry, skip: 0 } } : {}),
   };
 }

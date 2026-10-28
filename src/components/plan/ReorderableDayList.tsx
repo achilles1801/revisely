@@ -84,7 +84,6 @@ export function ReorderableDayList({
   days,
   limit,
   today,
-  startsIn = 0,
   scroll,
   onPressDay,
   onMove,
@@ -94,8 +93,6 @@ export function ReorderableDayList({
   days: number[][];
   limit?: number;
   today: Date;
-  /** Days from today to the first day (1 for a plan that starts tomorrow). */
-  startsIn?: number;
   scroll: ScrollLink;
   onPressDay: (index: number) => void;
   onMove: (from: number, to: number) => void;
@@ -165,8 +162,8 @@ export function ReorderableDayList({
   }, [visible, count]);
 
   // ---- JS side of the gestures (stable, reading the latest props) ----------
-  const latest = useRef({ onPressDay, onMove, onDelete, onDragChange, haptics, today, startsIn });
-  latest.current = { onPressDay, onMove, onDelete, onDragChange, haptics, today, startsIn };
+  const latest = useRef({ onPressDay, onMove, onDelete, onDragChange, haptics, today });
+  latest.current = { onPressDay, onMove, onDelete, onDragChange, haptics, today };
 
   const applyMove = useCallback((from: number, to: number) => {
     if (from === to) return;
@@ -304,7 +301,7 @@ export function ReorderableDayList({
       applyMove(from, to);
       latest.current.haptics.selection();
       AccessibilityInfo.announceForAccessibility(
-        `${summarizeDay(pages).title} moved to ${dayTitle(to, latest.current.today, latest.current.startsIn)}`,
+        `${summarizeDay(pages).title} moved to ${dayTitle(to, latest.current.today)}`,
       );
     },
     [applyMove],
@@ -330,7 +327,6 @@ export function ReorderableDayList({
           key={`slot-${i}`}
           index={i}
           today={today}
-          startsIn={startsIn}
           height={rowHeight}
           last={i === visible - 1}
           positions={positions}
@@ -345,7 +341,6 @@ export function ReorderableDayList({
           count={visible}
           pages={days[i]}
           today={today}
-          startsIn={startsIn}
           height={rowHeight}
           raised={raised === key}
           canDrag={canDrag}
@@ -382,7 +377,6 @@ interface Handlers {
 function Slot({
   index,
   today,
-  startsIn,
   height,
   last,
   positions,
@@ -390,7 +384,6 @@ function Slot({
 }: {
   index: number;
   today: Date;
-  startsIn: number;
   height: number;
   last: boolean;
   positions: SharedValue<Record<string, number>>;
@@ -409,7 +402,7 @@ function Slot({
         style={[styles.target, { backgroundColor: palette.accentSubtle }, target]}
         testID={`day-target-${index}`}
       />
-      <DateBadge index={index} today={today} startsIn={startsIn} />
+      <DateBadge index={index} today={today} />
       {last ? null : (
         <View style={[styles.separator, { backgroundColor: palette.separator }]} testID={`day-separator-${index}`} />
       )}
@@ -423,7 +416,6 @@ function DayItem({
   count,
   pages,
   today,
-  startsIn,
   height,
   raised,
   canDrag,
@@ -438,7 +430,6 @@ function DayItem({
   count: number;
   pages: number[];
   today: Date;
-  startsIn: number;
   height: number;
   raised: boolean;
   canDrag: boolean;
@@ -585,7 +576,7 @@ function DayItem({
   const dimStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value * PRESS_DIM }));
   const actionStyle = useAnimatedStyle(() => ({ width: Math.max(0, -x.value) }));
 
-  const name = `${dayTitle(index, today, startsIn)}: ${summary.title}, ${summary.subtitle}`;
+  const name = `${dayTitle(index, today)}: ${summary.title}, ${summary.subtitle}`;
   const actions = [
     { name: 'activate', label: 'Edit' },
     ...(index > 0 ? [{ name: 'moveUp', label: 'Move up' }] : []),
@@ -667,7 +658,7 @@ function DayItem({
             onPress={deleteNow}
             style={styles.actionButton}
             accessibilityRole="button"
-            accessibilityLabel={`Delete ${dayTitle(index, today, startsIn)}`}
+            accessibilityLabel={`Delete ${dayTitle(index, today)}`}
             testID={`day-delete-${index}`}
           >
             <Text style={[typeV2.button, { color: palette.onRedFill }]} maxFontSizeMultiplier={1.4}>
