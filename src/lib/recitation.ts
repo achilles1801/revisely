@@ -15,9 +15,10 @@
 // to have the first and last verse of all 114 surahs plus a random sample.
 
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
-import { afterVerse, pauseMs } from './playbackPlan';
+import { afterVerse, pauseMs, previousInRange } from './playbackPlan';
+import NowPlayingCommands from '../../modules/now-playing-commands';
 import { claimAudio, onAudioClaimed, setAudioMode } from './audioFocus';
-import { nextVerseInJuz, VerseKey } from './verses';
+import { nextVerseInJuz, previousVerse, VerseKey } from './verses';
 import type { VerseRange } from './playbackPlan';
 import { getSurahDisplay } from './quranData';
 import { lockScreenArtwork } from './nowPlayingArtwork';
@@ -242,6 +243,8 @@ export class Recitation {
   private onLockScreen = false;
 
   constructor() {
+    // Previous and next on the lock screen and in Control Center.
+    NowPlayingCommands?.addListener('onRemoteCommand', ({ command }) => this.skip(command === 'next' ? 1 : -1));
     // A recording starting or playing takes over the audio.
     onAudioClaimed((activity) => {
       if (activity !== 'recitation') this.stop();
@@ -330,6 +333,7 @@ export class Recitation {
       } else {
         player.setActiveForLockScreen(true, metadata, { showSeekForward: false, showSeekBackward: false });
         this.onLockScreen = true;
+        NowPlayingCommands?.setEnabled(true);
       }
     } catch (err) {
       logger.warn('Now Playing not shown', err);
@@ -339,11 +343,28 @@ export class Recitation {
   private hideNowPlaying() {
     if (!this.onLockScreen) return;
     this.onLockScreen = false;
+    NowPlayingCommands?.setEnabled(false);
     try {
       this.player?.setActiveForLockScreen(false);
     } catch (err) {
       logger.warn('Now Playing not cleared', err);
     }
+  }
+
+  /**
+   * A verse back or on, as previous and next on the lock screen do: within the
+   * range it was started with (or the juz), and playing. Nothing past either end.
+   */
+  skip(direction: 1 | -1) {
+    const verse = this.state.verse;
+    if (!verse || this.state.status === 'idle') return;
+    const to =
+      direction > 0
+        ? this.advance(verse)
+        : this.range
+          ? previousInRange(this.range, verse)
+          : previousVerse(verse);
+    if (to) this.start(to, 1);
   }
 
   /** The ayahs being played, if a range was given. */
