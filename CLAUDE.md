@@ -572,6 +572,16 @@ To rotate one (or after a leak: revoke the old key in the portal first):
   everyone on a date, Arabic (Amiri, bundled in the extension) and the reference only (Saheeh
   International isn't licensed, #80; The Clear Quran® is API-only). Tap: `revisely://read?page=N`.
   `scripts/widget-verses.ts` builds the list from api.alquran.cloud, as the verse sheet shows it.
+  **Qibla** (small, Lock Screen circular): a fixed dial, north up, with the Kaaba at the bearing,
+  "Qibla 58° NE" and the distance to Makkah. WidgetKit can't read the compass, so it doesn't turn
+  with the phone. Tap: `revisely://qibla`, which opens Home and calls `requestQiblaSheet()`
+  (`src/lib/widgets/links.ts`). The screen that hosts the Qibla sheet must listen with
+  `onQiblaSheetRequest(open)`; a request from a cold start waits for the listener.
+  `WidgetSync` reads the phone's last known position when the app comes back, only if location is
+  already allowed (it never asks), or else uses the account's Fajr location. Only the bearing,
+  label and distance (`src/lib/widgets/qibla.ts`) go into the snapshot, never the position. A city
+  line appears once `WidgetSync` is given the sheet's city list (`cities`). With no position the
+  widget says "Open Revisely to set your location".
 - **Data:** the App Group `group.com.revisionbuddy.app` (both targets' entitlements).
   `src/components/WidgetSync.tsx` rebuilds the snapshot (`src/lib/widgets/snapshot.ts`) from what
   Home shows (sessions, carry-over, plan, accent, the revision day at fajr or midnight, the app coming
@@ -580,6 +590,9 @@ To rotate one (or after a leak: revoke the old key in the portal first):
   after the last it asks to open Revisely. Signed out or no plan: "Open Revisely to set up your plan".
   The streak is "alive": through today, or through yesterday until today ends. Home shows a streak
   only once today has a session.
+- **Location:** one purpose string for Fajr and the Qibla (expo-location plugin, `app.config.js`).
+  It says Fajr saves the location to the account, as the Fajr setting does. expo-location is
+  ~19.0.8, SDK 54's version; it had drifted to ^55.
 - **Links:** `revisely` is listed in `ios.infoPlist.CFBundleURLTypes`. Setting that key makes Expo
   ignore `scheme`, so before Oct 28 2026 revisely:// wasn't registered at all.
 - **Look:** the new design's grounds, ink and hairlines, the accent's colours from the snapshot.

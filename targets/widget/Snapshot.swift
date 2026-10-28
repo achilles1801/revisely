@@ -46,6 +46,18 @@ struct ColorPair: Codable, Hashable {
   )
 }
 
+/// The Qibla from the phone's last known position (WidgetQibla in qibla.ts): the
+/// bearing and distance only, never the position.
+struct QiblaInfo: Codable, Hashable {
+  /// Degrees from true north.
+  let bearing: Int
+  /// "58° NE".
+  let label: String
+  /// "10,306 km".
+  let distance: String
+  let place: String?
+}
+
 struct Snapshot: Codable {
   let v: Int
   /// "ready", "signedOut" or "noPlan".
@@ -53,6 +65,8 @@ struct Snapshot: Codable {
   let accent: String
   let colors: ColorPair
   let days: [WidgetDay]
+  /// Missing in snapshots written before the Qibla widget.
+  let qibla: QiblaInfo?
 }
 
 enum SnapshotStore {

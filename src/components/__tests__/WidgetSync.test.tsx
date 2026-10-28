@@ -7,6 +7,13 @@ jest.mock('../../lib/widgets/storage', () => ({ writeWidgetSnapshot: (s: any) =>
 const mockBuild = jest.fn((input: any) => ({ built: input }));
 jest.mock('../../lib/widgets/snapshot', () => ({ buildWidgetSnapshot: (i: any) => mockBuild(i) }));
 jest.mock('../../lib/quranData', () => ({ getQuranData: () => [] }));
+let mockPosition: any = null;
+jest.mock('../../lib/widgets/position', () => ({ lastKnownPosition: () => Promise.resolve(mockPosition) }));
+const mockRequestQibla = jest.fn();
+jest.mock('../../lib/widgets/links', () => ({
+  ...jest.requireActual('../../lib/widgets/links'),
+  requestQiblaSheet: () => mockRequestQibla(),
+}));
 let mockDay = '2026-10-27';
 jest.mock('../../hooks/useRevisionDay', () => ({ useRevisionDay: () => ({ day: mockDay, date: new Date() }) }));
 
@@ -35,6 +42,8 @@ beforeEach(() => {
   mockBuild.mockClear();
   mockNavigate.mockClear();
   mockNavReady = true;
+  mockPosition = null;
+  mockRequestQibla.mockClear();
   mockDay = '2026-10-27';
   mockAccent = 'indigo';
   initialUrl = null;
@@ -161,5 +170,26 @@ describe('<WidgetSync />', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("the Qibla from the phone's last known position, else the account's Fajr location", async () => {
+    mockApp = { ...mockApp, user: { id: 'u1', locationCoords: { latitude: 51.5, longitude: -0.12 } } };
+    const view = render(<WidgetSync />);
+    await flush();
+    expect(lastInput().qiblaFrom).toEqual({ latitude: 51.5, longitude: -0.12 });
+    mockPosition = { latitude: 43.65, longitude: -79.38 };
+    act(() => appStateListener?.('active'));
+    await flush();
+    expect(lastInput().qiblaFrom).toEqual({ latitude: 43.65, longitude: -79.38 });
+    view.unmount();
+  });
+
+  it('the Qibla link: Home, and asks for the Qibla sheet', async () => {
+    render(<WidgetSync />);
+    await flush();
+    act(() => urlListener?.({ url: 'revisely://qibla' }));
+    await flush();
+    expect(mockNavigate).toHaveBeenLastCalledWith('Home', { screen: 'Dashboard' });
+    expect(mockRequestQibla).toHaveBeenCalledTimes(1);
   });
 });

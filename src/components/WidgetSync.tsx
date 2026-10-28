@@ -7,7 +7,9 @@ import { useRevisionDay } from '../hooks/useRevisionDay';
 import { getQuranData } from '../lib/quranData';
 import { buildWidgetSnapshot } from '../lib/widgets/snapshot';
 import { writeWidgetSnapshot } from '../lib/widgets/storage';
-import { parseWidgetLink, type WidgetLink } from '../lib/widgets/links';
+import { lastKnownPosition } from '../lib/widgets/position';
+import type { Coords } from '../lib/widgets/qibla';
+import { parseWidgetLink, requestQiblaSheet, type WidgetLink } from '../lib/widgets/links';
 import { navigationRef } from '../navigation/navigationRef';
 
 /**
@@ -17,7 +19,9 @@ import { navigationRef } from '../navigation/navigationRef';
  * The snapshot is rebuilt from what Home shows (the user, pages and sessions):
  * a session saved or edited, a carry-over, a plan edit, the accent, the revision
  * day rolling over at fajr or midnight, the app coming back. It is written only
- * when it changed (lib/widgets/storage).
+ * when it changed (lib/widgets/storage). The Qibla widget's bearing comes from the
+ * phone's last known position, read when the app comes back, or else from the
+ * account's Fajr location.
  */
 export function WidgetSync() {
   const { user, pages, logs, loading, onboardingComplete } = useApp();
@@ -38,6 +42,18 @@ export function WidgetSync() {
   const signedIn = !!firebaseUser;
   const ownUser = firebaseUser && user?.id === firebaseUser.uid ? user : null;
 
+  const [position, setPosition] = useState<Coords | null>(null);
+  useEffect(() => {
+    let live = true;
+    lastKnownPosition().then((p) => {
+      if (live) setPosition(p);
+    });
+    return () => {
+      live = false;
+    };
+  }, [foreground]);
+  const qiblaFrom = position ?? ownUser?.locationCoords ?? null;
+
   useEffect(() => {
     if (authLoading || (signedIn && (loading || !ownUser))) return;
     writeWidgetSnapshot(
@@ -50,9 +66,10 @@ export function WidgetSync() {
         quranData: getQuranData(),
         accent,
         now: new Date(),
+        qiblaFrom,
       }),
     );
-  }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, accent, day, foreground]);
+  }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, accent, day, foreground, qiblaFrom]);
 
   useWidgetLinks(signedIn && !loading && !!ownUser && onboardingComplete);
   return null;
@@ -104,6 +121,9 @@ export function openWidgetLink(link: WidgetLink) {
     navigationRef.navigate('Home', { screen: 'ActiveRevision', initial: false });
   } else if (link.kind === 'home') {
     navigationRef.navigate('Home', { screen: 'Dashboard' });
+  } else if (link.kind === 'qibla') {
+    navigationRef.navigate('Home', { screen: 'Dashboard' });
+    requestQiblaSheet();
   } else {
     navigationRef.navigate('Read', { screen: 'QuranReader', params: { pageNumber: link.page }, initial: false });
   }
