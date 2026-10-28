@@ -205,7 +205,7 @@ async function main() {
   await db.doc(`users/${uid}`).set({
     uid,
     // A demo name, not a person: it heads Home's Today post in the store shots.
-    displayName: 'Karim',
+    displayName: 'Asiyah',
     accent: 'indigo',
     // Store shots show recordings placed on the simulator by hand (CLAUDE.md,
     // Screenshots); with backup off they stay there and nothing uploads.
