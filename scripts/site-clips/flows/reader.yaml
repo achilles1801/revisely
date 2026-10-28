@@ -1,0 +1,24 @@
+appId: com.revisionbuddy.app
+---
+- pause: 1500
+- longPressOn:
+    point: "220,330"
+- pause: 1400
+- tapOn:
+    point: "179,440"
+- pause: 3000
+- tapOn:
+    point: "345,615"
+- pause: 2600
+- tapOn:
+    point: "40,615"
+- pause: 1200
+- tapOn:
+    point: "220,520"
+- pause: 900
+- tapOn:
+    point: "42,882"
+- pause: 3500
+- tapOn:
+    point: "42,882"
+- pause: 1000
