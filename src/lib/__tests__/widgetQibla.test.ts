@@ -43,11 +43,17 @@ describe('widgetQibla', () => {
 
   it('the nearest listed city within 150 km, else none', () => {
     const cities = [
-      { name: 'Toronto', latitude: 43.6532, longitude: -79.3832 },
-      { name: 'Montreal', latitude: 45.5017, longitude: -73.5673 },
+      { name: 'Toronto', country: 'Canada', latitude: 43.6532, longitude: -79.3832 },
+      { name: 'Montreal', country: 'Canada', latitude: 45.5017, longitude: -73.5673 },
     ];
     expect(widgetQibla({ latitude: 43.7, longitude: -79.4 }, cities)!.place).toBe('Toronto');
     expect(widgetQibla(NEW_YORK, cities)!.place).toBeNull();
+  });
+
+  it('with the bundled cities, as the widget gets them', () => {
+    const { bundledCities } = require('../qibla');
+    expect(widgetQibla(TORONTO, bundledCities())!.place).toBe('Toronto');
+    expect(widgetQibla(LONDON, bundledCities())!.place).toBe('London');
   });
 
   it('no position, or a nonsense one: no Qibla', () => {
