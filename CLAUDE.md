@@ -431,6 +431,31 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
   wheel is one adjustable element for VoiceOver): tap by point. Maestro takes whole-number
   percentages only; `"26.5%"` throws an exception that a grep for `FAILED` misses.
 
+**Qibla** (Oct 28 2026; mocks and notes in `~/Documents/revisely-qibla-mocks/`): a compass icon in
+Home's top bar (left of Activity and Settings; `TopBar`'s `sideWidth` 120 keeps the salam centred)
+opens `qibla/QiblaSheet`, a `v2/Sheet` (drag to close, Done).
+- `lib/qibla.ts` is the pure part: the initial great-circle bearing to the Kaaba (21.4225°N,
+  39.8262°E) from **true** north, haversine distance, where it is relative to the phone
+  (−180…180, right positive), facing it at ±3° and no longer past ±5°, and the nearest city from
+  `src/data/cities.json` (~465 major cities, coordinates rounded to 0.01°) within 150 km. No reverse
+  geocoding: nothing leaves the phone.
+- `qibla/useQibla`: permission when it opens (in-app explanation → `requestForegroundPermissionsAsync`;
+  refused and not askable → Open Settings), the last known position then a fresh one, and
+  `watchHeadingAsync` only while the sheet is open and the app in front. It uses `trueHeading`; −1
+  (no true heading yet) or no compass shows the bearing as text ("119° from north"), never a
+  magnetic guess. Readings are smoothed on the circle. Accuracy ≤ 1 for a second asks for a figure 8;
+  "Facing the Qibla" (and one light haptic) needs accuracy ≥ 2. Positions and headings are never
+  stored, sent or logged.
+- `qibla/QiblaDial` draws the mocks: the dial turns on the UI thread (the shorter way), the letters
+  and the Kaaba stay upright, the Kaaba and its tick in `done`/`doneText`, a glow when facing it.
+  `qiblaView` picks the state; `QiblaContent` renders one, which is how to show a state on the
+  simulator (it has no compass).
+- **Native follow-up (the release session's build):** the iOS location purpose string still names
+  only fajr; it should name the Qibla too (Info.plist, so a build), and `expo-location` (^55, SDK 55's
+  line) should be aligned with SDK 54. The compass itself is JS on the existing binaries.
+- Privacy: the policy's Location item says the compass works on the device only. No App Privacy
+  change (nothing is collected).
+
 **Recording backup** (`src/lib/recordingBackup.ts`, `recordingCloud.ts`, `recordingBackupController.ts`):
 recordings upload to Storage `recordings/<uid>/<id>-<n>.m4a`, with a record per recording in Firestore
 `users/<uid>/recordings/<id>`. It's on unless `recordingBackup === false`, Wi-Fi only unless

@@ -44,6 +44,7 @@ import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
+import { QiblaSheet } from '../../components/qibla/QiblaSheet';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
@@ -88,6 +89,7 @@ export default function DashboardScreen() {
   const scrollRef = useRef<ScrollView>(null);
   useScrollToTop(scrollRef);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
+  const [qiblaOpen, setQiblaOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
@@ -390,10 +392,13 @@ export default function DashboardScreen() {
         }
         right={
           <>
+            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => setQiblaOpen(true)} testID="open-qibla" />
             <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} />
             <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} />
           </>
         }
+        // Three icons on the right: both sides widen so the salam stays centred.
+        sideWidth={120}
       />
       <ScrollView
         ref={scrollRef}
@@ -459,6 +464,7 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
+      <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
     </SafeAreaView>
   );
 }
