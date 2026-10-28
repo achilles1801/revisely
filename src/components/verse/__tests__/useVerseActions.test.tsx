@@ -5,6 +5,7 @@ import { useVerseActions } from '../useVerseActions';
 import { AudioOptionsSheet } from '../AudioOptionsSheet';
 import { updateAudioOptions } from '../../../lib/audioOptions';
 import { DEFAULT_PLAYBACK } from '../../../lib/playbackPlan';
+import { isPresented, resetPresenters } from '../../../lib/nowPlaying';
 import { VerseMenu } from '../VerseMenu';
 import { UndoToast } from '../../revision/UndoToast';
 
@@ -15,11 +16,6 @@ const mockCopy = jest.fn();
 jest.mock('../../../lib/clipboard', () => ({ copyText: (t: string) => mockCopy(t) }));
 const mockShareText = jest.fn();
 jest.mock('../../../lib/verseShare', () => ({ verseShareText: (...a: unknown[]) => mockShareText(...a) }));
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('../VerseSheet', () => ({ VerseSheet: () => null }));
 jest.mock('../VerseMenu', () => ({ VerseMenu: () => null }));
@@ -33,11 +29,20 @@ const mockRecitation = {
   getState: () => ({ status: 'idle', verse: null }),
   subscribe: () => () => {},
   stop: jest.fn(),
-  play: jest.fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  play: jest.fn((_v: any, _a: any, _o?: any, range: any = null) => {
+    mockRecitation.range = range;
+  }),
   pause: jest.fn(),
   resume: jest.fn(),
   setVoice: jest.fn(),
   setOptions: jest.fn(),
+  // Like the engine: it keeps the range it was started with.
+  range: null as unknown,
+  getRange() {
+    return this.range;
+  },
+  adopt: jest.fn(),
 };
 jest.mock('../../../lib/recitation', () => ({
   ...jest.requireActual('../../../lib/recitation'),
@@ -46,8 +51,70 @@ jest.mock('../../../lib/recitation', () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRecitation.range = null;
   mockCapturing = false;
   mockImpact.mockResolvedValue(undefined);
+});
+
+describe('useVerseActions: the recitation outside the screen', () => {
+  // The recitation as other screens see it: a state and its listeners.
+  let listener: (s: unknown) => void = () => {};
+  let state: Record<string, unknown> = { status: 'idle', verse: null };
+  const realGetState = mockRecitation.getState;
+  const realSubscribe = mockRecitation.subscribe;
+  beforeEach(() => {
+    resetPresenters();
+    state = { status: 'idle', verse: null };
+    mockRecitation.getState = (() => state) as typeof mockRecitation.getState;
+    mockRecitation.subscribe = ((l: (s: unknown) => void) => {
+      listener = l;
+      return () => {};
+    }) as typeof mockRecitation.subscribe;
+  });
+  afterEach(() => {
+    mockRecitation.getState = realGetState;
+    mockRecitation.subscribe = realSubscribe;
+  });
+  const emit = (next: Record<string, unknown>) => {
+    state = next;
+    act(() => listener(next));
+  };
+
+  it('leaving the screen leaves it playing', () => {
+    const { unmount } = renderHook(() => useVerseActions({ pages: [3], currentPage: 3 }));
+    act(() => unmount());
+    expect(mockRecitation.stop).not.toHaveBeenCalled();
+  });
+
+  it('the screen in front whose pages hold the verse takes it over, and shows it (the mini player steps aside)', () => {
+    const { rerender, unmount } = renderHook(
+      ({ focused }: { focused: boolean }) => useVerseActions({ pages: [3, 4], currentPage: 3, focused }),
+      { initialProps: { focused: false } },
+    );
+    // Started on another screen (or one since closed).
+    emit({ status: 'playing', verse: { sura: 2, ayah: 13 }, owner: 'elsewhere' });
+    expect(mockRecitation.adopt).not.toHaveBeenCalled();
+    expect(isPresented()).toBe(false);
+    rerender({ focused: true });
+    expect(mockRecitation.adopt).toHaveBeenCalledTimes(1);
+    const me = mockRecitation.adopt.mock.calls[0][0];
+    emit({ status: 'playing', verse: { sura: 2, ayah: 13 }, owner: me });
+    expect(isPresented()).toBe(true);
+    // Another tab: still playing, now the mini player's.
+    rerender({ focused: false });
+    expect(isPresented()).toBe(false);
+    rerender({ focused: true });
+    expect(isPresented()).toBe(true);
+    act(() => unmount());
+    expect(isPresented()).toBe(false);
+  });
+
+  it('a verse outside the screen’s pages is left to whoever has it', () => {
+    renderHook(() => useVerseActions({ pages: [3], currentPage: 3, focused: true }));
+    emit({ status: 'playing', verse: { sura: 3, ayah: 5 }, owner: 'elsewhere' });
+    expect(mockRecitation.adopt).not.toHaveBeenCalled();
+    expect(isPresented()).toBe(false);
+  });
 });
 
 describe('useVerseActions: Copy and Share', () => {

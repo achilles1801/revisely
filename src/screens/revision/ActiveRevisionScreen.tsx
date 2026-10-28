@@ -150,6 +150,7 @@ export default function ActiveRevisionScreen() {
     pages: sessionPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
+    focused: isScreenFocused,
   });
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (beside the page, never over it); another

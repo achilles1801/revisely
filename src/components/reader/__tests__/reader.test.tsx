@@ -19,11 +19,6 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's' },
 }));
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 const mockInsets = { top: 59, bottom: 34, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => {
   const actual = require('react-native-safe-area-context/jest/mock').default;

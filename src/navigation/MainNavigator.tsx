@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
@@ -18,7 +18,11 @@ import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
-import { TabBar } from './TabBar';
+import { TabBar, useTabBarHeight } from './TabBar';
+import type { PagerTabBarProps } from './PagerTabs';
+import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
+import { getRecitation } from '../lib/recitation';
+import { openReaderAt } from './openReader';
 import { createPagerTabNavigator } from './PagerTabs';
 import { swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
@@ -114,6 +118,20 @@ function ReadStackNavigator() {
   );
 }
 
+/**
+ * The mini player above the tab bar, while a recitation goes on somewhere the
+ * user isn't looking; › opens the reader at the verse.
+ */
+function MiniPlayerAboveTabs({ navigation }: { navigation: PagerTabBarProps['navigation'] }) {
+  const bottom = useTabBarHeight() + MINI_PLAYER_GAP;
+  return (
+    <MiniPlayer
+      bottom={bottom}
+      onOpen={(verse) => openReaderAt(navigation, verse)}
+    />
+  );
+}
+
 export function MainNavigator() {
   const { user } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
@@ -124,6 +142,8 @@ export function MainNavigator() {
 
   const [previewOpen, setPreviewOpen] = useState(false);
   useAppUsageTracking();
+  // Signing out leaves the app's screens: the recitation stops with them.
+  useEffect(() => () => getRecitation().stop(), []);
 
   return (
     <ReadingTimerProvider>
@@ -132,16 +152,20 @@ export function MainNavigator() {
           tabBar={(props) => {
             // Hide the tab bar on full-screen "deep" screens: they own the
             // bottom edge (Done buttons, save bars) and would otherwise
-            // collide with the bar.
+            // collide with the bar. The mini player goes with it (the reader
+            // and the session show the recitation in their own player bar).
             const tabRoute = props.state.routes[props.state.index];
             const focused = getFocusedRouteNameFromRoute(tabRoute);
             if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
             return (
-              <TabBar
-                {...props}
-                showInsightsTab={showInsightsTab}
-                onInsightsTabPress={glowInsightsTab ? () => setPreviewOpen(true) : undefined}
-              />
+              <>
+                <MiniPlayerAboveTabs navigation={props.navigation} />
+                <TabBar
+                  {...props}
+                  showInsightsTab={showInsightsTab}
+                  onInsightsTabPress={glowInsightsTab ? () => setPreviewOpen(true) : undefined}
+                />
+              </>
             );
           }}
           swipeableCount={swipeableTabCount(smartTrackingEnabled)}

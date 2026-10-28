@@ -8,6 +8,7 @@ import { nextVerse, nextVerseInJuz, pageOfVerse, previousVerse, toAyahRef, Verse
 import { logger } from '../../lib/logger';
 import { isRecordingActive } from '../../lib/recordings';
 import { prefetchVerseText } from '../../lib/translation';
+import { setPresenting } from '../../lib/nowPlaying';
 import { VerseMenu } from './VerseMenu';
 import type { Box } from './menuPlacement';
 import { VerseSheet } from './VerseSheet';
@@ -44,6 +45,9 @@ interface Options {
   /** The page on screen; recitation only turns the page when its verse has no
    *  lines here. */
   currentPage?: number;
+  /** The screen is the one in front (useIsFocused). A focused screen whose
+   *  pages hold the verse playing takes the recitation over. */
+  focused?: boolean;
 }
 
 /**
@@ -53,7 +57,7 @@ interface Options {
  * by the Quran tab and revision sessions. Returns the props for MushafPager and
  * the overlay to render on top of it.
  */
-export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
+export function useVerseActions({ pages, onShowPage, currentPage, focused = true }: Options) {
   const { user, saveUser } = useApp();
   // A held verse is an outcome (it's selected): Medium; the Haptics setting
   // can turn it off.
@@ -84,15 +88,25 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   useEffect(() => {
     recitation.setOptions({ speed: audio.speed, repeat: audio.repeat, pauseFactor: audio.pauseFactor });
   }, [recitation, audio.speed, audio.repeat, audio.pauseFactor]);
-  // The ayahs this screen's recitation plays: From to To.
-  const rangeRef = useRef<VerseRange | null>(null);
   const rangeFrom = useCallback(
     (from: VerseKey): VerseRange => ({ from, to: rangeEnd(from, audio.playUpTo, lastCustomTo) }),
     [audio.playUpTo],
   );
-  // Leaving the screen stops the recitation it started.
-  useEffect(() => () => recitation.stop(owner), [recitation, owner]);
   const mine = playback.owner === owner;
+
+  // Leaving the screen leaves the recitation going: elsewhere the mini player
+  // shows it, and in the background the lock screen. The screen in front whose
+  // pages hold the verse playing takes it over (its player bar, highlight and
+  // page turns follow it) and, while it shows it, the mini player steps aside.
+  const active = playback.status !== 'idle' && playback.verse != null;
+  const holdsVerse = active && allowed.has(pageOfVerse(playback.verse as VerseKey));
+  useEffect(() => {
+    if (focused && holdsVerse && !mine) recitation.adopt(owner);
+  }, [focused, holdsVerse, mine, recitation, owner]);
+  useEffect(() => {
+    setPresenting(owner, focused && mine && active);
+  }, [owner, focused, mine, active]);
+  useEffect(() => () => setPresenting(owner, false), [owner]);
 
   // While playing, the highlight follows the recited verse onto its page.
   const playingRef = useMemo(
@@ -129,15 +143,18 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
 
   // Play continues to the end of its range (Play up to; the juz by default),
   // within this screen's pages.
-  const advance = useCallback((v: VerseKey) => {
-    const range = rangeRef.current;
-    const next = range ? nextInRange(range, v) : nextVerseInJuz(v);
-    return next && allowedRef.current.has(pageOfVerse(next)) ? next : null;
-  }, []);
+  const advance = useCallback(
+    (v: VerseKey) => {
+      // The range the recitation was started with, whichever screen started it.
+      const range = recitation.getRange();
+      const next = range ? nextInRange(range, v) : nextVerseInJuz(v);
+      return next && allowedRef.current.has(pageOfVerse(next)) ? next : null;
+    },
+    [recitation],
+  );
   const start = useCallback(
     (range: VerseRange) => {
-      rangeRef.current = range;
-      recitation.play(range.from, advance, owner);
+      recitation.play(range.from, advance, owner, range);
     },
     [recitation, advance, owner],
   );
@@ -261,8 +278,8 @@ export function useVerseActions({ pages, onShowPage, currentPage }: Options) {
   // Previous / next verse while playing, within the range and this screen's pages.
   const playingVerse = playerVisibleState(mine, playback) ? playback.verse : null;
   const stepTo = (v: VerseKey | null) =>
-    v && allowed.has(pageOfVerse(v)) ? () => recitation.play(v, advance, owner) : undefined;
-  const range = rangeRef.current;
+    v && allowed.has(pageOfVerse(v)) ? () => recitation.play(v, advance, owner, recitation.getRange()) : undefined;
+  const range = recitation.getRange();
   const previous = playingVerse ? (range ? previousInRange(range, playingVerse) : previousVerse(playingVerse)) : null;
   const next = playingVerse ? (range ? nextInRange(range, playingVerse) : nextVerse(playingVerse)) : null;
 

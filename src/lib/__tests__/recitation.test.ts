@@ -12,6 +12,10 @@ jest.mock('expo-audio', () => ({
       pause: jest.fn(),
       setPlaybackRate: jest.fn(),
       shouldCorrectPitch: false,
+      setActiveForLockScreen: jest.fn(),
+      updateLockScreenMetadata: jest.fn(),
+      loop: false,
+      volume: 1,
       remove: jest.fn(),
       addListener: jest.fn((_: string, l: (s: any) => void) => listeners.push(l)),
       opts: mockOpts,
@@ -80,14 +84,54 @@ describe('recitation', () => {
     expect(r.getState().verse).toEqual({ sura: 2, ayah: 1 });
   });
 
-  it('pauses when the app goes to the background, and resumes', () => {
+  it('keeps playing in the background; iOS pausing it shows paused, and ▶ from outside plays again', () => {
     const r = new Recitation();
     r.play({ sura: 1, ayah: 1 });
-    mockPlayers[0].emit({ playing: true });
+    const p = mockPlayers[0];
+    p.emit({ playing: true });
+    // The app leaves the foreground, the phone locks: it goes on.
     mockAppState.forEach((l) => l('background'));
-    expect(r.getState().status).toBe('paused');
-    r.resume();
     expect(r.getState().status).toBe('playing');
+    // A call, Siri, headphones unplugged, or Pause on the lock screen.
+    p.emit({ playing: false });
+    expect(r.getState().status).toBe('paused');
+    // The call ends (iOS resumes it), or ▶ on the lock screen.
+    p.emit({ playing: true });
+    expect(r.getState().status).toBe('playing');
+  });
+
+  it('on the lock screen and in Control Center: the verse and the reciter, updated verse by verse, gone on stop', () => {
+    const r = new Recitation();
+    r.play({ sura: 2, ayah: 13 });
+    const p = mockPlayers[0];
+    expect(p.setActiveForLockScreen).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ title: 'Al-Baqarah 2:13', artist: 'Al-Husary (Murattal)', albumTitle: 'Revisely' }),
+      { showSeekForward: false, showSeekBackward: false },
+    );
+    p.emit({ playing: true });
+    p.emit({ didJustFinish: true });
+    expect(p.updateLockScreenMetadata).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Al-Baqarah 2:14' }));
+    expect(p.setActiveForLockScreen).toHaveBeenCalledTimes(1);
+    r.stop();
+    expect(p.setActiveForLockScreen).toHaveBeenLastCalledWith(false);
+  });
+
+  it('keeps the range it was started with; a screen showing it takes it over without a restart', () => {
+    const r = new Recitation();
+    const range = { from: { sura: 2, ayah: 1 }, to: { sura: 2, ayah: 5 } };
+    r.play({ sura: 2, ayah: 1 }, undefined, 'reader-a', range);
+    const p = mockPlayers[0];
+    p.emit({ playing: true });
+    expect(r.getRange()).toEqual(range);
+    expect(r.getState().owner).toBe('reader-a');
+    r.adopt('reader-b');
+    expect(r.getState()).toMatchObject({ status: 'playing', verse: { sura: 2, ayah: 1 }, owner: 'reader-b' });
+    expect(p.replace).toHaveBeenCalledTimes(1);
+    r.stop();
+    expect(r.getRange()).toBeNull();
+    r.adopt('reader-c');
+    expect(r.getState()).toEqual({ status: 'idle', verse: null });
   });
 
   it('shows paused when iOS interrupts playback (a call)', () => {
@@ -157,7 +201,7 @@ describe('recitation', () => {
   it('a verse paused while loading loads again on resume (and can still time out)', () => {
     const r = new Recitation();
     r.play({ sura: 1, ayah: 1 });
-    mockAppState.forEach((l) => l('background'));
+    r.pause();
     expect(r.getState().status).toBe('paused');
     r.resume();
     expect(r.getState().status).toBe('loading');
@@ -326,7 +370,7 @@ describe('Audio Options: repeats, pauses, speed', () => {
     expect(r.getState()).toMatchObject({ status: 'loading', verse: v(2, 2) });
   });
 
-  it('an interruption between verses (the app goes to the background) pauses, and resumes on', () => {
+  it('between verses a silent clip keeps the app awake, so the next verse comes with the phone locked', () => {
     const r = new Recitation();
     r.setOptions({ pauseFactor: 1 });
     r.play(v(2, 1));
@@ -335,10 +379,27 @@ describe('Audio Options: repeats, pauses, speed', () => {
     // The finished player reports it stopped: not an interruption.
     p.emit({ playing: false });
     expect(r.getState().status).toBe('playing');
+    const silence = mockPlayers[1];
+    expect(silence.play).toHaveBeenCalled();
+    expect(silence.loop).toBe(true);
+    expect(silence.volume).toBe(0);
     mockAppState.forEach((l) => l('background'));
-    expect(r.getState().status).toBe('paused');
-    r.resume();
-    expect(r.getState().verse).toEqual(v(2, 2));
+    jest.advanceTimersByTime(3000);
+    expect(r.getState()).toMatchObject({ status: 'loading', verse: v(2, 2) });
+    expect(silence.pause).toHaveBeenCalled();
+  });
+
+  it('paused between verses, ▶ on the lock screen goes on to the next verse', () => {
+    const r = new Recitation();
+    r.setOptions({ pauseFactor: 1 });
+    r.play(v(2, 1));
+    const p = mockPlayers[0];
+    playThrough(p, 3);
+    r.pause();
+    expect(r.getState()).toMatchObject({ status: 'paused', verse: v(2, 1) });
+    // iOS plays the (finished) player from the lock screen.
+    p.emit({ playing: true });
+    expect(r.getState()).toMatchObject({ status: 'loading', verse: v(2, 2) });
   });
 
   it('Stop during the pause after a verse ends it', () => {
