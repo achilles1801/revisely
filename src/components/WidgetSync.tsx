@@ -9,6 +9,7 @@ import { buildWidgetSnapshot } from '../lib/widgets/snapshot';
 import { writeWidgetSnapshot } from '../lib/widgets/storage';
 import { lastKnownPosition } from '../lib/widgets/position';
 import type { Coords } from '../lib/widgets/qibla';
+import { bundledCities } from '../lib/qibla';
 import { parseWidgetLink, requestQiblaSheet, type WidgetLink } from '../lib/widgets/links';
 import { navigationRef } from '../navigation/navigationRef';
 
@@ -67,6 +68,7 @@ export function WidgetSync() {
         accent,
         now: new Date(),
         qiblaFrom,
+        cities: bundledCities(),
       }),
     );
   }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, accent, day, foreground, qiblaFrom]);

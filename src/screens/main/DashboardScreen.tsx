@@ -45,6 +45,7 @@ import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
+import { onQiblaSheetRequest } from '../../lib/widgets/links';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
@@ -90,6 +91,8 @@ export default function DashboardScreen() {
   useScrollToTop(scrollRef);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [qiblaOpen, setQiblaOpen] = useState(false);
+  // The Qibla widget's tap (revisely://qibla) opens the sheet here, also from a cold start.
+  useEffect(() => onQiblaSheetRequest(() => setQiblaOpen(true)), []);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
