@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, StyleSheet, Text, View } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -103,6 +103,18 @@ export function RecordingsList({
   useEffect(() => {
     if (reloadKey != null) load();
   }, [reloadKey, load]);
+
+  // A recording's playback stays in the foreground: leaving the app pauses it
+  // (recitation, unlike it, carries on; lib/audioFocus).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && playerRef.current?.playing) {
+        playerRef.current.pause();
+        setPaused(true);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // The recording and segment loaded in the player. A recording is its
   // segments played back to back on one timeline.

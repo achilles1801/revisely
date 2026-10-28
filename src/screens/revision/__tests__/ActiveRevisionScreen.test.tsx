@@ -15,11 +15,6 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's' },
 }));
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 // The page: a tap toggles the controls, and the test can swipe it.
 const mockPager: { onUserSwipe?: () => void; onPageChange?: (p: number) => void } = {};
 jest.mock('../../../components/MushafPager', () => {

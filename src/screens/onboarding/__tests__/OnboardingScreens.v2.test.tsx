@@ -19,11 +19,6 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's', Warning: 'w' },
 }));
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('@react-native-community/slider', () => {
   const { View } = require('react-native');

@@ -404,8 +404,28 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
   fake timers. A repeat replays the verse with `replace` (it may fetch it again). The pause waits
   `duration / speed × factor`; Pause during it holds the next step, and leaving the app pauses as
   before. Speed is `setPlaybackRate(speed, 'high')` with `shouldCorrectPitch`.
-- **No background or lock-screen playback**: recitation pauses when the app leaves the foreground.
-  Adding it needs `UIBackgroundModes: audio` and lock-screen controls, a native change for a build.
+- **App-wide and in the background** (runtime `bdc5b27…`, build 26 on, Oct 28 2026): recitation
+  goes on wherever the user goes, with the app in the background and the phone locked
+  (`UIBackgroundModes: audio` in app.config; `shouldPlayInBackground` in `lib/audioFocus`).
+  - Leaving a screen no longer stops it. The focused screen whose pages hold the verse playing
+    `adopt`s it (its player bar, highlight and page turns follow) and "presents" it
+    (`lib/nowPlaying`); anywhere else the **mini player** (`components/player/MiniPlayer`) sits
+    above the tab bar: ▶/❚❚, "Al-Baqarah 2:13 · reciter", ✕ to stop, › to the reader at that page
+    (`navigation/openReader`). It hides with the tab bar (the reader and the session show the
+    recitation in their own bar), and `useTabBarFootprint` adds its height so lists clear it.
+    Signing out stops it. The range (From–To) lives in the engine (`getRange`).
+  - Lock screen and Control Center: Now Playing (verse, reciter, "Revisely", the app icon via
+    `lib/nowPlayingArtwork`) with play/pause and the scrubber, through expo-audio's
+    `setActiveForLockScreen`. expo-audio 1.1 has no next/previous-track commands; adding them would
+    be a small native patch to its `MediaController`, so a build.
+  - iOS pauses it for a call, Siri or unplugged headphones and resumes it after an interruption;
+    the engine follows the player (`onStatus`: paused and playing from outside). The pause after a
+    verse plays a looped second of silence (`assets/audio/silence.m4a`): with nothing playing, iOS
+    suspends a backgrounded app and the next verse would never come.
+  - A recording's playback stays in the foreground (`RecordingsList` pauses it when the app leaves);
+    recording itself is unchanged.
+  - The simulator's dev client predates the key, so it can't show background play: check on a
+    TestFlight build.
 - `v2/WheelPicker`'s `contentOffset` is where it starts, set once. Changing it after mount moved
   the wheel a second row on a phone (a test covers it). Maestro can't tap a wheel's rows by id (the
   wheel is one adjustable element for VoiceOver): tap by point. Maestro takes whole-number
@@ -630,9 +650,8 @@ classic default), and a fresh install starts in light.
 - Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
   a native change for a versioned release. Until then Settings offers Light and Dark only
   (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
-- `expo-blur` and `expo-glass-effect` are no longer imported. Removing them from `package.json`
-  changes the fingerprint, so do it with the next native change, along with the tests'
-  `jest.mock('expo-glass-effect')` / `jest.mock('expo-blur')` calls.
+- `expo-blur` and `expo-glass-effect` were removed from `package.json` (and the tests' mocks) with
+  the background-audio build (Oct 28 2026).
 
 ## UI traps
 

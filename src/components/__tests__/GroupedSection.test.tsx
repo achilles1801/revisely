@@ -5,11 +5,6 @@ import { ThemeProvider } from '../../context/ThemeContext';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn(), impactAsync: jest.fn() }));
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 
 function CollapsibleCycle() {
   const [collapsed, setCollapsed] = useState(false);

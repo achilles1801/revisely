@@ -22,11 +22,20 @@ const mockRecitation = {
   getState: () => ({ status: 'idle', verse: null }),
   subscribe: () => () => {},
   stop: jest.fn(),
-  play: jest.fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  play: jest.fn((_v: any, _a: any, _o?: any, range: any = null) => {
+    mockRecitation.range = range;
+  }),
   pause: jest.fn(),
   resume: jest.fn(),
   setVoice: jest.fn(),
   setOptions: jest.fn(),
+  // Like the engine: it keeps the range it was started with.
+  range: null as unknown,
+  getRange() {
+    return this.range;
+  },
+  adopt: jest.fn(),
 };
 jest.mock('../../../lib/recitation', () => ({
   ...jest.requireActual('../../../lib/recitation'),

@@ -30,6 +30,9 @@ export default {
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // Recitation goes on with the app in the background or the phone
+        // locked, with Now Playing on the lock screen (lib/recitation).
+        UIBackgroundModes: ["audio"],
         // Apple requires these strings whenever the binary contains photo
         // library API symbols, even if our app code never touches them.
         // Some SDKs (Sentry attachments, Google Sign-In profile picture

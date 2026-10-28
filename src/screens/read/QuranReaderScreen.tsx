@@ -88,6 +88,7 @@ export default function QuranReaderScreen() {
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage,
+    focused: isScreenFocused,
   });
 
   // Reading: nothing but the page (its number, the juz and surah). A tap on

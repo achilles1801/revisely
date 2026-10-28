@@ -7,6 +7,8 @@ import type { PagerTabBarProps } from './PagerTabs';
 import { useTheme } from '../context/ThemeContext';
 import { layoutV2 } from '../theme/v2';
 import { useReduceMotion } from '../design/motion';
+import { useMiniPlayer } from '../lib/nowPlaying';
+import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../components/player/MiniPlayer';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -25,12 +27,19 @@ function useBottomGap() {
   return insets.bottom > 0 ? insets.bottom : 14;
 }
 
+/** The tab bar's own height, with the home indicator's room below it. */
+export function useTabBarHeight() {
+  return BAR_HEIGHT + useBottomGap();
+}
+
 /**
- * Vertical space the tab bar occupies at the bottom of the screen.
- * Use to leave clearance at the bottom of scrollable content.
+ * Vertical space the tab bar occupies at the bottom of the screen, with the
+ * mini player above it while that shows. Use to leave clearance at the bottom
+ * of scrollable content.
  */
 export function useTabBarFootprint() {
-  return BAR_HEIGHT + useBottomGap();
+  const { visible } = useMiniPlayer();
+  return useTabBarHeight() + (visible ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0);
 }
 
 function isHidden(tabBarStyle: unknown): boolean {

@@ -55,13 +55,16 @@ export function isAudioSessionError(err: unknown): boolean {
 /**
  * Playback or recording mode. Always `doNotMix` (other apps pause) and audible
  * in silent mode; recording mode is needed only while recording, since iOS then
- * routes playback to the earpiece.
+ * routes playback to the earpiece. Playback goes on in the background
+ * (UIBackgroundModes audio): recitation carries on with the phone locked; a
+ * recording's playback pauses itself (components/recordings/RecordingsList).
+ * Recording in the background stays off (expo-audio's allowsBackgroundRecording).
  */
 export function setAudioMode(recording: boolean): Promise<void> {
   return setAudioModeAsync({
     playsInSilentMode: true,
     interruptionMode: 'doNotMix',
-    shouldPlayInBackground: false,
+    shouldPlayInBackground: true,
     allowsRecording: recording,
   }).catch(() => undefined);
 }

@@ -25,11 +25,6 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // Glass, when it shows, is a marker: the new design must have none.
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 
 // A gorhom sheet that shows its content once presented, with the frame it was given.
 jest.mock('@gorhom/bottom-sheet', () => {

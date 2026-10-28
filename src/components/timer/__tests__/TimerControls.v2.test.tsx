@@ -16,11 +16,6 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 's', Warning: 'w' },
 }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
-jest.mock('expo-glass-effect', () => {
-  const { View } = require('react-native');
-  return { GlassView: View, GlassContainer: View, isLiquidGlassAvailable: () => false };
-});
-jest.mock('expo-blur', () => ({ BlurView: require('react-native').View }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // Any glass card the controls render shows up as this.
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
