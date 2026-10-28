@@ -234,3 +234,68 @@ describe('<MushafPager /> a verse’s highlight', () => {
     expect(boxes.every((box) => frameOf(box as unknown as Node) === frame)).toBe(true);
   });
 });
+
+describe('<MushafPager /> end card', () => {
+  function setupEnd(initialPage: number) {
+    const onPageChange = jest.fn();
+    const onAdvance = jest.fn();
+    const onReachEnd = jest.fn();
+    const onUserSwipe = jest.fn();
+    render(
+      <MushafPager
+        pages={PAGES}
+        initialPage={initialPage}
+        onPageChange={onPageChange}
+        onAdvance={onAdvance}
+        onUserSwipe={onUserSwipe}
+        endCard={<></>}
+        onReachEnd={onReachEnd}
+      />,
+    );
+    const list = screen.UNSAFE_getByType(FlatList);
+    const report = (index: number) =>
+      act(() => {
+        list.props.onViewableItemsChanged({
+          viewableItems: [{ index, item: index < PAGES.length ? PAGES[index] : -1, key: `${index}`, isViewable: true }],
+          changed: [],
+        });
+      });
+    const drag = () => act(() => list.props.onScrollBeginDrag());
+    return { list, onPageChange, onAdvance, onReachEnd, onUserSwipe, report, drag };
+  }
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('is one more item after the last page', () => {
+    const { list } = setupEnd(1);
+    expect(list.props.data).toEqual([...PAGES, -1]);
+  });
+
+  it('swiping off the last page onto it: reached by swipe, not an advance or a page change', () => {
+    const { onReachEnd, onAdvance, onPageChange, onUserSwipe, report, drag } = setupEnd(20);
+    act(() => jest.runAllTimers());
+    drag();
+    report(20);
+    expect(onReachEnd).toHaveBeenCalledWith(20, true);
+    expect(onAdvance).not.toHaveBeenCalled();
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(onUserSwipe).toHaveBeenCalled();
+    // Back to the last page: a page change, as any.
+    report(19);
+    expect(onPageChange).toHaveBeenCalledWith(20, 19);
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
+
+  it('getting there without a swipe from the last page is not a swipe', () => {
+    const { onReachEnd, report } = setupEnd(18);
+    act(() => jest.runAllTimers());
+    report(20);
+    expect(onReachEnd).toHaveBeenCalledWith(20, false);
+  });
+
+  it('without an end card the pages are the list', () => {
+    render(<MushafPager pages={PAGES} />);
+    expect(screen.UNSAFE_getByType(FlatList).props.data).toEqual(PAGES);
+  });
+});

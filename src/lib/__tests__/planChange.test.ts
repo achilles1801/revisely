@@ -152,3 +152,45 @@ describe('revisedOn', () => {
     ]);
   });
 });
+
+// The owner's example: 5 of 10 done today, then today's and tomorrow's days are
+// swapped in the editor: today is now 15 pages with 5 of them done.
+describe('5 of 10 done, then today and tomorrow swapped: 5 of 15', () => {
+  const thirty: UserPage[] = Array.from({ length: 30 }, (_, i) => ({ ...memorized[0], pageNumber: i + 1 }));
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  const plan: CustomPlan = { days: [range(1, 10), range(11, 20), range(21, 30)], cycleStartDate: TODAY, direction: 'forward' };
+  const onPlan: User = { ...baseUser, dailyPageCapacity: 10, customPlan: plan };
+  const revisedToday = log(TODAY, range(1, 10), range(1, 5));
+  const todayOf = (u: User) => generateDailyAssignment(thirty, [], u, today).pages;
+  const progress = (u: User) => {
+    const pages = todayOf(u);
+    const done = new Set(revisedToday.pagesRevised);
+    return { done: pages.filter((p) => done.has(p)).length, total: pages.length };
+  };
+  const edit = (days: number[][]) =>
+    userWithNewSchedule(onPlan, { customPlan: { ...plan, days } }, {
+      revisionDate: today,
+      memorized: thirty,
+      logs: [revisedToday],
+      newPlan: false,
+    });
+
+  it('before: 5 of 10', () => {
+    expect(progress(onPlan)).toEqual({ done: 5, total: 10 });
+  });
+
+  it('swapped: the 5 done stay on today, done, then tomorrow’s 10: 5 of 15', () => {
+    const after = edit([range(11, 20), range(1, 10), range(21, 30)]);
+    expect(todayOf(after)).toEqual([...range(1, 5), ...range(11, 20)]);
+    expect(progress(after)).toEqual({ done: 5, total: 15 });
+    // Tomorrow is the old today, all 10 pages.
+    expect(generateDailyAssignment(thirty, [], after, day(18)).pages).toEqual(range(1, 10));
+  });
+
+  it('done pages that are also on the new day are counted once and stay done', () => {
+    // Today edited to pages 4–13: 4 and 5 were already revised.
+    const after = edit([range(4, 13), range(14, 23), [...range(24, 30), 1, 2, 3]]);
+    expect(todayOf(after)).toEqual(range(1, 13));
+    expect(progress(after)).toEqual({ done: 5, total: 13 });
+  });
+});

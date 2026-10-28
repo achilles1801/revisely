@@ -453,6 +453,27 @@ describe('a new plan and today', () => {
     alert.mockRestore();
   });
 
+  it('5 of 10 done, today and tomorrow swapped in the editor: 5 of 15, saved without a question', async () => {
+    const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+    mockApp.user = {
+      ...baseUser,
+      dailyPageCapacity: 10,
+      customPlan: { days: [range(1, 10), range(11, 20), range(21, 30)], cycleStartDate: TODAY, direction: 'forward' },
+    };
+    mockApp.logs = [sessionLog(TODAY, range(1, 10), range(1, 5))];
+    await mount(<PlanEditScreen />);
+    // Today's day moved down a place: tomorrow's pages come to today.
+    fireEvent(screen.getByTestId('day-item-0'), 'accessibilityAction', { nativeEvent: { actionName: 'moveDown' } });
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+    const today = todayOf(savedUser());
+    expect(today).toEqual([...range(1, 5), ...range(11, 20)]);
+    expect(today.filter((p: number) => p <= 5)).toHaveLength(5);
+    expect(todayOf(savedUser(), tomorrow)).toEqual(range(1, 10));
+  });
+
   it('Use automatic schedule: today switches to the automatic day (leftovers go)', async () => {
     const alert = jest.spyOn(Alert, 'alert');
     mockApp.user = { ...withLeftovers(), customPlan: { days: [[1, 2], [3, 4]], cycleStartDate: TODAY, direction: 'forward' } };

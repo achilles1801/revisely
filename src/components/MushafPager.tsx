@@ -41,6 +41,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DEFAULT_SIZE = fitPage(SCREEN_WIDTH, 0);
 // How long after scrollToPage a report of another page is taken as stale.
 const JUMP_SETTLE_MS = 500;
+// The end card's item in the list (page numbers are 1–604).
+const END = -1;
 
 interface MushafPagerProps {
   pages: number[];
@@ -63,6 +65,12 @@ interface MushafPagerProps {
   /** Per-page extra data hashed into key — bumps trigger re-render of that
    *  page. Use for marking visual state (e.g. revised checkmark overlay). */
   extraData?: string;
+  /** One more "page" after the last: swiping onto it is how the last page is
+   *  left (a revision session finishes there). */
+  endCard?: React.ReactNode;
+  /** The end card came on screen. `bySwipe`: the user swiped there from the
+   *  last page (a deliberate page turn, as for any page), not a jump. */
+  onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
 }
 
 export interface MushafPagerHandle {
@@ -247,6 +255,8 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     onLongPressAyah,
     highlightedAyah,
     extraData,
+    endCard,
+    onReachEnd,
   },
   ref,
 ) {
@@ -310,12 +320,26 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     [pages, onPageChange],
   );
 
+  const hasEnd = endCard != null;
+  const data = useMemo(() => (hasEnd ? [...pages, END] : pages), [pages, hasEnd]);
+
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length === 0) return;
       const first = viewableItems[0];
       if (first.index == null) return;
       const newIndex = first.index;
+      // The end card: leaving the last page by a swipe is how it is done.
+      if (hasEnd && newIndex === pages.length) {
+        const prevIndex = currentIndexRef.current;
+        if (prevIndex === newIndex) return;
+        jumpRef.current = null;
+        currentIndexRef.current = newIndex;
+        const lastPage = pages[pages.length - 1];
+        if (draggedRef.current) onUserSwipe?.();
+        if (lastPage != null) onReachEnd?.(lastPage, draggedRef.current && prevIndex === pages.length - 1);
+        return;
+      }
       // Right after a jump, ignore a stale report of the page we left. Any
       // other page is where the list really is (e.g. the user swiped meanwhile).
       const jump = jumpRef.current;
@@ -338,35 +362,40 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       if (draggedRef.current) onUserSwipe?.();
       if (newPage != null) onPageChange?.(newPage, newIndex);
     },
-    [pages, onAdvance, onPageChange, onUserSwipe],
+    [pages, hasEnd, onAdvance, onPageChange, onUserSwipe, onReachEnd],
   );
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   // The verse a sheet is about is tinted: the accent's text colour at a quarter.
   const renderItem = useCallback(
-    ({ item }: { item: number }) => (
-      <PageItem
-        pageNumber={item}
-        onTap={onTap}
-        onLongPressAyah={onLongPressAyah}
-        highlight={highlightedAyah ?? null}
-        highlightColor={v2.accentText}
-        highlightOpacity={0.25}
-        pageTint={palette.pageTint}
-        tintColor={palette.textPrimary}
-        bg={palette.pageBg}
-        size={pageSize}
-      />
-    ),
-    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize],
+    ({ item }: { item: number }) =>
+      item === END ? (
+        <View style={[styles.page, { backgroundColor: palette.pageBg }]} testID="mushaf-end">
+          {endCard}
+        </View>
+      ) : (
+        <PageItem
+          pageNumber={item}
+          onTap={onTap}
+          onLongPressAyah={onLongPressAyah}
+          highlight={highlightedAyah ?? null}
+          highlightColor={v2.accentText}
+          highlightOpacity={0.25}
+          pageTint={palette.pageTint}
+          tintColor={palette.textPrimary}
+          bg={palette.pageBg}
+          size={pageSize}
+        />
+      ),
+    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard],
   );
 
   return (
     <FlatList
       ref={listRef}
-      data={pages}
-      keyExtractor={(p) => `mushaf-${p}`}
+      data={data}
+      keyExtractor={(p) => (p === END ? 'mushaf-end' : `mushaf-${p}`)}
       renderItem={renderItem}
       horizontal
       pagingEnabled
