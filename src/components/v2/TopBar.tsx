@@ -50,6 +50,7 @@ export function TopBar({
   left,
   right,
   separator,
+  sideWidth = 84,
 }: {
   title?: string;
   center?: React.ReactNode;
@@ -57,6 +58,8 @@ export function TopBar({
   left?: React.ReactNode;
   right?: React.ReactNode;
   separator?: boolean;
+  /** Each side's width (equal, so the middle stays centred): 84 fits two icons, 120 three. */
+  sideWidth?: number;
 }) {
   const { palette } = useTheme();
   return (
@@ -66,7 +69,7 @@ export function TopBar({
         separator && { borderBottomWidth: layoutV2.hairline, borderBottomColor: palette.separator },
       ]}
     >
-      <View style={[styles.side, styles.left]}>
+      <View style={[styles.side, styles.left, { width: sideWidth }]}>
         {onBack ? <IconButton icon="chevron-back" onPress={onBack} label="Back" size={26} testID="back" /> : left}
       </View>
       <View style={styles.center}>
@@ -82,7 +85,7 @@ export function TopBar({
             </Text>
           ) : null)}
       </View>
-      <View style={[styles.side, styles.right]}>{right}</View>
+      <View style={[styles.side, styles.right, { width: sideWidth }]}>{right}</View>
     </View>
   );
 }
