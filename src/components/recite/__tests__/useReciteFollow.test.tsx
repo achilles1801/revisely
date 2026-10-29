@@ -64,10 +64,21 @@ const flush = () => act(async () => {});
 function setup(active = true, pages = [2, 3], currentPage = 2) {
   const onShowPage = jest.fn();
   const onPageDone = jest.fn();
-  const hook = renderHook((p: { active: boolean }) => useReciteFollow({ active: p.active, pages, currentPage, onShowPage, onPageDone }), {
-    initialProps: { active },
-  });
+  const hook = renderHook(
+    (p: { active: boolean; round?: number }) =>
+      useReciteFollow({ active: p.active, round: p.round, pages, currentPage, onShowPage, onPageDone }),
+    { initialProps: { active } as { active: boolean; round?: number } },
+  );
   return { ...hook, onShowPage, onPageDone };
+}
+
+async function recite(n: number) {
+  for (const c of utterances(n)) {
+    await act(async () => {
+      mockHandlers!.onAudio(c);
+      await new Promise((r) => setImmediate(r));
+    });
+  }
 }
 
 beforeEach(() => {
@@ -115,6 +126,35 @@ describe('useReciteFollow', () => {
     // Page 2 ends with 2:5: reaching 2:6 turns to page 3, and page 2 counts.
     expect(onShowPage).toHaveBeenCalledWith(3);
     expect(onPageDone).toHaveBeenCalledWith(2);
+  });
+
+  it('listening stops: what was recited stays shown, and listening again carries on from there', async () => {
+    const first = (a: number) => words.verseFirstWord(2, a);
+    mockHeard = [say(verse(2, 2)), say(verse(2, 2)), say(verse(2, 3)), say(verse(2, 3))];
+    const { result, rerender, onPageDone } = setup(true, [2, 3], 2);
+    await flush();
+    await recite(2);
+    expect(result.current.follow!.shown(first(3))).toBe(true);
+    // Paused (a recording, the screen left, the mic turned off): the words stay.
+    rerender({ active: false });
+    await flush();
+    expect(mockStopMic).toHaveBeenCalled();
+    expect(result.current.follow!.shown(first(2))).toBe(true);
+    expect(result.current.follow!.shown(first(3))).toBe(true);
+    expect(result.current.follow!.next).toBe(first(4));
+    // Listening again goes on from 2:4, with 2:2-2:3 still shown.
+    mockHeard = [say(verse(2, 4)), say(verse(2, 4)), say(verse(2, 5)), say(verse(2, 5))];
+    rerender({ active: true });
+    await flush();
+    expect(result.current.status).toBe('following');
+    await recite(2);
+    expect(result.current.follow!.shown(first(2))).toBe(true);
+    expect(result.current.follow!.shown(first(5))).toBe(true);
+    expect(onPageDone.mock.calls.filter(([p]) => p === 2)).toHaveLength(1);
+    // The page hidden again (a new round): everything is covered again.
+    rerender({ active: true, round: 1 });
+    await flush();
+    expect(result.current.follow?.shown(first(2)) ?? false).toBe(false);
   });
 
   it('no microphone access: says so, doesn’t listen', async () => {

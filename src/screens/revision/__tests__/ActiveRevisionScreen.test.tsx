@@ -66,12 +66,14 @@ const mockFollow = {
   followable: true,
   status: 'finding' as string,
   active: false,
+  round: undefined as number | undefined,
   onPageDone: undefined as undefined | ((p: number) => void),
 };
 jest.mock('../../../components/recite/useReciteFollow', () => ({
   canFollowWords: () => mockFollow.followable,
-  useReciteFollow: (opts: { active: boolean; onPageDone: (p: number) => void }) => {
+  useReciteFollow: (opts: { active: boolean; round?: number; onPageDone: (p: number) => void }) => {
     mockFollow.active = opts.active;
+    mockFollow.round = opts.round;
     mockFollow.onPageDone = opts.onPageDone;
     return { status: mockFollow.status, available: mockFollow.followable, follow: null, heard: '', resume: jest.fn() };
   },
@@ -549,6 +551,20 @@ describe('ActiveRevisionScreen — hidden pages, word by word', () => {
     expect(screen.getByTestId('recite-status')).toHaveTextContent('Start reciting');
     expect(screen.getByText('Recite: each word shows as you say it', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
+  });
+
+  it('hiding the page again starts a new round (covered again); showing it keeps the round', () => {
+    mockModelState = { status: 'ready', bytes: 59_707_625 };
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    const first = mockFollow.round;
+    fireEvent.press(screen.getByLabelText('Show the page'));
+    expect(mockFollow.active).toBe(false);
+    expect(mockFollow.round).toBe(first);
+    fireEvent.press(screen.getByLabelText('Hide the page'));
+    expect(mockFollow.active).toBe(true);
+    expect(mockFollow.round).toBe((first as number) + 1);
   });
 
   it('a page recited through counts as revised', () => {

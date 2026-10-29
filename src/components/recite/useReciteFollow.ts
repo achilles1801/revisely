@@ -10,6 +10,7 @@ import { downloadedModelPath } from '../../lib/recite/speechModel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
 import { loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { ReciteSession } from '../../lib/recite/reciteSession';
+import type { RecitationTracker } from '../../lib/recite/tracker';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
 
 /**
@@ -42,16 +43,21 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * show (`follow`, for the covers); reaching another page turns to it
  * (`onShowPage`); a page recited through counts as revised (`onPageDone`).
  * Stops when not active, in the background, or when something else takes the
- * audio (a recording starting, recitation playing).
+ * audio (a recording starting, recitation playing). What was recited stays
+ * shown while it's stopped, and listening again carries on from there, until
+ * a new `round` (the page hidden again).
  */
 export function useReciteFollow({
   active,
+  round = 0,
   pages,
   currentPage,
   onShowPage,
   onPageDone,
 }: {
   active: boolean;
+  /** A new round of reciting (the page hidden again): what was followed before is forgotten. */
+  round?: number;
   pages: number[];
   currentPage: number;
   onShowPage: (page: number) => void;
@@ -63,12 +69,14 @@ export function useReciteFollow({
   const [, setVersion] = useState(0);
   const [words, setWords] = useState<QuranWords | null>(null);
   const sessionRef = useRef<ReciteSession | null>(null);
+  /** This round's progress, kept between sessions. */
+  const progressRef = useRef<{ round: number; tracker: RecitationTracker; donePages: Set<number> } | null>(null);
   const [owner] = useState(() => `recite-follow-${Math.random().toString(36).slice(2)}`);
   const [foreground, setForeground] = useState(AppState.currentState !== 'background');
   const [suspended, setSuspended] = useState(false);
   const turningToRef = useRef<number | null>(null);
-  const optsRef = useRef({ pages, currentPage, onShowPage, onPageDone });
-  optsRef.current = { pages, currentPage, onShowPage, onPageDone };
+  const optsRef = useRef({ pages, currentPage, onShowPage, onPageDone, round });
+  optsRef.current = { pages, currentPage, onShowPage, onPageDone, round };
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => setForeground(s !== 'background'));
@@ -119,6 +127,7 @@ export function useReciteFollow({
         claimAudio('recorder', owner);
         getRecitation().stop();
         const o = optsRef.current;
+        const kept = progressRef.current?.round === o.round ? progressRef.current : null;
         const session = new ReciteSession({
           words: loaded,
           engine,
@@ -135,6 +144,8 @@ export function useReciteFollow({
           },
           pages: o.pages,
           page: o.currentPage,
+          tracker: kept?.tracker,
+          donePages: kept?.donePages,
           onChange: () => {
             setVersion((v) => v + 1);
             const s = sessionRef.current;
@@ -153,6 +164,7 @@ export function useReciteFollow({
           },
         });
         sessionRef.current = session;
+        progressRef.current = { round: o.round, tracker: session.tracker, donePages: session.donePages };
         await session.start();
         if (cancelled || sessionRef.current !== session) return;
         setStatus(session.position == null ? 'finding' : 'following');
@@ -166,9 +178,9 @@ export function useReciteFollow({
       cancelled = true;
       stopSession();
     };
-    // Starts and stops with `run`; the rest is read through refs.
+    // Starts and stops with `run` (and afresh for a new round); the rest is read through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run]);
+  }, [run, round]);
 
   // The user turned the page: look for the reciter there.
   useEffect(() => {
@@ -198,12 +210,14 @@ export function useReciteFollow({
   }, [active]);
 
   const session = sessionRef.current;
+  const kept = progressRef.current?.round === round ? progressRef.current : null;
+  const tracker = session?.tracker ?? kept?.tracker ?? null;
   const follow: WordFollow | null =
-    session && words
+    tracker && words
       ? {
           words,
-          shown: (w) => session.isPreviewCorrect(w) || (!session.tracker.isStale(w) && session.tracker.statusOf(w) !== 'pending'),
-          next: session.position,
+          shown: (w) => !!session?.isPreviewCorrect(w) || (!tracker.isStale(w) && tracker.statusOf(w) !== 'pending'),
+          next: session ? session.position : tracker.position,
         }
       : null;
 

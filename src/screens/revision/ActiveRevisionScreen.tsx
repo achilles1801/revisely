@@ -197,10 +197,13 @@ export default function ActiveRevisionScreen() {
   const followable = canFollowWords();
   const wordMode = hidden && followable && speechModel.status === 'ready';
   const [modelSheet, setModelSheet] = useState(false);
+  // Each hide is a new round: what was followed before is covered again.
+  const [hideRound, setHideRound] = useState(0);
   const markRevisedRef = useRef<(page: number) => void>(() => undefined);
   const followPages = assignment?.pages ?? NO_PAGES;
   const follow = useReciteFollow({
     active: wordMode && listenOn && isScreenFocused && !recorder.recording,
+    round: hideRound,
     pages: followPages,
     currentPage: pageOnScreen ?? followPages[0] ?? 1,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
@@ -266,6 +269,7 @@ export default function ActiveRevisionScreen() {
     if (!hidden) {
       // Covered again from the start; recitation would read it out.
       setReveal(NOTHING_REVEALED);
+      setHideRound((r) => r + 1);
       if (verseActions.player.state.status !== 'idle') stopPlayback();
     }
     setHidden(!hidden);

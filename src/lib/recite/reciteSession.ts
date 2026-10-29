@@ -36,6 +36,12 @@ export interface ReciteSessionOptions {
   page: number;
   /** Or a word to start from ("recite from here"). */
   startWord?: number;
+  /**
+   * Carry on from an earlier session (listening paused and resumed): its
+   * tracker, so what was recited stays recited, and the pages it counted.
+   */
+  tracker?: RecitationTracker;
+  donePages?: Set<number>;
   /** Something changed: redraw. */
   onChange: () => void;
   /** New mistakes were found (the paid mistake detection; unused for now). */
@@ -59,7 +65,8 @@ export class ReciteSession {
   private source: AudioSource | null = null;
   private preview: Preview | null = null;
   private previewCorrect = new Set<number>();
-  private donePages = new Set<number>();
+  /** Pages recited through (counted once, across resumed sessions). */
+  readonly donePages: Set<number>;
   private readonly startedAt: number;
   private listeningSince: number | null = null;
   private listenedMs = 0;
@@ -79,7 +86,17 @@ export class ReciteSession {
     this.allowed = new Set(options.pages);
     const lastPage = Math.max(...options.pages);
     this.lastWord = options.words.pageRange(lastPage)[1] - 1;
-    this.tracker = new RecitationTracker(options.words, options.page);
+    this.donePages = options.donePages ?? new Set<number>();
+    if (options.tracker) {
+      // Resumed: on from where the reciter was, unless the page on screen is
+      // another one now (turned while paused): then look for them there.
+      this.tracker = options.tracker;
+      const pos = this.tracker.position;
+      const words = options.words;
+      if (pos == null || words.pageOf(Math.min(pos, words.count - 1)) !== options.page) this.tracker.searchOnPage(options.page);
+    } else {
+      this.tracker = new RecitationTracker(options.words, options.page);
+    }
     if (options.startWord != null) this.tracker.startAt(options.startWord);
     this.recognizer = new StreamingRecognizer(options.engine, {
       onPartial: (text) => this.onPartial(text),
