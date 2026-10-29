@@ -8,8 +8,9 @@ type Progress = (p: { totalBytesWritten: number; totalBytesExpectedToWrite: numb
 const mockDownload: {
   next: (url: string, dest: string, progress: Progress) => Promise<{ status: number } | undefined>;
   urls: string[];
+  dests: string[];
   cancelled: number;
-} = { next: async () => ({ status: 200 }), urls: [], cancelled: 0 };
+} = { next: async () => ({ status: 200 }), urls: [], dests: [], cancelled: 0 };
 
 jest.mock('expo-file-system', () => {
   const join = (parts: unknown[]) =>
@@ -56,13 +57,22 @@ jest.mock('expo-file-system', () => {
       this.uri = to.uri;
     }
   }
-  return { Directory, File, Paths: { document: new Directory('file:///app/Documents'), availableDiskSpace: 1e10 } };
+  return {
+    Directory,
+    File,
+    Paths: {
+      document: new Directory('file:///app/Documents'),
+      cache: new Directory('file:///app/Library/Caches'),
+      availableDiskSpace: 1e10,
+    },
+  };
 });
 
 jest.mock('expo-file-system/legacy', () => ({
   createDownloadResumable: (url: string, dest: string, _opts: unknown, progress: Progress) => ({
     downloadAsync: () => {
       mockDownload.urls.push(url);
+      mockDownload.dests.push(dest);
       return mockDownload.next(url, dest, progress);
     },
     cancelAsync: async () => {
@@ -126,6 +136,7 @@ beforeEach(async () => {
   mockFiles.clear();
   mockExclude.mockClear();
   mockDownload.urls = [];
+  mockDownload.dests = [];
   mockDownload.cancelled = 0;
   downloads();
   resetAthanStoreForTests();
@@ -182,6 +193,16 @@ describe('the catalog', () => {
   });
 });
 
+describe('a voice’s state, as screens read it', () => {
+  it('is the same object until it changes (useSyncExternalStore loops on a new one each read)', () => {
+    // The bundled voice's state was a new object on every read: the voice
+    // picker's rows re-rendered until React gave up ("Maximum update depth").
+    expect(getAthanVoiceState(BUNDLED_ATHAN_VOICE_ID)).toBe(getAthanVoiceState(BUNDLED_ATHAN_VOICE_ID));
+    expect(getAthanVoiceState(BUNDLED_ATHAN_VOICE_ID)).toEqual({ status: 'bundled' });
+    expect(getAthanVoiceState('makkah-fajr')).toBe(getAthanVoiceState('makkah-fajr'));
+  });
+});
+
 describe('download, cancel, delete', () => {
   beforeEach(async () => {
     serve(CATALOG);
@@ -197,6 +218,10 @@ describe('download, cancel, delete', () => {
     expect(getAthanVoiceState('makkah-fajr')).toEqual({ status: 'ready' });
     expect(mockFiles.get(`${SOUNDS}/athan-makkah-fajr.caf`)).toBe(CLIP);
     expect(mockFiles.has(`${SOUNDS}/athan-makkah-fajr.caf.part`)).toBe(false);
+    // The legacy download API writes only in Documents and Caches ("is not
+    // writable" in Library/Sounds, on every phone): it lands in Caches first.
+    expect(mockDownload.dests).toEqual(['file:///app/Library/Caches/athan-makkah-fajr.caf.part']);
+    expect(mockFiles.has('file:///app/Library/Caches/athan-makkah-fajr.caf.part')).toBe(false);
     expect(mockExclude).toHaveBeenCalledWith('/app/Library/Sounds/athan-makkah-fajr.caf');
     expect(athanSoundFile('makkah-fajr')).toBe('athan-makkah-fajr.caf');
     expect(seen[0]).toContain('downloading');

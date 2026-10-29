@@ -111,8 +111,11 @@ export function resetAthanStoreForTests(): void {
   soundsVersion = 0;
 }
 
+/** One object: screens read states with useSyncExternalStore, which loops on a new object per read. */
+const BUNDLED_STATE: AthanVoiceState = { status: 'bundled' };
+
 export function getAthanVoiceState(id: string): AthanVoiceState {
-  if (id === BUNDLED_ATHAN_VOICE_ID) return { status: 'bundled' };
+  if (id === BUNDLED_ATHAN_VOICE_ID) return BUNDLED_STATE;
   let s = states.get(id);
   if (!s) {
     s = ATHAN_DOWNLOADS_SUPPORTED && onDisk(id) ? { status: 'ready' } : { status: 'missing', error: null };
@@ -273,7 +276,9 @@ export async function downloadAthanVoice(id: string): Promise<boolean> {
   downloads.set(id, job);
   setState(id, { status: 'downloading', progress: 0 });
   const target = clipFile(id);
-  const partial = new File(soundsDir(), `${athanClipName(id)}.part`);
+  // Downloaded into Caches, then moved: the legacy download API writes only in
+  // Documents and Caches ("… is not writable" in Library/Sounds).
+  const partial = new File(Paths.cache, `${athanClipName(id)}.part`);
   try {
     if (partial.exists) partial.delete();
     job.task = createDownloadResumable(url, partial.uri, {}, (p) => {
