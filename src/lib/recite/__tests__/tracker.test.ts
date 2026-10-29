@@ -189,6 +189,18 @@ describe('finding the reciter', () => {
     expect(t.statusOf(first(2, 10))).toBe('pending');
   });
 
+  it('takes the page on screen when the words are on it and on a page beside it', () => {
+    // فسبح باسم ربك العظيم is 56:74 (page 536) and 56:96 (page 537).
+    for (const [page, sura, ayah] of [
+      [536, 56, 74],
+      [537, 56, 96],
+    ]) {
+      const r = new RecitationTracker(words, page).commit('فسبح باسم ربك العظيم');
+      expect(r.placed).toBe(true);
+      expect(r.start).toBe(first(sura, ayah));
+    }
+  });
+
   it('starts from a chosen verse', () => {
     const t = new RecitationTracker(words, 50);
     t.startAt(first(3, 1));
@@ -386,5 +398,15 @@ describe('preview', () => {
     expect(p.correct).toContain(first(1, 1));
     expect(t.position).toBe(first(1, 1));
     expect(t.statusOf(first(1, 1))).toBe('pending');
+  });
+
+  it('before the reciter is found, only places them on the page on screen', () => {
+    // Recognition runs on into 60:1 (لا تتخذوا) while the reciter starts 59:18 on
+    // page 548. A preview there revealed 60:1 and turned to page 549 for a moment.
+    const t = new RecitationTracker(words, 548);
+    const p = t.preview('يا أيها الذين آمنوا لا تتخذوا');
+    expect(p.position == null || words.pageOf(p.position) === 548).toBe(true);
+    expect(p.correct.every((w) => words.pageOf(w) === 548)).toBe(true);
+    expect(t.anchored).toBe(false);
   });
 });

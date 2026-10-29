@@ -36,6 +36,8 @@ const MATCH = 2;
 const SUB = -1;
 const INS = -1;
 const DEL = -1;
+/** Breaks a tie between equal fits in favour of the page on screen. */
+const ON_SCREEN = 0.01;
 /** Starting further on: each word jumped is missed, up to this much in total. */
 const SKIP_CAP = 6;
 /** Going back to repeat: a small cost that grows slowly with the distance. */
@@ -175,6 +177,8 @@ export class RecitationTracker {
   private readonly heard = new Map<number, string>();
   private pos: number | null = null;
   private region: [number, number];
+  /** The words of the page on screen while searching (it wins a tie). */
+  private onScreen: [number, number];
   private misses = 0;
   /** While searching: the last utterance too short to place (الم, then a pause). */
   private unplaced: Heard | null = null;
@@ -195,6 +199,7 @@ export class RecitationTracker {
     this.status = new Uint8Array(words.count);
     this.stale = new Uint8Array(words.count);
     this.region = this.pageRegion(startPage);
+    this.onScreen = this.words.pageRange(startPage);
   }
 
   /** The next word expected, or null while searching. */
@@ -248,6 +253,7 @@ export class RecitationTracker {
   searchOnPage(page: number): void {
     this.pos = null;
     this.region = this.pageRegion(page);
+    this.onScreen = this.words.pageRange(page);
     this.misses = 0;
     this.unplaced = null;
     this.previousEvidence = [];
@@ -288,12 +294,16 @@ export class RecitationTracker {
 
   /**
    * Where a partial result (the utterance so far) puts the reciter, without
-   * changing anything. Only moves forward from the committed position.
+   * changing anything. Only moves forward from the committed position. Before
+   * the reciter is found, only on the page on screen: a partial result is
+   * short and often runs on into a common continuation (يا أيها الذين آمنوا لا),
+   * which fitted the next page better, revealed words there and turned to it
+   * for a moment. The final result searches the pages either side.
    */
   preview(text: string | string[]): Preview {
     const heard = toHeard(text);
     if (heard.keys.length === 0) return { position: this.pos, correct: [] };
-    const a = this.align(heard);
+    const a = this.pos == null ? this.search(heard, this.onScreen) : this.align(heard);
     if (!a) return { position: this.pos, correct: [] };
     const correct: number[] = [];
     let end = -1;
@@ -341,6 +351,7 @@ export class RecitationTracker {
         Math.max(0, this.words.pageRange(this.words.pageOf(pos) - 2)[0]),
         Math.min(this.words.count, this.words.pageRange(this.words.pageOf(pos) + 3)[1]),
       ];
+      this.onScreen = this.words.pageRange(this.words.pageOf(pos));
       a = this.search(heard);
       anchored = !!a;
     }
@@ -518,9 +529,9 @@ export class RecitationTracker {
   }
 
   /** Find the utterance in the search region (no reciter position yet). */
-  private search(heard: Heard): Alignment | null {
-    const [lo, hi] = this.region;
-    const a = this.dp(heard, lo, hi, () => 0);
+  private search(heard: Heard, [lo, hi] = this.region): Alignment | null {
+    const [from, to] = this.onScreen;
+    const a = this.dp(heard, lo, hi, (s) => (s >= from && s < to ? ON_SCREEN : 0));
     if (!a || !this.plausible(a, null)) return null;
     // A lone word (الله, من) is everywhere: it takes two to place the reciter.
     if (a.matches < Math.min(3, Math.max(2, a.spoken))) return null;
