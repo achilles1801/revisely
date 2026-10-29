@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';

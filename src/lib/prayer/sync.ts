@@ -9,6 +9,7 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../logger';
+import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID } from '../notificationChannels';
 import {
   PlannedNotification,
   PRAYER_ID_PREFIX,
@@ -70,7 +71,12 @@ async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
           sound: n.sound === 'standard',
           data: { kind: 'prayer', prayer: n.prayer ?? null },
         },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: n.at,
+          // Android: the sound is the channel's (iOS ignores it).
+          channelId: n.sound === 'standard' ? PRAYER_CHANNEL_ID : PRAYER_SILENT_CHANNEL_ID,
+        },
       });
     } catch (err) {
       logger.warn('Could not schedule a prayer notification', err);

@@ -30,6 +30,7 @@ import {
 import * as firestoreService from '../services/firestoreService';
 import { alertSessionSaved } from '../components/timer/sessionSavedAlert';
 import { logger } from '../lib/logger';
+import { REMINDER_CHANNEL_ID } from '../lib/notificationChannels';
 import { ReadingTimerMode } from '../types';
 
 const STORAGE_KEY = '@revisely_reading_timer';
@@ -67,7 +68,7 @@ async function scheduleCompletionNotification(timer: ActiveReadingTimer) {
         title: 'Reading session complete',
         body: `${formatDuration((timer.targetSeconds ?? 0))} logged. Nice work.`,
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at) },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at), channelId: REMINDER_CHANNEL_ID },
     });
   } catch (err) {
     logger.log('Could not schedule reading timer notification', err);

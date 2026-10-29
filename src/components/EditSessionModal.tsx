@@ -5,9 +5,9 @@ import {
   StyleSheet,
   Modal,
   Alert,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from './SafeAreaView';
 import { useTheme } from '../context/ThemeContext';
 import { useApp } from '../context/AppContext';
 import { spacing } from '../theme/spacing';
@@ -24,6 +24,7 @@ import {
   getJuzForPage,
   getSurahsForPage,
 } from '../lib/quranData';
+import { arabicLabelLines } from '../lib/platformUi';
 
 interface EditSessionModalProps {
   visible: boolean;
@@ -179,7 +180,7 @@ export function EditSessionModal({
                 </Text>
               ) : null}
               {firstSurah?.nameArabic ? (
-                <Text style={[arabicV2(13), { color: read.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                <Text style={[arabicV2(13), { color: read.textSecondary }]} maxFontSizeMultiplier={1.3} numberOfLines={arabicLabelLines}>
                   {firstSurah.nameArabic}
                 </Text>
               ) : null}

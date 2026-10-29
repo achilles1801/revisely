@@ -7,6 +7,7 @@ import { ActionSheet } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
 import { PillButton } from '../../v2/PillButton';
 import { RowText, ThreadRow } from '../../v2/ThreadRow';
+import { arabicLabelLines } from '../../../lib/platformUi';
 
 /**
  * Friday on Home: a post suggesting Surah Al-Kahf. Read opens it; "Mark as
@@ -39,7 +40,7 @@ export function KahfPost({
         mark={<Mark label="١٨" arabic done={done} />}
         name="Al-Kahf"
         nameAfter={
-          <Text style={[arabicV2(16), { color: palette.secondary, marginLeft: 6, lineHeight: 20 }]} accessibilityLanguage="ar">
+          <Text style={[arabicV2(16), { color: palette.secondary, marginLeft: 6, lineHeight: 20 }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
             الكهف
           </Text>
         }

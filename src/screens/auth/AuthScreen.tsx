@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   TextInputProps,
 } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleGIcon } from '../../components/GoogleGIcon';
 import { Mark } from '../../components/v2/Mark';
@@ -213,7 +212,9 @@ export default function AuthScreen() {
   // icon, read out as they appear.
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="auth">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
+      {/* Padding on Android too: with edge-to-edge the window isn't resized for the
+          keyboard, and 'height' left the password and Sign in under it. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.keyboardView}>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={v2.content}
