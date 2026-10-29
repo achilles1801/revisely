@@ -5,7 +5,7 @@
 
 import { setAudioModeAsync, setIsAudioActiveAsync } from 'expo-audio';
 
-export type AudioActivity = 'recitation' | 'recording-playback' | 'recorder';
+export type AudioActivity = 'recitation' | 'recording-playback' | 'recorder' | 'preview';
 
 type Listener = (claimedBy: AudioActivity, owner: string) => void;
 const listeners = new Set<Listener>();

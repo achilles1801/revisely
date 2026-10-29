@@ -10,6 +10,7 @@ import PlanEditScreen from '../screens/main/PlanEditScreen';
 import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
 import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
+import AthanVoiceScreen from '../screens/prayer/AthanVoiceScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
@@ -61,6 +62,7 @@ export type HomeStackParamList = {
   // Settings → Prayer (testers).
   PrayerCalculation: undefined;
   PrayerNotifications: undefined;
+  AthanVoice: undefined;
 };
 
 export type ReadStackParamList = {
@@ -102,6 +104,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
+      <HomeStack.Screen name="AthanVoice" component={AthanVoiceScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
