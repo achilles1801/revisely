@@ -191,20 +191,19 @@ describe('Settings: Appearance and haptics (Oct 28)', () => {
   });
 });
 
-describe('Settings: Prayer (testers)', () => {
+describe('Settings: Prayer (every account from 1.0.3)', () => {
   afterEach(() => {
     delete mockUser.previewTester;
   });
 
-  it('not a tester: Day boundary as before, no Prayer section or Next prayer switch', async () => {
+  it('not a tester: Prayer is there too (public), in place of Day boundary', async () => {
     await renderV2();
-    expect(screen.getByText('Day boundary')).toBeTruthy();
-    expect(screen.queryByText('Prayer notifications')).toBeNull();
-    expect(screen.queryByText('Next prayer')).toBeNull();
+    expect(screen.queryByText('Day boundary')).toBeNull();
+    expect(screen.getByText('Prayer notifications')).toBeTruthy();
+    expect(screen.getByText('Next prayer')).toBeTruthy();
   });
 
-  it('a tester: Prayer holds times, notifications, calculation, the Qibla and Start day at fajr; Home screen gets Next prayer', async () => {
-    mockUser.previewTester = true;
+  it('Prayer holds times, notifications, calculation, the Qibla and Start day at fajr; Home screen gets Next prayer', async () => {
     mockUser.fajrCalculationMethod = 'MoonsightingCommittee';
     await renderV2();
     expect(screen.queryByText('Day boundary')).toBeNull();
