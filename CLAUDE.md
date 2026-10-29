@@ -611,6 +611,16 @@ from before blocks). Each:
 - `observability` is off: no stored request logs (they would say who read which verse). Watch live with
   `npx wrangler@4.153.0 tail revisely`.
 
+**Athan voices (`/athan/`, `worker/athan.ts`):** the catalog and audio for prayer notifications, from
+the R2 bucket `revisely-athan` (binding `ATHAN`; the bucket has no public access of its own):
+`catalog.json`, `notif/<id>.caf|m4a` (≤ 30 s clips the app copies into `Library/Sounds`),
+`full/<id>.m4a` (streamed, with byte ranges) and `previews/<id>.m4a`. GET and HEAD only, those key
+shapes only, ETags, the catalog cached an hour and audio a day; Worker Previews have no bucket (503).
+The files come from the athan project (`~/Documents/revisely-athan`: `build_athan.py`, `DESIGN.md`,
+`LICENSES.md` with the takedown process); upload them with `npx wrangler@4.153.0 r2 object put
+revisely-athan/<key> --file <path> --remote`. To take a voice down, delete its objects or set
+`enabled: false` in `catalog.json`. The bucket must exist before a deploy that binds it.
+
 **Deploying:** Cloudflare Workers Builds deploys `main` on every push (and runs `wrangler preview` for
 other branches, which is why `wrangler.jsonc` has a `previews` block: previews get no keys and answer
 503). So worker changes reach revisely.app through a PR into `main`: they are outside the app hash, so
