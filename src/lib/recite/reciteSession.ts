@@ -68,6 +68,9 @@ export class ReciteSession {
   private lastPage: number | null = null;
   private errors = 0;
   private heardText = '';
+  // Development measurements: audio heard so far against the clock.
+  private audioSamples = 0;
+  private wallStart = 0;
 
   constructor(options: ReciteSessionOptions) {
     this.o = options;
@@ -127,7 +130,13 @@ export class ReciteSession {
 
   async start(): Promise<void> {
     const source = await this.o.startSource({
-      onAudio: (samples) => this.recognizer.push(samples),
+      onAudio: (samples) => {
+        if (__DEV__) {
+          if (this.audioSamples === 0) this.wallStart = Date.now();
+          this.audioSamples += samples.length;
+        }
+        this.recognizer.push(samples);
+      },
       onStop: (reason) => {
         this.source = null;
         this.end(reason);
@@ -201,10 +210,10 @@ export class ReciteSession {
 
   private onPartial(text: string) {
     this.errors = 0;
-    if (__DEV__) logger.log('[recite] partial:', text);
     this.heardText = text;
     this.preview = this.tracker.preview(text);
     this.previewCorrect = new Set(this.preview.correct);
+    if (__DEV__) logger.log('[recite] partial:', text, '→', this.preview.position, this.timing());
     this.followPage();
     this.o.onChange();
   }
@@ -214,7 +223,7 @@ export class ReciteSession {
     const before = this.tracker.position;
     if (text.trim()) this.heardText = text;
     const result = this.tracker.commit(text, partials, { lastWordUnsure: cut });
-    if (__DEV__) logger.log('[recite] final:', text, '| placed', result.placed, 'at', result.start, '→', result.position);
+    if (__DEV__) logger.log('[recite] final:', text, '| placed', result.placed, 'at', result.start, '→', result.position, this.timing());
     this.preview = null;
     this.previewCorrect.clear();
     if (result.mistakes.length > 0) this.o.onMistakes?.(result.mistakes);
@@ -258,7 +267,18 @@ export class ReciteSession {
     }
   }
 
+  /** Development: how far behind the audio this result came (ms). */
+  private timing(): string {
+    const audioMs = Math.round((this.audioSamples / 16000) * 1000);
+    const wallMs = Date.now() - this.wallStart;
+    return `| audio ${audioMs} ms, wall ${wallMs} ms, behind ${wallMs - audioMs} ms`;
+  }
+
   private end(reason: ReciteEnd) {
+    if (__DEV__) {
+      const span = this.tracker.span;
+      logger.log('[recite] end', reason, '| recited', this.tracker.recitedCount(), 'span', span ? `${span[0]}-${span[1]}` : '-', 'mistakes', this.tracker.mistakes().length, this.timing());
+    }
     if (this.ended) return;
     this.ended = true;
     this.pauseClock();
