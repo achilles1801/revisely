@@ -27,6 +27,10 @@ import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { HiddenPageOverlay } from '../../components/recite/HiddenPageOverlay';
 import { RecitePanel } from '../../components/recite/RecitePanel';
 import { usePauseListener } from '../../components/recite/usePauseListener';
+import { canFollowWords, useReciteFollow } from '../../components/recite/useReciteFollow';
+import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
+import { followLabel, WordByWordChip } from '../../components/recite/RecitePanel';
+import { useSpeechModelState } from '../../lib/recite/speechModelStore';
 import {
   NOTHING_REVEALED,
   nextHiddenVerse,
@@ -184,8 +188,26 @@ export default function ActiveRevisionScreen() {
       return verse ? revealVerse(s, page, verse) : s;
     });
   }, []);
+  // Word by word (phase 2): with the speech model on the phone, the reciter is
+  // followed on the device and each word shows as it is recited; the page
+  // turns when they reach the next, and a page recited through counts as
+  // revised. Without the model (or on a binary without the module), the pause
+  // listener below; also while recording (it listens through the recording).
+  const speechModel = useSpeechModelState();
+  const followable = canFollowWords();
+  const wordMode = hidden && followable && speechModel.status === 'ready';
+  const [modelSheet, setModelSheet] = useState(false);
+  const markRevisedRef = useRef<(page: number) => void>(() => undefined);
+  const followPages = assignment?.pages ?? NO_PAGES;
+  const follow = useReciteFollow({
+    active: wordMode && listenOn && isScreenFocused && !recorder.recording,
+    pages: followPages,
+    currentPage: pageOnScreen ?? followPages[0] ?? 1,
+    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
+    onPageDone: (page) => markRevisedRef.current(page),
+  });
   const listener = usePauseListener({
-    active: hidden && listenOn && isScreenFocused,
+    active: hidden && listenOn && isScreenFocused && (!wordMode || recorder.recording),
     externalLevel: recorder.level,
     onPause: revealNext,
   });
@@ -221,10 +243,16 @@ export default function ActiveRevisionScreen() {
     () =>
       hidden
         ? (page: number, scale: number) => (
-            <HiddenPageOverlay page={page} scale={scale} revealed={revealedOn(reveal, page)} colors={coverColors} />
+            <HiddenPageOverlay
+              page={page}
+              scale={scale}
+              revealed={revealedOn(reveal, page)}
+              follow={wordMode ? follow.follow : null}
+              colors={coverColors}
+            />
           )
         : undefined,
-    [hidden, reveal, coverColors],
+    [hidden, reveal, coverColors, wordMode, follow.follow],
   );
 
   const verseActions = useVerseActions({
@@ -412,6 +440,7 @@ export default function ActiveRevisionScreen() {
     },
     [haptics],
   );
+  markRevisedRef.current = markRevised;
 
   const unmarkRevised = useCallback((pageNumber: number) => {
     setCompletedPages((prev) => {
@@ -737,7 +766,11 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="recite-hint"
               >
-                {listener.status === 'listening' ? 'Pause after a verse to see it' : 'Tap a verse to see it'}
+                {wordMode && listenOn
+                  ? 'Recite: each word shows as you say it'
+                  : listener.status === 'listening'
+                    ? 'Pause after a verse to see it'
+                    : 'Tap a verse to see it'}
               </Text>
             ) : firstSurahOnPage ? (
               <View style={styles.crumbRight}>
@@ -791,12 +824,28 @@ export default function ActiveRevisionScreen() {
             {hidden ? (
               <RecitePanel
                 status={listener.status}
-                hearing={listener.hearing}
+                hearing={wordMode && !recorder.recording ? follow.status === 'following' : listener.hearing}
+                {...(wordMode && !recorder.recording
+                  ? {
+                      label: listenOn ? followLabel(follow.status) : 'Mic off',
+                      on: listenOn && ['starting', 'finding', 'following'].includes(follow.status),
+                    }
+                  : {})}
+                accessory={
+                  followable && speechModel.status !== 'ready' ? (
+                    <WordByWordChip
+                      progress={speechModel.status === 'downloading' ? speechModel.progress : null}
+                      onPress={() => setModelSheet(true)}
+                    />
+                  ) : null
+                }
                 onToggleListening={() => {
-                  if (listenOn && listener.status !== 'paused') setListenOn(false);
+                  const paused = wordMode ? follow.status === 'paused' : listener.status === 'paused';
+                  if (listenOn && !paused) setListenOn(false);
                   else {
                     setListenOn(true);
                     listener.resume();
+                    follow.resume();
                   }
                 }}
                 onNextVerse={revealNext}
@@ -865,6 +914,7 @@ export default function ActiveRevisionScreen() {
         />
       </ReaderFrame>
 
+      <SpeechModelSheet visible={modelSheet} onClose={() => setModelSheet(false)} onReady={() => setModelSheet(false)} />
       <UndoToast
         visible={!!savedRecording}
         message="Recording saved"

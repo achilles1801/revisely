@@ -13,6 +13,16 @@
 
 import { AyahRef, ayahRects, Rect, versesOnPage } from '../ayahBounds';
 import { pageLines, Span, subtractSpans } from './pageLines';
+import type { QuranWords } from './quranWords';
+
+/** Following the reciter word by word (on-device recognition, lib/recite/reciteSession). */
+export interface WordFollow {
+  words: QuranWords;
+  /** Whether a word has been recited (it shows). */
+  shown: (word: number) => boolean;
+  /** The next word to recite (the accent band's line), or null while finding the reciter. */
+  next: number | null;
+}
 
 /** What revealed a verse. 'speech' is for recognition (not in this version). */
 export type RevealSource = 'tap' | 'pause' | 'next' | 'speech';
@@ -83,8 +93,16 @@ const onLine = (r: Rect, y0: number, y1: number) => {
   return mid >= y0 - 3 && mid <= y1 + 3;
 };
 
-/** How a page is drawn while hidden, with `revealed` verses shown. */
-export function hiddenPageLayout(page: number, revealed: ReadonlySet<string>): { lines: CoverLine[]; next: AyahRef | null } {
+/**
+ * How a page is drawn while hidden, with `revealed` verses shown, and with
+ * `follow`, the words recited so far shown too (word by word).
+ */
+export function hiddenPageLayout(
+  page: number,
+  revealed: ReadonlySet<string>,
+  follow?: WordFollow | null,
+): { lines: CoverLine[]; next: AyahRef | null } {
+  if (follow) return followedPageLayout(page, revealed, follow);
   const verses = versesOnPage(page);
   const next = verses.find((v) => !revealed.has(verseKey(v))) ?? null;
   const boxes = verses.flatMap((v) =>
@@ -116,4 +134,45 @@ export function hiddenPageLayout(page: number, revealed: ReadonlySet<string>): {
     };
   });
   return { lines, next };
+}
+
+/** Word by word: each line less its markers and the words shown (recited, or in a revealed verse). */
+function followedPageLayout(page: number, revealed: ReadonlySet<string>, follow: WordFollow): { lines: CoverLine[]; next: AyahRef | null } {
+  const { words } = follow;
+  const [from, to] = words.pageRange(page);
+  const byLine = new Map<number, { shown: Span[]; hidden: Span[] }>();
+  let firstHidden: number | null = null;
+  for (let w = from; w < to; w++) {
+    const ref = words.ref(w);
+    const shown = follow.shown(w) || revealed.has(verseKey(ref));
+    if (!shown && firstHidden == null) firstHidden = w;
+    const line = words.lineOf(w);
+    let entry = byLine.get(line);
+    if (!entry) byLine.set(line, (entry = { shown: [], hidden: [] }));
+    const r = words.rect(w);
+    if (shown) entry.shown.push([r.x0, r.x1]);
+    else entry.hidden.push([r.x0 - EDGE, r.x1 + EDGE]);
+  }
+  // The band: on the next word to recite when it's on this page, else on the first hidden one.
+  const nextWord = follow.next != null && follow.next >= from && follow.next < to ? follow.next : firstHidden;
+  const nextLine = nextWord != null ? words.lineOf(nextWord) : null;
+  const lines = pageLines(page).map((l): CoverLine => {
+    const entry = byLine.get(l.line) ?? { shown: [], hidden: [] };
+    const opened = entry.shown.flatMap(([a, b]) => subtractSpans(a, b, entry.hidden));
+    return {
+      line: l.line,
+      y0: l.y0,
+      y1: l.y1,
+      top: l.coverTop,
+      bottom: l.coverBottom,
+      x0: l.x0,
+      x1: l.x1,
+      covers: subtractSpans(l.x0, l.x1, [...l.markers, ...opened]).filter(([a, b]) =>
+        entry.hidden.some(([h0, h1]) => Math.min(b, h1) - Math.max(a, h0) > 1),
+      ),
+      current: nextLine != null && l.line === nextLine && firstHidden != null,
+    };
+  });
+  const nextRef = firstHidden != null ? words.ref(firstHidden) : null;
+  return { lines, next: nextRef ? { page, sura: nextRef.sura, ayah: nextRef.ayah } : null };
 }

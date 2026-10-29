@@ -61,6 +61,18 @@ jest.mock('../../../lib/recordingBackupUi', () => ({
 }));
 jest.mock('../../../lib/sentry', () => ({ reportProblem: jest.fn() }));
 
+let mockFollowable = true;
+jest.mock('../../../components/recite/useReciteFollow', () => ({ canFollowWords: () => mockFollowable }));
+let mockModelState: Record<string, unknown> = { status: 'missing', error: null };
+const mockRemoveModel = jest.fn();
+jest.mock('../../../lib/recite/speechModelStore', () => ({
+  useSpeechModelState: () => mockModelState,
+  removeSpeechModel: () => mockRemoveModel(),
+  startModelDownload: jest.fn(),
+  cancelModelDownload: jest.fn(),
+}));
+jest.mock('@react-native-community/netinfo', () => ({ fetch: jest.fn(async () => ({ type: 'wifi' })) }));
+
 import SettingsScreen from '../SettingsScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
@@ -208,5 +220,56 @@ describe('Settings: Prayer (testers)', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerNotifications');
     fireEvent.press(screen.getByText('Calculation'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerCalculation');
+  });
+});
+
+describe('Settings: the speech model (testers)', () => {
+  beforeEach(() => {
+    mockFollowable = true;
+    mockModelState = { status: 'missing', error: null };
+  });
+  afterEach(() => {
+    delete mockUser.previewTester;
+  });
+
+  it('not a tester, or a binary without the module: no row', async () => {
+    await renderV2();
+    expect(screen.queryByText('Speech model')).toBeNull();
+    mockUser.previewTester = true;
+    mockFollowable = false;
+    await renderV2();
+    expect(screen.queryByText('Speech model')).toBeNull();
+  });
+
+  it('not downloaded: says so, and opens the download', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    expect(screen.getByText('Speech model')).toBeTruthy();
+    expect(screen.getByText('Follows your recitation word by word, on this iPhone')).toBeTruthy();
+    expect(screen.getByText('Not downloaded')).toBeTruthy();
+    fireEvent.press(screen.getByText('Speech model'));
+    await act(async () => {});
+    expect(screen.getByTestId('speech-model-sheet')).toBeTruthy();
+  });
+
+  it('on the phone: its size, and Delete', async () => {
+    mockUser.previewTester = true;
+    mockModelState = { status: 'ready', bytes: 59_707_625 };
+    await renderV2();
+    expect(screen.getByText('57 MB')).toBeTruthy();
+    fireEvent.press(screen.getByText('Speech model'));
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('sheet-action-delete'));
+    await act(async () => {
+      screen.UNSAFE_getAllByType(require('react-native').Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
+    });
+    expect(mockRemoveModel).toHaveBeenCalled();
+  });
+
+  it('downloading: the progress', async () => {
+    mockUser.previewTester = true;
+    mockModelState = { status: 'downloading', progress: 0.3 };
+    await renderV2();
+    expect(screen.getByText('30%')).toBeTruthy();
   });
 });

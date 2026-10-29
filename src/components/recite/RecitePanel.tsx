@@ -7,6 +7,7 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import type { ListenStatus } from './usePauseListener';
+import type { FollowStatus } from './useReciteFollow';
 
 /** What the panel says about listening. */
 export function listenLabel(status: ListenStatus, hearing: boolean): string {
@@ -26,6 +27,45 @@ export function listenLabel(status: ListenStatus, hearing: boolean): string {
   }
 }
 
+/** What the panel says while following word by word. */
+export function followLabel(status: FollowStatus): string {
+  switch (status) {
+    case 'starting':
+      return 'Starting…';
+    case 'finding':
+      return 'Start reciting';
+    case 'following':
+      return 'Following';
+    case 'paused':
+      return 'Paused · tap the mic';
+    case 'denied':
+      return 'Microphone is off';
+    case 'error':
+      return 'Couldn’t listen · tap the mic';
+    default:
+      return 'Mic off';
+  }
+}
+
+/** "Word by word": the speech model to download (its progress while it does). */
+export function WordByWordChip({ progress, onPress }: { progress: number | null; onPress: () => void }) {
+  const { theme } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      style={[styles.next, { borderColor: theme.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={progress == null ? 'Follow word by word' : `Downloading the speech model, ${Math.round(progress * 100)}%`}
+      testID="recite-word-by-word"
+    >
+      <Text style={[typography.caption, styles.nextText, { color: theme.textPrimary }]} maxFontSizeMultiplier={1.2}>
+        {progress == null ? 'Word by word' : `${Math.round(progress * 100)}%`}
+      </Text>
+    </Pressable>
+  );
+}
+
 /**
  * The hidden recite mode's controls, in the player capsule's place under the
  * page: the microphone (reveal when you pause; on while listening), what it is
@@ -34,6 +74,9 @@ export function listenLabel(status: ListenStatus, hearing: boolean): string {
 export function RecitePanel({
   status,
   hearing,
+  label,
+  on: onOverride,
+  accessory,
   onToggleListening,
   onNextVerse,
   nextDisabled,
@@ -45,6 +88,12 @@ export function RecitePanel({
 }: {
   status: ListenStatus;
   hearing: boolean;
+  /** What it says, in place of the pause listener's (word by word). */
+  label?: string;
+  /** Whether the mic shows on, in place of the pause listener's. */
+  on?: boolean;
+  /** Beside the label: "Word by word" (the speech model to download). */
+  accessory?: ReactNode;
   onToggleListening: () => void;
   onNextVerse: () => void;
   /** Every verse on the page shown. */
@@ -56,7 +105,7 @@ export function RecitePanel({
   surface: { background: string; border: string };
 }) {
   const { theme } = useTheme();
-  const on = status === 'listening' || status === 'starting';
+  const on = onOverride ?? (status === 'listening' || status === 'starting');
   const pressMic = () => {
     if (status === 'denied') {
       Alert.alert(
@@ -101,8 +150,9 @@ export function RecitePanel({
         accessibilityLiveRegion="polite"
         testID="recite-status"
       >
-        {listenLabel(status, hearing)}
+        {label ?? listenLabel(status, hearing)}
       </Text>
+      {accessory}
       <Pressable
         onPress={onNextVerse}
         disabled={nextDisabled}
