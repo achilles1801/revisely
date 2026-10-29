@@ -25,6 +25,9 @@ name: Promote to production
 # Rolling back: run it by hand with `group` = the previous production update group and `rollback` =
 # true. That group is looked up on production as well as preview, the health check is skipped (it
 # already ran in production), and the approval still applies.
+#
+# Android is opt-in (repository variable ANDROID_RELEASES, as in preview.yml): off, only the group's
+# iOS update is republished, so nothing reaches Android's production channel until it is turned on.
 on:
   push:
     branches: [main]
@@ -194,7 +197,8 @@ jobs:
         env:
           GROUP: ${{ needs.find.outputs.group }}
           MESSAGE: ${{ needs.find.outputs.message }}
+          PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
         run: |
-          eas update:republish --group "$GROUP" --destination-branch production \
+          eas update:republish --group "$GROUP" --destination-branch production --platform "$PLATFORM" \
             --message "Promoted from preview: $MESSAGE" --non-interactive
-          echo "Promoted $GROUP (runtime ${{ needs.find.outputs.runtime }}) to production." >> "$GITHUB_STEP_SUMMARY"
+          echo "Promoted $GROUP ($PLATFORM, runtime ${{ needs.find.outputs.runtime }}) to production." >> "$GITHUB_STEP_SUMMARY"

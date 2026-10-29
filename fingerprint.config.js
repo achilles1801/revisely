@@ -21,6 +21,9 @@ module.exports = {
     // Gitignored, so present on a laptop and on EAS but not on the GitHub runner.
     'GoogleService-Info.plist',
     'google-services.json',
+    // The Android build reads it from GOOGLE_SERVICES_JSON (app.config.js), a file outside the
+    // project on the runner and on EAS: ignored wherever it is, as above.
+    '**/google-services.json',
     // Terminal colouring the config loader pulls in only when it has a .env.local to announce.
     '**/node_modules/chalk/**/*',
     '**/node_modules/ansi-styles/**/*',

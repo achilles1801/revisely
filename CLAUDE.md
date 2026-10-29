@@ -513,6 +513,64 @@ Fahd Complex fonts (open-source quran.com-images). They are served from the Stor
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
 
+## Android (Google Play)
+
+Not on Google Play yet (Oct 28 2026). Package `com.revisionbuddy.app`, the same as the iOS bundle id
+(permanent once on Play). `versionCode` comes from EAS (`appVersionSource: remote`, `autoIncrement`).
+Target SDK 36, min 24; every native library is 16 KB aligned (checked on an API 37 16 KB-page
+emulator). `store/android/` holds the listing, Data safety and content rating answers and the
+click-by-click setup.
+- **Opt-in in CI.** Repository variables (Settings → Secrets and variables → Actions → Variables):
+  `ANDROID_RELEASES` = `true` makes Preview look up the Android fingerprint (tag `android-fp/<hash>`),
+  build on a Linux runner when it has none (`android-build.yml`, `eas build --local`, no credits) and
+  publish updates for both platforms; Promote then republishes Android too. Off, both are iOS only.
+  `ANDROID_SUBMIT` = `true` uploads each build to Play's internal testing (`eas submit`, eas.json
+  `submit.production.android`: `track: internal`, `releaseStatus: draft` until the app is
+  published once, then `completed`). Every build attaches the `.aab` to the run (7 days): Play takes
+  the first upload only through Play Console. EAS Build (by hand) has a platform choice.
+- **Secrets.** `GOOGLE_SERVICES_JSON` (repository secret, base64 of google-services.json), written
+  outside the repo and passed by path (`GOOGLE_SERVICES_JSON`, app.config.js). The upload keystore
+  and the Play service account key live on EAS (`eas credentials --platform android`), like the
+  iOS credentials, so no workflow holds them.
+- **Fingerprint.** The iOS fingerprint hashes the whole app config, the `android` section and every
+  plugin's options included: any Android change in `app.config.js` (permissions, icons, plugins) is
+  a native change for iOS too (raise `version`, a TestFlight build, an App Store release). Changes
+  that move nothing on iOS: Android-only local modules (`modules/*` with only `android`), `eas.json`,
+  and google-services.json, ignored wherever it is (`**/google-services.json`: a file outside the
+  project was hashed, so the runner's and a laptop's Android hashes differed).
+- **Gradle memory.** Lint (`lintVitalAnalyzeRelease`) ran out of memory with the default 2 GB; the
+  workflow writes `org.gradle.jvmargs=-Xmx6g` to `~/.gradle/gradle.properties` (it wins over the
+  project's, which prebuild writes). Locally: `-Dorg.gradle.jvmargs=-Xmx6g` and
+  `SENTRY_DISABLE_AUTO_UPLOAD=true` on `./gradlew assembleRelease`.
+- **Preview channel.** Play can't tell internal testing from production, so on Android the
+  `previewTester` account alone decides (`lib/updateChannel`); Play's reviewers use the demo account.
+- **Sign-in.** Google needs the app's SHA-1s (upload key, Play App Signing key, and a laptop's debug
+  key for dev builds) under the Android app in Firebase Console; Apple's button doesn't show.
+  App Check uses Play Integrity in release builds (link it in Firebase → App Check); dev builds use
+  the debug provider, with their own debug token registered under the Android app.
+- **Edge-to-edge traps** (Android 15+ enforces it; SDK 54 turns it on):
+  - React Native's `SafeAreaView` pads only on iOS: use `components/SafeAreaView`.
+  - The window isn't resized for the keyboard: `KeyboardAvoidingView` needs `padding` on Android too.
+  - The status bar's icons and native dialogs follow the app's theme through `AndroidSystemTheme`;
+    a screen with its own `<StatusBar>` (the reader) wins while mounted.
+- **Other traps.**
+  - Android measures voweled Amiri narrower than it draws it: a short Arabic label needs
+    `numberOfLines={arabicLabelLines}` (`lib/platformUi`) or its last word disappears.
+  - A runtime permission dialog is an activity: the app goes to `background` while it asks.
+  - A notification's sound and importance are its channel's: schedule with a `channelId`
+    (`lib/notificationChannels`: Reminders, Prayer times, Prayer times (silent); Recitation is
+    expo-audio's channel, created first so it has a name). Without one it lands in "Miscellaneous".
+  - Recitation's media notification has play/pause and the scrubber, not previous/next verse
+    (expo-audio 1.1 removes track commands on Android; a patch or a later expo-audio).
+  - expo-location sends a heading only after a ~2° turn, so a phone held still can show
+    "Finding north…" until it moves.
+  - Widgets are iOS only (WidgetKit); Android home-screen widgets are a follow-up.
+- **Testing on an emulator** without touching production: the Firebase emulators (Auth, Firestore,
+  Storage) with a dev build pointed at them, and an account seeded there with
+  `functions/scripts/seed-screenshots.js` (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`).
+  The Clear Quran needs a real ID token, so it can't be tried there. In `adb shell input text`, an
+  `r` typed twice outside a text field reloads a dev build.
+
 ## Worker (revisely.app/api)
 
 `wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs

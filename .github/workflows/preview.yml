@@ -18,6 +18,12 @@ name: Preview
 #
 # Config values (Firebase keys, client ids, Sentry) come from the `production` environment on EAS,
 # the same one production builds read, so an update carries the config its binary was built with.
+#
+# Android is opt-in, with the repository variable ANDROID_RELEASES = 'true' (Settings > Secrets and
+# variables > Actions > Variables). Off, everything here is iOS only, as before. On, the Android
+# fingerprint is looked up the same way (tag android-fp/<hash>), a Linux runner builds it when it has
+# no build (android-build.yml: Google Play internal testing once ANDROID_SUBMIT is 'true'), and the
+# update is published for both platforms.
 on:
   push:
     branches: [develop]
@@ -51,6 +57,8 @@ jobs:
     outputs:
       hash: ${{ steps.fp.outputs.hash }}
       needs_build: ${{ steps.fp.outputs.needs_build }}
+      android_hash: ${{ steps.android.outputs.hash }}
+      android_needs_build: ${{ steps.android.outputs.needs_build }}
     steps:
       - name: Require an Expo token
         env:
@@ -109,6 +117,25 @@ jobs:
             echo "::notice title=New iOS build::Native code changed (fingerprint $HASH). Building on the runner and submitting to TestFlight."
           fi
 
+      # Android (opt-in). Only a runner build counts: there were never EAS builds for Android.
+      - name: Look for an Android build
+        id: android
+        if: ${{ vars.ANDROID_RELEASES == 'true' }}
+        run: |
+          HASH=$(eas env:exec production 'npx expo-updates fingerprint:generate --platform android' --non-interactive | grep '^{' | jq -r .hash)
+          if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
+            echo "::error::Could not compute the Android fingerprint."
+            exit 1
+          fi
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/android-fp/$HASH")" ]; then
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+            echo "An Android build exists for $HASH, publishing an update only."
+          else
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=New Android build::Native code changed (fingerprint $HASH). Building on a Linux runner."
+          fi
+
   build:
     name: Build
     needs: fingerprint
@@ -121,11 +148,23 @@ jobs:
       fingerprint: ${{ needs.fingerprint.outputs.hash }}
     secrets: inherit
 
+  android-build:
+    name: Build (android)
+    needs: fingerprint
+    if: ${{ vars.ANDROID_RELEASES == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
+    permissions:
+      contents: write # pushes the android-fp/<hash> tag
+    uses: ./.github/workflows/android-build.yml
+    with:
+      submit: true
+      fingerprint: ${{ needs.fingerprint.outputs.android_hash }}
+    secrets: inherit
+
   # Published even when the build failed: an update for a fingerprint with no build reaches nobody,
   # and does no harm.
   update:
     name: Publish update
-    needs: [fingerprint, build]
+    needs: [fingerprint, build, android-build]
     if: ${{ !cancelled() && needs.fingerprint.result == 'success' }}
     runs-on: ubuntu-latest
     env:
@@ -154,11 +193,13 @@ jobs:
         run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
 
       - name: eas update (preview)
+        env:
+          PLATFORM: ${{ vars.ANDROID_RELEASES == 'true' && 'all' || 'ios' }}
         run: |
           # Short enough that the hash survives: EAS lists messages cut at 512 characters.
           SUBJECT=$(echo "$MESSAGE" | head -n 1 | cut -c 1-300)
           APP=$(.github/scripts/app-hash.sh)
-          eas update --channel preview --environment production --platform ios \
+          eas update --channel preview --environment production --platform "$PLATFORM" \
             --message "$SUBJECT [app $APP]" --non-interactive
 
       # Source maps for the bundle just published (left in dist/ by eas update), so Sentry shows
