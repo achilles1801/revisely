@@ -1,0 +1,129 @@
+name: Android build
+
+# Builds the production Android app bundle (.aab) on a GitHub Linux runner (`eas build --local`)
+# and, once Google Play submission is set up, uploads it to the internal testing track
+# (`eas submit`). Local builds use no EAS build credits, and Linux runners cost nothing on a public
+# repository. Called by Preview (preview.yml, when Android is on and its native code changed) and by
+# EAS Build (by hand). Android is opt-in: see "Android" in CLAUDE.md.
+#
+# Signing: the upload keystore stays on EAS and is fetched with EXPO_TOKEN (created once with
+# `eas credentials --platform android`). Google Play: the service account key is uploaded to EAS too
+# (`eas credentials --platform android` > Google Service Account), so this workflow holds no Play
+# secret; submission runs only when the repository variable ANDROID_SUBMIT is 'true'.
+# google-services.json is gitignored, so it comes from the GOOGLE_SERVICES_JSON repository secret
+# (base64) and is passed by path (GOOGLE_SERVICES_JSON, app.config.js); fingerprint.config.js ignores
+# it wherever it is, so the runtime matches the one Preview computed.
+on:
+  workflow_call:
+    inputs:
+      submit:
+        description: Upload the bundle to Google Play (internal testing)
+        type: boolean
+        default: true
+      fingerprint:
+        description: Android fingerprint of this commit; tagged android-fp/<hash> once submitted
+        type: string
+        default: ''
+    secrets:
+      EXPO_TOKEN:
+        required: true
+      GOOGLE_SERVICES_JSON:
+        required: true
+      SENTRY_AUTH_TOKEN:
+        required: false
+
+jobs:
+  build:
+    name: Build and submit (android)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Require the Firebase config
+        env:
+          JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$JSON" ]; then
+            echo "::error::Add a GOOGLE_SERVICES_JSON repository secret: base64 of google-services.json (Firebase Console > Project settings > the Android app)."
+            exit 1
+          fi
+
+      # An Android build needs about 15 GB; the image ships tools this job never uses.
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android/sdk/emulator "$AGENT_TOOLSDIRECTORY/CodeQL" && df -h /
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # React Native 0.81 builds with JDK 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Gradle's default 2 GB ran out of memory in lint (lintVitalAnalyzeRelease) on a release build.
+      # The user-level file wins over the project's gradle.properties, which prebuild writes.
+      - name: Gradle memory
+        run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write google-services.json
+        env:
+          JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$JSON" | base64 -d > "$RUNNER_TEMP/google-services.json"
+
+      - name: eas build --local
+        env:
+          GOOGLE_SERVICES_JSON: ${{ runner.temp }}/google-services.json
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: revisely
+          SENTRY_PROJECT: react-native
+          SENTRY_URL: https://sentry.io/
+          SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
+          # A failed upload costs readable stack traces, not the release.
+          SENTRY_ALLOW_FAILURE: 'true'
+        run: eas build --local --profile production --platform android --non-interactive --output "$RUNNER_TEMP/revisely.aab"
+
+      # For the first upload, which Google Play takes only through Play Console, and for a look
+      # without Play. The repository is public, so anyone signed in to GitHub can download it while
+      # it is kept (an .aab holds nothing that the app on Play won't).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: revisely-android-${{ github.sha }}
+          path: ${{ runner.temp }}/revisely.aab
+          retention-days: 7
+
+      - name: eas submit (Google Play, internal testing)
+        if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' }}
+        run: eas submit --platform android --profile production --path "$RUNNER_TEMP/revisely.aab" --non-interactive
+
+      # The marker preview.yml looks for: local builds are not listed by `eas build:list`, so this tag
+      # is how it knows the fingerprint has a build on Play.
+      - name: Tag the fingerprint
+        if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' && inputs.fingerprint != '' }}
+        env:
+          FP: ${{ inputs.fingerprint }}
+        run: |
+          if [ -z "$(git ls-remote --tags origin "refs/tags/android-fp/$FP")" ]; then
+            git tag "android-fp/$FP"
+            git push origin "refs/tags/android-fp/$FP"
+          fi
+          echo "::notice title=Google Play::Bundle uploaded to internal testing for fingerprint $FP."
+
+      - name: Not submitted
+        if: ${{ !(inputs.submit && vars.ANDROID_SUBMIT == 'true') }}
+        run: echo "::notice title=Not submitted::The .aab is attached to this run (Artifacts). Google Play submission is off (repository variable ANDROID_SUBMIT)."

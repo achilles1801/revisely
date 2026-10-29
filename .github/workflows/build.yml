@@ -1,13 +1,19 @@
 name: EAS Build
 
 # A native build, started by hand from the Actions tab, e.g. to replace a TestFlight build before it
-# expires (90 days). Rarely needed otherwise: Preview (preview.yml) starts one by itself when a push to
-# develop changes native code. Runs on a GitHub macOS runner (ios-build.yml), so it uses no EAS build credits.
+# expires (90 days), or Android's first bundle for Google Play. Rarely needed otherwise: Preview
+# (preview.yml) starts one by itself when a push to develop changes native code. iOS runs on a GitHub
+# macOS runner (ios-build.yml), Android on a Linux runner (android-build.yml): no EAS build credits.
 on:
   workflow_dispatch:
     inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        options: [ios, android]
+        default: ios
       submit:
-        description: Submit to TestFlight once built
+        description: Submit once built (TestFlight; Google Play internal testing when ANDROID_SUBMIT is on)
         type: boolean
         default: true
 
@@ -17,7 +23,17 @@ permissions:
 jobs:
   build:
     name: Build production (ios)
+    if: ${{ inputs.platform == 'ios' }}
     uses: ./.github/workflows/ios-build.yml
+    with:
+      submit: ${{ inputs.submit }}
+    secrets: inherit
+
+  # The .aab is attached to the run (Artifacts): the first upload to Google Play is made by hand.
+  build-android:
+    name: Build production (android)
+    if: ${{ inputs.platform == 'android' }}
+    uses: ./.github/workflows/android-build.yml
     with:
       submit: ${{ inputs.submit }}
     secrets: inherit
