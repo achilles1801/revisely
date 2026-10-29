@@ -208,14 +208,6 @@ hard-coded token was deleted from the console on 2026-10-27.
 - The release workflows use Node 22, which current eas-cli requires. CI jobs use Node 20.
 - The runner build pins Xcode (`xcode-select` in `ios-build.yml`, image `macos-26`). Apple requires
   a current SDK for uploads; move the pin when the image or Apple's minimum changes.
-- **The UIScene life cycle** (Oct 29 2026, 1.0.3): built with the iOS 27 SDK (Xcode 27), an app without
-  it crashes at launch on iOS 27. Expo adopts it in SDK 58; until then `plugins/withSceneDelegate.js`
-  adds the scene manifest and a `SceneDelegate` (in AppDelegate.swift). Release builds start React
-  Native in the scene, with the launch URL as a launch option (`Linking.getInitialURL`); development
-  builds still start it at launch, because expo-dev-launcher throws otherwise. URLs, user activities
-  and the active/background callbacks go back through `ExpoAppDelegate`. The plugin is listed before
-  the RNFirebase plugins (mods run in reverse; it must edit after them), and prebuild fails if the
-  template changes. Remove it when upgrading to SDK 58.
 - Secret EAS variables are unreadable on the runner: the plist comes from `GOOGLE_SERVICE_INFO_PLIST`,
   and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
 - There is no Maestro job. The flows run locally (`npm run test:e2e:ios`) against a dev client.

@@ -119,10 +119,6 @@ export default {
       // own `post_install` block conflicted with Expo's (CocoaPods only
       // allows one), causing "Specifying multiple post_install hooks is
       // unsupported" failures.
-      // The UIScene life cycle (the iOS 27 SDK requires it). Listed before the
-      // RNFirebase plugins on purpose: mods run in reverse order, and this one
-      // must edit AppDelegate.swift after @react-native-firebase/app has.
-      "./plugins/withSceneDelegate",
       "@react-native-firebase/app",
       "@react-native-firebase/app-check",
       // Native Google Sign-In SDK (replaces expo-auth-session/providers/google,
