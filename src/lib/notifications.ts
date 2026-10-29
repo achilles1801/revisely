@@ -3,6 +3,9 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
+import { REMINDER_CHANNEL_ID } from './notificationChannels';
+
+export { REMINDER_CHANNEL_ID };
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -13,19 +16,47 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * Android's notification channels, as Settings → Apps → Revisely → Notifications
+ * lists them. The daily reminder and the reading timer use 'default' (its id since
+ * the first version; it was also named "default"). Without a channel a scheduled
+ * notification went to expo-notifications' "Miscellaneous". Recitation's controls
+ * (expo-audio) use its own channel, which it creates only when it is missing and
+ * names after its id: made here first, it has a name.
+ */
+const PLAYBACK_CHANNEL_ID = 'expo_audio_channel';
+
+export async function ensureAndroidChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    await Promise.all([
+      Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
+        name: 'Reminders',
+        description: 'Your daily revision reminder and the reading timer.',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: NOTIFICATION_LIGHT_COLOR,
+      }),
+      Notifications.setNotificationChannelAsync(PLAYBACK_CHANNEL_ID, {
+        name: 'Recitation',
+        description: 'Play and pause a recitation from the notification and the lock screen.',
+        importance: Notifications.AndroidImportance.LOW,
+        sound: null,
+        enableVibrate: false,
+        showBadge: false,
+      }),
+    ]);
+  } catch (error) {
+    logger.log('Could not set up notification channels:', error);
+  }
+}
+
 // Requests notification permission (idempotent — no-op if already granted).
 // Returns true if the user has granted permission, false otherwise.
 // Works on simulators for local notifications; the device gate only applies
 // to fetching a push token below.
 export async function ensureNotificationsPermission(): Promise<boolean> {
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: NOTIFICATION_LIGHT_COLOR,
-    });
-  }
+  await ensureAndroidChannels();
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   if (existingStatus === 'granted') return true;
@@ -97,6 +128,7 @@ export async function scheduleDailyReminder(time: string, enabled: boolean) {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: hours,
       minute: minutes,
+      channelId: REMINDER_CHANNEL_ID,
     },
   });
 }
@@ -112,6 +144,6 @@ export async function scheduleDangerAlert(juz: number, enabled: boolean) {
       body: `Juz ${juz} is due for review`,
       sound: true,
     },
-    trigger: null, // Immediate
+    trigger: { channelId: REMINDER_CHANNEL_ID }, // Immediate
   });
 }

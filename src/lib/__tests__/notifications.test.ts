@@ -49,7 +49,8 @@ describe('scheduleDailyReminder', () => {
   it('schedules one daily reminder, by name, at the time given', async () => {
     await scheduleDailyReminder('07:30', true);
     expect(ids()).toEqual([DAILY_REMINDER_ID]);
-    expect(mockScheduled.get(DAILY_REMINDER_ID)!.trigger).toEqual({ type: 'daily', hour: 7, minute: 30 });
+    // channelId: Android's Reminders channel (iOS ignores it).
+    expect(mockScheduled.get(DAILY_REMINDER_ID)!.trigger).toEqual({ type: 'daily', hour: 7, minute: 30, channelId: 'default' });
   });
 
   it("keeps a running reading timer's notification (the launch reschedule used to cancel it)", async () => {
@@ -77,14 +78,14 @@ describe('scheduleDailyReminder', () => {
 
     await scheduleDailyReminder('07:30', true);
     expect(ids()).toEqual([DAILY_REMINDER_ID, TIMER_ID].sort());
-    expect(mockScheduled.get(DAILY_REMINDER_ID)!.trigger).toEqual({ type: 'daily', hour: 7, minute: 30 });
+    expect(mockScheduled.get(DAILY_REMINDER_ID)!.trigger).toEqual({ type: 'daily', hour: 7, minute: 30, channelId: 'default' });
   });
 
   it('changing the time keeps one reminder', async () => {
     await scheduleDailyReminder('07:30', true);
     await scheduleDailyReminder('20:15', true);
     expect(ids()).toEqual([DAILY_REMINDER_ID]);
-    expect(mockScheduled.get(DAILY_REMINDER_ID)!.trigger).toEqual({ type: 'daily', hour: 20, minute: 15 });
+    expect(mockScheduled.get(DAILY_REMINDER_ID)!.trigger).toEqual({ type: 'daily', hour: 20, minute: 15, channelId: 'default' });
   });
 
   it("can't list what's scheduled: still schedules by name (which replaces the last one)", async () => {

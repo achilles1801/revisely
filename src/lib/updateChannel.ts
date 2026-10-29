@@ -13,10 +13,16 @@
 // reviewers untested JavaScript; their account isn't a tester. Anything else
 // (App Store, other accounts, unsure) clears the switch: production.
 //
+// Android: Google Play can't tell an internal-testing install from a production
+// one (the installer is the Play Store either way), so the account alone decides:
+// a tester follows preview, everyone else production. Play's reviewers sign in with
+// the demo account, which isn't a tester. No native module is needed.
+//
 // expo-updates keeps the choice. When it changes, the new channel's update is
 // fetched at once, so the next cold start runs it. Only the channel header,
 // which the build itself sets, is replaced, so expo-updates' safeguards stay on.
 
+import { Platform } from 'react-native';
 import * as Updates from 'expo-updates';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import InstallSource from '../../modules/install-source';
@@ -30,7 +36,9 @@ export function channelOverride(channel: Channel): Record<string, string> | null
   return channel === PREVIEW_CHANNEL ? { 'expo-channel-name': PREVIEW_CHANNEL } : null;
 }
 
-function installedFromTestFlight(): boolean {
+/** Where an install may follow preview: a TestFlight install on iOS; any on Android. */
+function installAllowsPreview(): boolean {
+  if (Platform.OS === 'android') return true;
   try {
     return InstallSource?.isTestFlight() === true;
   } catch (err) {
@@ -45,11 +53,12 @@ let applied: Channel | null = null;
 
 /**
  * Point this install at its channel. Returns the channel it follows, or null
- * where updates don't apply (development, binaries before 1.0.2).
+ * where updates don't apply (development, iOS binaries before 1.0.2).
  */
 export function applyUpdateChannel(isTester: boolean): Channel | null {
-  if (__DEV__ || !Updates.isEnabled || !InstallSource) return null;
-  const channel: Channel = isTester && installedFromTestFlight() ? PREVIEW_CHANNEL : 'production';
+  if (__DEV__ || !Updates.isEnabled) return null;
+  if (Platform.OS === 'ios' && !InstallSource) return null;
+  const channel: Channel = isTester && installAllowsPreview() ? PREVIEW_CHANNEL : 'production';
   if (channel === applied) return channel;
   try {
     Updates.setUpdateRequestHeadersOverride(channelOverride(channel));

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
   Platform,
@@ -13,6 +12,7 @@ import {
   LayoutAnimation,
   AccessibilityState,
 } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
@@ -65,6 +65,7 @@ import {
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { supportMailto } from '../../lib/contact';
 import { PillTabs } from '../../components/v2/PillTabs';
+import { shareIcon } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -801,7 +802,7 @@ export default function SettingsScreen() {
 
         <Section title="Support">
           <Row
-            icon="share-outline"
+            icon={shareIcon}
             label="Share Revisely"
             onPress={handleShareApp}
           />

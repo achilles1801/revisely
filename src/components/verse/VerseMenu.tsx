@@ -22,6 +22,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Box, placeMenu } from './menuPlacement';
+import { shareIcon } from '../../lib/platformUi';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -162,7 +163,7 @@ export function VerseMenu({
     ],
     [
       { key: 'copy', label: 'Copy', icon: 'copy-outline', onPress: onCopy },
-      { key: 'share', label: 'Share', icon: 'share-outline', onPress: onShare },
+      { key: 'share', label: 'Share', icon: shareIcon, onPress: onShare },
     ],
   ];
   // VoiceOver hears which verse: there is no title.

@@ -279,7 +279,9 @@ export function Sheet({
           </Animated.View>
         </Reanimated.View>
         {keyboard ? (
-          <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
+          // Padding on Android too: with edge-to-edge the modal's window isn't resized
+          // for the keyboard, which covered the whole sheet (Send feedback).
+          <KeyboardAvoidingView style={styles.fill} behavior="padding" pointerEvents="box-none">
             {sheet}
           </KeyboardAvoidingView>
         ) : (
