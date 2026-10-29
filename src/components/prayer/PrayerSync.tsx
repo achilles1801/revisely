@@ -10,6 +10,7 @@ import { dayTimes, defaultMethodFor } from '../../lib/prayer/times';
 import { PLAN_DAYS, planDays } from '../../lib/prayer/schedule';
 import { clearPrayerNotifications, syncPrayerNotifications } from '../../lib/prayer/sync';
 import { logger } from '../../lib/logger';
+import { useAthanSoundsVersion } from '../../lib/athan/store';
 import { prayerTimesEnabled, setScheduledPrayerDays } from '../../lib/prayer/status';
 
 export { prayerTimesEnabled };
@@ -39,6 +40,8 @@ export function PrayerSync() {
   const { user, saveUser } = useApp();
   const { firebaseUser, isLoading: authLoading } = useAuth();
   const prefs = usePrayerPrefs();
+  // A voice's clip downloaded or deleted: the athan's sound file changed.
+  const athanSounds = useAthanSoundsVersion();
   const [foreground, setForeground] = useState(0);
   const [tz, setTz] = useState(zone);
 
@@ -118,7 +121,7 @@ export function PrayerSync() {
     return () => clearTimeout(timer);
     // The settings and alerts by value (keys); the rest as listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedOut, ownUser?.id, enabled, anyOn, lat, lng, settingsKey, alertsKey, foreground, tz]);
+  }, [signedOut, ownUser?.id, enabled, anyOn, lat, lng, settingsKey, alertsKey, foreground, tz, athanSounds]);
 
   return null;
 }

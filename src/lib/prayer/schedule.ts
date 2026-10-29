@@ -33,6 +33,8 @@ export interface PlannedNotification {
   title: string;
   body: string;
   sound: PrayerSound;
+  /** The athan voice, for a prayer's time with the athan. */
+  voice?: string | null;
   kind: 'at' | 'before' | 'keep-going';
   prayer?: PrayerName;
 }
@@ -79,6 +81,7 @@ export function planPrayerNotifications({
           title: name,
           body: `It’s time for ${name} · ${time}`,
           sound: alert.sound,
+          voice: alert.sound === 'athan' ? (alert.voice ?? null) : null,
           kind: 'at',
           prayer,
         });
@@ -129,5 +132,5 @@ export function planDays(plan: PlannedNotification[], now: Date): number {
 
 /** What a scheduled notification must match to be left as it is. */
 export function signature(n: PlannedNotification): string {
-  return `${n.at.getTime()}|${n.title}|${n.body}|${n.sound}`;
+  return `${n.at.getTime()}|${n.title}|${n.body}|${n.sound}|${n.voice ?? ''}`;
 }
