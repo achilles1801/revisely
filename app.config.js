@@ -34,10 +34,11 @@ export default {
       // widgets show here (src/lib/widgets).
       entitlements: {
         "com.apple.security.application-groups": ["group.com.revisionbuddy.app"],
-        // Prayer notifications at a prayer's time break through Focus and the
-        // notification summary (interruptionLevel in lib/prayer/sync). A capability
-        // on the App ID: EAS signing needs `eas credentials:configure-build` once.
-        "com.apple.developer.usernotifications.time-sensitive": true,
+        // Not yet: com.apple.developer.usernotifications.time-sensitive (prayer
+        // notifications through Focus; lib/prayer/sync already asks for it). It's a
+        // capability Apple's App Store Connect API can't enable, so CI signing can't
+        // add it: it needs `eas credentials:configure-build -p ios -e production`
+        // with the Apple ID first, then this line, in a native build after 1.0.3.
       },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
