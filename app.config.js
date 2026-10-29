@@ -6,7 +6,7 @@ export default {
     slug: "revision-buddy",
     owner: "achilles1802",
     scheme: "revisely",
-    version: "1.0.2",
+    version: "1.0.3",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
     // build that lacks it.
@@ -62,8 +62,23 @@ export default {
         ]
       }
     },
+    // Android's notifications (reminders, prayer times, the timer): a white R that Android
+    // tints, and Indigo for the app's name in them. Without it Android drew the launcher icon
+    // as a blank white shape. Read by expo-notifications' plugin (Android only).
+    notification: {
+      icon: "./assets/notification-icon.png",
+      color: "#624BD5"
+    },
     android: {
       package: "com.revisionbuddy.app",
+      // Expo adds these by default. The app never draws over other apps (only the dev menu
+      // did) and stores files in its own folders (no storage permission since Android 10);
+      // Play lists every permission on the store page.
+      blockedPermissions: [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
@@ -128,6 +143,8 @@ export default {
         },
       ],
       "expo-font",
+      // Android dialogs', cursor's and selection handles' colour (ink, not Material's teal).
+      "./plugins/withAndroidTheme",
       "expo-web-browser",
       // The launch screen: the R, 200 pt wide, on black (in light and dark mode
       // alike). imageWidth needs this plugin: the top-level `splash` key shows the
