@@ -50,7 +50,7 @@ import { NextPrayerLine } from '../../components/prayer/NextPrayerLine';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { prayerTimesEnabled } from '../../lib/prayer/status';
 import { usePrayerPrefs } from '../../lib/prayer/prefs';
-import { onQiblaSheetRequest } from '../../lib/widgets/links';
+import { onPrayerSheetRequest } from '../../lib/widgets/links';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
@@ -96,7 +96,6 @@ export default function DashboardScreen() {
   useScrollToTop(scrollRef);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [qiblaOpen, setQiblaOpen] = useState(false);
-  // The Qibla widget's tap (revisely://qibla) opens the sheet here, also from a cold start.
   // Prayer times (testers): one sheet, Times | Qibla; the compass opens it on
   // Qibla, the next-prayer line on Times.
   const [prayerTab, setPrayerTab] = useState<PrayerTab>('qibla');
@@ -107,10 +106,16 @@ export default function DashboardScreen() {
     setPrayerTab(tab);
     setQiblaOpen(true);
   };
+  // The widgets' taps open it here on their tab, also from a cold start: Qibla
+  // (revisely://qibla) and prayer times (revisely://prayer). Without prayer
+  // times there is only the Qibla sheet, so the prayer widget just shows Home.
+  const prayerEnabledRef = useRef(prayerEnabled);
+  prayerEnabledRef.current = prayerEnabled;
   useEffect(
     () =>
-      onQiblaSheetRequest(() => {
-        setPrayerTab('qibla');
+      onPrayerSheetRequest((tab) => {
+        if (tab === 'times' && !prayerEnabledRef.current) return;
+        setPrayerTab(tab);
         setQiblaOpen(true);
       }),
     [],

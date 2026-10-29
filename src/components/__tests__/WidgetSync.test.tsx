@@ -9,10 +9,10 @@ jest.mock('../../lib/widgets/snapshot', () => ({ buildWidgetSnapshot: (i: any) =
 jest.mock('../../lib/quranData', () => ({ getQuranData: () => [] }));
 let mockPosition: any = null;
 jest.mock('../../lib/widgets/position', () => ({ lastKnownPosition: () => Promise.resolve(mockPosition) }));
-const mockRequestQibla = jest.fn();
+const mockRequestSheet = jest.fn();
 jest.mock('../../lib/widgets/links', () => ({
   ...jest.requireActual('../../lib/widgets/links'),
-  requestQiblaSheet: () => mockRequestQibla(),
+  requestPrayerSheet: (tab: string) => mockRequestSheet(tab),
 }));
 let mockDay = '2026-10-27';
 jest.mock('../../hooks/useRevisionDay', () => ({ useRevisionDay: () => ({ day: mockDay, date: new Date() }) }));
@@ -43,7 +43,7 @@ beforeEach(() => {
   mockNavigate.mockClear();
   mockNavReady = true;
   mockPosition = null;
-  mockRequestQibla.mockClear();
+  mockRequestSheet.mockClear();
   mockDay = '2026-10-27';
   mockAccent = 'indigo';
   initialUrl = null;
@@ -184,12 +184,34 @@ describe('<WidgetSync />', () => {
     view.unmount();
   });
 
-  it('the Qibla link: Home, and asks for the Qibla sheet', async () => {
+  it('the Qibla link: Home, and asks for the sheet on Qibla', async () => {
     render(<WidgetSync />);
     await flush();
     act(() => urlListener?.({ url: 'revisely://qibla' }));
     await flush();
     expect(mockNavigate).toHaveBeenLastCalledWith('Home', { screen: 'Dashboard' });
-    expect(mockRequestQibla).toHaveBeenCalledTimes(1);
+    expect(mockRequestSheet.mock.calls).toEqual([['qibla']]);
+  });
+
+  it('the prayer link: Home, and asks for the sheet on Times', async () => {
+    render(<WidgetSync />);
+    await flush();
+    act(() => urlListener?.({ url: 'revisely://prayer' }));
+    await flush();
+    expect(mockNavigate).toHaveBeenLastCalledWith('Home', { screen: 'Dashboard' });
+    expect(mockRequestSheet.mock.calls).toEqual([['times']]);
+  });
+
+  it('the prayer link that started the app waits for the main screens', async () => {
+    initialUrl = 'revisely://prayer';
+    mockApp = { ...mockApp, loading: true };
+    const view = render(<WidgetSync />);
+    await flush();
+    expect(mockRequestSheet).not.toHaveBeenCalled();
+    mockApp = { ...mockApp, loading: false };
+    view.rerender(<WidgetSync />);
+    await flush();
+    expect(mockNavigate).toHaveBeenCalledWith('Home', { screen: 'Dashboard' });
+    expect(mockRequestSheet.mock.calls).toEqual([['times']]);
   });
 });
