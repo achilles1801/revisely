@@ -23,6 +23,8 @@ import { formatTime, TIME_LABELS } from '../../lib/prayer/times';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { usePrayerNotifyPermission } from '../../components/prayer/usePrayerNotifyPermission';
 import { useScheduledPrayerDays } from '../../lib/prayer/status';
+import { ATHAN_DOWNLOADS_SUPPORTED } from '../../lib/athan';
+import { useChosenAthanVoice } from '../../components/prayer/useChosenAthanVoice';
 
 /** "Standard tone · 10 min before", "Athan", "Silent". */
 export function alertSummary(a: PrayerAlert): string {
@@ -103,11 +105,39 @@ export default function PrayerNotificationsScreen() {
             );
           })}
         </GroupedSection>
+        {ATHAN_DOWNLOADS_SUPPORTED ? <AthanVoiceSection onPress={() => navigation.navigate('AthanVoice' as never)} /> : null}
       </ScrollView>
 
       <AlertSheet prayer={editing} onClose={() => setEditing(null)} />
       {permission.sheets}
     </View>
+  );
+}
+
+/** The voice of prayers set to Athan, and the way to change it. */
+function AthanVoiceSection({ onPress }: { onPress: () => void }) {
+  const { palette } = useTheme();
+  const voice = useChosenAthanVoice();
+  return (
+    <GroupedSection header="Athan">
+      <Tap
+        onPress={onPress}
+        style={styles.row}
+        accessibilityRole="button"
+        accessibilityLabel={`Athan voice: ${voice.name}. Change`}
+        testID="prayer-athan-voice"
+      >
+        <View style={styles.rowText}>
+          <Text style={[typeV2.body, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+            Voice
+          </Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            {voice.name}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+      </Tap>
+    </GroupedSection>
   );
 }
 
