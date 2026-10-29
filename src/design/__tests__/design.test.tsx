@@ -218,7 +218,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     }
     // The accent's tint marks a picked or running thing (a time, a drop slot,
     // the timer chip); its labels are ink or grey.
-    for (const ink of [p.text, p.secondary]) {
+    for (const ink of [p.text, p.secondary, p.subtleText]) {
       expect(contrast(ink, p.accentSubtle)).toBeGreaterThanOrEqual(4.5);
     }
     // Labels and glyphs on the accent's fills.

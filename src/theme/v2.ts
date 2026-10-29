@@ -46,6 +46,8 @@ interface AccentTokens {
   link: string;
   /** A tinted ground (a selected row, a chip). */
   accentSubtle: string;
+  /** Accent text on `accentSubtle` (≥ 4.5:1): the next prayer's row. */
+  subtleText: string;
   /** The glow behind Home's Today post; null for none. */
   hero: HeroStops | null;
   /** A progress fill, start to end. */
@@ -197,6 +199,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#616977',
       accentSubtle: '#EDEDEF',
+      subtleText: '#1A1A1A',
       hero: lightGlow('#3FA084', 0.3),
       progress: ['#0E6B5A', '#0E6B5A'],
       ring: ['#0E6B5A', '#0E6B5A'],
@@ -213,6 +216,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#000000',
       link: '#8A8A93',
       accentSubtle: '#181818',
+      subtleText: '#FFFFFF',
       hero: null,
       progress: ['#4DBA9F', '#4DBA9F'],
       ring: ['#4DBA9F', '#4DBA9F'],
@@ -235,6 +239,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#DC1433',
       accentSubtle: '#FCE8EB',
+      subtleText: '#B30F28',
       hero: lightGlow('#DC1433', 0.24),
       progress: ['#3E0812', '#DC1433'],
       ring: ['#3E0812', '#DC1433'],
@@ -251,6 +256,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#000000',
       link: '#F03C56',
       accentSubtle: '#2E0E15',
+      subtleText: '#F03C56',
       hero: [
         { offset: 0, color: '#3E0812', opacity: 1 },
         { offset: 0.5, color: '#33080E', opacity: 0.6 },
@@ -278,6 +284,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#FFFFFF',
       link: '#624BD5',
       accentSubtle: '#EFECFB',
+      subtleText: '#624BD5',
       hero: lightGlow('#624BD5', 0.32),
       progress: ['#2E0EC6', '#9789DA'],
       ring: ['#2E0EC6', '#9789DA'],
@@ -294,6 +301,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       onAccentText: '#000000',
       link: '#9789DA',
       accentSubtle: '#16113A',
+      subtleText: '#9789DA',
       hero: [
         { offset: 0, color: '#2E0EC6', opacity: 0.45 },
         { offset: 0.5, color: '#3A2694', opacity: 0.3 },

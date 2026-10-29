@@ -8,6 +8,8 @@ import SettingsScreen from '../screens/main/SettingsScreen';
 import MemorizationScreen from '../screens/main/MemorizationScreen';
 import PlanEditScreen from '../screens/main/PlanEditScreen';
 import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
+import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
+import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
@@ -56,6 +58,9 @@ export type HomeStackParamList = {
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string } | undefined;
+  // Settings → Prayer (testers).
+  PrayerCalculation: undefined;
+  PrayerNotifications: undefined;
 };
 
 export type ReadStackParamList = {
@@ -95,6 +100,8 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
       <HomeStack.Screen name="PlanEdit" component={PlanEditScreen} />
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
+      <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />
+      <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />

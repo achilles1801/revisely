@@ -29,6 +29,12 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
+import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
+import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
+import { prayerTimesEnabled } from '../../lib/prayer/status';
+import { PRAYERS, setPrayerPrefs, usePrayerPrefs } from '../../lib/prayer/prefs';
+import { formatTime as formatPrayerTime, methodLabel, TIME_LABELS } from '../../lib/prayer/times';
+import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../lib/qibla';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
@@ -97,6 +103,7 @@ function RowIcon({ name, destructive }: { name: IconName; destructive?: boolean 
 function Row({
   icon,
   label,
+  subtitle,
   value,
   rightSlot,
   onPress,
@@ -105,6 +112,8 @@ function Row({
 }: {
   icon?: IconName;
   label: string;
+  /** What it does, under the label. */
+  subtitle?: string;
   value?: string;
   rightSlot?: React.ReactNode;
   onPress?: () => void;
@@ -115,11 +124,18 @@ function Row({
   const row = (
     <View style={v2.row}>
       {icon ? <RowIcon name={icon} destructive={destructive} /> : null}
-      <Text
-        style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
-      >
-        {label}
-      </Text>
+      {subtitle ? (
+        <View style={[v2.rowLabel, !icon && v2.indent]}>
+          <Text style={[typeV2.body, { color: destructive ? palette.red : palette.text }]}>{label}</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{subtitle}</Text>
+        </View>
+      ) : (
+        <Text
+          style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
+        >
+          {label}
+        </Text>
+      )}
       {value !== undefined && (
         <Text style={[typeV2.body, styles.rowValue, { color: palette.secondary }]} numberOfLines={1}>
           {value}
@@ -199,6 +215,17 @@ export default function SettingsScreen() {
   const [tempName, setTempName] = useState(user?.name ?? '');
   const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
+  // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
+  const prayerEnabled = prayerTimesEnabled(user);
+  const prayerPrefs = usePrayerPrefs();
+  const prayerTimes = usePrayerTimes(user);
+  const [prayerSheet, setPrayerSheet] = useState<PrayerTab | null>(null);
+  const prayerOn = PRAYERS.filter((p) => prayerPrefs.alerts[p].on).length;
+  const qiblaValue = prayerTimes.place
+    ? [formatBearing(qiblaBearing(prayerTimes.place)), nearestCity(prayerTimes.place, bundledCities())?.name]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
   // The progress card's options stay folded until opened (remembered per device).
   const [metricsOpen, setMetricsOpen] = usePersistedFlag('@revisely_settings_progress_open', false);
   const toggleMetricsOpen = useCallback(() => {
@@ -624,6 +651,16 @@ export default function SettingsScreen() {
                 );
               })
             : null}
+          {prayerEnabled ? (
+            <Row
+              icon="time-outline"
+              label="Next prayer"
+              subtitle="A line under the header"
+              rightSlot={
+                <SettingSwitch value={prayerPrefs.homeLine} onValueChange={(v) => setPrayerPrefs({ homeLine: v })} />
+              }
+            />
+          ) : null}
           <Row
             icon="book-outline"
             label="Friday Al-Kahf reminder"
@@ -636,9 +673,38 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        <Section title="Day boundary">
-          <FajrBoundaryCard />
-        </Section>
+        {prayerEnabled ? (
+          <Section title="Prayer">
+            <Row
+              icon="time-outline"
+              label="Prayer times"
+              value={
+                prayerTimes.next
+                  ? `${TIME_LABELS[prayerTimes.next.name].en} ${formatPrayerTime(prayerTimes.next.time)}`
+                  : undefined
+              }
+              onPress={() => setPrayerSheet('times')}
+            />
+            <Row
+              icon="notifications-outline"
+              label="Prayer notifications"
+              value={prayerOn > 0 ? `${prayerOn} on` : 'Off'}
+              onPress={() => navigation.navigate('PrayerNotifications')}
+            />
+            <Row
+              icon="options-outline"
+              label="Calculation"
+              value={methodLabel(prayerTimes.settings.method, true)}
+              onPress={() => navigation.navigate('PrayerCalculation')}
+            />
+            <Row icon="compass-outline" label="Qibla" value={qiblaValue} onPress={() => setPrayerSheet('qibla')} />
+            <FajrBoundaryCard compact />
+          </Section>
+        ) : (
+          <Section title="Day boundary">
+            <FajrBoundaryCard />
+          </Section>
+        )}
 
         <Section title="Revision">
           {/* Like Keep daily amount below: the line under the label says what it does. */}
@@ -805,6 +871,18 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
+      {prayerEnabled ? (
+        <PrayerSheet
+          visible={prayerSheet != null}
+          tab={prayerSheet ?? 'times'}
+          onTab={setPrayerSheet}
+          onClose={() => setPrayerSheet(null)}
+          onOpenCalculation={() => {
+            setPrayerSheet(null);
+            navigation.navigate('PrayerCalculation');
+          }}
+        />
+      ) : null}
 
       <ReminderTimeSheetV2
         visible={showTimeModal}

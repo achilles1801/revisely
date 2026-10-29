@@ -178,3 +178,35 @@ describe('Settings: Appearance and haptics (Oct 28)', () => {
     expect(screen.queryByLabelText('Haptics')).toBeNull();
   });
 });
+
+describe('Settings: Prayer (testers)', () => {
+  afterEach(() => {
+    delete mockUser.previewTester;
+  });
+
+  it('not a tester: Day boundary as before, no Prayer section or Next prayer switch', async () => {
+    await renderV2();
+    expect(screen.getByText('Day boundary')).toBeTruthy();
+    expect(screen.queryByText('Prayer notifications')).toBeNull();
+    expect(screen.queryByText('Next prayer')).toBeNull();
+  });
+
+  it('a tester: Prayer holds times, notifications, calculation, the Qibla and Start day at fajr; Home screen gets Next prayer', async () => {
+    mockUser.previewTester = true;
+    mockUser.fajrCalculationMethod = 'MoonsightingCommittee';
+    await renderV2();
+    expect(screen.queryByText('Day boundary')).toBeNull();
+    for (const label of ['Prayer', 'Prayer times', 'Prayer notifications', 'Calculation', 'Qibla', 'Start day at fajr']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    // The method is under Calculation now, not under the fajr switch.
+    expect(screen.queryByTestId('fajr-method')).toBeNull();
+    expect(screen.getByText('Moonsighting')).toBeTruthy();
+    expect(screen.getByText('Next prayer')).toBeTruthy();
+    expect(screen.getByText('A line under the header')).toBeTruthy();
+    fireEvent.press(screen.getByText('Prayer notifications'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerNotifications');
+    fireEvent.press(screen.getByText('Calculation'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerCalculation');
+  });
+});

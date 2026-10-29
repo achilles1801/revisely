@@ -108,12 +108,23 @@ describe('revision day with the fajr boundary', () => {
 });
 
 describe('edge cases', () => {
-  it('has no fajr in the polar summer, and then turns the day at midnight', () => {
+  it('in the polar summer, Fajr comes from the nearest latitude that has one, as the prayer times do', () => {
+    // It used to be "no fajr" (the day turned at midnight); prayer times can't
+    // leave Fajr out, and the day starts at the Fajr they show.
     const tromso = { ...user, locationCoords: { latitude: 69.65, longitude: 18.96 } };
     const june = new Date(2026, 5, 21, 12);
-    expect(getFajrTimeFor(june, tromso)).toBeNull();
+    const fajr = getFajrTimeFor(june, tromso);
+    expect(fajr).not.toBeNull();
+    const { dayTimes } = require('../prayer/times');
+    const shown = dayTimes(tromso.locationCoords, june, {
+      method: tromso.fajrCalculationMethod,
+      highLatitude: 'recommended',
+      madhab: 'standard',
+      adjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
+    });
+    expect(fajr!.getTime()).toBe(shown.fajr.getTime());
     expect(getRevisionDayForUser(tromso, june)).toBe('2026-06-21');
-    expect(getNextRevisionDayStart(tromso, june).getTime()).toBe(new Date(2026, 5, 22).getTime());
+    expect(getNextRevisionDayStart(tromso, june).getTime()).toBeGreaterThan(june.getTime());
   });
 
   it('never returns a turnover in the past', () => {
