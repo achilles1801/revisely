@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
-import { REMINDER_CHANNEL_ID } from './notificationChannels';
+import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID, REMINDER_CHANNEL_ID } from './notificationChannels';
 
 export { REMINDER_CHANNEL_ID };
 
@@ -19,7 +19,8 @@ Notifications.setNotificationHandler({
 /**
  * Android's notification channels, as Settings → Apps → Revisely → Notifications
  * lists them. The daily reminder and the reading timer use 'default' (its id since
- * the first version; it was also named "default"). Without a channel a scheduled
+ * the first version; it was also named "default"); prayer notifications theirs, with
+ * a silent one (lib/notificationChannels). Without a channel a scheduled
  * notification went to expo-notifications' "Miscellaneous". Recitation's controls
  * (expo-audio) use its own channel, which it creates only when it is missing and
  * names after its id: made here first, it has a name.
@@ -36,6 +37,19 @@ export async function ensureAndroidChannels(): Promise<void> {
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: NOTIFICATION_LIGHT_COLOR,
+      }),
+      Notifications.setNotificationChannelAsync(PRAYER_CHANNEL_ID, {
+        name: 'Prayer times',
+        description: 'A prayer’s time, or a reminder before it, with the standard tone.',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: NOTIFICATION_LIGHT_COLOR,
+      }),
+      Notifications.setNotificationChannelAsync(PRAYER_SILENT_CHANNEL_ID, {
+        name: 'Prayer times (silent)',
+        description: 'Prayer notifications set to Silent.',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: null,
+        enableVibrate: false,
       }),
       Notifications.setNotificationChannelAsync(PLAYBACK_CHANNEL_ID, {
         name: 'Recitation',

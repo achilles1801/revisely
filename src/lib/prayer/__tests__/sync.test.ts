@@ -1,5 +1,5 @@
 // Scheduling with expo-notifications (kept in memory here, as iOS keeps them).
-const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean }; trigger: { date: Date } }>();
+const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean }; trigger: { date: Date; channelId?: string } }>();
 const mockCalls = { schedule: 0, cancel: 0 };
 jest.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: { DATE: 'date', DAILY: 'daily' },
@@ -58,6 +58,9 @@ describe('syncPrayerNotifications', () => {
     const isha = mockPending.get('prayer-2026-10-28-isha')!;
     expect(isha.content.sound).toBe(false);
     expect(isha.trigger.date.getTime()).toBe(dayTimes(LONDON, OCT28, S).isha!.getTime());
+    // On Android the sound is the channel's: silent ones go to the silent channel.
+    expect(isha.trigger.channelId).toBe('prayer-silent');
+    expect(mockPending.get('prayer-2026-10-29-fajr')!.trigger.channelId).toBe('prayer');
   });
 
   it('again with nothing changed: nothing rescheduled', async () => {
