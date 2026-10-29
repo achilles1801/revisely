@@ -1,0 +1,20 @@
+{
+  "_note": "Google Play listing (Play Console > Grow > Store presence > Main store listing). Kept in step with store/listing.json (the App Store's). Limits: title 30, short description 80, full description 4000.",
+  "title": "Revisely: Quran Revision",
+  "shortDescription": "Revise your Quran hifz on a schedule, page by page, in a real mushaf.",
+  "fullDescription": "Revisely is a Quran revision tracker built around a schedule that fits your hifz.\n\nPick how much you want to cover each day, and Revisely rotates through everything you've memorized on a repeating cycle. As you memorize more, the cycle grows with you. Miss a day and the schedule keeps moving instead of piling up, or step back a day when you need to catch up.\n\nInside:\n\n• Three ways to schedule: pages per day (1–60), juz per day (1–5), or a custom plan you build day by day, starting from any point\n• Full-page mushaf revision: swipe through the actual pages of the Qur'an, check each one off, and optionally rate its strength from 1 to 5. A timer shows how long the session took\n• Recitation: press and hold a verse to play it, or play a page, a surah or a juz. It goes on verse by verse with the app in the background or the screen locked, with play and pause in the notification. Choose the reciter, the speed, repeats and a pause after each verse to recite it back\n• Translations: Saheeh International and The Clear Quran® by Dr. Mustafa Khattab, under any verse you hold. Copy or share a verse in Arabic with its reference\n• Record yourself reciting: recordings stay on your phone and are backed up to your account (Wi-Fi only unless you allow mobile data), so you keep them when you change phones\n• Smart Tracking (optional): Insights ranks your memorized pages by how weak you've rated them and how often they've been skipped, so you know where to focus. Your daily assignment stays on schedule; this shows you what's slipping\n• Activity: a calendar of every day you revised, read and recorded, with a daily log for your own notes\n• Qibla compass: the direction of the Kaaba from where you are, worked out on your phone\n• Fajr-aligned days: start your revision day at dawn instead of midnight, so a late-night session counts for the right day\n• Memorization manager: browse the Qur'an by surah, juz or hizb, and mark pages as you memorize them\n• Read tab and reading timer: a separate Qur'an reader for reading outside of revision, with timed reading sessions\n• Streaks, full session history with editing, daily reminders, and light and dark themes\n\nHow it works:\n\n1. Mark what you've already memorized\n2. Choose how much to revise each day, and whether your day starts at fajr or midnight\n3. Open the app each day, tap Start revision, and swipe through your pages\n\nSign in with Google or email, and your progress syncs across your devices. You can delete your account and all of its data at any time from Settings.\n\nFree, with no ads and no in-app purchases.\n\nBuilt for people who want to keep the Qur'an they've memorized. Made to be used every day.",
+  "category": "Education",
+  "tags": [
+    "Education",
+    "Religion"
+  ],
+  "contactEmail": "support@revisely.app",
+  "website": "https://revisely.app",
+  "privacyPolicyUrl": "https://revisely.app/privacy/",
+  "deleteAccountUrl": "https://revisely.app/support/#delete-account",
+  "graphics": {
+    "icon": "store/android/icon-512.png",
+    "featureGraphic": "store/android/feature-graphic.png",
+    "phoneScreenshots": "store/android/screenshots/phone/ (1080x1920, light; dark/ holds the same in dark)"
+  }
+}
