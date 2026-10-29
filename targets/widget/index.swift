@@ -7,5 +7,6 @@ struct ReviselyWidgets: WidgetBundle {
     TodayWidget()
     VerseWidget()
     QiblaWidget()
+    PrayerWidget()
   }
 }

@@ -13,7 +13,7 @@ import { bundledCities, nearestCity } from '../lib/qibla';
 import { usePrayerPrefs } from '../lib/prayer/prefs';
 import { prayerTimesEnabled } from '../lib/prayer/status';
 import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
-import { parseWidgetLink, requestQiblaSheet, type WidgetLink } from '../lib/widgets/links';
+import { parseWidgetLink, requestPrayerSheet, type WidgetLink } from '../lib/widgets/links';
 import { navigationRef } from '../navigation/navigationRef';
 
 /**
@@ -140,9 +140,10 @@ export function openWidgetLink(link: WidgetLink) {
     navigationRef.navigate('Home', { screen: 'ActiveRevision', initial: false });
   } else if (link.kind === 'home') {
     navigationRef.navigate('Home', { screen: 'Dashboard' });
-  } else if (link.kind === 'qibla') {
+  } else if (link.kind === 'qibla' || link.kind === 'prayer') {
+    // The Prayer sheet over Home, on the widget's tab.
     navigationRef.navigate('Home', { screen: 'Dashboard' });
-    requestQiblaSheet();
+    requestPrayerSheet(link.kind === 'qibla' ? 'qibla' : 'times');
   } else {
     navigationRef.navigate('Read', { screen: 'QuranReader', params: { pageNumber: link.page }, initial: false });
   }

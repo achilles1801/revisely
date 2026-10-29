@@ -1,5 +1,11 @@
 import { compassPoint, distanceKm, formatDistance, qiblaBearing, widgetQibla, KAABA } from '../widgets/qibla';
-import { onQiblaSheetRequest, parseWidgetLink, requestQiblaSheet } from '../widgets/links';
+import {
+  onPrayerSheetRequest,
+  onQiblaSheetRequest,
+  parseWidgetLink,
+  requestPrayerSheet,
+  requestQiblaSheet,
+} from '../widgets/links';
 
 const NEW_YORK = { latitude: 40.7128, longitude: -74.006 };
 const LONDON = { latitude: 51.5074, longitude: -0.1278 };
@@ -87,5 +93,43 @@ describe('the Qibla link', () => {
     const stopOther = onQiblaSheetRequest(other);
     expect(other).not.toHaveBeenCalled();
     stopOther();
+  });
+});
+
+describe('the prayer link', () => {
+  it('parses', () => {
+    expect(parseWidgetLink('revisely://prayer')).toEqual({ kind: 'prayer' });
+    expect(parseWidgetLink('revisely://prayer/')).toEqual({ kind: 'prayer' });
+    expect(parseWidgetLink('revisely://prayers')).toBeNull();
+  });
+
+  it('asks for the sheet on its tab; the Qibla request asks for Qibla', () => {
+    const open = jest.fn();
+    const stop = onPrayerSheetRequest(open);
+    requestPrayerSheet('times');
+    requestQiblaSheet();
+    expect(open.mock.calls).toEqual([['times'], ['qibla']]);
+    stop();
+  });
+
+  it('a request before the sheet listens waits for it with its tab, once; a later one replaces it', () => {
+    requestPrayerSheet('qibla');
+    requestPrayerSheet('times');
+    const open = jest.fn();
+    const stop = onPrayerSheetRequest(open);
+    expect(open.mock.calls).toEqual([['times']]);
+    stop();
+    const other = jest.fn();
+    const stopOther = onPrayerSheetRequest(other);
+    expect(other).not.toHaveBeenCalled();
+    stopOther();
+  });
+
+  it('a Qibla-only host opens for any request', () => {
+    const open = jest.fn();
+    const stop = onQiblaSheetRequest(open);
+    requestPrayerSheet('times');
+    expect(open).toHaveBeenCalledTimes(1);
+    stop();
   });
 });

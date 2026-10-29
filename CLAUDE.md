@@ -672,14 +672,27 @@ To rotate one (or after a leak: revoke the old key in the portal first):
   `scripts/widget-verses.ts` builds the list from api.alquran.cloud, as the verse sheet shows it.
   **Qibla** (small, Lock Screen circular): a fixed dial, north up, with the Kaaba at the bearing,
   "Qibla 58° NE" and the distance to Makkah. WidgetKit can't read the compass, so it doesn't turn
-  with the phone. Tap: `revisely://qibla`, which opens Home and calls `requestQiblaSheet()`
-  (`src/lib/widgets/links.ts`). The screen that hosts the Qibla sheet must listen with
-  `onQiblaSheetRequest(open)`; a request from a cold start waits for the listener.
+  with the phone. Tap: `revisely://qibla`, which opens Home and calls `requestPrayerSheet('qibla')`
+  (`src/lib/widgets/links.ts`). The screen that hosts the sheet must listen with
+  `onPrayerSheetRequest(open)` (`open(tab)`); a request from a cold start waits for the listener.
   `WidgetSync` reads the phone's last known position when the app comes back, only if location is
   already allowed (it never asks), or else uses the account's Fajr location. Only the bearing,
   label and distance (`src/lib/widgets/qibla.ts`) go into the snapshot, never the position. A city
   line appears once `WidgetSync` is given the sheet's city list (`cities`). With no position the
   widget says "Open Revisely to set your location".
+- **Prayer times** (`PrayerWidget.swift`, kind `ReviselyPrayer`; small, medium; Lock Screen
+  rectangular, circular, inline): the next prayer (name in the accent, its time, a live countdown,
+  "in 1 hr, 12 min") and the place; the medium adds the day's six times (the next in the accent,
+  passed ones and sunrise quieter, as the Times tab); the circle is a ring filling from the last
+  prayer to the next around its name and time; inline is "Asr 3:42 PM". Data: the snapshot's
+  `prayer` (`widgetPrayer`: 7 days of the six times as epoch ms, null where a day has none, and
+  the nearest city), only with prayer times on and a place. Times are absolute and drawn with
+  SwiftUI's time styles, so the phone's time zone and 12/24-hour setting apply. Timeline: an entry
+  now, at every time and every midnight of the days written (`.atEnd`), so it moves on with the app
+  closed; past the last Isha, or with no `prayer`, "Open Revisely to see prayer times". Tap:
+  `revisely://prayer`, Home and `requestPrayerSheet('times')`: the Prayer sheet on Times (Home
+  listens with `onPrayerSheetRequest(tab)`; the Qibla widget asks for `'qibla'`). Without prayer
+  times on the account, Home just shows.
 - **Data:** the App Group `group.com.revisionbuddy.app` (both targets' entitlements).
   `src/components/WidgetSync.tsx` rebuilds the snapshot (`src/lib/widgets/snapshot.ts`) from what
   Home shows (sessions, carry-over, plan, accent, the revision day at fajr or midnight, the app coming

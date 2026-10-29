@@ -58,6 +58,26 @@ struct QiblaInfo: Codable, Hashable {
   let place: String?
 }
 
+/// A day's prayer times as epoch milliseconds (absolute instants); nil when there
+/// is no such time that day (high latitudes). WidgetPrayerDay in snapshot.ts.
+struct PrayerDay: Codable, Hashable {
+  /// The local day the app worked them out for, "YYYY-MM-DD".
+  let day: String
+  let fajr: Double?
+  let sunrise: Double?
+  let dhuhr: Double?
+  let asr: Double?
+  let maghrib: Double?
+  let isha: Double?
+}
+
+/// Prayer times for the coming days (WidgetPrayer in snapshot.ts): never the position.
+struct PrayerInfo: Codable, Hashable {
+  /// "London", or nil if no listed city is near.
+  let place: String?
+  let days: [PrayerDay]
+}
+
 struct Snapshot: Codable {
   let v: Int
   /// "ready", "signedOut" or "noPlan".
@@ -67,6 +87,8 @@ struct Snapshot: Codable {
   let days: [WidgetDay]
   /// Missing in snapshots written before the Qibla widget.
   let qibla: QiblaInfo?
+  /// Only with prayer times and a place; missing in snapshots written before them.
+  let prayer: PrayerInfo?
 }
 
 enum SnapshotStore {
