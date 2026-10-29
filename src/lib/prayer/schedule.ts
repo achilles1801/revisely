@@ -18,6 +18,15 @@ export const RESERVED_FOR_OTHERS = 2;
 /** Days of times worked out; the budget usually ends the window sooner. */
 export const PLAN_DAYS = 14;
 
+/** How a notification may interrupt (iOS 15+): a prayer's time breaks through
+ *  Focus and the summary (Time Sensitive, with the app's entitlement); a reminder
+ *  before it is an ordinary one; "keep going" never lights the screen. */
+export type Interruption = 'timeSensitive' | 'active' | 'passive';
+
+export function interruptionFor(kind: PlannedNotification['kind']): Interruption {
+  return kind === 'at' ? 'timeSensitive' : kind === 'before' ? 'active' : 'passive';
+}
+
 export interface PlannedNotification {
   id: string;
   at: Date;
@@ -82,7 +91,8 @@ export function planPrayerNotifications({
             at: early,
             title: `${name} in ${alert.before} minutes`,
             body: place ? `${time} · ${place}` : time,
-            sound: alert.sound,
+            // The athan is for the time itself; its reminder has the standard tone.
+            sound: alert.sound === 'athan' ? 'standard' : alert.sound,
             kind: 'before',
             prayer,
           });

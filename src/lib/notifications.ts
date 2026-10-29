@@ -3,7 +3,13 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
-import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID, REMINDER_CHANNEL_ID } from './notificationChannels';
+import {
+  ATHAN_DEFAULT_SOUND_ANDROID,
+  PRAYER_ATHAN_CHANNEL_ID,
+  PRAYER_CHANNEL_ID,
+  PRAYER_SILENT_CHANNEL_ID,
+  REMINDER_CHANNEL_ID,
+} from './notificationChannels';
 
 export { REMINDER_CHANNEL_ID };
 
@@ -42,6 +48,13 @@ export async function ensureAndroidChannels(): Promise<void> {
         name: 'Prayer times',
         description: 'A prayer’s time, or a reminder before it, with the standard tone.',
         importance: Notifications.AndroidImportance.HIGH,
+        lightColor: NOTIFICATION_LIGHT_COLOR,
+      }),
+      Notifications.setNotificationChannelAsync(PRAYER_ATHAN_CHANNEL_ID, {
+        name: 'Prayer times (athan)',
+        description: 'A prayer’s time, with the athan.',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: ATHAN_DEFAULT_SOUND_ANDROID,
         lightColor: NOTIFICATION_LIGHT_COLOR,
       }),
       Notifications.setNotificationChannelAsync(PRAYER_SILENT_CHANNEL_ID, {

@@ -24,9 +24,9 @@ import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { usePrayerNotifyPermission } from '../../components/prayer/usePrayerNotifyPermission';
 import { useScheduledPrayerDays } from '../../lib/prayer/status';
 
-/** "Standard tone · 10 min before", "Silent". */
+/** "Standard tone · 10 min before", "Athan", "Silent". */
 export function alertSummary(a: PrayerAlert): string {
-  const sound = a.sound === 'silent' ? 'Silent' : 'Standard tone';
+  const sound = a.sound === 'silent' ? 'Silent' : a.sound === 'athan' ? 'Athan' : 'Standard tone';
   return a.before > 0 ? `${sound} · ${a.before} min before` : sound;
 }
 
@@ -160,6 +160,7 @@ function AlertSheet({ prayer, onClose }: { prayer: PrayerName | null; onClose: (
         {(
           [
             { id: 'standard', label: 'Standard tone', detail: undefined },
+            { id: 'athan', label: 'Athan', detail: 'At the prayer’s time. A reminder before it has the standard tone' },
             { id: 'silent', label: 'Silent', detail: 'A banner only' },
           ] as const
         ).map((o) => {

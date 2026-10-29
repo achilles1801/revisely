@@ -1,5 +1,5 @@
 // Scheduling with expo-notifications (kept in memory here, as iOS keeps them).
-const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean }; trigger: { date: Date; channelId?: string } }>();
+const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean | string; interruptionLevel?: string }; trigger: { date: Date; channelId?: string } }>();
 const mockCalls = { schedule: 0, cancel: 0 };
 jest.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: { DATE: 'date', DAILY: 'daily' },
@@ -61,6 +61,35 @@ describe('syncPrayerNotifications', () => {
     // On Android the sound is the channel's: silent ones go to the silent channel.
     expect(isha.trigger.channelId).toBe('prayer-silent');
     expect(mockPending.get('prayer-2026-10-29-fajr')!.trigger.channelId).toBe('prayer');
+  });
+
+  it('athan: the bundled athan at the time (Time Sensitive), the standard tone before it', async () => {
+    const alerts = { ...on(10), maghrib: { on: true, before: 10, sound: 'athan' } } as Record<PrayerName, PrayerAlert>;
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts, place: 'London' });
+    const at = mockPending.get('prayer-2026-10-28-maghrib')!;
+    expect(at.content.sound).toBe('athan_default.caf');
+    expect(at.content.interruptionLevel).toBe('timeSensitive');
+    expect(at.trigger.channelId).toBe('prayer-athan');
+    const before = mockPending.get('prayer-2026-10-28-maghrib-before')!;
+    expect(before.content.sound).toBe(true);
+    expect(before.content.interruptionLevel).toBe('active');
+    expect(before.trigger.channelId).toBe('prayer');
+    // The others: the standard tone, Time Sensitive at the time.
+    const asr = mockPending.get('prayer-2026-10-28-asr')!;
+    expect(asr.content.sound).toBe(true);
+    expect(asr.content.interruptionLevel).toBe('timeSensitive');
+    expect(mockPending.get('prayer-keep-going')!.content.interruptionLevel).toBe('passive');
+  });
+
+  it('switching a prayer to the athan replaces just its notifications', async () => {
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts: on(10), place: 'London' });
+    mockCalls.schedule = 0;
+    const alerts = { ...on(10), isha: { on: true, before: 10, sound: 'athan' } } as Record<PrayerName, PrayerAlert>;
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts, place: 'London' });
+    // Isha at its time changes (silent → athan); its reminder (silent → standard) too.
+    expect(mockPending.get('prayer-2026-10-28-isha')!.content.sound).toBe('athan_default.caf');
+    expect(mockCalls.schedule).toBeGreaterThan(0);
+    expect(mockCalls.schedule).toBeLessThanOrEqual(2 * 7);
   });
 
   it('again with nothing changed: nothing rescheduled', async () => {
