@@ -40,3 +40,29 @@ interface DurableObjectNamespace {
   idFromName(name: string): DurableObjectId;
   get(id: DurableObjectId): DurableObjectStub;
 }
+
+/** R2 (wrangler.jsonc "r2_buckets"): the parts the athan route uses. */
+type R2Range = { offset?: number; length?: number } | { suffix: number };
+
+interface R2Object {
+  readonly key: string;
+  readonly size: number;
+  readonly httpEtag: string;
+  readonly range?: R2Range;
+}
+
+interface R2ObjectBody extends R2Object {
+  readonly body: ReadableStream;
+}
+
+interface R2GetOptions {
+  /** A Range header (or the request's headers) for a ranged read. */
+  range?: Headers | R2Range;
+  /** Conditional headers (If-None-Match, …): when they fail, the object comes back without a body. */
+  onlyIf?: Headers;
+}
+
+interface R2Bucket {
+  head(key: string): Promise<R2Object | null>;
+  get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | R2Object | null>;
+}
