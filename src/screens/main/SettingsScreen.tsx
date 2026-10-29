@@ -29,6 +29,12 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
+import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
+import { ActionSheet } from '../../components/v2/ActionSheet';
+import { canFollowWords } from '../../components/recite/useReciteFollow';
+import { reciteModeEnabled } from '../../lib/recite/availability';
+import { formatModelSize } from '../../lib/recite/speechModel';
+import { removeSpeechModel, useSpeechModelState } from '../../lib/recite/speechModelStore';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { prayerTimesEnabled } from '../../lib/prayer/status';
@@ -216,6 +222,11 @@ export default function SettingsScreen() {
   const [tempName, setTempName] = useState(user?.name ?? '');
   const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
+  // The speech model (hidden pages, word by word; testers): its size, its
+  // download, Delete.
+  const speechModel = useSpeechModelState();
+  const [speechSheet, setSpeechSheet] = useState(false);
+  const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
   // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
   const prayerEnabled = prayerTimesEnabled(user);
   const prayerPrefs = usePrayerPrefs();
@@ -729,6 +740,21 @@ export default function SettingsScreen() {
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}
           />
+          {reciteModeEnabled(user) && canFollowWords() ? (
+            <Row
+              icon="mic-outline"
+              label="Speech model"
+              subtitle="Follows your recitation word by word, on this iPhone"
+              value={
+                speechModel.status === 'ready'
+                  ? formatModelSize(speechModel.bytes)
+                  : speechModel.status === 'downloading'
+                    ? `${Math.round(speechModel.progress * 100)}%`
+                    : 'Not downloaded'
+              }
+              onPress={() => (speechModel.status === 'ready' ? setDeleteSpeechOpen(true) : setSpeechSheet(true))}
+            />
+          ) : null}
 
         </Section>
 
@@ -872,6 +898,15 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
+      <SpeechModelSheet visible={speechSheet} onClose={() => setSpeechSheet(false)} onReady={() => setSpeechSheet(false)} />
+      <ActionSheet
+        visible={deleteSpeechOpen}
+        onClose={() => setDeleteSpeechOpen(false)}
+        title="Speech model"
+        message={`${formatModelSize()} on this iPhone. It downloads again the next time you follow word by word.`}
+        actions={[{ key: 'delete', label: 'Delete speech model', icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
+        testID="speech-model-delete-menu"
+      />
       {prayerEnabled ? (
         <PrayerSheet
           visible={prayerSheet != null}

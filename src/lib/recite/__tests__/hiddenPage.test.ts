@@ -115,3 +115,58 @@ describe('hidden page', () => {
     expect(nextHiddenVerse(NOTHING_REVEALED, 3)).toEqual(first);
   });
 });
+
+describe('hidden page, word by word (following the reciter)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const { setQuranWordsForTests, getQuranWords } = require('../quranWords');
+  beforeAll(() => {
+    setQuranWordsForTests(JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/quranWords.dat'), 'utf8')));
+  });
+  afterAll(() => setQuranWordsForTests(null));
+  const covered = (lines: { covers: [number, number][]; line: number }[], line: number, x: number) =>
+    lines.find((l) => l.line === line)!.covers.some(([a, b]) => x >= a && x <= b);
+
+  it('the words recited open in place, the rest of the line stays covered; the band follows the next word', () => {
+    const words = getQuranWords();
+    const [from] = words.pageRange(1);
+    // The first two words of Al-Fatihah recited; the third is next.
+    const shown = new Set([from, from + 1]);
+    const { lines } = hiddenPageLayout(1, new Set(), { words, shown: (w: number) => shown.has(w), next: from + 2 });
+    const mid = (w: number) => (words.rect(w).x0 + words.rect(w).x1) / 2;
+    const line = words.lineOf(from);
+    expect(covered(lines, line, mid(from))).toBe(false);
+    expect(covered(lines, line, mid(from + 1))).toBe(false);
+    expect(covered(lines, words.lineOf(from + 2), mid(from + 2))).toBe(true);
+    expect(lines.filter((l) => l.current).map((l) => l.line)).toEqual([words.lineOf(from + 2)]);
+  });
+
+  it('nothing recited: every word covered (markers open), as the verse mode', () => {
+    const words = getQuranWords();
+    const [from, to] = words.pageRange(50);
+    const { lines } = hiddenPageLayout(50, new Set(), { words, shown: () => false, next: null });
+    for (let w = from; w < to; w++) {
+      const r = words.rect(w);
+      expect(covered(lines, words.lineOf(w), (r.x0 + r.x1) / 2)).toBe(true);
+    }
+  });
+
+  it('a whole page recited: nothing covered, no band', () => {
+    const words = getQuranWords();
+    const { lines, next } = hiddenPageLayout(50, new Set(), { words, shown: () => true, next: null });
+    expect(lines.every((l) => l.covers.length === 0 && !l.current)).toBe(true);
+    expect(next).toBeNull();
+  });
+
+  it('a verse shown by a tap shows all its words, beside the ones recited', () => {
+    const words = getQuranWords();
+    const [a, b] = words.verseRange(1, 3);
+    const { lines } = hiddenPageLayout(1, new Set(['1:3']), { words, shown: () => false, next: null });
+    for (let w = a; w < b; w++) {
+      const r = words.rect(w);
+      expect(covered(lines, words.lineOf(w), (r.x0 + r.x1) / 2)).toBe(false);
+    }
+    const r4 = words.rect(words.verseRange(1, 4)[0]);
+    expect(covered(lines, words.lineOf(words.verseRange(1, 4)[0]), (r4.x0 + r4.x1) / 2)).toBe(true);
+  });
+});

@@ -179,7 +179,7 @@ export default {
         "expo-audio",
         {
           microphonePermission:
-            "Revisely uses the microphone to record your recitation so you can listen back to it.",
+            "Revisely uses the microphone to record your recitation, and to follow along word by word as you recite from memory. Following along happens on this iPhone; that audio isn't recorded or sent.",
           recordAudioAndroid: false,
         },
       ],
