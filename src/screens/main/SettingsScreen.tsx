@@ -18,7 +18,7 @@ import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
-import { AccentPicker } from '../../components/settings/AccentPicker';
+import { AccentSetting } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
@@ -787,10 +787,7 @@ export default function SettingsScreen() {
               Kept with the account (DesignGate brings it to other devices). */}
           <View style={v2.iconRow} testID="accent-row">
             <SettingIcon name="color-filter-outline" />
-            <View style={styles.rowText}>
-              <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
-            </View>
-            <AccentPicker
+            <AccentSetting
               value={design.accent}
               onChange={(accent) => {
                 design.setAccent(accent);
