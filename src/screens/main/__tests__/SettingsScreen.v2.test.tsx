@@ -241,6 +241,13 @@ describe('Settings: the speech model (testers)', () => {
     expect(screen.queryByText('Speech model')).toBeNull();
   });
 
+  it('prayer times public, not a tester: still no row (recite mode has its own gate)', async () => {
+    const spy = jest.spyOn(require('../../../lib/prayer/status'), 'prayerTimesEnabled').mockReturnValue(true);
+    await renderV2();
+    expect(screen.queryByText('Speech model')).toBeNull();
+    spy.mockRestore();
+  });
+
   it('not downloaded: says so, and opens the download', async () => {
     mockUser.previewTester = true;
     await renderV2();

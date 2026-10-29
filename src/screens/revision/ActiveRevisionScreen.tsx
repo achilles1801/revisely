@@ -28,6 +28,7 @@ import { HiddenPageOverlay } from '../../components/recite/HiddenPageOverlay';
 import { RecitePanel } from '../../components/recite/RecitePanel';
 import { usePauseListener } from '../../components/recite/usePauseListener';
 import { canFollowWords, useReciteFollow } from '../../components/recite/useReciteFollow';
+import { reciteModeEnabled } from '../../lib/recite/availability';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { followLabel, WordByWordChip } from '../../components/recite/RecitePanel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
@@ -169,7 +170,7 @@ export default function ActiveRevisionScreen() {
   // a verse shows again when tapped, with Next verse, or when the reciter
   // pauses after it (usePauseListener). Each hide starts covered again; what
   // was shown on a page stays shown while it lasts.
-  const reciteAvailable = user?.previewTester === true;
+  const reciteAvailable = reciteModeEnabled(user);
   const [hidden, setHidden] = useState(false);
   const [reveal, setReveal] = useState<RevealState>(NOTHING_REVEALED);
   const [listenOn, setListenOn] = useState(true);

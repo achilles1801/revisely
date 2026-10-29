@@ -32,6 +32,7 @@ import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { canFollowWords } from '../../components/recite/useReciteFollow';
+import { reciteModeEnabled } from '../../lib/recite/availability';
 import { formatModelSize } from '../../lib/recite/speechModel';
 import { removeSpeechModel, useSpeechModelState } from '../../lib/recite/speechModelStore';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
@@ -739,7 +740,7 @@ export default function SettingsScreen() {
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}
           />
-          {prayerEnabled && canFollowWords() ? (
+          {reciteModeEnabled(user) && canFollowWords() ? (
             <Row
               icon="mic-outline"
               label="Speech model"
