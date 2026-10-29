@@ -34,6 +34,13 @@ export interface SegmenterOptions {
   partialEveryMs: number;
   /** Speech is this much louder than the noise floor (dB). */
   speechAboveNoiseDb: number;
+  /**
+   * Once an utterance has started, this much above the floor still counts as
+   * speaking (dB). Lower than the start: in a noisy room the softer syllables
+   * sit closer to the noise, and with one threshold they read as pauses, so a
+   * phrase came out as one-word fragments and much of it was never decoded.
+   */
+  continueAboveNoiseDb: number;
   /** Quieter than this is never speech (dBFS). */
   minSpeechDb: number;
   /** The noise floor is never above the quietest moment of this much recent audio. */
@@ -50,6 +57,7 @@ export const DEFAULT_SEGMENTER: SegmenterOptions = {
   cutOverlapMs: 1000,
   partialEveryMs: 1000,
   speechAboveNoiseDb: 12,
+  continueAboveNoiseDb: 6,
   minSpeechDb: -55,
   floorWindowMs: 6000,
 };
@@ -159,8 +167,8 @@ export class UtteranceSegmenter {
     return events;
   }
 
-  private isSpeech(db: number): boolean {
-    return db >= this.o.minSpeechDb && db >= this.noiseDb + this.o.speechAboveNoiseDb;
+  private isSpeech(db: number, aboveNoiseDb = this.o.speechAboveNoiseDb): boolean {
+    return db >= this.o.minSpeechDb && db >= this.noiseDb + aboveNoiseDb;
   }
 
   private onFrame(frame: Int16Array, events: SegmenterEvent[]) {
@@ -206,12 +214,9 @@ export class UtteranceSegmenter {
 
     this.utterance.append(frame);
     this.sinceDecode += frame.length;
-    if (speech) {
-      this.speechFrames++;
-      this.silentFrames = 0;
-    } else {
-      this.silentFrames++;
-    }
+    if (speech) this.speechFrames++;
+    if (speech || this.isSpeech(db, this.o.continueAboveNoiseDb)) this.silentFrames = 0;
+    else this.silentFrames++;
 
     const ms = (n: number) => (n * 1000) / SAMPLE_RATE;
     if (ms(this.silentFrames * this.frame) >= this.o.endSilenceMs) {

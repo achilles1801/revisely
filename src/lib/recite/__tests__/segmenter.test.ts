@@ -27,6 +27,7 @@ const concat = (...parts: Int16Array[]) => {
   }
   return out;
 };
+const mix = (a: Int16Array, b: Int16Array) => a.map((x, i) => Math.max(-32768, Math.min(32767, x + (b[i] ?? 0))));
 /** Push in 100 ms chunks, as the microphone does. */
 function feed(seg: UtteranceSegmenter, audio: Int16Array): SegmenterEvent[] {
   const events: SegmenterEvent[] = [];
@@ -121,6 +122,22 @@ describe('UtteranceSegmenter', () => {
     expect(finals.slice(0, -1).every((f) => f.cut)).toBe(true);
     expect(finals.length).toBeGreaterThanOrEqual(3);
     expect(events.filter((e) => e.type === 'discard')).toHaveLength(0);
+  });
+
+  it('keeps a phrase whole in a noisy room, where softer syllables sit near the noise', () => {
+    const seg = new UtteranceSegmenter();
+    // Steady noise (about -43 dBFS), then about 6 s of recitation: loud
+    // syllables with softer stretches of 0.9 s only about 9 dB above the noise.
+    // With one threshold each soft stretch read as a pause, so the phrase came
+    // out in fragments and the softer parts were never decoded.
+    const loud = () => mix(noise(500, 400), tone(500, 8000));
+    const soft = () => mix(noise(900, 400), tone(900, 850));
+    const parts = [noise(3000, 400)];
+    for (let i = 0; i < 4; i++) parts.push(loud(), soft());
+    parts.push(loud(), noise(1500, 400));
+    const finals = feed(seg, concat(...parts)).filter((e) => e.type === 'final') as { audio: Int16Array }[];
+    expect(finals).toHaveLength(1);
+    expect(ms(finals[0].audio.length)).toBeGreaterThan(6000);
   });
 
   it('flushes the utterance in progress', () => {
