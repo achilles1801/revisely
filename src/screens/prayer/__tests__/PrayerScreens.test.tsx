@@ -55,6 +55,7 @@ describe('Prayer notifications', () => {
   it('each prayer: off, or what it does (sound · reminder); the summary', () => {
     expect(alertSummary({ on: true, before: 10, sound: 'standard' })).toBe('Standard tone · 10 min before');
     expect(alertSummary({ on: true, before: 0, sound: 'silent' })).toBe('Silent');
+    expect(alertSummary({ on: true, before: 5, sound: 'athan' })).toBe('Athan · 5 min before');
     resetPrayerPrefsForTests({
       ...DEFAULT_PRAYER_PREFS,
       place: LONDON,

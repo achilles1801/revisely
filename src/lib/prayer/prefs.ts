@@ -14,7 +14,9 @@ export const DAY_TIMES: readonly TimeName[] = ['fajr', 'sunrise', 'dhuhr', 'asr'
 /** adhan's HighLatitudeRule values, or "recommended" for its pick by latitude. */
 export type HighLatitude = 'recommended' | 'middleofthenight' | 'seventhofthenight' | 'twilightangle';
 export type AsrMadhab = 'standard' | 'hanafi';
-export type PrayerSound = 'standard' | 'silent';
+/** 'athan': the athan at the prayer's time (the bundled default voice for now);
+ *  its reminder before plays the standard tone. */
+export type PrayerSound = 'standard' | 'silent' | 'athan';
 /** Minutes before the prayer for its reminder (0: none). */
 export const REMINDER_OPTIONS = [0, 5, 10, 15, 30] as const;
 export type ReminderBefore = (typeof REMINDER_OPTIONS)[number];
@@ -67,7 +69,7 @@ function parseAlert(raw: unknown): PrayerAlert {
   return {
     on: a.on === true,
     before: (REMINDER_OPTIONS as readonly number[]).includes(a.before as number) ? (a.before as ReminderBefore) : 0,
-    sound: a.sound === 'silent' ? 'silent' : 'standard',
+    sound: a.sound === 'silent' || a.sound === 'athan' ? a.sound : 'standard',
   };
 }
 

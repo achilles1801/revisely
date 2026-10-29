@@ -34,6 +34,10 @@ export default {
       // widgets show here (src/lib/widgets).
       entitlements: {
         "com.apple.security.application-groups": ["group.com.revisionbuddy.app"],
+        // Prayer notifications at a prayer's time break through Focus and the
+        // notification summary (interruptionLevel in lib/prayer/sync). A capability
+        // on the App ID: EAS signing needs `eas credentials:configure-build` once.
+        "com.apple.developer.usernotifications.time-sensitive": true,
       },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -143,6 +147,15 @@ export default {
         },
       ],
       "expo-font",
+      // Notification sounds bundled into the app: the default athan (assets/sounds,
+      // README there). Both files go to both platforms; each uses its own. The
+      // Android notification icon and colour still come from `notification` above.
+      [
+        "expo-notifications",
+        {
+          sounds: ["./assets/sounds/athan_default.caf", "./assets/sounds/athan_default_android.m4a"],
+        },
+      ],
       // Android dialogs', cursor's and selection handles' colour (ink, not Material's teal).
       "./plugins/withAndroidTheme",
       "expo-web-browser",
@@ -183,10 +196,10 @@ export default {
       [
         "expo-location",
         {
-          // Fajr (the day boundary, saved to the account: docs/privacy) and the Qibla
-          // (worked out on the phone; the widget keeps only the bearing).
-          locationAlwaysAndWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking.",
-          locationWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking."
+          // Prayer times and the Qibla (worked out on the phone; docs/privacy), and Fajr
+          // for the revision day (saved to the account, as that setting says).
+          locationAlwaysAndWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking.",
+          locationWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking."
         }
       ]
     ],
