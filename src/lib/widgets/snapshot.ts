@@ -7,6 +7,7 @@
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
 import { generateDailyAssignment } from '../algorithm';
+import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
 import { paletteV2, type AccentName } from '../../theme/v2';
@@ -61,6 +62,48 @@ export interface WidgetSnapshot {
   days: WidgetDay[];
   /** The Qibla widget's bearing and distance; null until the phone has a position. */
   qibla: WidgetQibla | null;
+  /** Prayer times for the coming days (testers, with a place; for the prayer
+   *  widgets of the native phase). Absent otherwise. */
+  prayer?: WidgetPrayer;
+}
+
+/** A day's prayer times as epoch milliseconds (null: none that day). */
+export interface WidgetPrayerDay {
+  day: string;
+  fajr: number | null;
+  sunrise: number | null;
+  dhuhr: number | null;
+  asr: number | null;
+  maghrib: number | null;
+  isha: number | null;
+}
+
+export interface WidgetPrayer {
+  /** "London", or null if no listed city is near. */
+  place: string | null;
+  days: WidgetPrayerDay[];
+}
+
+export const WIDGET_PRAYER_DAYS = 7;
+
+/** The coming days' prayer times, worked out as the app does (lib/prayer/times). */
+export function widgetPrayer(from: Coords, settings: CalcSettings, place: string | null, now: Date): WidgetPrayer {
+  const ms = (d: Date | null) => (d ? d.getTime() : null);
+  return {
+    place,
+    days: Array.from({ length: WIDGET_PRAYER_DAYS }, (_, i) => {
+      const t = dayTimes(from, new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, 12), settings);
+      return {
+        day: t.day,
+        fajr: ms(t.fajr),
+        sunrise: ms(t.sunrise),
+        dhuhr: ms(t.dhuhr),
+        asr: ms(t.asr),
+        maghrib: ms(t.maghrib),
+        isha: ms(t.isha),
+      };
+    }),
+  };
 }
 
 export interface WidgetInputs {
@@ -76,6 +119,8 @@ export interface WidgetInputs {
   qiblaFrom?: Coords | null;
   /** Cities for the Qibla widget's place line. */
   cities?: readonly City[];
+  /** Prayer times to include (testers with a place); none otherwise. */
+  prayer?: { from: Coords; settings: CalcSettings; place: string | null } | null;
 }
 
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
@@ -138,6 +183,9 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     accent: input.accent,
     colors: colorsFor(input.accent),
     qibla: widgetQibla(input.qiblaFrom ?? null, input.cities),
+    ...(input.prayer
+      ? { prayer: widgetPrayer(input.prayer.from, input.prayer.settings, input.prayer.place, input.now) }
+      : {}),
   };
   if (!input.signedIn || !input.user) return { ...base, state: 'signedOut', days: [] };
   const user = input.user;

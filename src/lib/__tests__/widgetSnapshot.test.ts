@@ -185,3 +185,36 @@ describe('the Qibla in the snapshot', () => {
     expect(buildWidgetSnapshot(inputs()).qibla).toBeNull();
   });
 });
+
+describe('widget snapshot: prayer times (for the prayer widgets)', () => {
+  const LONDON = { latitude: 51.51, longitude: -0.13 };
+  const settings = {
+    method: 'MoonsightingCommittee',
+    highLatitude: 'recommended' as const,
+    madhab: 'standard' as const,
+    adjustments: { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
+  };
+
+  it('with a place: a week of the six times, as the app works them out', () => {
+    const { dayTimes } = require('../prayer/times');
+    const snap = buildWidgetSnapshot(inputs({ prayer: { from: LONDON, settings, place: 'London' } }));
+    expect(snap.prayer!.place).toBe('London');
+    expect(snap.prayer!.days).toHaveLength(7);
+    const first = snap.prayer!.days[0];
+    const t = dayTimes(LONDON, inputs().now, settings);
+    expect(first).toEqual({
+      day: t.day,
+      fajr: t.fajr.getTime(),
+      sunrise: t.sunrise.getTime(),
+      dhuhr: t.dhuhr.getTime(),
+      asr: t.asr.getTime(),
+      maghrib: t.maghrib.getTime(),
+      isha: t.isha.getTime(),
+    });
+  });
+
+  it('without (not a tester, no place): no prayer key at all, so nothing else changes', () => {
+    expect('prayer' in buildWidgetSnapshot(inputs())).toBe(false);
+    expect('prayer' in buildWidgetSnapshot(inputs({ prayer: null }))).toBe(false);
+  });
+});

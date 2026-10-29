@@ -9,7 +9,10 @@ import { buildWidgetSnapshot } from '../lib/widgets/snapshot';
 import { writeWidgetSnapshot } from '../lib/widgets/storage';
 import { lastKnownPosition } from '../lib/widgets/position';
 import type { Coords } from '../lib/widgets/qibla';
-import { bundledCities } from '../lib/qibla';
+import { bundledCities, nearestCity } from '../lib/qibla';
+import { usePrayerPrefs } from '../lib/prayer/prefs';
+import { prayerTimesEnabled } from '../lib/prayer/status';
+import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
 import { parseWidgetLink, requestQiblaSheet, type WidgetLink } from '../lib/widgets/links';
 import { navigationRef } from '../navigation/navigationRef';
 
@@ -55,6 +58,11 @@ export function WidgetSync() {
   }, [foreground]);
   const qiblaFrom = position ?? ownUser?.locationCoords ?? null;
 
+  // Prayer times for the prayer widgets (testers, with a place).
+  const prayerPrefs = usePrayerPrefs();
+  const prayerFrom = prayerTimesEnabled(ownUser) ? prayerPlace(ownUser, prayerPrefs) : null;
+  const prayerKey = prayerFrom ? JSON.stringify([prayerFrom, prayerSettings(ownUser, prayerPrefs)]) : '';
+
   useEffect(() => {
     if (authLoading || (signedIn && (loading || !ownUser))) return;
     writeWidgetSnapshot(
@@ -69,9 +77,18 @@ export function WidgetSync() {
         now: new Date(),
         qiblaFrom,
         cities: bundledCities(),
+        prayer: prayerFrom
+          ? {
+              from: prayerFrom,
+              settings: prayerSettings(ownUser, prayerPrefs),
+              place: nearestCity(prayerFrom, bundledCities())?.name ?? null,
+            }
+          : null,
       }),
     );
-  }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, accent, day, foreground, qiblaFrom]);
+    // prayerKey stands for the prayer place and settings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, accent, day, foreground, qiblaFrom, prayerKey]);
 
   useWidgetLinks(signedIn && !loading && !!ownUser && onboardingComplete);
   return null;

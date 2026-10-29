@@ -71,6 +71,22 @@ export function qiblaView(r: Omit<QiblaReading, 'allow' | 'openSettings' | 'retr
  * closes by dragging its handle or header down, tapping outside, or Done.
  */
 export function QiblaSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const q = useQiblaView(visible);
+  return (
+    <QiblaContent
+      visible={visible}
+      onClose={onClose}
+      view={q.view}
+      onAllow={q.onAllow}
+      onOpenSettings={q.onOpenSettings}
+      onRetry={q.onRetry}
+    />
+  );
+}
+
+/** The compass's state while `open` (the reading, "facing it" held, one tap on facing it). */
+export function useQiblaView(open: boolean) {
+  const visible = open;
   const reading = useQibla(visible);
   const haptics = useHaptics();
 
@@ -93,17 +109,11 @@ export function QiblaSheet({ visible, onClose }: { visible: boolean; onClose: ()
   }, [visible]);
 
   const view = qiblaView(reading, aligned);
-  return (
-    <QiblaContent
-      visible={visible}
-      onClose={onClose}
-      view={view}
-      onAllow={reading.allow}
-      onOpenSettings={reading.openSettings}
-      onRetry={reading.retry}
-    />
-  );
+  return { view, onAllow: reading.allow, onOpenSettings: reading.openSettings, onRetry: reading.retry };
 }
+
+/** Whether the compass is asking for location (the sheet's foot says Not now). */
+export const qiblaAsking = (view: QiblaView) => view.kind === 'permission' || view.kind === 'denied';
 
 /** The sheet for one state: the dial over a few lines, as the mocks draw it. */
 export function QiblaContent({
@@ -121,8 +131,33 @@ export function QiblaContent({
   onOpenSettings: () => void;
   onRetry: () => void;
 }) {
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Qibla"
+      footer={{ label: qiblaAsking(view) ? 'Not now' : 'Done', onPress: onClose, testID: 'qibla-done' }}
+      testID="qibla-sheet"
+    >
+      <QiblaBody view={view} onAllow={onAllow} onOpenSettings={onOpenSettings} onRetry={onRetry} />
+    </Sheet>
+  );
+}
+
+/** The compass for one state: the dial over a few lines, as the mocks draw it (no sheet around it). */
+export function QiblaBody({
+  view,
+  onAllow,
+  onOpenSettings,
+  onRetry,
+}: {
+  view: QiblaView;
+  onAllow: () => void;
+  onOpenSettings: () => void;
+  onRetry: () => void;
+}) {
   const { palette } = useTheme();
-  const asking = view.kind === 'permission' || view.kind === 'denied';
+  const asking = qiblaAsking(view);
   const small =
     view.kind === 'checking' || asking || view.kind === 'locating' || view.kind === 'noLocation';
 
@@ -258,13 +293,7 @@ export function QiblaContent({
   }
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      title="Qibla"
-      footer={{ label: asking ? 'Not now' : 'Done', onPress: onClose, testID: 'qibla-done' }}
-      testID="qibla-sheet"
-    >
+    <View testID="qibla-body">
       <View style={styles.content} testID={`qibla-${view.kind}`}>
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.dial}>
           <QiblaDial size={small ? 220 : 300} mode={mode} bearing={bearing} heading={heading} />
@@ -272,7 +301,7 @@ export function QiblaContent({
         <View style={styles.text}>{text}</View>
         {action ? <View style={styles.action}>{action}</View> : null}
       </View>
-    </Sheet>
+    </View>
   );
 }
 

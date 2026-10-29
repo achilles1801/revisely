@@ -45,6 +45,11 @@ import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
+import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
+import { NextPrayerLine } from '../../components/prayer/NextPrayerLine';
+import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
+import { prayerTimesEnabled } from '../../lib/prayer/status';
+import { usePrayerPrefs } from '../../lib/prayer/prefs';
 import { onQiblaSheetRequest } from '../../lib/widgets/links';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
@@ -92,7 +97,24 @@ export default function DashboardScreen() {
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [qiblaOpen, setQiblaOpen] = useState(false);
   // The Qibla widget's tap (revisely://qibla) opens the sheet here, also from a cold start.
-  useEffect(() => onQiblaSheetRequest(() => setQiblaOpen(true)), []);
+  // Prayer times (testers): one sheet, Times | Qibla; the compass opens it on
+  // Qibla, the next-prayer line on Times.
+  const [prayerTab, setPrayerTab] = useState<PrayerTab>('qibla');
+  const prayerEnabled = prayerTimesEnabled(user);
+  const prayerPrefs = usePrayerPrefs();
+  const prayerTimes = usePrayerTimes(user);
+  const openPrayer = (tab: PrayerTab) => {
+    setPrayerTab(tab);
+    setQiblaOpen(true);
+  };
+  useEffect(
+    () =>
+      onQiblaSheetRequest(() => {
+        setPrayerTab('qibla');
+        setQiblaOpen(true);
+      }),
+    [],
+  );
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
@@ -395,7 +417,7 @@ export default function DashboardScreen() {
         }
         right={
           <>
-            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => setQiblaOpen(true)} testID="open-qibla" />
+            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => openPrayer('qibla')} testID="open-qibla" />
             <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} />
             <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} />
           </>
@@ -415,6 +437,9 @@ export default function DashboardScreen() {
       >
         {/* No line under the header: one across the glow ended it in a hard
             edge, at rest and while pulling (it read as a box). */}
+        {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
+          <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
+        ) : null}
         <TodayPost
           name={userName}
           initial={avatarInitial(userName, firebaseUser?.email)}
@@ -467,7 +492,20 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
-      <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
+      {prayerEnabled ? (
+        <PrayerSheet
+          visible={qiblaOpen}
+          tab={prayerTab}
+          onTab={setPrayerTab}
+          onClose={() => setQiblaOpen(false)}
+          onOpenCalculation={() => {
+            setQiblaOpen(false);
+            navigation.navigate('PrayerCalculation');
+          }}
+        />
+      ) : (
+        <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
+      )}
     </SafeAreaView>
   );
 }
