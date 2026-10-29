@@ -98,17 +98,22 @@ async function testFileSource(handlers: AudioSourceHandlers): Promise<AudioSourc
     offset += 8 + size + (size % 2);
   }
   const samples = new Int16Array(bytes.buffer.slice(bytes.byteOffset + dataStart, bytes.byteOffset + dataStart + (dataLength & ~1)));
+  // Paced by the clock, as a microphone is: a late timer sends what is due
+  // (JS timers fire on the next frame, so counting ticks would fall behind).
   const chunk = SAMPLE_RATE / 10;
+  const started = Date.now();
   let at = 0;
   const timer = setInterval(() => {
+    const due = Math.min(samples.length, Math.floor(((Date.now() - started) / 1000) * SAMPLE_RATE));
+    while (at < due && (at + chunk <= due || due === samples.length)) {
+      handlers.onAudio(samples.subarray(at, Math.min(at + chunk, samples.length)));
+      at += chunk;
+    }
     if (at >= samples.length) {
       clearInterval(timer);
       handlers.onStop('ended');
-      return;
     }
-    handlers.onAudio(samples.subarray(at, at + chunk));
-    at += chunk;
-  }, 100);
+  }, 50);
   return {
     async stop() {
       clearInterval(timer);
