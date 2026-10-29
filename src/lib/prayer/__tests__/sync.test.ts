@@ -15,6 +15,13 @@ jest.mock('expo-notifications', () => ({
   }),
 }));
 
+// Which athan clips are on the phone (lib/athan/store keeps that; here a set).
+const mockReady = new Set<string>();
+jest.mock('../../athan/store', () => ({
+  athanSoundFile: (voice: string | null | undefined) =>
+    voice && mockReady.has(voice) ? `athan-${voice}.caf` : 'athan_default.caf',
+}));
+
 import { dayTimes, CalcSettings } from '../times';
 import { clearPrayerNotifications, syncPrayerNotifications } from '../sync';
 import { PLAN_DAYS } from '../schedule';
@@ -90,6 +97,26 @@ describe('syncPrayerNotifications', () => {
     expect(mockPending.get('prayer-2026-10-28-isha')!.content.sound).toBe('athan_default.caf');
     expect(mockCalls.schedule).toBeGreaterThan(0);
     expect(mockCalls.schedule).toBeLessThanOrEqual(2 * 7);
+  });
+
+  it('a chosen voice plays its clip once it’s on the phone; until then the bundled one', async () => {
+    mockReady.clear();
+    const alerts = { ...on(0), fajr: { on: true, before: 0, sound: 'athan', voice: 'makkah-fajr' } } as Record<PrayerName, PrayerAlert>;
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts, place: 'London' });
+    expect(mockPending.get('prayer-2026-10-29-fajr')!.content.sound).toBe('athan_default.caf');
+
+    // The download finishes (PrayerSync runs again): rescheduled with the voice, nothing else.
+    mockReady.add('makkah-fajr');
+    mockCalls.schedule = 0;
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts, place: 'London' });
+    expect(mockPending.get('prayer-2026-10-29-fajr')!.content.sound).toBe('athan-makkah-fajr.caf');
+    const fajrs = [...mockPending.keys()].filter((k) => /^prayer-\d{4}-\d{2}-\d{2}-fajr$/.test(k)).length;
+    expect(mockCalls.schedule).toBe(fajrs);
+
+    // Deleted: back to the bundled one.
+    mockReady.clear();
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts, place: 'London' });
+    expect(mockPending.get('prayer-2026-10-29-fajr')!.content.sound).toBe('athan_default.caf');
   });
 
   it('again with nothing changed: nothing rescheduled', async () => {

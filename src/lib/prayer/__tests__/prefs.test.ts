@@ -16,3 +16,15 @@ describe('parsePrayerPrefs: the sound', () => {
     expect(parsePrayerPrefs(null)).toBe(DEFAULT_PRAYER_PREFS);
   });
 });
+
+describe('parsePrayerPrefs: the athan voice', () => {
+  const withVoice = (voice: unknown) =>
+    parsePrayerPrefs(JSON.stringify({ alerts: { fajr: { on: true, before: 0, sound: 'athan', voice } } })).alerts.fajr.voice;
+
+  it('keeps a voice id; anything else is the bundled voice (null)', () => {
+    expect(withVoice('makkah-fajr')).toBe('makkah-fajr');
+    expect(withVoice('../x')).toBeNull();
+    expect(withVoice(42)).toBeNull();
+    expect(withVoice(undefined)).toBeNull();
+  });
+});

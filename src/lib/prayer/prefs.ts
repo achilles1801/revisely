@@ -5,6 +5,7 @@
 
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isAthanVoiceId } from '../athan/catalog';
 
 export type PrayerName = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 export type TimeName = PrayerName | 'sunrise';
@@ -14,8 +15,8 @@ export const DAY_TIMES: readonly TimeName[] = ['fajr', 'sunrise', 'dhuhr', 'asr'
 /** adhan's HighLatitudeRule values, or "recommended" for its pick by latitude. */
 export type HighLatitude = 'recommended' | 'middleofthenight' | 'seventhofthenight' | 'twilightangle';
 export type AsrMadhab = 'standard' | 'hanafi';
-/** 'athan': the athan at the prayer's time (the bundled default voice for now);
- *  its reminder before plays the standard tone. */
+/** 'athan': the athan at the prayer's time, in `voice` (lib/athan); its
+ *  reminder before plays the standard tone. */
 export type PrayerSound = 'standard' | 'silent' | 'athan';
 /** Minutes before the prayer for its reminder (0: none). */
 export const REMINDER_OPTIONS = [0, 5, 10, 15, 30] as const;
@@ -25,6 +26,9 @@ export interface PrayerAlert {
   on: boolean;
   before: ReminderBefore;
   sound: PrayerSound;
+  /** The athan voice (lib/athan) when `sound` is 'athan'; null or absent: the
+   *  bundled voice. One that isn't on the phone plays the bundled voice. */
+  voice?: string | null;
 }
 
 export interface Place {
@@ -49,7 +53,7 @@ export interface PrayerPrefs {
 
 export const ADJUST_LIMIT = 30;
 
-const ALERT_OFF: PrayerAlert = { on: false, before: 0, sound: 'standard' };
+const ALERT_OFF: PrayerAlert = { on: false, before: 0, sound: 'standard', voice: null };
 export const DEFAULT_PRAYER_PREFS: PrayerPrefs = {
   highLatitude: 'recommended',
   madhab: 'standard',
@@ -70,6 +74,7 @@ function parseAlert(raw: unknown): PrayerAlert {
     on: a.on === true,
     before: (REMINDER_OPTIONS as readonly number[]).includes(a.before as number) ? (a.before as ReminderBefore) : 0,
     sound: a.sound === 'silent' || a.sound === 'athan' ? a.sound : 'standard',
+    voice: isAthanVoiceId(a.voice) ? a.voice : null,
   };
 }
 
