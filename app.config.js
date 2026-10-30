@@ -148,15 +148,6 @@ export default {
         },
       ],
       "expo-font",
-      // Notification sounds bundled into the app: the default athan (assets/sounds,
-      // README there). Both files go to both platforms; each uses its own. The
-      // Android notification icon and colour still come from `notification` above.
-      [
-        "expo-notifications",
-        {
-          sounds: ["./assets/sounds/athan_default.caf", "./assets/sounds/athan_default_android.m4a"],
-        },
-      ],
       // Android dialogs', cursor's and selection handles' colour (ink, not Material's teal).
       "./plugins/withAndroidTheme",
       "expo-web-browser",

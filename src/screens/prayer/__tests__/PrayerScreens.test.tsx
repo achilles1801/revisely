@@ -33,10 +33,6 @@ jest.mock('expo-location', () => ({
   getCurrentPositionAsync: jest.fn(async () => null),
 }));
 
-jest.mock('../../../components/prayer/useChosenAthanVoice', () => ({
-  useChosenAthanVoice: () => ({ id: 'makkah-regular', name: 'Makkah – Masjid al-Haram' }),
-}));
-
 import PrayerNotificationsScreen, { alertSummary } from '../PrayerNotificationsScreen';
 import PrayerCalculationScreen, { adjustLabel } from '../PrayerCalculationScreen';
 import { DEFAULT_PRAYER_PREFS, getPrayerPrefs, resetPrayerPrefsForTests } from '../../../lib/prayer/prefs';
@@ -59,7 +55,6 @@ describe('Prayer notifications', () => {
   it('each prayer: off, or what it does (sound · reminder); the summary', () => {
     expect(alertSummary({ on: true, before: 10, sound: 'standard' })).toBe('Standard tone · 10 min before');
     expect(alertSummary({ on: true, before: 0, sound: 'silent' })).toBe('Silent');
-    expect(alertSummary({ on: true, before: 5, sound: 'athan' })).toBe('Athan · 5 min before');
     resetPrayerPrefsForTests({
       ...DEFAULT_PRAYER_PREFS,
       place: LONDON,
@@ -104,16 +99,6 @@ describe('Prayer notifications', () => {
     fireEvent.press(within(sheet).getByTestId('prayer-sound-silent'));
     expect(getPrayerPrefs().alerts.maghrib).toEqual({ on: true, before: 15, sound: 'silent' });
     expect(within(sheet).getByText('A banner only')).toBeTruthy();
-  });
-});
-
-describe('Prayer notifications: the athan voice', () => {
-  it('shows the voice of prayers set to Athan, and opens the picker', () => {
-    render(<PrayerNotificationsScreen />);
-    const row = screen.getByTestId('prayer-athan-voice');
-    expect(within(row).getByText('Makkah – Masjid al-Haram')).toBeTruthy();
-    fireEvent.press(row);
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('AthanVoice');
   });
 });
 
