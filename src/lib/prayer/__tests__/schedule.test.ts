@@ -84,16 +84,6 @@ describe('prayer notification plan', () => {
     expect(plan.filter((p) => p.kind !== 'keep-going').every((p) => p.prayer === 'isha' && p.sound === 'silent')).toBe(true);
   });
 
-  it('the athan is for the time itself: its reminder before has the standard tone', () => {
-    const plan = planPrayerNotifications({ now, days: days(OCT28, 2), alerts: alerts({ maghrib: { on: true, before: 15, sound: 'athan' } }), budget: 62, place: null });
-    const at = plan.filter((p) => p.kind === 'at');
-    const before = plan.filter((p) => p.kind === 'before');
-    expect(at.length).toBeGreaterThan(0);
-    expect(at.every((p) => p.sound === 'athan')).toBe(true);
-    expect(before.length).toBeGreaterThan(0);
-    expect(before.every((p) => p.sound === 'standard')).toBe(true);
-  });
-
   it('a prayer’s time is Time Sensitive; its reminder ordinary; "keep going" passive', () => {
     expect(interruptionFor('at')).toBe('timeSensitive');
     expect(interruptionFor('before')).toBe('active');

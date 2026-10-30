@@ -39,8 +39,6 @@ import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { prayerTimesEnabled } from '../../lib/prayer/status';
 import { PRAYERS, setPrayerPrefs, usePrayerPrefs } from '../../lib/prayer/prefs';
-import { ATHAN_DOWNLOADS_SUPPORTED } from '../../lib/athan';
-import { useChosenAthanVoice } from '../../components/prayer/useChosenAthanVoice';
 import { formatTime as formatPrayerTime, methodLabel, TIME_LABELS } from '../../lib/prayer/times';
 import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../lib/qibla';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
@@ -196,12 +194,6 @@ function ThemeSegmentedControl<T extends string>({
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
-
-/** Settings → Prayer → Athan voice: its own component, so the catalog is read only where it shows. */
-function AthanVoiceRow({ onPress }: { onPress: () => void }) {
-  const voice = useChosenAthanVoice();
-  return <Row icon="volume-high-outline" label="Athan voice" value={voice.name} onPress={onPress} />;
-}
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -711,7 +703,6 @@ export default function SettingsScreen() {
               value={prayerOn > 0 ? `${prayerOn} on` : 'Off'}
               onPress={() => navigation.navigate('PrayerNotifications')}
             />
-            {ATHAN_DOWNLOADS_SUPPORTED ? <AthanVoiceRow onPress={() => navigation.navigate('AthanVoice')} /> : null}
             <Row
               icon="options-outline"
               label="Calculation"

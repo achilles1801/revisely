@@ -19,9 +19,6 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 // Any glass left in the new design would show up as this.
 jest.mock('../../../navigation/TabBar', () => ({ useTabBarFootprint: () => 0 }));
 jest.mock('../../../components/settings/AppInfo', () => ({ AppInfo: () => null }));
-jest.mock('../../../components/prayer/useChosenAthanVoice', () => ({
-  useChosenAthanVoice: () => ({ id: 'makkah-regular', name: 'Makkah – Masjid al-Haram' }),
-}));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => {
@@ -222,10 +219,6 @@ describe('Settings: Prayer (every account from 1.0.3)', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerNotifications');
     fireEvent.press(screen.getByText('Calculation'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerCalculation');
-    // The athan voice, by name (iPhone; Android plays the bundled one).
-    expect(screen.getByText('Makkah – Masjid al-Haram')).toBeTruthy();
-    fireEvent.press(screen.getByText('Athan voice'));
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('AthanVoice');
   });
 });
 
