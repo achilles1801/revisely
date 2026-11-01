@@ -826,6 +826,17 @@ classic default), and a fresh install starts in light.
     hairline (both removed, with the tester-only setting that compared them). Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
+  - **Today's two lines** (`lib/todayLines`; the owner's option E, Nov 1 2026, mocks in
+    `~/Documents/revisely-today-mocks/`): "Starts at Al-Mujadila, p. 542 ›" over "20 pages · to
+    At-Tahrim · Juz 28"; in progress "Continue at <the first page not revised>, p. N ›" over a thin
+    bar and "6 of 20"; done "● Done · 20 pages" over "Adh-Dhariyat → Al-Hadid · Juz 27" (no ›, but
+    a tap still opens the menu); across the cycle's end "20 pages · then Al-Fatihah, p. 1"; carried
+    pages "20 pages · 4 from yesterday first". Pages are read in the session's order. The › sheet's
+    header holds the exact ranges. No-break spaces hold "p. 542 ›", "20 pages" and "Juz 28"
+    together and no-break hyphens hold surah names, so the › never stands alone and "Al-" never
+    ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
+    fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
+    also keeps 12pt from the icons (about 1.05 on an iPhone SE).
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
     and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
     are `lib/activityHeatmap` levels in `palette.heat` (≥ 2:1 on the ground) with

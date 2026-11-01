@@ -22,6 +22,7 @@ export function ThreadRow({
   name,
   nameAfter,
   meta,
+  headerMaxScale,
   onMenu,
   menuLabel = 'More',
   lineAbove,
@@ -39,6 +40,8 @@ export function ThreadRow({
   /** Beside the name, before the metadata (e.g. the Arabic name). */
   nameAfter?: React.ReactNode;
   meta?: string;
+  /** Caps how far the name and metadata grow with Dynamic Type. */
+  headerMaxScale?: number;
   onMenu?: () => void;
   menuLabel?: string;
   lineAbove?: boolean;
@@ -66,12 +69,20 @@ export function ThreadRow({
       </View>
       <View style={[styles.content, { paddingTop: pad, paddingBottom: pad }]}>
         <View style={styles.header}>
-          <Text style={[typeV2.name, styles.name, { color: palette.text }]} numberOfLines={1}>
+          <Text
+            style={[typeV2.name, styles.name, { color: palette.text }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={headerMaxScale}
+          >
             {name}
           </Text>
           {nameAfter}
           {meta ? (
-            <Text style={[typeV2.meta, styles.meta, { color: palette.secondary }]} numberOfLines={1}>
+            <Text
+              style={[typeV2.meta, styles.meta, { color: palette.secondary }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={headerMaxScale}
+            >
               {meta}
             </Text>
           ) : null}
