@@ -19,9 +19,8 @@ export const RESERVED_FOR_OTHERS = 2;
 export const PLAN_DAYS = 14;
 
 /** How a notification may interrupt (iOS 15+): a prayer's time breaks through
- *  Focus and the summary (Time Sensitive, once the app has the entitlement; until
- *  then iOS treats it as an ordinary one); a reminder before it is ordinary;
- *  "keep going" never lights the screen. */
+ *  Focus and the summary (Time Sensitive, with the app's entitlement); a reminder
+ *  before it is an ordinary one; "keep going" never lights the screen. */
 export type Interruption = 'timeSensitive' | 'active' | 'passive';
 
 export function interruptionFor(kind: PlannedNotification['kind']): Interruption {
