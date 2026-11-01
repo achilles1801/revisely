@@ -521,9 +521,11 @@ Target SDK 36, min 24; every native library is 16 KB aligned (checked on an API 
 emulator). `store/android/` holds the listing, Data safety and content rating answers and the
 click-by-click setup.
 - **Opt-in in CI.** Repository variables (Settings → Secrets and variables → Actions → Variables):
-  `ANDROID_RELEASES` = `true` makes Preview look up the Android fingerprint (tag `android-fp/<hash>`),
-  build on a Linux runner when it has none (`android-build.yml`, `eas build --local`, no credits) and
-  publish updates for both platforms; Promote then republishes Android too. Off, both are iOS only.
+  `ANDROID_RELEASES` = `true` makes Preview look up the Android fingerprint (tag `android-fp/<hash>`)
+  and publish updates for both platforms; Promote then republishes Android too. Off, both are iOS
+  only. Preview builds Android (Linux runner, `android-build.yml`, `eas build --local`, no credits)
+  only when `ANDROID_SUBMIT` is on too: the tag is pushed once a build is on Play, so before that every
+  push would build again. Until then a native change means EAS Build (android) and an upload by hand.
   `ANDROID_SUBMIT` = `true` uploads each build to Play's internal testing (`eas submit`, eas.json
   `submit.production.android`: `track: internal`, `releaseStatus: draft` until the app is
   published once, then `completed`). Every build attaches the `.aab` to the run (7 days): Play takes
