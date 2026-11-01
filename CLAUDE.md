@@ -27,8 +27,11 @@ file is the release mechanics and the traps behind them.
      app hash and republishes that same update to `production`, after you approve the run in the
      `production` environment (Actions > the run > Review deployments; only `main` may deploy there).
      No matching preview update: nothing is promoted and the run fails. It never builds.
+- **Android does all of this too, in the same runs** (Play internal testing in TestFlight's place;
+  one update group per platform, promoted together). See "Android (Google Play)".
 - **Nothing publishes to `production` except promote.yml.** Not a laptop, not another workflow. A fix
-  goes through `develop` and TestFlight like anything else. App Store submission stays manual.
+  goes through `develop` and TestFlight like anything else. App Store submission and Play production
+  releases stay manual (`scripts/asc.js`, `scripts/play.js`), on the owner's word.
 - Native builds run on a GitHub macOS runner (`ios-build.yml`: `eas build --local`, then
   `eas submit --path`), which uses no EAS build credits; the repo is public, so runner minutes are free.
   Local builds are not listed by `eas build:list`, so a submitted build pushes a tag `ios-fp/<fingerprint>`,
@@ -90,8 +93,14 @@ file is the release mechanics and the traps behind them.
 - `Health report` (`health-report.yml`, daily 13:00 UTC, `scripts/sentry/report.js`): a comment on
   the pinned "App health (daily report)" issue, mentioning the owner.
 - `Promote to production` refuses an update with fewer than 5 preview sessions or under 99%
-  crash-free (`scripts/sentry/gate.js`). A run by hand can change the bar or skip it. A bar that isn't
-  a number fails the check; it never passes it.
+  crash-free (`scripts/sentry/gate.js`), checked per platform: the iOS and the Android group must
+  each pass, so an Android tester has to open the update too. A run by hand can change the bar or skip
+  it. A bar that isn't a number fails the check; it never passes it.
+- Android is in all of this: its sessions and events go to the same Sentry project (environment
+  `production` or `preview`, release `…@<version>+<versionCode>`, `.u<group>` for an update, one
+  group per platform), new GitHub issues get an `ios` or `android` label from their latest event, and
+  the daily report has a per-platform table. Sentry groups sessions by release only, never by OS, so
+  crash-free rates are per release (each update group is one platform).
 - Secrets:
   - `SENTRY_API_TOKEN`: a Sentry internal integration token with read access to Issue & Event,
     Project and Organization. It is separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps.
@@ -515,25 +524,51 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
 
 ## Android (Google Play)
 
-Not on Google Play yet (Oct 28 2026). Package `com.revisionbuddy.app`, the same as the iOS bundle id
-(permanent once on Play). `versionCode` comes from EAS (`appVersionSource: remote`, `autoIncrement`).
-Target SDK 36, min 24; every native library is 16 KB aligned (checked on an API 37 16 KB-page
-emulator). `store/android/` holds the listing, Data safety and content rating answers and the
-click-by-click setup.
-- **Opt-in in CI.** Repository variables (Settings → Secrets and variables → Actions → Variables):
-  `ANDROID_RELEASES` = `true` makes Preview look up the Android fingerprint (tag `android-fp/<hash>`)
-  and publish updates for both platforms; Promote then republishes Android too. Off, both are iOS
-  only. Preview builds Android (Linux runner, `android-build.yml`, `eas build --local`, no credits)
-  only when `ANDROID_SUBMIT` is on too: the tag is pushed once a build is on Play, so before that every
-  push would build again. Until then a native change means EAS Build (android) and an upload by hand.
-  `ANDROID_SUBMIT` = `true` uploads each build to Play's internal testing (`eas submit`, eas.json
-  `submit.production.android`: `track: internal`, `releaseStatus: draft` until the app is
-  published once, then `completed`). Every build attaches the `.aab` to the run (7 days): Play takes
-  the first upload only through Play Console. EAS Build (by hand) has a platform choice.
+Package `com.revisionbuddy.app`, the same as the iOS bundle id (permanent). `versionCode` comes from
+EAS (`appVersionSource: remote`, `autoIncrement`), counted apart from iOS build numbers; the version
+string is the same `version` in app.config.js. Target SDK 36, min 24; every native library is 16 KB
+aligned (checked on an API 37 16 KB-page emulator). `store/android/` holds the listing, Data safety
+and content rating answers and the click-by-click setup. On Play since Nov 1 2026: internal testing,
+and Closed testing (track `alpha`) approved; a personal account needs 12 testers opted in for 14 days
+before production can be applied for.
+
+**Android moves with iOS.** Same branches, same version, same flow:
+
+| | iOS | Android |
+| --- | --- | --- |
+| Native change on develop | Preview builds on macOS, TestFlight; tag `ios-fp/<hash>` | Preview builds on Linux, Play internal testing (released to its testers); tag `android-fp/<hash>` |
+| Release branch (release/1.0.x) | EAS Build by hand, platform `all` (the default): both from one commit | same run |
+| JavaScript | Preview publishes to `preview` | the same push, its own update group (another runtime), same `[app <hash>]` |
+| Testers on `preview` | TestFlight install + `previewTester` | `previewTester` alone (Play can't tell testing from production) |
+| To store users | Promote: one approval republishes both platforms' groups for main's hash; both must pass the crash-free gate | same run |
+| Store release | `scripts/asc.js` (version, build, submit) by hand | `scripts/play.js promote <versionCode> --to production --rollout 0.2 --yes` by hand |
+| Crashes | Sentry, dSYMs uploaded by the build | Sentry, JS source maps and native symbols uploaded by the build (Gradle plugin) |
+| GitHub issues from Sentry | label `ios` | label `android` |
+
+- **CI switches.** Repository variables (Settings → Secrets and variables → Actions → Variables):
+  `ANDROID_RELEASES` = `true` (on) makes Preview look up the Android fingerprint and publish updates
+  for both platforms, and Promote and EAS Build include Android. `ANDROID_SUBMIT` = `true` (on) makes
+  Preview build Android when its fingerprint has no tag and upload it (`eas submit`, eas.json
+  `submit.production.android`: `track: internal`, `releaseStatus: completed`); the tag is pushed only
+  once a build is on Play, so with uploads off every push would build again (Preview then only says
+  so). Every build attaches the `.aab` to the run (7 days).
+- **Moving a build on.** Uploads go to internal testing only. Closed testing and production take the
+  same bundle, never a rebuild: `node scripts/play.js status`, then `promote <versionCode> --to alpha`
+  (Google reviews closed-testing changes; usually hours, "typically within 7 days"), and for the store
+  `promote <versionCode> --to production --rollout 0.2 --yes`, later `rollout 1 --yes` (`halt --yes`
+  stops it). Production is the owner's decision, as App Store submission is: run it only when asked.
+  The key needs production rights first (below).
 - **Secrets.** `GOOGLE_SERVICES_JSON` (repository secret, base64 of google-services.json), written
   outside the repo and passed by path (`GOOGLE_SERVICES_JSON`, app.config.js). The upload keystore
-  and the Play service account key live on EAS (`eas credentials --platform android`), like the
-  iOS credentials, so no workflow holds them.
+  stays on EAS (`eas credentials --platform android`; don't script that menu: "Set up a new keystore"
+  is one keypress away, and a new upload key breaks Play uploads). `PLAY_SERVICE_ACCOUNT_JSON`
+  (repository secret, base64): the key of `eas-play-submit@revision-buddy-3a398.iam.gserviceaccount.com`,
+  which may release to testing tracks and edit tester lists, nothing else. `android-build.yml` writes
+  it to a file only for the upload step, after the build; eas.json reads the path from
+  `PLAY_SERVICE_ACCOUNT_KEY_PATH`. The same key is `~/secrets/revisely-play-service-account.json` on
+  the laptop for `scripts/play.js` (`PLAY_KEY_PATH`). Production needs "Release to production,
+  exclude devices, and use Play App Signing" granted to it in Play Console (Users and permissions),
+  which the owner decides.
 - **Fingerprint.** The iOS fingerprint hashes the whole app config, the `android` section and every
   plugin's options included: any Android change in `app.config.js` (permissions, icons, plugins) is
   a native change for iOS too (raise `version`, a TestFlight build, an App Store release). Changes
@@ -567,6 +602,9 @@ click-by-click setup.
   - expo-location sends a heading only after a ~2° turn, so a phone held still can show
     "Finding north…" until it moves.
   - Widgets are iOS only (WidgetKit); Android home-screen widgets are a follow-up.
+- **Not on Android yet:** home-screen widgets, recite mode's speech recognition (whisper.rn's iOS
+  path only), Sign in with Apple, previous/next verse in the media notification and on the lock
+  screen.
 - **Testing on an emulator** without touching production: the Firebase emulators (Auth, Firestore,
   Storage) with a dev build pointed at them, and an account seeded there with
   `functions/scripts/seed-screenshots.js` (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`).
