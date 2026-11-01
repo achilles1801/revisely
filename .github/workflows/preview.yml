@@ -19,11 +19,13 @@ name: Preview
 # Config values (Firebase keys, client ids, Sentry) come from the `production` environment on EAS,
 # the same one production builds read, so an update carries the config its binary was built with.
 #
-# Android is opt-in, with the repository variable ANDROID_RELEASES = 'true' (Settings > Secrets and
-# variables > Actions > Variables). Off, everything here is iOS only, as before. On, the Android
-# fingerprint is looked up the same way (tag android-fp/<hash>), a Linux runner builds it when it has
-# no build (android-build.yml: Google Play internal testing once ANDROID_SUBMIT is 'true'), and the
-# update is published for both platforms.
+# Android works the same way when the repository variable ANDROID_RELEASES is 'true' (Settings >
+# Secrets and variables > Actions > Variables; on since Nov 1 2026): its fingerprint is looked up too
+# (tag android-fp/<hash>), a Linux runner builds one with no build and uploads it to Google Play's
+# internal testing track (android-build.yml, when ANDROID_SUBMIT is 'true'), and the update is
+# published for both platforms. The two runtimes differ, so EAS makes one update group per platform,
+# both with the same [app <hash>]; promote.yml promotes them together. Android testers follow
+# `preview` by their account alone (updateChannel.ts).
 on:
   push:
     branches: [develop]

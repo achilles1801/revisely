@@ -10,13 +10,17 @@ const TITLE = 'App health (daily report)';
 
 async function main() {
   const q = (s) => sentryApi.issues(s, '24h');
-  const [newIssues, regressed, top, feedback, prod, preview] = await Promise.all([
+  const onPlatform = (os) => sentryApi.issues(`is:unresolved !issue.category:feedback os.name:${os}`, '24h', 100);
+  const [newIssues, regressed, top, feedback, prod, preview, ios, android] = await Promise.all([
     q('is:unresolved firstSeen:-24h !issue.category:feedback'),
     q('is:unresolved is:regressed !issue.category:feedback'),
     sentryApi.issues('is:unresolved !issue.category:feedback', '24h', 5),
     q('issue.category:feedback'),
     sentryApi.sessionsByRelease({ environment: 'production', statsPeriod: '24h' }),
     sentryApi.sessionsByRelease({ environment: 'preview', statsPeriod: '24h' }),
+    // Sentry groups sessions by release only, not by OS: the platform split comes from issues.
+    onPlatform('iOS'),
+    onPlatform('Android'),
   ]);
   const production = sessionsByRelease(prod);
   const alerts = productionAlerts(production, { minSessions: 50, minCrashFree: 0.99 });
@@ -38,6 +42,7 @@ async function main() {
     preview: sessionsByRelease(preview),
     alerts,
     mention: MENTION,
+    platforms: { ios, android },
   });
 
   const open = await githubApi.issuesWithLabel('health-report', 'open');

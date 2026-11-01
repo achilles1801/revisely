@@ -1,7 +1,7 @@
 const { sync } = require('../sync');
 const { marker } = require('../logic');
 
-function fakes({ sentryIssues = {}, tracked = [], sessions = { groups: [] }, openHealth = [], failSessions = false, failCreate = false } = {}) {
+function fakes({ sentryIssues = {}, tracked = [], sessions = { groups: [] }, openHealth = [], failSessions = false, failCreate = false, event = { tags: [], entries: [] } } = {}) {
   const created = [];
   const comments = [];
   const reopened = [];
@@ -15,7 +15,7 @@ function fakes({ sentryIssues = {}, tracked = [], sessions = { groups: [] }, ope
     deps: {
       sentryApi: {
         issues: async (q) => sentryIssues[q.split(' ')[1]] || [],
-        latestEvent: async () => ({ tags: [], entries: [] }),
+        latestEvent: async () => event,
         sessionsByRelease: async () => {
           if (failSessions) throw new Error('Sentry sessions -> 500');
           return sessions;
@@ -57,6 +57,15 @@ describe('sync', () => {
     expect(opened).toEqual([101]);
     expect(f.created[0].labels).toEqual(['sentry']);
     expect(f.created[0].body).toContain(marker('1'));
+  });
+
+  it.each([
+    ['Android', 'android'],
+    ['iOS', 'ios'],
+  ])('adds the platform of the latest event as a label (%s), never claude-fix', async (os, label) => {
+    const f = fakes({ sentryIssues: { 'is:new': [issue('9', 'new')] }, event: { tags: [{ key: 'os.name', value: os }], entries: [] } });
+    await sync(f.deps, {}, quiet);
+    expect(f.created[0].labels).toEqual(['sentry', label]);
   });
 
   it('does not open a second issue for one already tracked', async () => {
