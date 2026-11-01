@@ -527,8 +527,10 @@ h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 .doc th { font-weight: 600; color: var(--secondary); font-size: 13px; border-bottom-color: var(--secondary); }
 
 .doc .card-list { list-style: none; padding: 0; margin: 28px 0 0; }
-.doc .card-list li { margin: 0; padding: 18px 0; border-top: 0.5px solid var(--separator); }
-.doc .card-list li:last-child { border-bottom: 0.5px solid var(--separator); }
+.doc .card-list > li { margin: 0; padding: 18px 0; border-top: 0.5px solid var(--separator); }
+.doc .card-list > li:last-child { border-bottom: 0.5px solid var(--separator); }
+/* A list inside a card (support: deleting some of your data) reads like the card's text. */
+.doc .card-list ul { margin: 4px 0 0; color: var(--secondary); }
 .doc .card-list h2 { border: 0; padding: 0; margin: 0; font-size: 17px; }
 .doc .card-list p { margin: 4px 0 0; color: var(--secondary); }
 
