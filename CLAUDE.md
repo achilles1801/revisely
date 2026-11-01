@@ -766,12 +766,16 @@ classic default), and a fresh install starts in light.
   until the offset is 0. Before (Oct 28 2026) it acted only on release and closed on an 80pt
   bounce, so it never followed the finger.
 - The owner's rules from testing (Oct 26 2026):
-  - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
-    second card restating it. Under the Memorized line, **juz dots** (`v2/JuzDots`): thirty, one per
+  - **Minimal.** Home is one Today post (pages, juz, surahs, the action, how much is memorized); no
+    second card restating it, and no ⋯ (Nov 2026): today's pages carry a › that opens exactly two
+    actions, "Jump to…" (`lib/jump`, `home/JumpSheet`) and "Edit schedule"; the memorized line,
+    "17.9% of the Quran memorized ›" (one decimal, of 604 pages; always shown, no setting; it wraps,
+    never truncates), opens the memorized pages ready to edit. The old "Behind? / back a day" (Home
+    and the plan editor's "Running behind?") is gone: Jump to covers it. Under the memorized line,
+    **juz dots** (`v2/JuzDots`): thirty, one per
     juz, each lit by that juz's memorized share (`juzFractions`; half a juz, half a dot) in the
-    accent's `palette.ring` colours (both ends ≥ 3:1 on the ground): no words, "Memorized 27% of
-    the Quran" for VoiceOver, shown and hidden with the Memorized line (Settings → Progress card),
-    Reduce Motion respected. The user chose them on Oct 28 2026 over a ring around the mark and a
+    accent's `palette.ring` colours (both ends ≥ 3:1 on the ground): no words, the line's text for
+    VoiceOver, Reduce Motion respected. The user chose them on Oct 28 2026 over a ring around the mark and a
     hairline (both removed, with the tester-only setting that compared them). Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".

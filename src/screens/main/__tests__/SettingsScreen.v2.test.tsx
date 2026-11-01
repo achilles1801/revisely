@@ -158,13 +158,15 @@ describe('Settings in the new design: its sheets and rows', () => {
   });
 });
 
-describe('Settings: no Progress style any more (the juz dots won)', () => {
-  it('the row is gone, the progress card’s own rows stay', async () => {
+describe('Settings: no progress card setting (Home always shows how much is memorized)', () => {
+  it('no Progress card, no Shows, no Progress style; Home screen keeps its other rows', async () => {
     await renderV2();
+    for (const gone of ['Progress card', 'Shows', 'Juz memorized', 'Pages memorized', 'Surahs memorized', 'Progress style']) {
+      expect(screen.queryByText(gone)).toBeNull();
+    }
     expect(screen.queryByTestId('progress-style-row')).toBeNull();
-    expect(screen.queryByText('Progress style')).toBeNull();
-    expect(screen.queryByText('Juz dots')).toBeNull();
-    expect(screen.getByText('Progress card')).toBeTruthy();
+    expect(screen.getByText('Home screen')).toBeTruthy();
+    expect(screen.getByText('Friday Al-Kahf reminder')).toBeTruthy();
   });
 });
 

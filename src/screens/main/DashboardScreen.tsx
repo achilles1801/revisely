@@ -27,12 +27,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
-import {
-  generateDailyAssignment,
-  shiftScheduleAnchor,
-  canPushScheduleBack,
-  scheduleStartingByToday,
-} from '../../lib/algorithm';
+import { generateDailyAssignment, scheduleStartingByToday } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
@@ -76,14 +71,13 @@ export default function DashboardScreen() {
 
   const homePrefs = useHomePrefs();
   const tabFootprint = useTabBarFootprint();
-  const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
   // "Jump to…": the sheet, and the toast after a jump (with what to put back).
   const [jumpOpen, setJumpOpen] = useState(false);
   const [jumped, setJumped] = useState<{ message: string; before: User } | null>(null);
 
-  // A schedule that starts after today (an earlier "back a day" on a schedule
-  // that started today) leaves today with nothing to revise: start it today.
+  // A schedule that starts after today (an older version's "back a day" on a
+  // schedule that started that day) leaves today with nothing: start it today.
   const repairingStartRef = useRef(false);
   useEffect(() => {
     if (!user || repairingStartRef.current) return;
@@ -376,9 +370,6 @@ export default function DashboardScreen() {
     }
   };
 
-  // Fell behind? Slide the whole schedule a day later so today reverts to the
-  // review you missed instead of marching on. Pure anchor nudge — no per-day
-  // edits — applied immediately so the Today post updates in place.
   // Today starts at another juz, surah or page; the days after carry on from it.
   const handleJump = async (target: JumpTarget) => {
     setJumpOpen(false);
@@ -409,18 +400,6 @@ export default function DashboardScreen() {
     }
   };
 
-  const handlePushBack = async () => {
-    if (!user || shifting || !canPushScheduleBack(user, revisionDate)) return;
-    setShifting(true);
-    try {
-      await saveUser(shiftScheduleAnchor(user, 1));
-    } catch {
-      Alert.alert("Couldn't update your schedule", 'Please try again.');
-    } finally {
-      setShifting(false);
-    }
-  };
-
   const editModal = selectedLog && (
     <EditSessionModal
       visible={showEditModal}
@@ -441,11 +420,8 @@ export default function DashboardScreen() {
   // Friday's Al-Kahf, then the last few sessions; the rest is behind "See
   // all", searchable. A running timer shows in the top bar.
   const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
-  const progress =
-    homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized')
-      ? memorizedText(pages, homePrefs.metrics)
-      : null;
-  const memorized = progress?.body ?? null;
+  // How much of the Quran is memorized: everyone sees it (no setting).
+  const memorized = memorizedText(pages);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
@@ -491,8 +467,6 @@ export default function DashboardScreen() {
           done={donePagesToday}
           streak={calculatedStreak}
           memorized={memorized}
-          memorizedFraction={progress?.fraction}
-          memorizedJuz={progress?.juz}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
@@ -500,9 +474,6 @@ export default function DashboardScreen() {
           leftovers={leftovers.length}
           onCarryOver={handleCarryOver}
           carrying={carrying}
-          onPushBack={handlePushBack}
-          canPushBack={canPushScheduleBack(user, revisionDate)}
-          shifting={shifting}
         />
 
         {showKahfCard && (

@@ -185,9 +185,12 @@ describe('the schedule in the new design', () => {
     for (const header of ['Cycle', 'Saved plans', 'More']) {
       expect(flat(screen.getByText(header).props.style)).toMatchObject({ fontWeight: '600', color: palette.text });
     }
-    for (const label of ['Show all 10 days', 'Add rest day', 'Create new plan', 'Save current plan…', 'Running behind?', 'Daily amount']) {
+    for (const label of ['Show all 10 days', 'Add rest day', 'Create new plan', 'Save current plan…', 'Daily amount']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
+    // Running behind? (push back / skip ahead a day) is gone: Home's Jump to… moves where today starts.
+    expect(screen.queryByText('Running behind?')).toBeNull();
+    expect(screen.queryByTestId('plan-timing')).toBeNull();
     expect(screen.queryByText('Create New Plan')).toBeNull();
     // "Show all" is a link; actions read in ink.
     expect(flat(screen.getByText('Show all 10 days').props.style).color).toBe(palette.link);
@@ -278,27 +281,6 @@ describe('the schedule in the new design', () => {
     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
     fireEvent.press(within(sheet).getByTestId('pill-juz'));
     expect(within(sheet).getByText('Ajzaʼ per day')).toBeTruthy();
-  });
-
-  it('Running behind? is a v2 menu with the two shifts', async () => {
-    await mount(<PlanEditScreen />);
-    fireEvent.press(screen.getByTestId('plan-timing'));
-    await act(async () => {});
-    const menu = screen.getByTestId('plan-timing-menu');
-    expect(within(menu).getByText('Push back a day')).toBeTruthy();
-    expect(within(menu).getByText('Skip ahead a day')).toBeTruthy();
-    expect(within(menu).getByTestId('sheet-cancel')).toBeTruthy();
-  });
-
-  it('Running behind? on a schedule that starts today: no Push back a day (nothing before today)', async () => {
-    const now = new Date().toISOString();
-    mockApp.user = { ...baseUser, createdAt: now, scheduleAnchorDate: now, savedPlans: [] };
-    await mount(<PlanEditScreen />);
-    fireEvent.press(screen.getByTestId('plan-timing'));
-    await act(async () => {});
-    const menu = screen.getByTestId('plan-timing-menu');
-    expect(within(menu).queryByText('Push back a day')).toBeNull();
-    expect(within(menu).getByText('Skip ahead a day')).toBeTruthy();
   });
 
   it('a saved plan opens a v2 menu: Load plan replaces the days, Delete plan in red', async () => {
