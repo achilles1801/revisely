@@ -1,10 +1,8 @@
 {
   // Cloudflare Worker "revisely" (revisely.app): the static site in /docs
-  // (privacy, terms), under /api/ a small API for the app (worker/), and under
-  // /athan/ the athan voices from the R2 bucket revisely-athan (worker/athan.ts).
-  // Only /api/* and /athan/* run the worker code; every other path is served
-  // straight from the assets. Cloudflare Workers Builds deploys it on each push
-  // to main. The bucket must exist before a deploy that binds it.
+  // (privacy, terms) and, under /api/, a small API for the app (worker/).
+  // Only /api/* runs the worker code; every other path is served straight from
+  // the assets. Cloudflare Workers Builds deploys it on each push to main.
   //
   // Secrets (never in this file; `npx wrangler@4.153.0 secret put <NAME>`):
   //   TCQ_API_KEY_LIVE     The Clear Quran API production key (tcq_eng_liv_…): the App
@@ -21,11 +19,8 @@
   "assets": {
     "directory": "docs",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/athan/*"]
+    "run_worker_first": ["/api/*"]
   },
-  // Athan voices (catalog.json, notif/, full/, previews/): public through
-  // /athan/ only; the bucket itself has no public access.
-  "r2_buckets": [{ "binding": "ATHAN", "bucket_name": "revisely-athan" }],
   "vars": {
     // Firebase project whose sign-in tokens the API accepts.
     "FIREBASE_PROJECT_ID": "revision-buddy-3a398",
@@ -71,8 +66,7 @@
   ],
   // Workers Builds runs `wrangler preview` for branches other than main, which
   // needs this block (previews inherit nothing). Previews get no API keys, so
-  // /api/tcq answers 503 there and uses none of the plan; nor a bucket, so
-  // /athan/ answers 503.
+  // /api/tcq answers 503 there and uses none of the plan.
   "previews": {
     "vars": {
       "FIREBASE_PROJECT_ID": "revision-buddy-3a398",
