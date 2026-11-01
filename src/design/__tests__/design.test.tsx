@@ -23,7 +23,11 @@ import { DesignProvider, useDesign } from '../DesignContext';
 import { makeHaptics, useHaptics } from '../haptics';
 import { ThemeProvider, isExistingInstall, resolveThemeMode, useTheme } from '../../context/ThemeContext';
 import { PressableScale } from '../../components/PressableScale';
-import { TodayPost, formatPercent, juzLabel, memorizedText, todayText } from '../../components/home/feed/TodayPost';
+import { TodayPost, formatPercent, memorizedText } from '../../components/home/feed/TodayPost';
+import { NBHY, NBSP } from '../../lib/todayLines';
+
+/** Today's text as written: names held with no-break hyphens. */
+const held = (s: string) => s.replace(/(\w)-(\w)/g, `$1${NBHY}$2`).split(' → ').join(`${NBSP}→ `);
 import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
@@ -443,41 +447,12 @@ const wrap = (ui: React.ReactElement) => (
 
 describe('Home in the new design (a feed)', () => {
   beforeEach(() => AsyncStorage.setItem('@revisely_theme_v2', 'light'));
-  it('today is real pages, juz and surahs in one post, never "Juz 27 + 1 more"', () => {
-    const pages = Array.from({ length: 20 }, (_, i) => 503 + i);
-    const juz = [
-      { juz: 26, pages: pages.slice(0, 19) },
-      { juz: 27, pages: pages.slice(19) },
-    ];
-    expect(todayText('not_started', pages, new Set(), juz)).toEqual({
-      title: 'Pages 503–522',
-      detail: '20 pages · Juz 26–27 · Al-Ahqaf to Adh-Dhariyat',
-      cta: 'Start revision',
-      solid: true,
-    });
-    expect(todayText('partial', pages, new Set([503, 504]), juz).detail).toBe('2 of 20 done · Juz 26–27 · Al-Ahqaf to Adh-Dhariyat');
-    expect(todayText('completed', pages, new Set(pages))).toMatchObject({ title: 'Done for today', solid: false });
-    expect(todayText('not_started', [], new Set()).title).toBe('Nothing to revise yet');
-  });
-
-  it('names the juz briefly', () => {
-    expect(juzLabel([{ juz: 30 }])).toBe('Juz 30');
-    expect(juzLabel([{ juz: 27 }, { juz: 26 }])).toBe('Juz 26–27');
-    expect(juzLabel([{ juz: 3 }, { juz: 7 }])).toBe('Juz 3, 7');
-    expect(juzLabel([{ juz: 1 }, { juz: 3 }, { juz: 5 }, { juz: 9 }])).toBe('4 juz');
-    expect(juzLabel([])).toBe('');
-  });
-
   const post = (over: Partial<React.ComponentProps<typeof TodayPost>> = {}) => {
     const props: React.ComponentProps<typeof TodayPost> = {
       name: 'Karim',
       initial: 'K',
       status: 'partial',
       pages: [520, 521, 522],
-      juzBreakdown: [
-        { juz: 26, pages: [520, 521] },
-        { juz: 27, pages: [522] },
-      ],
       done: new Set([520, 521]),
       streak: 7,
       memorized: { body: '27.5% of the Quran memorized', fraction: 166 / 604, juz: Array(30).fill(0.27) },
@@ -499,7 +474,9 @@ describe('Home in the new design (a feed)', () => {
     await act(async () => {});
     expect(screen.getByText('Karim')).toBeTruthy();
     expect(screen.getByText('Today · 7-day streak')).toBeTruthy();
-    expect(screen.getByText('2 of 3 done · Juz 26–27 · Qaf to Adh-Dhariyat')).toBeTruthy();
+    // In progress: where to carry on, then how far today has got.
+    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Adh-Dhariyat, p.${NBSP}522`), { exact: false });
+    expect(screen.getByTestId('today-progress')).toHaveTextContent('2 of 3');
     expect(screen.queryByTestId('thread-line')).toBeNull();
     expect(screen.queryByText('Juz 26')).toBeNull();
     fireEvent.press(screen.getByTestId('today-cta'));
@@ -575,20 +552,57 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onCarryOver).toHaveBeenCalled();
   });
 
-  it('today’s pages (›) open a menu of exactly two: Jump to… and Edit schedule; it runs once the sheet has gone', async () => {
+  it('today’s › opens a menu of exactly two, Jump to… and Edit schedule, under the exact pages; it runs once the sheet has gone', async () => {
     const props = post();
     await act(async () => {});
-    expect(screen.getByText(/^2 of 3 done · Juz 26–27 · Qaf to Adh-Dhariyat/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('today-summary'));
     const menu = screen.getByTestId('today-menu');
+    // The exact pages in the header, which grows no further than the rows (1.4).
+    expect(within(menu).getByText(held('Pages 520–522 · Qaf → Adh-Dhariyat')).props.maxFontSizeMultiplier).toBe(1.4);
     expect(within(menu).getByText('Jump to…')).toBeTruthy();
     expect(within(menu).getByText('Start today at another juz, surah or page')).toBeTruthy();
     expect(within(menu).getByText('Edit schedule')).toBeTruthy();
-    for (const gone of ['Edit memorized pages', 'Memorized pages', 'Behind? Move the plan back a day']) {
+    for (const gone of ['Edit memorized pages', 'Memorized pages', 'Behind? Move the plan back a day', 'Go back a day']) {
       expect(within(menu).queryByText(gone)).toBeNull();
     }
     fireEvent.press(within(menu).getByText('Edit schedule'));
     expect(props.onEditSchedule).not.toHaveBeenCalled();
+  });
+
+  it('not started: "Starts at …, p. N ›" over how much and to where; the › is held to the page and grows with the text', async () => {
+    post({ status: 'not_started', pages: Array.from({ length: 20 }, (_, i) => 542 + i), done: new Set() });
+    await act(async () => {});
+    const title = screen.getByTestId('today-title');
+    expect(title).toHaveTextContent(held(`Starts at Al-Mujadila, p.${NBSP}542${NBSP}`), { exact: false });
+    expect(screen.getByTestId('today-detail')).toHaveTextContent(held(`20${NBSP}pages · to At-Tahrim · Juz${NBSP}28`));
+    // Two lines at most, even at the largest text sizes (it shrinks before a third).
+    for (const id of ['today-title', 'today-detail']) {
+      const t = screen.getByTestId(id);
+      expect(t.props.numberOfLines).toBe(2);
+      expect(t.props.adjustsFontSizeToFit).toBe(true);
+      expect(t.props.maxFontSizeMultiplier).toBe(1.6);
+    }
+    // The name and streak grow no further than the top bar.
+    expect(screen.getByText('Karim').props.maxFontSizeMultiplier).toBe(1.4);
+    expect(screen.getByText('Today · 7-day streak').props.maxFontSizeMultiplier).toBe(1.4);
+  });
+
+  it('carried in from yesterday, and two ranges: said once in line 2', async () => {
+    post({ status: 'not_started', pages: Array.from({ length: 20 }, (_, i) => 538 + i), done: new Set(), carried: 4 });
+    await act(async () => {});
+    expect(screen.getByTestId('today-detail')).toHaveTextContent(`20${NBSP}pages · 4 from yesterday first`);
+  });
+
+  it('done: a dot, "Done · N pages" with no ›, then the surahs and juz; still opens the menu', async () => {
+    const pages = Array.from({ length: 20 }, (_, i) => 522 + i);
+    post({ status: 'completed', pages, done: new Set(pages) });
+    await act(async () => {});
+    expect(screen.getByTestId('today-done-dot', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('today-title')).toHaveTextContent(`Done · 20${NBSP}pages`);
+    expect(screen.getByTestId('today-detail')).toHaveTextContent(held(`Adh-Dhariyat → Al-Hadid · Juz${NBSP}27`));
+    expect(screen.getByTestId('today-cta')).toHaveTextContent('Review session');
+    fireEvent.press(screen.getByTestId('today-summary'));
+    expect(screen.getByTestId('today-menu')).toBeTruthy();
   });
 
   it('VoiceOver: today’s pages are one button that says what it opens; the Memorized line says it edits', async () => {
@@ -596,13 +610,13 @@ describe('Home in the new design (a feed)', () => {
     await act(async () => {});
     const summary = screen.getByTestId('today-summary');
     expect(summary.props.accessibilityRole).toBe('button');
-    expect(summary.props.accessibilityLabel).toBe('Pages 520–522. 2 of 3 done · Juz 26–27 · Qaf to Adh-Dhariyat');
+    expect(summary.props.accessibilityLabel).toBe('Continue at Adh-Dhariyat, page 522. 2 of 3 pages done');
     expect(summary.props.accessibilityHint).toBe('Jump to another start, or edit the schedule');
     expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe('27.5% of the Quran memorized. Edit memorized pages');
   });
 
   it('nothing to revise yet: today’s line isn’t a button and has no ›', async () => {
-    const props = post({ pages: [], juzBreakdown: [], done: new Set(), status: 'not_started' });
+    const props = post({ pages: [], done: new Set(), status: 'not_started' });
     await act(async () => {});
     const summary = screen.getByTestId('today-summary');
     expect(summary.props.accessibilityRole).toBeUndefined();

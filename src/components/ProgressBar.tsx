@@ -17,6 +17,8 @@ interface ProgressBarProps {
   height?: number;
   /** Color override for the fill. Defaults to the accent's progress fill. */
   color?: string;
+  /** The track's colour. Defaults to the separator grey. */
+  trackColor?: string;
   testID?: string;
 }
 
@@ -25,6 +27,7 @@ export function ProgressBar({
   showLabel = false,
   height = 6,
   color,
+  trackColor,
   testID,
 }: ProgressBarProps) {
   const { palette } = useTheme();
@@ -57,7 +60,7 @@ export function ProgressBar({
         </Text>
       )}
       <View
-        style={[styles.track, { height, backgroundColor: palette.separator, borderRadius: radius.full }]}
+        style={[styles.track, { height, backgroundColor: trackColor ?? palette.separator, borderRadius: radius.full }]}
         testID={testID ? `${testID}-track` : undefined}
       >
         <Animated.View
