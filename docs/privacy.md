@@ -81,14 +81,12 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **AlQuran Cloud (Islamic Network)** | Verse text and English translations | Not specified |
 | **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
 | **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
-| **Cloudflare, Inc.** | Hosts this website, our server that fetches The Clear Quran® translation, and the athan voices you can download | United States |
+| **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
 | **Stripe, Inc.** | Payment processing for donations on revisely.app | United States |
 
 When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
 
 If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse, with the verses around it, from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only verse numbers, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. So that text isn't requested again, our server keeps The Clear Quran® text it has fetched for up to 60 days, and the app keeps the text of verses you have read on your device for up to 60 days, in its private cache folder (not backed up or shared; deleting the app removes it). This is the translation's text only, nothing about you.
-
-If you choose an athan voice for prayer notifications, the app downloads its sound from our server (revisely.app, hosted by Cloudflare) and keeps it on your phone. The request carries nothing about you or your account; like any web server, ours sees your device's IP address, which we don't log or store.
 
 We do not transfer your data to any party not listed above for any other purpose.
 
