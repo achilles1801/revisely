@@ -7,7 +7,7 @@ import { getJuzForPage, getSurahForPage } from './quranData';
 // otherwise a memorized surah would split across two awkward half-days. Long
 // surahs that span 3+ juz (Al-Baqarah, An-Nisa) are kept on page-juz so a "1
 // juz" day doesn't accidentally become a 48-page Baqarah marathon.
-function juzKeyForPage(pageNumber: number): number {
+export function juzKeyForPage(pageNumber: number): number {
   const surah = getSurahForPage(pageNumber);
   const startJuz = getJuzForPage(surah.startPage);
   const endJuz = getJuzForPage(surah.endPage);
@@ -199,20 +199,37 @@ function juzModePagesForDate(
   date: Date,
   memorizedPages: UserPage[],
 ): number[] {
-  const memorizedPageNumbers = memorizedPages.map((p) => p.pageNumber);
-  const juzSet = new Set<number>();
-  for (const p of memorizedPageNumbers) juzSet.add(juzKeyForPage(p));
-  const juzList = Array.from(juzSet).sort((a, b) => a - b);
-  if (juzList.length === 0) return [];
+  const juz = juzModeCycle(user, memorizedPages);
+  if (!juz) return [];
 
   const start = new Date(user.scheduleAnchorDate || user.createdAt);
   const daysSinceStart = calendarDaysBetween(start, date);
   if (daysSinceStart < 0) return [];
 
-  const juzPerDay = Math.min(user.dailyJuzCount, juzList.length);
+  // The juz pattern repeats every cycle.length days; a shift moves within it.
+  const dayIndex = daysSinceStart % juz.cycle.length;
+  const shift = user.scheduleShiftPages ?? 0;
+  if (!shift) return [...juz.cycle[dayIndex]];
+  return shiftedCycleDay(juz.cycle, dayIndex, shift);
+}
+
+/**
+ * Juz mode's cycle: the juz holding memorized pages (by juzKeyForPage), how
+ * many a day, and the days of one cycle (day 0 = the anchor's day), each the
+ * memorized pages of its juz. Null without memorized pages.
+ */
+export function juzModeCycle(
+  user: User,
+  memorizedPages: UserPage[],
+): { juzList: number[]; juzPerDay: number; cycle: number[][] } | null {
+  const memorizedPageNumbers = memorizedPages.map((p) => p.pageNumber);
+  const juzSet = new Set<number>();
+  for (const p of memorizedPageNumbers) juzSet.add(juzKeyForPage(p));
+  const juzList = Array.from(juzSet).sort((a, b) => a - b);
+  if (juzList.length === 0) return null;
+  const juzPerDay = Math.max(1, Math.min(user.dailyJuzCount, juzList.length));
   const pagesForDay = (dayNumber: number): number[] => {
-    const juzOffset =
-      ((dayNumber * juzPerDay) % juzList.length + juzList.length) % juzList.length;
+    const juzOffset = (dayNumber * juzPerDay) % juzList.length;
     const result: number[] = [];
     for (let i = 0; i < juzPerDay; i++) {
       const juz = juzList[(juzOffset + i) % juzList.length];
@@ -223,13 +240,8 @@ function juzModePagesForDate(
     }
     return result;
   };
-
-  const shift = user.scheduleShiftPages ?? 0;
-  if (!shift) return pagesForDay(daysSinceStart);
-  // The juz pattern repeats every cycleLength days; shift within that cycle.
   const cycleLength = juzList.length / gcd(juzList.length, juzPerDay);
-  const cycle = Array.from({ length: cycleLength }, (_, i) => pagesForDay(i));
-  return shiftedCycleDay(cycle, daysSinceStart % cycleLength, shift);
+  return { juzList, juzPerDay, cycle: Array.from({ length: cycleLength }, (_, i) => pagesForDay(i)) };
 }
 
 /**
