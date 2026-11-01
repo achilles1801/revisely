@@ -27,15 +27,14 @@ Every collected type: **not shared**, **not processed ephemerally**.
 | Personal info → **Name** | Yes | Optional | App functionality, Account management | The display name (from sign-up or Google). |
 | Personal info → **Email address** | Yes | Required | App functionality, Account management | The account's email. |
 | Personal info → **User IDs** | Yes | Required | App functionality, Account management, Analytics | The account's internal ID (Firebase); crash reports carry it instead of a name or email. |
-| Photos and videos → **Photos** | Yes | Optional | App functionality | A screenshot the user chooses to attach to Settings → Report a problem. |
 | Audio → **Voice or sound recordings** | Yes | Optional | App functionality | Recitation recordings backed up to the user's account (Settings → Activity → Back up recordings turns it off). |
 | App activity → **App interactions** | Yes | Required | App functionality | Revision sessions, pages revised and their ratings, reading sessions, time in the app. |
 | App activity → **Other user-generated content** | Yes | Optional | App functionality | Daily log notes, Send feedback and Report a problem text. |
 | App info and performance → **Crash logs** | Yes | Required | Analytics | Crash and error reports (Sentry). |
-| App info and performance → **Diagnostics** | Yes | Required | Analytics | Session health per app version, device model and OS (Sentry). |
+| App info and performance → **Diagnostics** | Yes | Required | Analytics | Session health per app version, device model and OS (Sentry); a problem report's technical details, including a screenshot of Revisely's own screen if the user takes one in Report a problem. |
 | Device or other IDs → **Device or other IDs** | Yes | Required | App functionality | The notification token registered with Expo's push service. |
 
-Not collected: financial info, health and fitness, messages, contacts, calendar, files and docs, web browsing, app info
+Not collected: photos and videos (Report a problem only offers to capture Revisely's own screen, `enableTakeScreenshot`; it never reads the photo library, `enableScreenshot: false` in App.tsx), financial info, health and fitness, messages, contacts, calendar, files and docs, web browsing, app info
 (installed apps), other personal info, race and ethnicity, political or religious beliefs, sexual orientation, phone
 number, address, search history, purchase history, videos, music files, other audio files, other actions.
 
