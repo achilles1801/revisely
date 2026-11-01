@@ -31,7 +31,8 @@ function addDays(isoDay: string, delta: number): string {
 /**
  * Pages assigned on the previous `lookbackDays` revision days that were started
  * but not finished, and that have not been revised since. Days with no session
- * at all are left to "Go back a day". Oldest day first, in session order.
+ * at all are left out (Jump to… moves where today starts). Oldest day first,
+ * in session order.
  */
 export function findLeftoverPages(
   logs: RevisionLog[],

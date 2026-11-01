@@ -446,11 +446,10 @@ function addDaysToISOTimestamp(iso: string, deltaDays: number): string {
 /**
  * Slide the whole schedule by `deltaDays` calendar days, leaving the cycle
  * contents untouched. Because the scheduler is purely date-derived (see
- * getPagesScheduledForDate), moving the anchor is all it takes:
- *
- *   deltaDays = +1  → every assignment lands one day later. "I'm behind —
- *                     push it back" so today's revision reappears tomorrow.
- *   deltaDays = -1  → every assignment lands one day earlier. "Skip ahead."
+ * getPagesScheduledForDate), moving the anchor is all it takes: +1 puts every
+ * assignment a day later, -1 a day earlier. scheduleStartingByToday uses it to
+ * start a schedule left in the future on today ("Jump to…", lib/jump, is how
+ * the user moves where today starts).
  *
  * Shifts whichever anchor is live: `customPlan.cycleStartDate` when a custom
  * plan is set, otherwise `scheduleAnchorDate`. Returns a new User; never
@@ -492,17 +491,6 @@ export function scheduleStartDay(user: User): Date {
     return parseLocalDateString(user.customPlan.cycleStartDate);
   }
   return startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
-}
-
-/**
- * "Behind? Move the plan back a day" makes today repeat yesterday's revision,
- * which needs a yesterday: the schedule must have started before `today`. On a
- * schedule that starts today (a new account, a plan saved today) there's
- * nothing to go back to, and moving the start to tomorrow would leave today
- * with nothing to revise.
- */
-export function canPushScheduleBack(user: User, today: Date): boolean {
-  return calendarDaysBetween(scheduleStartDay(user), today) >= 1;
 }
 
 /**

@@ -1,12 +1,7 @@
-// "Behind? Move the plan back a day" on a schedule that starts today: not
-// offered, and an account an earlier version left with a start in the future
-// gets today's revision back.
-import {
-  canPushScheduleBack,
-  getPagesForDay,
-  scheduleStartingByToday,
-  shiftScheduleAnchor,
-} from '../algorithm';
+// An account an earlier version left with a start in the future (its "back a
+// day", since removed: Jump to… moves where today starts) gets today's
+// revision back.
+import { getPagesForDay, scheduleStartingByToday, shiftScheduleAnchor } from '../algorithm';
 import { createCustomPlanFromDraft } from '../schedulePlans';
 import type { User, UserPage } from '../../types';
 
@@ -48,32 +43,8 @@ const fresh: User = {
   fajrCalculationMethod: 'NorthAmerica',
 };
 
-describe('going back a day', () => {
-  it('is not offered on a new account: there is no yesterday to repeat', () => {
-    expect(canPushScheduleBack(fresh, today)).toBe(false);
-  });
-
-  it('is offered from the second day on', () => {
-    expect(canPushScheduleBack(fresh, day(1))).toBe(true);
-    const older = { ...fresh, scheduleAnchorDate: day(-5).toISOString() };
-    expect(canPushScheduleBack(older, today)).toBe(true);
-  });
-
-  it('follows a custom plan: not on the day it was saved, yes after', () => {
-    const planned: User = { ...fresh, customPlan: createCustomPlanFromDraft([[1, 2], [3, 4]], 'forward', today) };
-    expect(canPushScheduleBack(planned, today)).toBe(false);
-    expect(canPushScheduleBack(planned, day(1))).toBe(true);
-  });
-
-  it('when offered, today repeats yesterday', () => {
-    const older = { ...fresh, scheduleAnchorDate: day(-1).toISOString() };
-    const yesterday = getPagesForDay(older, day(-1), memorized);
-    expect(getPagesForDay(shiftScheduleAnchor(older, 1), today, memorized)).toEqual(yesterday);
-  });
-});
-
 describe('an account left with a start in the future', () => {
-  // What an earlier version did when "back a day" was tapped on the first day.
+  // What an earlier version's "back a day" did on the schedule's first day.
   const stuck = shiftScheduleAnchor(fresh, 1);
 
   it('had nothing to revise today', () => {
@@ -85,7 +56,6 @@ describe('an account left with a start in the future', () => {
     expect(repaired).not.toBeNull();
     expect(getPagesForDay(repaired!, today, memorized)).toEqual([1, 2]);
     expect(getPagesForDay(repaired!, day(1), memorized)).toEqual([3, 4]);
-    expect(canPushScheduleBack(repaired!, today)).toBe(false);
   });
 
   it('a custom plan in the same state is repaired the same way', () => {

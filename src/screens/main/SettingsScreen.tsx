@@ -9,7 +9,6 @@ import {
   Linking,
   Share,
   TextInput,
-  LayoutAnimation,
   AccessibilityState,
 } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
@@ -54,15 +53,7 @@ import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
 import { askTurnOffBackup, backupLabel, deleteAllEverywhere, useBackupStatus } from '../../lib/recordingBackupUi';
 import { formatBytes } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
-import {
-  ALL_HOME_METRICS,
-  HOME_METRIC_LABELS,
-  homeMetricsSummary,
-  setHomePrefs,
-  toggleHomeMetric,
-  useHomePrefs,
-} from '../../lib/homePrefs';
-import { usePersistedFlag } from '../../hooks/usePersistedFlag';
+import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { supportMailto } from '../../lib/contact';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { shareIcon } from '../../lib/platformUi';
@@ -227,12 +218,6 @@ export default function SettingsScreen() {
         .filter(Boolean)
         .join(' · ')
     : undefined;
-  // The progress card's options stay folded until opened (remembered per device).
-  const [metricsOpen, setMetricsOpen] = usePersistedFlag('@revisely_settings_progress_open', false);
-  const toggleMetricsOpen = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
-    setMetricsOpen(!metricsOpen);
-  }, [metricsOpen, setMetricsOpen]);
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
   // On this phone: how many, their size here; how many are backed up, and how
@@ -610,48 +595,6 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Home screen">
-          <Row
-            icon="stats-chart-outline"
-            label="Progress card"
-            rightSlot={
-              <SettingSwitch
-                value={homePrefs.showProgressCard}
-                onValueChange={(v) => setHomePrefs({ showProgressCard: v })}
-              />
-            }
-          />
-          {homePrefs.showProgressCard ? (
-            // What the card shows, folded into one row until opened.
-            <Row
-              label="Shows"
-              value={homeMetricsSummary(homePrefs.metrics)}
-              onPress={toggleMetricsOpen}
-              accessibilityState={{ expanded: metricsOpen }}
-              rightSlot={
-                <Ionicons name={metricsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textMuted} />
-              }
-            />
-          ) : null}
-          {homePrefs.showProgressCard && metricsOpen
-            ? ALL_HOME_METRICS.map((metric) => {
-                const selected = homePrefs.metrics.includes(metric);
-                return (
-                  <Row
-                    key={metric}
-                    label={HOME_METRIC_LABELS[metric]}
-                    onPress={() => toggleHomeMetric(metric)}
-                    accessibilityState={{ selected }}
-                    rightSlot={
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color={selected ? theme.accent : 'transparent'}
-                      />
-                    }
-                  />
-                );
-              })
-            : null}
           {prayerEnabled ? (
             <Row
               icon="time-outline"

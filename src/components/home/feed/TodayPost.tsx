@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
-import { computeMemorizationStats, formatFractional } from '../../../lib/memorizationStats';
-import type { HomeMetric } from '../../../lib/homePrefs';
+import { computeMemorizationStats } from '../../../lib/memorizationStats';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../../../lib/pageRanges';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
@@ -18,26 +17,21 @@ export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
 const count = (n: number) => `${n} page${n === 1 ? '' : 's'}`;
 
-/** "27% of the Quran" ("<1%" for a page or two). */
-export function percentOfQuran(fraction: number): string {
-  const percent = fraction * 100;
-  return `${percent < 1 && percent > 0 ? '<1' : Math.round(percent)}% of the Quran`;
+/** "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends). */
+export function formatPercent(fraction: number): string {
+  const percent = Math.round(fraction * 1000) / 10;
+  if (percent <= 0) return '0%';
+  if (percent >= 100) return '100%';
+  return `${percent.toFixed(1)}%`;
 }
 
-/** "6.2 of 30 juz · 123 of 604 pages", in the order Settings → Home screen chose. */
-export function memorizedText(pages: UserPage[], metrics: HomeMetric[]) {
+/** How much is memorized: "17.9% of the Quran memorized", and each juz's share (the dots). */
+export function memorizedText(pages: UserPage[]) {
   const stats = computeMemorizationStats(pages);
   const fraction = stats.pages / 604;
-  const parts: Record<HomeMetric, string> = {
-    juz: `${formatFractional(stats.fractionalJuz)} of 30 juz`,
-    pages: `${stats.pages} of 604 pages`,
-    surahs: `${stats.surahs} of 114 surahs`,
-  };
-  const shown = (metrics.length > 0 ? metrics : (['juz', 'pages'] as HomeMetric[])).map((m) => parts[m]);
   return {
-    body: shown.join(' · '),
-    meta: percentOfQuran(fraction),
-    /** Of the 604 pages (the dots' VoiceOver label). */
+    body: `${formatPercent(fraction)} of the Quran memorized`,
+    /** Of the 604 pages. */
     fraction,
     /** Each juz's memorized share, juz 1 first (the juz dots). */
     juz: stats.juzFractions,
@@ -82,10 +76,10 @@ export function todayText(
 }
 
 /**
- * Today on Home, in one post: today's pages, the juz and surahs they cover,
- * the one action (start, continue, review), and under it how much is
- * memorized (› opens the memorized pages to edit). The pages line and the ⋯'s
- * "Jump to…" choose where today starts; the ⋯ holds the schedule actions.
+ * Today on Home, in one post: today's pages, the juz and surahs they cover
+ * (with a ›: Jump to… or Edit schedule), the one action (start, continue,
+ * review), and under it how much of the Quran is memorized (› opens the
+ * memorized pages to edit), with a dot per juz. No ⋯: those two are the menu.
  */
 export function TodayPost({
   name,
@@ -96,8 +90,6 @@ export function TodayPost({
   done,
   streak,
   memorized,
-  memorizedFraction,
-  memorizedJuz,
   onPrimary,
   onEditSchedule,
   onMemorization,
@@ -105,9 +97,6 @@ export function TodayPost({
   leftovers,
   onCarryOver,
   carrying,
-  onPushBack,
-  canPushBack,
-  shifting,
 }: {
   name: string;
   initial: string;
@@ -116,62 +105,55 @@ export function TodayPost({
   juzBreakdown: { juz: number; pages: number[] }[];
   done: ReadonlySet<number>;
   streak: number;
-  /** "8.1 of 30 juz · 166 of 604 pages" (Settings → Home screen), or null to leave it out. */
-  memorized: string | null;
-  /** How much of the Quran is memorized (0–1), for the dots' VoiceOver label. */
-  memorizedFraction?: number;
-  /** Each juz's memorized share, juz 1 first: one dot each, shown with `memorized`. */
-  memorizedJuz?: number[];
+  /** How much is memorized (memorizedText): the line and the juz dots. */
+  memorized: { body: string; fraction: number; juz: number[] };
   onPrimary: () => void;
   onEditSchedule: () => void;
   /** Opens the memorized pages, ready to edit. */
   onMemorization: () => void;
-  /** Where today starts (Jump to…); absent: nothing to revise to jump in. */
-  onJump?: () => void;
+  /** Where today starts (Jump to…). */
+  onJump: () => void;
   leftovers: number;
   onCarryOver: () => void;
   carrying: boolean;
-  onPushBack: () => void;
-  /** There's a day before today to go back to (not on a schedule that starts today). */
-  canPushBack: boolean;
-  shifting: boolean;
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const text = todayText(status, pages, done, juzBreakdown);
   const empty = pages.length === 0;
   const meta = streak > 0 ? `Today · ${streak}-day streak` : 'Today';
-  // How much is memorized, as a dot per juz; only with the Memorized line.
-  const progress = memorized != null && memorizedFraction != null ? memorizedFraction : null;
-  const progressLabel = progress != null ? `Memorized ${percentOfQuran(progress)}` : '';
 
-  const jump = !empty && onJump ? onJump : undefined;
   const actions: SheetAction[] = [
-    ...(jump
-      ? [
-          {
-            key: 'jump',
-            label: 'Jump to…',
-            subtitle: 'Start today at another juz, surah or page',
-            icon: 'locate-outline' as const,
-            onPress: jump,
-          },
-        ]
-      : []),
+    {
+      key: 'jump',
+      label: 'Jump to…',
+      subtitle: 'Start today at another juz, surah or page',
+      icon: 'locate-outline',
+      onPress: onJump,
+    },
     { key: 'schedule', label: 'Edit schedule', icon: 'calendar-outline', onPress: onEditSchedule },
-    ...(status !== 'completed' && !empty && canPushBack
-      ? [
-          {
-            key: 'pushback',
-            label: shifting ? 'Updating…' : 'Behind? Move the plan back a day',
-            icon: 'arrow-undo-outline' as const,
-            disabled: shifting,
-            onPress: onPushBack,
-          },
-        ]
-      : []),
-    { key: 'memorized', label: 'Edit memorized pages', icon: 'create-outline', onPress: onMemorization },
   ];
+
+  // Today's pages and what they cover; with something to revise, a › and a menu.
+  const summary = (
+    <>
+      <View style={styles.titleRow}>
+        {status === 'completed' ? (
+          <View style={[styles.dot, { backgroundColor: palette.done }]} accessibilityElementsHidden />
+        ) : null}
+        <RowText>{text.title}</RowText>
+      </View>
+      <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
+        {text.detail}
+        {empty ? null : (
+          <>
+            {' '}
+            <Ionicons name="chevron-forward" size={13} color={palette.secondary} />
+          </>
+        )}
+      </Text>
+    </>
+  );
 
   return (
     <View testID="today-thread">
@@ -179,8 +161,6 @@ export function TodayPost({
         mark={<Mark label={initial} />}
         name={name || 'Today'}
         meta={name ? meta : undefined}
-        onMenu={() => setMenuOpen(true)}
-        menuLabel="Today's options"
         testID="today-post"
         footer={
           <>
@@ -200,41 +180,37 @@ export function TodayPost({
                 testID="today-carry-over"
               />
             ) : null}
-            {memorized ? (
-              <Tap
-                onPress={onMemorization}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel={`Memorized ${memorized}. Edit memorized pages`}
-                style={styles.memorized}
-                testID="today-memorized"
-              >
-                <Text style={[typeV2.meta, styles.memorizedText, { color: palette.secondary }]} numberOfLines={1}>
-                  {`Memorized ${memorized}`}
-                </Text>
+            <Tap
+              onPress={onMemorization}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`${memorized.body}. Edit memorized pages`}
+              style={styles.memorized}
+              testID="today-memorized"
+            >
+              {/* The › inside the text, so a long line wraps instead of cutting off. */}
+              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
+                {memorized.body}{' '}
                 <Ionicons name="chevron-forward" size={13} color={palette.secondary} />
-              </Tap>
-            ) : null}
-            {progress != null ? (
-              <JuzDots juz={memorizedJuz ?? []} progress={progress} label={progressLabel} testID="today-dots" />
-            ) : null}
+              </Text>
+            </Tap>
+            <JuzDots juz={memorized.juz} progress={memorized.fraction} label={memorized.body} testID="today-dots" />
           </>
         }
       >
-        <Tap
-          onPress={jump}
-          disabled={!jump}
-          accessibilityRole={jump ? 'button' : undefined}
-          accessibilityLabel={jump ? `${text.title}. Jump to another start` : undefined}
-          style={styles.titleRow}
-          testID="today-pages"
-        >
-          {status === 'completed' ? (
-            <View style={[styles.dot, { backgroundColor: palette.done }]} accessibilityElementsHidden />
-          ) : null}
-          <RowText>{text.title}</RowText>
-        </Tap>
-        <RowText secondary>{text.detail}</RowText>
+        {empty ? (
+          <View testID="today-summary">{summary}</View>
+        ) : (
+          <Tap
+            onPress={() => setMenuOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${text.title}. ${text.detail}`}
+            accessibilityHint="Jump to another start, or edit the schedule"
+            testID="today-summary"
+          >
+            {summary}
+          </Tap>
+        )}
       </ThreadRow>
 
       <ActionSheet
@@ -251,6 +227,5 @@ export function TodayPost({
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  memorized: { width: '100%', marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  memorizedText: { flexShrink: 1 },
+  memorized: { width: '100%', marginTop: 4 },
 });
