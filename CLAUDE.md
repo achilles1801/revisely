@@ -126,6 +126,28 @@ file is the release mechanics and the traps behind them.
 - `.u<group>` release names come from `src/lib/releaseInfo.ts` (PR #22); the promote gate needs them,
   so #22 lands before this automation.
 
+## Stats (weekly digest)
+
+- `Stats digest` (`.github/workflows/stats-digest.yml`, Mondays 15:00 UTC, `scripts/stats/weekly.js`) is a
+  comment on the "App stats (weekly digest)" issue (label `stats-digest`), mentioning the owner. It
+  shows last week's App Store first-time downloads, re-downloads and updates against the week before,
+  the top five countries for first downloads, and the totals since launch. Days Apple hasn't published
+  yet are named, and they count the next week. Run it by hand from Actions any time.
+- Data: App Store Connect Sales and Trends, daily `SALES`/`SUMMARY` reports, plus a finished month's
+  `MONTHLY` once Apple publishes it. Product types `1*` are first downloads, `3*` re-downloads and
+  `7*` updates. It reads only this app's Apple ID, `6767990248`. Read-only.
+- Secrets (repository; the run skips with a notice until all four exist):
+  - `ASC_REPORTS_KEY_ID`, `ASC_REPORTS_ISSUER_ID` and `ASC_REPORTS_KEY` (the `.p8` file's text): a
+    team API key with the **Sales** role only. The App Manager key used by `scripts/asc.js` stays
+    off GitHub, and an API key's role can't be changed after it's made.
+  - `ASC_VENDOR_NUMBER`: App Store Connect → Payments and Financial Reports.
+- Google Play (once the app is live there): Play Console exports installs, uninstalls and active
+  devices as monthly CSVs to its Cloud Storage bucket (Download reports → Statistics → copy the
+  `gs://pubsite_prod_…` URI). Invite a Google Cloud service account in Play Console → Users and
+  permissions with "View app information and download bulk reports". Then fill in `play()` in
+  `scripts/stats/weekly.js` to read `stats/installs/installs_com.revisionbuddy.app_YYYYMM_overview.csv`,
+  with secrets `PLAY_REPORTS_BUCKET` and `PLAY_REPORTS_SA_KEY`.
+
 **Rolling back** a production update: Actions → Promote to production → Run workflow on `main` →
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
