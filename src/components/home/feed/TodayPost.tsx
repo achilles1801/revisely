@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { computeMemorizationStats, formatFractional } from '../../../lib/memorizationStats';
 import type { HomeMetric } from '../../../lib/homePrefs';
@@ -83,7 +84,8 @@ export function todayText(
 /**
  * Today on Home, in one post: today's pages, the juz and surahs they cover,
  * the one action (start, continue, review), and under it how much is
- * memorized (opens Memorization). The ⋯ holds the schedule actions.
+ * memorized (› opens the memorized pages to edit). The pages line and the ⋯'s
+ * "Jump to…" choose where today starts; the ⋯ holds the schedule actions.
  */
 export function TodayPost({
   name,
@@ -99,6 +101,7 @@ export function TodayPost({
   onPrimary,
   onEditSchedule,
   onMemorization,
+  onJump,
   leftovers,
   onCarryOver,
   carrying,
@@ -121,7 +124,10 @@ export function TodayPost({
   memorizedJuz?: number[];
   onPrimary: () => void;
   onEditSchedule: () => void;
+  /** Opens the memorized pages, ready to edit. */
   onMemorization: () => void;
+  /** Where today starts (Jump to…); absent: nothing to revise to jump in. */
+  onJump?: () => void;
   leftovers: number;
   onCarryOver: () => void;
   carrying: boolean;
@@ -139,7 +145,19 @@ export function TodayPost({
   const progress = memorized != null && memorizedFraction != null ? memorizedFraction : null;
   const progressLabel = progress != null ? `Memorized ${percentOfQuran(progress)}` : '';
 
+  const jump = !empty && onJump ? onJump : undefined;
   const actions: SheetAction[] = [
+    ...(jump
+      ? [
+          {
+            key: 'jump',
+            label: 'Jump to…',
+            subtitle: 'Start today at another juz, surah or page',
+            icon: 'locate-outline' as const,
+            onPress: jump,
+          },
+        ]
+      : []),
     { key: 'schedule', label: 'Edit schedule', icon: 'calendar-outline', onPress: onEditSchedule },
     ...(status !== 'completed' && !empty && canPushBack
       ? [
@@ -152,7 +170,7 @@ export function TodayPost({
           },
         ]
       : []),
-    { key: 'memorized', label: 'Memorized pages', icon: 'book-outline', onPress: onMemorization },
+    { key: 'memorized', label: 'Edit memorized pages', icon: 'create-outline', onPress: onMemorization },
   ];
 
   return (
@@ -187,13 +205,14 @@ export function TodayPost({
                 onPress={onMemorization}
                 hitSlop={6}
                 accessibilityRole="button"
-                accessibilityLabel={`Memorized ${memorized}. Open memorization`}
+                accessibilityLabel={`Memorized ${memorized}. Edit memorized pages`}
                 style={styles.memorized}
                 testID="today-memorized"
               >
-                <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
+                <Text style={[typeV2.meta, styles.memorizedText, { color: palette.secondary }]} numberOfLines={1}>
                   {`Memorized ${memorized}`}
                 </Text>
+                <Ionicons name="chevron-forward" size={13} color={palette.secondary} />
               </Tap>
             ) : null}
             {progress != null ? (
@@ -202,12 +221,19 @@ export function TodayPost({
           </>
         }
       >
-        <View style={styles.titleRow}>
+        <Tap
+          onPress={jump}
+          disabled={!jump}
+          accessibilityRole={jump ? 'button' : undefined}
+          accessibilityLabel={jump ? `${text.title}. Jump to another start` : undefined}
+          style={styles.titleRow}
+          testID="today-pages"
+        >
           {status === 'completed' ? (
             <View style={[styles.dot, { backgroundColor: palette.done }]} accessibilityElementsHidden />
           ) : null}
           <RowText>{text.title}</RowText>
-        </View>
+        </Tap>
         <RowText secondary>{text.detail}</RowText>
       </ThreadRow>
 
@@ -225,5 +251,6 @@ export function TodayPost({
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  memorized: { width: '100%', marginTop: 4 },
+  memorized: { width: '100%', marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  memorizedText: { flexShrink: 1 },
 });

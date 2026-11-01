@@ -579,6 +579,37 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onEditSchedule).not.toHaveBeenCalled();
   });
 
+  it('Jump to…: first in the ⋯ menu, and tapping today’s pages opens it; the Memorized line edits, with a ›', async () => {
+    const onJump = jest.fn();
+    const props = post({ onJump });
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('today-pages'));
+    expect(onJump).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('today-pages').props.accessibilityLabel).toBe('Pages 520–522. Jump to another start');
+    expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe(
+      'Memorized 8.1 of 30 juz · 166 of 604 pages. Edit memorized pages',
+    );
+    fireEvent.press(screen.getByTestId('today-post-menu'));
+    const labels = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel).filter(Boolean);
+    expect(screen.getByText('Jump to…')).toBeTruthy();
+    expect(screen.getByText('Start today at another juz, surah or page')).toBeTruthy();
+    expect(screen.getByText('Edit memorized pages')).toBeTruthy();
+    expect(screen.queryByText('Memorized pages')).toBeNull();
+    expect(labels.indexOf('Jump to…')).toBeLessThan(labels.indexOf('Edit schedule'));
+    expect(props.onMemorization).not.toHaveBeenCalled();
+  });
+
+  it('nothing to revise yet: no Jump to, and today’s line isn’t a button', async () => {
+    const onJump = jest.fn();
+    post({ onJump, pages: [], juzBreakdown: [], done: new Set(), status: 'not_started' });
+    await act(async () => {});
+    fireEvent.press(screen.getByTestId('today-pages'));
+    expect(onJump).not.toHaveBeenCalled();
+    expect(screen.getByTestId('today-pages').props.accessibilityRole).toBeUndefined();
+    fireEvent.press(screen.getByTestId('today-post-menu'));
+    expect(screen.queryByText('Jump to…')).toBeNull();
+  });
+
   it('"back a day" only when there is a day before today to go back to', async () => {
     post({ canPushBack: false });
     await act(async () => {});

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
 import {
@@ -26,6 +26,7 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Memorizatio
 
 export default function MemorizationScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<HomeStackParamList, 'Memorization'>>();
   const { user, pages, updatePages, saveUser } = useApp();
   const { palette } = useTheme();
   const barFootprint = useTabBarFootprint();
@@ -33,7 +34,8 @@ export default function MemorizationScreen() {
   // present a sheet while another is being dismissed).
   const reviewAfterSave = useRef(false);
 
-  const [markMode, setMarkMode] = useState(false);
+  // From Home's Memorized line (and its menu), straight to editing.
+  const [markMode, setMarkMode] = useState(route.params?.edit === true);
   const [pendingChanges, setPendingChanges] = useState<
     Map<number, PageStatus>
   >(new Map());
