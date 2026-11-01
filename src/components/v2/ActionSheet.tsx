@@ -38,6 +38,7 @@ export function ActionSheet({
   onClose,
   title,
   message,
+  messageMaxScale,
   actions = [],
   cancelLabel = 'Cancel',
   children,
@@ -47,6 +48,8 @@ export function ActionSheet({
   onClose: () => void;
   title?: string;
   message?: string;
+  /** Caps how far the message grows with Dynamic Type. */
+  messageMaxScale?: number;
   actions?: SheetAction[];
   cancelLabel?: string;
   /** Custom content between the title and the actions. */
@@ -73,6 +76,7 @@ export function ActionSheet({
       onClose={onClose}
       title={title}
       message={message}
+      messageMaxScale={messageMaxScale}
       scroll
       footer={{ label: cancelLabel, onPress: onClose, testID: 'sheet-cancel' }}
       onHidden={runPending}

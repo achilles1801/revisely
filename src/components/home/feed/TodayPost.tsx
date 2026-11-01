@@ -3,19 +3,18 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { computeMemorizationStats } from '../../../lib/memorizationStats';
-import { describePageRuns, describeSurahRuns, pageRuns } from '../../../lib/pageRanges';
+import { NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
 import { JuzDots } from '../../v2/JuzDots';
 import { PillButton } from '../../v2/PillButton';
-import { RowText, ThreadRow } from '../../v2/ThreadRow';
+import { ThreadRow } from '../../v2/ThreadRow';
+import { ProgressBar } from '../../ProgressBar';
 import { Tap } from '../../v2/Tap';
 
-export type TodayStatus = 'not_started' | 'partial' | 'completed';
-
-const count = (n: number) => `${n} page${n === 1 ? '' : 's'}`;
+export type { TodayStatus } from '../../../lib/todayLines';
 
 /** "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends). */
 export function formatPercent(fraction: number): string {
@@ -38,56 +37,37 @@ export function memorizedText(pages: UserPage[]) {
   };
 }
 
-/** "Juz 26", "Juz 26–27", "Juz 3, 7", or "5 juz". */
-export function juzLabel(juzBreakdown: { juz: number }[]): string {
-  const js = [...new Set(juzBreakdown.map((j) => j.juz))].sort((a, b) => a - b);
-  if (js.length === 0) return '';
-  if (js.length === 1) return `Juz ${js[0]}`;
-  if (js.every((j, i) => i === 0 || j === js[i - 1] + 1)) return `Juz ${js[0]}–${js[js.length - 1]}`;
-  return js.length <= 3 ? `Juz ${js.join(', ')}` : `${js.length} juz`;
-}
+/**
+ * How far the assignment lines and the memorized line grow with Dynamic Type:
+ * at the largest size each still fits two lines on an iPhone SE (and shrinks
+ * to fit if a long surah name would need a third).
+ */
+const LINES_MAX_SCALE = 1.6;
+/** The name and streak above them, like the top bar and the buttons. */
+const HEADER_MAX_SCALE = 1.4;
 
-/** What today's post says, from today's pages, the juz they're in and those done. */
-export function todayText(
-  status: TodayStatus,
-  pages: number[],
-  done: ReadonlySet<number>,
-  juzBreakdown: { juz: number }[] = [],
-) {
-  const runs = pageRuns(pages);
-  const total = runs.reduce((n, r) => n + r.last - r.first + 1, 0);
-  if (total === 0) {
-    return {
-      title: 'Nothing to revise yet',
-      detail: "Start by marking what you've memorized. Most people begin with Juz 30.",
-      cta: 'Mark memorized pages',
-      solid: true,
-    };
-  }
-  const where = [juzLabel(juzBreakdown), describeSurahRuns(runs)].filter(Boolean).join(' · ');
-  if (status === 'completed') {
-    return { title: 'Done for today', detail: `${count(Math.max(done.size, total))} revised · ${where}`, cta: 'Review session', solid: false };
-  }
-  if (status === 'partial') {
-    const doneHere = pages.filter((p) => done.has(p)).length;
-    return { title: describePageRuns(runs), detail: `${doneHere} of ${total} done · ${where}`, cta: 'Continue revision', solid: true };
-  }
-  return { title: describePageRuns(runs), detail: `${count(total)} · ${where}`, cta: 'Start revision', solid: true };
+/**
+ * A › that grows with the text around it (icons don't scale by themselves).
+ * Put a no-break space before it so it never starts a line alone.
+ */
+function Chevron({ color }: { color: string }) {
+  return <Ionicons name="chevron-forward" size={14} color={color} allowFontScaling />;
 }
 
 /**
- * Today on Home, in one post: today's pages, the juz and surahs they cover
- * (with a ›: Jump to… or Edit schedule), the one action (start, continue,
- * review), and under it how much of the Quran is memorized (› opens the
- * memorized pages to edit), with a dot per juz. No ⋯: those two are the menu.
+ * Today on Home, in one post (lib/todayLines): where today starts and how much
+ * it is, with a › that opens Jump to… and Edit schedule (the exact pages in the
+ * sheet's header); the one action (start, continue, review); then how much of
+ * the Quran is memorized (its › opens the memorized pages to edit), with a dot
+ * per juz. No ⋯: those are the menus.
  */
 export function TodayPost({
   name,
   initial,
   status,
   pages,
-  juzBreakdown,
   done,
+  carried = 0,
   streak,
   memorized,
   onPrimary,
@@ -101,9 +81,11 @@ export function TodayPost({
   name: string;
   initial: string;
   status: TodayStatus;
+  /** Today's pages, in the session's order. */
   pages: number[];
-  juzBreakdown: { juz: number; pages: number[] }[];
   done: ReadonlySet<number>;
+  /** How many of today's pages were carried in from yesterday (they come first). */
+  carried?: number;
   streak: number;
   /** How much is memorized (memorizedText): the line and the juz dots. */
   memorized: { body: string; fraction: number; juz: number[] };
@@ -119,8 +101,7 @@ export function TodayPost({
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const text = todayText(status, pages, done, juzBreakdown);
-  const empty = pages.length === 0;
+  const lines = todayLines(status, pages, done, carried);
   const meta = streak > 0 ? `Today · ${streak}-day streak` : 'Today';
 
   const actions: SheetAction[] = [
@@ -134,24 +115,44 @@ export function TodayPost({
     { key: 'schedule', label: 'Edit schedule', icon: 'calendar-outline', onPress: onEditSchedule },
   ];
 
-  // Today's pages and what they cover; with something to revise, a › and a menu.
+  // Two lines, each at most two lines tall: where today starts (ink), then how
+  // much it is (grey), or how far it has got (a thin bar and "6 of 20").
+  const fit = { numberOfLines: 2, adjustsFontSizeToFit: true, minimumFontScale: 0.7, maxFontSizeMultiplier: LINES_MAX_SCALE };
+  const detail = lines.detail;
   const summary = (
     <>
       <View style={styles.titleRow}>
-        {status === 'completed' ? (
-          <View style={[styles.dot, { backgroundColor: palette.done }]} accessibilityElementsHidden />
+        {lines.title.dot ? (
+          <View style={[styles.dot, { backgroundColor: palette.done }]} accessibilityElementsHidden testID="today-done-dot" />
         ) : null}
-        <RowText>{text.title}</RowText>
+        <Text style={[typeV2.name, styles.shrink, { color: palette.text }]} {...fit} testID="today-title">
+          {lines.title.text}
+          {lines.title.chevron ? (
+            <>
+              {NBSP}
+              <Chevron color={palette.secondary} />
+            </>
+          ) : null}
+        </Text>
       </View>
-      <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-        {text.detail}
-        {empty ? null : (
-          <>
-            {' '}
-            <Ionicons name="chevron-forward" size={13} color={palette.secondary} />
-          </>
-        )}
-      </Text>
+      {detail.kind === 'progress' ? (
+        <View style={styles.progressRow} testID="today-progress">
+          <View style={styles.bar}>
+            <ProgressBar progress={(detail.done / detail.total) * 100} height={4} trackColor={palette.track} />
+          </View>
+          <Text
+            style={[typeV2.body, typeV2.numeral, { color: palette.secondary }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={LINES_MAX_SCALE}
+          >
+            {`${detail.done} of ${detail.total}`}
+          </Text>
+        </View>
+      ) : (
+        <Text style={[typeV2.body, { color: palette.secondary }]} {...fit} testID="today-detail">
+          {detail.text}
+        </Text>
+      )}
     </>
   );
 
@@ -161,13 +162,14 @@ export function TodayPost({
         mark={<Mark label={initial} />}
         name={name || 'Today'}
         meta={name ? meta : undefined}
+        headerMaxScale={HEADER_MAX_SCALE}
         testID="today-post"
         footer={
           <>
             <PillButton
-              title={text.cta}
+              title={lines.cta}
               onPress={onPrimary}
-              variant={text.solid ? 'solid' : 'outline'}
+              variant={lines.solid ? 'solid' : 'outline'}
               testID="today-cta"
             />
             {leftovers > 0 ? (
@@ -188,23 +190,25 @@ export function TodayPost({
               style={styles.memorized}
               testID="today-memorized"
             >
-              {/* The › inside the text, so a long line wraps instead of cutting off. */}
-              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-                {memorized.body}{' '}
-                <Ionicons name="chevron-forward" size={13} color={palette.secondary} />
+              {/* The › inside the text, held to its last word, so a long line wraps instead of cutting off. */}
+              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
+                {memorized.body}
+                {NBSP}
+                <Chevron color={palette.secondary} />
               </Text>
             </Tap>
             <JuzDots juz={memorized.juz} progress={memorized.fraction} label={memorized.body} testID="today-dots" />
           </>
         }
       >
-        {empty ? (
+        {lines.empty ? (
           <View testID="today-summary">{summary}</View>
         ) : (
+          // Done, it shows no ›, but a tap still opens Jump to… and Edit schedule.
           <Tap
             onPress={() => setMenuOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel={`${text.title}. ${text.detail}`}
+            accessibilityLabel={lines.label}
             accessibilityHint="Jump to another start, or edit the schedule"
             testID="today-summary"
           >
@@ -217,6 +221,10 @@ export function TodayPost({
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
         title="Today"
+        message={lines.ranges}
+        // A header line, like the title and the rows (1.4): at the largest
+        // sizes a surah name would otherwise split mid-word on a small phone.
+        messageMaxScale={HEADER_MAX_SCALE}
         actions={actions}
         testID="today-menu"
       />
@@ -226,6 +234,9 @@ export function TodayPost({
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  shrink: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  bar: { flex: 1 },
   memorized: { width: '100%', marginTop: 4 },
 });

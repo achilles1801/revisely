@@ -5,6 +5,7 @@ import {
   StyleSheet,
   RefreshControl,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
@@ -60,9 +61,20 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>
 
 const COMPACT_SESSION_LIMIT = 3;
 
+/** Each side of Home's top bar: three icons. */
+const TOP_BAR_SIDE = 120;
+/** السلام عليكم at 20pt, measured ink (Amiri draws past its box). */
+const SALAM_INK_WIDTH = 76;
+
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { theme, palette } = useTheme();
+  // The greeting grows like the icons beside it (1.4), but always keeps 12pt
+  // from them: on an iPhone SE's narrower bar that is about 1.05.
+  // (React Native ignores a cap under 1, so 1 is the floor.)
+  const { width: screenWidth } = useWindowDimensions();
+  const salamRoom = screenWidth - 2 * layoutV2.gutter - 2 * TOP_BAR_SIDE - 2 * 12;
+  const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const { user, pages, logs, updateLog, deleteLog, loadData, error, saveUser } = useApp();
@@ -164,6 +176,14 @@ export default function DashboardScreen() {
     );
     return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
   }, [logs, revisionDay, assignment, pages, user]);
+
+  // How many of today's pages came from yesterday (they come first: "4 from yesterday first").
+  const carriedToday = useMemo(() => {
+    const carry = user?.carryOver;
+    if (!assignment || !carry || carry.day !== revisionDay) return 0;
+    const carried = new Set(carry.pages);
+    return assignment.pages.filter((p) => carried.has(p)).length;
+  }, [user, assignment, revisionDay]);
 
   useEffect(() => {
     registerForPushNotificationsAsync();
@@ -424,7 +444,13 @@ export default function DashboardScreen() {
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
         center={
-          <Text style={[arabicV2(20), { color: palette.text }]} accessibilityLanguage="ar" testID="salam">
+          <Text
+            style={[arabicV2(20), { color: palette.text }]}
+            accessibilityLanguage="ar"
+            // At the largest sizes it ran into the icons (or wrapped, on an SE).
+            maxFontSizeMultiplier={salamScale}
+            testID="salam"
+          >
             السلام عليكم
           </Text>
         }
@@ -436,7 +462,7 @@ export default function DashboardScreen() {
           </>
         }
         // Three icons on the right: both sides widen so the salam stays centred.
-        sideWidth={120}
+        sideWidth={TOP_BAR_SIDE}
       />
       <ScrollView
         ref={scrollRef}
@@ -458,8 +484,8 @@ export default function DashboardScreen() {
           initial={avatarInitial(userName, firebaseUser?.email)}
           status={todayStatus.status}
           pages={assignment.pages}
-          juzBreakdown={assignment.juzBreakdown}
           done={donePagesToday}
+          carried={carriedToday}
           streak={calculatedStreak}
           memorized={memorized}
           onPrimary={handleCtaPress}
