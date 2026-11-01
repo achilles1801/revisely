@@ -42,7 +42,8 @@ export type HomeStackParamList = {
   Dashboard: undefined;
   ActiveRevision: undefined;
   Settings: undefined;
-  Memorization: undefined;
+  // edit: open with the pages ready to edit (Home's Memorized line).
+  Memorization: { edit?: boolean } | undefined;
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
   // merge the day-level edit into its in-memory days[] without round-tripping
   // through a context or store.

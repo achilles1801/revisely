@@ -56,6 +56,10 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
+import { JumpSheet } from '../../components/home/JumpSheet';
+import { UndoToast } from '../../components/revision/UndoToast';
+import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
+import type { User } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
@@ -74,6 +78,9 @@ export default function DashboardScreen() {
   const tabFootprint = useTabBarFootprint();
   const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+  // "Jump to…": the sheet, and the toast after a jump (with what to put back).
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [jumped, setJumped] = useState<{ message: string; before: User } | null>(null);
 
   // A schedule that starts after today (an earlier "back a day" on a schedule
   // that started today) leaves today with nothing to revise: start it today.
@@ -313,7 +320,7 @@ export default function DashboardScreen() {
       );
       if (todayLog) handleEditSession(todayLog);
     } else if (assignment.totalPages === 0) {
-      navigation.navigate('Memorization');
+      navigation.navigate('Memorization', { edit: true });
     } else {
       navigation.navigate('ActiveRevision');
     }
@@ -372,6 +379,36 @@ export default function DashboardScreen() {
   // Fell behind? Slide the whole schedule a day later so today reverts to the
   // review you missed instead of marching on. Pure anchor nudge — no per-day
   // edits — applied immediately so the Today post updates in place.
+  // Today starts at another juz, surah or page; the days after carry on from it.
+  const handleJump = async (target: JumpTarget) => {
+    setJumpOpen(false);
+    if (!user) return;
+    const memorized = pages.filter((p) => p.status === 'memorized');
+    const result = jumpTo(user, target, { revisionDate, memorized, logs });
+    if (!result) {
+      Alert.alert("Couldn't start there", "That part isn't in your schedule.");
+      return;
+    }
+    try {
+      await saveUser(result.user);
+      const where = describeStart(target, result.startPage);
+      setJumped({ message: result.today ? `Today now starts at ${where}` : `Your next revision starts at ${where}`, before: user });
+    } catch {
+      Alert.alert("Couldn't update your schedule", 'Please try again.');
+    }
+  };
+
+  const handleUndoJump = async () => {
+    const last = jumped;
+    setJumped(null);
+    if (!user || !last) return;
+    try {
+      await saveUser(undoJump(user, last.before));
+    } catch {
+      Alert.alert("Couldn't undo", 'Please try again.');
+    }
+  };
+
   const handlePushBack = async () => {
     if (!user || shifting || !canPushScheduleBack(user, revisionDate)) return;
     setShifting(true);
@@ -458,7 +495,8 @@ export default function DashboardScreen() {
           memorizedJuz={progress?.juz}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}
-          onMemorization={() => navigation.navigate('Memorization')}
+          onMemorization={() => navigation.navigate('Memorization', { edit: true })}
+          onJump={() => setJumpOpen(true)}
           leftovers={leftovers.length}
           onCarryOver={handleCarryOver}
           carrying={carrying}
@@ -497,6 +535,22 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
+      <JumpSheet
+        visible={jumpOpen}
+        onClose={() => setJumpOpen(false)}
+        user={user}
+        memorized={pages.filter((p) => p.status === 'memorized')}
+        revisionDate={revisionDate}
+        onJump={handleJump}
+      />
+      <UndoToast
+        visible={!!jumped}
+        message={jumped?.message ?? ''}
+        onUndo={handleUndoJump}
+        onDismiss={() => setJumped(null)}
+        duration={6000}
+        bottomInset={tabFootprint}
+      />
       {prayerEnabled ? (
         <PrayerSheet
           visible={qiblaOpen}

@@ -131,9 +131,12 @@ jobs:
           if [ -n "$(git ls-remote --tags origin "refs/tags/android-fp/$HASH")" ]; then
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
             echo "An Android build exists for $HASH, publishing an update only."
-          else
+          elif [ "${{ vars.ANDROID_SUBMIT }}" = "true" ]; then
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
             echo "::notice title=New Android build::Native code changed (fingerprint $HASH). Building on a Linux runner."
+          else
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Android build by hand::No Play build is tagged for fingerprint $HASH and ANDROID_SUBMIT is off. If native code changed since the build on Play, run EAS Build (android) and upload it in Play Console; the update reaches only binaries with this fingerprint."
           fi
 
   build:
@@ -148,10 +151,13 @@ jobs:
       fingerprint: ${{ needs.fingerprint.outputs.hash }}
     secrets: inherit
 
+  # Only once builds go to Google Play by themselves (ANDROID_SUBMIT): a build is tagged when it is
+  # uploaded, so before that every push would build again, and no tester would get it. Until then a
+  # native change needs EAS Build (android) by hand and an upload in Play Console (the notice says so).
   android-build:
     name: Build (android)
     needs: fingerprint
-    if: ${{ vars.ANDROID_RELEASES == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
+    if: ${{ vars.ANDROID_RELEASES == 'true' && vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
     permissions:
       contents: write # pushes the android-fp/<hash> tag
     uses: ./.github/workflows/android-build.yml

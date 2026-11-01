@@ -15,7 +15,8 @@ jest.mock('expo-haptics', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 const mockNavigation = { navigate: jest.fn(), goBack: jest.fn() };
-jest.mock('@react-navigation/native', () => ({ useNavigation: () => mockNavigation }));
+const mockRoute: { params?: { edit?: boolean } } = {};
+jest.mock('@react-navigation/native', () => ({ useNavigation: () => mockNavigation, useRoute: () => mockRoute }));
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
@@ -101,6 +102,18 @@ describe('Memorization in the new design', () => {
     expect(flat(screen.getByTestId('page-chip-1').props.style).backgroundColor).toBe(palette.done);
     fireEvent.press(screen.getByTestId('surah-2'));
     expect(flat(screen.getByTestId('page-chip-2').props.style).backgroundColor).toBe(palette.fill);
+  });
+
+  it('opened from Home’s Memorized line, it is ready to edit at once', async () => {
+    mockRoute.params = { edit: true };
+    try {
+      await renderScreen();
+      expect(screen.getByTestId('surah-1-check')).toBeTruthy();
+      expect(screen.getByTestId('memorization-cancel')).toBeTruthy();
+      expect(screen.queryByTestId('memorization-edit')).toBeNull();
+    } finally {
+      mockRoute.params = undefined;
+    }
   });
 
   it('edit: checkboxes, a flat bar with Cancel and Save, then a sheet to confirm', async () => {
