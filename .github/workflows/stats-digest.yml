@@ -1,0 +1,60 @@
+name: Stats digest
+
+# Mondays at 15:00 UTC (9 am Central in winter, 10 am in summer; Apple publishes the day before by
+# 5 am Pacific): last week's App Store first-time downloads, re-downloads and updates against the
+# week before, the top countries and totals since launch, as a comment on the "App stats (weekly
+# digest)" issue mentioning the owner, so GitHub emails it. Google Play joins once the app is live.
+# scripts/stats/weekly.js. Read-only: a Sales-role App Store Connect key and the vendor number.
+# Until those secrets exist the run skips with a notice (CLAUDE.md, Stats).
+on:
+  schedule:
+    - cron: '0 15 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the reports key
+        id: secrets
+        env:
+          ASC_REPORTS_KEY_ID: ${{ secrets.ASC_REPORTS_KEY_ID }}
+          ASC_REPORTS_ISSUER_ID: ${{ secrets.ASC_REPORTS_ISSUER_ID }}
+          ASC_REPORTS_KEY: ${{ secrets.ASC_REPORTS_KEY }}
+          ASC_VENDOR_NUMBER: ${{ secrets.ASC_VENDOR_NUMBER }}
+        run: |
+          missing=""
+          for n in ASC_REPORTS_KEY_ID ASC_REPORTS_ISSUER_ID ASC_REPORTS_KEY ASC_VENDOR_NUMBER; do
+            [ -n "${!n}" ] || missing="$missing $n"
+          done
+          if [ -n "$missing" ]; then
+            echo "::notice title=Stats digest skipped::Add the repository secrets:$missing (CLAUDE.md, Stats)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      # No dependencies: Node's own fetch, crypto and zlib.
+      - name: Post the digest
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ASC_REPORTS_KEY_ID: ${{ secrets.ASC_REPORTS_KEY_ID }}
+          ASC_REPORTS_ISSUER_ID: ${{ secrets.ASC_REPORTS_ISSUER_ID }}
+          ASC_REPORTS_KEY: ${{ secrets.ASC_REPORTS_KEY }}
+          ASC_VENDOR_NUMBER: ${{ secrets.ASC_VENDOR_NUMBER }}
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+        run: node scripts/stats/weekly.js
