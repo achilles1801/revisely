@@ -1,15 +1,17 @@
 name: Android build
 
 # Builds the production Android app bundle (.aab) on a GitHub Linux runner (`eas build --local`)
-# and, once Google Play submission is set up, uploads it to the internal testing track
-# (`eas submit`). Local builds use no EAS build credits, and Linux runners cost nothing on a public
-# repository. Called by Preview (preview.yml, when Android is on and its native code changed) and by
-# EAS Build (by hand). Android is opt-in: see "Android" in CLAUDE.md.
+# and uploads it to Google Play's internal testing track (`eas submit`), released to its testers at
+# once, as TestFlight's Team (Expo) group gets every iOS build. Local builds use no EAS build credits,
+# and Linux runners cost nothing on a public repository. Called by Preview (preview.yml, native code
+# changed on develop) and by EAS Build (by hand). See "Android" in CLAUDE.md.
 #
 # Signing: the upload keystore stays on EAS and is fetched with EXPO_TOKEN (created once with
-# `eas credentials --platform android`). Google Play: the service account key is uploaded to EAS too
-# (`eas credentials --platform android` > Google Service Account), so this workflow holds no Play
-# secret; submission runs only when the repository variable ANDROID_SUBMIT is 'true'.
+# `eas credentials --platform android`). Google Play: the service account key (eas-play-submit,
+# testing tracks only, no production rights) is the PLAY_SERVICE_ACCOUNT_JSON repository secret
+# (base64). It is written to a file only for the upload step, after the build, so no code from the
+# repository runs while it is on disk, and eas.json reads its path from PLAY_SERVICE_ACCOUNT_KEY_PATH.
+# Submission runs only when the repository variable ANDROID_SUBMIT is 'true'.
 # google-services.json is gitignored, so it comes from the GOOGLE_SERVICES_JSON repository secret
 # (base64) and is passed by path (GOOGLE_SERVICES_JSON, app.config.js); fingerprint.config.js ignores
 # it wherever it is, so the runtime matches the one Preview computed.
@@ -30,6 +32,8 @@ on:
       GOOGLE_SERVICES_JSON:
         required: true
       SENTRY_AUTH_TOKEN:
+        required: false
+      PLAY_SERVICE_ACCOUNT_JSON:
         required: false
 
 jobs:
@@ -107,9 +111,21 @@ jobs:
           path: ${{ runner.temp }}/revisely.aab
           retention-days: 7
 
+      # Released to internal testers at once (releaseStatus completed in eas.json). Closed testing and
+      # production take the same bundle later, by hand: scripts/play.js promote (CLAUDE.md, Android).
       - name: eas submit (Google Play, internal testing)
         if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' }}
-        run: eas submit --platform android --profile production --path "$RUNNER_TEMP/revisely.aab" --non-interactive
+        env:
+          KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Add a PLAY_SERVICE_ACCOUNT_JSON repository secret: base64 of the eas-play-submit service account key (CLAUDE.md, Android)."
+            exit 1
+          fi
+          export PLAY_SERVICE_ACCOUNT_KEY_PATH="$RUNNER_TEMP/play-service-account.json"
+          trap 'rm -f "$PLAY_SERVICE_ACCOUNT_KEY_PATH"' EXIT
+          (umask 077 && echo "$KEY" | base64 -d > "$PLAY_SERVICE_ACCOUNT_KEY_PATH")
+          eas submit --platform android --profile production --path "$RUNNER_TEMP/revisely.aab" --non-interactive
 
       # The marker preview.yml looks for: local builds are not listed by `eas build:list`, so this tag
       # is how it knows the fingerprint has a build on Play.
@@ -122,7 +138,7 @@ jobs:
             git tag "android-fp/$FP"
             git push origin "refs/tags/android-fp/$FP"
           fi
-          echo "::notice title=Google Play::Bundle uploaded to internal testing for fingerprint $FP."
+          echo "::notice title=Google Play::Bundle uploaded to internal testing (released to its testers) for fingerprint $FP."
 
       - name: Not submitted
         if: ${{ !(inputs.submit && vars.ANDROID_SUBMIT == 'true') }}

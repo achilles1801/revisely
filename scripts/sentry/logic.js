@@ -111,6 +111,14 @@ function exceptionLine(event) {
   return v ? `${sanitize(v.type || 'Error', { max: 80 })}: ${sanitize(v.value || '', { max: 300 })}` : null;
 }
 
+/** 'android', 'ios' or null, from the event's OS (its tags, else its os context). */
+function platformOf(event) {
+  const os = String(tagMap(event)['os.name'] || event?.contexts?.os?.name || '');
+  if (/^android$/i.test(os)) return 'android';
+  if (/^(ios|ipados|iphone os)$/i.test(os)) return 'ios';
+  return null;
+}
+
 /** Why the issue is being raised now. */
 function reason(issue) {
   const s = issue.substatus;
@@ -269,7 +277,7 @@ function gate(health, { minSessions, minCrashFree }) {
     return { ok: false, reason: 'The promotion bar is not a number.' };
   }
   if (health.sessions < minSessions) {
-    return { ok: false, reason: `Only ${health.sessions} preview session(s) ran this update; ${minSessions} needed. Use it in TestFlight a little more, or override.` };
+    return { ok: false, reason: `Only ${health.sessions} preview session(s) ran this update; ${minSessions} needed. Use it a little more on a tester's phone (TestFlight, or a Play testing install), or override.` };
   }
   if (health.crashFree == null) {
     return { ok: true, reason: 'No preview sessions ran this update (the minimum was set to 0).' };
@@ -308,10 +316,26 @@ function issueList(issues, max = 10) {
     .join('\n');
 }
 
-function dailyReport({ date, newIssues, regressed, top, feedback, production, preview, alerts, mention }) {
+/** Issues with events in the period, and their events, on each platform (from os.name searches). */
+function platformTable(platforms) {
+  const rows = [
+    ['iOS', platforms?.ios],
+    ['Android', platforms?.android],
+  ].filter(([, p]) => p);
+  if (!rows.length) return null;
+  const events = (list) => list.reduce((n, i) => n + (Number(i.count) || 0), 0);
+  return [
+    '| Platform | Issues | Events | Users (largest issue) |',
+    '|---|---:|---:|---:|',
+    ...rows.map(([name, list]) => `| ${name} | ${list.length} | ${events(list)} | ${list.reduce((m, i) => Math.max(m, Number(i.userCount) || 0), 0)} |`),
+  ].join('\n');
+}
+
+function dailyReport({ date, newIssues, regressed, top, feedback, production, preview, alerts, mention, platforms }) {
   const head = alerts.length
     ? `⚠️ **${alerts.length} production release(s) below the crash-free bar.**`
     : '✅ Production crash-free rate is above the bar.';
+  const byPlatform = platformTable(platforms);
   return [
     `## App health · ${date} (last 24 h)`,
     mention ? `${mention} ${head}` : head,
@@ -330,11 +354,14 @@ function dailyReport({ date, newIssues, regressed, top, feedback, production, pr
     `### Problem reports (${feedback.length})`,
     issueList(feedback, 5),
     '',
-    '### Production (App Store)',
+    ...(byPlatform ? ['### By platform (unresolved issues with events in the last 24 h)', byPlatform, ''] : []),
+    '### Production (App Store, Google Play)',
     healthTable(production),
     '',
-    '### Preview (TestFlight testers)',
+    '### Preview (testers: TestFlight, Play testing tracks)',
     healthTable(preview),
+    '',
+    '_Releases: `1.0.3+32` is a build\'s own JavaScript, `.u<group>` an update (one group per platform). iOS build numbers and Android version codes are counted separately._',
   ].join('\n');
 }
 
@@ -348,6 +375,7 @@ module.exports = {
   shortRelease,
   issueTitle,
   issueBody,
+  platformOf,
   inAppFrames,
   eventDetails,
   sessionsByRelease,

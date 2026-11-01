@@ -11,7 +11,7 @@
 // opened is found by its marker, what wasn't is opened next time.
 
 const api = require('./api');
-const { findTracked, issueTitle, issueBody, sessionsByRelease, productionAlerts, pct, safe, shortRelease, sanitize } = require('./logic');
+const { findTracked, issueTitle, issueBody, platformOf, sessionsByRelease, productionAlerts, pct, safe, shortRelease, sanitize } = require('./logic');
 
 const DEFAULTS = {
   maxNew: Number(process.env.MAX_NEW_ISSUES || 5),
@@ -67,7 +67,9 @@ async function syncIssues({ sentryApi, githubApi }, { maxNew, maxOpen }, log) {
           continue;
         }
         const event = await sentryApi.latestEvent(issue.id).catch(() => null);
-        const gh = await githubApi.createIssue(issueTitle(issue), issueBody(issue, event), ['sentry']);
+        // Labelled with the platform of its latest event (iOS, Android), so either can be filtered.
+        const platform = platformOf(event);
+        const gh = await githubApi.createIssue(issueTitle(issue), issueBody(issue, event), ['sentry', ...(platform ? [platform] : [])]);
         tracked.push(gh);
         opened.push(gh.number);
         open++;
@@ -119,6 +121,8 @@ async function sync(deps, opts = {}, log = console.log) {
   await githubApi.ensureLabel('sentry', 'e5484d', 'Raised from Sentry');
   await githubApi.ensureLabel('claude-fix', '7c3aed', 'The owner adds this to have Claude open a fix PR into develop');
   await githubApi.ensureLabel('release-health', 'f08c00', 'Crash-free rate below the bar');
+  await githubApi.ensureLabel('ios', '0a84ff', 'Seen on iOS');
+  await githubApi.ensureLabel('android', '3ddc84', 'Seen on Android');
 
   const errors = [];
   let opened = [];
