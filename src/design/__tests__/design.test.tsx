@@ -27,7 +27,7 @@ import { TodayPost, formatPercent, memorizedText } from '../../components/home/f
 import { NBHY, NBSP } from '../../lib/todayLines';
 
 /** Today's text as written: names held with no-break hyphens. */
-const held = (s: string) => s.replace(/(\w)-(\w)/g, `$1${NBHY}$2`);
+const held = (s: string) => s.replace(/(\w)-(\w)/g, `$1${NBHY}$2`).split(' → ').join(`${NBSP}→ `);
 import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';

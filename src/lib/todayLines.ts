@@ -42,7 +42,7 @@ export interface TodayLines {
 
 /** How VoiceOver should read a line: "page 542", "Al-Mujadila to At-Tahrim". */
 export const spoken = (s: string) =>
-  s.split(`p.${NBSP}`).join('page ').split(' → ').join(' to ').split(NBSP).join(' ').split(NBHY).join('-');
+  s.split(`p.${NBSP}`).join('page ').split(NBSP).join(' ').split(' → ').join(' to ').split(NBHY).join('-');
 
 const pages = (n: number) => `${n}${NBSP}page${n === 1 ? '' : 's'}`;
 const page = (p: number) => `p.${NBSP}${p}`;
@@ -73,11 +73,14 @@ export function juzSpan(list: number[]): string | null {
   return null;
 }
 
+/** A "→" held to the name before it: a line may end with it, never start with it. */
+const to = (a: string, b: string) => `${a}${NBSP}→ ${b}`;
+
 /** "Al-Mujadila → At-Tahrim", or one name when the run is inside one surah. */
 function surahSpan(run: PageRun): string {
   const a = firstSurah(run.first);
   const b = lastSurah(run.last);
-  return a === b ? a : `${a} → ${b}`;
+  return a === b ? a : to(a, b);
 }
 
 /** "Pages 542–561 · Al-Mujadila → At-Tahrim", "Pages 595–604, 1–10 · Ash-Shams → An-Nas, Al-Fatihah → Al-Baqarah". */
@@ -117,7 +120,7 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
 
   if (status === 'completed') {
     const title = `Done · ${pages(Math.max(done.size, total))}`;
-    const span = runs.length === 1 ? surahSpan(runs[0]) : `${firstSurah(runs[0].first)} → ${lastSurah(runs[runs.length - 1].last)}`;
+    const span = runs.length === 1 ? surahSpan(runs[0]) : to(firstSurah(runs[0].first), lastSurah(runs[runs.length - 1].last));
     const juz = runs.length === 1 ? juzSpan(ordered) : null;
     const detail = [span, juz].filter(Boolean).join(' · ');
     return {

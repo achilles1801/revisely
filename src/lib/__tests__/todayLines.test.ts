@@ -89,6 +89,8 @@ describe('Today’s lines (E: "Starts at")', () => {
       'Pages 595–604, 1–10 · Ash-Shams → An-Nas, Al-Fatihah → Al-Baqarah',
     );
     expect(plain(rangesText([5]))).toBe('Page 5 · Al-Baqarah');
+    // The arrow stays with the name before it, so a line never starts with "→".
+    expect(rangesText(range(542, 561))).toContain(`Mujadila${NBSP}→ At`);
   });
 
   it('VoiceOver reads both lines in words ("page 542", "to"); in progress, how many are done', () => {
