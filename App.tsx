@@ -8,6 +8,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { RecordingBackupController } from './src/components/RecordingBackupController';
+import { MushafOfflineController } from './src/components/MushafOfflineController';
 import { WidgetSync } from './src/components/WidgetSync';
 import { PrayerSync } from './src/components/prayer/PrayerSync';
 import { DesignProvider } from './src/design/DesignContext';
@@ -106,6 +107,7 @@ function App() {
                   <DesignGate />
                   <AndroidSystemTheme />
                   <RecordingBackupController />
+                  <MushafOfflineController />
                   <WidgetSync />
                   <PrayerSync />
                 </BottomSheetModalProvider>

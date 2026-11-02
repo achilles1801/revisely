@@ -62,6 +62,8 @@ import { logger } from '../../lib/logger';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { supportMailto } from '../../lib/contact';
 import { PillTabs } from '../../components/v2/PillTabs';
+import { setMushafCellular } from '../../lib/mushafOffline';
+import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
 import { shareIcon } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
@@ -218,6 +220,9 @@ export default function SettingsScreen() {
   const speechModel = useSpeechModelState();
   const [speechSheet, setSpeechSheet] = useState(false);
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
+  const mushaf = useMushafOffline();
+  const mushafText = describeMushaf(mushaf);
+  const [mushafMenu, setMushafMenu] = useState(false);
   // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
   const prayerEnabled = prayerTimesEnabled(user);
   const prayerPrefs = usePrayerPrefs();
@@ -709,6 +714,29 @@ export default function SettingsScreen() {
 
         </Section>
 
+        <Section title="Mushaf">
+          <View testID="mushaf-offline-row">
+            <Row
+              icon="cloud-download-outline"
+              label="Offline mushaf"
+              subtitle={mushafText.subtitle}
+              value={mushafText.value || undefined}
+              onPress={() => setMushafMenu(true)}
+            />
+          </View>
+          <Row
+            icon="cellular-outline"
+            label="Download over mobile data"
+            rightSlot={
+              <SettingSwitch
+                value={mushaf.prefs.cellular}
+                onValueChange={(v) => void setMushafCellular(v)}
+                accessibilityLabel="Download the mushaf over mobile data"
+              />
+            }
+          />
+        </Section>
+
         <Section title="Notifications">
           <Row
             icon="notifications-outline"
@@ -854,6 +882,14 @@ export default function SettingsScreen() {
         message={`${formatModelSize()} on this iPhone. It downloads again the next time you follow word by word.`}
         actions={[{ key: 'delete', label: 'Delete speech model', icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
         testID="speech-model-delete-menu"
+      />
+      <ActionSheet
+        visible={mushafMenu}
+        onClose={() => setMushafMenu(false)}
+        title="Offline mushaf"
+        message={mushafText.subtitle}
+        actions={mushafMenuActions(mushaf)}
+        testID="mushaf-offline-menu"
       />
       {prayerEnabled ? (
         <PrayerSheet

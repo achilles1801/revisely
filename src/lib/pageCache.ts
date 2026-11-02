@@ -1,68 +1,84 @@
-// On-disk cache for the mushaf page images.
+// The mushaf's page images on this phone.
 //
-// React Native's <Image> only has iOS's small URL cache behind it, so pages were
-// fetched again (≈380 KB each) almost every time they were shown. Pages are
-// immutable, so each one is downloaded once into the caches directory and read
-// from disk after that. Caches, not documents: the files can be downloaded again,
-// so they must not go into iCloud backups, and iOS may purge them when space is low.
+// Pages are immutable, so each one is downloaded once and read from disk after
+// that: the pages the reader opens, and in the background the rest
+// (lib/mushafOffline), so the whole mushaf works offline. They live in the
+// documents directory (Documents/mushaf/<set>/001.png …), which the system
+// never empties. Until Nov 2026 they were kept in the caches directory, which
+// iOS and Android may clear when space is low; pages found there are moved
+// over once (migrateLegacyPages) and read from there until then.
+//
+// Backups: on iOS the folder is kept out of iCloud backups, as Apple's storage
+// guidelines ask of data that can be downloaded again but must stay for offline
+// use (RecitationAudio.excludeFromBackup, in every binary on this runtime). On
+// Android the files directory is part of Auto Backup; keeping it out needs
+// backup rules in the manifest, a native change (see CLAUDE.md, Offline mushaf).
 //
 // Each set of pages (quranImages: the originals, or Android's width-sized
 // copies) has its own folder, so a file is always the copy its name says.
 
+import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
+import RecitationAudio from '../../modules/recitation-audio';
 import { getQuranPageImageUrl, pageImageSet, PageImageSet } from './quranImages';
+import { nativeRequestUrl } from './devNetwork';
 import { logger } from './logger';
 
 const MAX_CONCURRENT_DOWNLOADS = 3;
 const SETS: PageImageSet[] = ['full', 'w1080', 'w1440'];
-// After the reader's first pages, not during them.
-const CLEANUP_DELAY_MS = 10_000;
+export const PAGE_COUNT = 604;
+const PAGE_FILE = /^(\d{3})\.png$/;
 
-/** The folder in the caches directory for a set: `mushaf` (the originals, as before), `mushaf-w1080`, … */
+/** The folder in the documents directory holding every set. */
+export const STORE_FOLDER = 'mushaf';
+
+/** The old folder in the caches directory for a set: `mushaf` (the originals), `mushaf-w1080`, … */
 export function cacheFolderName(set: PageImageSet): string {
   return set === 'full' ? 'mushaf' : `mushaf-${set}`;
 }
 
+function storeRoot(): Directory {
+  return new Directory(Paths.document, STORE_FOLDER);
+}
+
 let dir: Directory | null = null;
-let cleanupScheduled = false;
-function cacheDir(): Directory {
-  if (!dir) {
-    const set = pageImageSet();
-    dir = new Directory(Paths.cache, cacheFolderName(set));
-    // iOS uses the originals, as it always has: nothing to clear.
-    if (set !== 'full' && !cleanupScheduled) {
-      cleanupScheduled = true;
-      setTimeout(removeOtherPageSets, CLEANUP_DELAY_MS);
-    }
-  }
+function storeDir(): Directory {
+  if (!dir) dir = new Directory(storeRoot(), pageImageSet());
   return dir;
 }
 
-/**
- * Delete the folders of sets this device doesn't use: on Android, the
- * full-size pages cached before it switched to its own set. Once a launch.
- */
-export function removeOtherPageSets(): void {
-  const current = pageImageSet();
-  for (const set of SETS) {
-    if (set === current) continue;
-    try {
-      const other = new Directory(Paths.cache, cacheFolderName(set));
-      if (other.exists) other.delete();
-    } catch (err) {
-      logger.warn('Page cache cleanup failed', err);
-    }
+function legacyDir(set: PageImageSet = pageImageSet()): Directory {
+  return new Directory(Paths.cache, cacheFolderName(set));
+}
+
+// The old cache folder may still hold pages until migrateLegacyPages has run.
+let migrated = false;
+let backupExcluded = false;
+
+/** A file:// URI as a path (the native call takes paths). */
+export function pathOf(uri: string): string {
+  return decodeURIComponent(uri.replace(/^file:\/\//, '')).replace(/\/$/, '');
+}
+
+/** iOS: keep the folder (and everything in it) out of iCloud backups. Once a launch. */
+function excludeFromBackup(): void {
+  if (backupExcluded || Platform.OS !== 'ios') return;
+  backupExcluded = true;
+  try {
+    RecitationAudio?.excludeFromBackup(pathOf(storeRoot().uri));
+  } catch (err) {
+    logger.warn('Could not keep the mushaf out of backups', err);
   }
 }
 
-// Checked before every download: iOS may empty the caches directory while the
-// app is running.
-function ensureCacheDir(): Directory {
-  const d = cacheDir();
+// Checked before every download: the folder may have been removed (Settings).
+function ensureStoreDir(): Directory {
+  const d = storeDir();
   if (!d.exists) {
     d.create({ intermediates: true, idempotent: true });
-    onDisk.clear();
+    backupExcluded = false;
   }
+  excludeFromBackup();
   return d;
 }
 
@@ -73,16 +89,32 @@ function fileName(pageNumber: number): string {
 // Pages known to be on disk, so a hit costs no file-system call.
 const onDisk = new Map<number, string>();
 const inFlight = new Map<number, Promise<string | null>>();
+const storedListeners = new Set<(page: number) => void>();
 
-/** Local file URI for a page if it has been downloaded, otherwise null. Synchronous. */
+/** Hears each page saved to the phone (by the reader or the offline download). */
+export function onPageStored(listener: (page: number) => void): () => void {
+  storedListeners.add(listener);
+  return () => {
+    storedListeners.delete(listener);
+  };
+}
+
+/** Local file URI for a page if it is on the phone, otherwise null. Synchronous. */
 export function getCachedPageUri(pageNumber: number): string | null {
   const known = onDisk.get(pageNumber);
   if (known) return known;
   try {
-    const file = new File(cacheDir(), fileName(pageNumber));
+    const file = new File(storeDir(), fileName(pageNumber));
     if (file.exists) {
       onDisk.set(pageNumber, file.uri);
       return file.uri;
+    }
+    if (!migrated) {
+      const old = new File(legacyDir(), fileName(pageNumber));
+      if (old.exists) {
+        onDisk.set(pageNumber, old.uri);
+        return old.uri;
+      }
     }
   } catch (err) {
     logger.warn('Page cache lookup failed', err);
@@ -91,7 +123,7 @@ export function getCachedPageUri(pageNumber: number): string | null {
 }
 
 /**
- * Download a page into the cache (once; concurrent calls share the download).
+ * Download a page to the phone (once; concurrent calls share the download).
  * Resolves to the local URI, or null if the download failed.
  */
 export function cachePage(pageNumber: number): Promise<string | null> {
@@ -102,18 +134,19 @@ export function cachePage(pageNumber: number): Promise<string | null> {
 
   const run = (async () => {
     try {
-      const d = ensureCacheDir();
+      const d = ensureStoreDir();
       const target = new File(d, fileName(pageNumber));
       // Download beside the target and move it in, so an interrupted download
-      // never leaves a truncated page that looks cached.
+      // never leaves a truncated page that looks downloaded.
       const partial = new File(d, `${fileName(pageNumber)}.part`);
       if (partial.exists) partial.delete();
-      await File.downloadFileAsync(getQuranPageImageUrl(pageNumber), partial, {
+      await File.downloadFileAsync(nativeRequestUrl(getQuranPageImageUrl(pageNumber)), partial, {
         idempotent: true,
       });
       if (target.exists) target.delete();
       partial.move(target);
       onDisk.set(pageNumber, target.uri);
+      storedListeners.forEach((l) => l(pageNumber));
       return target.uri;
     } catch (err) {
       logger.warn(`Page ${pageNumber} download failed`, err);
@@ -124,6 +157,84 @@ export function cachePage(pageNumber: number): Promise<string | null> {
   })();
   inFlight.set(pageNumber, run);
   return run;
+}
+
+/** The pages of this device's set that are on the phone. */
+export function pagesOnPhone(): Set<number> {
+  const out = new Set<number>();
+  const dirs = migrated ? [storeDir()] : [storeDir(), legacyDir()];
+  for (const d of dirs) {
+    try {
+      if (!d.exists) continue;
+      for (const entry of d.list()) {
+        const m = PAGE_FILE.exec(entry.name);
+        const n = m ? Number(m[1]) : 0;
+        if (n >= 1 && n <= PAGE_COUNT) out.add(n);
+      }
+    } catch (err) {
+      logger.warn('Could not list the pages on this phone', err);
+    }
+  }
+  return out;
+}
+
+/**
+ * Once a launch: move the pages cached in the caches directory (before Nov
+ * 2026) into the documents directory, and delete the folders of sets this
+ * device doesn't use (on Android, the full-size pages it cached before it
+ * switched to its own set).
+ */
+export function migrateLegacyPages(): void {
+  if (migrated) return;
+  const current = pageImageSet();
+  try {
+    const old = legacyDir(current);
+    if (old.exists) {
+      const d = ensureStoreDir();
+      for (const entry of old.list()) {
+        if (!PAGE_FILE.test(entry.name) || !(entry instanceof File)) continue;
+        const target = new File(d, entry.name);
+        try {
+          if (target.exists) entry.delete();
+          else entry.move(target);
+        } catch (err) {
+          logger.warn('Could not move a cached page', err);
+        }
+      }
+      old.delete();
+    }
+  } catch (err) {
+    logger.warn('Page cache migration failed', err);
+  }
+  for (const set of SETS) {
+    try {
+      if (set !== current) {
+        const other = legacyDir(set);
+        if (other.exists) other.delete();
+        const stored = new Directory(storeRoot(), set);
+        if (stored.exists) stored.delete();
+      }
+    } catch (err) {
+      logger.warn('Page cache cleanup failed', err);
+    }
+  }
+  migrated = true;
+  // Pages known by their old location are looked up again.
+  onDisk.clear();
+}
+
+/** Delete every page on the phone (Settings → Offline mushaf → Remove). */
+export function removeAllPages(): void {
+  queue = [];
+  for (const d of [storeRoot(), ...SETS.map((s) => legacyDir(s))]) {
+    try {
+      if (d.exists) d.delete();
+    } catch (err) {
+      logger.warn('Could not remove the mushaf pages', err);
+    }
+  }
+  backupExcluded = false;
+  onDisk.clear();
 }
 
 // Prefetch queue. The newest request goes first: it describes where the reader
@@ -143,12 +254,14 @@ function pump() {
   }
 }
 
-/** Forget a cached page that failed to load (purged or unreadable) and delete it. */
-export function evictCachedPage(pageNumber: number): void {
+/** Forget a page file that failed to load (unreadable) and delete it. */
+export function evictCachedPage(pageNumber: number, uri?: string): void {
   onDisk.delete(pageNumber);
   try {
-    const file = new File(cacheDir(), fileName(pageNumber));
-    if (file.exists) file.delete();
+    const candidates = [new File(storeDir(), fileName(pageNumber)), new File(legacyDir(), fileName(pageNumber))];
+    for (const file of candidates) {
+      if ((uri === undefined || file.uri === uri) && file.exists) file.delete();
+    }
   } catch (err) {
     logger.warn('Page cache eviction failed', err);
   }
@@ -157,7 +270,7 @@ export function evictCachedPage(pageNumber: number): void {
 /** Download these pages in the background, in the order given. */
 export function prefetchPages(pageNumbers: number[]): void {
   const wanted = pageNumbers.filter(
-    (p) => p >= 1 && p <= 604 && !onDisk.has(p) && !inFlight.has(p),
+    (p) => p >= 1 && p <= PAGE_COUNT && !onDisk.has(p) && !inFlight.has(p),
   );
   if (wanted.length === 0) return;
   const wantedSet = new Set(wanted);
@@ -189,9 +302,11 @@ export function pagesAround(
 /** Test hook: forget in-memory state. */
 export function __resetPageCacheForTests(): void {
   dir = null;
-  cleanupScheduled = false;
+  migrated = false;
+  backupExcluded = false;
   onDisk.clear();
   inFlight.clear();
+  storedListeners.clear();
   queue = [];
   active = 0;
 }

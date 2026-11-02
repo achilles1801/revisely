@@ -222,6 +222,47 @@ for good: it waited for the server to answer for the user document.
   `xcrun simctl openurl <udid> "revisely://devoffline?on=1"` (`exp+revision-buddy://devoffline?on=1`
   on dev clients without the revisely scheme; `on=0` turns it off); it is kept for the next launch.
   `defaults write` from `simctl spawn` doesn't reach the app once it has saved its own value.
+  Native requests don't pass through it, except those whose URL goes through `lib/devNetwork`
+  (`nativeRequestUrl`: the mushaf's page downloads and page images).
+
+### Offline mushaf (`lib/pageCache`, `lib/mushafOffline`)
+
+Every page is downloaded to the phone, so the reader and revision sessions work offline (Nov 2026).
+- **Where:** `Documents/mushaf/<set>/001.png …` (`Paths.document`; Android's files directory), which
+  the system never empties. Before, pages were cached as read in the caches directory, which iOS and
+  Android may clear; `migrateLegacyPages` moves those over once (2 s after launch) and they are read
+  from there until then. The reader saves the pages it opens to the same folder.
+- **Backups:** on iOS the folder (and `Documents/quran-text`) is kept out of iCloud backups with
+  `RecitationAudio.excludeFromBackup`, which every binary on runtime 2df7a2f0 has (builds 31/32);
+  `xattr -l` shows `com_apple_backup_excludeItem` on it. Android has no way to do that from
+  JavaScript (expo-file-system writes only to files/ and cache/), so the pages are in Auto Backup's
+  files/, and with them Android's 25 MB backup quota is passed (recordings already pass it for most
+  users). The fix is backup rules excluding `files/mushaf` (`android:fullBackupContent` /
+  `dataExtractionRules`): a native change for the next build.
+- **Sizes** (`src/data/mushafSizes.json`, from `node scripts/mushaf-sizes.js`; run it again if the
+  images in Storage change): iOS (the originals) 247 MB, Android w1080 135 MB, w1440 191 MB; the
+  Arabic text 2 MB more.
+- **The download** (`mushafOffline`, started by `MushafOfflineController` 20 s after launch with
+  someone signed in): Wi-Fi only (metered Wi-Fi, a hotspot on Android, counts as mobile data),
+  unless "Download over mobile data" is on or "Download now" was confirmed over it once; only in the
+  foreground; only with room for the rest plus 100 MB. Three pages at a time; it stops between pages
+  when any of that changes and carries on from there. A page is downloaded to `.part` and moved in, so
+  a page there is whole. Failures are tried again on the connection coming back, the app coming to
+  the front, or after 1, 5, 15 minutes; a run stops after 6 failures in a row.
+- **Settings → Mushaf:** "Offline mushaf" (status and %, a menu with Download now and Remove from
+  this phone) and "Download over mobile data". Remove deletes the pages and the Arabic text and turns
+  the download off (kept on this phone, `@revisely_mushaf_offline:v1`) until Download now; pages the
+  reader opens are still kept.
+- **A page not on the phone:** online, it downloads (or loads from Storage, as before); offline
+  (`networkState`, fed from NetInfo), the reader shows "Page N isn't downloaded yet" with Try again,
+  and loads it by itself when the connection is back.
+- **Text offline:** the whole Arabic (Tanzil's Uthmani via alquran.cloud, verbatim copies allowed)
+  is downloaded with the pages (`downloadArabicText`, one request), so Copy and Share and the verse
+  sheet's Arabic work offline. Saheeh International stays cached as read (caches directory): we have
+  no licence for alquran.cloud's copy (#80), so it isn't downloaded whole. The Clear Quran stays as
+  the owner decided on Oct 27 2026 (cached as read, 30 + 30 days, never the whole of it). Surah and
+  juz data and the verse boxes are bundled. Recitation streams from everyayah.com and needs a
+  connection.
 
 ## Runtime version is a fingerprint
 

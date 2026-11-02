@@ -6,7 +6,9 @@
 // Every request from JavaScript (fetch is built on XMLHttpRequest) to anything
 // but this computer (Metro) goes to a closed local port and fails at once, as
 // in airplane mode: Firebase Auth, Firestore, Storage, NetInfo's reachability
-// check. Native requests (images, App Check) are not affected.
+// check. Native requests whose URL passes through lib/devNetwork (mushaf page
+// downloads and page images) go there too; other native requests (App Check,
+// recitation audio) are not affected.
 //
 //   on at launch:  xcrun simctl spawn <udid> defaults write com.revisionbuddy.app ReviselyOffline -bool YES
 //   off at launch: xcrun simctl spawn <udid> defaults delete com.revisionbuddy.app ReviselyOffline
@@ -37,6 +39,8 @@ export function installOfflineSwitch(): void {
   proto.open = function patchedOpen(this: unknown, method: unknown, url: unknown, ...rest: unknown[]) {
     return open.call(this, method, blocked(url) ? CLOSED_PORT : url, ...rest);
   };
+  (globalThis as { __reviselyDevNativeUrl?: (url: string) => string }).__reviselyDevNativeUrl = (url) =>
+    blocked(url) ? CLOSED_PORT : url;
   Linking.addEventListener('url', ({ url }) => {
     const m = /^[a-z+.-]+:\/\/devoffline\?on=([01])/i.exec(url ?? '');
     if (!m) return;

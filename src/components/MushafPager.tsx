@@ -15,6 +15,7 @@ import {
   Image,
   Pressable,
   StyleSheet,
+  Text,
   View,
   ViewToken,
 } from 'react-native';
@@ -22,6 +23,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getReadPalette } from '../theme/readPalette';
 import { getQuranPageImageUrl, pageImageProps } from '../lib/quranImages';
+import { nativeRequestUrl } from '../lib/devNetwork';
+import { knownOffline, onNetworkState } from '../lib/networkState';
+import { typeV2 } from '../theme/v2';
+import { PillButton } from './v2/PillButton';
 import {
   cachePage,
   evictCachedPage,
@@ -99,6 +104,8 @@ interface PageItemProps {
   highlightOpacity?: number;
   pageTint: string | null;
   tintColor: string;
+  /** Secondary text (the "not downloaded" placeholder). */
+  mutedColor: string;
   bg: string;
   /** The page as drawn: fits the pager, so controls never cover it. */
   size: PageSize;
@@ -116,31 +123,51 @@ const PageItem = React.memo(function PageItem({
   highlightOpacity,
   pageTint,
   tintColor,
+  mutedColor,
   bg,
   size,
   overlay,
   onTapVerse,
 }: PageItemProps) {
   const BOUNDS_SCALE = size.scale;
-  // A cached page renders from disk on the first frame. Otherwise it is
-  // downloaded into the cache first; if that fails, the image loads straight
-  // from Storage as it used to.
+  // A page on the phone renders from disk on the first frame. Otherwise it is
+  // downloaded first; if that fails, the image loads straight from Storage as
+  // it used to, unless the phone is offline: then it says the page isn't
+  // downloaded yet, and tries again by itself once the connection is back.
   const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber));
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  // Couldn't be shown: 'offline' (not on the phone, no connection) or 'failed'.
+  const [missing, setMissing] = useState<'offline' | 'failed' | null>(null);
   const isRemote = uri != null && uri.startsWith('http');
 
   useEffect(() => {
-    if (uri) return;
+    if (uri || missing) return;
     let live = true;
     cachePage(pageNumber).then((local) => {
-      if (live) setUri(local ?? getQuranPageImageUrl(pageNumber));
+      if (!live) return;
+      if (local) setUri(local);
+      else if (knownOffline()) setMissing('offline');
+      else setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber)));
     });
     return () => {
       live = false;
     };
-  }, [pageNumber, uri, attempt]);
+  }, [pageNumber, uri, missing, attempt]);
+
+  const retry = useCallback(() => {
+    setMissing(null);
+    setUri(getCachedPageUri(pageNumber));
+    setAttempt((a) => a + 1);
+  }, [pageNumber]);
+
+  // Back online (or the page arrived meanwhile): try again.
+  useEffect(() => {
+    if (!missing) return;
+    return onNetworkState((s) => {
+      if (s.connected) retry();
+    });
+  }, [missing, retry]);
 
   const handleLongPress = (e: GestureResponderEvent) => {
     if (!onLongPressAyah) return;
@@ -182,26 +209,32 @@ const PageItem = React.memo(function PageItem({
     <Pressable
       style={[styles.page, { backgroundColor: bg }]}
       onPress={onTap}
+      // The placeholder's text and button are read on their own.
+      accessible={!missing}
       accessibilityRole="button"
       accessibilityLabel={`Page ${pageNumber}`}
       accessibilityHint={onTap ? 'Shows or hides the controls' : undefined}
     >
-      {(uri == null || (isRemote && loading)) && !error && (
+      {(uri == null || (isRemote && loading)) && !missing && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={tintColor} />
         </View>
       )}
-      {error ? (
-        <Pressable
-          onPress={() => {
-            setError(false);
-            setUri(getCachedPageUri(pageNumber));
-            setAttempt((a) => a + 1);
-          }}
-          style={styles.errorBox}
-        >
-          <Ionicons name="refresh-outline" size={32} color={tintColor} />
-        </Pressable>
+      {missing ? (
+        <View style={styles.missing} testID="page-missing">
+          <Ionicons
+            name={missing === 'offline' ? 'cloud-offline-outline' : 'alert-circle-outline'}
+            size={32}
+            color={mutedColor}
+          />
+          <Text style={[typeV2.name, styles.missingText, { color: tintColor }]}>
+            {missing === 'offline' ? `Page ${pageNumber} isn't downloaded yet` : `Couldn't load page ${pageNumber}`}
+          </Text>
+          <Text style={[typeV2.meta, styles.missingText, { color: mutedColor }]}>
+            {missing === 'offline' ? "It shows when you're back online." : 'Check your connection and try again.'}
+          </Text>
+          <PillButton title="Try again" variant="outline" size="sm" onPress={retry} testID="page-retry" />
+        </View>
       ) : uri != null ? (
         // The pressable is exactly the image, so touch locations are page
         // coordinates.
@@ -245,11 +278,16 @@ const PageItem = React.memo(function PageItem({
             onError={() => {
               setLoading(false);
               if (!isRemote) {
-                // Purged or unreadable cache file: drop it and load from Storage.
-                evictCachedPage(pageNumber);
-                setUri(getQuranPageImageUrl(pageNumber));
+                // Unreadable file: drop it and load from Storage.
+                evictCachedPage(pageNumber, uri);
+                if (knownOffline()) {
+                  setUri(null);
+                  setMissing('offline');
+                } else {
+                  setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber)));
+                }
               } else {
-                setError(true);
+                setMissing(knownOffline() ? 'offline' : 'failed');
               }
             }}
           />
@@ -408,6 +446,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           highlightOpacity={0.25}
           pageTint={palette.pageTint}
           tintColor={palette.textPrimary}
+          mutedColor={palette.textSecondary}
           bg={palette.pageBg}
           size={pageSize}
           overlay={pageOverlay ? pageOverlay(item, pageSize.scale) : null}
@@ -468,8 +507,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorBox: {
-    padding: 24,
+  missing: {
+    flex: 1,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  missingText: {
+    textAlign: 'center',
   },
 });

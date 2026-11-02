@@ -10,9 +10,12 @@ jest.mock('../../context/ThemeContext', () => {
   const { paletteLight, v2ThemeColors } = require('../../theme/v2');
   return { useTheme: () => ({ isDark: false, theme: v2ThemeColors(false), palette: paletteLight }) };
 });
+// What is on the phone: every page, unless a test says otherwise.
+let mockCachedUri: string | null = 'file:///page.png';
+let mockDownload: string | null = null;
 jest.mock('../../lib/pageCache', () => ({
-  getCachedPageUri: () => 'file:///page.png',
-  cachePage: () => Promise.resolve(null),
+  getCachedPageUri: () => mockCachedUri,
+  cachePage: () => Promise.resolve(mockDownload),
   evictCachedPage: jest.fn(),
   prefetchPages: jest.fn(),
   pagesAround: (pages: number[]) => pages.slice(0, 1),
@@ -367,5 +370,57 @@ describe('<MushafPager /> page overlay and taps on verses', () => {
       nativeEvent: { locationX: ((x0 + x1) / 2) * scale, locationY: ((y0 + y1) / 2) * scale },
     });
     expect(onTap).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('<MushafPager /> pages not on the phone', () => {
+  const { __resetNetworkStateForTests, setNetworkState } = require('../../lib/networkState');
+
+  beforeEach(() => {
+    __resetNetworkStateForTests();
+    mockCachedUri = null;
+    mockDownload = null;
+  });
+
+  afterEach(() => {
+    mockCachedUri = 'file:///page.png';
+    mockDownload = null;
+  });
+
+  it('says a page isn\'t downloaded yet when offline, and shows it once back online', async () => {
+    setNetworkState({ connected: false, type: 'none' });
+    render(<MushafPager pages={[300]} />);
+    expect(await screen.findByTestId('page-missing')).toBeTruthy();
+    expect(screen.getByText("Page 300 isn't downloaded yet")).toBeTruthy();
+    expect(screen.queryByTestId('page-image')).toBeNull();
+
+    mockDownload = 'file:///300.png';
+    await act(async () => {
+      setNetworkState({ connected: true, type: 'wifi' });
+    });
+    expect(screen.queryByTestId('page-missing')).toBeNull();
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'file:///300.png' });
+  });
+
+  it('tries again from its button', async () => {
+    setNetworkState({ connected: false, type: 'none' });
+    render(<MushafPager pages={[300]} />);
+    await screen.findByTestId('page-missing');
+    mockCachedUri = 'file:///300.png';
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('page-retry'));
+    });
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'file:///300.png' });
+  });
+
+  it('online, loads it from Storage; if that fails too, says so', async () => {
+    setNetworkState({ connected: true, type: 'wifi' });
+    render(<MushafPager pages={[300]} />);
+    const image = await screen.findByTestId('page-image');
+    expect(image.props.source).toEqual({ uri: 'https://x/p.png' });
+    act(() => {
+      image.props.onError();
+    });
+    expect(screen.getByText("Couldn't load page 300")).toBeTruthy();
   });
 });
