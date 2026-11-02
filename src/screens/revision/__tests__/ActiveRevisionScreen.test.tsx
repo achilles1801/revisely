@@ -61,6 +61,30 @@ const mockListener = {
   yieldMic: jest.fn(async () => undefined),
   resume: jest.fn(),
 };
+// Word by word (phase 2): the hook's state from the test, and how the screen uses it.
+const mockFollow = {
+  followable: true,
+  status: 'finding' as string,
+  active: false,
+  round: undefined as number | undefined,
+  onPageDone: undefined as undefined | ((p: number) => void),
+};
+jest.mock('../../../components/recite/useReciteFollow', () => ({
+  canFollowWords: () => mockFollow.followable,
+  useReciteFollow: (opts: { active: boolean; round?: number; onPageDone: (p: number) => void }) => {
+    mockFollow.active = opts.active;
+    mockFollow.round = opts.round;
+    mockFollow.onPageDone = opts.onPageDone;
+    return { status: mockFollow.status, available: mockFollow.followable, follow: null, heard: '', resume: jest.fn() };
+  },
+}));
+let mockModelState: Record<string, unknown> = { status: 'missing', error: null };
+jest.mock('../../../lib/recite/speechModelStore', () => ({
+  useSpeechModelState: () => mockModelState,
+  startModelDownload: jest.fn(),
+  cancelModelDownload: jest.fn(),
+}));
+jest.mock('@react-native-community/netinfo', () => ({ fetch: jest.fn(async () => ({ type: 'wifi' })) }));
 jest.mock('../../../components/recite/usePauseListener', () => ({
   usePauseListener: (opts: { active: boolean; onPause: () => void }) => {
     mockListener.active = opts.active;
@@ -168,6 +192,10 @@ beforeEach(() => {
   mockListener.active = false;
   mockPager.pageOverlay = undefined;
   mockPager.onTapVerse = undefined;
+  mockFollow.followable = true;
+  mockFollow.status = 'finding';
+  mockFollow.active = false;
+  mockModelState = { status: 'missing', error: null };
 });
 
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
@@ -498,5 +526,84 @@ describe('ActiveRevisionScreen — hidden pages (testers)', () => {
     expect(mockPager.pageOverlay).toBeUndefined();
     hide();
     expect(mockPager.onTapVerse!(v1)).toBe(true);
+  });
+});
+
+// Word by word: with the speech model on the phone, the reciter is followed on
+// the device and each word shows as it is said.
+describe('ActiveRevisionScreen — hidden pages, word by word', () => {
+  const tester = () => {
+    setup([]);
+    mockApp.user = { ...mockApp.user, previewTester: true };
+  };
+  const hide = () => {
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Hide the page'));
+  };
+
+  it('with the model: follows word by word (the pause listener steps aside), and says so', () => {
+    mockModelState = { status: 'ready', bytes: 59_707_625 };
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    expect(mockFollow.active).toBe(true);
+    expect(mockListener.active).toBe(false);
+    expect(screen.getByTestId('recite-status')).toHaveTextContent('Start reciting');
+    expect(screen.getByText('Recite: each word shows as you say it', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
+  });
+
+  it('hiding the page again starts a new round (covered again); showing it keeps the round', () => {
+    mockModelState = { status: 'ready', bytes: 59_707_625 };
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    const first = mockFollow.round;
+    fireEvent.press(screen.getByLabelText('Show the page'));
+    expect(mockFollow.active).toBe(false);
+    expect(mockFollow.round).toBe(first);
+    fireEvent.press(screen.getByLabelText('Hide the page'));
+    expect(mockFollow.active).toBe(true);
+    expect(mockFollow.round).toBe((first as number) + 1);
+  });
+
+  it('a page recited through counts as revised', () => {
+    mockModelState = { status: 'ready', bytes: 59_707_625 };
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    act(() => mockFollow.onPageDone?.(331));
+    expect(screen.getAllByText(/1\/10/, { includeHiddenElements: true }).length).toBeGreaterThan(0);
+  });
+
+  it('without the model: the pause listener, and "Word by word" opens the download', async () => {
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    expect(mockFollow.active).toBe(false);
+    expect(mockListener.active).toBe(true);
+    fireEvent.press(screen.getByTestId('recite-word-by-word'));
+    await act(async () => {});
+    expect(screen.getByTestId('speech-model-sheet')).toBeTruthy();
+    expect(screen.getByTestId('speech-model-privacy')).toBeTruthy();
+  });
+
+  it('downloading: the chip shows the progress', () => {
+    mockModelState = { status: 'downloading', progress: 0.42 };
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    expect(screen.getByTestId('recite-word-by-word')).toHaveTextContent('42%');
+  });
+
+  it('a binary without the mic module: no chip, phase 1 as before', () => {
+    mockFollow.followable = false;
+    mockModelState = { status: 'ready', bytes: 1 };
+    tester();
+    render(<ActiveRevisionScreen />);
+    hide();
+    expect(mockFollow.active).toBe(false);
+    expect(mockListener.active).toBe(true);
+    expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
   });
 });

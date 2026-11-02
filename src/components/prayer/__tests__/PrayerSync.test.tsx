@@ -70,13 +70,13 @@ describe('<PrayerSync />', () => {
     expect(mockSync).not.toHaveBeenCalled();
   });
 
-  it('not a tester, or signed out: clears; still loading: does nothing', async () => {
+  it('every account (public from 1.0.3, not only testers); signed out: clears; still loading: does nothing', async () => {
     setPrayerAlert('asr', { on: true });
     Object.assign(mockApp, { user: tester({ previewTester: false }) });
     const view = render(<PrayerSync />);
     await settle();
-    expect(mockClear).toHaveBeenCalledTimes(1);
-    expect(mockSync).not.toHaveBeenCalled();
+    expect(mockSync).toHaveBeenCalled();
+    expect(mockClear).not.toHaveBeenCalled();
 
     jest.clearAllMocks();
     Object.assign(mockApp, { user: null });

@@ -10,7 +10,9 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../logger';
 import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID } from '../notificationChannels';
+import type { PrayerSound } from './prefs';
 import {
+  interruptionFor,
   PlannedNotification,
   PRAYER_ID_PREFIX,
   planPrayerNotifications,
@@ -19,6 +21,11 @@ import {
 } from './schedule';
 
 const SIGNATURES_KEY = '@revisely_prayer_scheduled';
+
+/** Android takes the sound from the channel, so "silent" has its own. */
+export function androidChannel(sound: PrayerSound): string {
+  return sound === 'standard' ? PRAYER_CHANNEL_ID : PRAYER_SILENT_CHANNEL_ID;
+}
 
 type PlanInput = Omit<Parameters<typeof planPrayerNotifications>[0], 'budget'>;
 
@@ -69,13 +76,14 @@ async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
           title: n.title,
           body: n.body,
           sound: n.sound === 'standard',
+          interruptionLevel: interruptionFor(n.kind),
           data: { kind: 'prayer', prayer: n.prayer ?? null },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: n.at,
           // Android: the sound is the channel's (iOS ignores it).
-          channelId: n.sound === 'standard' ? PRAYER_CHANNEL_ID : PRAYER_SILENT_CHANNEL_ID,
+          channelId: androidChannel(n.sound),
         },
       });
     } catch (err) {

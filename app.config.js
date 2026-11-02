@@ -6,7 +6,7 @@ export default {
     slug: "revision-buddy",
     owner: "achilles1802",
     scheme: "revisely",
-    version: "1.0.2",
+    version: "1.0.3",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
     // build that lacks it.
@@ -34,6 +34,10 @@ export default {
       // widgets show here (src/lib/widgets).
       entitlements: {
         "com.apple.security.application-groups": ["group.com.revisionbuddy.app"],
+        // Prayer notifications at a prayer's time break through Focus and the
+        // notification summary (interruptionLevel in lib/prayer/sync). A capability
+        // on the App ID: EAS signing needs `eas credentials:configure-build` once.
+        "com.apple.developer.usernotifications.time-sensitive": true,
       },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -62,8 +66,23 @@ export default {
         ]
       }
     },
+    // Android's notifications (reminders, prayer times, the timer): a white R that Android
+    // tints, and Indigo for the app's name in them. Without it Android drew the launcher icon
+    // as a blank white shape. Read by expo-notifications' plugin (Android only).
+    notification: {
+      icon: "./assets/notification-icon.png",
+      color: "#624BD5"
+    },
     android: {
       package: "com.revisionbuddy.app",
+      // Expo adds these by default. The app never draws over other apps (only the dev menu
+      // did) and stores files in its own folders (no storage permission since Android 10);
+      // Play lists every permission on the store page.
+      blockedPermissions: [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
@@ -128,6 +147,8 @@ export default {
         },
       ],
       "expo-font",
+      // Android dialogs', cursor's and selection handles' colour (ink, not Material's teal).
+      "./plugins/withAndroidTheme",
       "expo-web-browser",
       // The launch screen: the R, 200 pt wide, on black (in light and dark mode
       // alike). imageWidth needs this plugin: the top-level `splash` key shows the
@@ -149,7 +170,7 @@ export default {
         "expo-audio",
         {
           microphonePermission:
-            "Revisely uses the microphone to record your recitation so you can listen back to it.",
+            "Revisely uses the microphone to record your recitation, and to follow along word by word as you recite from memory. Following along happens on this iPhone; that audio isn't recorded or sent.",
           recordAudioAndroid: false,
         },
       ],
@@ -166,10 +187,10 @@ export default {
       [
         "expo-location",
         {
-          // Fajr (the day boundary, saved to the account: docs/privacy) and the Qibla
-          // (worked out on the phone; the widget keeps only the bearing).
-          locationAlwaysAndWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking.",
-          locationWhenInUsePermission: "Revisely uses your location to calculate Fajr times for your revision day and the Qibla direction. For Fajr times it is saved to your account; it is never shared or used for tracking."
+          // Prayer times and the Qibla (worked out on the phone; docs/privacy), and Fajr
+          // for the revision day (saved to the account, as that setting says).
+          locationAlwaysAndWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking.",
+          locationWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking."
         }
       ]
     ],

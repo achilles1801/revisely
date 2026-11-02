@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { hiddenPageLayout } from '../../lib/recite/hiddenPage';
+import { hiddenPageLayout, WordFollow } from '../../lib/recite/hiddenPage';
 
 /** Where the guide line runs in a line's band (from the top): about the baseline. */
 const GUIDE_AT = 0.74;
@@ -16,15 +16,18 @@ export function HiddenPageOverlay({
   page,
   scale,
   revealed,
+  follow,
   colors,
 }: {
   page: number;
   /** Bounds to points (MushafPager's page size). */
   scale: number;
   revealed: ReadonlySet<string>;
+  /** Following the reciter word by word: the words recited show too. */
+  follow?: WordFollow | null;
   colors: { cover: string; guide: string; band: string };
 }) {
-  const { lines } = useMemo(() => hiddenPageLayout(page, revealed), [page, revealed]);
+  const { lines } = useMemo(() => hiddenPageLayout(page, revealed, follow), [page, revealed, follow]);
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`hidden-page-${page}`}>
       {lines.map((l) =>
