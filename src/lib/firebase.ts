@@ -18,7 +18,6 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { logger } from './logger';
 import {
   getFirestore,
   doc,
@@ -31,7 +30,6 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
-  enableIndexedDbPersistence,
 } from 'firebase/firestore';
 import Constants from 'expo-constants';
 import { User, UserPage, RevisionLog } from '../types';
@@ -63,20 +61,11 @@ try {
   auth = getAuth(app);
 }
 
-// Initialize Firestore with offline persistence
+// Firestore keeps only a memory cache here: its disk persistence needs
+// IndexedDB, which React Native doesn't have (enableIndexedDbPersistence only
+// ever failed with "unimplemented"). The app keeps its own copy of the account
+// and an outbox of changes on the phone instead (src/lib/offline).
 const db = getFirestore(app);
-
-// Enable offline persistence for mobile
-// This allows the app to work offline and sync when back online
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    // Multiple tabs open, persistence can only be enabled in one tab at a time
-    logger.warn('Firestore persistence failed: Multiple tabs open');
-  } else if (err.code === 'unimplemented') {
-    // The current browser doesn't support persistence
-    logger.warn('Firestore persistence not supported in this browser');
-  }
-});
 
 export { auth, db };
 export type { FirebaseUser };

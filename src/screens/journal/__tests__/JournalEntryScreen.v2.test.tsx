@@ -34,8 +34,12 @@ const mockService = {
 };
 jest.mock('../../../services/firestoreService', () => ({
   getJournalEntry: (...a: unknown[]) => mockService.getJournalEntry(...(a as [])),
-  saveJournalEntry: (...a: unknown[]) => mockService.saveJournalEntry(...(a as [])),
-  deleteJournalEntry: (...a: unknown[]) => mockService.deleteJournalEntry(...(a as [])),
+}));
+// Saves go into the outbox (lib/offline), which sends them when it can.
+const mockQueue = { queueChange: jest.fn(async () => ({})), pendingJournalEntry: jest.fn(() => undefined) };
+jest.mock('../../../lib/offline/queue', () => ({
+  queueChange: (...a: unknown[]) => mockQueue.queueChange(...(a as [])),
+  pendingJournalEntry: (...a: unknown[]) => mockQueue.pendingJournalEntry(...(a as [])),
 }));
 
 import JournalEntryScreen from '../JournalEntryScreen';
@@ -98,10 +102,11 @@ describe('the daily log in the new design', () => {
     await act(async () => {
       fireEvent.press(save());
     });
-    expect(mockService.saveJournalEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ date: '2026-10-20', memorization: '1/2 p3', memorizationMinutes: 20 }),
-      true,
-    );
+    expect(mockQueue.queueChange).toHaveBeenCalledWith({
+      kind: 'journal.save',
+      entry: expect.objectContaining({ date: '2026-10-20', memorization: '1/2 p3', memorizationMinutes: 20 }),
+      isNew: true,
+    });
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
     expect(mockNavigation.goBack).toHaveBeenCalled();
   });
@@ -130,7 +135,30 @@ describe('the daily log in the new design', () => {
     await act(async () => {
       await buttons.find((b) => b.text === 'Delete')!.onPress!();
     });
-    expect(mockService.deleteJournalEntry).toHaveBeenCalledWith('2026-10-20');
+    expect(mockQueue.queueChange).toHaveBeenCalledWith({ kind: 'journal.delete', date: '2026-10-20' });
     alert.mockRestore();
+  });
+
+  it("offline, a day it can't read isn't editable (a save could overwrite the server's), and Try again reads it again", async () => {
+    mockService.getJournalEntry.mockRejectedValueOnce(
+      Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' }),
+    );
+    await renderV2();
+    expect(screen.getByTestId('journal-offline')).toBeTruthy();
+    expect(screen.getByText('Connect to the internet to see and edit it.')).toBeTruthy();
+    expect(screen.getByTestId('journal-save').props.accessibilityState).toMatchObject({ disabled: true });
+    mockService.getJournalEntry.mockResolvedValueOnce({ ...emptyJournalEntry('2026-10-20'), notes: 'Back' });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('journal-retry'));
+    });
+    expect(screen.getByTestId('journal-notes-input').props.value).toBe('Back');
+  });
+
+  it('offline, a change still waiting on this phone shows (and stays editable)', async () => {
+    mockService.getJournalEntry.mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'unavailable' }));
+    mockQueue.pendingJournalEntry.mockReturnValueOnce({ ...emptyJournalEntry('2026-10-20'), notes: 'Typed offline' } as never);
+    await renderV2();
+    expect(screen.queryByTestId('journal-offline')).toBeNull();
+    expect(screen.getByTestId('journal-notes-input').props.value).toBe('Typed offline');
   });
 });

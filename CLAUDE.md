@@ -161,6 +161,68 @@ file is the release mechanics and the traps behind them.
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
 
+## Offline (src/lib/offline)
+
+Firestore's JavaScript SDK keeps nothing on disk in React Native (its persistence needs IndexedDB), so
+the app keeps its own copy and its own queue. Before Nov 2026 a cold start offline sat on the spinner
+for good: it waited for the server to answer for the user document.
+- **The copy** (`accountCache`): the user document, the 604 pages and the 100 latest sessions, as the
+  server last sent them, per account in AsyncStorage (`@revisely_account:v1:<uid>:…`). `AppProvider`
+  opens from it at once and replaces it with each server snapshot. Snapshots marked `fromCache` (the
+  SDK's memory: empty on a cold start) are never applied or saved: an empty one once wrote blank
+  pages over real progress (REACT-NATIVE-6), and missing data is still created only when the server
+  confirms it (`lib/userDoc`). Signing out deletes the copy.
+- **The outbox** (`outbox`, `ops`, `sync`, `apply`): every change (user fields, pages, sessions, the
+  timer's reading sessions, the daily log, usage seconds) is saved on the phone first and sent in
+  order, one at a time. The app shows the copy with pending changes laid over it (`overlayAccount`),
+  so nothing waits for the server.
+  - **Only what changed:** a save sends just the fields that differ from what the app shows
+    (`changedOnly`, `pageChange`). The copy can be older than the server (another phone); sending
+    every field would put its old values back.
+  - **Safe to send twice:** values are absolute, page lists merge as sets, and `createdAt`s are fixed.
+    A session is merged with the server's inside a transaction, since another phone may have added
+    to the day. Its minutes add `durationAdd`, unless the server already has `durationAtLeast`.
+    When the other phone added at least as many minutes, this phone's minutes don't count; the
+    server keeps no record of which changes it has.
+  - **Crossing off:** a change leaves the outbox only after it has been folded into what's shown
+    and into the copy (`onApplied` is awaited).
+  - **Offline or a timeout:** it is tried again (2 s … 1 min), and at once when NetInfo says the
+    connection is back or the app comes to the front. `connectivity` also restarts Firestore's
+    connection, which otherwise waits out its own backoff.
+  - **"Permission denied":** this is how the rules refuse, but also how App Check or a stale
+    sign-in fail. A change is dropped (reported, kind only) only after a server read works
+    (`probe`), on the third refusal. Other refusals are dropped at once. An error that isn't
+    Firestore's (a bug) is dropped after 5 tries, so it can't hold up the rest.
+  - **Accounts:** nothing is sent for an account that isn't the one signed in. Signing out keeps
+    its outbox for its next sign-in here; deleting the account clears it.
+  - **Storage:** a stored queue that can't be read is never written over, and a damaged one is
+    kept aside (`@revisely_outbox_damaged:…`).
+  - **Usage seconds** aren't idempotent: a crash between the server's answer and crossing them off
+    counts them twice.
+- **Listeners:** one that ends in an error (e.g. refused before App Check had its token) is
+  subscribed again after a backoff; "Try again" does it at once. Pull to refresh doesn't read the
+  server: the listeners already do, and an older read could roll a newer snapshot back.
+- **First launch offline** (no copy): `connectionNeeded` → `ConnectToSetUp` ("Connect to the internet
+  to set up", Try again, Sign out) when NetInfo or Firestore says offline, or after `SERVER_WAIT_MS`
+  (6 s). It carries on by itself when the server answers. Onboarding never starts without the server.
+- **A slow network at launch:** Firebase Auth checks its saved sign-in with the server first (up to
+  30 s). After `AUTH_GRACE_MS` (1.5 s) the app opens with the account Auth saved
+  (`provisionalUid`, read from Auth's own AsyncStorage entry) and its copy; nothing is sent until Auth
+  confirms it. Offline, Auth keeps an expired sign-in (it can't check it) and refreshes it once online.
+- **Offline note:** Home's `OfflineNote` ("Offline", "Offline · changes saved on this phone").
+- The daily log can't be read offline unless Firestore already holds that day: the screen then says
+  so and can't be saved (a save would overwrite the server's entry).
+- The start-up self-heal (`syncPagesFromLogs`) runs only on the server's pages and sessions, never on
+  the copy, and compares last-revised dates by day (comparing a day with a timestamp rewrote every
+  revised page, unchanged, on every launch).
+- **Testing offline:** the Android emulator has airplane mode (`adb shell cmd connectivity
+  airplane-mode enable`; Metro still works through `adb reverse`). The iOS Simulator has none:
+  `src/dev/offlineSwitch.ts` (development builds only; absent from release bundles) sends every
+  JavaScript request except to Metro to a closed port. Turn it on in the app with
+  `xcrun simctl openurl <udid> "revisely://devoffline?on=1"` (`exp+revision-buddy://devoffline?on=1`
+  on dev clients without the revisely scheme; `on=0` turns it off); it is kept for the next launch.
+  `defaults write` from `simctl spawn` doesn't reach the app once it has saved its own value.
+
 ## Runtime version is a fingerprint
 
 `runtimeVersion: { policy: "fingerprint" }` in `app.config.js`: an update reaches only binaries built

@@ -180,8 +180,38 @@ export async function getUser(userId?: string): Promise<FirestoreUser | null> {
   return snapshot.exists() ? (snapshot.data() as FirestoreUser) : null;
 }
 
-export async function updateUser(updates: UpdateUserInput, userId?: string): Promise<void> {
-  const updateData: Record<string, unknown> = {
+/**
+ * The user document fields for `updates`: plain values ("notifications.enabled"
+ * style keys for nested ones), as kept in the outbox (lib/offline).
+ */
+export function userUpdateFields(updates: UpdateUserInput): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  const keys = [
+    'displayName', 'dailyPageCapacity', 'scheduleMode', 'dailyJuzCount', 'smartTrackingEnabled',
+    'hasSeenSmartTrackingPreview', 'theme', 'currentMemorizationJuz', 'currentMemorizationPage',
+    'currentKhatamPage', 'customPlan', 'savedPlans', 'onboardingComplete', 'totalMemorizedPages',
+    'streak', 'lastRevisionDate', 'memorizedSurahs', 'fajrBoundaryEnabled', 'locationCoords',
+    'fajrCalculationMethod', 'scheduleAnchorDate', 'carryOverMode', 'accent', 'carryOver',
+    'scheduleShiftPages', 'translationId', 'recordingBackup', 'recordingBackupCellular', 'reciter',
+  ] as const;
+  for (const k of keys) {
+    if (updates[k] !== undefined) fields[k] = updates[k];
+  }
+  if (updates.notifications) {
+    if (updates.notifications.enabled !== undefined) {
+      fields['notifications.enabled'] = updates.notifications.enabled;
+    }
+    if (updates.notifications.reminderTime !== undefined) {
+      fields['notifications.reminderTime'] = updates.notifications.reminderTime;
+    }
+  }
+  return fields;
+}
+
+/** Writes user document fields (from userUpdateFields), with the times and the legacy cleanup. */
+export async function applyUserFields(fields: Record<string, unknown>, userId?: string): Promise<void> {
+  await updateDoc(getUserRef(userId), {
+    ...fields,
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
     // Cleanup: evict fields removed in Phase 1 / 6 / 8 from any legacy user
@@ -192,59 +222,36 @@ export async function updateUser(updates: UpdateUserInput, userId?: string): Pro
     activeDays: deleteField(),
     'notifications.dangerAlertEnabled': deleteField(),
     'notifications.dayStartHour': deleteField(),
-  };
-
-  if (updates.displayName !== undefined) updateData.displayName = updates.displayName;
-  if (updates.dailyPageCapacity !== undefined) updateData.dailyPageCapacity = updates.dailyPageCapacity;
-  if (updates.scheduleMode !== undefined) updateData.scheduleMode = updates.scheduleMode;
-  if (updates.dailyJuzCount !== undefined) updateData.dailyJuzCount = updates.dailyJuzCount;
-  if (updates.smartTrackingEnabled !== undefined) updateData.smartTrackingEnabled = updates.smartTrackingEnabled;
-  if (updates.hasSeenSmartTrackingPreview !== undefined) updateData.hasSeenSmartTrackingPreview = updates.hasSeenSmartTrackingPreview;
-  if (updates.theme !== undefined) updateData.theme = updates.theme;
-  if (updates.currentMemorizationJuz !== undefined) updateData.currentMemorizationJuz = updates.currentMemorizationJuz;
-  if (updates.currentMemorizationPage !== undefined) updateData.currentMemorizationPage = updates.currentMemorizationPage;
-  if (updates.currentKhatamPage !== undefined) updateData.currentKhatamPage = updates.currentKhatamPage;
-  if (updates.customPlan !== undefined) updateData.customPlan = updates.customPlan;
-  if (updates.savedPlans !== undefined) updateData.savedPlans = updates.savedPlans;
-  if (updates.onboardingComplete !== undefined) updateData.onboardingComplete = updates.onboardingComplete;
-  if (updates.totalMemorizedPages !== undefined) updateData.totalMemorizedPages = updates.totalMemorizedPages;
-  if (updates.streak !== undefined) updateData.streak = updates.streak;
-  if (updates.lastRevisionDate !== undefined) updateData.lastRevisionDate = updates.lastRevisionDate;
-  if (updates.memorizedSurahs !== undefined) updateData.memorizedSurahs = updates.memorizedSurahs;
-  if (updates.fajrBoundaryEnabled !== undefined) updateData.fajrBoundaryEnabled = updates.fajrBoundaryEnabled;
-  if (updates.locationCoords !== undefined) updateData.locationCoords = updates.locationCoords;
-  if (updates.fajrCalculationMethod !== undefined) updateData.fajrCalculationMethod = updates.fajrCalculationMethod;
-  if (updates.scheduleAnchorDate !== undefined) updateData.scheduleAnchorDate = updates.scheduleAnchorDate;
-  if (updates.carryOverMode !== undefined) updateData.carryOverMode = updates.carryOverMode;
-  if (updates.accent !== undefined) updateData.accent = updates.accent;
-  if (updates.carryOver !== undefined) updateData.carryOver = updates.carryOver;
-  if (updates.scheduleShiftPages !== undefined) updateData.scheduleShiftPages = updates.scheduleShiftPages;
-  if (updates.translationId !== undefined) updateData.translationId = updates.translationId;
-  if (updates.recordingBackup !== undefined) updateData.recordingBackup = updates.recordingBackup;
-  if (updates.recordingBackupCellular !== undefined) updateData.recordingBackupCellular = updates.recordingBackupCellular;
-  if (updates.reciter !== undefined) updateData.reciter = updates.reciter;
-
-  if (updates.notifications) {
-    if (updates.notifications.enabled !== undefined) {
-      updateData['notifications.enabled'] = updates.notifications.enabled;
-    }
-    if (updates.notifications.reminderTime !== undefined) {
-      updateData['notifications.reminderTime'] = updates.notifications.reminderTime;
-    }
-  }
-
-  await updateDoc(getUserRef(userId), updateData);
+  });
 }
 
+export async function updateUser(updates: UpdateUserInput, userId?: string): Promise<void> {
+  await applyUserFields(userUpdateFields(updates), userId);
+}
+
+/**
+ * The user document as it changes. `fromCache` snapshots (the SDK's memory:
+ * offline, or not yet heard from the server) come too, with metadata changes,
+ * which is how the app tells it can't reach the server.
+ */
 export function subscribeToUser(
   callback: (user: FirestoreUser | null, meta: { fromCache: boolean }) => void,
   userId?: string,
+  onError?: (error: unknown) => void,
 ): Unsubscribe {
-  return onSnapshot(getUserRef(userId), (snapshot) => {
-    callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
-      fromCache: snapshot.metadata.fromCache,
-    });
-  });
+  return onSnapshot(
+    getUserRef(userId),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      callback(snapshot.exists() ? (snapshot.data() as FirestoreUser) : null, {
+        fromCache: snapshot.metadata.fromCache,
+      });
+    },
+    (error) => {
+      logger.error('subscribeToUser failed', error);
+      onError?.(error);
+    },
+  );
 }
 
 /** Whether the user's document exists, asked of the server (not the local cache). */
@@ -320,16 +327,35 @@ export async function batchUpdatePages(
   }
 }
 
+/** Page changes from the outbox (absolute fields; times as Timestamps already). */
+export async function applyPageUpdates(
+  pages: { pageNumber: number; data: Record<string, unknown> }[],
+  userId: string,
+): Promise<void> {
+  const BATCH_SIZE = 450;
+  for (let i = 0; i < pages.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    for (const { pageNumber, data } of pages.slice(i, i + BATCH_SIZE)) {
+      batch.update(getPageRef(pageNumber, userId), { ...data, updatedAt: serverTimestamp() });
+    }
+    await batch.commit();
+  }
+}
+
 export function subscribeToPages(
   callback: (pages: FirestorePage[], meta: { fromCache: boolean }) => void,
   userId?: string,
+  onError?: (error: unknown) => void,
 ): Unsubscribe {
   const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
   return onSnapshot(
     q,
     (snapshot) =>
       callback(snapshot.docs.map((d) => d.data() as FirestorePage), { fromCache: snapshot.metadata.fromCache }),
-    (error) => logger.error('subscribeToPages failed', error),
+    (error) => {
+      logger.error('subscribeToPages failed', error);
+      onError?.(error);
+    },
   );
 }
 
@@ -409,6 +435,47 @@ export async function getRecentSessions(
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => d.data() as FirestoreSession);
+}
+
+/** The most recent sessions (newest first) as they change. */
+export function subscribeToSessions(
+  callback: (sessions: FirestoreSession[], meta: { fromCache: boolean }) => void,
+  userId: string,
+  limitCount = 100,
+  onError?: (error: unknown) => void,
+): Unsubscribe {
+  const q = query(getSessionsCollectionRef(userId), orderBy('date', 'desc'), limit(limitCount));
+  return onSnapshot(
+    q,
+    (snapshot) =>
+      callback(snapshot.docs.map((d) => d.data() as FirestoreSession), { fromCache: snapshot.metadata.fromCache }),
+    (error) => {
+      logger.error('subscribeToSessions failed', error);
+      onError?.(error);
+    },
+  );
+}
+
+/**
+ * Merges a change into a day's session on the server: reads what is there
+ * (another phone may have added to it), merges, and creates or updates it.
+ * `merge` returns null to leave it alone (an edit of a session that's gone).
+ */
+export async function mergeSessionOnServer(
+  sessionId: string,
+  merge: (existing: FirestoreSession | null) => FirestoreSession | null,
+  updateData: (merged: FirestoreSession) => Record<string, unknown>,
+  userId: string,
+): Promise<void> {
+  const ref = getSessionRef(sessionId, userId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const existing = snap.exists() ? (snap.data() as FirestoreSession) : null;
+    const merged = merge(existing);
+    if (!merged) return;
+    if (existing) tx.update(ref, { ...updateData(merged), updatedAt: serverTimestamp() });
+    else tx.set(ref, { ...merged, updatedAt: serverTimestamp() });
+  });
 }
 
 export async function deleteSession(sessionId: string, userId?: string): Promise<void> {
@@ -548,6 +615,31 @@ export async function addReadingSession(
     updatedAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+/**
+ * Save a finished session under an id made on the phone, so sending it again
+ * (from the outbox) writes the same document: every field but updatedAt is
+ * the same, which the rules allow as an update.
+ */
+export async function putReadingSession(
+  id: string,
+  session: Omit<ReadingSession, 'id'>,
+  createdAtMs: number,
+  userId: string,
+): Promise<void> {
+  await setDoc(doc(getReadingSessionsRef(userId), id), {
+    date: session.date,
+    startedAt: Timestamp.fromMillis(session.startedAt),
+    endedAt: Timestamp.fromMillis(session.endedAt),
+    durationSeconds: Math.round(session.durationSeconds),
+    mode: session.mode,
+    targetSeconds: session.targetSeconds,
+    pages: session.pages,
+    pagesVisited: session.pagesVisited,
+    createdAt: Timestamp.fromMillis(createdAtMs),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 /** Only the page assignment is editable after the fact. */

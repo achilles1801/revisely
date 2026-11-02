@@ -20,6 +20,9 @@ import { greetingName } from '../../lib/displayName';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
 import * as firestoreService from '../../services/firestoreService';
+import { queueChange, withPendingReadings } from '../../lib/offline/queue';
+import { OfflineNote } from '../../components/offline/OfflineNote';
+import { autoId } from '../../lib/offline/apply';
 import { logger } from '../../lib/logger';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { typography } from '../../theme/typography';
@@ -250,7 +253,7 @@ export default function DashboardScreen() {
       firestoreService
         .getReadingSessions(20)
         .then((s) => {
-          if (live) setReadingSessions(s);
+          if (live) setReadingSessions(withPendingReadings(s));
         })
         .catch((err) => logger.warn('Failed to load reading sessions for Al-Kahf', err))
         .finally(() => {
@@ -355,14 +358,10 @@ export default function DashboardScreen() {
     kahfSavingRef.current = true;
     setKahfSaving(true);
     const session = kahfReadingSession(revisionDay, minutes, Date.now());
-    const write = firestoreService.addReadingSession(session);
     try {
-      // Offline, the write is queued and only settles when the server acks
-      // (as with the reading timer): show it as read after a few seconds.
-      const id = await Promise.race([
-        write,
-        new Promise<string>((resolve) => setTimeout(() => resolve(`pending-${session.startedAt}`), 6000)),
-      ]);
+      // Saved on the phone at once; it reaches the server when it can.
+      const id = autoId();
+      await queueChange({ kind: 'reading.add', id, session });
       setReadingSessions((prev) => [{ ...session, id }, ...prev]);
     } catch (err) {
       logger.error('Failed to save Al-Kahf reading session', err);
@@ -371,7 +370,6 @@ export default function DashboardScreen() {
       kahfSavingRef.current = false;
       setKahfSaving(false);
     }
-    write.catch((err) => logger.error('Al-Kahf reading session write failed', err));
   };
 
   const handleCarryOver = async () => {
@@ -481,6 +479,7 @@ export default function DashboardScreen() {
       >
         {/* No line under the header: one across the glow ended it in a hard
             edge, at rest and while pulling (it read as a box). */}
+        <OfflineNote />
         {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
           <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
         ) : null}
