@@ -43,8 +43,11 @@ async function appStore(now, env = process.env, get) {
   const today = D.ymd(now);
   let total = D.EMPTY();
   for (const month of D.monthsSince(LAUNCH, now)) {
+    // A month's report comes out days after it ends, and until then Apple answers
+    // "no sales", as for an empty month. Either way its days give the answer.
     const r = await fetchReport(month, 'MONTHLY');
-    total = D.add(total, r.missing ? await sumDays(D.daysOfMonth(month, LAUNCH, today)) : D.tally(r.rows, APPLE_ID));
+    const usable = !r.missing && r.rows.length > 0;
+    total = D.add(total, usable ? D.tally(r.rows, APPLE_ID) : await sumDays(D.daysOfMonth(month, LAUNCH, today)));
   }
   total = D.add(total, await sumDays(D.daysOfMonth(today.slice(0, 7), LAUNCH, today)));
 
