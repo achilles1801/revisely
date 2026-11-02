@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's list, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { FlatList } from 'react-native-gesture-handler';
@@ -23,6 +24,7 @@ import {
 } from '../../lib/readingHistory';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
+import { arabicLabelLines } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
 
@@ -205,7 +207,7 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
         <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Page ${entry.pageNumber} · ${when}`}</Text>
       </View>
       {display?.nameArabicVoweled ? (
-        <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+        <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
           {display.nameArabicVoweled}
         </Text>
       ) : null}
@@ -232,7 +234,7 @@ function SurahRowV2({ row, onPress }: { row: SurahRow; onPress: () => void }) {
         </Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
       </View>
-      <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+      <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
         {row.nameArabicVoweled}
       </Text>
     </Tap>

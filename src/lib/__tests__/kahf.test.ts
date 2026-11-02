@@ -216,21 +216,15 @@ describe('parseHomePrefs (Al-Kahf fields)', () => {
   it('defaults the reminder on for new and older installs', () => {
     expect(parseHomePrefs(null).fridayKahfReminder).toBe(true);
     const old = parseHomePrefs(JSON.stringify({ showProgressCard: false, metrics: ['juz'] }));
-    expect(old).toEqual({
-      showProgressCard: false,
-      metrics: ['juz'],
-      fridayKahfReminder: true,
-      kahfDismissedDay: null,
-    });
+    expect(old).toEqual({ fridayKahfReminder: true, kahfDismissedDay: null });
   });
 
   it('keeps saved values and drops bad ones', () => {
     const p = parseHomePrefs(
-      JSON.stringify({ fridayKahfReminder: false, kahfDismissedDay: FRI, metrics: ['bogus', 'pages'] }),
+      JSON.stringify({ fridayKahfReminder: false, kahfDismissedDay: FRI }),
     );
     expect(p.fridayKahfReminder).toBe(false);
     expect(p.kahfDismissedDay).toBe(FRI);
-    expect(p.metrics).toEqual(['pages']);
     expect(parseHomePrefs('{not json').fridayKahfReminder).toBe(true);
     expect(parseHomePrefs(JSON.stringify({ kahfDismissedDay: 5 })).kahfDismissedDay).toBeNull();
   });

@@ -3,9 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -43,6 +43,7 @@ import { Tap } from '../../components/v2/Tap';
 import { useHaptics } from '../../design/haptics';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { arabicLabelLines } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -304,7 +305,7 @@ export default function PlanDayEditScreen() {
                   ) : undefined
                 }
                 trailing={
-                  <Text style={[arabicV2(18), { color: palette.secondary }]} accessibilityLanguage="ar">
+                  <Text style={[arabicV2(18), { color: palette.secondary }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
                     {s.nameArabic}
                   </Text>
                 }

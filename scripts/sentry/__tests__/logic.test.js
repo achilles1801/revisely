@@ -14,6 +14,7 @@ const {
   gate,
   productionAlerts,
   dailyReport,
+  platformOf,
 } = require('../logic');
 
 const issue = {
@@ -341,5 +342,31 @@ describe('release health', () => {
     expect(md).not.toMatch(/@[a-z]/);
     expect(md).toContain('- REACT-NATIVE-6 `');
     expect(md).toContain('| `—` | 1 |');
+  });
+
+  it('splits issues by platform when given, and leaves the section out otherwise', () => {
+    const base = { date: '2026-11-02', newIssues: [], regressed: [], top: [], feedback: [], production: [], preview: [], alerts: [] };
+    const md = dailyReport({
+      ...base,
+      platforms: { ios: [{ count: '4', userCount: 2 }], android: [{ count: '10', userCount: 3 }, { count: 1, userCount: 1 }] },
+    });
+    expect(md).toContain('| iOS | 1 | 4 | 2 |');
+    expect(md).toContain('| Android | 2 | 11 | 3 |');
+    expect(md).toContain('### Production (App Store, Google Play)');
+    expect(dailyReport(base)).not.toContain('By platform');
+  });
+});
+
+describe('platformOf', () => {
+  it('reads the OS from the tags, then the os context', () => {
+    expect(platformOf({ tags: [{ key: 'os.name', value: 'Android' }] })).toBe('android');
+    expect(platformOf({ tags: [{ key: 'os.name', value: 'iOS' }] })).toBe('ios');
+    expect(platformOf({ tags: [], contexts: { os: { name: 'iPadOS' } } })).toBe('ios');
+  });
+
+  it('is null for anything else (no event, forged or unknown OS)', () => {
+    expect(platformOf(null)).toBeNull();
+    expect(platformOf({ tags: [{ key: 'os.name', value: 'Android<script>' }] })).toBeNull();
+    expect(platformOf({ tags: [{ key: 'os.name', value: 'Windows' }] })).toBeNull();
   });
 });

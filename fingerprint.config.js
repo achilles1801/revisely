@@ -14,13 +14,21 @@ module.exports = {
   // The widget extension (Swift, assets, font) lives outside ios/, where the fingerprint doesn't
   // look by itself; a widget change must make a new build. Prebuild writes nothing into it
   // (targets/widget/expo-target.config.js), so it hashes the same everywhere.
-  extraSources: [{ type: 'dir', filePath: 'targets', reasons: ['widgetExtension'] }],
+  // patches/ changes native dependencies after install (whisper.rn's podspec), so a patch change
+  // must make a new build too. (Local modules in modules/ are counted by autolinking.)
+  extraSources: [
+    { type: 'dir', filePath: 'targets', reasons: ['widgetExtension'] },
+    { type: 'dir', filePath: 'patches', reasons: ['patchPackage'] },
+  ],
   ignorePaths: [
     // Build and submit settings; counted whole, adding a store id would start a new build.
     'eas.json',
     // Gitignored, so present on a laptop and on EAS but not on the GitHub runner.
     'GoogleService-Info.plist',
     'google-services.json',
+    // The Android build reads it from GOOGLE_SERVICES_JSON (app.config.js), a file outside the
+    // project on the runner and on EAS: ignored wherever it is, as above.
+    '**/google-services.json',
     // Terminal colouring the config loader pulls in only when it has a .env.local to announce.
     '**/node_modules/chalk/**/*',
     '**/node_modules/ansi-styles/**/*',

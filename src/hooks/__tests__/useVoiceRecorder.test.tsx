@@ -391,6 +391,29 @@ describe('useVoiceRecorder sessions', () => {
     await act(() => result.current.finish());
   });
 
+  it("Android's permission dialog (the app in the background meanwhile) doesn't pause the first recording", async () => {
+    mockPerms.get.mockResolvedValue({ granted: false, canAskAgain: true });
+    let answer: (v: { granted: boolean }) => void = () => undefined;
+    mockPerms.request.mockImplementationOnce(() => new Promise((r) => (answer = r)));
+    const { result } = setup();
+    let started: Promise<void> = Promise.resolve();
+    act(() => {
+      started = result.current.start();
+    });
+    await act(async () => undefined);
+    // The dialog is an activity of its own: the app goes to the background, then back.
+    await act(async () => appStateListeners.forEach((l) => l('background')));
+    await act(async () => appStateListeners.forEach((l) => l('active')));
+    await act(async () => answer({ granted: true }));
+    await act(() => started);
+    expect(result.current.phase).toBe('recording');
+    expect(result.current.interrupted).toBe(false);
+    // Leaving the app afterwards still pauses it.
+    await act(async () => appStateListeners.forEach((l) => l('background')));
+    expect(result.current.phase).toBe('paused');
+    await act(() => result.current.finish());
+  });
+
   it('allows one recording session at a time across screens', async () => {
     const a = setup();
     const b = setup();

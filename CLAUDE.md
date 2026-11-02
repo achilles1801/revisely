@@ -27,8 +27,11 @@ file is the release mechanics and the traps behind them.
      app hash and republishes that same update to `production`, after you approve the run in the
      `production` environment (Actions > the run > Review deployments; only `main` may deploy there).
      No matching preview update: nothing is promoted and the run fails. It never builds.
+- **Android does all of this too, in the same runs** (Play internal testing in TestFlight's place;
+  one update group per platform, promoted together). See "Android (Google Play)".
 - **Nothing publishes to `production` except promote.yml.** Not a laptop, not another workflow. A fix
-  goes through `develop` and TestFlight like anything else. App Store submission stays manual.
+  goes through `develop` and TestFlight like anything else. App Store submission and Play production
+  releases stay manual (`scripts/asc.js`, `scripts/play.js`), on the owner's word.
 - Native builds run on a GitHub macOS runner (`ios-build.yml`: `eas build --local`, then
   `eas submit --path`), which uses no EAS build credits; the repo is public, so runner minutes are free.
   Local builds are not listed by `eas build:list`, so a submitted build pushes a tag `ios-fp/<fingerprint>`,
@@ -90,8 +93,14 @@ file is the release mechanics and the traps behind them.
 - `Health report` (`health-report.yml`, daily 13:00 UTC, `scripts/sentry/report.js`): a comment on
   the pinned "App health (daily report)" issue, mentioning the owner.
 - `Promote to production` refuses an update with fewer than 5 preview sessions or under 99%
-  crash-free (`scripts/sentry/gate.js`). A run by hand can change the bar or skip it. A bar that isn't
-  a number fails the check; it never passes it.
+  crash-free (`scripts/sentry/gate.js`), checked per platform: the iOS and the Android group must
+  each pass, so an Android tester has to open the update too. A run by hand can change the bar or skip
+  it. A bar that isn't a number fails the check; it never passes it.
+- Android is in all of this: its sessions and events go to the same Sentry project (environment
+  `production` or `preview`, release `…@<version>+<versionCode>`, `.u<group>` for an update, one
+  group per platform), new GitHub issues get an `ios` or `android` label from their latest event, and
+  the daily report has a per-platform table. Sentry groups sessions by release only, never by OS, so
+  crash-free rates are per release (each update group is one platform).
 - Secrets:
   - `SENTRY_API_TOKEN`: a Sentry internal integration token with read access to Issue & Event,
     Project and Organization. It is separate from `SENTRY_AUTH_TOKEN`, which only uploads source maps.
@@ -335,6 +344,11 @@ app from the home screen to clear the back-link in the status bar.
   tapping its waveform 42% in), Insights.
   `store/screenshots/dark/` holds the same in dark; `asc.js screenshots` uploads only the top-level
   PNGs, so move a dark one up to use it.
+- 1.0.3 (Nov 1 2026, release/1.0.3 2c28017): only Home was retaken, light and dark, for the
+  "Starts at" line and the next-prayer line (location set to Chicago, the Mac's time zone). The
+  seed writes sessions through yesterday in UTC, so in the evening (US time) shift them back a
+  day, or Home shows today done. A worktree needs the local `.env` copied in, or the app stops
+  at auth/invalid-api-key. PNGs from `simctl io` carry alpha: save them as RGB.
 - The recordings are demo audio (a synthesized tone), placed on the simulator: two `.m4a` files and
   an `index.json` entry each (`levels` drawn to look like recitation) in the app's
   `Documents/recordings/<uid>/`, with the app closed. The seed turns the account's recording backup
@@ -535,6 +549,95 @@ Fahd Complex fonts (open-source quran.com-images). They are served from the Stor
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
 asks about rights to them, that is the answer; the Qur'an text itself is public domain.
 
+## Android (Google Play)
+
+Package `com.revisionbuddy.app`, the same as the iOS bundle id (permanent). `versionCode` comes from
+EAS (`appVersionSource: remote`, `autoIncrement`), counted apart from iOS build numbers; the version
+string is the same `version` in app.config.js. Target SDK 36, min 24; every native library is 16 KB
+aligned (checked on an API 37 16 KB-page emulator). `store/android/` holds the listing, Data safety
+and content rating answers and the click-by-click setup. On Play since Nov 1 2026: internal testing,
+and Closed testing (track `alpha`) approved; a personal account needs 12 testers opted in for 14 days
+before production can be applied for.
+
+**Android moves with iOS.** Same branches, same version, same flow:
+
+| | iOS | Android |
+| --- | --- | --- |
+| Native change on develop | Preview builds on macOS, TestFlight; tag `ios-fp/<hash>` | Preview builds on Linux, Play internal testing (released to its testers); tag `android-fp/<hash>` |
+| Release branch (release/1.0.x) | EAS Build by hand, platform `all` (the default): both from one commit | same run |
+| JavaScript | Preview publishes to `preview` | the same push, its own update group (another runtime), same `[app <hash>]` |
+| Testers on `preview` | TestFlight install + `previewTester` | `previewTester` alone (Play can't tell testing from production) |
+| To store users | Promote: one approval republishes both platforms' groups for main's hash; both must pass the crash-free gate | same run |
+| Store release | `scripts/asc.js` (version, build, submit) by hand | `scripts/play.js promote <versionCode> --to production --rollout 0.2 --yes` by hand |
+| Crashes | Sentry, dSYMs uploaded by the build | Sentry, JS source maps and native symbols uploaded by the build (Gradle plugin) |
+| GitHub issues from Sentry | label `ios` | label `android` |
+
+- **CI switches.** Repository variables (Settings → Secrets and variables → Actions → Variables):
+  `ANDROID_RELEASES` = `true` (on) makes Preview look up the Android fingerprint and publish updates
+  for both platforms, and Promote and EAS Build include Android. `ANDROID_SUBMIT` = `true` (on) makes
+  Preview build Android when its fingerprint has no tag and upload it (`eas submit`, eas.json
+  `submit.production.android`: `track: internal`, `releaseStatus: completed`); the tag is pushed only
+  once a build is on Play, so with uploads off every push would build again (Preview then only says
+  so). Every build attaches the `.aab` to the run (7 days).
+- **Moving a build on.** Uploads go to internal testing only. Closed testing and production take the
+  same bundle, never a rebuild: `node scripts/play.js status`, then `promote <versionCode> --to alpha`
+  (Google reviews closed-testing changes; usually hours, "typically within 7 days"), and for the store
+  `promote <versionCode> --to production --rollout 0.2 --yes`, later `rollout 1 --yes` (`halt --yes`
+  stops it). Production is the owner's decision, as App Store submission is: run it only when asked.
+  The key needs production rights first (below).
+- **Secrets.** `GOOGLE_SERVICES_JSON` (repository secret, base64 of google-services.json), written
+  outside the repo and passed by path (`GOOGLE_SERVICES_JSON`, app.config.js). The upload keystore
+  stays on EAS (`eas credentials --platform android`; don't script that menu: "Set up a new keystore"
+  is one keypress away, and a new upload key breaks Play uploads). `PLAY_SERVICE_ACCOUNT_JSON`
+  (repository secret, base64): the key of `eas-play-submit@revision-buddy-3a398.iam.gserviceaccount.com`,
+  which may release to testing tracks and edit tester lists, nothing else. `android-build.yml` writes
+  it to a file only for the upload step, after the build; eas.json reads the path from
+  `PLAY_SERVICE_ACCOUNT_KEY_PATH`. The same key is `~/secrets/revisely-play-service-account.json` on
+  the laptop for `scripts/play.js` (`PLAY_KEY_PATH`). Production needs "Release to production,
+  exclude devices, and use Play App Signing" granted to it in Play Console (Users and permissions),
+  which the owner decides.
+- **Fingerprint.** The iOS fingerprint hashes the whole app config, the `android` section and every
+  plugin's options included: any Android change in `app.config.js` (permissions, icons, plugins) is
+  a native change for iOS too (raise `version`, a TestFlight build, an App Store release). Changes
+  that move nothing on iOS: Android-only local modules (`modules/*` with only `android`), `eas.json`,
+  and google-services.json, ignored wherever it is (`**/google-services.json`: a file outside the
+  project was hashed, so the runner's and a laptop's Android hashes differed).
+- **Gradle memory.** Lint (`lintVitalAnalyzeRelease`) ran out of memory with the default 2 GB; the
+  workflow writes `org.gradle.jvmargs=-Xmx6g` to `~/.gradle/gradle.properties` (it wins over the
+  project's, which prebuild writes). Locally: `-Dorg.gradle.jvmargs=-Xmx6g` and
+  `SENTRY_DISABLE_AUTO_UPLOAD=true` on `./gradlew assembleRelease`.
+- **Preview channel.** Play can't tell internal testing from production, so on Android the
+  `previewTester` account alone decides (`lib/updateChannel`); Play's reviewers use the demo account.
+- **Sign-in.** Google needs the app's SHA-1s (upload key, Play App Signing key, and a laptop's debug
+  key for dev builds) under the Android app in Firebase Console; Apple's button doesn't show.
+  App Check uses Play Integrity in release builds (link it in Firebase → App Check); dev builds use
+  the debug provider, with their own debug token registered under the Android app.
+- **Edge-to-edge traps** (Android 15+ enforces it; SDK 54 turns it on):
+  - React Native's `SafeAreaView` pads only on iOS: use `components/SafeAreaView`.
+  - The window isn't resized for the keyboard: `KeyboardAvoidingView` needs `padding` on Android too.
+  - The status bar's icons and native dialogs follow the app's theme through `AndroidSystemTheme`;
+    a screen with its own `<StatusBar>` (the reader) wins while mounted.
+- **Other traps.**
+  - Android measures voweled Amiri narrower than it draws it: a short Arabic label needs
+    `numberOfLines={arabicLabelLines}` (`lib/platformUi`) or its last word disappears.
+  - A runtime permission dialog is an activity: the app goes to `background` while it asks.
+  - A notification's sound and importance are its channel's: schedule with a `channelId`
+    (`lib/notificationChannels`: Reminders, Prayer times, Prayer times (silent); Recitation is
+    expo-audio's channel, created first so it has a name). Without one it lands in "Miscellaneous".
+  - Recitation's media notification has play/pause and the scrubber, not previous/next verse
+    (expo-audio 1.1 removes track commands on Android; a patch or a later expo-audio).
+  - expo-location sends a heading only after a ~2° turn, so a phone held still can show
+    "Finding north…" until it moves.
+  - Widgets are iOS only (WidgetKit); Android home-screen widgets are a follow-up.
+- **Not on Android yet:** home-screen widgets, recite mode's speech recognition (whisper.rn's iOS
+  path only), Sign in with Apple, previous/next verse in the media notification and on the lock
+  screen.
+- **Testing on an emulator** without touching production: the Firebase emulators (Auth, Firestore,
+  Storage) with a dev build pointed at them, and an account seeded there with
+  `functions/scripts/seed-screenshots.js` (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`).
+  The Clear Quran needs a real ID token, so it can't be tried there. In `adb shell input text`, an
+  `r` typed twice outside a text field reloads a dev build.
+
 ## Worker (revisely.app/api)
 
 `wrangler.jsonc` + `worker/`: the Cloudflare Worker that serves `docs/` at revisely.app also runs
@@ -626,14 +729,27 @@ To rotate one (or after a leak: revoke the old key in the portal first):
   `scripts/widget-verses.ts` builds the list from api.alquran.cloud, as the verse sheet shows it.
   **Qibla** (small, Lock Screen circular): a fixed dial, north up, with the Kaaba at the bearing,
   "Qibla 58° NE" and the distance to Makkah. WidgetKit can't read the compass, so it doesn't turn
-  with the phone. Tap: `revisely://qibla`, which opens Home and calls `requestQiblaSheet()`
-  (`src/lib/widgets/links.ts`). The screen that hosts the Qibla sheet must listen with
-  `onQiblaSheetRequest(open)`; a request from a cold start waits for the listener.
+  with the phone. Tap: `revisely://qibla`, which opens Home and calls `requestPrayerSheet('qibla')`
+  (`src/lib/widgets/links.ts`). The screen that hosts the sheet must listen with
+  `onPrayerSheetRequest(open)` (`open(tab)`); a request from a cold start waits for the listener.
   `WidgetSync` reads the phone's last known position when the app comes back, only if location is
   already allowed (it never asks), or else uses the account's Fajr location. Only the bearing,
   label and distance (`src/lib/widgets/qibla.ts`) go into the snapshot, never the position. A city
   line appears once `WidgetSync` is given the sheet's city list (`cities`). With no position the
   widget says "Open Revisely to set your location".
+- **Prayer times** (`PrayerWidget.swift`, kind `ReviselyPrayer`; small, medium; Lock Screen
+  rectangular, circular, inline): the next prayer (name in the accent, its time, a live countdown,
+  "in 1 hr, 12 min") and the place; the medium adds the day's six times (the next in the accent,
+  passed ones and sunrise quieter, as the Times tab); the circle is a ring filling from the last
+  prayer to the next around its name and time; inline is "Asr 3:42 PM". Data: the snapshot's
+  `prayer` (`widgetPrayer`: 7 days of the six times as epoch ms, null where a day has none, and
+  the nearest city), only with prayer times on and a place. Times are absolute and drawn with
+  SwiftUI's time styles, so the phone's time zone and 12/24-hour setting apply. Timeline: an entry
+  now, at every time and every midnight of the days written (`.atEnd`), so it moves on with the app
+  closed; past the last Isha, or with no `prayer`, "Open Revisely to see prayer times". Tap:
+  `revisely://prayer`, Home and `requestPrayerSheet('times')`: the Prayer sheet on Times (Home
+  listens with `onPrayerSheetRequest(tab)`; the Qibla widget asks for `'qibla'`). Without prayer
+  times on the account, Home just shows.
 - **Data:** the App Group `group.com.revisionbuddy.app` (both targets' entitlements).
   `src/components/WidgetSync.tsx` rebuilds the snapshot (`src/lib/widgets/snapshot.ts`) from what
   Home shows (sessions, carry-over, plan, accent, the revision day at fajr or midnight, the app coming
@@ -715,15 +831,30 @@ classic default), and a fresh install starts in light.
   until the offset is 0. Before (Oct 28 2026) it acted only on release and closed on an 80pt
   bounce, so it never followed the finger.
 - The owner's rules from testing (Oct 26 2026):
-  - **Minimal.** Home is one Today post (pages, juz, surahs, the action, a "Memorized …" line); no
-    second card restating it. Under the Memorized line, **juz dots** (`v2/JuzDots`): thirty, one per
+  - **Minimal.** Home is one Today post (pages, juz, surahs, the action, how much is memorized); no
+    second card restating it, and no ⋯ (Nov 2026): today's pages carry a › that opens exactly two
+    actions, "Jump to…" (`lib/jump`, `home/JumpSheet`) and "Edit schedule"; the memorized line,
+    "17.9% of the Quran memorized ›" (one decimal, of 604 pages; always shown, no setting; it wraps,
+    never truncates), opens the memorized pages ready to edit. The old "Behind? / back a day" (Home
+    and the plan editor's "Running behind?") is gone: Jump to covers it. Under the memorized line,
+    **juz dots** (`v2/JuzDots`): thirty, one per
     juz, each lit by that juz's memorized share (`juzFractions`; half a juz, half a dot) in the
-    accent's `palette.ring` colours (both ends ≥ 3:1 on the ground): no words, "Memorized 27% of
-    the Quran" for VoiceOver, shown and hidden with the Memorized line (Settings → Progress card),
-    Reduce Motion respected. The user chose them on Oct 28 2026 over a ring around the mark and a
+    accent's `palette.ring` colours (both ends ≥ 3:1 on the ground): no words, the line's text for
+    VoiceOver, Reduce Motion respected. The user chose them on Oct 28 2026 over a ring around the mark and a
     hairline (both removed, with the tester-only setting that compared them). Lists show the **last 3** things (`RecentSection`) with "See all"
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
+  - **Today's two lines** (`lib/todayLines`; the owner's option E, Nov 1 2026, mocks in
+    `~/Documents/revisely-today-mocks/`): "Starts at Al-Mujadila, p. 542 ›" over "20 pages · to
+    At-Tahrim · Juz 28"; in progress "Continue at <the first page not revised>, p. N ›" over a thin
+    bar and "6 of 20"; done "● Done · 20 pages" over "Adh-Dhariyat → Al-Hadid · Juz 27" (no ›, but
+    a tap still opens the menu); across the cycle's end "20 pages · then Al-Fatihah, p. 1"; carried
+    pages "20 pages · 4 from yesterday first". Pages are read in the session's order. The › sheet's
+    header holds the exact ranges. No-break spaces hold "p. 542 ›", "20 pages" and "Juz 28"
+    together and no-break hyphens hold surah names, so the › never stands alone and "Al-" never
+    ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
+    fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
+    also keeps 12pt from the icons (about 1.05 on an iPhone SE).
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
     and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
     are `lib/activityHeatmap` levels in `palette.heat` (≥ 2:1 on the ground) with

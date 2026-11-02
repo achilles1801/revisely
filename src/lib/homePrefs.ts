@@ -1,42 +1,27 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/** What the optional progress card on Home shows. Per-device preference. */
-export type HomeMetric = 'juz' | 'pages' | 'surahs';
-
+/** Home's options, kept on this device. */
 export interface HomePrefs {
-  showProgressCard: boolean;
-  metrics: HomeMetric[];
   /** Friday card suggesting Surah Al-Kahf. */
   fridayKahfReminder: boolean;
   /** Revision day on which the Al-Kahf card was dismissed ("Not today"). */
   kahfDismissedDay: string | null;
 }
 
-export const HOME_METRIC_LABELS: Record<HomeMetric, string> = {
-  juz: 'Juz memorized',
-  pages: 'Pages memorized',
-  surahs: 'Surahs memorized',
-};
-
-export const ALL_HOME_METRICS: HomeMetric[] = ['juz', 'pages', 'surahs'];
-
-const HOME_METRIC_SHORT: Record<HomeMetric, string> = { juz: 'Juz', pages: 'Pages', surahs: 'Surahs' };
-
-/** What the card shows, for the folded row in Settings: "Juz, Pages". */
-export function homeMetricsSummary(metrics: HomeMetric[]): string {
-  return ALL_HOME_METRICS.filter((m) => metrics.includes(m))
-    .map((m) => HOME_METRIC_SHORT[m])
-    .join(', ');
-}
-
 const STORAGE_KEY = '@revisely_home_prefs';
 const DEFAULT_PREFS: HomePrefs = {
-  showProgressCard: true,
-  metrics: ['juz', 'pages'],
   fridayKahfReminder: true,
   kahfDismissedDay: null,
 };
+
+/**
+ * Settings that are gone: the progress card (Home always shows how much is
+ * memorized, as a percentage) and what it showed, and whether that row was
+ * folded open in Settings. Dropped from storage once read.
+ */
+const RETIRED_KEYS = ['showProgressCard', 'metrics', 'progressStyle'];
+const RETIRED_STORAGE = ['@revisely_settings_progress_open'];
 
 /** Saved prefs over the defaults; fields added later default for old installs. */
 export function parseHomePrefs(raw: string | null): HomePrefs {
@@ -48,10 +33,6 @@ export function parseHomePrefs(raw: string | null): HomePrefs {
     return DEFAULT_PREFS;
   }
   return {
-    showProgressCard: saved.showProgressCard ?? DEFAULT_PREFS.showProgressCard,
-    metrics: (Array.isArray(saved.metrics) ? saved.metrics : DEFAULT_PREFS.metrics).filter(
-      (m) => ALL_HOME_METRICS.includes(m),
-    ),
     fridayKahfReminder:
       typeof saved.fridayKahfReminder === 'boolean'
         ? saved.fridayKahfReminder
@@ -59,6 +40,17 @@ export function parseHomePrefs(raw: string | null): HomePrefs {
     kahfDismissedDay:
       typeof saved.kahfDismissedDay === 'string' ? saved.kahfDismissedDay : null,
   };
+}
+
+/** Whether saved prefs still hold a retired setting (then they're written back without it). */
+export function hasRetiredKeys(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    const saved = JSON.parse(raw);
+    return !!saved && typeof saved === 'object' && RETIRED_KEYS.some((k) => k in saved);
+  } catch {
+    return false;
+  }
 }
 
 let prefs: HomePrefs = DEFAULT_PREFS;
@@ -69,6 +61,10 @@ AsyncStorage.getItem(STORAGE_KEY)
     if (!raw) return;
     prefs = parseHomePrefs(raw);
     listeners.forEach((l) => l());
+    if (hasRetiredKeys(raw)) {
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)).catch(() => {});
+      AsyncStorage.multiRemove(RETIRED_STORAGE).catch(() => {});
+    }
   })
   .catch(() => {});
 
@@ -76,14 +72,6 @@ export function setHomePrefs(update: Partial<HomePrefs>) {
   prefs = { ...prefs, ...update };
   listeners.forEach((l) => l());
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)).catch(() => {});
-}
-
-/** Toggle a metric, keeping the canonical order and at least one selected. */
-export function toggleHomeMetric(metric: HomeMetric) {
-  const has = prefs.metrics.includes(metric);
-  if (has && prefs.metrics.length === 1) return;
-  const next = has ? prefs.metrics.filter((m) => m !== metric) : [...prefs.metrics, metric];
-  setHomePrefs({ metrics: ALL_HOME_METRICS.filter((m) => next.includes(m)) });
 }
 
 export function useHomePrefs(): HomePrefs {

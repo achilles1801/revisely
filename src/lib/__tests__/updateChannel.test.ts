@@ -115,6 +115,39 @@ describe('update channel', () => {
     expect(mockSetOverride).not.toHaveBeenCalled();
   });
 
+  describe('Android (Play cannot tell internal testing from production)', () => {
+    const { Platform } = jest.requireActual('react-native') as typeof import('react-native');
+    const realOS = Platform.OS;
+    beforeEach(() => {
+      Object.defineProperty(Platform, 'OS', { configurable: true, get: () => 'android' });
+      mockModule = null; // the module is iOS-only
+    });
+    afterEach(() => {
+      Object.defineProperty(Platform, 'OS', { configurable: true, get: () => realOS });
+    });
+
+    it('a tester follows preview without the install-source module', async () => {
+      expect(applyUpdateChannel(true)).toBe('preview');
+      expect(mockSetOverride).toHaveBeenCalledWith({ 'expo-channel-name': 'preview' });
+      await flush();
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it("everyone else, Play's reviewers included, stays on production", () => {
+      expect(applyUpdateChannel(false)).toBe('production');
+      expect(mockSetOverride).toHaveBeenCalledWith(null);
+    });
+
+    it('still does nothing in development or with updates off', () => {
+      mockEnabled = false;
+      expect(applyUpdateChannel(true)).toBeNull();
+      mockEnabled = true;
+      g.__DEV__ = true;
+      expect(applyUpdateChannel(true)).toBeNull();
+      expect(mockSetOverride).not.toHaveBeenCalled();
+    });
+  });
+
   it('only ever overrides the channel header (the one expo-updates allows)', () => {
     expect(channelOverride('preview')).toEqual({ 'expo-channel-name': 'preview' });
     expect(channelOverride('production')).toBeNull();

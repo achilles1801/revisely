@@ -4,10 +4,10 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs).
 import { ScrollView } from 'react-native-gesture-handler';

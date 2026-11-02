@@ -157,10 +157,9 @@ describe('applyCarryOver', () => {
     expect(generateDailyAssignment(without5, [], next, today).pages).toEqual([6, 7, 8, 9]);
   });
 
-  it('keeps "Go back a day" working after a shift (plan start is untouched)', () => {
+  it('leaves the plan’s start untouched (the shift is a page offset, not a date)', () => {
     const user = { ...baseUser, customPlan: plan };
     const next = applyCarryOver(user, memorized, [5, 6], today);
-    // Tomorrow, going back a day repeats tomorrow's slot the day after.
     expect(pagesOn(next, 18)).toEqual([8, 9, 1]);
     expect(next.customPlan?.cycleStartDate).toBe('2026-10-15');
   });

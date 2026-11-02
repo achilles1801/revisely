@@ -1,30 +1,37 @@
 name: Promote to production
 
-# App Store users get JavaScript only from here, and only an update that TestFlight already had.
+# Store users get JavaScript only from here, and only an update that testers already had: TestFlight
+# on iOS, a Play testing install on Android.
 #
-# develop publishes every push to the `preview` channel (preview.yml), which TestFlight installs follow.
-# Once it has been tried there, develop is merged into main; this then finds the preview update built
-# from exactly what main holds (the "[app <hash>]" in its message, .github/scripts/app-hash.sh: every
-# file that goes into the app) and republishes that same update (the same bundle and assets, not a new
-# build of them) to `production`. If main's app was never published to preview (a change made on main
-# directly, or main ahead of develop), nothing is promoted and the run fails: make the change on
-# develop, try it in TestFlight, merge again. Docs, store and scripts changes don't count.
+# develop publishes every push to the `preview` channel (preview.yml), which testers' installs follow.
+# iOS and Android have different runtimes, so each push publishes one update group per platform, both
+# stamped with the same "[app <hash>]" (.github/scripts/app-hash.sh: every file that goes into the app).
+# Once it has been tried, develop is merged into main; this then finds, for each platform, the newest
+# preview group built from exactly what main holds and republishes those same updates (the same
+# bundles and assets, not a new build of them) to `production`, together: one approval, both stores.
+# If main's app was never published to preview for a platform (a change made on main directly, main
+# ahead of develop), nothing is promoted and the run fails: make the change on develop, try it, merge
+# again. Docs, store and scripts changes don't count.
 #
 # The promote job waits for approval in the `production` environment (Actions > the run > Review
-# deployments): the TestFlight sign-off. An update promoted for a runtime that the App Store doesn't
-# have yet (a new version in review) reaches App Store users when that version is released.
+# deployments): the testers' sign-off. An update promoted for a runtime that a store doesn't have yet
+# (a new version in review) reaches its users when that version is released.
 #
-# Release health: before the approval, the candidate update must have run at least `min_sessions`
-# sessions on preview (TestFlight testers) at `min_crash_free` crash-free or better, read from Sentry
-# (scripts/sentry/gate.js; sessions are labelled per update, src/lib/releaseInfo.ts). Below that,
-# nothing is promoted. A run by hand can lower the bar or skip the check (`skip_health_check`).
+# Release health: before the approval, each platform's update must have run at least `min_sessions`
+# sessions on preview at `min_crash_free` crash-free or better, read from Sentry (scripts/sentry/gate.js;
+# sessions are labelled per update group, src/lib/releaseInfo.ts). One platform below the bar stops
+# both. A run by hand can lower the bar or skip the check (`skip_health_check`).
 #
-# workflow_dispatch can promote a given update group instead (e.g. a fix for an older binary, published
-# to preview from a branch cut before a native change); it goes through the same approval.
+# workflow_dispatch can promote given update groups instead (e.g. a fix for an older binary, published
+# to preview from a branch cut before a native change): `group` takes one or more, separated by commas
+# or spaces (the iOS and the Android group of a push). It goes through the same approval.
 #
-# Rolling back: run it by hand with `group` = the previous production update group and `rollback` =
-# true. That group is looked up on production as well as preview, the health check is skipped (it
+# Rolling back: run it by hand with `group` = the previous production update group(s) and `rollback`
+# = true. Those groups are looked up on production as well as preview, the health check is skipped (it
 # already ran in production), and the approval still applies.
+#
+# Android is opt-in (repository variable ANDROID_RELEASES, as in preview.yml): off, Android groups are
+# left out and only iOS is promoted.
 on:
   push:
     branches: [main]
@@ -45,11 +52,11 @@ on:
   workflow_dispatch:
     inputs:
       group:
-        description: Update group to promote (empty = the preview update with main's app hash)
+        description: Update group(s) to promote, comma-separated (empty = each platform's preview update with main's app hash)
         type: string
         required: false
       rollback:
-        description: Roll back to an earlier production update (group required; skips the health check)
+        description: Roll back to earlier production updates (groups required; skips the health check)
         type: boolean
         default: false
       skip_health_check:
@@ -77,8 +84,8 @@ jobs:
     name: Find the tested update
     runs-on: ubuntu-latest
     outputs:
-      group: ${{ steps.find.outputs.group }}
-      runtime: ${{ steps.find.outputs.runtime }}
+      # "<platform>:<group>" per platform, space-separated (ios:ff76d17c-… android:51b39a90-…).
+      targets: ${{ steps.find.outputs.targets }}
       message: ${{ steps.find.outputs.message }}
     steps:
       - uses: actions/checkout@v4
@@ -107,34 +114,54 @@ jobs:
         env:
           GROUP: ${{ inputs.group }}
           ROLLBACK: ${{ inputs.rollback }}
+          ANDROID: ${{ vars.ANDROID_RELEASES == 'true' }}
         run: |
           APP=$(.github/scripts/app-hash.sh)
           eas update:list --branch preview --limit 50 --json --non-interactive > preview.json
           if [ "$ROLLBACK" = "true" ]; then
-            if [ -z "$GROUP" ]; then echo "::error::A rollback needs the group to roll back to."; exit 1; fi
+            if [ -z "$GROUP" ]; then echo "::error::A rollback needs the group(s) to roll back to."; exit 1; fi
             eas update:list --branch production --limit 50 --json --non-interactive > production.json
             jq -s '{currentPage: (.[0].currentPage + .[1].currentPage)}' preview.json production.json > preview.json.tmp
             mv preview.json.tmp preview.json
           fi
           if [ -n "$GROUP" ]; then
-            MATCH=$(jq -c --arg g "$GROUP" '[.currentPage[] | select(.group == $g)][0] // empty' preview.json)
-            WHAT="update group $GROUP"
+            WANT=$(echo "$GROUP" | tr ', ' '\n\n' | grep -v '^$' | jq -R . | jq -sc .)
+            MATCHES=$(jq -c --argjson w "$WANT" '[.currentPage[] | select(.group as $g | $w | index($g))] | unique_by(.group)' preview.json)
+            MISSING=$(jq -r --argjson w "$WANT" --argjson m "$MATCHES" -n '$w - ($m | map(.group)) | join(", ")')
+            if [ -n "$MISSING" ]; then
+              WHERE=preview; [ "$ROLLBACK" = "true" ] && WHERE="preview or production"
+              echo "::error title=Not found::No update group $MISSING on $WHERE. Nothing was promoted."
+              exit 1
+            fi
+            WHAT="update group(s) $GROUP"
           else
-            MATCH=$(jq -c --arg t "[app $APP]" '[.currentPage[] | select((.message // "") | contains($t))][0] // empty' preview.json)
+            # Newest first: the first group per platform is the latest one with main's app.
+            MATCHES=$(jq -c --arg t "[app $APP]" '[.currentPage[] | select((.message // "") | contains($t))] | group_by(.platforms) | map(.[0])' preview.json)
             WHAT="main's app (hash $APP)"
           fi
-          if [ -z "$MATCH" ]; then
-            echo "::error title=Not tested in TestFlight::No preview update found for $WHAT. Nothing was promoted. Make the change on develop (it publishes to preview), try it in TestFlight, then merge develop into main again."
+          if [ "$ANDROID" != "true" ]; then
+            MATCHES=$(jq -c 'map(select(.platforms != "android"))' <<<"$MATCHES")
+          fi
+          if [ "$(jq length <<<"$MATCHES")" = "0" ]; then
+            echo "::error title=Not tested::No preview update found for $WHAT. Nothing was promoted. Make the change on develop (it publishes to preview), try it on a tester's phone, then merge develop into main again."
             exit 1
           fi
+          # Both stores move together: without a group named by hand, each platform must have one.
+          if [ -z "$GROUP" ]; then
+            for P in ios $([ "$ANDROID" = "true" ] && echo android); do
+              if [ "$(jq --arg p "$P" 'map(select(.platforms == $p)) | length' <<<"$MATCHES")" = "0" ]; then
+                echo "::error title=No $P update::No $P preview update for $WHAT, so neither store was promoted. Run Preview on develop (Actions > Preview > Run workflow), or promote by hand with the group(s) to promote."
+                exit 1
+              fi
+            done
+          fi
           {
-            echo "group=$(jq -r .group <<<"$MATCH")"
-            echo "runtime=$(jq -r .runtimeVersion <<<"$MATCH")"
+            echo "targets=$(jq -r 'map("\(if (.platforms | contains(",")) then "all" else .platforms end):\(.group)") | join(" ")' <<<"$MATCHES")"
             # Listed as "<message>" (N minutes ago by X): keep the message, without its [app ...].
-            echo "message=$(jq -r '(.message // "") | sub("^\""; "") | sub("\" \\([^)]*\\)$"; "") | sub(" \\[app [0-9a-f]+\\]$"; "")' <<<"$MATCH" | head -n 1 | cut -c 1-200)"
+            echo "message=$(jq -r '.[0].message // "" | sub("^\""; "") | sub("\" \\([^)]*\\)$"; "") | sub(" \\[app [0-9a-f]+\\]$"; "")' <<<"$MATCHES" | head -n 1 | cut -c 1-200)"
           } >> "$GITHUB_OUTPUT"
           echo "### Ready to promote" >> "$GITHUB_STEP_SUMMARY"
-          jq -r '"- group `\(.group)`\n- runtime `\(.runtimeVersion)`\n- \(.message)"' <<<"$MATCH" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.[] | "- \(.platforms): group `\(.group)`, runtime `\(.runtimeVersion)`, \(.message)"' <<<"$MATCHES" >> "$GITHUB_STEP_SUMMARY"
 
   health:
     name: Release health on preview
@@ -153,16 +180,17 @@ jobs:
           SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
           MIN_SESSIONS: ${{ inputs.min_sessions || '5' }}
           MIN_CRASH_FREE: ${{ inputs.min_crash_free || '0.99' }}
-          GROUP: ${{ needs.find.outputs.group }}
+          TARGETS: ${{ needs.find.outputs.targets }}
         run: |
           if [ -z "$SENTRY_API_TOKEN" ]; then
             echo "::error title=No release health::Add the SENTRY_API_TOKEN secret (read access to Sentry), or run this by hand with skip_health_check. Nothing was promoted."
             exit 1
           fi
-          node scripts/sentry/gate.js "$GROUP"
+          # Every platform's update must pass: one below the bar stops both.
+          node scripts/sentry/gate.js $TARGETS
 
   promote:
-    name: Promote (after TestFlight sign-off)
+    name: Promote (after the testers' sign-off)
     needs: [find, health]
     # The health check passed, or was skipped on purpose (a rollback or a run by hand that skips it).
     if: ${{ !cancelled() && needs.find.result == 'success' && (needs.health.result == 'success' || needs.health.result == 'skipped') }}
@@ -192,9 +220,13 @@ jobs:
 
       - name: Republish to production
         env:
-          GROUP: ${{ needs.find.outputs.group }}
+          TARGETS: ${{ needs.find.outputs.targets }}
           MESSAGE: ${{ needs.find.outputs.message }}
         run: |
-          eas update:republish --group "$GROUP" --destination-branch production \
-            --message "Promoted from preview: $MESSAGE" --non-interactive
-          echo "Promoted $GROUP (runtime ${{ needs.find.outputs.runtime }}) to production." >> "$GITHUB_STEP_SUMMARY"
+          for T in $TARGETS; do
+            PLATFORM="${T%%:*}"
+            GROUP="${T#*:}"
+            eas update:republish --group "$GROUP" --destination-branch production --platform all \
+              --message "Promoted from preview: $MESSAGE" --non-interactive
+            echo "- Promoted $PLATFORM group \`$GROUP\` to production." >> "$GITHUB_STEP_SUMMARY"
+          done

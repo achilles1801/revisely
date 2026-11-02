@@ -1,13 +1,21 @@
 name: EAS Build
 
-# A native build, started by hand from the Actions tab, e.g. to replace a TestFlight build before it
-# expires (90 days). Rarely needed otherwise: Preview (preview.yml) starts one by itself when a push to
-# develop changes native code. Runs on a GitHub macOS runner (ios-build.yml), so it uses no EAS build credits.
+# A native build, started by hand from the Actions tab: a release branch's binaries (release/1.0.3),
+# a TestFlight build about to expire (90 days), or a bundle for Google Play. Rarely needed otherwise:
+# Preview (preview.yml) starts one by itself when a push to develop changes native code. iOS runs on a
+# GitHub macOS runner (ios-build.yml), Android on a Linux runner (android-build.yml): no EAS build
+# credits. By default both platforms build from the same commit, so the two stores stay on the same
+# version; each submitted build tags its fingerprint (ios-fp/<hash>, android-fp/<hash>) for Preview.
 on:
   workflow_dispatch:
     inputs:
+      platform:
+        description: Platforms to build (all = iOS and, when ANDROID_RELEASES is on, Android)
+        type: choice
+        options: [all, ios, android]
+        default: all
       submit:
-        description: Submit to TestFlight once built
+        description: Submit once built (TestFlight; Google Play internal testing when ANDROID_SUBMIT is on)
         type: boolean
         default: true
 
@@ -15,9 +23,67 @@ permissions:
   contents: read
 
 jobs:
+  # The fingerprints the builds will have, computed as Preview does, so a submitted build is tagged.
+  fingerprint:
+    name: Fingerprint
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.fp.outputs.ios }}
+      android: ${{ steps.fp.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write the Firebase plist
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
+      - name: Compute
+        id: fp
+        run: |
+          for P in ios android; do
+            HASH=$(eas env:exec production "npx expo-updates fingerprint:generate --platform $P" --non-interactive | grep '^{' | jq -r .hash)
+            if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
+              echo "::error::Could not compute the $P fingerprint."
+              exit 1
+            fi
+            echo "$P=$HASH" >> "$GITHUB_OUTPUT"
+            echo "$P fingerprint: $HASH"
+          done
+
   build:
     name: Build production (ios)
+    needs: fingerprint
+    if: ${{ inputs.platform != 'android' }}
+    permissions:
+      contents: write # pushes the ios-fp/<hash> tag
     uses: ./.github/workflows/ios-build.yml
     with:
       submit: ${{ inputs.submit }}
+      fingerprint: ${{ needs.fingerprint.outputs.ios }}
+    secrets: inherit
+
+  build-android:
+    name: Build production (android)
+    needs: fingerprint
+    if: ${{ inputs.platform == 'android' || (inputs.platform == 'all' && vars.ANDROID_RELEASES == 'true') }}
+    permissions:
+      contents: write # pushes the android-fp/<hash> tag
+    uses: ./.github/workflows/android-build.yml
+    with:
+      submit: ${{ inputs.submit }}
+      fingerprint: ${{ needs.fingerprint.outputs.android }}
     secrets: inherit

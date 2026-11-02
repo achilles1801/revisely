@@ -23,8 +23,6 @@ import {
   scheduledDaysFrom,
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
-  canPushScheduleBack,
-  shiftScheduleAnchor,
 } from '../../lib/algorithm';
 import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
 import { userWithNewSchedule } from '../../lib/planChange';
@@ -163,11 +161,9 @@ export default function PlanEditScreen() {
   const [tempMode, setTempMode] = useState<QuotaMode>(user?.scheduleMode ?? 'pages');
   const [tempCapacity, setTempCapacity] = useState(user?.dailyPageCapacity ?? 20);
   const [tempJuzCount, setTempJuzCount] = useState(user?.dailyJuzCount ?? 1);
-  // Menus are v2/ActionSheet: a saved plan's Load / Delete, Running behind?'s
-  // two shifts.
+  // Menus are v2/ActionSheet: a saved plan's Load / Delete.
   const [menuPlan, setMenuPlan] = useState<SavedPlan | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
-  const [timingOpen, setTimingOpen] = useState(false);
 
   const savedPlans = useMemo(
     () => [...(user?.savedPlans ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -254,9 +250,9 @@ export default function PlanEditScreen() {
   const handleSave = () => {
     if (!user || saving || !isDirty || days.length === 0) return;
     const plan: CustomPlan = createCustomPlanFromDraft(days, direction, revisionDate);
-    // After "push back a day" the live anchor sits in the future and the
-    // draft wasn't rotated (see rotateCustomPlanToToday) — keep that anchor
-    // so saving an edit doesn't silently undo the push-back.
+    // An older version's "push back a day" could leave the live anchor in the
+    // future, and the draft wasn't rotated (see rotateCustomPlanToToday): keep
+    // that anchor so saving an edit doesn't silently undo it.
     const liveStart = user.customPlan?.cycleStartDate;
     if (!newPlan && liveStart && liveStart > plan.cycleStartDate) plan.cycleStartDate = liveStart;
     saveSchedule(plan, newPlan);
@@ -370,25 +366,6 @@ export default function PlanEditScreen() {
     setMenuPlan(plan);
     setPlanMenuOpen(true);
   };
-
-  // ---- Timing ------------------------------------------------------------------------
-  const handleShift = useCallback(
-    (delta: number) => {
-      if (!user || saving || isDirty) return;
-      if (delta > 0 && !canPushScheduleBack(user, revisionDate)) return;
-      setSaving(true);
-      saveUser(shiftScheduleAnchor(user, delta))
-        .then(() => {
-          haptics.success();
-          leave();
-        })
-        .catch(() => {
-          setSaving(false);
-          Alert.alert("Couldn't update", 'Please try again.');
-        });
-    },
-    [user, saving, isDirty, saveUser, leave, haptics, revisionDate],
-  );
 
   // ---- Automatic schedule / quota ---------------------------------------------------
   const presentQuota = () => {
@@ -646,15 +623,6 @@ export default function PlanEditScreen() {
           }
         >
           <GroupedRow
-            title="Running behind?"
-            subtitle={isDirty ? 'Save your changes first' : undefined}
-            icon="time-outline"
-            accessory="chevron"
-            disabled={isDirty || days.length === 0}
-            onPress={() => setTimingOpen(true)}
-            testID="plan-timing"
-          />
-          <GroupedRow
             title="Daily amount"
             icon="speedometer-outline"
             value={quotaSummary}
@@ -698,37 +666,6 @@ export default function PlanEditScreen() {
         longCycleDays={LONG_CYCLE_DAYS}
       />
 
-      <ActionSheet
-        visible={timingOpen}
-        onClose={() => setTimingOpen(false)}
-        title="Running behind?"
-        message="Only the timing changes; what's on each day stays the same."
-        actions={[
-          // Only with a day before today: on a schedule that starts today,
-          // pushing back would leave today with nothing to revise.
-          ...(user && canPushScheduleBack(user, revisionDate)
-            ? [
-                {
-                  key: 'push-back',
-                  label: 'Push back a day',
-                  subtitle: "Today's revision moves to tomorrow",
-                  icon: 'arrow-undo-outline' as const,
-                  disabled: saving || isDirty,
-                  onPress: () => handleShift(1),
-                },
-              ]
-            : []),
-          {
-            key: 'skip-ahead',
-            label: 'Skip ahead a day',
-            subtitle: "Start tomorrow's revision today",
-            icon: 'arrow-redo-outline',
-            disabled: saving || isDirty,
-            onPress: () => handleShift(-1),
-          },
-        ]}
-        testID="plan-timing-menu"
-      />
       <ActionSheet
         visible={planMenuOpen}
         onClose={() => setPlanMenuOpen(false)}

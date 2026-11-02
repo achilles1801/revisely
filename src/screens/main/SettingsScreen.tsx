@@ -3,22 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
   Platform,
   Linking,
   Share,
   TextInput,
-  LayoutAnimation,
   AccessibilityState,
 } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
-import { AccentPicker } from '../../components/settings/AccentPicker';
+import { AccentSetting } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
@@ -29,6 +28,18 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
+import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
+import { ActionSheet } from '../../components/v2/ActionSheet';
+import { canFollowWords } from '../../components/recite/useReciteFollow';
+import { reciteModeEnabled } from '../../lib/recite/availability';
+import { formatModelSize } from '../../lib/recite/speechModel';
+import { removeSpeechModel, useSpeechModelState } from '../../lib/recite/speechModelStore';
+import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
+import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
+import { prayerTimesEnabled } from '../../lib/prayer/status';
+import { PRAYERS, setPrayerPrefs, usePrayerPrefs } from '../../lib/prayer/prefs';
+import { formatTime as formatPrayerTime, methodLabel, TIME_LABELS } from '../../lib/prayer/times';
+import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../lib/qibla';
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
@@ -48,17 +59,10 @@ import { deleteAllRecordings, listRecordings } from '../../lib/recordings';
 import { askTurnOffBackup, backupLabel, deleteAllEverywhere, useBackupStatus } from '../../lib/recordingBackupUi';
 import { formatBytes } from '../../lib/recordingFormat';
 import { logger } from '../../lib/logger';
-import {
-  ALL_HOME_METRICS,
-  HOME_METRIC_LABELS,
-  homeMetricsSummary,
-  setHomePrefs,
-  toggleHomeMetric,
-  useHomePrefs,
-} from '../../lib/homePrefs';
-import { usePersistedFlag } from '../../hooks/usePersistedFlag';
+import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { supportMailto } from '../../lib/contact';
 import { PillTabs } from '../../components/v2/PillTabs';
+import { shareIcon } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -97,6 +101,7 @@ function RowIcon({ name, destructive }: { name: IconName; destructive?: boolean 
 function Row({
   icon,
   label,
+  subtitle,
   value,
   rightSlot,
   onPress,
@@ -105,6 +110,8 @@ function Row({
 }: {
   icon?: IconName;
   label: string;
+  /** What it does, under the label. */
+  subtitle?: string;
   value?: string;
   rightSlot?: React.ReactNode;
   onPress?: () => void;
@@ -115,11 +122,18 @@ function Row({
   const row = (
     <View style={v2.row}>
       {icon ? <RowIcon name={icon} destructive={destructive} /> : null}
-      <Text
-        style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
-      >
-        {label}
-      </Text>
+      {subtitle ? (
+        <View style={[v2.rowLabel, !icon && v2.indent]}>
+          <Text style={[typeV2.body, { color: destructive ? palette.red : palette.text }]}>{label}</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{subtitle}</Text>
+        </View>
+      ) : (
+        <Text
+          style={[typeV2.body, v2.rowLabel, !icon && v2.indent, { color: destructive ? palette.red : palette.text }]}
+        >
+          {label}
+        </Text>
+      )}
       {value !== undefined && (
         <Text style={[typeV2.body, styles.rowValue, { color: palette.secondary }]} numberOfLines={1}>
           {value}
@@ -199,12 +213,22 @@ export default function SettingsScreen() {
   const [tempName, setTempName] = useState(user?.name ?? '');
   const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
-  // The progress card's options stay folded until opened (remembered per device).
-  const [metricsOpen, setMetricsOpen] = usePersistedFlag('@revisely_settings_progress_open', false);
-  const toggleMetricsOpen = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
-    setMetricsOpen(!metricsOpen);
-  }, [metricsOpen, setMetricsOpen]);
+  // The speech model (hidden pages, word by word; testers): its size, its
+  // download, Delete.
+  const speechModel = useSpeechModelState();
+  const [speechSheet, setSpeechSheet] = useState(false);
+  const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
+  // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
+  const prayerEnabled = prayerTimesEnabled(user);
+  const prayerPrefs = usePrayerPrefs();
+  const prayerTimes = usePrayerTimes(user);
+  const [prayerSheet, setPrayerSheet] = useState<PrayerTab | null>(null);
+  const prayerOn = PRAYERS.filter((p) => prayerPrefs.alerts[p].on).length;
+  const qiblaValue = prayerTimes.place
+    ? [formatBearing(qiblaBearing(prayerTimes.place)), nearestCity(prayerTimes.place, bundledCities())?.name]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
   const [readingSeconds, setReadingSeconds] = useState<number | null>(null);
   const [appSeconds, setAppSeconds] = useState<number | null>(null);
   // On this phone: how many, their size here; how many are backed up, and how
@@ -582,48 +606,16 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Home screen">
-          <Row
-            icon="stats-chart-outline"
-            label="Progress card"
-            rightSlot={
-              <SettingSwitch
-                value={homePrefs.showProgressCard}
-                onValueChange={(v) => setHomePrefs({ showProgressCard: v })}
-              />
-            }
-          />
-          {homePrefs.showProgressCard ? (
-            // What the card shows, folded into one row until opened.
+          {prayerEnabled ? (
             <Row
-              label="Shows"
-              value={homeMetricsSummary(homePrefs.metrics)}
-              onPress={toggleMetricsOpen}
-              accessibilityState={{ expanded: metricsOpen }}
+              icon="time-outline"
+              label="Next prayer"
+              subtitle="A line under the header"
               rightSlot={
-                <Ionicons name={metricsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textMuted} />
+                <SettingSwitch value={prayerPrefs.homeLine} onValueChange={(v) => setPrayerPrefs({ homeLine: v })} />
               }
             />
           ) : null}
-          {homePrefs.showProgressCard && metricsOpen
-            ? ALL_HOME_METRICS.map((metric) => {
-                const selected = homePrefs.metrics.includes(metric);
-                return (
-                  <Row
-                    key={metric}
-                    label={HOME_METRIC_LABELS[metric]}
-                    onPress={() => toggleHomeMetric(metric)}
-                    accessibilityState={{ selected }}
-                    rightSlot={
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color={selected ? theme.accent : 'transparent'}
-                      />
-                    }
-                  />
-                );
-              })
-            : null}
           <Row
             icon="book-outline"
             label="Friday Al-Kahf reminder"
@@ -636,9 +628,38 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        <Section title="Day boundary">
-          <FajrBoundaryCard />
-        </Section>
+        {prayerEnabled ? (
+          <Section title="Prayer">
+            <Row
+              icon="time-outline"
+              label="Prayer times"
+              value={
+                prayerTimes.next
+                  ? `${TIME_LABELS[prayerTimes.next.name].en} ${formatPrayerTime(prayerTimes.next.time)}`
+                  : undefined
+              }
+              onPress={() => setPrayerSheet('times')}
+            />
+            <Row
+              icon="notifications-outline"
+              label="Prayer notifications"
+              value={prayerOn > 0 ? `${prayerOn} on` : 'Off'}
+              onPress={() => navigation.navigate('PrayerNotifications')}
+            />
+            <Row
+              icon="options-outline"
+              label="Calculation"
+              value={methodLabel(prayerTimes.settings.method, true)}
+              onPress={() => navigation.navigate('PrayerCalculation')}
+            />
+            <Row icon="compass-outline" label="Qibla" value={qiblaValue} onPress={() => setPrayerSheet('qibla')} />
+            <FajrBoundaryCard compact />
+          </Section>
+        ) : (
+          <Section title="Day boundary">
+            <FajrBoundaryCard />
+          </Section>
+        )}
 
         <Section title="Revision">
           {/* Like Keep daily amount below: the line under the label says what it does. */}
@@ -662,6 +683,21 @@ export default function SettingsScreen() {
             mode={localUser.carryOverMode}
             onChange={(carryOverMode) => updateUser({ carryOverMode })}
           />
+          {reciteModeEnabled(user) && canFollowWords() ? (
+            <Row
+              icon="mic-outline"
+              label="Speech model"
+              subtitle="Follows your recitation word by word, on this iPhone"
+              value={
+                speechModel.status === 'ready'
+                  ? formatModelSize(speechModel.bytes)
+                  : speechModel.status === 'downloading'
+                    ? `${Math.round(speechModel.progress * 100)}%`
+                    : 'Not downloaded'
+              }
+              onPress={() => (speechModel.status === 'ready' ? setDeleteSpeechOpen(true) : setSpeechSheet(true))}
+            />
+          ) : null}
 
         </Section>
 
@@ -720,10 +756,7 @@ export default function SettingsScreen() {
               Kept with the account (DesignGate brings it to other devices). */}
           <View style={v2.iconRow} testID="accent-row">
             <SettingIcon name="color-filter-outline" />
-            <View style={styles.rowText}>
-              <Text style={[typeV2.body, { color: theme.textPrimary }]}>Accent</Text>
-            </View>
-            <AccentPicker
+            <AccentSetting
               value={design.accent}
               onChange={(accent) => {
                 design.setAccent(accent);
@@ -735,7 +768,7 @@ export default function SettingsScreen() {
 
         <Section title="Support">
           <Row
-            icon="share-outline"
+            icon={shareIcon}
             label="Share Revisely"
             onPress={handleShareApp}
           />
@@ -805,6 +838,27 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
+      <SpeechModelSheet visible={speechSheet} onClose={() => setSpeechSheet(false)} onReady={() => setSpeechSheet(false)} />
+      <ActionSheet
+        visible={deleteSpeechOpen}
+        onClose={() => setDeleteSpeechOpen(false)}
+        title="Speech model"
+        message={`${formatModelSize()} on this iPhone. It downloads again the next time you follow word by word.`}
+        actions={[{ key: 'delete', label: 'Delete speech model', icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
+        testID="speech-model-delete-menu"
+      />
+      {prayerEnabled ? (
+        <PrayerSheet
+          visible={prayerSheet != null}
+          tab={prayerSheet ?? 'times'}
+          onTab={setPrayerSheet}
+          onClose={() => setPrayerSheet(null)}
+          onOpenCalculation={() => {
+            setPrayerSheet(null);
+            navigation.navigate('PrayerCalculation');
+          }}
+        />
+      ) : null}
 
       <ReminderTimeSheetV2
         visible={showTimeModal}

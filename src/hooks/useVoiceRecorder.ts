@@ -156,6 +156,10 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   // Stop asked for while there was nothing to stop yet (a start in progress,
   // or the reopened session not restored yet): honoured once there is.
   const stopRequestedRef = useRef(false);
+  // Android's permission dialog is an activity of its own: while it asks for the
+  // microphone the app is in the 'background', which paused the first recording
+  // before it had started (0:00, paused). Not leaving the app.
+  const askingRef = useRef(false);
 
   const recorder = useAudioRecorder(VOICE_PRESET, (status: RecordingStatus) => {
     // Interrupted or failed (a call, another app taking the microphone): keep
@@ -295,7 +299,14 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     setPhaseBoth('starting');
     try {
       let perm = await getRecordingPermissionsAsync();
-      if (!perm.granted && perm.canAskAgain) perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) {
+        askingRef.current = true;
+        try {
+          perm = await requestRecordingPermissionsAsync();
+        } finally {
+          askingRef.current = false;
+        }
+      }
       if (!perm.granted) {
         releaseRecording(owner);
         setPhaseBoth('idle');
@@ -518,13 +529,26 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   // Control Center or a notification banner; recording goes on.)
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'background') pauseRef.current(true);
+      if (s === 'background' && !askingRef.current) pauseRef.current(true);
     });
     return () => sub.remove();
   }, []);
 
+  /** The microphone's level now (dBFS) while recording, else null: the hidden
+   *  recite mode listens through it instead of opening the microphone again. */
+  const level = useCallback((): number | null => {
+    if (phaseRef.current !== 'recording') return null;
+    try {
+      const db = recorder.getStatus().metering;
+      return typeof db === 'number' && Number.isFinite(db) ? db : null;
+    } catch {
+      return null;
+    }
+  }, [recorder]);
+
   return {
     phase,
+    level,
     recording: phase === 'recording',
     paused: phase === 'paused',
     /** Paused by a call, an alarm, Siri or leaving the app (not by the user). */

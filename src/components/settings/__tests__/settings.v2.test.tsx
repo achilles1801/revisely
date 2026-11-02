@@ -31,7 +31,7 @@ jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { AppInfo } from '../AppInfo';
-import { AccentPicker } from '../AccentPicker';
+import { AccentPicker, AccentSetting } from '../AccentPicker';
 import { FajrBoundaryCard } from '../../FajrBoundaryCard';
 import { KahfPost } from '../../home/feed/KahfPost';
 import { describeRelease } from '../../../lib/releaseInfo';
@@ -102,6 +102,35 @@ describe('the accent picker', () => {
     await renderV2(<AccentPicker value="indigo" onChange={jest.fn()} />);
     expect(flat(screen.getByTestId('accent-indigo').props.style).borderColor).toBe(palette.text);
     expect(flat(screen.getByTestId('accent-jade').props.style).borderColor).toBe(palette.outline);
+  });
+});
+
+describe('the Accent row', () => {
+  const layout = (testID: string, width: number) =>
+    fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+      nativeEvent: { layout: { width, height: 30, x: 0, y: 0 } },
+    });
+
+  it('names the chips only when they fit beside the label, as measured (not from the screen width)', async () => {
+    await renderV2(<AccentSetting value="indigo" onChange={jest.fn()} />);
+    // Not measured yet: the swatches, which always fit.
+    expect(screen.queryByText('Indigo')).toBeNull();
+    layout('accent-measure-label', 52);
+    layout('accent-measure-chips', 268);
+    // 52 + 12 + 268 = 332: a point short (an iPhone 17 Pro's row was about this).
+    layout('accent-setting', 331);
+    expect(screen.queryByText('Indigo')).toBeNull();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    layout('accent-setting', 340);
+    expect(screen.getByText('Indigo')).toBeTruthy();
+    expect(screen.getByText('Jade')).toBeTruthy();
+  });
+
+  it('the label never breaks inside the word, and the unseen measuring copy isn’t read out', async () => {
+    await renderV2(<AccentSetting value="indigo" onChange={jest.fn()} />);
+    expect(screen.getByText('Accent').props.numberOfLines).toBe(1);
+    expect(screen.getAllByText('Accent')).toHaveLength(1);
+    expect(screen.getAllByRole('radio').map((r) => r.props.accessibilityLabel)).toEqual(['Indigo', 'Crimson', 'Jade']);
   });
 });
 

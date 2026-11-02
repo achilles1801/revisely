@@ -1,58 +1,32 @@
-import {
-  Coordinates,
-  CalculationMethod,
-  HighLatitudeRule,
-  PrayerTimes,
-} from 'adhan';
 import { User } from '../types';
+import { getPrayerPrefs } from './prayer/prefs';
+import { CALCULATION_METHODS, DEFAULT_METHOD, dayTimes } from './prayer/times';
 
 /**
  * Supported adhan calculation methods, surfaced as a small picker in
- * Settings. Names match adhan's static factory functions so we can resolve
- * them dynamically.
+ * Settings (lib/prayer/times has the list; prayer times use the same one).
  */
-export const FAJR_CALCULATION_METHODS = [
-  { id: 'MuslimWorldLeague', label: 'Muslim World League' },
-  { id: 'Egyptian', label: 'Egyptian' },
-  { id: 'Karachi', label: 'Karachi' },
-  { id: 'UmmAlQura', label: 'Umm al-Qura (Makkah)' },
-  { id: 'Dubai', label: 'Dubai' },
-  { id: 'MoonsightingCommittee', label: 'Moonsighting Committee' },
-  { id: 'NorthAmerica', label: 'ISNA (North America)' },
-  { id: 'Kuwait', label: 'Kuwait' },
-  { id: 'Qatar', label: 'Qatar' },
-  { id: 'Singapore', label: 'Singapore' },
-  { id: 'Turkey', label: 'Turkey' },
-  { id: 'Tehran', label: 'Tehran' },
-] as const;
+export const FAJR_CALCULATION_METHODS = CALCULATION_METHODS.map(({ id, label }) => ({ id, label }));
 
-export const DEFAULT_FAJR_METHOD = 'NorthAmerica';
-
-function paramsFor(methodId: string) {
-  const cm = CalculationMethod as unknown as Record<string, () => ReturnType<typeof CalculationMethod.MuslimWorldLeague>>;
-  const factory = cm[methodId] ?? cm[DEFAULT_FAJR_METHOD];
-  const params = factory();
-  // At very high latitudes adhan would otherwise return invalid times. Pick
-  // a sane default rule rather than crashing the UI.
-  params.highLatitudeRule = HighLatitudeRule.TwilightAngle;
-  return params;
-}
+export const DEFAULT_FAJR_METHOD = DEFAULT_METHOD;
 
 /**
  * Fajr time for a given date at the user's coords + method. Returned as a
- * native Date (local timezone of the device).
+ * native Date (local timezone of the device). Worked out exactly as the prayer
+ * times are (lib/prayer/times): the account's method with this phone's
+ * high-latitude rule and adjustments, so the day starts at the Fajr the Prayer
+ * sheet shows. (It used to force the twilight-angle rule.)
  */
 export function getFajrTimeFor(date: Date, user: User): Date | null {
   if (!user.locationCoords) return null;
-  const coords = new Coordinates(
-    user.locationCoords.latitude,
-    user.locationCoords.longitude,
-  );
-  const params = paramsFor(user.fajrCalculationMethod || DEFAULT_FAJR_METHOD);
-  const prayerTimes = new PrayerTimes(coords, date, params);
-  // adhan returns an Invalid Date when there is no fajr (polar summer).
-  const fajr = prayerTimes.fajr;
-  return fajr && !isNaN(fajr.getTime()) ? fajr : null;
+  const prefs = getPrayerPrefs();
+  // adhan gives no fajr (null here) in a polar summer.
+  return dayTimes(user.locationCoords, date, {
+    method: user.fajrCalculationMethod || DEFAULT_FAJR_METHOD,
+    highLatitude: prefs.highLatitude,
+    madhab: prefs.madhab,
+    adjustments: prefs.adjustments,
+  }).fajr;
 }
 
 function formatLocalDay(date: Date): string {

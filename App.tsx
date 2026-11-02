@@ -9,8 +9,10 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { RecordingBackupController } from './src/components/RecordingBackupController';
 import { WidgetSync } from './src/components/WidgetSync';
+import { PrayerSync } from './src/components/prayer/PrayerSync';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
+import { AndroidSystemTheme } from './src/components/AndroidSystemTheme';
 import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
@@ -102,8 +104,10 @@ function App() {
                 <BottomSheetModalProvider>
                   <RootNavigator />
                   <DesignGate />
+                  <AndroidSystemTheme />
                   <RecordingBackupController />
                   <WidgetSync />
+                  <PrayerSync />
                 </BottomSheetModalProvider>
               </AppProvider>
             </AuthProvider>

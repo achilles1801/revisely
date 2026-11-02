@@ -72,6 +72,7 @@ export function Sheet({
   onClose,
   title,
   message,
+  messageMaxScale,
   left,
   right,
   children,
@@ -87,6 +88,8 @@ export function Sheet({
   onClose: () => void;
   title?: string;
   message?: string;
+  /** Caps how far the message grows with Dynamic Type (a header line, like the title). */
+  messageMaxScale?: number;
   left?: SheetHeaderAction;
   right?: SheetHeaderAction;
   children?: React.ReactNode;
@@ -231,7 +234,12 @@ export function Sheet({
                       </Text>
                     ) : null}
                     {message ? (
-                      <Text style={[typeV2.meta, styles.center, styles.message, { color: palette.secondary }]}>{message}</Text>
+                      <Text
+                        style={[typeV2.meta, styles.center, styles.message, { color: palette.secondary }]}
+                        maxFontSizeMultiplier={messageMaxScale}
+                      >
+                        {message}
+                      </Text>
                     ) : null}
                   </View>
                   <View style={[styles.side, styles.sideRight]}>{right ? <HeaderButton action={right} /> : null}</View>
@@ -279,7 +287,9 @@ export function Sheet({
           </Animated.View>
         </Reanimated.View>
         {keyboard ? (
-          <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
+          // Padding on Android too: with edge-to-edge the modal's window isn't resized
+          // for the keyboard, which covered the whole sheet (Send feedback).
+          <KeyboardAvoidingView style={styles.fill} behavior="padding" pointerEvents="box-none">
             {sheet}
           </KeyboardAvoidingView>
         ) : (

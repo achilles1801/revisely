@@ -7,7 +7,7 @@ import { getJuzForPage, getSurahForPage } from './quranData';
 // otherwise a memorized surah would split across two awkward half-days. Long
 // surahs that span 3+ juz (Al-Baqarah, An-Nisa) are kept on page-juz so a "1
 // juz" day doesn't accidentally become a 48-page Baqarah marathon.
-function juzKeyForPage(pageNumber: number): number {
+export function juzKeyForPage(pageNumber: number): number {
   const surah = getSurahForPage(pageNumber);
   const startJuz = getJuzForPage(surah.startPage);
   const endJuz = getJuzForPage(surah.endPage);
@@ -199,20 +199,37 @@ function juzModePagesForDate(
   date: Date,
   memorizedPages: UserPage[],
 ): number[] {
-  const memorizedPageNumbers = memorizedPages.map((p) => p.pageNumber);
-  const juzSet = new Set<number>();
-  for (const p of memorizedPageNumbers) juzSet.add(juzKeyForPage(p));
-  const juzList = Array.from(juzSet).sort((a, b) => a - b);
-  if (juzList.length === 0) return [];
+  const juz = juzModeCycle(user, memorizedPages);
+  if (!juz) return [];
 
   const start = new Date(user.scheduleAnchorDate || user.createdAt);
   const daysSinceStart = calendarDaysBetween(start, date);
   if (daysSinceStart < 0) return [];
 
-  const juzPerDay = Math.min(user.dailyJuzCount, juzList.length);
+  // The juz pattern repeats every cycle.length days; a shift moves within it.
+  const dayIndex = daysSinceStart % juz.cycle.length;
+  const shift = user.scheduleShiftPages ?? 0;
+  if (!shift) return [...juz.cycle[dayIndex]];
+  return shiftedCycleDay(juz.cycle, dayIndex, shift);
+}
+
+/**
+ * Juz mode's cycle: the juz holding memorized pages (by juzKeyForPage), how
+ * many a day, and the days of one cycle (day 0 = the anchor's day), each the
+ * memorized pages of its juz. Null without memorized pages.
+ */
+export function juzModeCycle(
+  user: User,
+  memorizedPages: UserPage[],
+): { juzList: number[]; juzPerDay: number; cycle: number[][] } | null {
+  const memorizedPageNumbers = memorizedPages.map((p) => p.pageNumber);
+  const juzSet = new Set<number>();
+  for (const p of memorizedPageNumbers) juzSet.add(juzKeyForPage(p));
+  const juzList = Array.from(juzSet).sort((a, b) => a - b);
+  if (juzList.length === 0) return null;
+  const juzPerDay = Math.max(1, Math.min(user.dailyJuzCount, juzList.length));
   const pagesForDay = (dayNumber: number): number[] => {
-    const juzOffset =
-      ((dayNumber * juzPerDay) % juzList.length + juzList.length) % juzList.length;
+    const juzOffset = (dayNumber * juzPerDay) % juzList.length;
     const result: number[] = [];
     for (let i = 0; i < juzPerDay; i++) {
       const juz = juzList[(juzOffset + i) % juzList.length];
@@ -223,13 +240,8 @@ function juzModePagesForDate(
     }
     return result;
   };
-
-  const shift = user.scheduleShiftPages ?? 0;
-  if (!shift) return pagesForDay(daysSinceStart);
-  // The juz pattern repeats every cycleLength days; shift within that cycle.
   const cycleLength = juzList.length / gcd(juzList.length, juzPerDay);
-  const cycle = Array.from({ length: cycleLength }, (_, i) => pagesForDay(i));
-  return shiftedCycleDay(cycle, daysSinceStart % cycleLength, shift);
+  return { juzList, juzPerDay, cycle: Array.from({ length: cycleLength }, (_, i) => pagesForDay(i)) };
 }
 
 /**
@@ -434,11 +446,10 @@ function addDaysToISOTimestamp(iso: string, deltaDays: number): string {
 /**
  * Slide the whole schedule by `deltaDays` calendar days, leaving the cycle
  * contents untouched. Because the scheduler is purely date-derived (see
- * getPagesScheduledForDate), moving the anchor is all it takes:
- *
- *   deltaDays = +1  → every assignment lands one day later. "I'm behind —
- *                     push it back" so today's revision reappears tomorrow.
- *   deltaDays = -1  → every assignment lands one day earlier. "Skip ahead."
+ * getPagesScheduledForDate), moving the anchor is all it takes: +1 puts every
+ * assignment a day later, -1 a day earlier. scheduleStartingByToday uses it to
+ * start a schedule left in the future on today ("Jump to…", lib/jump, is how
+ * the user moves where today starts).
  *
  * Shifts whichever anchor is live: `customPlan.cycleStartDate` when a custom
  * plan is set, otherwise `scheduleAnchorDate`. Returns a new User; never
@@ -480,17 +491,6 @@ export function scheduleStartDay(user: User): Date {
     return parseLocalDateString(user.customPlan.cycleStartDate);
   }
   return startOfDay(new Date(user.scheduleAnchorDate || user.createdAt));
-}
-
-/**
- * "Behind? Move the plan back a day" makes today repeat yesterday's revision,
- * which needs a yesterday: the schedule must have started before `today`. On a
- * schedule that starts today (a new account, a plan saved today) there's
- * nothing to go back to, and moving the start to tomorrow would leave today
- * with nothing to revise.
- */
-export function canPushScheduleBack(user: User, today: Date): boolean {
-  return calendarDaysBetween(scheduleStartDay(user), today) >= 1;
 }
 
 /**

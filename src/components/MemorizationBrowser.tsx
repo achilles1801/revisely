@@ -32,6 +32,7 @@ import {
 } from '../lib/quranData';
 import { UserPage } from '../types';
 import { PageStatus } from '../lib/memorizationChanges';
+import { arabicLabelLines } from '../lib/platformUi';
 
 if (
   Platform.OS === 'android' &&
@@ -799,7 +800,7 @@ function BaseRow({
             ) : null}
           </View>
           {arabic ? (
-            <Text style={[arabicV2(20), v2s.arabic, { color: palette.text }]} accessibilityLanguage="ar">
+            <Text style={[arabicV2(20), v2s.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
               {arabic}
             </Text>
           ) : null}

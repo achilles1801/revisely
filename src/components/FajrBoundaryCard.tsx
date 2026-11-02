@@ -16,11 +16,12 @@ import {
 } from '../lib/fajrBoundary';
 
 /**
- * Settings card for the fajr-based day boundary. Wires the location prompt,
+ * Settings card for the fajr-based day boundary (`compact`: the toggle alone,
+ * in Settings → Prayer, where Calculation holds the method). Wires the location prompt,
  * persists coords + chosen calculation method, and surfaces today's fajr
  * time so the user can see the boundary they just configured.
  */
-export function FajrBoundaryCard() {
+export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}) {
   const { palette } = useTheme();
   const { user, saveUser } = useApp();
   const [busy, setBusy] = useState(false);
@@ -118,7 +119,8 @@ export function FajrBoundaryCard() {
         </View>
         <SettingSwitch value={enabled} onValueChange={handleToggle} disabled={busy} accessibilityLabel="Start day at fajr" />
       </View>
-      {enabled && (
+      {/* In Settings → Prayer the method is under Calculation (shared with prayer times). */}
+      {enabled && !compact && (
         <Tap
           onPress={() => setMethodOpen(true)}
           accessibilityRole="button"

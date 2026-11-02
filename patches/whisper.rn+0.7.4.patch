@@ -1,0 +1,14 @@
+diff --git a/node_modules/whisper.rn/whisper-rn.podspec b/node_modules/whisper.rn/whisper-rn.podspec
+index e24aa83..f9acd7d 100644
+--- a/node_modules/whisper.rn/whisper-rn.podspec
++++ b/node_modules/whisper.rn/whisper-rn.podspec
+@@ -52,6 +52,9 @@ Pod::Spec.new do |s|
+     end
+   else
+     s.source_files = "ios/**/*.{h,m,mm}", "cpp/jsi/*.{h,cpp}"
++    # The framework's own headers (one copy per slice) must not be copied in as
++    # this pod's headers: with use_frameworks they collide ("Multiple commands produce").
++    s.exclude_files = "ios/rnwhisper.xcframework/**/*"
+     s.vendored_frameworks = "ios/rnwhisper.xcframework"
+   end
+ 

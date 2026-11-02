@@ -193,7 +193,7 @@ describe('schedule editing lifecycle', () => {
     expect(savedPlansFromFirestore(persisted)).toEqual(plans);
   });
 
-  it('go back a day persists by shifting the custom plan anchor, not the cycle contents', () => {
+  it('moving the schedule (shiftScheduleAnchor) persists by shifting the custom plan anchor, not the cycle contents', () => {
     const user = {
       ...baseUser,
       customPlan: {

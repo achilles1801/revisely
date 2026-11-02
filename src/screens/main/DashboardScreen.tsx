@@ -3,10 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   RefreshControl,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { ScrollView } from 'react-native-gesture-handler';
@@ -27,12 +28,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
-import {
-  generateDailyAssignment,
-  shiftScheduleAnchor,
-  canPushScheduleBack,
-  scheduleStartingByToday,
-} from '../../lib/algorithm';
+import { generateDailyAssignment, scheduleStartingByToday } from '../../lib/algorithm';
 import { getQuranData } from '../../lib/quranData';
 import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
@@ -45,20 +41,40 @@ import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
-import { onQiblaSheetRequest } from '../../lib/widgets/links';
+import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
+import { NextPrayerLine } from '../../components/prayer/NextPrayerLine';
+import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
+import { prayerTimesEnabled } from '../../lib/prayer/status';
+import { usePrayerPrefs } from '../../lib/prayer/prefs';
+import { onPrayerSheetRequest } from '../../lib/widgets/links';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
+import { JumpSheet } from '../../components/home/JumpSheet';
+import { UndoToast } from '../../components/revision/UndoToast';
+import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
+import type { User } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
 const COMPACT_SESSION_LIMIT = 3;
 
+/** Each side of Home's top bar: three icons. */
+const TOP_BAR_SIDE = 120;
+/** السلام عليكم at 20pt, measured ink (Amiri draws past its box). */
+const SALAM_INK_WIDTH = 76;
+
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { theme, palette } = useTheme();
+  // The greeting grows like the icons beside it (1.4), but always keeps 12pt
+  // from them: on an iPhone SE's narrower bar that is about 1.05.
+  // (React Native ignores a cap under 1, so 1 is the floor.)
+  const { width: screenWidth } = useWindowDimensions();
+  const salamRoom = screenWidth - 2 * layoutV2.gutter - 2 * TOP_BAR_SIDE - 2 * 12;
+  const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const { user, pages, logs, updateLog, deleteLog, loadData, error, saveUser } = useApp();
@@ -67,11 +83,13 @@ export default function DashboardScreen() {
 
   const homePrefs = useHomePrefs();
   const tabFootprint = useTabBarFootprint();
-  const [shifting, setShifting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+  // "Jump to…": the sheet, and the toast after a jump (with what to put back).
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [jumped, setJumped] = useState<{ message: string; before: User } | null>(null);
 
-  // A schedule that starts after today (an earlier "back a day" on a schedule
-  // that started today) leaves today with nothing to revise: start it today.
+  // A schedule that starts after today (an older version's "back a day" on a
+  // schedule that started that day) leaves today with nothing: start it today.
   const repairingStartRef = useRef(false);
   useEffect(() => {
     if (!user || repairingStartRef.current) return;
@@ -91,8 +109,30 @@ export default function DashboardScreen() {
   useScrollToTop(scrollRef);
   const [selectedLog, setSelectedLog] = useState<RevisionLog | null>(null);
   const [qiblaOpen, setQiblaOpen] = useState(false);
-  // The Qibla widget's tap (revisely://qibla) opens the sheet here, also from a cold start.
-  useEffect(() => onQiblaSheetRequest(() => setQiblaOpen(true)), []);
+  // Prayer times (testers): one sheet, Times | Qibla; the compass opens it on
+  // Qibla, the next-prayer line on Times.
+  const [prayerTab, setPrayerTab] = useState<PrayerTab>('qibla');
+  const prayerEnabled = prayerTimesEnabled(user);
+  const prayerPrefs = usePrayerPrefs();
+  const prayerTimes = usePrayerTimes(user);
+  const openPrayer = (tab: PrayerTab) => {
+    setPrayerTab(tab);
+    setQiblaOpen(true);
+  };
+  // The widgets' taps open it here on their tab, also from a cold start: Qibla
+  // (revisely://qibla) and prayer times (revisely://prayer). Without prayer
+  // times there is only the Qibla sheet, so the prayer widget just shows Home.
+  const prayerEnabledRef = useRef(prayerEnabled);
+  prayerEnabledRef.current = prayerEnabled;
+  useEffect(
+    () =>
+      onPrayerSheetRequest((tab) => {
+        if (tab === 'times' && !prayerEnabledRef.current) return;
+        setPrayerTab(tab);
+        setQiblaOpen(true);
+      }),
+    [],
+  );
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
@@ -141,6 +181,14 @@ export default function DashboardScreen() {
     );
     return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
   }, [logs, revisionDay, assignment, pages, user]);
+
+  // How many of today's pages came from yesterday (they come first: "4 from yesterday first").
+  const carriedToday = useMemo(() => {
+    const carry = user?.carryOver;
+    if (!assignment || !carry || carry.day !== revisionDay) return 0;
+    const carried = new Set(carry.pages);
+    return assignment.pages.filter((p) => carried.has(p)).length;
+  }, [user, assignment, revisionDay]);
 
   useEffect(() => {
     registerForPushNotificationsAsync();
@@ -286,7 +334,7 @@ export default function DashboardScreen() {
       );
       if (todayLog) handleEditSession(todayLog);
     } else if (assignment.totalPages === 0) {
-      navigation.navigate('Memorization');
+      navigation.navigate('Memorization', { edit: true });
     } else {
       navigation.navigate('ActiveRevision');
     }
@@ -342,18 +390,33 @@ export default function DashboardScreen() {
     }
   };
 
-  // Fell behind? Slide the whole schedule a day later so today reverts to the
-  // review you missed instead of marching on. Pure anchor nudge — no per-day
-  // edits — applied immediately so the Today post updates in place.
-  const handlePushBack = async () => {
-    if (!user || shifting || !canPushScheduleBack(user, revisionDate)) return;
-    setShifting(true);
+  // Today starts at another juz, surah or page; the days after carry on from it.
+  const handleJump = async (target: JumpTarget) => {
+    setJumpOpen(false);
+    if (!user) return;
+    const memorized = pages.filter((p) => p.status === 'memorized');
+    const result = jumpTo(user, target, { revisionDate, memorized, logs });
+    if (!result) {
+      Alert.alert("Couldn't start there", "That part isn't in your schedule.");
+      return;
+    }
     try {
-      await saveUser(shiftScheduleAnchor(user, 1));
+      await saveUser(result.user);
+      const where = describeStart(target, result.startPage);
+      setJumped({ message: result.today ? `Today now starts at ${where}` : `Your next revision starts at ${where}`, before: user });
     } catch {
       Alert.alert("Couldn't update your schedule", 'Please try again.');
-    } finally {
-      setShifting(false);
+    }
+  };
+
+  const handleUndoJump = async () => {
+    const last = jumped;
+    setJumped(null);
+    if (!user || !last) return;
+    try {
+      await saveUser(undoJump(user, last.before));
+    } catch {
+      Alert.alert("Couldn't undo", 'Please try again.');
     }
   };
 
@@ -377,11 +440,8 @@ export default function DashboardScreen() {
   // Friday's Al-Kahf, then the last few sessions; the rest is behind "See
   // all", searchable. A running timer shows in the top bar.
   const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
-  const progress =
-    homePrefs.showProgressCard && pages.some((p) => p.status === 'memorized')
-      ? memorizedText(pages, homePrefs.metrics)
-      : null;
-  const memorized = progress?.body ?? null;
+  // How much of the Quran is memorized: everyone sees it (no setting).
+  const memorized = memorizedText(pages);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
@@ -389,19 +449,25 @@ export default function DashboardScreen() {
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
         center={
-          <Text style={[arabicV2(20), { color: palette.text }]} accessibilityLanguage="ar" testID="salam">
+          <Text
+            style={[arabicV2(20), { color: palette.text }]}
+            accessibilityLanguage="ar"
+            // At the largest sizes it ran into the icons (or wrapped, on an SE).
+            maxFontSizeMultiplier={salamScale}
+            testID="salam"
+          >
             السلام عليكم
           </Text>
         }
         right={
           <>
-            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => setQiblaOpen(true)} testID="open-qibla" />
+            <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => openPrayer('qibla')} testID="open-qibla" />
             <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} />
             <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} />
           </>
         }
         // Three icons on the right: both sides widen so the salam stays centred.
-        sideWidth={120}
+        sideWidth={TOP_BAR_SIDE}
       />
       <ScrollView
         ref={scrollRef}
@@ -415,26 +481,25 @@ export default function DashboardScreen() {
       >
         {/* No line under the header: one across the glow ended it in a hard
             edge, at rest and while pulling (it read as a box). */}
+        {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
+          <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
+        ) : null}
         <TodayPost
           name={userName}
           initial={avatarInitial(userName, firebaseUser?.email)}
           status={todayStatus.status}
           pages={assignment.pages}
-          juzBreakdown={assignment.juzBreakdown}
           done={donePagesToday}
+          carried={carriedToday}
           streak={calculatedStreak}
           memorized={memorized}
-          memorizedFraction={progress?.fraction}
-          memorizedJuz={progress?.juz}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}
-          onMemorization={() => navigation.navigate('Memorization')}
+          onMemorization={() => navigation.navigate('Memorization', { edit: true })}
+          onJump={() => setJumpOpen(true)}
           leftovers={leftovers.length}
           onCarryOver={handleCarryOver}
           carrying={carrying}
-          onPushBack={handlePushBack}
-          canPushBack={canPushScheduleBack(user, revisionDate)}
-          shifting={shifting}
         />
 
         {showKahfCard && (
@@ -467,7 +532,36 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
-      <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
+      <JumpSheet
+        visible={jumpOpen}
+        onClose={() => setJumpOpen(false)}
+        user={user}
+        memorized={pages.filter((p) => p.status === 'memorized')}
+        revisionDate={revisionDate}
+        onJump={handleJump}
+      />
+      <UndoToast
+        visible={!!jumped}
+        message={jumped?.message ?? ''}
+        onUndo={handleUndoJump}
+        onDismiss={() => setJumped(null)}
+        duration={6000}
+        bottomInset={tabFootprint}
+      />
+      {prayerEnabled ? (
+        <PrayerSheet
+          visible={qiblaOpen}
+          tab={prayerTab}
+          onTab={setPrayerTab}
+          onClose={() => setQiblaOpen(false)}
+          onOpenCalculation={() => {
+            setQiblaOpen(false);
+            navigation.navigate('PrayerCalculation');
+          }}
+        />
+      ) : (
+        <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
+      )}
     </SafeAreaView>
   );
 }
