@@ -30,6 +30,11 @@ export interface SyncApi {
   apply: (uid: string, entry: OutboxEntry) => Promise<void>;
   /** Whether a server read works now (Auth and App Check are fine). */
   probe?: (uid: string) => Promise<boolean>;
+  /**
+   * Runs before a run sends anything (the account's reset check, lib/offline/reset;
+   * it may drop changes). Throwing means "not now": the run is tried again later.
+   */
+  beforeSend?: (uid: string) => Promise<void>;
 }
 
 const BACKOFF_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
@@ -114,6 +119,16 @@ function scheduleRetry(uid: string) {
 
 async function run(uid: string): Promise<void> {
   await loadOutbox(uid);
+  if (pendingEntries(uid).length === 0) return;
+  if (api?.beforeSend) {
+    try {
+      await api.beforeSend(uid);
+    } catch {
+      // Offline, or the server can't be read yet: nothing is sent until it can.
+      scheduleRetry(uid);
+      return;
+    }
+  }
   for (;;) {
     if (!api || api.currentUid() !== uid || api.isDeleting(uid)) return;
     const head = pendingEntries(uid)[0];

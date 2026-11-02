@@ -98,7 +98,7 @@ jest.mock('../../lib/logger', () => ({ logger: { log: jest.fn(), warn: jest.fn()
 
 import { AppProvider, useApp, SERVER_WAIT_MS } from '../AppContext';
 import { writeAccountPart, readAccount } from '../../lib/offline/accountCache';
-import { loadOutbox, resetOutboxForTests } from '../../lib/offline/outbox';
+import { enqueue, loadOutbox, resetOutboxForTests } from '../../lib/offline/outbox';
 import { resetSyncForTests, settleSync } from '../../lib/offline/sync';
 
 // ---- an account
@@ -501,6 +501,137 @@ describe('a sign-in that lapsed offline', () => {
     await goOnline();
     expect(mockServer.applied).toHaveLength(1);
     expect(app.pendingChanges).toBe(0);
+  });
+});
+
+describe('an account reset on the server (functions/scripts/reset-account.js)', () => {
+  const resetAt = Date.parse('2026-11-02T23:00:00Z');
+  const resetUser = {
+    ...fsUser,
+    onboardingComplete: false,
+    createdAt: Timestamp.fromMillis(resetAt),
+    dataResetAt: Timestamp.fromMillis(resetAt),
+  } as FirestoreUser;
+  const newPages = fsPages.map((p) => ({ ...p, status: 'not_memorized' })) as FirestorePage[];
+  const oldChange: OutboxEntry['op'] = { kind: 'pages', pages: [{ pageNumber: 3, totalRevisionCount: 7 }] };
+
+  afterEach(() => mockService.getUserFromServer.mockReset());
+
+  it('a cold start after it: nothing from before is sent, the old copy goes, and the account starts at onboarding', async () => {
+    await keepCopyOnPhone();
+    await enqueue('u1', oldChange, resetAt - 60_000);
+    await enqueue('u1', { kind: 'user', fields: { onboardingComplete: true } }, resetAt - 60_000);
+    resetOutboxForTests();
+    mockServer.online = true;
+    mockService.getUserFromServer.mockResolvedValue(resetUser);
+    view();
+    await settle();
+    await act(async () => settleSync('u1'));
+
+    // The outbox checked the server before sending, and dropped the old changes.
+    expect(mockService.getUserFromServer).toHaveBeenCalledWith('u1');
+    expect(mockServer.applied).toEqual([]);
+    expect(app.pendingChanges).toBe(0);
+    resetOutboxForTests();
+    expect(await loadOutbox('u1')).toEqual([]);
+    // The copy's pages and sessions are gone, on screen and on the phone.
+    expect(app.loading).toBe(true);
+    expect(app.logs).toEqual([]);
+    expect(await readAccount('u1')).toBeNull();
+
+    // The server's snapshots: onboarding, with the new pages.
+    act(() => {
+      mockListeners.user!(resetUser, { fromCache: false });
+      mockListeners.pages!(newPages, { fromCache: false });
+      mockListeners.sessions!([], { fromCache: false });
+    });
+    expect(app.loading).toBe(false);
+    expect(app.onboardingComplete).toBe(false);
+    expect(app.pages.filter((p) => p.status === 'memorized')).toHaveLength(0);
+  });
+
+  it('while the app is open: changes waiting from before it are dropped; changes after it are sent', async () => {
+    await keepCopyOnPhone();
+    view();
+    await settle();
+    act(() => {
+      mockListeners.user!(fsUser, { fromCache: false });
+      mockListeners.pages!(fsPages, { fromCache: false });
+      mockListeners.sessions!([yesterday], { fromCache: false });
+    });
+    await settle();
+    goOffline();
+    const updated = app.pages.map((p) => (p.pageNumber === 3 ? { ...p, totalRevisionCount: 7 } : p));
+    await act(async () => {
+      await app.updatePages(updated, [3]);
+    });
+    // The change, and the start-up self-heal's (yesterday's pages).
+    expect(app.pendingChanges).toBe(2);
+
+    // The admin resets it; the listener hears.
+    await act(async () => {
+      mockListeners.user!(resetUser, { fromCache: false });
+      mockListeners.pages!(newPages, { fromCache: false });
+      mockListeners.sessions!([], { fromCache: false });
+    });
+    await settle();
+    expect(app.pendingChanges).toBe(0);
+    await goOnline();
+    expect(mockServer.applied).toEqual([]);
+
+    // A change made now belongs to the new account and goes.
+    await act(async () => {
+      await app.completeOnboarding();
+    });
+    await act(async () => settleSync('u1'));
+    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([{ kind: 'user', fields: { onboardingComplete: true } }]);
+  });
+
+  it('signed out since (no copy): only the changes made before the reset are dropped', async () => {
+    await enqueue('u1', oldChange, resetAt - 60_000);
+    await enqueue('u1', { kind: 'usage', seconds: 30 }, resetAt + 60_000);
+    resetOutboxForTests();
+    mockServer.online = true;
+    mockService.getUserFromServer.mockResolvedValue(resetUser);
+    view();
+    await settle();
+    await act(async () => settleSync('u1'));
+    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([{ kind: 'usage', seconds: 30 }]);
+  });
+
+  it('a copy made after the reset: nothing is dropped', async () => {
+    await writeAccountPart('u1', 'user', resetUser);
+    await writeAccountPart('u1', 'pages', newPages);
+    await enqueue('u1', oldChange, resetAt + 60_000);
+    resetOutboxForTests();
+    mockServer.online = true;
+    mockService.getUserFromServer.mockResolvedValue(resetUser);
+    view();
+    await settle();
+    await act(async () => settleSync('u1'));
+    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([oldChange]);
+    expect(await readAccount('u1')).not.toBeNull();
+  });
+
+  it('nothing is sent until the check can be made', async () => {
+    await keepCopyOnPhone();
+    await enqueue('u1', oldChange, resetAt - 60_000);
+    resetOutboxForTests();
+    mockServer.online = true;
+    mockService.getUserFromServer.mockRejectedValue(
+      Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' }),
+    );
+    view();
+    await settle();
+    await act(async () => settleSync('u1'));
+    expect(mockServer.applied).toEqual([]);
+    expect(app.pendingChanges).toBe(1);
+
+    // The server can be read again, and has no reset: the change goes.
+    mockService.getUserFromServer.mockResolvedValue(fsUser);
+    goOffline();
+    await goOnline();
+    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([oldChange]);
   });
 });
 

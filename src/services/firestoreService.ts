@@ -259,6 +259,12 @@ export async function userDocExistsOnServer(userId?: string): Promise<boolean> {
   return (await getDocFromServer(getUserRef(userId))).exists();
 }
 
+/** The user's document from the server (not the local cache); null if there is none. */
+export async function getUserFromServer(userId?: string): Promise<FirestoreUser | null> {
+  const snapshot = await getDocFromServer(getUserRef(userId));
+  return snapshot.exists() ? (snapshot.data() as FirestoreUser) : null;
+}
+
 // ============================================================================
 // PAGE OPERATIONS
 // ============================================================================

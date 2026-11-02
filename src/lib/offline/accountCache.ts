@@ -50,9 +50,10 @@ export async function writeAccountPart(uid: string, part: AccountPart, value: un
   }
 }
 
-export async function clearAccount(uid: string): Promise<void> {
+/** Deletes the account's copy (or only some parts of it). */
+export async function clearAccount(uid: string, parts: AccountPart[] = PARTS): Promise<void> {
   try {
-    await AsyncStorage.multiRemove(PARTS.map((p) => key(uid, p)));
+    await AsyncStorage.multiRemove(parts.map((p) => key(uid, p)));
   } catch (err) {
     logger.warn('Could not delete the account copy', err);
   }

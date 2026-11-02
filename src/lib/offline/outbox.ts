@@ -122,6 +122,19 @@ export async function removeEntry(uid: string, entryId: string): Promise<void> {
   await persist(uid);
 }
 
+/** Drops several changes at once (the account was reset on the server, lib/offline/reset). */
+export async function removeEntries(uid: string, entryIds: string[]): Promise<void> {
+  const drop = new Set(entryIds);
+  const entries = queues.get(uid);
+  if (!entries || !entries.some((e) => drop.has(e.id))) return;
+  queues.set(
+    uid,
+    entries.filter((e) => !drop.has(e.id)),
+  );
+  notify(uid);
+  await persist(uid);
+}
+
 export async function markFailed(uid: string, entryId: string): Promise<number> {
   const entries = queues.get(uid) ?? [];
   let failures = 0;
