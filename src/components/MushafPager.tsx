@@ -278,9 +278,16 @@ const PageItem = React.memo(function PageItem({
             onError={() => {
               setLoading(false);
               if (!isRemote) {
-                // Unreadable file: drop it and load from Storage.
-                evictCachedPage(pageNumber, uri);
-                if (knownOffline()) {
+                // A whole file that failed to decode (memory) stays; Try again
+                // shows it. A broken one is deleted (and downloaded again).
+                if (evictCachedPage(pageNumber, uri)) {
+                  setMissing('failed');
+                  return;
+                }
+                // Moved meanwhile (the first launch's move out of the caches directory)?
+                const moved = getCachedPageUri(pageNumber);
+                if (moved && moved !== uri) setUri(moved);
+                else if (knownOffline()) {
                   setUri(null);
                   setMissing('offline');
                 } else {

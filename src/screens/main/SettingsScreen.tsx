@@ -10,6 +10,7 @@ import {
   Share,
   TextInput,
   AccessibilityState,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
@@ -222,6 +223,9 @@ export default function SettingsScreen() {
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
   const mushaf = useMushafOffline();
   const mushafText = describeMushaf(mushaf);
+  // At the accessibility text sizes the line under the label says it all; a
+  // value beside it would leave the label a word wide.
+  const { fontScale } = useWindowDimensions();
   const [mushafMenu, setMushafMenu] = useState(false);
   // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
   const prayerEnabled = prayerTimesEnabled(user);
@@ -720,7 +724,7 @@ export default function SettingsScreen() {
               icon="cloud-download-outline"
               label="Offline mushaf"
               subtitle={mushafText.subtitle}
-              value={mushafText.value || undefined}
+              value={fontScale > 1.35 ? undefined : mushafText.value || undefined}
               onPress={() => setMushafMenu(true)}
             />
           </View>
@@ -888,6 +892,7 @@ export default function SettingsScreen() {
         onClose={() => setMushafMenu(false)}
         title="Offline mushaf"
         message={mushafText.subtitle}
+        messageMaxScale={1.4}
         actions={mushafMenuActions(mushaf)}
         testID="mushaf-offline-menu"
       />

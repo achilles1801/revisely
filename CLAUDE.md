@@ -245,10 +245,22 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
 - **The download** (`mushafOffline`, started by `MushafOfflineController` 20 s after launch with
   someone signed in): Wi-Fi only (metered Wi-Fi, a hotspot on Android, counts as mobile data),
   unless "Download over mobile data" is on or "Download now" was confirmed over it once; only in the
-  foreground; only with room for the rest plus 100 MB. Three pages at a time; it stops between pages
-  when any of that changes and carries on from there. A page is downloaded to `.part` and moved in, so
-  a page there is whole. Failures are tried again on the connection coming back, the app coming to
-  the front, or after 1, 5, 15 minutes; a run stops after 6 failures in a row.
+  foreground; only while there is room for the next page plus 100 MB. Three pages at a time; it
+  stops between pages when any of that changes and carries on from there. A page is downloaded to
+  `.part` and moved in, so a page there is whole. Failures are tried again on the connection coming
+  back, the app coming to the front, or after 1, 5, 15 minutes; a run stops after 6 failures in a
+  row. Progress reaches Settings at most every 400 ms.
+- **Android downloads** go through `expo-file-system/legacy`'s `downloadAsync` (one shared OkHttp
+  client), checked for the status, the `Content-Length` and a 2-minute timeout (it can hang when the
+  connection drops mid-file). `File.downloadFileAsync` makes a new client per file: re-downloading
+  300 pages on the emulator reached 1,092 open files, 325 sockets and 653 threads (older Android
+  allows 1,024 files); with the shared client, 195, 26 and 75. iOS keeps `File.downloadFileAsync`
+  (`URLSession.shared`).
+- **Sets:** another set already downloaded is kept (a foldable's two screens pick different sets;
+  deleting one would re-download 135–191 MB on every switch). Old cache folders of other sets go.
+- **A page that fails to show** (`evictCachedPage`) is deleted only if its size isn't the table's
+  (a decoding failure from memory can hit a whole file: "Couldn't load page N", Try again); the
+  download hears it (`onPageRemoved`) and fetches it again.
 - **Settings → Mushaf:** "Offline mushaf" (status and %, a menu with Download now and Remove from
   this phone) and "Download over mobile data". Remove deletes the pages and the Arabic text and turns
   the download off (kept on this phone, `@revisely_mushaf_offline:v1`) until Download now; pages the

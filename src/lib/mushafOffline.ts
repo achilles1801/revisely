@@ -4,13 +4,16 @@
 //
 // - It starts a little after launch (MushafOfflineController), once someone is
 //   signed in, on Wi-Fi (mobile data only if allowed, or for one "Download
-//   now"), with the app in front, and only with room for the rest plus a
-//   margin. Three pages at a time; the reader's own page loads don't wait for it.
+//   now"), with the app in front, and while there is room for the next page
+//   plus a margin. Three pages at a time; the reader's own page loads don't
+//   wait for it.
 // - It stops between pages when any of that changes, and carries on from
 //   where it was: a page is either whole on the phone or not there.
 // - Failed pages are tried again on the next run: the connection coming back,
 //   the app coming to the front, or a timer (1, 5, 15 minutes).
-// - The whole Arabic text (lib/translation, ~2 MB) comes first.
+// - The whole Arabic text (lib/translation, ~2 MB) comes first; if that fails it
+//   is tried again on a later run, no sooner than its own backoff.
+// - A page the reader found broken (pageCache.onPageRemoved) is downloaded again.
 // - "Remove from this phone" deletes it all and turns the download off until
 //   "Download now"; pages the reader opens are still kept.
 //
@@ -24,6 +27,7 @@ import {
   PAGE_COUNT,
   cachePage,
   migrateLegacyPages,
+  onPageRemoved,
   onPageStored,
   pagesOnPhone,
   removeAllPages,
@@ -62,8 +66,6 @@ export interface MushafStatus {
   /** On the phone, by the size table. */
   bytes: number;
   totalBytes: number;
-  /** Free space the rest needs (the pages left and a margin). */
-  needBytes: number;
   prefs: MushafPrefs;
 }
 
@@ -90,6 +92,8 @@ let downloading = false;
 let failedRun = false;
 let noSpace = false;
 let attempt = 0;
+let arabicAttempt = 0;
+let arabicRetryAt = 0;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void)[] = [];
 
@@ -140,9 +144,13 @@ let status: MushafStatus = {
   total: PAGE_COUNT,
   bytes: 0,
   totalBytes: 0,
-  needBytes: 0,
   prefs: DEFAULT_PREFS,
 };
+
+/** Progress (pages, bytes) reaches the screen at most this often; a new phase at once. */
+const PROGRESS_EVERY_MS = 400;
+let lastPublish = 0;
+let trailing: ReturnType<typeof setTimeout> | null = null;
 
 function publish(): void {
   const total = totalBytes();
@@ -153,7 +161,6 @@ function publish(): void {
     total: PAGE_COUNT,
     bytes,
     totalBytes: total,
-    needBytes: Math.max(0, total - bytes) + SPACE_MARGIN,
     prefs,
   };
   const same =
@@ -162,6 +169,19 @@ function publish(): void {
     next.totalBytes === status.totalBytes &&
     next.prefs === status.prefs;
   if (same) return;
+  const onlyProgress =
+    next.phase === status.phase && next.prefs === status.prefs && next.totalBytes === status.totalBytes;
+  const now = Date.now();
+  if (onlyProgress && now - lastPublish < PROGRESS_EVERY_MS) {
+    trailing ??= setTimeout(() => {
+      trailing = null;
+      publish();
+    }, PROGRESS_EVERY_MS - (now - lastPublish));
+    return;
+  }
+  if (trailing) clearTimeout(trailing);
+  trailing = null;
+  lastPublish = now;
   status = next;
   listeners.forEach((l) => l(next));
 }
@@ -208,6 +228,11 @@ export function prepareMushafOffline(): Promise<void> {
           present.add(page);
           publish();
         }),
+        onPageRemoved((page) => {
+          present.delete(page);
+          publish();
+          requestMushafDownload();
+        }),
         onNetworkState((net, before) => {
           // Stops between pages if the connection may no longer be used; a run
           // starts when it may again.
@@ -251,6 +276,8 @@ export async function downloadMushafNow({ overMobileData = false } = {}): Promis
 
 /** "Download over mobile data". */
 export async function setMushafCellular(value: boolean): Promise<void> {
+  // The saved choices first, or this would save the defaults over them.
+  await prepareMushafOffline();
   if (!value) cellularOnce = false;
   await savePrefs({ ...prefs, cellular: value });
   requestMushafDownload();
@@ -258,6 +285,7 @@ export async function setMushafCellular(value: boolean): Promise<void> {
 
 /** "Remove from this phone": every page and the Arabic text; the download stays off until "Download now". */
 export async function removeMushafDownload(): Promise<void> {
+  await prepareMushafOffline();
   generation++;
   cellularOnce = false;
   failedRun = false;
@@ -293,17 +321,37 @@ function freeSpace(): number | null {
   }
 }
 
+/** Room for this page and the margin (unknown free space counts as room). */
+function roomFor(page: number): boolean {
+  const free = freeSpace();
+  return free == null || free >= SPACE_MARGIN + (sizeTable()[page - 1] ?? 0);
+}
+
+/** The whole Arabic text, unless it's here or failed too recently. */
+async function fetchArabicText(gen: number): Promise<void> {
+  if (hasArabicText() || Date.now() < arabicRetryAt) return;
+  try {
+    await downloadArabicText(() => gen === generation);
+    arabicAttempt = 0;
+  } catch (err) {
+    logger.warn('Arabic text download failed', err);
+    arabicRetryAt = Date.now() + RETRY_MS[Math.min(arabicAttempt, RETRY_MS.length - 1)];
+    arabicAttempt++;
+  }
+}
+
 async function runOnce(): Promise<void> {
   const gen = generation;
   if (!mayRun(gen)) return;
   if (present.size >= PAGE_COUNT) {
     // Every page is here; the Arabic text may have failed before.
-    if (!hasArabicText()) await downloadArabicText().catch((err) => logger.warn('Arabic text download failed', err));
+    await fetchArabicText(gen);
     return;
   }
   clearRetry();
-  const free = freeSpace();
-  if (free != null && free < Math.max(0, totalBytes() - bytesOnPhone()) + SPACE_MARGIN) {
+  const missing: number[] = [];
+  for (let p = 1; p <= PAGE_COUNT; p++) if (!present.has(p)) missing.push(p);
+  if (!roomFor(missing[0])) {
     noSpace = true;
     return;
   }
@@ -312,19 +360,20 @@ async function runOnce(): Promise<void> {
   downloading = true;
   publish();
   try {
-    if (!hasArabicText()) {
-      await downloadArabicText().catch((err) => logger.warn('Arabic text download failed', err));
-    }
-    const missing: number[] = [];
-    for (let p = 1; p <= PAGE_COUNT; p++) if (!present.has(p)) missing.push(p);
+    await fetchArabicText(gen);
     let next = 0;
     let failures = 0;
     let inARow = 0;
+    let full = false;
     await Promise.all(
       Array.from({ length: WORKERS }, async () => {
-        while (next < missing.length && inARow < MAX_FAILURES_IN_A_ROW && mayRun(gen)) {
+        while (next < missing.length && inARow < MAX_FAILURES_IN_A_ROW && !full && mayRun(gen)) {
           const page = missing[next++];
           if (present.has(page)) continue;
+          if (!roomFor(page)) {
+            full = true;
+            break;
+          }
           const uri = await cachePage(page);
           if (uri) {
             inARow = 0;
@@ -337,6 +386,11 @@ async function runOnce(): Promise<void> {
     );
     if (gen !== generation || present.size >= PAGE_COUNT) {
       attempt = 0;
+      return;
+    }
+    if (full) {
+      // Carries on at the next run (the app coming to the front) if room was made.
+      noSpace = true;
       return;
     }
     // Stopped by the network, the app leaving or the settings: it carries on
@@ -395,6 +449,11 @@ export function __resetMushafOfflineForTests(): void {
   failedRun = false;
   noSpace = false;
   attempt = 0;
+  arabicAttempt = 0;
+  arabicRetryAt = 0;
+  if (trailing) clearTimeout(trailing);
+  trailing = null;
+  lastPublish = 0;
   status = { ...status, phase: 'unknown', pages: 0, prefs: DEFAULT_PREFS };
   listeners.clear();
 }

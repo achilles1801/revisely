@@ -234,12 +234,17 @@ export function hasArabicText(): boolean {
   }
 }
 
-/** Downloads the whole Arabic text to the phone (lib/mushafOffline). Throws on failure. */
-export async function downloadArabicText(): Promise<void> {
+/**
+ * Downloads the whole Arabic text to the phone (lib/mushafOffline). Throws on
+ * failure. `stillWanted` is asked before anything is written (Remove may have
+ * been tapped meanwhile).
+ */
+export async function downloadArabicText(stillWanted: () => boolean = () => true): Promise<void> {
   if (hasArabicText()) return;
   const res = await fetch(`https://api.alquran.cloud/v1/quran/${ARABIC_EDITION}`);
   if (!res.ok) throw new Error(`Arabic text request failed (${res.status})`);
   const byPage = parseQuranResponse(await res.json());
+  if (!stillWanted()) return;
   const dir = textDir();
   if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
   if (Platform.OS === 'ios') {

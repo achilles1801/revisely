@@ -13,10 +13,12 @@ jest.mock('../../context/ThemeContext', () => {
 // What is on the phone: every page, unless a test says otherwise.
 let mockCachedUri: string | null = 'file:///page.png';
 let mockDownload: string | null = null;
+// evictCachedPage: the file that failed to load is whole (kept).
+let mockEvictKeeps = false;
 jest.mock('../../lib/pageCache', () => ({
   getCachedPageUri: () => mockCachedUri,
   cachePage: () => Promise.resolve(mockDownload),
-  evictCachedPage: jest.fn(),
+  evictCachedPage: () => mockEvictKeeps,
   prefetchPages: jest.fn(),
   pagesAround: (pages: number[]) => pages.slice(0, 1),
 }));
@@ -385,6 +387,33 @@ describe('<MushafPager /> pages not on the phone', () => {
   afterEach(() => {
     mockCachedUri = 'file:///page.png';
     mockDownload = null;
+    mockEvictKeeps = false;
+  });
+
+  it('keeps a whole page file that failed to show (memory), with Try again', async () => {
+    mockCachedUri = 'file:///300.png';
+    mockEvictKeeps = true;
+    render(<MushafPager pages={[300]} />);
+    const image = await screen.findByTestId('page-image');
+    act(() => {
+      image.props.onError();
+    });
+    expect(screen.getByText("Couldn't load page 300")).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('page-retry'));
+    });
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'file:///300.png' });
+  });
+
+  it('a page moved while shown (first launch) is shown from where it went', async () => {
+    mockCachedUri = 'cache/mushaf/300.png';
+    render(<MushafPager pages={[300]} />);
+    const image = await screen.findByTestId('page-image');
+    mockCachedUri = 'documents/mushaf/full/300.png';
+    act(() => {
+      image.props.onError();
+    });
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'documents/mushaf/full/300.png' });
   });
 
   it('says a page isn\'t downloaded yet when offline, and shows it once back online', async () => {

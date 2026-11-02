@@ -16,15 +16,24 @@
 //
 // Each set of pages (quranImages: the originals, or Android's width-sized
 // copies) has its own folder, so a file is always the copy its name says.
+//
+// Android downloads through expo-file-system's legacy downloadAsync, which
+// shares one HTTP client: the newer File.downloadFileAsync makes a new client
+// for every file, and 300 pages left ~1,100 files and ~650 threads open
+// (measured on an emulator), past the 1,024 files older Android allows an app.
 
 import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
+import { downloadAsync } from 'expo-file-system/legacy';
 import RecitationAudio from '../../modules/recitation-audio';
+import sizes from '../data/mushafSizes.json';
 import { getQuranPageImageUrl, pageImageSet, PageImageSet } from './quranImages';
 import { nativeRequestUrl } from './devNetwork';
 import { logger } from './logger';
 
 const MAX_CONCURRENT_DOWNLOADS = 3;
+/** A page download that hasn't finished by then has failed (Android's can hang when the connection drops). */
+const DOWNLOAD_TIMEOUT_MS = 120_000;
 const SETS: PageImageSet[] = ['full', 'w1080', 'w1440'];
 export const PAGE_COUNT = 604;
 const PAGE_FILE = /^(\d{3})\.png$/;
@@ -82,6 +91,50 @@ function ensureStoreDir(): Directory {
   return d;
 }
 
+/** A page's size in bytes, from src/data/mushafSizes.json (scripts/mushaf-sizes.js). */
+export function expectedPageSize(pageNumber: number, set: PageImageSet = pageImageSet()): number | undefined {
+  return (sizes as Record<string, number[]>)[set]?.[pageNumber - 1];
+}
+
+function fileSize(file: File): number | null {
+  try {
+    const n = file.size;
+    return typeof n === 'number' ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Page download timed out')), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Downloads a page to `partial`; throws unless the whole file arrived. */
+async function download(url: string, partial: File): Promise<void> {
+  if (Platform.OS !== 'android') {
+    // iOS: URLSession.shared, a download task that ends whole or in an error.
+    await File.downloadFileAsync(url, partial, { idempotent: true });
+    return;
+  }
+  const result = await withTimeout(downloadAsync(url, partial.uri), DOWNLOAD_TIMEOUT_MS);
+  if (!(result.status >= 200 && result.status < 300)) throw new Error(`Page download failed (${result.status})`);
+  const header = Object.entries(result.headers ?? {}).find(([k]) => k.toLowerCase() === 'content-length')?.[1];
+  const length = header != null ? Number(header) : NaN;
+  if (Number.isFinite(length) && fileSize(partial) !== length) throw new Error('Page download incomplete');
+}
+
 function fileName(pageNumber: number): string {
   return `${String(pageNumber).padStart(3, '0')}.png`;
 }
@@ -90,12 +143,21 @@ function fileName(pageNumber: number): string {
 const onDisk = new Map<number, string>();
 const inFlight = new Map<number, Promise<string | null>>();
 const storedListeners = new Set<(page: number) => void>();
+const removedListeners = new Set<(page: number) => void>();
 
 /** Hears each page saved to the phone (by the reader or the offline download). */
 export function onPageStored(listener: (page: number) => void): () => void {
   storedListeners.add(listener);
   return () => {
     storedListeners.delete(listener);
+  };
+}
+
+/** Hears a page deleted because its file was broken (evictCachedPage). */
+export function onPageRemoved(listener: (page: number) => void): () => void {
+  removedListeners.add(listener);
+  return () => {
+    removedListeners.delete(listener);
   };
 }
 
@@ -140,9 +202,7 @@ export function cachePage(pageNumber: number): Promise<string | null> {
       // never leaves a truncated page that looks downloaded.
       const partial = new File(d, `${fileName(pageNumber)}.part`);
       if (partial.exists) partial.delete();
-      await File.downloadFileAsync(nativeRequestUrl(getQuranPageImageUrl(pageNumber)), partial, {
-        idempotent: true,
-      });
+      await download(nativeRequestUrl(getQuranPageImageUrl(pageNumber)), partial);
       if (target.exists) target.delete();
       partial.move(target);
       onDisk.set(pageNumber, target.uri);
@@ -150,6 +210,12 @@ export function cachePage(pageNumber: number): Promise<string | null> {
       return target.uri;
     } catch (err) {
       logger.warn(`Page ${pageNumber} download failed`, err);
+      try {
+        const partial = new File(storeDir(), `${fileName(pageNumber)}.part`);
+        if (partial.exists) partial.delete();
+      } catch {
+        // Deleted before the next try.
+      }
       return null;
     } finally {
       inFlight.delete(pageNumber);
@@ -180,9 +246,11 @@ export function pagesOnPhone(): Set<number> {
 
 /**
  * Once a launch: move the pages cached in the caches directory (before Nov
- * 2026) into the documents directory, and delete the folders of sets this
- * device doesn't use (on Android, the full-size pages it cached before it
- * switched to its own set).
+ * 2026) into the documents directory, and delete the old cache folders of
+ * sets this device doesn't use (on Android, the full-size pages it cached
+ * before it switched to its own set). Another set already in the documents
+ * directory stays: a phone whose screen changes (a foldable's two screens)
+ * would otherwise delete one download and fetch the other on every switch.
  */
 export function migrateLegacyPages(): void {
   if (migrated) return;
@@ -211,8 +279,6 @@ export function migrateLegacyPages(): void {
       if (set !== current) {
         const other = legacyDir(set);
         if (other.exists) other.delete();
-        const stored = new Directory(storeRoot(), set);
-        if (stored.exists) stored.delete();
       }
     } catch (err) {
       logger.warn('Page cache cleanup failed', err);
@@ -254,17 +320,29 @@ function pump() {
   }
 }
 
-/** Forget a page file that failed to load (unreadable) and delete it. */
-export function evictCachedPage(pageNumber: number, uri?: string): void {
+/**
+ * A page file failed to load. It is deleted (and the offline download told)
+ * only if it isn't whole: a decoding failure (memory) can hit a good file.
+ * Returns true if the file is still there, whole.
+ */
+export function evictCachedPage(pageNumber: number, uri?: string): boolean {
   onDisk.delete(pageNumber);
+  let kept = false;
   try {
     const candidates = [new File(storeDir(), fileName(pageNumber)), new File(legacyDir(), fileName(pageNumber))];
     for (const file of candidates) {
-      if ((uri === undefined || file.uri === uri) && file.exists) file.delete();
+      if ((uri !== undefined && file.uri !== uri) || !file.exists) continue;
+      if (fileSize(file) === expectedPageSize(pageNumber)) {
+        kept = true;
+        continue;
+      }
+      file.delete();
+      removedListeners.forEach((l) => l(pageNumber));
     }
   } catch (err) {
     logger.warn('Page cache eviction failed', err);
   }
+  return kept;
 }
 
 /** Download these pages in the background, in the order given. */
@@ -307,6 +385,7 @@ export function __resetPageCacheForTests(): void {
   onDisk.clear();
   inFlight.clear();
   storedListeners.clear();
+  removedListeners.clear();
   queue = [];
   active = 0;
 }

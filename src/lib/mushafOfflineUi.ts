@@ -42,7 +42,7 @@ export function describeMushaf(s: MushafStatus): { value: string; subtitle: stri
         subtitle: s.pages > 0 ? `${pages} on this phone` : `Not on this phone · ${formatMegabytes(s.totalBytes)}`,
       };
     case 'no-space':
-      return { value: 'Download', subtitle: `Not enough free space · needs ${formatMegabytes(s.needBytes)}` };
+      return { value: percent, subtitle: `Not enough free space · ${pages}` };
     case 'error':
       return { value: percent, subtitle: `Some pages didn't download · tries again soon` };
     default:

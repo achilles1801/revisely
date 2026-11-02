@@ -4,6 +4,14 @@ const mockDirs = new Set<string>();
 const mockDownloads: string[] = [];
 const mockExcluded: string[] = [];
 let mockFailing = new Set<string>();
+// Sizes by path (a file without one is 1 byte); Android's legacy downloads.
+const mockSizes = new Map<string, number>();
+const mockLegacy: string[] = [];
+let mockLegacyResult: (url: string) => { status: number; headers: Record<string, string>; size: number } = () => ({
+  status: 200,
+  headers: { 'Content-Length': '1' },
+  size: 1,
+});
 
 jest.mock('expo-file-system', () => {
   const join = (parts: unknown[]) =>
@@ -19,6 +27,9 @@ jest.mock('expo-file-system', () => {
     get exists() {
       return mockFiles.has(this.uri);
     }
+    get size() {
+      return mockFiles.has(this.uri) ? (mockSizes.get(this.uri) ?? 1) : null;
+    }
     delete() {
       mockFiles.delete(this.uri);
     }
@@ -26,6 +37,7 @@ jest.mock('expo-file-system', () => {
       if (!mockFiles.has(this.uri)) throw new Error('missing');
       mockFiles.delete(this.uri);
       mockFiles.add(to.uri);
+      if (mockSizes.has(this.uri)) mockSizes.set(to.uri, mockSizes.get(this.uri) as number);
     }
     static async downloadFileAsync(url: string, dest: { uri: string }) {
       mockDownloads.push(url);
@@ -58,6 +70,16 @@ jest.mock('expo-file-system', () => {
   return { Directory, File, Paths: { cache: 'cache', document: 'documents' } };
 });
 
+jest.mock('expo-file-system/legacy', () => ({
+  downloadAsync: async (url: string, uri: string) => {
+    mockLegacy.push(url);
+    const r = mockLegacyResult(url);
+    mockFiles.add(uri);
+    mockSizes.set(uri, r.size);
+    return { uri, status: r.status, headers: r.headers };
+  },
+}));
+
 jest.mock('../../../modules/recitation-audio', () => ({
   __esModule: true,
   default: { excludeFromBackup: (path: string) => mockExcluded.push(path) },
@@ -69,8 +91,10 @@ import {
   cacheFolderName,
   cachePage,
   evictCachedPage,
+  expectedPageSize,
   getCachedPageUri,
   migrateLegacyPages,
+  onPageRemoved,
   onPageStored,
   pagesAround,
   pagesOnPhone,
@@ -86,6 +110,9 @@ beforeEach(() => {
   mockDownloads.length = 0;
   mockExcluded.length = 0;
   mockFailing = new Set(['013.png']);
+  mockSizes.clear();
+  mockLegacy.length = 0;
+  mockLegacyResult = () => ({ status: 200, headers: { 'Content-Length': '1' }, size: 1 });
   __resetPageCacheForTests();
   __resetPageImageSetForTests();
 });
@@ -171,6 +198,28 @@ describe('pages on the phone', () => {
     evictCachedPage(7, 'cache/mushaf/007.png');
     expect([...mockFiles]).toEqual(['documents/mushaf/full/007.png']);
   });
+
+  it('deletes a page that failed to load only if it isn\'t whole, and says so', () => {
+    const removed: number[] = [];
+    onPageRemoved((p) => removed.push(p));
+    mockFiles.add('documents/mushaf/full/007.png');
+    mockSizes.set('documents/mushaf/full/007.png', expectedPageSize(7) as number);
+    expect(evictCachedPage(7, 'documents/mushaf/full/007.png')).toBe(true);
+    expect(mockFiles.has('documents/mushaf/full/007.png')).toBe(true);
+    expect(removed).toEqual([]);
+
+    mockSizes.set('documents/mushaf/full/007.png', 1000);
+    expect(evictCachedPage(7, 'documents/mushaf/full/007.png')).toBe(false);
+    expect(mockFiles.has('documents/mushaf/full/007.png')).toBe(false);
+    expect(removed).toEqual([7]);
+  });
+
+  it('knows every page\'s size in each set', () => {
+    for (const set of ['full', 'w1080', 'w1440'] as const) {
+      for (const p of [1, 3, 300, 604]) expect(expectedPageSize(p, set)).toBeGreaterThan(50_000);
+    }
+    expect(expectedPageSize(3, 'full')).toBe(4_350_701);
+  });
 });
 
 describe('pages cached before Nov 2026 (the caches directory)', () => {
@@ -206,7 +255,7 @@ describe('pages on Android (#153)', () => {
 
   it('keeps the width-sized copy in its own folder, downloaded from its own set', async () => {
     expect(await cachePage(50)).toBe('documents/mushaf/w1080/050.png');
-    expect(mockDownloads).toEqual([
+    expect(mockLegacy).toEqual([
       'https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf/w1080/050.png',
     ]);
     expect(getCachedPageUri(50)).toBe('documents/mushaf/w1080/050.png');
@@ -219,13 +268,51 @@ describe('pages on Android (#153)', () => {
     expect(getCachedPageUri(50)).toBeNull();
   });
 
-  it('moves its own cached copies and deletes the other sets', () => {
+  it('moves its own cached copies, deletes the other cached sets, keeps another downloaded set', () => {
+    // A foldable has used its other screen: that download stays.
     mockFiles.add('cache/mushaf-w1080/020.png');
     mockFiles.add('cache/mushaf/020.png');
     mockFiles.add('cache/mushaf-w1440/020.png');
     mockFiles.add('documents/mushaf/w1440/021.png');
     migrateLegacyPages();
-    expect([...mockFiles]).toEqual(['documents/mushaf/w1080/020.png']);
+    expect([...mockFiles].sort()).toEqual(['documents/mushaf/w1080/020.png', 'documents/mushaf/w1440/021.png']);
+  });
+
+  it('downloads with the shared HTTP client (legacy downloadAsync), never one client a file', async () => {
+    expect(await cachePage(50)).toBe('documents/mushaf/w1080/050.png');
+    expect(mockLegacy).toEqual([
+      'https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf/w1080/050.png',
+    ]);
+    expect(mockDownloads).toEqual([]);
+  });
+
+  it('refuses an error response and leaves nothing behind', async () => {
+    mockLegacyResult = () => ({ status: 404, headers: {}, size: 300 });
+    expect(await cachePage(50)).toBeNull();
+    expect([...mockFiles]).toEqual([]);
+  });
+
+  it('refuses a page cut short (fewer bytes than the server said)', async () => {
+    mockLegacyResult = () => ({ status: 200, headers: { 'content-length': '5000' }, size: 4000 });
+    expect(await cachePage(50)).toBeNull();
+    expect([...mockFiles]).toEqual([]);
+    expect(getCachedPageUri(50)).toBeNull();
+  });
+
+  it('gives up on a download that never ends', async () => {
+    jest.useFakeTimers();
+    const legacy = require('expo-file-system/legacy');
+    const real = legacy.downloadAsync;
+    legacy.downloadAsync = () => new Promise(() => undefined);
+    try {
+      const p = cachePage(51);
+      await Promise.resolve();
+      jest.advanceTimersByTime(120_000);
+      expect(await p).toBeNull();
+    } finally {
+      legacy.downloadAsync = real;
+      jest.useRealTimers();
+    }
   });
 });
 
