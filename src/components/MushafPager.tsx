@@ -21,7 +21,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getReadPalette } from '../theme/readPalette';
-import { getQuranPageImageUrl } from '../lib/quranImages';
+import { getQuranPageImageUrl, pageImageProps } from '../lib/quranImages';
 import {
   cachePage,
   evictCachedPage,
@@ -234,6 +234,7 @@ const PageItem = React.memo(function PageItem({
           <Image
             testID="page-image"
             source={{ uri }}
+            {...pageImageProps()}
             style={[
               { width: size.width, height: size.height },
               pageTint != null && { tintColor: pageTint, opacity: 0.92 },
