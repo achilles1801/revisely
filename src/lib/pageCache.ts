@@ -5,17 +5,54 @@
 // immutable, so each one is downloaded once into the caches directory and read
 // from disk after that. Caches, not documents: the files can be downloaded again,
 // so they must not go into iCloud backups, and iOS may purge them when space is low.
+//
+// Each set of pages (quranImages: the originals, or Android's width-sized
+// copies) has its own folder, so a file is always the copy its name says.
 
 import { Directory, File, Paths } from 'expo-file-system';
-import { getQuranPageImageUrl } from './quranImages';
+import { getQuranPageImageUrl, pageImageSet, PageImageSet } from './quranImages';
 import { logger } from './logger';
 
 const MAX_CONCURRENT_DOWNLOADS = 3;
+const SETS: PageImageSet[] = ['full', 'w1080', 'w1440'];
+// After the reader's first pages, not during them.
+const CLEANUP_DELAY_MS = 10_000;
+
+/** The folder in the caches directory for a set: `mushaf` (the originals, as before), `mushaf-w1080`, … */
+export function cacheFolderName(set: PageImageSet): string {
+  return set === 'full' ? 'mushaf' : `mushaf-${set}`;
+}
 
 let dir: Directory | null = null;
+let cleanupScheduled = false;
 function cacheDir(): Directory {
-  if (!dir) dir = new Directory(Paths.cache, 'mushaf');
+  if (!dir) {
+    const set = pageImageSet();
+    dir = new Directory(Paths.cache, cacheFolderName(set));
+    // iOS uses the originals, as it always has: nothing to clear.
+    if (set !== 'full' && !cleanupScheduled) {
+      cleanupScheduled = true;
+      setTimeout(removeOtherPageSets, CLEANUP_DELAY_MS);
+    }
+  }
   return dir;
+}
+
+/**
+ * Delete the folders of sets this device doesn't use: on Android, the
+ * full-size pages cached before it switched to its own set. Once a launch.
+ */
+export function removeOtherPageSets(): void {
+  const current = pageImageSet();
+  for (const set of SETS) {
+    if (set === current) continue;
+    try {
+      const other = new Directory(Paths.cache, cacheFolderName(set));
+      if (other.exists) other.delete();
+    } catch (err) {
+      logger.warn('Page cache cleanup failed', err);
+    }
+  }
 }
 
 // Checked before every download: iOS may empty the caches directory while the
@@ -152,6 +189,7 @@ export function pagesAround(
 /** Test hook: forget in-memory state. */
 export function __resetPageCacheForTests(): void {
   dir = null;
+  cleanupScheduled = false;
   onDisk.clear();
   inFlight.clear();
   queue = [];
