@@ -5,13 +5,23 @@
 // the caches directory; a verse carried over from the previous page is listed
 // under that page by the API, so it is fetched on its own.
 //
+// The Arabic (Uthmani, Tanzil's text) is also downloaded whole with the offline
+// mushaf (downloadArabicText: one request, ~2 MB) and kept in the documents
+// directory, so the verse sheet's Arabic and Copy / Share work offline. Its
+// terms allow verbatim copies. Saheeh International is not downloaded whole:
+// we have no licence for the copy alquran.cloud serves (#80), so it stays
+// cached as read.
+//
 // Translations are listed in TRANSLATIONS. The Clear Quran® (Dr. Mustafa
 // Khattab) is licensed: its text comes from The Clear Quran API through our
-// worker (lib/clearQuran), is never stored on the device, and its publisher
-// requires the credit line (`credit`) wherever it is shown. One that is not
-// `available` is shown in the picker as unavailable.
+// worker (lib/clearQuran), is kept on the phone only as read (lib/clearQuran,
+// the owner's decision of Oct 27 2026), never the whole of it, and its
+// publisher requires the credit line (`credit`) wherever it is shown. One that
+// is not `available` is shown in the picker as unavailable.
 
+import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
+import RecitationAudio from '../../modules/recitation-audio';
 import { logger } from './logger';
 import { getClearQuranVerse, peekClearQuranVerse, prefetchClearQuran, prefetchClearQuranAround } from './clearQuran';
 import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
@@ -121,6 +131,10 @@ export async function getPageEdition(
   const key = `${edition}/${pageNumber}`;
   const known = memory.get(key);
   if (known) return known;
+  if (edition === ARABIC_EDITION && (await loadArabicText())) {
+    const whole = memory.get(key);
+    if (whole) return whole;
+  }
 
   const file = cacheFile(edition, pageNumber);
   if (file?.exists) {
@@ -146,6 +160,128 @@ export async function getPageEdition(
     logger.warn('Could not cache translation', err);
   }
   return ayahs;
+}
+
+// The whole Arabic text, kept with the offline mushaf (Documents/quran-text/).
+const ARABIC_FILE = 'quran-uthmani.json';
+const VERSE_COUNT = 6236;
+
+function textDir(): Directory {
+  return new Directory(Paths.document, 'quran-text');
+}
+
+function arabicFile(): File {
+  return new File(textDir(), ARABIC_FILE);
+}
+
+/** Exported for tests: alquran.cloud's whole edition, by page, in our shape. */
+export function parseQuranResponse(json: unknown): Record<number, TranslatedAyah[]> {
+  const surahs = (json as {
+    data?: { surahs?: { number: number; englishName: string; ayahs: (ApiAyah & { page: number })[] }[] };
+  })?.data?.surahs;
+  if (!Array.isArray(surahs) || surahs.length !== 114) throw new Error('Unexpected Quran response');
+  const byPage: Record<number, TranslatedAyah[]> = {};
+  let verses = 0;
+  for (const s of surahs) {
+    for (const a of s.ayahs) {
+      if (!(a.page >= 1 && a.page <= 604) || typeof a.text !== 'string') throw new Error('Unexpected Quran response');
+      (byPage[a.page] ??= []).push({
+        surahNumber: s.number,
+        surahName: s.englishName,
+        ayahNumber: a.numberInSurah,
+        text: a.text,
+      });
+      verses++;
+    }
+  }
+  if (verses !== VERSE_COUNT || Object.keys(byPage).length !== 604) throw new Error('Unexpected Quran response');
+  return byPage;
+}
+
+let arabicLoaded: Promise<boolean> | null = null;
+
+function fillMemory(byPage: Record<number, TranslatedAyah[]>) {
+  for (const [page, ayahs] of Object.entries(byPage)) memory.set(`${ARABIC_EDITION}/${page}`, ayahs);
+}
+
+/** Reads the whole Arabic text into memory, once, if it is on the phone. */
+function loadArabicText(): Promise<boolean> {
+  if (!arabicLoaded) {
+    arabicLoaded = (async () => {
+      try {
+        const file = arabicFile();
+        if (!file.exists) return false;
+        fillMemory(JSON.parse(await file.text()) as Record<number, TranslatedAyah[]>);
+        return true;
+      } catch (err) {
+        logger.warn('Could not read the Arabic text', err);
+        return false;
+      }
+    })().then((ok) => {
+      if (!ok) arabicLoaded = null;
+      return ok;
+    });
+  }
+  return arabicLoaded;
+}
+
+/** The whole Arabic text is on the phone. */
+export function hasArabicText(): boolean {
+  try {
+    return arabicFile().exists;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Downloads the whole Arabic text to the phone (lib/mushafOffline). Throws on
+ * failure. `stillWanted` is asked before anything is written (Remove may have
+ * been tapped meanwhile).
+ */
+export async function downloadArabicText(stillWanted: () => boolean = () => true): Promise<void> {
+  if (hasArabicText()) return;
+  const res = await fetch(`https://api.alquran.cloud/v1/quran/${ARABIC_EDITION}`);
+  if (!res.ok) throw new Error(`Arabic text request failed (${res.status})`);
+  const byPage = parseQuranResponse(await res.json());
+  if (!stillWanted()) return;
+  const dir = textDir();
+  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+  if (Platform.OS === 'ios') {
+    try {
+      RecitationAudio?.excludeFromBackup(decodeURIComponent(dir.uri.replace(/^file:\/\//, '')).replace(/\/$/, ''));
+    } catch (err) {
+      logger.warn('Could not keep the Arabic text out of backups', err);
+    }
+  }
+  // Written beside it and moved in, so a file there is always whole.
+  const partial = new File(dir, `${ARABIC_FILE}.part`);
+  if (partial.exists) partial.delete();
+  partial.create();
+  partial.write(JSON.stringify(byPage));
+  const target = arabicFile();
+  if (target.exists) target.delete();
+  partial.move(target);
+  fillMemory(byPage);
+  arabicLoaded = Promise.resolve(true);
+}
+
+/** Deletes the whole Arabic text (Settings → Offline mushaf → Remove). */
+export function removeArabicText(): void {
+  try {
+    const dir = textDir();
+    if (dir.exists) dir.delete();
+  } catch (err) {
+    logger.warn('Could not remove the Arabic text', err);
+  }
+  arabicLoaded = null;
+}
+
+/** Test hook. */
+export function __resetTranslationForTests(): void {
+  memory.clear();
+  singleAyahs.clear();
+  arabicLoaded = null;
 }
 
 /** Kept for the existing callers. */

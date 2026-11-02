@@ -10,6 +10,8 @@ import { ActivityIndicator, Image, StyleSheet, Text, useWindowDimensions, View }
 import { useTheme } from '../../context/ThemeContext';
 import { getSurahForPage } from '../../lib/quranData';
 import { getQuranPageImageUrl, pageImageProps } from '../../lib/quranImages';
+import { getCachedPageUri } from '../../lib/pageCache';
+import { nativeRequestUrl } from '../../lib/devNetwork';
 import { fitPage } from '../../lib/pageFit';
 import { getReadPalette } from '../../theme/readPalette';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
@@ -223,7 +225,7 @@ export function PagePreviewSheet({ pageNumber, onClose }: { pageNumber: number |
         >
           {loading ? <ActivityIndicator style={styles.loader} color={read.textSecondary} /> : null}
           <Image
-            source={{ uri: getQuranPageImageUrl(shown) }}
+            source={{ uri: getCachedPageUri(shown) ?? nativeRequestUrl(getQuranPageImageUrl(shown)) }}
             {...pageImageProps()}
             resizeMode="contain"
             style={[{ width: size.width, height: size.height }, read.pageTint != null && { tintColor: read.pageTint }]}
