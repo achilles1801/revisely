@@ -3,7 +3,7 @@ import {
   assertSucceeds,
   RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { getTestEnv, cleanupTestEnv } from './setup';
 
 const ALICE = 'alice';
@@ -75,6 +75,57 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       const date = '2026-05-10';
       await assertFails(
         setDoc(doc(bob, `users/${ALICE}/sessions/${date}`), validSession(date)),
+      );
+    });
+  });
+
+  // The outbox (src/lib/offline) creates a day's session with the whole
+  // document, then updates it with the session's mutable fields only.
+  describe('from the outbox', () => {
+    const created = Timestamp.fromMillis(1_793_600_000_000);
+    const full = (over: Record<string, unknown> = {}) => ({
+      ...validSession('2026-11-02'),
+      state: 'IN_PROGRESS',
+      createdAt: created,
+      updatedAt: serverTimestamp(),
+      completedAt: null,
+      durationMinutes: 12,
+      totalAssignedPages: 3,
+      pagesRevised: [1],
+      weaknessUpdates: [{ pageNumber: 1, previousRating: 4, newRating: 2, changedAt: created }],
+      completionPercentage: 33.33333333333333,
+      ...over,
+    });
+    const mutable = (s: Record<string, unknown>) => ({
+      state: s.state,
+      pagesRevised: s.pagesRevised,
+      pagesSkipped: s.pagesSkipped,
+      weaknessUpdates: s.weaknessUpdates,
+      durationMinutes: s.durationMinutes,
+      completionPercentage: s.completionPercentage,
+      assignedPages: s.assignedPages,
+      totalAssignedPages: s.totalAssignedPages,
+      updatedAt: serverTimestamp(),
+    });
+
+    it('creates the day with the whole document, then merges into it (twice is fine)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      const merged = full({ pagesRevised: [1, 2], durationMinutes: 15, completionPercentage: 66.66666666666666 });
+      await assertSucceeds(updateDoc(ref, mutable(merged)));
+      await assertSucceeds(updateDoc(ref, mutable(merged)));
+      const done = full({ state: 'COMPLETED', pagesRevised: [1, 2, 3], assignedPages: [1, 2, 3, 4], totalAssignedPages: 4, completionPercentage: 75 });
+      await assertSucceeds(updateDoc(ref, mutable(done)));
+      await assertSucceeds(updateDoc(ref, mutable(done)));
+    });
+
+    it('an edit sets revised and skipped pages, minutes and ratings', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      await assertSucceeds(
+        updateDoc(ref, { pagesRevised: [2], pagesSkipped: [1], durationMinutes: null, weaknessUpdates: [], updatedAt: serverTimestamp() }),
       );
     });
   });

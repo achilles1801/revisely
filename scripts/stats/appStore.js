@@ -10,6 +10,9 @@ const { parseSummary } = require('./digest');
 
 const API = 'https://api.appstoreconnect.apple.com';
 
+/** The summary report's version per frequency: monthly and yearly refuse 1_1 (400, Nov 2 2026). */
+const VERSIONS = { DAILY: '1_1', WEEKLY: '1_1', MONTHLY: '1_0', YEARLY: '1_0' };
+
 function token(env = process.env) {
   const { ASC_REPORTS_KEY_ID: kid, ASC_REPORTS_ISSUER_ID: iss, ASC_REPORTS_KEY: key } = env;
   if (!kid || !iss || !key) throw new Error('ASC_REPORTS_KEY_ID, ASC_REPORTS_ISSUER_ID and ASC_REPORTS_KEY must be set');
@@ -34,7 +37,7 @@ async function salesSummary(date, { frequency = 'DAILY', env = process.env, fetc
     'filter[frequency]': frequency,
     'filter[reportType]': 'SALES',
     'filter[reportSubType]': 'SUMMARY',
-    'filter[version]': '1_1',
+    'filter[version]': VERSIONS[frequency] || '1_0',
     'filter[reportDate]': date,
     'filter[vendorNumber]': vendor,
   });

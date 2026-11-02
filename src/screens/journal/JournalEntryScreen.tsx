@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
+import { pendingJournalEntry, queueChange } from '../../lib/offline/queue';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
   JOURNAL_NOTES_MAX,
@@ -99,23 +100,39 @@ export default function JournalEntryScreen() {
   // after the unsaved-changes guard has re-rendered as disabled.
   const [done, setDone] = useState(false);
 
+  // Offline, a day Firestore hasn't seen in this run can't be read: editing
+  // it then could write over what the server has, so it waits for a
+  // connection (a change still waiting on this phone shows, though).
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    const show = (entry: JournalEntry | null) => {
+      if (cancelled) return;
+      setExists(!!entry);
+      if (!entry) return;
+      const loaded = toForm(entry);
+      setInitial(loaded);
+      setForm(loaded);
+    };
+    setLoadFailed(false);
     firestoreService
       .getJournalEntry(date)
       .then((entry) => {
-        if (cancelled || !entry) return;
-        const loaded = toForm(entry);
-        setInitial(loaded);
-        setForm(loaded);
-        setExists(true);
+        const waiting = pendingJournalEntry(date);
+        show(waiting === undefined ? entry : waiting);
       })
-      .catch((err) => logger.error('Failed to load journal entry', err))
+      .catch((err) => {
+        const waiting = pendingJournalEntry(date);
+        if (waiting !== undefined) return show(waiting);
+        logger.warn('Failed to load journal entry', err);
+        if (!cancelled) setLoadFailed(true);
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, attempt]);
 
   const dirty = useMemo(
     () => (Object.keys(form) as (keyof FormState)[]).some((k) => form[k] !== initial[k]),
@@ -162,15 +179,16 @@ export default function JournalEntryScreen() {
     try {
       if (isJournalEntryEmpty(entry)) {
         // Clearing every field is the same as deleting the day.
-        if (exists) await firestoreService.deleteJournalEntry(date);
+        if (exists) await queueChange({ kind: 'journal.delete', date });
       } else {
-        await firestoreService.saveJournalEntry(entry, !exists);
+        // Saved on the phone at once; it reaches the server when it can.
+        await queueChange({ kind: 'journal.save', entry, isNew: !exists });
       }
       haptics.success();
       setDone(true);
     } catch (err) {
       logger.error('Failed to save journal entry', err);
-      Alert.alert("Couldn't save", 'Check your connection and try again.');
+      Alert.alert("Couldn't save", 'Please try again.');
       setSaving(false);
     }
   }, [date, form, exists, haptics]);
@@ -184,11 +202,11 @@ export default function JournalEntryScreen() {
         onPress: async () => {
           setSaving(true);
           try {
-            await firestoreService.deleteJournalEntry(date);
+            await queueChange({ kind: 'journal.delete', date });
             setDone(true);
           } catch (err) {
             logger.error('Failed to delete journal entry', err);
-            Alert.alert("Couldn't delete", 'Check your connection and try again.');
+            Alert.alert("Couldn't delete", 'Please try again.');
             setSaving(false);
           }
         },
@@ -196,7 +214,7 @@ export default function JournalEntryScreen() {
     ]);
   };
 
-  const canSave = dirty && !saving && !loading;
+  const canSave = dirty && !saving && !loading && !loadFailed;
   const fillFromSession = () =>
     sessionSuggestion &&
     setForm((prev) => ({
@@ -246,6 +264,24 @@ export default function JournalEntryScreen() {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.secondary} />
+        </View>
+      ) : loadFailed ? (
+        <View style={[styles.center, styles.failed]} testID="journal-offline">
+          <Text style={[typeV2.name, { color: palette.text, textAlign: 'center' }]}>
+            {"Couldn't load this day's log"}
+          </Text>
+          <Text style={[typeV2.body, { color: palette.secondary, textAlign: 'center' }]}>
+            Connect to the internet to see and edit it.
+          </Text>
+          <PillButton
+            title="Try again"
+            variant="outline"
+            onPress={() => {
+              setLoading(true);
+              setAttempt((n) => n + 1);
+            }}
+            testID="journal-retry"
+          />
         </View>
       ) : (
         <ScrollView
@@ -391,6 +427,7 @@ function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  failed: { gap: 12, paddingHorizontal: 32 },
   scroll: { flex: 1 },
 });
 

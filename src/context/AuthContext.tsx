@@ -16,11 +16,44 @@ import { identifyUser } from '../lib/sentry';
 import { logger } from '../lib/logger';
 import { deleteAllRecordings, forgetCloudDeletes } from '../lib/recordings';
 import { discardStoppedBackup, resumeBackup, stopBackup } from '../lib/recordingBackupController';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { clearAccount } from '../lib/offline/accountCache';
+import { clearOutbox } from '../lib/offline/outbox';
+
+/**
+ * How long Firebase Auth may take to check its saved sign-in before the app
+ * opens with the account it saved. Offline it answers at once, but on a weak
+ * connection it waits for the server (up to 30 s) before it says anything.
+ */
+export const AUTH_GRACE_MS = 1_500;
+
+/**
+ * The uid of the sign-in Firebase Auth saved on this phone (its own
+ * AsyncStorage entry), or null. Only to show that account's copy while Auth
+ * checks it: nothing is sent for it until Auth confirms the sign-in.
+ */
+export async function savedSignInUid(): Promise<string | null> {
+  const apiKey = Constants.expoConfig?.extra?.firebase?.apiKey;
+  if (!apiKey) return null;
+  try {
+    const raw = await AsyncStorage.getItem(`firebase:authUser:${apiKey}:[DEFAULT]`);
+    const uid = raw ? (JSON.parse(raw) as { uid?: unknown }).uid : null;
+    return typeof uid === 'string' && uid.length > 0 ? uid : null;
+  } catch {
+    return null;
+  }
+}
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /**
+   * While Firebase Auth is still checking its saved sign-in (a weak
+   * connection), the uid it saved: the app shows that account's copy meanwhile.
+   */
+  provisionalUid: string | null;
   error: string | null;
   // Auth actions
   signUp: (email: string, password: string, name?: string) => Promise<void>;
@@ -42,15 +75,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [provisionalUid, setProvisionalUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let answered = false;
     const unsubscribe = subscribeToAuthChanges((user) => {
+      answered = true;
       setFirebaseUser(user);
+      setProvisionalUid(null);
       identifyUser(user?.uid ?? null);
       setIsLoading(false);
     });
-    return unsubscribe;
+    const grace = setTimeout(() => {
+      if (answered) return;
+      savedSignInUid().then((uid) => {
+        if (!answered && uid) setProvisionalUid(uid);
+      });
+    }, AUTH_GRACE_MS);
+    return () => {
+      clearTimeout(grace);
+      unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, name?: string) => {
@@ -185,6 +231,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await firestoreService.deleteAccount();
       discardStoppedBackup();
+      // The account is gone: so are its copy and its unsent changes here.
+      if (uid) {
+        await Promise.all([clearAccount(uid), clearOutbox(uid)]).catch((err) =>
+          logger.warn('Could not delete the account copy', err),
+        );
+      }
       // The server deleted the account's backup; this removes the recordings on
       // this phone, and the backup deletions still queued here.
       if (uid) {
@@ -214,8 +266,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Recordings deleted on this phone are deleted from the backup first (a
     // queue left here would only run when this account signs in here again).
     await stopBackup({ flushDeletes: true });
+    const uid = getAuth().currentUser?.uid;
     try {
       await logoutUser();
+      // The copy of the account on this phone goes; changes not yet sent stay
+      // (they go when this account signs in here again).
+      if (uid) await clearAccount(uid);
       // Clear the native Google session too so the next sign-in shows the
       // account chooser instead of silently picking the previous account.
       await signOutGoogle();
@@ -249,6 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUser,
         isAuthenticated: !!firebaseUser,
         isLoading,
+        provisionalUid,
         error,
         signUp,
         signIn,

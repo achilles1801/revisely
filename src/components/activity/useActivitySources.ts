@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import * as firestoreService from '../../services/firestoreService';
+import { withPendingJournal, withPendingReadings } from '../../lib/offline/queue';
 import { listRecordings, RecordingMeta } from '../../lib/recordings';
 import { logger } from '../../lib/logger';
 import type { JournalEntry, ReadingSession } from '../../types';
@@ -21,8 +22,8 @@ export function useActivitySources() {
 
   const load = useCallback(async () => {
     const [r, j] = await Promise.allSettled([
-      firestoreService.getReadingSessions(),
-      firestoreService.getJournalEntries(400),
+      firestoreService.getReadingSessions().then((list) => withPendingReadings(list)),
+      firestoreService.getJournalEntries(400).then((list) => withPendingJournal(list)),
     ]);
     listRecordings()
       .then(setRecordings)

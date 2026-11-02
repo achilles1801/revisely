@@ -188,7 +188,7 @@ function ThemeSegmentedControl<T extends string>({
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, saveUser, resetOnboarding } = useApp();
+  const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
@@ -358,7 +358,14 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign out?', 'Your local data will be preserved.', [
+    // Changes made offline and not yet sent wait on this phone for this
+    // account's next sign-in here (lib/offline).
+    Alert.alert(
+      'Sign out?',
+      pendingChanges > 0
+        ? "Some changes haven't synced yet. They'll sync the next time you sign in to this account on this phone."
+        : 'Your local data will be preserved.',
+      [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
@@ -370,7 +377,8 @@ export default function SettingsScreen() {
           }
         },
       },
-    ]);
+      ],
+    );
   };
 
   const handleDeleteAccount = () => {

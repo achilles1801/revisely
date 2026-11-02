@@ -39,20 +39,46 @@ jest.mock('firebase/auth', () => ({
   signInWithCredential: jest.fn(),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  getFirestore: jest.fn(() => ({})),
-  doc: jest.fn(),
-  setDoc: jest.fn(),
-  getDoc: jest.fn(),
-  collection: jest.fn(),
-  query: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  getDocs: jest.fn(),
-  addDoc: jest.fn(),
-  serverTimestamp: jest.fn(),
-  enableIndexedDbPersistence: jest.fn(() => Promise.resolve()),
-}));
+jest.mock('firebase/firestore', () => {
+  // Enough of Timestamp for code that converts times (lib/offline/codec).
+  class Timestamp {
+    seconds: number;
+    nanoseconds: number;
+    constructor(s: number, ns: number) {
+      this.seconds = s;
+      this.nanoseconds = ns;
+    }
+    static fromMillis(ms: number) {
+      return new Timestamp(Math.floor(ms / 1000), (ms % 1000) * 1e6);
+    }
+    static now() {
+      return Timestamp.fromMillis(Date.now());
+    }
+    toMillis() {
+      return this.seconds * 1000 + Math.floor(this.nanoseconds / 1e6);
+    }
+    toDate() {
+      return new Date(this.toMillis());
+    }
+  }
+  return {
+    Timestamp,
+    disableNetwork: jest.fn(() => Promise.resolve()),
+    enableNetwork: jest.fn(() => Promise.resolve()),
+    getFirestore: jest.fn(() => ({})),
+    doc: jest.fn(),
+    setDoc: jest.fn(),
+    getDoc: jest.fn(),
+    collection: jest.fn(),
+    query: jest.fn(),
+    orderBy: jest.fn(),
+    limit: jest.fn(),
+    getDocs: jest.fn(),
+    addDoc: jest.fn(),
+    serverTimestamp: jest.fn(),
+    enableIndexedDbPersistence: jest.fn(() => Promise.resolve()),
+  };
+});
 
 jest.mock('@react-native-firebase/app', () => ({}), { virtual: true });
 jest.mock('@react-native-firebase/app-check', () => ({}), { virtual: true });
