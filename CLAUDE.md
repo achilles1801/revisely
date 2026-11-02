@@ -344,6 +344,11 @@ app from the home screen to clear the back-link in the status bar.
   tapping its waveform 42% in), Insights.
   `store/screenshots/dark/` holds the same in dark; `asc.js screenshots` uploads only the top-level
   PNGs, so move a dark one up to use it.
+- 1.0.3 (Nov 1 2026, release/1.0.3 2c28017): only Home was retaken, light and dark, for the
+  "Starts at" line and the next-prayer line (location set to Chicago, the Mac's time zone). The
+  seed writes sessions through yesterday in UTC, so in the evening (US time) shift them back a
+  day, or Home shows today done. A worktree needs the local `.env` copied in, or the app stops
+  at auth/invalid-api-key. PNGs from `simctl io` carry alpha: save them as RGB.
 - The recordings are demo audio (a synthesized tone), placed on the simulator: two `.m4a` files and
   an `index.json` entry each (`levels` drawn to look like recitation) in the app's
   `Documents/recordings/<uid>/`, with the app closed. The seed turns the account's recording backup
