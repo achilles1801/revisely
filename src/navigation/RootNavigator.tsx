@@ -7,11 +7,15 @@ import { OnboardingNavigator } from './OnboardingNavigator';
 import { MainNavigator } from './MainNavigator';
 import { navigationRef } from './navigationRef';
 import AuthScreen from '../screens/auth/AuthScreen';
+import { ConnectToSetUp } from '../components/offline/ConnectToSetUp';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 export function RootNavigator() {
-  const { loading, onboardingComplete } = useApp();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { loading, onboardingComplete, connectionNeeded } = useApp();
+  const { isAuthenticated, isLoading: authLoading, provisionalUid } = useAuth();
+  // While Auth checks a saved sign-in on a slow connection, the app opens
+  // with that account's copy on the phone (AppProvider).
+  const signedIn = isAuthenticated || !!provisionalUid;
   const { theme, isDark, palette } = useTheme();
 
   // Nav theme bg is transparent so the flat ground shows through every screen.
@@ -27,7 +31,9 @@ export function RootNavigator() {
     },
   };
 
-  if (loading || authLoading) {
+  if (connectionNeeded) return <ConnectToSetUp />;
+
+  if (loading || (authLoading && !provisionalUid)) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: palette.bg }]} testID="root-loading">
         {/* A plain grey spinner on the ground, no accent. */}
@@ -36,7 +42,7 @@ export function RootNavigator() {
     );
   }
 
-  const content = !isAuthenticated ? (
+  const content = !signedIn ? (
     <AuthScreen />
   ) : onboardingComplete ? (
     <MainNavigator />

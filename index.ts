@@ -1,3 +1,5 @@
+// First: development-only switches that must be in place before Firebase starts.
+import './src/dev/install';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

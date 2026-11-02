@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { Timestamp } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { getAuth } from 'firebase/auth';
 import { User, UserPage, RevisionLog } from '../types';
 import {
   FirestoreUser,
@@ -27,6 +26,21 @@ import { applyUpdateChannel } from '../lib/updateChannel';
 import { ensureOnServer, retryDelayMs } from '../lib/userDoc';
 import * as Sentry from '@sentry/react-native';
 import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
+import { useAuth } from './AuthContext';
+import { readAccount, writeAccountPart, AccountPart } from '../lib/offline/accountCache';
+import { enqueue, loadOutbox, pendingEntries, subscribeOutbox } from '../lib/offline/outbox';
+import { configureSync, onApplied, requestFlush } from '../lib/offline/sync';
+import { applyEntry } from '../lib/offline/apply';
+import {
+  overlayAccount,
+  overlaySessions,
+  OutboxEntry,
+  OutboxOp,
+  PageFields,
+  WeaknessChange,
+} from '../lib/offline/ops';
+import { restartFirestore, watchConnectivity } from '../lib/offline/connectivity';
+import { setCurrentAccount } from '../lib/offline/queue';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -109,10 +123,21 @@ interface AppState {
   onboardingComplete: boolean;
   isAuthenticated: boolean;
   error: string | null;
+  /**
+   * Signed in, no copy of the account on this phone yet, and the server can't
+   * be reached: the first launch needs a connection (RootNavigator says so).
+   */
+  connectionNeeded: boolean;
+  /** The server can't be reached: what's shown is the copy on this phone. */
+  offline: boolean;
+  /** Changes on this phone the server doesn't have yet. */
+  pendingChanges: number;
 }
 
 interface AppContextType extends AppState {
   loadData: () => Promise<void>;
+  /** Try the server again now (the "Connect to the internet" screen). */
+  retryConnection: () => void;
   saveUser: (user: User) => Promise<void>;
   savePages: (pages: UserPage[], changedPageNumbers?: number[]) => Promise<void>;
   updatePage: (page: UserPage) => Promise<void>;
@@ -130,38 +155,154 @@ interface AppContextType extends AppState {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // ============================================================================
+// OFFLINE-FIRST DATA
+// ============================================================================
+//
+// What the app shows is `base` (the server's last word: from the listeners, or
+// the copy kept on the phone, lib/offline/accountCache) with the outbox's
+// pending changes laid over it (lib/offline/ops). Every change goes into the
+// outbox first (saved on the phone) and reaches the server through
+// lib/offline/sync, in order; nothing waits for the server.
+//
+// Only server snapshots update `base`: an offline listener fires Firestore's
+// memory, which is empty on a cold start, and an empty answer from it once
+// overwrote real progress (REACT-NATIVE-6). Missing data is created only when
+// the server confirms it is missing (lib/userDoc).
+
+/** Without a copy on the phone, how long to wait for the server before saying a connection is needed. */
+export const SERVER_WAIT_MS = 6_000;
+/** Server snapshots are saved to the phone at most this often per part. */
+const CACHE_WRITE_DELAY_MS = 400;
+
+interface Base {
+  uid: string;
+  /** undefined: not known yet; null: the server has none (and creating it failed). */
+  user: FirestoreUser | null | undefined;
+  pages: FirestorePage[] | undefined;
+  sessions: FirestoreSession[] | undefined;
+  /** Pages and sessions heard from the server in this run (the self-heal waits for both). */
+  pagesFresh: boolean;
+  sessionsFresh: boolean;
+  /** The pages' creation was decided without pages arriving (offline, or it failed). */
+  pagesSettled: boolean;
+}
+
+const emptyBase = (uid: string): Base => ({
+  uid,
+  user: undefined,
+  pages: undefined,
+  sessions: undefined,
+  pagesFresh: false,
+  sessionsFresh: false,
+  pagesSettled: false,
+});
+
+/** A change the server took, folded into `base` until its snapshot arrives. */
+function commitToBase(b: Base, entry: OutboxEntry): Base {
+  const view = overlayAccount(
+    { user: b.user ?? null, pages: b.pages ?? [], sessions: b.sessions ?? [] },
+    [entry],
+  );
+  return {
+    ...b,
+    user: b.user === undefined ? undefined : view.user,
+    pages: b.pages === undefined ? undefined : view.pages,
+    sessions: b.sessions === undefined ? undefined : view.sessions,
+  };
+}
+
+/** "2026-10-27" from a day or an ISO time (its UTC date, as the day is stored). */
+const revisedDay = (s: string | null | undefined): string | null => (s ? s.slice(0, 10) : null);
+
+const isoToMillis = (iso: string | null | undefined): number | null => {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+};
+
+function pageChange(p: UserPage): PageFields {
+  return {
+    pageNumber: p.pageNumber,
+    status: p.status === 'in_progress' ? 'learning' : p.status,
+    dateMemorized: isoToMillis(p.dateMemorized),
+    lastRevisedAt: isoToMillis(p.lastRevisedDate),
+    weaknessRating: p.weaknessRating as WeaknessRating,
+    totalRevisionCount: p.totalRevisionCount,
+    skipCount: p.skipCount,
+  };
+}
+
+function weaknessChanges(updates: { page: number; rating: number }[], at: number): WeaknessChange[] {
+  return updates.map((w) => ({ pageNumber: w.page, newRating: w.rating, changedAt: at }));
+}
+
+/** The user document fields saveUser writes. */
+function userFields(updatedUser: User): Record<string, unknown> {
+  return firestoreService.userUpdateFields({
+    displayName: updatedUser.name || null,
+    smartTrackingEnabled: updatedUser.smartTrackingEnabled,
+    hasSeenSmartTrackingPreview: updatedUser.hasSeenSmartTrackingPreview,
+    dailyPageCapacity: updatedUser.dailyPageCapacity,
+    scheduleMode: updatedUser.scheduleMode,
+    dailyJuzCount: updatedUser.dailyJuzCount,
+    notifications: {
+      enabled: updatedUser.notificationsEnabled,
+      reminderTime: updatedUser.reminderTime,
+    },
+    currentMemorizationJuz: updatedUser.currentMemorizationJuz,
+    currentMemorizationPage: updatedUser.currentMemorizationPage,
+    currentKhatamPage: updatedUser.currentKhatamPage,
+    customPlan: customPlanToFirestore(updatedUser.customPlan),
+    savedPlans: savedPlansToFirestore(updatedUser.savedPlans),
+    memorizedSurahs: updatedUser.memorizedSurahs,
+    fajrBoundaryEnabled: updatedUser.fajrBoundaryEnabled,
+    locationCoords: updatedUser.locationCoords,
+    fajrCalculationMethod: updatedUser.fajrCalculationMethod,
+    scheduleAnchorDate: updatedUser.scheduleAnchorDate,
+    // Sent only once set (null clears carryOver), so saving a user who never
+    // used carry-over writes nothing new.
+    ...(updatedUser.carryOverMode !== undefined && { carryOverMode: updatedUser.carryOverMode }),
+    ...(updatedUser.accent !== undefined && { accent: updatedUser.accent }),
+    ...(updatedUser.carryOver !== undefined && { carryOver: updatedUser.carryOver }),
+    ...(updatedUser.scheduleShiftPages !== undefined && {
+      scheduleShiftPages: updatedUser.scheduleShiftPages,
+    }),
+    ...(updatedUser.translationId !== undefined && { translationId: updatedUser.translationId }),
+    ...(updatedUser.reciter !== undefined && { reciter: updatedUser.reciter }),
+    ...(updatedUser.recordingBackup !== undefined && { recordingBackup: updatedUser.recordingBackup }),
+    ...(updatedUser.recordingBackupCellular !== undefined && {
+      recordingBackupCellular: updatedUser.recordingBackupCellular,
+    }),
+  });
+}
+
+// ============================================================================
 // PROVIDER COMPONENT
 // ============================================================================
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [pages, setPages] = useState<UserPage[]>([]);
-  const [logs, setLogs] = useState<RevisionLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  // A tester's TestFlight install follows the preview update channel; anything
-  // else production (lib/updateChannel). Decided once the account is known.
-  const userId = user?.id;
-  const previewTester = user?.previewTester === true;
-  const signedOut = !loading && !user;
-  useEffect(() => {
-    // While the account loads, nothing changes; signed out is production.
-    if (!userId && !signedOut) return;
-    const channel = applyUpdateChannel(!!userId && previewTester);
-    if (channel) Sentry.setTag('update_channel', channel);
-  }, [userId, previewTester, signedOut]);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { firebaseUser, provisionalUid } = useAuth();
+  // The account shown: the signed-in one, or (while Firebase Auth is still
+  // checking its saved sign-in on a slow network) the one it saved.
+  const uid = firebaseUser?.uid ?? provisionalUid ?? null;
+  const signedInUid = firebaseUser?.uid ?? null;
+
+  const [base, setBase] = useState<Base | null>(null);
+  const [pending, setPending] = useState<OutboxEntry[]>([]);
+  // The uid whose copy (and outbox) has been read from the phone.
+  const [cacheChecked, setCacheChecked] = useState<string | null>(null);
+  const [waitedOut, setWaitedOut] = useState(false);
+  const [netIsOffline, setNetIsOffline] = useState(false);
+  // From the user document's listener: false while Firestore can't reach the server.
+  const [serverReachable, setServerReachable] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const hasInitialLoadCompleted = useRef(false);
-  const lastSaveTimestamp = useRef(0);
-  // Ref to current pages so log mutations can recompute derived state
-  // without making the mutation callbacks depend on pages.
-  const pagesRef = useRef<UserPage[]>([]);
-  useEffect(() => {
-    pagesRef.current = pages;
-  }, [pages]);
-  // Guard so the initial-load self-heal runs at most once per session.
+  const uidRef = useRef<string | null>(uid);
+  uidRef.current = uid;
+  const serverReachableRef = useRef<boolean | null>(null);
+  serverReachableRef.current = serverReachable;
+
+  // Guard so the initial-load self-heal runs at most once per account and run.
   const hasSelfHealedOnLoad = useRef(false);
   // Tracks which user.id we've already (re)scheduled the daily reminder for
   // this session. The OS notification scheduler is per-device, so a fresh
@@ -170,69 +311,112 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const lastScheduledUserIdRef = useRef<string | null>(null);
 
   // ============================================================================
-  // AUTH LISTENER - Listen for auth state changes
+  // SYNC: the outbox reaches the server while its account is signed in
   // ============================================================================
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsAuthenticated(!!firebaseUser);
-
-      if (!firebaseUser) {
-        // User logged out - clear state
-        setUser(null);
-        setPages([]);
-        setLogs([]);
-        setOnboardingComplete(false);
-        hasInitialLoadCompleted.current = false;
-        lastScheduledUserIdRef.current = null;
-        setLoading(false);
-        return;
-      }
-
-      // User logged in - data will be loaded by Firestore subscriptions
+    configureSync({
+      currentUid: () => getAuth().currentUser?.uid ?? null,
+      isDeleting: (u) => firestoreService.isDeletingAccount(u),
+      apply: applyEntry,
     });
-
-    return () => unsubscribe();
+    const offApplied = onApplied((u, entry) => {
+      setBase((b) => (b && b.uid === u ? commitToBase(b, entry) : b));
+    });
+    const offOutbox = subscribeOutbox((u) => {
+      if (u === uidRef.current) setPending(pendingEntries(u));
+    });
+    const offNet = watchConnectivity(
+      (offline) => setNetIsOffline(offline),
+      () => {
+        // Back online, or back in front: restart Firestore's connection if it
+        // was down (it would otherwise wait out its backoff), and send.
+        if (serverReachableRef.current === false) restartFirestore();
+        requestFlush(getAuth().currentUser?.uid);
+      },
+    );
+    return () => {
+      offApplied();
+      offOutbox();
+      offNet();
+      configureSync(null);
+    };
   }, []);
 
+  useEffect(() => {
+    if (signedInUid) requestFlush(signedInUid);
+  }, [signedInUid]);
+
   // ============================================================================
-  // FIRESTORE SUBSCRIPTIONS - Real-time data sync
+  // THE ACCOUNT: the copy on the phone at once, then the server's snapshots
   // ============================================================================
 
-  // Whether the server has told us about the user document (it exists, or it
-  // was missing and has been created). Until then the app keeps loading: an
-  // existing user offline on a fresh install must not see onboarding, whose
-  // defaults would be written over their account when they reconnect.
-  const [userResolved, setUserResolved] = useState(false);
+  const cacheTimers = useRef(new Map<AccountPart, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = cacheTimers.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  const saveCopy = useCallback((forUid: string, part: AccountPart, value: unknown) => {
+    const timers = cacheTimers.current;
+    const t = timers.get(part);
+    if (t) clearTimeout(t);
+    timers.set(
+      part,
+      setTimeout(() => {
+        timers.delete(part);
+        // Only for the account still shown.
+        if (uidRef.current === forUid) writeAccountPart(forUid, part, value);
+      }, CACHE_WRITE_DELAY_MS),
+    );
+  }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    setCurrentAccount(uid);
+    if (!uid) {
+      setBase(null);
+      setPending([]);
+      setCacheChecked(null);
+      setServerReachable(null);
+      hasSelfHealedOnLoad.current = false;
+      lastScheduledUserIdRef.current = null;
+      return;
+    }
 
-    setLoading(true);
-    setUserResolved(false);
+    let active = true;
+    setBase(emptyBase(uid));
+    setPending(pendingEntries(uid));
+    setCacheChecked(null);
+    setWaitedOut(false);
+    setServerReachable(null);
     setError(null);
+    hasSelfHealedOnLoad.current = false;
+    const update = (fn: (b: Base) => Base) => setBase((b) => (b && b.uid === uid ? fn(b) : b));
 
-    // Subscribe to user document. If Firebase Auth says we're logged in but
-    // the Firestore doc is missing (e.g. a dev wiped the users collection,
-    // or first launch after re-creating an account), recreate the doc so
-    // subsequent updates have something to land on.
+    // The copy on the phone and the outbox. A server answer that came first wins.
+    Promise.all([readAccount(uid), loadOutbox(uid)]).then(([cached]) => {
+      if (!active) return;
+      if (cached) {
+        update((b) => ({
+          ...b,
+          user: b.user === undefined ? cached.user : b.user,
+          pages: b.pages === undefined ? cached.pages : b.pages,
+          sessions: b.sessions === undefined ? cached.sessions : b.sessions,
+        }));
+      }
+      setPending(pendingEntries(uid));
+      setCacheChecked(uid);
+    });
+    const waitTimer = setTimeout(() => active && setWaitedOut(true), SERVER_WAIT_MS);
+
     // Missing data is created only when the server confirms it (lib/userDoc);
     // while offline, it is asked again on a backoff until it answers.
-    let active = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const ensuring = { user: false, pages: false };
-    const ensure = (
-      what: 'user' | 'pages',
-      fromCache: boolean,
-      attempt = 0,
-    ) => {
+    const ensure = (what: 'user' | 'pages', fromCache: boolean, attempt = 0) => {
       const fbUser = getAuth().currentUser;
-      if (!active || !fbUser) return;
-      const inFlight = what === 'user' ? ensuring.user : ensuring.pages;
-      if (inFlight) return;
-      if (what === 'user') ensuring.user = true;
-      else ensuring.pages = true;
+      if (!active || !fbUser || fbUser.uid !== uid) return;
+      if (ensuring[what]) return;
+      ensuring[what] = true;
       ensureOnServer({
         fromCache,
         skip: () => !active || firestoreService.isDeletingAccount(fbUser.uid),
@@ -254,82 +438,136 @@ export function AppProvider({ children }: { children: ReactNode }) {
           logger.error(what === 'user' ? 'Failed to recreate missing user doc:' : 'Failed to initialize pages:', err),
       })
         .then((outcome) => {
-          if (what === 'user') ensuring.user = false;
-          else ensuring.pages = false;
+          ensuring[what] = false;
           if (!active) return;
           // Created, or there after all: the listener refires with it.
           if (outcome === 'wait') {
             timers.push(setTimeout(() => ensure(what, false, attempt + 1), retryDelayMs(attempt)));
           } else if (outcome === 'failed' && what === 'user') {
-            setUserResolved(true);
-            setUser(null);
-            setOnboardingComplete(false);
+            update((b) => ({ ...b, user: b.user ?? null }));
           }
-          if (what === 'pages' && outcome !== 'created' && outcome !== 'exists') setLoading(false);
+          if (what === 'pages' && outcome !== 'created' && outcome !== 'exists') {
+            update((b) => ({ ...b, pagesSettled: true }));
+          }
         })
         .catch(() => undefined);
     };
 
-    const unsubscribeUser = firestoreService.subscribeToUser(async (fsUser, { fromCache }) => {
-      if (fsUser) {
-        setUserResolved(true);
-        setUser(firestoreUserToLocal(fsUser));
-        setOnboardingComplete(fsUser.onboardingComplete);
-        return;
-      }
-      if (!getAuth().currentUser) {
-        setUserResolved(true);
-        setUser(null);
-        setOnboardingComplete(false);
-        return;
-      }
-      ensure('user', fromCache);
-    });
+    const unsubscribeUser = firestoreService.subscribeToUser(
+      (fsUser, { fromCache }) => {
+        if (!active) return;
+        setServerReachable(!fromCache);
+        // Firestore's memory, not the server: the copy on the phone stands.
+        if (fromCache) return;
+        if (fsUser) {
+          update((b) => ({ ...b, user: fsUser }));
+          saveCopy(uid, 'user', fsUser);
+          return;
+        }
+        if (getAuth().currentUser?.uid !== uid) return;
+        ensure('user', false);
+      },
+      uid,
+    );
 
-    // Subscribe to pages
-    const unsubscribePages = firestoreService.subscribeToPages(async (fsPages, { fromCache }) => {
+    const unsubscribePages = firestoreService.subscribeToPages((fsPages, { fromCache }) => {
+      if (!active || fromCache) return;
       // No pages: create the 604 defaults, but only once the server confirms
-      // there are none (an empty cache offline is not "no pages").
+      // there are none.
       if (fsPages.length === 0) {
-        ensure('pages', fromCache);
-        if (fromCache) setLoading(false);
+        ensure('pages', false);
         return;
       }
+      update((b) => ({ ...b, pages: fsPages, pagesFresh: true }));
+      saveCopy(uid, 'pages', fsPages);
+    }, uid);
 
-      // Only apply subscription data if it's newer than our last save
-      // This prevents subscription from overwriting optimistic updates
-      const now = Date.now();
-      if (now - lastSaveTimestamp.current < 2000) {
-        // Skip subscription update if we saved within last 2 seconds
-        setLoading(false);
-        return;
-      }
-
-      const localPages = fsPages.map(firestorePageToLocal);
-      setPages(localPages);
-      hasInitialLoadCompleted.current = true;
-      setLoading(false);
-    });
-
-    // Load recent sessions (logs)
-    const loadSessions = async () => {
-      try {
-        const sessions = await firestoreService.getRecentSessions(100);
-        const localLogs = sessions.map(firestoreSessionToLog);
-        setLogs(localLogs);
-      } catch (err) {
-        logger.error('Failed to load sessions:', err);
-      }
-    };
-    loadSessions();
+    const unsubscribeSessions = firestoreService.subscribeToSessions((sessions, { fromCache }) => {
+      if (!active || fromCache) return;
+      update((b) => ({ ...b, sessions, sessionsFresh: true }));
+      saveCopy(uid, 'sessions', sessions);
+    }, uid);
 
     return () => {
       active = false;
+      clearTimeout(waitTimer);
       timers.forEach(clearTimeout);
       unsubscribeUser();
       unsubscribePages();
+      unsubscribeSessions();
     };
-  }, [isAuthenticated]);
+  }, [uid, saveCopy]);
+
+  // ============================================================================
+  // WHAT THE APP SHOWS
+  // ============================================================================
+
+  const forThisUid = base && base.uid === uid ? base : null;
+  const view = useMemo(
+    () =>
+      forThisUid
+        ? overlayAccount(
+            { user: forThisUid.user ?? null, pages: forThisUid.pages ?? [], sessions: forThisUid.sessions ?? [] },
+            pending,
+          )
+        : null,
+    [forThisUid, pending],
+  );
+  const viewUser = view?.user ?? null;
+  const user = useMemo(() => (viewUser ? firestoreUserToLocal(viewUser) : null), [viewUser]);
+  const viewPages = view?.pages;
+  const pages = useMemo(() => (viewPages ?? []).map(firestorePageToLocal), [viewPages]);
+  const viewSessions = view?.sessions;
+  const logs = useMemo(() => (viewSessions ?? []).map(firestoreSessionToLog), [viewSessions]);
+  const onboardingComplete = viewUser?.onboardingComplete === true;
+
+  // Latest values for the mutations, which don't re-create on every change.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const pagesRef = useRef<UserPage[]>(pages);
+  pagesRef.current = pages;
+
+  const userKnown = !!forThisUid && forThisUid.user !== undefined;
+  const ready =
+    userKnown &&
+    (forThisUid!.user === null || forThisUid!.pages !== undefined || forThisUid!.pagesSettled);
+  const offline = netIsOffline || serverReachable === false;
+  const connectionNeeded =
+    !!uid && cacheChecked === uid && !userKnown && (waitedOut || offline);
+  const loading = !!uid && !connectionNeeded && (cacheChecked !== uid || !ready);
+
+  // A tester's TestFlight install follows the preview update channel; anything
+  // else production (lib/updateChannel). Decided once the account is known.
+  const userId = user?.id;
+  const previewTester = user?.previewTester === true;
+  const signedOut = !uid;
+  useEffect(() => {
+    // While the account loads, nothing changes; signed out is production.
+    if (!userId && !signedOut) return;
+    const channel = applyUpdateChannel(!!userId && previewTester);
+    if (channel) Sentry.setTag('update_channel', channel);
+  }, [userId, previewTester, signedOut]);
+
+  // ============================================================================
+  // CHANGES: into the outbox (on the phone), then to the server
+  // ============================================================================
+
+  const enqueueOp = useCallback(async (op: OutboxOp, at = Date.now()) => {
+    const forUid = uidRef.current;
+    if (!forUid) throw new Error('User not authenticated');
+    await enqueue(forUid, op, at);
+    requestFlush(forUid);
+  }, []);
+
+  const retryConnection = useCallback(() => {
+    setWaitedOut(false);
+    restartFirestore();
+    requestFlush(getAuth().currentUser?.uid);
+    const forUid = uidRef.current;
+    setTimeout(() => {
+      if (uidRef.current === forUid) setWaitedOut(true);
+    }, SERVER_WAIT_MS);
+  }, []);
 
   // ============================================================================
   // INITIALIZE USER IN FIRESTORE
@@ -353,113 +591,159 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ============================================================================
-  // LOAD DATA (Manual refresh)
+  // PAGE OPERATIONS
+  // ============================================================================
+
+  const savePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
+    if (!changedPageNumbers || changedPageNumbers.length === 0) return;
+    const changed = new Set(changedPageNumbers);
+    const pagesToSync = updatedPages.filter((p) => changed.has(p.pageNumber));
+    if (pagesToSync.length === 0) return;
+    // Never on top of pages the phone doesn't have (nothing loaded yet).
+    if (!viewRef.current || viewRef.current.pages.length === 0) {
+      logger.warn('[savePages] No pages loaded; change not saved');
+      return;
+    }
+    setError(null);
+    await enqueueOp({ kind: 'pages', pages: pagesToSync.map(pageChange) });
+  }, [enqueueOp]);
+
+  const updatePage = useCallback(async (page: UserPage) => {
+    await savePages([page], [page.pageNumber]);
+  }, [savePages]);
+
+  const updatePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
+    await savePages(updatedPages, changedPageNumbers);
+  }, [savePages]);
+
+  // Re-derive per-page state (lastRevisedDate, totalRevisionCount, skipCount,
+  // weaknessRating) from the canonical session logs and persist any diffs.
+  // Called after every log mutation AND at the end of loadData so stale page
+  // state from older app versions (or pre-recompute deletes) self-heals.
+  const syncPagesFromLogs = useCallback(
+    async (currentPages: UserPage[], freshLogs: RevisionLog[]) => {
+      if (currentPages.length === 0) return;
+      const next = recomputePagesFromLogs(currentPages, freshLogs);
+      const changed = next
+        .filter((p) => {
+          const old = currentPages.find((c) => c.pageNumber === p.pageNumber);
+          if (!old) return false;
+          return (
+            // The logs give a day ("2026-10-27"); the page holds a time (that
+            // day's midnight UTC once healed). Comparing the strings rewrote
+            // every revised page, unchanged, on every launch.
+            revisedDay(old.lastRevisedDate) !== revisedDay(p.lastRevisedDate) ||
+            old.totalRevisionCount !== p.totalRevisionCount ||
+            old.skipCount !== p.skipCount ||
+            old.weaknessRating !== p.weaknessRating
+          );
+        })
+        .map((p) => p.pageNumber);
+      if (changed.length === 0) return;
+      await savePages(next, changed);
+    },
+    [savePages],
+  );
+
+  /** The logs once these changes are in (for the self-heal right after a change). */
+  const logsWith = useCallback((ops: OutboxOp[], at: number): RevisionLog[] => {
+    const v = viewRef.current;
+    if (!v) return [];
+    const extra: OutboxEntry[] = ops.map((op, i) => ({ id: `next-${i}`, op, at }));
+    return overlaySessions(v.sessions, extra).map(firestoreSessionToLog);
+  }, []);
+
+  // Self-heal on initial load, from what the server has (never from the copy
+  // on the phone, which can be older than a change made on another phone):
+  // once both pages and sessions have arrived, reconcile once. Later drift is
+  // handled by per-mutation recompute and pull-to-refresh (loadData).
+  useEffect(() => {
+    if (hasSelfHealedOnLoad.current || !forThisUid) return;
+    if (!forThisUid.pagesFresh || !forThisUid.sessionsFresh) return;
+    if (pages.length === 0 || logs.length === 0) return;
+    hasSelfHealedOnLoad.current = true;
+    syncPagesFromLogs(pages, logs).catch((err) => logger.warn('Self-heal failed', err));
+  }, [forThisUid, pages, logs, syncPagesFromLogs]);
+
+  // Rehydrate the daily reminder once per user identity per session. Settings
+  // and onboarding already schedule on mutation; this only covers cold starts
+  // on a device whose OS scheduler is empty (fresh install, new phone,
+  // sign-in to an existing account). Gated on onboardingComplete so we don't
+  // schedule against default placeholders for users still in the flow.
+  useEffect(() => {
+    if (!user || !onboardingComplete) return;
+    if (lastScheduledUserIdRef.current === user.id) return;
+    lastScheduledUserIdRef.current = user.id;
+    scheduleDailyReminder(user.reminderTime, user.notificationsEnabled).catch(
+      (err) => logger.error('Failed to rehydrate daily reminder:', err),
+    );
+  }, [user, onboardingComplete]);
+
+  // ============================================================================
+  // LOAD DATA (pull to refresh)
   // ============================================================================
 
   const loadData = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    // Only show loading on initial load to prevent navigation reset
-    const isInitialLoad = !hasInitialLoadCompleted.current;
-    if (isInitialLoad) {
-      setLoading(true);
-    }
+    const forUid = uidRef.current;
+    if (!forUid) return;
     setError(null);
-
+    requestFlush(getAuth().currentUser?.uid);
+    if (serverReachableRef.current === false) restartFirestore();
     try {
+      // From the server only: offline, Firestore's memory would answer with
+      // whatever it happens to hold (often nothing).
       const [fsUser, fsPages, fsSessions] = await Promise.all([
-        firestoreService.getUser(),
-        firestoreService.getAllPages(),
-        firestoreService.getRecentSessions(100),
+        firestoreService.getUserFromServer(forUid),
+        firestoreService.getAllPagesFromServer(forUid),
+        firestoreService.getRecentSessionsFromServer(100, forUid),
       ]);
-
-      if (fsUser) {
-        setUser(firestoreUserToLocal(fsUser));
-        setOnboardingComplete(fsUser.onboardingComplete);
-      }
-
-      const freshPages = fsPages.map(firestorePageToLocal);
-      const freshLogs = fsSessions.map(firestoreSessionToLog);
-      setPages(freshPages);
-      setLogs(freshLogs);
-      hasInitialLoadCompleted.current = true;
+      if (uidRef.current !== forUid) return;
+      setBase((b) => {
+        if (!b || b.uid !== forUid) return b;
+        return {
+          ...b,
+          user: fsUser ?? b.user,
+          pages: fsPages.length > 0 ? fsPages : b.pages,
+          sessions: fsSessions,
+          pagesFresh: b.pagesFresh || fsPages.length > 0,
+          sessionsFresh: true,
+        };
+      });
+      if (fsUser) writeAccountPart(forUid, 'user', fsUser);
+      if (fsPages.length > 0) writeAccountPart(forUid, 'pages', fsPages);
+      writeAccountPart(forUid, 'sessions', fsSessions);
 
       // Self-heal stale per-page state from prior app versions (or any data
-      // that drifted from the canonical log history). Runs after every load /
-      // pull-to-refresh; no-op when state already matches.
-      await syncPagesFromLogs(freshPages, freshLogs);
+      // that drifted from the canonical log history), with the server's data
+      // and the changes still waiting on top.
+      const v = overlayAccount(
+        { user: fsUser, pages: fsPages, sessions: fsSessions },
+        pendingEntries(forUid),
+      );
+      await syncPagesFromLogs(v.pages.map(firestorePageToLocal), v.sessions.map(firestoreSessionToLog));
     } catch (err) {
-      logger.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-      }
+      // Offline: what's shown stays as it is.
+      logger.log('Refresh failed; showing the copy on this phone', err);
     }
-  }, [isAuthenticated]);
+  }, [syncPagesFromLogs]);
 
   // ============================================================================
   // USER OPERATIONS
   // ============================================================================
 
   const saveUser = useCallback(async (updatedUser: User) => {
-    try {
-      setError(null);
-      // Optimistically update local context state so other screens (e.g. the
-      // Dashboard greeting) see the change immediately — don't wait for the
-      // Firestore subscription to round-trip.
-      setUser(updatedUser);
-      await firestoreService.updateUser({
-        displayName: updatedUser.name || null,
-        smartTrackingEnabled: updatedUser.smartTrackingEnabled,
-        hasSeenSmartTrackingPreview: updatedUser.hasSeenSmartTrackingPreview,
-        dailyPageCapacity: updatedUser.dailyPageCapacity,
-        scheduleMode: updatedUser.scheduleMode,
-        dailyJuzCount: updatedUser.dailyJuzCount,
-        notifications: {
-          enabled: updatedUser.notificationsEnabled,
-          reminderTime: updatedUser.reminderTime,
-        },
-        currentMemorizationJuz: updatedUser.currentMemorizationJuz,
-        currentMemorizationPage: updatedUser.currentMemorizationPage,
-        currentKhatamPage: updatedUser.currentKhatamPage,
-        customPlan: customPlanToFirestore(updatedUser.customPlan),
-        savedPlans: savedPlansToFirestore(updatedUser.savedPlans),
-        memorizedSurahs: updatedUser.memorizedSurahs,
-        fajrBoundaryEnabled: updatedUser.fajrBoundaryEnabled,
-        locationCoords: updatedUser.locationCoords,
-        fajrCalculationMethod: updatedUser.fajrCalculationMethod,
-        scheduleAnchorDate: updatedUser.scheduleAnchorDate,
-        // Sent only once set (null clears carryOver), so saving a user who never
-        // used carry-over writes nothing new.
-        ...(updatedUser.carryOverMode !== undefined && { carryOverMode: updatedUser.carryOverMode }),
-        ...(updatedUser.accent !== undefined && { accent: updatedUser.accent }),
-        ...(updatedUser.carryOver !== undefined && { carryOver: updatedUser.carryOver }),
-        ...(updatedUser.scheduleShiftPages !== undefined && {
-          scheduleShiftPages: updatedUser.scheduleShiftPages,
-        }),
-        ...(updatedUser.translationId !== undefined && { translationId: updatedUser.translationId }),
-        ...(updatedUser.reciter !== undefined && { reciter: updatedUser.reciter }),
-        ...(updatedUser.recordingBackup !== undefined && { recordingBackup: updatedUser.recordingBackup }),
-        ...(updatedUser.recordingBackupCellular !== undefined && {
-          recordingBackupCellular: updatedUser.recordingBackupCellular,
-        }),
-      });
-      // Also sync the Firebase Auth profile so screens that fall back to
-      // `firebaseUser.displayName` (e.g. dashboard greeting when the Firestore
-      // round-trip is mid-flight) reflect the new name. Failures here are
-      // best-effort — the Firestore write is the source of truth.
-      try {
-        await updateAuthDisplayName(updatedUser.name ?? null);
-      } catch (authErr) {
-        logger.warn('Failed to sync Firebase Auth displayName', authErr);
-      }
-    } catch (err) {
-      logger.error('Error saving user:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save user');
-      throw err;
+    setError(null);
+    await enqueueOp({ kind: 'user', fields: userFields(updatedUser) });
+    // Also sync the Firebase Auth profile so screens that fall back to
+    // `firebaseUser.displayName` reflect the new name. Best-effort (it needs
+    // the network): the user document is the source of truth.
+    const authName = getAuth().currentUser?.displayName ?? null;
+    if ((updatedUser.name ?? null) !== authName) {
+      updateAuthDisplayName(updatedUser.name ?? null).catch((authErr) =>
+        logger.warn('Failed to sync Firebase Auth displayName', authErr),
+      );
     }
-  }, []);
+  }, [enqueueOp]);
 
   const createDefaultUser = useCallback((overrides?: Partial<User>): User => {
     return {
@@ -492,362 +776,103 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const completeOnboarding = useCallback(async () => {
-    try {
-      setError(null);
-      await firestoreService.updateUser({ onboardingComplete: true });
-      setOnboardingComplete(true);
-    } catch (err) {
-      logger.error('Error completing onboarding:', err);
-      setError(err instanceof Error ? err.message : 'Failed to complete onboarding');
-      throw err;
-    }
-  }, []);
+    setError(null);
+    await enqueueOp({ kind: 'user', fields: { onboardingComplete: true } });
+  }, [enqueueOp]);
 
   const resetOnboarding = useCallback(async () => {
-    try {
-      setError(null);
-
-      const pageResets = pagesRef.current.map((p) => ({
-        pageNumber: p.pageNumber,
-        updates: {
-          status: 'not_memorized' as const,
-          dateMemorized: null,
-          lastRevisedAt: null,
-          weaknessRating: DEFAULT_WEAKNESS_RATING,
-          totalRevisionCount: 0,
-          skipCount: 0,
+    setError(null);
+    const v = viewRef.current;
+    if (!v) return;
+    const at = Date.now();
+    for (const s of v.sessions) await enqueueOp({ kind: 'session.delete', id: s.id }, at);
+    if (v.pages.length > 0) {
+      await enqueueOp(
+        {
+          kind: 'pages',
+          pages: v.pages.map((p) => ({
+            pageNumber: p.pageNumber,
+            status: 'not_memorized',
+            dateMemorized: null,
+            lastRevisedAt: null,
+            weaknessRating: DEFAULT_WEAKNESS_RATING,
+            totalRevisionCount: 0,
+            skipCount: 0,
+          })),
         },
-      }));
-
-      // Session deletion needs the IDs first, so kick that chain off as a
-      // single promise we can race alongside the independent page/user resets.
-      // Sessions, pages, and user doc are independent writes — parallelizing
-      // collapses the round-trip cost from ~4 sequential to ~2.
-      const sessionWipe = (async () => {
-        const sessions = await firestoreService.getRecentSessions(100);
-        if (sessions.length === 0) return;
-        await Promise.all(
-          sessions.map((s) => firestoreService.deleteSession(s.id)),
-        );
-      })();
-
-      await Promise.all([
-        sessionWipe,
-        pageResets.length > 0
-          ? firestoreService.batchUpdatePages(pageResets)
-          : Promise.resolve(),
-        firestoreService.updateUser({
-          onboardingComplete: false,
-          totalMemorizedPages: 0,
-          streak: 0,
-          lastRevisionDate: null,
-        }),
-      ]);
-
-      // Mirror the reset locally so the UI doesn't flash stale state before
-      // subscriptions catch up.
-      setLogs([]);
-      setPages((prev) =>
-        prev.map((p) => ({
-          ...p,
-          status: 'not_memorized',
-          dateMemorized: null,
-          lastRevisedDate: null,
-          weaknessRating: DEFAULT_WEAKNESS_RATING,
-          totalRevisionCount: 0,
-          skipCount: 0,
-        })),
+        at,
       );
-      setOnboardingComplete(false);
-    } catch (err) {
-      logger.error('Error resetting onboarding:', err);
-      setError(err instanceof Error ? err.message : 'Failed to reset onboarding');
-      throw err;
     }
-  }, []);
-
-  // ============================================================================
-  // PAGE OPERATIONS
-  // ============================================================================
-
-  const savePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
-    // Update local state immediately (optimistic update)
-    setPages(updatedPages);
-    lastSaveTimestamp.current = Date.now();
-
-    if (!changedPageNumbers || changedPageNumbers.length === 0) return;
-
-    const pagesToSync = updatedPages.filter(p => changedPageNumbers.includes(p.pageNumber));
-    if (pagesToSync.length === 0) return;
-
-    // Fire-and-forget Firestore update (don't await to avoid blocking UI)
-    const updates = pagesToSync.map(p => ({
-      pageNumber: p.pageNumber,
-      updates: {
-        status: p.status === 'in_progress' ? 'learning' as const : p.status,
-        dateMemorized: p.dateMemorized ? Timestamp.fromDate(new Date(p.dateMemorized)) : null,
-        lastRevisedAt: p.lastRevisedDate ? Timestamp.fromDate(new Date(p.lastRevisedDate)) : null,
-        weaknessRating: p.weaknessRating as WeaknessRating,
-        totalRevisionCount: p.totalRevisionCount,
-        skipCount: p.skipCount,
+    await enqueueOp(
+      {
+        kind: 'user',
+        fields: { onboardingComplete: false, totalMemorizedPages: 0, streak: 0, lastRevisionDate: null },
       },
-    }));
-
-    firestoreService.batchUpdatePages(updates).catch(err => {
-      logger.error('[savePages] batchUpdatePages error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save pages');
-    });
-  }, []);
-
-  const updatePage = useCallback(async (page: UserPage) => {
-    try {
-      setError(null);
-      await firestoreService.updatePage(page.pageNumber, {
-        status: page.status === 'in_progress' ? 'learning' as const : page.status,
-        dateMemorized: page.dateMemorized ? Timestamp.fromDate(new Date(page.dateMemorized)) : null,
-        lastRevisedAt: page.lastRevisedDate ? Timestamp.fromDate(new Date(page.lastRevisedDate)) : null,
-        weaknessRating: page.weaknessRating as WeaknessRating,
-        totalRevisionCount: page.totalRevisionCount,
-        skipCount: page.skipCount,
-      });
-      // State will be updated by subscription
-    } catch (err) {
-      logger.error('Error updating page:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update page');
-      throw err;
-    }
-  }, []);
-
-  const updatePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
-    await savePages(updatedPages, changedPageNumbers);
-  }, [savePages]);
-
-  // Re-derive per-page state (lastRevisedDate, totalRevisionCount, skipCount,
-  // weaknessRating) from the canonical session logs and persist any diffs.
-  // Called after every log mutation AND at the end of loadData so stale page
-  // state from older app versions (or pre-recompute deletes) self-heals.
-  const syncPagesFromLogs = useCallback(
-    async (currentPages: UserPage[], freshLogs: RevisionLog[]) => {
-      if (currentPages.length === 0) return;
-      const next = recomputePagesFromLogs(currentPages, freshLogs);
-      const changed = next
-        .filter((p) => {
-          const old = currentPages.find((c) => c.pageNumber === p.pageNumber);
-          if (!old) return false;
-          return (
-            old.lastRevisedDate !== p.lastRevisedDate ||
-            old.totalRevisionCount !== p.totalRevisionCount ||
-            old.skipCount !== p.skipCount ||
-            old.weaknessRating !== p.weaknessRating
-          );
-        })
-        .map((p) => p.pageNumber);
-      if (changed.length === 0) return;
-      await savePages(next, changed);
-    },
-    [savePages],
-  );
-
-  // Self-heal on initial load: subscriptions populate pages/logs separately,
-  // so wait until both are present, then reconcile once. Subsequent drift is
-  // handled by per-mutation recompute and pull-to-refresh (loadData).
-  useEffect(() => {
-    if (hasSelfHealedOnLoad.current) return;
-    if (pages.length === 0 || logs.length === 0) return;
-    hasSelfHealedOnLoad.current = true;
-    syncPagesFromLogs(pages, logs);
-  }, [pages, logs, syncPagesFromLogs]);
-
-  // Rehydrate the daily reminder once per user identity per session. Settings
-  // and onboarding already schedule on mutation; this only covers cold starts
-  // on a device whose OS scheduler is empty (fresh install, new phone,
-  // sign-in to an existing account). Gated on onboardingComplete so we don't
-  // schedule against default placeholders for users still in the flow.
-  useEffect(() => {
-    if (!user || !onboardingComplete) return;
-    if (lastScheduledUserIdRef.current === user.id) return;
-    lastScheduledUserIdRef.current = user.id;
-    scheduleDailyReminder(user.reminderTime, user.notificationsEnabled).catch(
-      (err) => logger.error('Failed to rehydrate daily reminder:', err),
+      at,
     );
-  }, [user, onboardingComplete]);
+  }, [enqueueOp]);
 
   // ============================================================================
   // LOG/SESSION OPERATIONS
   // ============================================================================
 
   const addLog = useCallback(async (log: Omit<RevisionLog, 'id'>) => {
-    try {
-      setError(null);
-
-      // Check if session exists for this date
-      const existingSession = await firestoreService.getSession(log.date);
-
-      // Clamp to [0, 100] — Firestore rules reject anything outside that range,
-      // and we can hit Infinity/NaN if a stale session has totalAssignedPages = 0
-      // or if the user revises more pages than were originally assigned.
-      const safePercent = (revised: number, total: number): number => {
-        if (!total || total <= 0) return revised > 0 ? 100 : 0;
-        const pct = (revised / total) * 100;
-        if (!Number.isFinite(pct)) return 0;
-        return Math.max(0, Math.min(100, pct));
-      };
-
-      if (existingSession) {
-        // Merge with existing session
-        const mergedPagesRevised = [...new Set([...existingSession.pagesRevised, ...log.pagesRevised])];
-        const mergedPagesSkipped = log.pagesSkipped.filter(p => !mergedPagesRevised.includes(p));
-
-        const newWeaknessUpdates = log.weaknessUpdates.map(wu => ({
-          pageNumber: wu.page,
-          previousRating: 4 as WeaknessRating,
-          newRating: wu.rating as WeaknessRating,
-          changedAt: Timestamp.now(),
-        }));
-
-        // Pages carried into the day after the session started join its
-        // assignment, so tomorrow's carry-over and completion see them.
-        const existingAssigned = existingSession.assignedPages ?? [];
-        const addedAssigned = (log.assignedPages ?? []).filter(
-          (p) => !existingAssigned.includes(p),
-        );
-        const mergedAssigned = [...existingAssigned, ...addedAssigned];
-        const totalAssigned =
-          (addedAssigned.length > 0 ? mergedAssigned.length : existingSession.totalAssignedPages) ||
-          mergedPagesRevised.length;
-        const wasCompleted = existingSession.state === 'COMPLETED';
-
-        await firestoreService.updateSession(existingSession.id, {
-          ...(addedAssigned.length > 0 && {
-            assignedPages: mergedAssigned,
-            totalAssignedPages: mergedAssigned.length,
-          }),
-          pagesRevised: mergedPagesRevised,
-          pagesSkipped: mergedPagesSkipped,
-          durationMinutes: Math.max(1, (existingSession.durationMinutes || 0) + (log.durationMinutes || 0)),
-          weaknessUpdates: [...existingSession.weaknessUpdates, ...newWeaknessUpdates],
-          // A completed session stays completed (the rules forbid going back).
-          state: wasCompleted || mergedPagesRevised.length >= totalAssigned ? 'COMPLETED' : 'IN_PROGRESS',
-          completionPercentage: safePercent(mergedPagesRevised.length, totalAssigned),
-        });
-      } else {
-        // Create new session. Prefer the caller-supplied assignedPages (the
-        // actual day's assignment) over reconstructing from revised+skipped,
-        // because intermediate Saves don't populate skipped and would
-        // otherwise create a session that "forgets" pending pages.
-        const fallbackAssigned = [...log.pagesRevised, ...log.pagesSkipped];
-        const assignedPages =
-          log.assignedPages && log.assignedPages.length > 0
-            ? log.assignedPages
-            : fallbackAssigned.length > 0
-              ? fallbackAssigned
-              : log.pagesRevised;
-        await firestoreService.createSession({
-          date: log.date,
-          assignedPages,
-        });
-
-        // Update with progress
-        if (log.pagesRevised.length > 0) {
-          const session = await firestoreService.getSession(log.date);
-          if (session) {
-            const totalAssigned = session.totalAssignedPages || log.pagesRevised.length;
-            await firestoreService.updateSession(session.id, {
-              pagesRevised: log.pagesRevised,
-              pagesSkipped: log.pagesSkipped,
-              durationMinutes: Math.max(1, log.durationMinutes || 1),
-              state: log.pagesRevised.length >= totalAssigned ? 'COMPLETED' : 'IN_PROGRESS',
-              completionPercentage: safePercent(log.pagesRevised.length, totalAssigned),
-              weaknessUpdates: log.weaknessUpdates.map(wu => ({
-                pageNumber: wu.page,
-                previousRating: 4 as WeaknessRating,
-                newRating: wu.rating as WeaknessRating,
-                changedAt: Timestamp.now(),
-              })),
-            });
-          }
-        }
-      }
-
-      // Refresh logs
-      const sessions = await firestoreService.getRecentSessions(100);
-      setLogs(sessions.map(firestoreSessionToLog));
-    } catch (err) {
-      logger.error('Error adding log:', err);
-      setError(err instanceof Error ? err.message : 'Failed to add log');
-      throw err;
-    }
-  }, []);
-
-  const updateLog = useCallback(async (log: RevisionLog) => {
-    try {
-      setError(null);
-      await firestoreService.updateSession(log.id, {
+    setError(null);
+    const at = Date.now();
+    const existing = viewRef.current?.sessions.find((s) => s.id === log.date);
+    await enqueueOp(
+      {
+        kind: 'session.add',
+        date: log.date,
+        assignedPages: log.assignedPages ?? [],
         pagesRevised: log.pagesRevised,
         pagesSkipped: log.pagesSkipped,
-        durationMinutes: log.durationMinutes,
-        weaknessUpdates: log.weaknessUpdates.map(wu => ({
-          pageNumber: wu.page,
-          previousRating: 4 as WeaknessRating,
-          newRating: wu.rating as WeaknessRating,
-          changedAt: Timestamp.now(),
-        })),
-      });
+        weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
+        // Minutes add up: at least what this phone knows plus this stretch.
+        durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
+      },
+      at,
+    );
+  }, [enqueueOp]);
 
-      // Refresh logs
-      const sessions = await firestoreService.getRecentSessions(100);
-      const freshLogs = sessions.map(firestoreSessionToLog);
-      setLogs(freshLogs);
-      await syncPagesFromLogs(pagesRef.current, freshLogs);
-    } catch (err) {
-      logger.error('Error updating log:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update log');
-      throw err;
-    }
-  }, [syncPagesFromLogs]);
-
-  const deleteLog = useCallback(async (logId: string) => {
-    try {
-      setError(null);
-      await firestoreService.deleteSession(logId);
-      // A session's id is its revision day; its recordings go with it. Awaited
-      // so a recordings list refreshed afterwards no longer shows them.
-      await deleteRecordings(isRevisionRecordingOf(logId)).catch((err) =>
-        logger.warn('Could not delete session recordings', err),
-      );
-
-      // Refresh logs
-      const sessions = await firestoreService.getRecentSessions(100);
-      const freshLogs = sessions.map(firestoreSessionToLog);
-      setLogs(freshLogs);
-      await syncPagesFromLogs(pagesRef.current, freshLogs);
-    } catch (err) {
-      logger.error('Error deleting log:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete log');
-      throw err;
-    }
-  }, [syncPagesFromLogs]);
+  const updateLog = useCallback(async (log: RevisionLog) => {
+    setError(null);
+    const at = Date.now();
+    const before = viewRef.current?.sessions.find((s) => s.id === log.id);
+    const old = new Set(before?.pagesRevised ?? []);
+    const next = new Set(log.pagesRevised);
+    const op: OutboxOp = {
+      kind: 'session.edit',
+      id: log.id,
+      addRevised: log.pagesRevised.filter((p) => !old.has(p)),
+      removeRevised: [...old].filter((p) => !next.has(p)),
+      pagesSkipped: log.pagesSkipped,
+      durationMinutes: log.durationMinutes,
+      weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
+    };
+    const freshLogs = logsWith([op], at);
+    await enqueueOp(op, at);
+    await syncPagesFromLogs(pagesRef.current, freshLogs);
+  }, [enqueueOp, logsWith, syncPagesFromLogs]);
 
   const deleteLogs = useCallback(async (logIds: string[]) => {
     if (logIds.length === 0) return;
-    try {
-      setError(null);
-      await Promise.all(logIds.map((id) => firestoreService.deleteSession(id)));
-      await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch(
-        (err) => logger.warn('Could not delete session recordings', err),
-      );
+    setError(null);
+    const at = Date.now();
+    const ops: OutboxOp[] = logIds.map((id) => ({ kind: 'session.delete', id }));
+    const freshLogs = logsWith(ops, at);
+    for (const op of ops) await enqueueOp(op, at);
+    // A session's id is its revision day; its recordings go with it. Awaited
+    // so a recordings list refreshed afterwards no longer shows them.
+    await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch((err) =>
+      logger.warn('Could not delete session recordings', err),
+    );
+    await syncPagesFromLogs(pagesRef.current, freshLogs);
+  }, [enqueueOp, logsWith, syncPagesFromLogs]);
 
-      // Refresh logs once after all deletions
-      const sessions = await firestoreService.getRecentSessions(100);
-      const freshLogs = sessions.map(firestoreSessionToLog);
-      setLogs(freshLogs);
-      await syncPagesFromLogs(pagesRef.current, freshLogs);
-    } catch (err) {
-      logger.error('Error deleting logs:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete sessions');
-      throw err;
-    }
-  }, [syncPagesFromLogs]);
+  const deleteLog = useCallback(async (logId: string) => {
+    await deleteLogs([logId]);
+  }, [deleteLogs]);
 
   // ============================================================================
   // RENDER
@@ -856,14 +881,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider
       value={{
-        user,
+        user: ready ? user : null,
         pages,
         logs,
-        loading: loading || (isAuthenticated && !userResolved),
+        loading,
         onboardingComplete,
-        isAuthenticated,
+        isAuthenticated: !!uid,
         error,
+        connectionNeeded,
+        offline,
+        pendingChanges: pending.length,
         loadData,
+        retryConnection,
         saveUser,
         savePages,
         updatePage,

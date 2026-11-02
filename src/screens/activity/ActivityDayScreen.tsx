@@ -20,6 +20,7 @@ import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
+import { pendingJournalEntry, queueChange, withPendingReadings } from '../../lib/offline/queue';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
 import { formatJournalDayRelative, formatMinutes, isJournalEntryEmpty, journalTotalMinutes } from '../../lib/journal';
@@ -98,8 +99,19 @@ export default function ActivityDayScreen() {
 
   const load = useCallback(async () => {
     const [r, j] = await Promise.allSettled([
-      firestoreService.getReadingSessionsForDay(date),
-      firestoreService.getJournalEntry(date),
+      firestoreService.getReadingSessionsForDay(date).then((list) => withPendingReadings(list, { date })),
+      firestoreService.getJournalEntry(date).then(
+        (entry) => {
+          const waiting = pendingJournalEntry(date);
+          return waiting === undefined ? entry : waiting;
+        },
+        // Offline and not in Firestore's memory: a change waiting here still shows.
+        (err) => {
+          const waiting = pendingJournalEntry(date);
+          if (waiting !== undefined) return waiting;
+          throw err;
+        },
+      ),
     ]);
     if (r.status === 'fulfilled') {
       setReadings(
@@ -127,7 +139,7 @@ export default function ActivityDayScreen() {
     setReadings((prev) => prev.map((s) => (s.id === session.id ? { ...s, pages } : s)));
     setEditingReading(null);
     try {
-      await firestoreService.updateReadingSessionPages(session.id, pages);
+      await queueChange({ kind: 'reading.pages', id: session.id, pages });
     } catch (err) {
       logger.error('Failed to update session pages', err);
       Alert.alert("Couldn't save pages", 'Please try again.');
@@ -145,7 +157,7 @@ export default function ActivityDayScreen() {
           setEditingReading(null);
           setReadings((prev) => prev.filter((s) => s.id !== session.id));
           try {
-            await firestoreService.deleteReadingSession(session.id);
+            await queueChange({ kind: 'reading.delete', id: session.id });
             // Recordings made while it ran go with it (a failure here must not
             // bring the deleted session back).
             // Only sessions timed in the reader: "Mark as read" sessions (e.g.

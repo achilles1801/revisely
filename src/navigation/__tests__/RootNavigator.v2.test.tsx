@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator } from 'react-native';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -18,8 +18,18 @@ jest.mock('../../screens/auth/AuthScreen', () => {
   return { __esModule: true, default: () => <Text>auth</Text> };
 });
 
-const mockApp = { loading: false, onboardingComplete: false };
-const mockAuth = { isAuthenticated: false, isLoading: false };
+const mockApp = {
+  loading: false,
+  onboardingComplete: false,
+  connectionNeeded: false,
+  retryConnection: jest.fn(),
+};
+const mockAuth: { isAuthenticated: boolean; isLoading: boolean; provisionalUid: string | null; signOutUser: jest.Mock } = {
+  isAuthenticated: false,
+  isLoading: false,
+  provisionalUid: null,
+  signOutUser: jest.fn(async () => undefined),
+};
 jest.mock('../../context/AppContext', () => ({ useApp: () => mockApp }));
 jest.mock('../../context/AuthContext', () => ({ useAuth: () => mockAuth }));
 
@@ -46,8 +56,11 @@ async function show() {
 beforeEach(async () => {
   await AsyncStorage.clear();
   mockApp.loading = false;
+  mockApp.onboardingComplete = false;
+  mockApp.connectionNeeded = false;
   mockAuth.isLoading = false;
   mockAuth.isAuthenticated = false;
+  mockAuth.provisionalUid = null;
 });
 
 describe('<RootNavigator /> in the new design', () => {
@@ -62,5 +75,25 @@ describe('<RootNavigator /> in the new design', () => {
     await show();
     expect(screen.getByText('auth')).toBeTruthy();
     expect(screen.UNSAFE_queryAllByType(LinearGradient)).toHaveLength(0);
+  });
+
+  it('signed in with no copy on this phone and no server: "Connect to the internet to set up", not a spinner', async () => {
+    mockAuth.isAuthenticated = true;
+    mockApp.connectionNeeded = true;
+    await show();
+    expect(screen.getByText('Connect to the internet to set up')).toBeTruthy();
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0);
+    fireEvent.press(screen.getByTestId('connect-retry'));
+    expect(mockApp.retryConnection).toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('connect-sign-out'));
+    expect(mockAuth.signOutUser).toHaveBeenCalled();
+  });
+
+  it('while Auth checks a saved sign-in on a slow network, the app opens with that account', async () => {
+    mockAuth.isLoading = true;
+    mockAuth.provisionalUid = 'u1';
+    mockApp.onboardingComplete = true;
+    await show();
+    expect(screen.getByText('main')).toBeTruthy();
   });
 });

@@ -161,6 +161,50 @@ file is the release mechanics and the traps behind them.
 `group` = the previous production update group (`eas update:list --branch production`), `rollback` =
 true → approve. It republishes that exact update, the same way promotion does.
 
+## Offline (src/lib/offline)
+
+Firestore's JavaScript SDK keeps nothing on disk in React Native (its persistence needs IndexedDB), so
+the app keeps its own copy and its own queue. Before Nov 2026 a cold start offline sat on the spinner
+for good: it waited for the server to answer for the user document.
+- **The copy** (`accountCache`): the user document, the 604 pages and the 100 latest sessions, as the
+  server last sent them, per account in AsyncStorage (`@revisely_account:v1:<uid>:…`). `AppProvider`
+  opens from it at once and replaces it with each server snapshot. Snapshots marked `fromCache` (the
+  SDK's memory: empty on a cold start) are never applied or saved: an empty one once wrote blank
+  pages over real progress (REACT-NATIVE-6), and missing data is still created only when the server
+  confirms it (`lib/userDoc`). Signing out deletes the copy.
+- **The outbox** (`outbox`, `ops`, `sync`, `apply`): every change (user fields, pages, sessions, the
+  timer's reading sessions, the daily log, usage seconds) is saved on the phone first and sent in
+  order, one at a time, crossed off when the server has it. The app shows the copy with pending
+  changes laid over it (`overlayAccount`), so nothing waits for the server. Each change is safe to send
+  twice (absolute values, page lists merged as sets, a session's minutes "at least" n, fixed
+  `createdAt`s); a session is merged with the server's inside a transaction (another phone may have
+  added to the day). Offline or a timeout: tried again (2 s … 1 min) and at once when NetInfo says the
+  connection is back or the app comes to the front (`connectivity` also restarts Firestore's
+  connection, which otherwise waits out its own backoff). Refused by the rules: dropped and reported
+  (kind only). Nothing is sent for an account that isn't the one signed in; signing out keeps its
+  outbox for its next sign-in here, deleting the account clears it. Usage seconds are the one change
+  that isn't idempotent: a crash between the server's answer and crossing it off counts them twice.
+- **First launch offline** (no copy): `connectionNeeded` → `ConnectToSetUp` ("Connect to the internet
+  to set up", Try again, Sign out) when NetInfo or Firestore says offline, or after `SERVER_WAIT_MS`
+  (6 s). It carries on by itself when the server answers. Onboarding never starts without the server.
+- **A slow network at launch:** Firebase Auth checks its saved sign-in with the server first (up to
+  30 s). After `AUTH_GRACE_MS` (1.5 s) the app opens with the account Auth saved
+  (`provisionalUid`, read from Auth's own AsyncStorage entry) and its copy; nothing is sent until Auth
+  confirms it. Offline, Auth keeps an expired sign-in (it can't check it) and refreshes it once online.
+- **Offline note:** Home's `OfflineNote` ("Offline", "Offline · changes saved on this phone").
+- The daily log can't be read offline unless Firestore already holds that day: the screen then says
+  so and can't be saved (a save would overwrite the server's entry).
+- The start-up self-heal (`syncPagesFromLogs`) runs only on the server's pages and sessions, never on
+  the copy, and compares last-revised dates by day (comparing a day with a timestamp rewrote every
+  revised page, unchanged, on every launch).
+- **Testing offline:** the Android emulator has airplane mode (`adb shell cmd connectivity
+  airplane-mode enable`; Metro still works through `adb reverse`). The iOS Simulator has none:
+  `src/dev/offlineSwitch.ts` (development builds only; absent from release bundles) sends every
+  JavaScript request except to Metro to a closed port. Turn it on in the app with
+  `xcrun simctl openurl <udid> "revisely://devoffline?on=1"` (`exp+revision-buddy://devoffline?on=1`
+  on dev clients without the revisely scheme; `on=0` turns it off); it is kept for the next launch.
+  `defaults write` from `simctl spawn` doesn't reach the app once it has saved its own value.
+
 ## Runtime version is a fingerprint
 
 `runtimeVersion: { policy: "fingerprint" }` in `app.config.js`: an update reaches only binaries built
