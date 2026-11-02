@@ -110,6 +110,15 @@ describe('salesSummary', () => {
     expect(fake.last.opts.headers.Authorization).toBe('Bearer x');
   });
 
+  it('asks for version 1_1 by day and week, 1_0 by month and year (Apple refuses 1_1 there)', async () => {
+    const f = fake(200, zlib.gzipSync(report()));
+    for (const [frequency, version] of [['DAILY', '1_1'], ['WEEKLY', '1_1'], ['MONTHLY', '1_0'], ['YEARLY', '1_0']]) {
+      await salesSummary('2026-10', { frequency, env, fetchImpl: f, auth: 'x' });
+      expect(fake.last.url).toContain(`filter%5Bfrequency%5D=${frequency}`);
+      expect(fake.last.url).toContain(`filter%5Bversion%5D=${version}`);
+    }
+  });
+
   it("a day with no sales is empty; a report that isn't out yet is missing", async () => {
     expect(await salesSummary('2026-11-02', { env, auth: 'x', fetchImpl: fake(404, null, { errors: [{ detail: 'There were no sales for the date specified.' }] }) })).toEqual({ rows: [] });
     expect(await salesSummary('2026-11-08', { env, auth: 'x', fetchImpl: fake(404, null, { errors: [{ detail: 'Report is not available yet. Daily reports …' }] }) })).toEqual({ missing: true });
@@ -138,5 +147,15 @@ describe('appStore (the whole collection)', () => {
     expect(r.appStore.total.update).toBe(50 + 14);
     const daily = calls.filter((c) => c.startsWith('DAILY'));
     expect(new Set(daily).size).toBe(daily.length);
+  });
+
+  it("a month whose report says no sales (Apple's answer before it is out) is counted from its days", async () => {
+    const get = async (date, frequency) => {
+      if (frequency === 'MONTHLY') return { rows: [] };
+      return { rows: D.parseSummary(report(row('1F', 1, 'US'))) };
+    };
+    const r = await appStore(new Date('2026-11-02T16:00:00Z'), {}, get);
+    // October 1–31 from its days, November 1 (today, the 2nd, isn't counted).
+    expect(r.appStore.total.first).toBe(31 + 1);
   });
 });
