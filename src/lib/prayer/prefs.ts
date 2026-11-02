@@ -67,6 +67,8 @@ function parseAlert(raw: unknown): PrayerAlert {
   return {
     on: a.on === true,
     before: (REMINDER_OPTIONS as readonly number[]).includes(a.before as number) ? (a.before as ReminderBefore) : 0,
+    // Silent stays silent; anything else is the standard tone, including
+    // "athan" saved by a 1.0.3 TestFlight build (the athan was removed).
     sound: a.sound === 'silent' ? 'silent' : 'standard',
   };
 }

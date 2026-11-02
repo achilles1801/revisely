@@ -1,5 +1,5 @@
 // Scheduling with expo-notifications (kept in memory here, as iOS keeps them).
-const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean }; trigger: { date: Date; channelId?: string } }>();
+const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean; interruptionLevel?: string }; trigger: { date: Date; channelId?: string } }>();
 const mockCalls = { schedule: 0, cancel: 0 };
 jest.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: { DATE: 'date', DAILY: 'daily' },
@@ -61,6 +61,14 @@ describe('syncPrayerNotifications', () => {
     // On Android the sound is the channel's: silent ones go to the silent channel.
     expect(isha.trigger.channelId).toBe('prayer-silent');
     expect(mockPending.get('prayer-2026-10-29-fajr')!.trigger.channelId).toBe('prayer');
+  });
+
+  it('a prayer’s time is Time Sensitive, its reminder ordinary, "keep going" passive', async () => {
+    await syncPrayerNotifications({ now, days: days(OCT28), alerts: on(10), place: 'London' });
+    expect(mockPending.get('prayer-2026-10-28-asr')!.content.interruptionLevel).toBe('timeSensitive');
+    expect(mockPending.get('prayer-2026-10-28-asr')!.content.sound).toBe(true);
+    expect(mockPending.get('prayer-2026-10-28-asr-before')!.content.interruptionLevel).toBe('active');
+    expect(mockPending.get('prayer-keep-going')!.content.interruptionLevel).toBe('passive');
   });
 
   it('again with nothing changed: nothing rescheduled', async () => {

@@ -1,5 +1,6 @@
 import { dayTimes, CalcSettings } from '../times';
 import {
+  interruptionFor,
   KEEP_GOING_ID,
   planDays,
   planPrayerNotifications,
@@ -81,6 +82,12 @@ describe('prayer notification plan', () => {
   it('a silent prayer stays silent; off prayers are left out', () => {
     const plan = planPrayerNotifications({ now, days: days(OCT28, 3), alerts: alerts({ isha: { on: true, sound: 'silent' } }), budget: 62, place: null });
     expect(plan.filter((p) => p.kind !== 'keep-going').every((p) => p.prayer === 'isha' && p.sound === 'silent')).toBe(true);
+  });
+
+  it('a prayer’s time is Time Sensitive; its reminder ordinary; "keep going" passive', () => {
+    expect(interruptionFor('at')).toBe('timeSensitive');
+    expect(interruptionFor('before')).toBe('active');
+    expect(interruptionFor('keep-going')).toBe('passive');
   });
 
   it('nothing on, or no room: nothing at all (no lone "keep going")', () => {
