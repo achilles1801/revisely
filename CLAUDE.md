@@ -20,7 +20,11 @@ file is the release mechanics and the traps behind them.
      `production`. Mark or unmark a tester with
      `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-preview-tester.js <email> [--off]`
      (`--list` shows them; clients can't write the field). Binaries before 1.0.2 lack the module and
-     stay on `production`, in TestFlight too.
+     stay on `production`, in TestFlight too. To start an account again as a new user (keeping its
+     sign-in and `previewTester`), `node scripts/reset-account.js <email>` from `functions/` (a dry
+     run; `--yes` backs up to `~/secrets/backups/<uid>-<date>/`, checks the backup, then resets;
+     `--check` says whether it still looks new). `restore-account.js <backup dir>` puts it back.
+     It refuses the App Review account.
   3. Try it in TestFlight, then merge `develop` into `main` (a PR, CI green). Changes made on `main`
      directly that go into the app block promotion until they come back through `develop`.
   4. `Promote to production` (`.github/workflows/promote.yml`) finds the preview update with main's
@@ -195,6 +199,13 @@ for good: it waited for the server to answer for the user document.
     Firestore's (a bug) is dropped after 5 tries, so it can't hold up the rest.
   - **Accounts:** nothing is sent for an account that isn't the one signed in. Signing out keeps
     its outbox for its next sign-in here; deleting the account clears it.
+  - **Reset by an admin** (`lib/offline/reset`): `functions/scripts/reset-account.js` sets
+    `dataResetAt` on the user document. A run sends nothing until it has compared that with the
+    mark of the copy (the user document's listener does it, or `beforeSend` reads the server once).
+    Reset since: every waiting change built on the copy is dropped (with no copy, the ones made
+    before the reset), and the copy's pages and sessions go, on screen and on the phone. Local
+    recordings stay (only the user deletes those); the script tombstones their records, so they
+    stay local-only.
   - **Storage:** a stored queue that can't be read is never written over, and a damaged one is
     kept aside (`@revisely_outbox_damaged:…`).
   - **Usage seconds** aren't idempotent: a crash between the server's answer and crossing them off

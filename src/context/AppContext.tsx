@@ -27,8 +27,9 @@ import { ensureOnServer, retryDelayMs } from '../lib/userDoc';
 import * as Sentry from '@sentry/react-native';
 import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 import { useAuth } from './AuthContext';
-import { readAccount, writeAccountPart, AccountPart } from '../lib/offline/accountCache';
-import { enqueue, loadOutbox, pendingEntries, subscribeOutbox } from '../lib/offline/outbox';
+import { clearAccount, readAccount, writeAccountPart, AccountPart } from '../lib/offline/accountCache';
+import { enqueue, loadOutbox, pendingEntries, removeEntries, subscribeOutbox } from '../lib/offline/outbox';
+import { resetMark, staleEntries, wasReset } from '../lib/offline/reset';
 import { configureSync, onApplied, requestFlush } from '../lib/offline/sync';
 import { applyEntry } from '../lib/offline/apply';
 import {
@@ -197,6 +198,20 @@ const emptyBase = (uid: string): Base => ({
   pagesSettled: false,
 });
 
+/** The reset check for the account shown (lib/offline/reset). */
+interface ResetCheck {
+  uid: string;
+  /** The copy and the outbox have been read from the phone. */
+  copyRead: boolean;
+  whenCopyRead: Promise<void>;
+  /** The reset mark of what the phone's data is built on (undefined: no copy). */
+  basis: number | null | undefined;
+  /** The server's mark, once heard. */
+  server: number | null | undefined;
+  /** Both were known and compared at least once. */
+  checked: boolean;
+}
+
 /** A change the server took, folded into `base` until its snapshot arrives. */
 function commitToBase(b: Base, entry: OutboxEntry): Base {
   const view = overlayAccount(
@@ -346,6 +361,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const lastScheduledUserIdRef = useRef<string | null>(null);
 
   // ============================================================================
+  // RESET ON THE SERVER (lib/offline/reset): what the phone holds from before
+  // an admin reset the account is dropped, and nothing is sent until checked
+  // ============================================================================
+
+  const resetCheck = useRef<ResetCheck | null>(null);
+
+  // Once both the copy and the server's user document are known.
+  const settleResetCheck = useCallback(
+    async (forUid: string) => {
+      const r = resetCheck.current;
+      if (!r || r.uid !== forUid || !r.copyRead || r.server === undefined) return;
+      const server = r.server;
+      const reset = wasReset(r.basis, server);
+      const stale = staleEntries(pendingEntries(forUid), r.basis, server);
+      r.basis = server;
+      r.checked = true;
+      if (!reset) return;
+      logger.log('The account was reset on the server; dropping what this phone held from before', {
+        changes: stale.length,
+      });
+      // Pages and sessions only as the server sent them in this run; the copy's go.
+      const parts: AccountPart[] = [];
+      mutateBase((b) => {
+        if (!b || b.uid !== forUid) return b;
+        if (!b.pagesFresh) parts.push('pages');
+        if (!b.sessionsFresh) parts.push('sessions');
+        return {
+          ...b,
+          pages: b.pagesFresh ? b.pages : undefined,
+          sessions: b.sessionsFresh ? b.sessions : undefined,
+        };
+      });
+      await Promise.all([
+        clearAccount(forUid, parts),
+        removeEntries(
+          forUid,
+          stale.map((e) => e.id),
+        ),
+      ]);
+    },
+    [mutateBase],
+  );
+
+  const noteServerUser = useCallback(
+    (forUid: string, fsUser: FirestoreUser | null | undefined): Promise<void> => {
+      const r = resetCheck.current;
+      if (!r || r.uid !== forUid) return Promise.resolve();
+      r.server = resetMark(fsUser);
+      return settleResetCheck(forUid);
+    },
+    [settleResetCheck],
+  );
+
+  // ============================================================================
   // SYNC: the outbox reaches the server while its account is signed in
   // ============================================================================
 
@@ -357,6 +426,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // A server read works: Auth and App Check are fine, so a permission
       // error on a change is the rules refusing it.
       probe: (u) => firestoreService.userDocExistsOnServer(u).then(() => true, () => false),
+      // The reset check, if the user document's listener hasn't done it yet.
+      beforeSend: async (u) => {
+        const r = resetCheck.current;
+        if (!r || r.uid !== u) throw new Error('The account is not loaded yet');
+        await r.whenCopyRead;
+        if (resetCheck.current !== r || r.checked) return;
+        await noteServerUser(u, await firestoreService.getUserFromServer(u));
+      },
     });
     const offApplied = onApplied(async (u, entry) => {
       // Folded into what's shown, and into the copy on the phone, before it
@@ -395,7 +472,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       offNet();
       configureSync(null);
     };
-  }, [mutateBase]);
+  }, [mutateBase, noteServerUser]);
 
   useEffect(() => {
     if (signedInUid) requestFlush(signedInUid);
@@ -427,6 +504,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setCurrentAccount(uid);
     if (!uid) {
+      resetCheck.current = null;
       mutateBase(() => null);
       setPending([]);
       setCacheChecked(null);
@@ -445,6 +523,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setError(null);
     hasSelfHealedOnLoad.current = false;
 
+    let copyRead = () => {};
+    const check: ResetCheck = {
+      uid,
+      copyRead: false,
+      basis: undefined,
+      server: undefined,
+      checked: false,
+      whenCopyRead: new Promise<void>((resolve) => {
+        copyRead = resolve;
+      }),
+    };
+    resetCheck.current = check;
+
     // The copy on the phone and the outbox. A server answer that came first wins.
     Promise.all([
       readAccount(uid),
@@ -454,6 +545,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }),
     ]).then(([cached]) => {
       if (!active) return;
+      // What the phone's changes are built on (none without a copy).
+      check.basis = cached ? resetMark(cached.user) : undefined;
+      check.copyRead = true;
       if (cached) {
         mutateBase((b) =>
           b && b.uid === uid
@@ -468,13 +562,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setPending(pendingEntries(uid));
       setCacheChecked(uid);
-    });
+      // The server may have answered first.
+      return settleResetCheck(uid);
+    }).finally(() => copyRead());
     const waitTimer = setTimeout(() => active && setWaitedOut(true), SERVER_WAIT_MS);
     return () => {
       active = false;
       clearTimeout(waitTimer);
     };
-  }, [uid, mutateBase]);
+  }, [uid, mutateBase, settleResetCheck]);
 
   // The listeners: subscribed again (after a backoff) if one ends in an error,
   // e.g. refused at launch before App Check had its token.
@@ -546,8 +642,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Firestore's memory, not the server: the copy on the phone stands.
         if (fromCache) return;
         heard();
+        if (fsUser) update((b) => ({ ...b, user: fsUser }));
+        // Reset by an admin since what the phone holds? Then that goes.
+        noteServerUser(uid, fsUser).catch((err) => logger.warn('Reset check failed', err));
         if (fsUser) {
-          update((b) => ({ ...b, user: fsUser }));
           saveCopy(uid, 'user', fsUser);
           return;
         }
@@ -592,7 +690,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsubscribePages();
       unsubscribeSessions();
     };
-  }, [uid, listenEpoch, saveCopy, mutateBase]);
+  }, [uid, listenEpoch, saveCopy, mutateBase, noteServerUser]);
 
   // ============================================================================
   // WHAT THE APP SHOWS

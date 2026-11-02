@@ -97,6 +97,10 @@ export interface FirestoreUser {
   /** Set by an admin only (functions/scripts/set-preview-tester.js; the rules
    *  refuse it from clients): TestFlight installs follow the preview channel. */
   previewTester?: boolean;
+  /** Set by an admin only (functions/scripts/reset-account.js): when the
+   *  account's data was reset. Phones drop what they held from before
+   *  (lib/offline/reset). */
+  dataResetAt?: Timestamp;
   // Identity
   /** User ID from Firebase Auth */
   uid: string;
