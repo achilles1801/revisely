@@ -1,22 +1,70 @@
 // Quran page images (Madani Mushaf, rendered by github.com/quran/quran.com-images),
 // mirrored to the project's own Storage bucket as public, immutable objects at
 // mushaf/001.png ... mushaf/604.png. Mirrored from github.com/GovarJabbar/Quran-PNG.
+//
+// Those are 2600×4206. iOS shrinks them to the screen with a proper filter.
+// Android's image pipeline (Fresco) caps a bitmap at 2048 px and gets there by
+// keeping one pixel in three, which breaks thin strokes (#153). So Android loads
+// copies made at a phone's width instead (scripts/build-mushaf-variants.py,
+// mushaf/w1080/ and mushaf/w1440/) and draws them as decoded (`resizeMethod`
+// "none", pageImageProps).
+
+import { Dimensions, PixelRatio, Platform } from 'react-native';
 
 const BASE_URL = 'https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf';
+
+/** Which copy of the pages a device loads: the originals, or a width-sized set. */
+export type PageImageSet = 'full' | 'w1080' | 'w1440';
+
+/**
+ * The set for a platform and the screen's short side in pixels. iOS keeps the
+ * originals. Android takes the smallest set at least as wide as the screen,
+ * and w1440 beyond it (tablets): a page drawn a little larger than its bitmap
+ * is smooth, while the originals would be cut down to 1 pixel in 3.
+ */
+export function pageImageSetFor(os: string, shortSidePixels: number): PageImageSet {
+  if (os !== 'android') return 'full';
+  return shortSidePixels <= 1080 ? 'w1080' : 'w1440';
+}
+
+let deviceSet: PageImageSet | null = null;
+
+/** This device's set, decided once (the screen, not the window: rotation and split screen don't change it). */
+export function pageImageSet(): PageImageSet {
+  if (deviceSet == null) {
+    const { width, height } = Dimensions.get('screen');
+    deviceSet = pageImageSetFor(
+      Platform.OS,
+      PixelRatio.getPixelSizeForLayoutSize(Math.min(width, height)),
+    );
+  }
+  return deviceSet;
+}
+
+/** Props for an <Image> showing a page: on Android, draw the copy as decoded (no Fresco downsampling). */
+export function pageImageProps(): { resizeMethod?: 'none' } {
+  return pageImageSet() === 'full' ? {} : { resizeMethod: 'none' };
+}
+
+/** Test hook: decide the set again. */
+export function __resetPageImageSetForTests(): void {
+  deviceSet = null;
+}
 
 /**
  * Get the URL for a specific Quran page image
  * @param pageNumber - Page number (1-604)
+ * @param set - which copy (default: this device's)
  * @returns URL string for the page image
  */
-export function getQuranPageImageUrl(pageNumber: number): string {
+export function getQuranPageImageUrl(pageNumber: number, set: PageImageSet = pageImageSet()): string {
   if (pageNumber < 1 || pageNumber > 604) {
     throw new Error(`Invalid page number: ${pageNumber}. Must be between 1 and 604.`);
   }
 
   // Pages are named with leading zeros (001.png, 002.png, etc.)
   const paddedNumber = pageNumber.toString().padStart(3, '0');
-  return `${BASE_URL}/${paddedNumber}.png`;
+  return set === 'full' ? `${BASE_URL}/${paddedNumber}.png` : `${BASE_URL}/${set}/${paddedNumber}.png`;
 }
 
 /**

@@ -17,7 +17,12 @@ jest.mock('../../lib/pageCache', () => ({
   prefetchPages: jest.fn(),
   pagesAround: (pages: number[]) => pages.slice(0, 1),
 }));
-jest.mock('../../lib/quranImages', () => ({ getQuranPageImageUrl: () => 'https://x/p.png' }));
+// The device's page image props (Android: { resizeMethod: 'none' }; iOS: none).
+let mockPageImageProps: Record<string, unknown> = {};
+jest.mock('../../lib/quranImages', () => ({
+  getQuranPageImageUrl: () => 'https://x/p.png',
+  pageImageProps: () => mockPageImageProps,
+}));
 
 const PAGES = Array.from({ length: 20 }, (_, i) => i + 1);
 
@@ -232,6 +237,23 @@ describe('<MushafPager /> a verse’s highlight', () => {
     const frame = frameOf(image as unknown as Node);
     expect(frame).not.toBeNull();
     expect(boxes.every((box) => frameOf(box as unknown as Node) === frame)).toBe(true);
+  });
+});
+
+describe('<MushafPager /> how the page image is decoded (#153)', () => {
+  afterEach(() => {
+    mockPageImageProps = {};
+  });
+
+  it('on Android, draws the width-sized copy as decoded (no Fresco downsampling)', () => {
+    mockPageImageProps = { resizeMethod: 'none' };
+    render(<MushafPager pages={[50]} />);
+    expect(screen.getByTestId('page-image').props.resizeMethod).toBe('none');
+  });
+
+  it('on iOS, leaves the image as it was', () => {
+    render(<MushafPager pages={[50]} />);
+    expect(screen.getByTestId('page-image').props.resizeMethod).toBeUndefined();
   });
 });
 

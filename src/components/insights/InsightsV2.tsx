@@ -9,7 +9,7 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { getSurahForPage } from '../../lib/quranData';
-import { getQuranPageImageUrl } from '../../lib/quranImages';
+import { getQuranPageImageUrl, pageImageProps } from '../../lib/quranImages';
 import { fitPage } from '../../lib/pageFit';
 import { getReadPalette } from '../../theme/readPalette';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
@@ -224,6 +224,7 @@ export function PagePreviewSheet({ pageNumber, onClose }: { pageNumber: number |
           {loading ? <ActivityIndicator style={styles.loader} color={read.textSecondary} /> : null}
           <Image
             source={{ uri: getQuranPageImageUrl(shown) }}
+            {...pageImageProps()}
             resizeMode="contain"
             style={[{ width: size.width, height: size.height }, read.pageTint != null && { tintColor: read.pageTint }]}
             onLoadStart={() => setLoading(true)}
