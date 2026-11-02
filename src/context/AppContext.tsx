@@ -220,7 +220,7 @@ const isoToMillis = (iso: string | null | undefined): number | null => {
   return Number.isFinite(ms) ? ms : null;
 };
 
-function pageChange(p: UserPage): PageFields {
+function pageFields(p: UserPage): PageFields {
   return {
     pageNumber: p.pageNumber,
     status: p.status === 'in_progress' ? 'learning' : p.status,
@@ -230,6 +230,30 @@ function pageChange(p: UserPage): PageFields {
     totalRevisionCount: p.totalRevisionCount,
     skipCount: p.skipCount,
   };
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Only the fields that differ from what the app shows. A change is built on
+ * the copy on the phone, which can be older than the server (another phone):
+ * sending every field would put its old values back.
+ */
+function changedOnly<T extends Record<string, unknown>>(next: T, before: T | null | undefined): Partial<T> {
+  if (!before) return next;
+  const out: Partial<T> = {};
+  for (const key of Object.keys(next) as (keyof T)[]) {
+    if (!same(next[key], before[key])) out[key] = next[key];
+  }
+  return out;
+}
+
+/** A page's change: the fields that differ from what's shown (null when nothing does). */
+export function pageChange(next: UserPage, before: UserPage | undefined): PageFields | null {
+  const { pageNumber, ...fields } = pageFields(next);
+  const prev = before ? pageFields(before) : null;
+  const changed = changedOnly(fields as Record<string, unknown>, prev as Record<string, unknown> | null);
+  return Object.keys(changed).length > 0 ? ({ pageNumber, ...changed } as PageFields) : null;
 }
 
 function weaknessChanges(updates: { page: number; rating: number }[], at: number): WeaknessChange[] {
@@ -288,6 +312,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const signedInUid = firebaseUser?.uid ?? null;
 
   const [base, setBase] = useState<Base | null>(null);
+  // The same, updated at once (state lags a render): the copy written when a
+  // change is crossed off must already hold the changes before it.
+  const baseRef = useRef<Base | null>(null);
+  const mutateBase = useCallback((fn: (b: Base | null) => Base | null) => {
+    const next = fn(baseRef.current);
+    if (next === baseRef.current) return;
+    baseRef.current = next;
+    setBase(next);
+  }, []);
   const [pending, setPending] = useState<OutboxEntry[]>([]);
   // The uid whose copy (and outbox) has been read from the phone.
   const [cacheChecked, setCacheChecked] = useState<string | null>(null);
@@ -296,6 +329,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // From the user document's listener: false while Firestore can't reach the server.
   const [serverReachable, setServerReachable] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped to subscribe the listeners again (one ended in an error, or "Try again").
+  const [listenEpoch, setListenEpoch] = useState(0);
 
   const uidRef = useRef<string | null>(uid);
   uidRef.current = uid;
@@ -319,9 +354,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentUid: () => getAuth().currentUser?.uid ?? null,
       isDeleting: (u) => firestoreService.isDeletingAccount(u),
       apply: applyEntry,
+      // A server read works: Auth and App Check are fine, so a permission
+      // error on a change is the rules refusing it.
+      probe: (u) => firestoreService.userDocExistsOnServer(u).then(() => true, () => false),
     });
-    const offApplied = onApplied((u, entry) => {
-      setBase((b) => (b && b.uid === u ? commitToBase(b, entry) : b));
+    const offApplied = onApplied(async (u, entry) => {
+      // Folded into what's shown, and into the copy on the phone, before it
+      // leaves the outbox: the app closing in between loses nothing.
+      let next: Base | null = null;
+      mutateBase((b) => {
+        if (!b || b.uid !== u) return b;
+        next = commitToBase(b, entry);
+        return next;
+      });
+      const committed = next as Base | null;
+      if (!committed) return;
+      const parts: AccountPart[] =
+        entry.op.kind === 'user' ? ['user'] : entry.op.kind === 'pages' ? ['pages'] : entry.op.kind.startsWith('session.') ? ['sessions'] : [];
+      await Promise.all(
+        parts
+          .filter((part) => committed[part] !== undefined)
+          .map((part) => writeAccountPart(u, part, committed[part])),
+      );
     });
     const offOutbox = subscribeOutbox((u) => {
       if (u === uidRef.current) setPending(pendingEntries(u));
@@ -341,7 +395,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       offNet();
       configureSync(null);
     };
-  }, []);
+  }, [mutateBase]);
 
   useEffect(() => {
     if (signedInUid) requestFlush(signedInUid);
@@ -373,7 +427,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setCurrentAccount(uid);
     if (!uid) {
-      setBase(null);
+      mutateBase(() => null);
       setPending([]);
       setCacheChecked(null);
       setServerReachable(null);
@@ -383,34 +437,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     let active = true;
-    setBase(emptyBase(uid));
+    mutateBase(() => emptyBase(uid));
     setPending(pendingEntries(uid));
     setCacheChecked(null);
     setWaitedOut(false);
     setServerReachable(null);
     setError(null);
     hasSelfHealedOnLoad.current = false;
-    const update = (fn: (b: Base) => Base) => setBase((b) => (b && b.uid === uid ? fn(b) : b));
 
     // The copy on the phone and the outbox. A server answer that came first wins.
-    Promise.all([readAccount(uid), loadOutbox(uid)]).then(([cached]) => {
+    Promise.all([
+      readAccount(uid),
+      loadOutbox(uid).catch((err) => {
+        logger.error('Could not read the outbox', err);
+        return [];
+      }),
+    ]).then(([cached]) => {
       if (!active) return;
       if (cached) {
-        update((b) => ({
-          ...b,
-          user: b.user === undefined ? cached.user : b.user,
-          pages: b.pages === undefined ? cached.pages : b.pages,
-          sessions: b.sessions === undefined ? cached.sessions : b.sessions,
-        }));
+        mutateBase((b) =>
+          b && b.uid === uid
+            ? {
+                ...b,
+                user: b.user === undefined ? cached.user : b.user,
+                pages: b.pages === undefined ? cached.pages : b.pages,
+                sessions: b.sessions === undefined ? cached.sessions : b.sessions,
+              }
+            : b,
+        );
       }
       setPending(pendingEntries(uid));
       setCacheChecked(uid);
     });
     const waitTimer = setTimeout(() => active && setWaitedOut(true), SERVER_WAIT_MS);
+    return () => {
+      active = false;
+      clearTimeout(waitTimer);
+    };
+  }, [uid, mutateBase]);
+
+  // The listeners: subscribed again (after a backoff) if one ends in an error,
+  // e.g. refused at launch before App Check had its token.
+  const listenRetry = useRef(0);
+  useEffect(() => {
+    if (!uid) return;
+    let active = true;
+    const update = (fn: (b: Base) => Base) => mutateBase((b) => (b && b.uid === uid ? fn(b) : b));
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let resubscribing = false;
+    const onListenError = () => {
+      if (!active || resubscribing) return;
+      resubscribing = true;
+      const delay = retryDelayMs(listenRetry.current++);
+      timers.push(setTimeout(() => active && setListenEpoch((n) => n + 1), delay));
+    };
+    const heard = () => {
+      listenRetry.current = 0;
+    };
 
     // Missing data is created only when the server confirms it (lib/userDoc);
     // while offline, it is asked again on a backoff until it answers.
-    const timers: ReturnType<typeof setTimeout>[] = [];
     const ensuring = { user: false, pages: false };
     const ensure = (what: 'user' | 'pages', fromCache: boolean, attempt = 0) => {
       const fbUser = getAuth().currentUser;
@@ -459,6 +545,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setServerReachable(!fromCache);
         // Firestore's memory, not the server: the copy on the phone stands.
         if (fromCache) return;
+        heard();
         if (fsUser) {
           update((b) => ({ ...b, user: fsUser }));
           saveCopy(uid, 'user', fsUser);
@@ -468,35 +555,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ensure('user', false);
       },
       uid,
+      onListenError,
     );
 
-    const unsubscribePages = firestoreService.subscribeToPages((fsPages, { fromCache }) => {
-      if (!active || fromCache) return;
-      // No pages: create the 604 defaults, but only once the server confirms
-      // there are none.
-      if (fsPages.length === 0) {
-        ensure('pages', false);
-        return;
-      }
-      update((b) => ({ ...b, pages: fsPages, pagesFresh: true }));
-      saveCopy(uid, 'pages', fsPages);
-    }, uid);
+    const unsubscribePages = firestoreService.subscribeToPages(
+      (fsPages, { fromCache }) => {
+        if (!active || fromCache) return;
+        // No pages: create the 604 defaults, but only once the server confirms
+        // there are none.
+        if (fsPages.length === 0) {
+          ensure('pages', false);
+          return;
+        }
+        update((b) => ({ ...b, pages: fsPages, pagesFresh: true }));
+        saveCopy(uid, 'pages', fsPages);
+      },
+      uid,
+      onListenError,
+    );
 
-    const unsubscribeSessions = firestoreService.subscribeToSessions((sessions, { fromCache }) => {
-      if (!active || fromCache) return;
-      update((b) => ({ ...b, sessions, sessionsFresh: true }));
-      saveCopy(uid, 'sessions', sessions);
-    }, uid);
+    const unsubscribeSessions = firestoreService.subscribeToSessions(
+      (sessions, { fromCache }) => {
+        if (!active || fromCache) return;
+        update((b) => ({ ...b, sessions, sessionsFresh: true }));
+        saveCopy(uid, 'sessions', sessions);
+      },
+      uid,
+      100,
+      onListenError,
+    );
 
     return () => {
       active = false;
-      clearTimeout(waitTimer);
       timers.forEach(clearTimeout);
       unsubscribeUser();
       unsubscribePages();
       unsubscribeSessions();
     };
-  }, [uid, saveCopy]);
+  }, [uid, listenEpoch, saveCopy, mutateBase]);
 
   // ============================================================================
   // WHAT THE APP SHOWS
@@ -561,6 +657,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const retryConnection = useCallback(() => {
     setWaitedOut(false);
+    listenRetry.current = 0;
+    setListenEpoch((n) => n + 1);
     restartFirestore();
     requestFlush(getAuth().currentUser?.uid);
     const forUid = uidRef.current;
@@ -605,7 +703,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     setError(null);
-    await enqueueOp({ kind: 'pages', pages: pagesToSync.map(pageChange) });
+    const shown = new Map(pagesRef.current.map((p) => [p.pageNumber, p] as const));
+    const changes = pagesToSync
+      .map((p) => pageChange(p, shown.get(p.pageNumber)))
+      .filter((c): c is PageFields => c != null);
+    if (changes.length === 0) return;
+    await enqueueOp({ kind: 'pages', pages: changes });
   }, [enqueueOp]);
 
   const updatePage = useCallback(async (page: UserPage) => {
@@ -687,44 +790,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const forUid = uidRef.current;
     if (!forUid) return;
     setError(null);
-    requestFlush(getAuth().currentUser?.uid);
+    // The listeners keep what's shown current; a refresh reconnects (if the
+    // server was out of reach), sends what's waiting, and heals the pages.
+    // Reading the server again here raced the listeners: an older read could
+    // land after a newer snapshot and roll it back.
     if (serverReachableRef.current === false) restartFirestore();
-    try {
-      // From the server only: offline, Firestore's memory would answer with
-      // whatever it happens to hold (often nothing).
-      const [fsUser, fsPages, fsSessions] = await Promise.all([
-        firestoreService.getUserFromServer(forUid),
-        firestoreService.getAllPagesFromServer(forUid),
-        firestoreService.getRecentSessionsFromServer(100, forUid),
-      ]);
-      if (uidRef.current !== forUid) return;
-      setBase((b) => {
-        if (!b || b.uid !== forUid) return b;
-        return {
-          ...b,
-          user: fsUser ?? b.user,
-          pages: fsPages.length > 0 ? fsPages : b.pages,
-          sessions: fsSessions,
-          pagesFresh: b.pagesFresh || fsPages.length > 0,
-          sessionsFresh: true,
-        };
-      });
-      if (fsUser) writeAccountPart(forUid, 'user', fsUser);
-      if (fsPages.length > 0) writeAccountPart(forUid, 'pages', fsPages);
-      writeAccountPart(forUid, 'sessions', fsSessions);
-
-      // Self-heal stale per-page state from prior app versions (or any data
-      // that drifted from the canonical log history), with the server's data
-      // and the changes still waiting on top.
-      const v = overlayAccount(
-        { user: fsUser, pages: fsPages, sessions: fsSessions },
-        pendingEntries(forUid),
-      );
-      await syncPagesFromLogs(v.pages.map(firestorePageToLocal), v.sessions.map(firestoreSessionToLog));
-    } catch (err) {
-      // Offline: what's shown stays as it is.
-      logger.log('Refresh failed; showing the copy on this phone', err);
-    }
+    requestFlush(getAuth().currentUser?.uid);
+    const b = baseRef.current;
+    // Self-heal stale per-page state from prior app versions (or any data
+    // that drifted from the canonical log history), only on the server's
+    // data (never the copy on the phone), with the changes waiting on top.
+    if (!b || b.uid !== forUid || !b.pagesFresh || !b.sessionsFresh) return;
+    await syncPagesFromLogs(pagesRef.current, viewRef.current?.sessions.map(firestoreSessionToLog) ?? []);
   }, [syncPagesFromLogs]);
 
   // ============================================================================
@@ -733,7 +810,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const saveUser = useCallback(async (updatedUser: User) => {
     setError(null);
-    await enqueueOp({ kind: 'user', fields: userFields(updatedUser) });
+    // Only what this save changes (see changedOnly).
+    const shown = viewRef.current?.user ? firestoreUserToLocal(viewRef.current.user) : null;
+    const fields = changedOnly(userFields(updatedUser), shown ? userFields(shown) : null);
+    if (Object.keys(fields).length > 0) await enqueueOp({ kind: 'user', fields });
     // Also sync the Firebase Auth profile so screens that fall back to
     // `firebaseUser.displayName` reflect the new name. Best-effort (it needs
     // the network): the user document is the source of truth.
@@ -828,8 +908,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pagesRevised: log.pagesRevised,
         pagesSkipped: log.pagesSkipped,
         weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
-        // Minutes add up: at least what this phone knows plus this stretch.
+        // Minutes add up: what this phone knows plus this stretch.
         durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
+        durationAdd: log.durationMinutes ?? 0,
       },
       at,
     );
@@ -850,8 +931,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       durationMinutes: log.durationMinutes,
       weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
     };
+    const forUid = uidRef.current;
     const freshLogs = logsWith([op], at);
     await enqueueOp(op, at);
+    // Signed out (or another account) meanwhile: nothing more for this one.
+    if (uidRef.current !== forUid) return;
     await syncPagesFromLogs(pagesRef.current, freshLogs);
   }, [enqueueOp, logsWith, syncPagesFromLogs]);
 
@@ -860,6 +944,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setError(null);
     const at = Date.now();
     const ops: OutboxOp[] = logIds.map((id) => ({ kind: 'session.delete', id }));
+    const forUid = uidRef.current;
     const freshLogs = logsWith(ops, at);
     for (const op of ops) await enqueueOp(op, at);
     // A session's id is its revision day; its recordings go with it. Awaited
@@ -867,6 +952,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch((err) =>
       logger.warn('Could not delete session recordings', err),
     );
+    if (uidRef.current !== forUid) return;
     await syncPagesFromLogs(pagesRef.current, freshLogs);
   }, [enqueueOp, logsWith, syncPagesFromLogs]);
 

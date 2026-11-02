@@ -67,6 +67,22 @@ describe('a session change from the outbox', () => {
     expect(sessionUpdateData(mergeSessionAdd(stored, add(), AT))).toEqual(sessionUpdateData(stored));
   });
 
+  it('minutes from two phones on the same day add up; the same change twice adds once', () => {
+    // This phone saw 10 minutes and adds 5; meanwhile another phone added 3
+    // (13 on the server). Had it added 5 or more, the server's total would
+    // look like this change already in, and these 5 wouldn't count: without
+    // a record of which changes it has, the server can't tell.
+    const op = add({ pagesRevised: [3], durationAtLeast: 15, durationAdd: 5, weaknessUpdates: [] });
+    const server = { ...mergeSessionAdd(null, add({ durationAtLeast: 10 }), AT), durationMinutes: 13 };
+    const once = mergeSessionAdd(server, op, AT);
+    expect(once.durationMinutes).toBe(18);
+    expect(mergeSessionAdd(once, op, AT).durationMinutes).toBe(18);
+    // Only this phone: 10 + 5, and sent twice still 15.
+    const mine = mergeSessionAdd({ ...server, durationMinutes: 10 }, op, AT);
+    expect(mine.durationMinutes).toBe(15);
+    expect(mergeSessionAdd(mine, op, AT).durationMinutes).toBe(15);
+  });
+
   it('merges with what another phone added to the same day', () => {
     const other = mergeSessionAdd(null, add({ pagesRevised: [3], weaknessUpdates: [], durationAtLeast: 5 }), AT - 1000);
     const merged = mergeSessionAdd(other, add(), AT);

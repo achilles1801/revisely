@@ -254,12 +254,6 @@ export function subscribeToUser(
   );
 }
 
-/** The user document from the server (rejects offline). */
-export async function getUserFromServer(userId: string): Promise<FirestoreUser | null> {
-  const snapshot = await getDocFromServer(getUserRef(userId));
-  return snapshot.exists() ? (snapshot.data() as FirestoreUser) : null;
-}
-
 /** Whether the user's document exists, asked of the server (not the local cache). */
 export async function userDocExistsOnServer(userId?: string): Promise<boolean> {
   return (await getDocFromServer(getUserRef(userId))).exists();
@@ -273,13 +267,6 @@ export async function userDocExistsOnServer(userId?: string): Promise<boolean> {
 export async function getAllPages(userId?: string): Promise<FirestorePage[]> {
   const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => d.data() as FirestorePage);
-}
-
-/** All pages from the server (rejects offline). */
-export async function getAllPagesFromServer(userId: string): Promise<FirestorePage[]> {
-  const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
-  const snapshot = await getDocsFromServer(q);
   return snapshot.docs.map((d) => d.data() as FirestorePage);
 }
 
@@ -358,13 +345,17 @@ export async function applyPageUpdates(
 export function subscribeToPages(
   callback: (pages: FirestorePage[], meta: { fromCache: boolean }) => void,
   userId?: string,
+  onError?: (error: unknown) => void,
 ): Unsubscribe {
   const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
   return onSnapshot(
     q,
     (snapshot) =>
       callback(snapshot.docs.map((d) => d.data() as FirestorePage), { fromCache: snapshot.metadata.fromCache }),
-    (error) => logger.error('subscribeToPages failed', error),
+    (error) => {
+      logger.error('subscribeToPages failed', error);
+      onError?.(error);
+    },
   );
 }
 
@@ -446,25 +437,22 @@ export async function getRecentSessions(
   return snapshot.docs.map((d) => d.data() as FirestoreSession);
 }
 
-/** The most recent sessions from the server (rejects offline). */
-export async function getRecentSessionsFromServer(limitCount: number, userId: string): Promise<FirestoreSession[]> {
-  const q = query(getSessionsCollectionRef(userId), orderBy('date', 'desc'), limit(limitCount));
-  const snapshot = await getDocsFromServer(q);
-  return snapshot.docs.map((d) => d.data() as FirestoreSession);
-}
-
 /** The most recent sessions (newest first) as they change. */
 export function subscribeToSessions(
   callback: (sessions: FirestoreSession[], meta: { fromCache: boolean }) => void,
   userId: string,
   limitCount = 100,
+  onError?: (error: unknown) => void,
 ): Unsubscribe {
   const q = query(getSessionsCollectionRef(userId), orderBy('date', 'desc'), limit(limitCount));
   return onSnapshot(
     q,
     (snapshot) =>
       callback(snapshot.docs.map((d) => d.data() as FirestoreSession), { fromCache: snapshot.metadata.fromCache }),
-    (error) => logger.error('subscribeToSessions failed', error),
+    (error) => {
+      logger.error('subscribeToSessions failed', error);
+      onError?.(error);
+    },
   );
 }
 

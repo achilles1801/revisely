@@ -59,6 +59,32 @@ describe('the outbox', () => {
     expect(b.op).toEqual(usage(2));
   });
 
+  it('a stored queue that can’t be read is never written over; the next read gets it', async () => {
+    await enqueue('u1', usage(1));
+    restartApp();
+    const storage = AsyncStorage as unknown as { getItem: typeof AsyncStorage.getItem };
+    const getItem = storage.getItem;
+    storage.getItem = () => Promise.reject(new Error('Row too big to fit into CursorWindow'));
+    try {
+      await expect(enqueue('u1', usage(2))).rejects.toThrow('CursorWindow');
+    } finally {
+      storage.getItem = getItem;
+    }
+    expect((await loadOutbox('u1')).map((e) => e.op)).toEqual([usage(1)]);
+    await enqueue('u1', usage(2));
+    restartApp();
+    expect((await loadOutbox('u1')).map((e) => e.op)).toEqual([usage(1), usage(2)]);
+  });
+
+  it('a damaged queue is kept aside, not lost', async () => {
+    await AsyncStorage.setItem('@revisely_outbox:v1:u1', '{damaged');
+    expect(await loadOutbox('u1')).toEqual([]);
+    const keys = await AsyncStorage.getAllKeys();
+    const aside = keys.find((k) => k.startsWith('@revisely_outbox_damaged:v1:u1:'));
+    expect(aside).toBeTruthy();
+    expect(await AsyncStorage.getItem(aside!)).toBe('{damaged');
+  });
+
   it('accounts are kept apart', async () => {
     await enqueue('u1', usage(1));
     await enqueue('u2', usage(2));
@@ -73,7 +99,9 @@ describe('the outbox', () => {
 describe('sync', () => {
   it('sends oldest first, each once, and crosses each off after the app has folded it in', async () => {
     const seen: string[] = [];
-    onApplied((_uid, e) => seen.push(`applied ${(e.op as { seconds: number }).seconds} with ${pendingEntries('u1').length} left`));
+    onApplied((_uid, e) => {
+      seen.push(`applied ${(e.op as { seconds: number }).seconds} with ${pendingEntries('u1').length} left`);
+    });
     await enqueue('u1', usage(1));
     await enqueue('u1', usage(2));
     requestFlush('u1');
@@ -148,12 +176,13 @@ describe('sync', () => {
     await settleSync('u1');
     expect(pendingEntries('u1')).toEqual([]);
     expect(apply).toHaveBeenCalledTimes(2);
-    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), { kind: 'usage', failures: 1 });
+    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), { kind: 'usage', failure: 'refused', failures: 1 });
   });
 
-  it('permission errors get a few tries first (App Check can refuse the first requests)', async () => {
+  it('"permission denied" while the server otherwise works (the rules refusing it): a few tries, then dropped', async () => {
     jest.useFakeTimers();
     apply.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    configureSync({ currentUid: () => signedIn, isDeleting: () => false, apply: (...a) => apply(...a), probe: async () => true });
     await enqueue('u1', usage(1));
     requestFlush('u1');
     for (let i = 0; i < 6; i++) {
@@ -161,13 +190,48 @@ describe('sync', () => {
       await jest.advanceTimersByTimeAsync(60_000);
     }
     await settleSync('u1');
-    expect(apply).toHaveBeenCalledTimes(5);
+    expect(apply).toHaveBeenCalledTimes(3);
     expect(pendingEntries('u1')).toEqual([]);
+  });
+
+  it('"permission denied" while no server read works either (App Check, a sign-in out of date): kept, however long', async () => {
+    jest.useFakeTimers();
+    apply.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    configureSync({ currentUid: () => signedIn, isDeleting: () => false, apply: (...a) => apply(...a), probe: async () => false });
+    await enqueue('u1', usage(1));
+    requestFlush('u1');
+    for (let i = 0; i < 12; i++) {
+      await settleSync('u1');
+      await jest.advanceTimersByTimeAsync(60_000);
+    }
+    expect(apply.mock.calls.length).toBeGreaterThan(5);
+    expect(pendingEntries('u1')).toHaveLength(1);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('an error that isn’t Firestore’s (a bug) is reported and dropped after a few tries, so it can’t hold up the rest', async () => {
+    jest.useFakeTimers();
+    apply.mockImplementation(async (_uid, e) => {
+      if ((e.op as { seconds: number }).seconds === 1) throw new TypeError("Cannot read properties of undefined (reading 'includes')");
+    });
+    await enqueue('u1', usage(1));
+    await enqueue('u1', usage(2));
+    requestFlush('u1');
+    for (let i = 0; i < 8; i++) {
+      await settleSync('u1');
+      await jest.advanceTimersByTimeAsync(60_000);
+    }
+    await settleSync('u1');
+    expect(pendingEntries('u1')).toEqual([]);
+    expect(apply.mock.calls.filter(([, e]) => (e.op as { seconds: number }).seconds === 1)).toHaveLength(5);
+    expect(apply.mock.calls.at(-1)![1].op).toEqual(usage(2));
+    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), { kind: 'usage', failure: 'bug', failures: 5 });
   });
 
   it('classifies Firestore errors', () => {
     expect(classifyError(offline())).toBe('later');
     expect(classifyError(new TypeError('Network request failed'))).toBe('later');
+    expect(classifyError(new TypeError('x is undefined'))).toBe('bug');
     expect(classifyError({ code: 'deadline-exceeded' })).toBe('later');
     expect(classifyError({ code: 'permission-denied' })).toBe('permission');
     expect(classifyError({ code: 'not-found' })).toBe('refused');

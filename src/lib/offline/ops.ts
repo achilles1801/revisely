@@ -42,8 +42,14 @@ export type OutboxOp =
       pagesRevised: number[];
       pagesSkipped: number[];
       weaknessUpdates: WeaknessChange[];
-      /** The session's minutes once this is in: at least this many. */
+      /** The session's minutes once this is in, as this phone sees it. */
       durationAtLeast: number;
+      /**
+       * The minutes this change adds. The server adds them to what it has
+       * (another phone's minutes count too), unless it already has
+       * `durationAtLeast`: then this change is in already (sent twice).
+       */
+      durationAdd?: number;
     }
   | {
       kind: 'session.edit';
@@ -169,6 +175,12 @@ function weaknessDocs(changes: WeaknessChange[]): FirestoreSession['weaknessUpda
 }
 
 type SessionAdd = Extract<OutboxOp, { kind: 'session.add' }>;
+
+/** The session's minutes with `op`'s added once (see durationAdd). */
+function addedMinutes(current: number, op: SessionAdd): number {
+  if (op.durationAdd === undefined) return Math.max(current, op.durationAtLeast);
+  return current >= op.durationAtLeast ? current : current + op.durationAdd;
+}
 type SessionEdit = Extract<OutboxOp, { kind: 'session.edit' }>;
 
 /**
@@ -201,7 +213,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
       pagesRevised,
       pagesSkipped,
       weaknessUpdates,
-      durationMinutes: Math.max(1, existing.durationMinutes ?? 0, op.durationAtLeast),
+      durationMinutes: Math.max(1, addedMinutes(existing.durationMinutes ?? 0, op)),
       // The rules forbid going back from completed.
       state: completed ? 'COMPLETED' : 'IN_PROGRESS',
       completionPercentage: safePercent(pagesRevised.length, totalAssignedPages),

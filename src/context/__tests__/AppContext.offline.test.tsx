@@ -21,7 +21,13 @@ jest.mock('firebase/auth', () => ({
 
 // ---- Firestore's listeners: the test plays the server (or its absence)
 type Cb<T> = (data: T, meta: { fromCache: boolean }) => void;
-const mockListeners: { user?: Cb<FirestoreUser | null>; pages?: Cb<FirestorePage[]>; sessions?: Cb<FirestoreSession[]> } = {};
+const mockListeners: {
+  user?: Cb<FirestoreUser | null>;
+  pages?: Cb<FirestorePage[]>;
+  sessions?: Cb<FirestoreSession[]>;
+  userError?: (e: unknown) => void;
+  subscribed: number;
+} = { subscribed: 0 };
 const mockService = {
   createUser: jest.fn(async () => undefined),
   initializeAllPages: jest.fn(async () => undefined),
@@ -36,8 +42,10 @@ jest.mock('../../services/firestoreService', () => {
   return {
     userUpdateFields: actual.userUpdateFields,
     isDeletingAccount: () => false,
-    subscribeToUser: (cb: never) => {
+    subscribeToUser: (cb: never, _uid: string, onError: never) => {
       mockListeners.user = cb;
+      mockListeners.userError = onError;
+      mockListeners.subscribed += 1;
       return () => {};
     },
     subscribeToPages: (cb: never) => {
@@ -173,6 +181,8 @@ beforeEach(async () => {
   delete mockListeners.user;
   delete mockListeners.pages;
   delete mockListeners.sessions;
+  delete mockListeners.userError;
+  mockListeners.subscribed = 0;
 });
 
 describe('cold start offline', () => {
@@ -355,16 +365,88 @@ describe('changes made offline', () => {
     await keepCopyOnPhone();
     view();
     await settle();
-    const offline = Object.assign(new Error('offline'), { code: 'unavailable' });
-    mockService.getUserFromServer.mockRejectedValueOnce(offline);
-    mockService.getAllPagesFromServer.mockRejectedValueOnce(offline);
-    mockService.getRecentSessionsFromServer.mockRejectedValueOnce(offline);
+    goOffline();
     await act(async () => {
       await app.loadData();
     });
     expect(app.pages).toHaveLength(604);
     expect(app.logs).toHaveLength(1);
     expect(app.error).toBeNull();
+  });
+});
+
+describe('the review’s cases', () => {
+  it('a save built on an older copy sends only what it changes (another phone’s newer plan stays)', async () => {
+    await keepCopyOnPhone();
+    view();
+    await settle();
+    goOffline();
+    await act(async () => {
+      await app.saveUser({ ...app.user!, reciter: 'minshawi' });
+    });
+    mockServer.online = true;
+    await act(async () => {
+      mockNet.listener?.({ isConnected: true, isInternetReachable: true });
+      await settleSync('u1');
+    });
+    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([{ kind: 'user', fields: { reciter: 'minshawi' } }]);
+  });
+
+  it('a page change sends only the fields that changed (not status or the memorized date)', async () => {
+    await keepCopyOnPhone();
+    view();
+    await settle();
+    goOffline();
+    const updated = app.pages.map((p) => (p.pageNumber === 3 ? { ...p, totalRevisionCount: 1 } : p));
+    await act(async () => {
+      await app.updatePages(updated, [3]);
+    });
+    expect(app.pendingChanges).toBe(1);
+    await goOnline();
+    expect(mockServer.applied[0].entry.op).toEqual({ kind: 'pages', pages: [{ pageNumber: 3, totalRevisionCount: 1 }] });
+  });
+
+  it('a change the server took is in the copy on the phone before it leaves the outbox', async () => {
+    await keepCopyOnPhone();
+    view();
+    await settle();
+    goOffline();
+    await act(async () => {
+      await app.addLog({ date: '2026-11-02', assignedPages: [3], pagesRevised: [3], pagesSkipped: [], weaknessUpdates: [], durationMinutes: 4 });
+    });
+    await goOnline();
+    // No snapshot has come (the listener didn't fire), and the copy has it anyway.
+    const copy = await readAccount('u1');
+    expect(copy!.sessions.map((x) => x.id)).toContain('2026-11-02');
+    expect(await loadOutbox('u1')).toEqual([]);
+  });
+
+  it('a listener that ends in an error is subscribed again (after a pause)', async () => {
+    jest.useFakeTimers();
+    await keepCopyOnPhone();
+    view();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10);
+    });
+    expect(mockListeners.subscribed).toBe(1);
+    act(() => mockListeners.userError!(Object.assign(new Error('denied'), { code: 'permission-denied' })));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5_000);
+    });
+    expect(mockListeners.subscribed).toBe(2);
+    // The data stayed on screen meanwhile.
+    expect(app.pages).toHaveLength(604);
+  });
+
+  it('"Try again" subscribes again at once', async () => {
+    view();
+    await settle();
+    act(() => mockListeners.user!(null, { fromCache: true }));
+    expect(app.connectionNeeded).toBe(true);
+    const before = mockListeners.subscribed;
+    act(() => app.retryConnection());
+    await settle();
+    expect(mockListeners.subscribed).toBe(before + 1);
   });
 });
 

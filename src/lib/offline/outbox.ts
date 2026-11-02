@@ -16,6 +16,8 @@ const KEY_PREFIX = '@revisely_outbox:v1:';
 const keyFor = (uid: string) => `${KEY_PREFIX}${uid}`;
 
 const queues = new Map<string, OutboxEntry[]>();
+// Accounts whose stored queue has been read (only those are written back).
+const loaded = new Set<string>();
 const loads = new Map<string, Promise<OutboxEntry[]>>();
 const writes = new Map<string, Promise<void>>();
 const listeners = new Set<(uid: string) => void>();
@@ -32,6 +34,7 @@ function notify(uid: string) {
 }
 
 function persist(uid: string): Promise<void> {
+  if (!loaded.has(uid)) return Promise.resolve();
   const prev = writes.get(uid) ?? Promise.resolve();
   const next = prev
     .catch(() => undefined)
@@ -49,22 +52,35 @@ function persist(uid: string): Promise<void> {
 
 /** The account's queue, read from the phone the first time. */
 export function loadOutbox(uid: string): Promise<OutboxEntry[]> {
-  const loaded = queues.get(uid);
-  if (loaded) return Promise.resolve(loaded);
+  if (loaded.has(uid)) return Promise.resolve(queues.get(uid) ?? []);
   let load = loads.get(uid);
   if (!load) {
-    load = AsyncStorage.getItem(keyFor(uid))
-      .catch(() => null)
-      .then((raw) => {
-        // A change made while it loaded is already in the map: keep both.
-        const stored = (decode<OutboxEntry[]>(raw) ?? []).filter((e) => e && e.id && e.op);
+    // A read that fails leaves the queue unloaded (and unwritten: persisting
+    // would put an empty queue over the stored one); the next call reads again.
+    load = AsyncStorage.getItem(keyFor(uid)).then(
+      async (raw) => {
+        let stored = decode<OutboxEntry[]>(raw);
+        if (raw && !Array.isArray(stored)) {
+          // Damaged: kept aside (never overwritten), and reported without its contents.
+          logger.error('The outbox could not be read; kept aside', undefined, { bytes: raw.length });
+          await AsyncStorage.setItem(`@revisely_outbox_damaged:v1:${uid}:${Date.now()}`, raw).catch(() => undefined);
+          stored = [];
+        }
+        const valid = (stored ?? []).filter((e) => e && e.id && e.op);
+        // Changes made while it loaded are already in the map: keep both.
         const during = queues.get(uid) ?? [];
-        const merged = [...stored, ...during.filter((e) => !stored.some((s) => s.id === e.id))];
+        const merged = [...valid, ...during.filter((e) => !valid.some((s) => s.id === e.id))];
         queues.set(uid, merged);
+        loaded.add(uid);
         loads.delete(uid);
         notify(uid);
         return merged;
-      });
+      },
+      (err) => {
+        loads.delete(uid);
+        throw err;
+      },
+    );
     loads.set(uid, load);
   }
   return load;
@@ -76,7 +92,7 @@ export function pendingEntries(uid: string | null | undefined): OutboxEntry[] {
 }
 
 export function isOutboxLoaded(uid: string): boolean {
-  return queues.has(uid);
+  return loaded.has(uid);
 }
 
 function newId(): string {
@@ -139,6 +155,7 @@ export function subscribeOutbox(listener: (uid: string) => void): () => void {
 /** Tests: forget everything held in memory. */
 export function resetOutboxForTests(): void {
   queues.clear();
+  loaded.clear();
   loads.clear();
   writes.clear();
   listeners.clear();

@@ -174,16 +174,34 @@ for good: it waited for the server to answer for the user document.
   confirms it (`lib/userDoc`). Signing out deletes the copy.
 - **The outbox** (`outbox`, `ops`, `sync`, `apply`): every change (user fields, pages, sessions, the
   timer's reading sessions, the daily log, usage seconds) is saved on the phone first and sent in
-  order, one at a time, crossed off when the server has it. The app shows the copy with pending
-  changes laid over it (`overlayAccount`), so nothing waits for the server. Each change is safe to send
-  twice (absolute values, page lists merged as sets, a session's minutes "at least" n, fixed
-  `createdAt`s); a session is merged with the server's inside a transaction (another phone may have
-  added to the day). Offline or a timeout: tried again (2 s … 1 min) and at once when NetInfo says the
-  connection is back or the app comes to the front (`connectivity` also restarts Firestore's
-  connection, which otherwise waits out its own backoff). Refused by the rules: dropped and reported
-  (kind only). Nothing is sent for an account that isn't the one signed in; signing out keeps its
-  outbox for its next sign-in here, deleting the account clears it. Usage seconds are the one change
-  that isn't idempotent: a crash between the server's answer and crossing it off counts them twice.
+  order, one at a time. The app shows the copy with pending changes laid over it (`overlayAccount`),
+  so nothing waits for the server.
+  - **Only what changed:** a save sends just the fields that differ from what the app shows
+    (`changedOnly`, `pageChange`). The copy can be older than the server (another phone); sending
+    every field would put its old values back.
+  - **Safe to send twice:** values are absolute, page lists merge as sets, and `createdAt`s are fixed.
+    A session is merged with the server's inside a transaction, since another phone may have added
+    to the day. Its minutes add `durationAdd`, unless the server already has `durationAtLeast`.
+    When the other phone added at least as many minutes, this phone's minutes don't count; the
+    server keeps no record of which changes it has.
+  - **Crossing off:** a change leaves the outbox only after it has been folded into what's shown
+    and into the copy (`onApplied` is awaited).
+  - **Offline or a timeout:** it is tried again (2 s … 1 min), and at once when NetInfo says the
+    connection is back or the app comes to the front. `connectivity` also restarts Firestore's
+    connection, which otherwise waits out its own backoff.
+  - **"Permission denied":** this is how the rules refuse, but also how App Check or a stale
+    sign-in fail. A change is dropped (reported, kind only) only after a server read works
+    (`probe`), on the third refusal. Other refusals are dropped at once. An error that isn't
+    Firestore's (a bug) is dropped after 5 tries, so it can't hold up the rest.
+  - **Accounts:** nothing is sent for an account that isn't the one signed in. Signing out keeps
+    its outbox for its next sign-in here; deleting the account clears it.
+  - **Storage:** a stored queue that can't be read is never written over, and a damaged one is
+    kept aside (`@revisely_outbox_damaged:…`).
+  - **Usage seconds** aren't idempotent: a crash between the server's answer and crossing them off
+    counts them twice.
+- **Listeners:** one that ends in an error (e.g. refused before App Check had its token) is
+  subscribed again after a backoff; "Try again" does it at once. Pull to refresh doesn't read the
+  server: the listeners already do, and an older read could roll a newer snapshot back.
 - **First launch offline** (no copy): `connectionNeeded` → `ConnectToSetUp` ("Connect to the internet
   to set up", Try again, Sign out) when NetInfo or Firestore says offline, or after `SERVER_WAIT_MS`
   (6 s). It carries on by itself when the server answers. Onboarding never starts without the server.
