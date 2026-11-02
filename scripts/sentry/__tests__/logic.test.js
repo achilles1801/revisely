@@ -283,8 +283,8 @@ describe('release health', () => {
   });
 
   it('reads the bar from the environment and refuses anything that is not a number in range', () => {
-    expect(parseBar({})).toEqual({ minSessions: 5, minCrashFree: 0.99 });
-    expect(parseBar({ MIN_SESSIONS: '', MIN_CRASH_FREE: ' ' })).toEqual({ minSessions: 5, minCrashFree: 0.99 });
+    expect(parseBar({})).toEqual({ minSessions: 1, minCrashFree: 0.99 });
+    expect(parseBar({ MIN_SESSIONS: '', MIN_CRASH_FREE: ' ' })).toEqual({ minSessions: 1, minCrashFree: 0.99 });
     expect(parseBar({ MIN_SESSIONS: '0', MIN_CRASH_FREE: '0.95' })).toEqual({ minSessions: 0, minCrashFree: 0.95 });
     expect(() => parseBar({ MIN_SESSIONS: 'five' })).toThrow(/MIN_SESSIONS/);
     expect(() => parseBar({ MIN_CRASH_FREE: '99%' })).toThrow(/MIN_CRASH_FREE/);

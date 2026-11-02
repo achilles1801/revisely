@@ -92,7 +92,8 @@ file is the release mechanics and the traps behind them.
   It cannot merge, change workflows or publish. Review the PR like any other.
 - `Health report` (`health-report.yml`, daily 13:00 UTC, `scripts/sentry/report.js`): a comment on
   the pinned "App health (daily report)" issue, mentioning the owner.
-- `Promote to production` refuses an update with fewer than 5 preview sessions or under 99%
+- `Promote to production` refuses an update that no tester has run on preview (the default bar is 1
+  session; it was 5 until Nov 2 2026, more than two testers reach on release day) or under 99%
   crash-free (`scripts/sentry/gate.js`), checked per platform: the iOS and the Android group must
   each pass, so an Android tester has to open the update too. A run by hand can change the bar or skip
   it. A bar that isn't a number fails the check; it never passes it.
