@@ -116,3 +116,8 @@ describe('the notification handler', () => {
     );
   });
 });
+
+it("the preview's id is outside the prayer notifications' prefix", () => {
+  const { PRAYER_ID_PREFIX } = require('../schedule');
+  expect(SOUND_PREVIEW_ID.startsWith(PRAYER_ID_PREFIX)).toBe(false);
+});

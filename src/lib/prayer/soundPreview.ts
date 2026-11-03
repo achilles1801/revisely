@@ -17,7 +17,8 @@ import type { PrayerSound } from './prefs';
  * Silent plays nothing. Without notification permission nothing is asked here
  * (turning the prayer on asked), and nothing plays.
  */
-export const SOUND_PREVIEW_ID = 'prayer-sound-preview';
+// Not 'prayer-…': that prefix is the prayer notifications' own (lib/prayer/sync).
+export const SOUND_PREVIEW_ID = 'sound-preview';
 
 /** How long the preview stays delivered (never shown) before it's cleared. */
 const CLEAR_AFTER_MS = 5000;
