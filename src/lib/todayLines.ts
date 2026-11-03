@@ -95,6 +95,15 @@ export function rangesText(list: number[]): string {
 }
 
 /**
+ * Done today: the quiet line that opens the next revision day ("Tomorrow starts
+ * at Al-Baqarah, p. 22 ›"). `lead` is "Tomorrow", or the weekday after that.
+ */
+export function aheadLine(lead: string, first: number): { text: string; label: string } {
+  const text = `${lead} starts at ${firstSurah(first)}, ${page(first)}`;
+  return { text, label: spoken(text) };
+}
+
+/**
  * Today's two lines from its pages (in session order), those revised today,
  * and how many of them were carried in from yesterday.
  */

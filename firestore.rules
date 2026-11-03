@@ -166,6 +166,8 @@ service cloud.firestore {
         'completedAt', 'durationMinutes', 'completionPercentage',
         // Grow-only: pages carried into the day after the session started.
         'assignedPages', 'totalAssignedPages',
+        // Pages revised ahead, credited to later days (lib/aheadCredit).
+        'ahead',
         'updatedAt'
       ];
     }
@@ -340,7 +342,10 @@ service cloud.firestore {
                          hasField('pagesRevised') &&
                          incomingData().pagesRevised is list &&
                          hasField('pagesSkipped') &&
-                         incomingData().pagesSkipped is list;
+                         incomingData().pagesSkipped is list &&
+                         (!hasField('ahead') ||
+                          (incomingData().ahead is map &&
+                           incomingData().ahead.size() <= 400));
 
         // Users can update sessions
         allow update: if isOwner(userId) &&
@@ -358,6 +363,11 @@ service cloud.firestore {
                          (!hasField('totalAssignedPages') ||
                           (incomingData().totalAssignedPages is int &&
                            isInRange(incomingData().totalAssignedPages, 0, 604))) &&
+                         // Pages revised ahead: a map from a day to its pages
+                         // (at most one entry per day of a cycle).
+                         (!hasField('ahead') ||
+                          (incomingData().ahead is map &&
+                           incomingData().ahead.size() <= 400)) &&
                          // Validate state if present
                          (!hasField('state') ||
                           isValidSessionState(incomingData().state)) &&

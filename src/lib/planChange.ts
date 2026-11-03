@@ -16,13 +16,16 @@ import { getPagesScheduledForDate } from './algorithm';
 import { settleCarryOverForNewPlan } from './carryOver';
 import { dateToLocalISODay } from './schedulePlans';
 
-/** Every page revised on the revision day `day`, once each, in the order revised. */
+/**
+ * Every page revised on the revision day `day` (or ahead for it, lib/aheadCredit),
+ * once each, in the order revised.
+ */
 export function revisedOn(logs: RevisionLog[], day: string): number[] {
   const out: number[] = [];
   const seen = new Set<number>();
   for (const log of logs) {
-    if (log.date !== day) continue;
-    for (const p of log.pagesRevised) {
+    const pages = [...(log.date === day ? log.pagesRevised : []), ...(log.ahead?.[day] ?? [])];
+    for (const p of pages) {
       if (seen.has(p)) continue;
       seen.add(p);
       out.push(p);

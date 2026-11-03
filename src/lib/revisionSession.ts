@@ -1,4 +1,5 @@
 import { RevisionLog } from '../types';
+import { removeAheadPages } from './aheadCredit';
 
 /**
  * Pages that were saved as revised today but have since been unchecked on
@@ -17,5 +18,10 @@ export function pagesToUnrevise(
  */
 export function removeRevisedPages(log: RevisionLog, pages: number[]): RevisionLog {
   const remove = new Set(pages);
-  return { ...log, pagesRevised: log.pagesRevised.filter((p) => !remove.has(p)) };
+  // A page unchecked here is no longer revised ahead for any day either.
+  return {
+    ...log,
+    pagesRevised: log.pagesRevised.filter((p) => !remove.has(p)),
+    ...(log.ahead ? { ahead: removeAheadPages(log.ahead, pages) } : {}),
+  };
 }

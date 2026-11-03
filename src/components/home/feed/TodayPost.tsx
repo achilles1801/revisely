@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { computeMemorizationStats } from '../../../lib/memorizationStats';
-import { NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
+import { aheadLine, NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
@@ -77,6 +77,8 @@ export function TodayPost({
   leftovers,
   onCarryOver,
   carrying,
+  ahead,
+  onAhead,
 }: {
   name: string;
   initial: string;
@@ -98,6 +100,9 @@ export function TodayPost({
   leftovers: number;
   onCarryOver: () => void;
   carrying: boolean;
+  /** Done today: the next revision day, for the quiet line that opens it (revise ahead). */
+  ahead?: { lead: string; first: number } | null;
+  onAhead?: () => void;
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -172,6 +177,23 @@ export function TodayPost({
               variant={lines.solid ? 'solid' : 'outline'}
               testID="today-cta"
             />
+            {ahead && onAhead && status === 'completed' ? (
+              // Quiet: a grey line, not a second button. Opens that day's pages.
+              <Tap
+                onPress={onAhead}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={aheadLine(ahead.lead, ahead.first).label}
+                style={styles.memorized}
+                testID="today-ahead"
+              >
+                <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
+                  {aheadLine(ahead.lead, ahead.first).text}
+                  {NBSP}
+                  <Chevron color={palette.secondary} />
+                </Text>
+              </Tap>
+            ) : null}
             {leftovers > 0 ? (
               <PillButton
                 title={carrying ? 'Adding…' : `Add ${leftovers} from yesterday`}

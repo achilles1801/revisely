@@ -40,7 +40,8 @@ export type MainTabParamList = {
 
 export type HomeStackParamList = {
   Dashboard: undefined;
-  ActiveRevision: undefined;
+  // aheadDay: open with that later revision day's pages after today's (Home's "starts at" line).
+  ActiveRevision: { aheadDay?: string } | undefined;
   Settings: undefined;
   // edit: open with the pages ready to edit (Home's Memorized line).
   Memorization: { edit?: boolean } | undefined;

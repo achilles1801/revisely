@@ -22,7 +22,7 @@ export const HEAT_STEPS = [10, 20, 40] as const;
  */
 export function activityScore(day: ActivityDay): number {
   const s = summarizeActivityDay(day);
-  return s.revisedPages + Math.round(s.readingSeconds / 60) + (s.journalMinutes ?? 0);
+  return s.revisedPages + s.aheadPages + Math.round(s.readingSeconds / 60) + (s.journalMinutes ?? 0);
 }
 
 export function heatLevel(day: ActivityDay | undefined): HeatLevel {
@@ -115,6 +115,7 @@ export function dayFacts(day: ActivityDay | undefined): string[] {
   const read = new Set(day.readings.flatMap((r) => r.pages)).size;
   const parts: string[] = [];
   if (s.revisedPages > 0) parts.push(`${plural(s.revisedPages, 'page')} revised`);
+  if (s.aheadPages > 0) parts.push(`${plural(s.aheadPages, 'page')} done ahead`);
   if (read > 0) parts.push(s.revisedPages > 0 ? `${read} read` : `${plural(read, 'page')} read`);
   if (s.totalMinutes > 0) parts.push(formatMinutesShort(s.totalMinutes));
   if ((day.recordings ?? 0) > 0) parts.push(plural(day.recordings ?? 0, 'recording'));

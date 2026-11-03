@@ -424,6 +424,11 @@ export interface FirestoreSession {
   pagesSkipped: number[];
   /** Weakness ratings updated during this session */
   weaknessUpdates: WeaknessUpdate[];
+  /**
+   * Pages revised ahead (lib/aheadCredit), credited to a later revision day:
+   * day ('YYYY-MM-DD') → page numbers. Those pages are also in pagesRevised.
+   */
+  ahead?: Record<string, number[]>;
 
   // Computed on completion
   /** Percentage of assigned pages completed (0-100) */

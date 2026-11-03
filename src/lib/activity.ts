@@ -24,6 +24,8 @@ export interface ActivityDay {
   journal: JournalEntry | null;
   /** Voice recordings made that day (stored on this device). */
   recordings?: number;
+  /** Pages of this day revised ahead, in an earlier session (lib/aheadCredit). */
+  aheadPages?: number[];
 }
 
 export interface ActivitySources {
@@ -94,6 +96,12 @@ export function buildActivityDays(
   for (const log of logs) {
     if (!isRevisionActivity(log) || !DAY_RE.test(log.date)) continue;
     dayFor(log.date).revisions.push(log);
+    // Pages revised ahead count for the day they're scheduled for.
+    for (const [day, pages] of Object.entries(log.ahead ?? {})) {
+      if (!DAY_RE.test(day) || pages.length === 0) continue;
+      const d = dayFor(day);
+      d.aheadPages = [...new Set([...(d.aheadPages ?? []), ...pages])];
+    }
   }
   for (const raw of readings) {
     const s = normalizeReadingSession(raw, user);
@@ -124,13 +132,19 @@ export function emptyActivityDay(date: string): ActivityDay {
 
 export function isActivityDayEmpty(day: ActivityDay): boolean {
   return (
-    day.revisions.length === 0 && day.readings.length === 0 && !day.journal && !day.recordings
+    day.revisions.length === 0 &&
+    day.readings.length === 0 &&
+    !day.journal &&
+    !day.recordings &&
+    !day.aheadPages?.length
   );
 }
 
 export interface ActivityDaySummary {
   /** Distinct pages revised across the day's revision sessions. */
   revisedPages: number;
+  /** Pages of the day revised earlier, ahead (lib/aheadCredit): not in revisedPages. */
+  aheadPages: number;
   /** Logged revision-session minutes, null when none recorded a duration. */
   revisionMinutes: number | null;
   readingCount: number;
@@ -162,6 +176,7 @@ export function summarizeActivityDay(day: ActivityDay): ActivityDaySummary {
   );
   return {
     revisedPages: pages.size,
+    aheadPages: day.aheadPages?.length ?? 0,
     revisionMinutes,
     readingCount: day.readings.length,
     readingSeconds,

@@ -1,6 +1,7 @@
 import { User, UserPage, QuranPage, DailyAssignment, RevisionLog } from '../types';
 import { getRevisionDayForUser } from './fajrBoundary';
 import { getJuzForPage, getSurahForPage } from './quranData';
+import { creditIndex } from './aheadCredit';
 
 // Surah-aware juz key. Short surahs that straddle a juz boundary (e.g. Yusuf
 // spilling from juz 12 into juz 13) get pinned to the juz where they start —
@@ -535,16 +536,14 @@ export function getMissedScheduledRevisions(
   const todayStart = startOfDay(today);
   if (cursor.getTime() > todayStart.getTime()) return 0;
 
-  // Index sessions by date for O(1) lookup.
-  const sessionByDate = new Map<string, RevisionLog>();
-  for (const s of sessions) sessionByDate.set(s.date, s);
+  // A day's page counts as revised when it was revised that day or ahead for it.
+  const credited = creditIndex(sessions);
 
   let missed = 0;
   while (cursor.getTime() <= todayStart.getTime()) {
     const scheduled = getPagesScheduledForDate(user, cursor, memorizedPages);
     if (scheduled.includes(page.pageNumber)) {
-      const session = sessionByDate.get(dateToISODay(cursor));
-      const wasRevised = !!session && session.pagesRevised.includes(page.pageNumber);
+      const wasRevised = credited.get(dateToISODay(cursor))?.has(page.pageNumber) ?? false;
       if (!wasRevised) missed++;
     }
     cursor.setDate(cursor.getDate() + 1);

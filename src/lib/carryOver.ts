@@ -12,6 +12,7 @@
 
 import { RevisionLog, User, UserPage } from '../types';
 import { getPagesScheduledForDate } from './algorithm';
+import { creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 
 export type CarryOverMode = 'shift' | 'add';
@@ -52,6 +53,7 @@ export function findLeftoverPages(
   }
 
   const exclude = new Set(todaysPages);
+  const credit = creditIndex(logs);
   const out: number[] = [];
   for (let back = lookbackDays; back >= 1; back--) {
     const day = addDays(today, -back);
@@ -61,6 +63,8 @@ export function findLeftoverPages(
       for (const p of log.assignedPages ?? []) {
         const revised = revisedSince.get(p);
         if (revised && revised >= day) continue;
+        // Revised ahead for this day: done, not a leftover.
+        if (credit.get(day)?.has(p)) continue;
         if (exclude.has(p) || !memorized.has(p)) continue;
         exclude.add(p);
         out.push(p);
