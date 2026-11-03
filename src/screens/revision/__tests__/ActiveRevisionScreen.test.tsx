@@ -238,6 +238,63 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
   });
 });
 
+// The iOS edge swipe and Android's back button close the screen without the
+// Back arrow; a page marked since the last 5-second save used to be lost.
+describe('ActiveRevisionScreen — every way out saves', () => {
+  it('closed without Back: what was marked is saved', async () => {
+    setup([332, 333]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [331] }));
+    expect(mockApp.updatePages).toHaveBeenCalledWith(expect.any(Array), [331]);
+  });
+
+  it('closed without Back: a saved page unchecked comes out of the session', async () => {
+    const log = setup(DAY_PAGES);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.updateLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.updateLog).toHaveBeenCalledWith({
+      ...log,
+      pagesRevised: DAY_PAGES.filter((p) => p !== 331),
+    });
+  });
+
+  it('Back, then the screen goes: saved once', async () => {
+    setup([332, 333]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Back'));
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+  });
+
+  it('nothing marked: closing it writes nothing', async () => {
+    setup([332, 333]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+    expect(mockApp.updatePages).not.toHaveBeenCalled();
+    expect(mockApp.updateLog).not.toHaveBeenCalled();
+  });
+});
+
 // The controls stay rendered (they fade); hidden, they are hidden from screen readers too.
 const byTestId = (id: string) => screen.getByTestId(id, { includeHiddenElements: true });
 

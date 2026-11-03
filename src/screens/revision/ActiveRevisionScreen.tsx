@@ -399,6 +399,13 @@ export default function ActiveRevisionScreen() {
     return () => sub.remove();
   }, [commitPendingPages]);
 
+  // Every way out saves. The Back arrow does, but the iOS edge swipe and
+  // Android's back button close the screen without it, and the timer above
+  // stops with the screen: a page marked in its last seconds was lost.
+  const commitOnLeaveRef = useRef(commitPendingPages);
+  commitOnLeaveRef.current = commitPendingPages;
+  useEffect(() => () => void commitOnLeaveRef.current(), []);
+
   // ===== Timer =====
   // The app has one timer (in the controls under the page, and Home's top bar
   // while it runs): pages marked revised while it runs are credited to it.
