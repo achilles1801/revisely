@@ -7,6 +7,8 @@
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
 import { generateDailyAssignment } from '../algorithm';
+import { creditedOnDay } from '../aheadCredit';
+import { daysDoneAhead } from '../aheadPlan';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
@@ -192,7 +194,8 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   const memorizedCount = input.pages.filter((p) => p.status === 'memorized').length;
   if (!input.onboardingComplete || memorizedCount === 0) return { ...base, state: 'noPlan', days: [] };
 
-  const logDays = new Set(input.logs.map((l) => l.date));
+  // A day with a session, or whose pages were all revised ahead, is a day done.
+  const logDays = new Set([...input.logs.map((l) => l.date), ...daysDoneAhead(user, input.pages, input.logs)]);
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -201,12 +204,11 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const assignment = generateDailyAssignment(input.pages, input.quranData, user, localDay(day));
     const runs = pageRuns(assignment.pages);
 
-    // As Home: done once as many pages were revised today as were assigned.
-    const revised = new Set<number>();
-    for (const log of input.logs) if (log.date === day) log.pagesRevised.forEach((p) => revised.add(p));
+    // As Home: done once every page of the day is revised, today or ahead.
+    const credited = creditedOnDay(input.logs, day);
     const total = assignment.totalPages;
-    const completed = revised.size > 0 && revised.size >= total;
-    const doneHere = assignment.pages.filter((p) => revised.has(p)).length;
+    const doneHere = assignment.pages.filter((p) => credited.has(p)).length;
+    const completed = total > 0 && doneHere >= total;
 
     days.push({
       day,

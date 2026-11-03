@@ -143,6 +143,8 @@ export interface RevisionLog {
   pagesSkipped: number[];
   weaknessUpdates: { page: number; rating: number }[];
   durationMinutes: number | null;
+  // Pages revised in this session but credited to a later day (lib/aheadCredit).
+  ahead?: Record<string, number[]>;
 }
 
 // One day in the user's personal memorization/revision journal. Free-form text

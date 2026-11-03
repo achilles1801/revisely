@@ -11,6 +11,7 @@
 
 import type { FirestorePage, FirestoreSession, FirestoreUser, PageStatus, WeaknessRating } from '../../types/firestore';
 import { tsFromMillis } from './codec';
+import { mergeAhead } from '../aheadCredit';
 
 /** User document fields: absolute values; "notifications.enabled" style keys for nested ones. */
 export type UserFields = Record<string, unknown>;
@@ -50,6 +51,8 @@ export type OutboxOp =
        * `durationAtLeast`: then this change is in already (sent twice).
        */
       durationAdd?: number;
+      /** Pages of this change credited to a later day (lib/aheadCredit): day → pages. */
+      ahead?: Record<string, number[]>;
     }
   | {
       kind: 'session.edit';
@@ -59,6 +62,8 @@ export type OutboxOp =
       pagesSkipped: number[];
       durationMinutes: number | null;
       weaknessUpdates: WeaknessChange[];
+      /** The session's whole `ahead` map after the edit (absent: unchanged). */
+      ahead?: Record<string, number[]>;
     }
   | { kind: 'session.delete'; id: string }
   | {
@@ -183,6 +188,12 @@ function addedMinutes(current: number, op: SessionAdd): number {
 }
 type SessionEdit = Extract<OutboxOp, { kind: 'session.edit' }>;
 
+/** How many of `list` are in `revised`. */
+function countOf(list: readonly number[], revised: readonly number[]): number {
+  const set = new Set(revised);
+  return list.filter((p) => set.has(p)).length;
+}
+
 /**
  * A day's session with `op` merged in: what addLog has always written (revised
  * pages joined, assigned pages only grow, a completed session stays completed),
@@ -205,7 +216,9 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     const assignedPages = [...existingAssigned, ...added];
     const totalAssignedPages =
       (added.length > 0 ? assignedPages.length : existing.totalAssignedPages) || pagesRevised.length;
-    const completed = existing.state === 'COMPLETED' || pagesRevised.length >= totalAssignedPages;
+    // Pages revised ahead are in pagesRevised too: only this day's own pages count here.
+    const revisedHere = countOf(assignedPages, pagesRevised);
+    const completed = existing.state === 'COMPLETED' || revisedHere >= totalAssignedPages;
     return {
       ...existing,
       assignedPages,
@@ -213,10 +226,11 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
       pagesRevised,
       pagesSkipped,
       weaknessUpdates,
+      ahead: mergeAhead(existing.ahead, op.ahead),
       durationMinutes: Math.max(1, addedMinutes(existing.durationMinutes ?? 0, op)),
       // The rules forbid going back from completed.
       state: completed ? 'COMPLETED' : 'IN_PROGRESS',
-      completionPercentage: safePercent(pagesRevised.length, totalAssignedPages),
+      completionPercentage: safePercent(revisedHere, totalAssignedPages),
     };
   }
   // A new session. Prefer the caller's assignedPages (the day's assignment)
@@ -243,13 +257,15 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
   };
   if (op.pagesRevised.length === 0) return base;
   const total = base.totalAssignedPages || op.pagesRevised.length;
+  const revisedHere = countOf(assignedPages, op.pagesRevised);
   return {
     ...base,
     pagesRevised: [...new Set(op.pagesRevised)],
     pagesSkipped: op.pagesSkipped,
+    ahead: mergeAhead(undefined, op.ahead),
     durationMinutes: Math.max(1, op.durationAtLeast || 1),
-    state: op.pagesRevised.length >= total ? 'COMPLETED' : 'IN_PROGRESS',
-    completionPercentage: safePercent(op.pagesRevised.length, total),
+    state: revisedHere >= total ? 'COMPLETED' : 'IN_PROGRESS',
+    completionPercentage: safePercent(revisedHere, total),
     weaknessUpdates: newWeakness,
   };
 }
@@ -263,6 +279,7 @@ export function applySessionEdit(existing: FirestoreSession | null, op: SessionE
     ...existing,
     pagesRevised,
     pagesSkipped: op.pagesSkipped,
+    ahead: op.ahead ?? existing.ahead,
     // The rules take minutes above 0, or none.
     durationMinutes: op.durationMinutes != null && op.durationMinutes > 0 ? op.durationMinutes : null,
     weaknessUpdates: weaknessDocs(op.weaknessUpdates),
@@ -280,6 +297,7 @@ export function sessionUpdateData(s: FirestoreSession): Record<string, unknown> 
     completionPercentage: s.completionPercentage,
     assignedPages: s.assignedPages,
     totalAssignedPages: s.totalAssignedPages,
+    ahead: s.ahead ?? {},
   };
 }
 

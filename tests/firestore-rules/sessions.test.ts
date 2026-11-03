@@ -105,6 +105,7 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       completionPercentage: s.completionPercentage,
       assignedPages: s.assignedPages,
       totalAssignedPages: s.totalAssignedPages,
+      ...(s.ahead !== undefined ? { ahead: s.ahead } : {}),
       updatedAt: serverTimestamp(),
     });
 
@@ -127,6 +128,28 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       await assertSucceeds(
         updateDoc(ref, { pagesRevised: [2], pagesSkipped: [1], durationMinutes: null, weaknessUpdates: [], updatedAt: serverTimestamp() }),
       );
+    });
+
+    // Revising ahead (#168): pages credited to a later day, as a map from the day.
+    it('writes pages revised ahead, keyed by the day they count for', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      await assertSucceeds(updateDoc(ref, mutable(full({ ahead: { '2026-11-03': [4, 5] } }))));
+      await assertSucceeds(updateDoc(ref, mutable(full({ ahead: {} }))));
+    });
+
+    it('rejects ahead credit that is not a map', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      await assertFails(updateDoc(ref, mutable(full({ ahead: [4, 5] }))));
+    });
+
+    it('creates a session with pages revised ahead, and rejects a list there too', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(setDoc(doc(alice, `users/${ALICE}/sessions/2026-11-02`), full({ ahead: { '2026-11-03': [4] } })));
+      await assertFails(setDoc(doc(alice, `users/${ALICE}/sessions/2026-11-04`), { ...validSession('2026-11-04'), ahead: [4] }));
     });
   });
 

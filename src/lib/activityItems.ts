@@ -158,6 +158,45 @@ function logItem(e: JournalEntry): ActivityItem {
   });
 }
 
+function weekdayName(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+/**
+ * A session's pages revised ahead (lib/aheadCredit): one item on the day they
+ * were revised ("Revised ahead for Wed") and one on the day they count for
+ * ("Done ahead on Tue").
+ */
+function aheadItems(log: RevisionLog): ActivityItem[] {
+  const out: ActivityItem[] = [];
+  for (const [day, pages] of Object.entries(log.ahead ?? {})) {
+    if (!DAY_RE.test(day) || pages.length === 0) continue;
+    const runs = pageRuns(pages);
+    const detail = [describePageRuns(runs), describeSurahRuns(runs)].filter(Boolean).join(' · ');
+    // Just after the session's own item on its day.
+    const at = Number.MAX_SAFE_INTEGER - 1;
+    out.push(item({
+      key: `ahead-from-${log.id}-${day}`,
+      kind: 'revision',
+      day: log.date,
+      at,
+      title: `Revised ahead for ${weekdayName(day)} · ${plural(pages.length, 'page')}`,
+      detail,
+    }, pages));
+    out.push(item({
+      key: `ahead-to-${log.id}-${day}`,
+      kind: 'revision',
+      day,
+      at,
+      title: `Done ahead on ${weekdayName(log.date)}`,
+      detail,
+      done: true,
+    }, pages));
+  }
+  return out;
+}
+
 /** Everything done, one item each, newest first. */
 export function buildActivityItems(
   {
@@ -174,7 +213,10 @@ export function buildActivityItems(
   user?: User | null,
 ): ActivityItem[] {
   const out: ActivityItem[] = [];
-  for (const log of logs) if (isRevisionActivity(log) && DAY_RE.test(log.date)) out.push(revisionItem(log));
+  for (const log of logs) {
+    if (!isRevisionActivity(log) || !DAY_RE.test(log.date)) continue;
+    out.push(revisionItem(log), ...aheadItems(log));
+  }
   for (const raw of readings) {
     const s = normalizeReadingSession(raw, user);
     if (s) out.push(readingItem(s));

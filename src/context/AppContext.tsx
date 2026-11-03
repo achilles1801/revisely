@@ -41,6 +41,7 @@ import {
 } from '../lib/offline/ops';
 import { restartFirestore, watchConnectivity } from '../lib/offline/connectivity';
 import { setCurrentAccount } from '../lib/offline/queue';
+import { removeAheadPages } from '../lib/aheadCredit';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -108,6 +109,7 @@ function firestoreSessionToLog(fsSession: FirestoreSession): RevisionLog {
       rating: wu.newRating,
     })),
     durationMinutes: fsSession.durationMinutes,
+    ahead: fsSession.ahead ?? {},
   };
 }
 
@@ -992,6 +994,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Minutes add up: what this phone knows plus this stretch.
         durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
         durationAdd: log.durationMinutes ?? 0,
+        ahead: log.ahead ?? {},
       },
       at,
     );
@@ -1011,6 +1014,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       pagesSkipped: log.pagesSkipped,
       durationMinutes: log.durationMinutes,
       weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
+      // Pages no longer revised here are no longer credited ahead either.
+      ahead: removeAheadPages(log.ahead, [...old].filter((p) => !next.has(p))),
     };
     const forUid = uidRef.current;
     const freshLogs = logsWith([op], at);

@@ -134,6 +134,11 @@ export default function ActivityDayScreen() {
     () => logs.filter((l) => l.date === date && isRevisionActivity(l)),
     [logs, date],
   );
+  const aheadPages = useMemo(() => {
+    const pages = new Set<number>();
+    for (const l of logs) for (const p of l.ahead?.[date] ?? []) pages.add(p);
+    return [...pages];
+  }, [logs, date]);
 
   const savePages = async (session: ReadingSession, pages: number[]) => {
     setReadings((prev) => prev.map((s) => (s.id === session.id ? { ...s, pages } : s)));
@@ -220,6 +225,27 @@ export default function ActivityDayScreen() {
         a11y: `Revision session, ${n} pages revised. Edit`,
       };
     }),
+    // Pages of this day revised ahead, in an earlier session (lib/aheadCredit).
+    ...(aheadPages.length > 0
+      ? [
+          (() => {
+            const runs = pageRuns(aheadPages);
+            const n = aheadPages.length;
+            return {
+              key: `ahead-${date}`,
+              mark: <Mark size="reply" done />,
+              name: `${n} ${n === 1 ? 'page' : 'pages'} done ahead`,
+              body: (
+                <RowText secondary numberOfLines={2}>
+                  {`${describePageRuns(runs)} · ${describeSurahRuns(runs)}`}
+                </RowText>
+              ),
+              onPress: () => undefined,
+              a11y: `${n} ${n === 1 ? 'page' : 'pages'} done ahead, revised in an earlier session`,
+            } as Reply;
+          })(),
+        ]
+      : []),
     ...readings.map((r): Reply => ({
       key: r.id,
       mark: <Mark size="reply" icon="stopwatch-outline" />,

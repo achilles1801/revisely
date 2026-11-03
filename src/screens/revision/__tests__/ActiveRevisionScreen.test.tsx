@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react-n
 import * as Haptics from 'expo-haptics';
 import ActiveRevisionScreen from '../ActiveRevisionScreen';
 import { getCurrentRevisionDay } from '../../../lib/algorithm';
+import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -22,21 +23,29 @@ const mockPager: {
   onUserSwipe?: () => void;
   onPageChange?: (p: number) => void;
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
+  onAdvance?: (leftPage: number, currentPage: number) => void;
+  pages?: number[];
   pageOverlay?: (page: number, scale: number) => React.ReactNode;
   onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
 } = {};
+// The session's route params (Home's "starts at" line opens a later day).
+let mockRouteParams: { aheadDay?: string } | undefined;
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable, View } = require('react-native');
   return {
     MushafPager: (props: {
+      pages?: number[];
       onTap?: () => void;
       onUserSwipe?: () => void;
       onPageChange?: (p: number) => void;
+      onAdvance?: (leftPage: number, currentPage: number) => void;
       onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
       endCard?: React.ReactNode;
       pageOverlay?: (page: number, scale: number) => React.ReactNode;
       onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
     }) => {
+      mockPager.pages = props.pages;
+      mockPager.onAdvance = props.onAdvance;
       mockPager.onUserSwipe = props.onUserSwipe;
       mockPager.onPageChange = props.onPageChange;
       mockPager.onReachEnd = props.onReachEnd;
@@ -121,7 +130,7 @@ function recordingInProgress() {
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
-  useRoute: () => ({ key: 'ActiveRevision-1', name: 'ActiveRevision' }),
+  useRoute: () => ({ key: 'ActiveRevision-1', name: 'ActiveRevision', params: mockRouteParams }),
   useIsFocused: () => true,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
@@ -592,6 +601,71 @@ describe('ActiveRevisionScreen — the session completes on its last page', () =
 
 // Hidden pages (the recite mode), for testers: the eye covers the page; a verse
 // shows when tapped, with Next verse, or after a pause in the reciter's voice.
+describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
+  const NEXT = [341, 342, 343];
+  const today = () => getCurrentRevisionDay(mockApp.user as User);
+  const tomorrow = () => {
+    const [y, m, d] = today().split('-').map(Number);
+    return dateToLocalISODay(new Date(y, m - 1, d + 1));
+  };
+
+  // Today's pages, then the next revision day's: a two-day cycle.
+  function setupTwoDays(revised: number[]) {
+    setup(revised);
+    const user = mockApp.user as User;
+    user.customPlan = { days: [DAY_PAGES, NEXT], cycleStartDate: today(), direction: 'forward' };
+    mockApp.pages = mockApp.pages.map((p: UserPage) =>
+      NEXT.includes(p.pageNumber) ? { ...p, status: 'memorized' } : p,
+    );
+  }
+
+  beforeEach(() => {
+    mockRouteParams = undefined;
+  });
+
+  it('after the last page, Keep going adds the next day’s pages; leaving saves them as credit for that day', async () => {
+    setupTwoDays([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.getByText(/Next: .* · 3 pages/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-end-keep-going'));
+    expect(mockPager.pages).toEqual([...DAY_PAGES, ...NEXT]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+
+    // One page of the next day, then leave.
+    await act(async () => {
+      mockPager.onAdvance?.(341, 342);
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [341], ahead: { [tomorrow()]: [341] } }),
+    );
+  });
+
+  it('at the end of the cycle there is no Keep going', async () => {
+    setup(DAY_PAGES.slice(0, 9));
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.queryByTestId('session-end-keep-going')).toBeNull();
+  });
+
+  it('Home’s “starts at” line opens the session with that day’s pages after today’s', () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    render(<ActiveRevisionScreen />);
+    expect(mockPager.pages).toEqual([...DAY_PAGES, ...NEXT]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+  });
+});
+
 describe('ActiveRevisionScreen — hidden pages (testers)', () => {
   const tester = () => {
     setup([]);

@@ -55,6 +55,8 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
+import { creditedOnDay } from '../../lib/aheadCredit';
+import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
@@ -153,16 +155,11 @@ export default function DashboardScreen() {
   }, [assignment]);
 
   const todayStatus = useMemo(() => {
-    const todayLogs = logs.filter((log) => log.date === revisionDay);
-    if (todayLogs.length === 0)
-      return { status: 'not_started' as const, pagesCompleted: 0 };
-
-    const pagesRevisedToday = new Set<number>();
-    todayLogs.forEach((log) =>
-      log.pagesRevised.forEach((p) => pagesRevisedToday.add(p)),
-    );
+    // Today's pages credited to today: revised today, or ahead from an earlier
+    // session (a day done ahead is done).
+    const credited = creditedOnDay(logs, revisionDay);
     const totalAssigned = assignment?.totalPages || 0;
-    const completed = pagesRevisedToday.size;
+    const completed = (assignment?.pages ?? []).filter((p) => credited.has(p)).length;
     // If the user revised pages today and the assignment later shrank
     // (custom-plan edit, un-memorized surah), treat that as completed
     // rather than letting `remaining` go negative downstream.
@@ -173,6 +170,15 @@ export default function DashboardScreen() {
       return { status: 'partial' as const, pagesCompleted: completed };
     return { status: 'not_started' as const, pagesCompleted: 0 };
   }, [logs, assignment, revisionDay]);
+
+  // Done today: the next revision day, which Home's quiet line opens (#168).
+  const aheadNext = useMemo(() => {
+    if (!user || !assignment || todayStatus.status !== 'completed' || assignment.pages.length === 0) return null;
+    const plan = nextRevisionDayPlan(user, pages, revisionDay, new Set(assignment.pages), logs);
+    if (!plan || plan.pages.length === 0) return null;
+    const lead = plan.day === revisionDayAfter(revisionDay) ? 'Tomorrow' : weekdayLabel(plan.day);
+    return { plan, lead };
+  }, [user, pages, logs, assignment, revisionDay, todayStatus.status]);
 
   // Pages from yesterday's session that were never revised, offered as
   // "Add to today". Empty once they are in today's assignment.
@@ -206,7 +212,10 @@ export default function DashboardScreen() {
       const [y, m, d] = s.split('-').map(Number);
       return new Date(y, m - 1, d).getTime();
     };
-    const sortedDays = logs.map((l) => localDay(l.date)).sort((a, b) => b - a);
+    // A day whose pages were all revised ahead is a day done, so it keeps the streak.
+    const days = new Set<string>(logs.map((l) => l.date));
+    if (user) for (const day of daysDoneAhead(user, pages, logs)) days.add(day);
+    const sortedDays = [...days].map(localDay).sort((a, b) => b - a);
     let streak = 0;
     for (const logDay of sortedDays) {
       const expectedDate = new Date(revisionDate);
@@ -218,7 +227,7 @@ export default function DashboardScreen() {
       }
     }
     return streak;
-  }, [logs, revisionDate]);
+  }, [logs, revisionDate, user, pages]);
 
   // Sessions
   const sessionLogs = useMemo(
@@ -230,11 +239,11 @@ export default function DashboardScreen() {
   );
 
   // Pages revised today: the Today post's page chips fill in as they're done.
-  const donePagesToday = useMemo(() => {
-    const done = new Set<number>();
-    logs.filter((log) => log.date === revisionDay).forEach((log) => log.pagesRevised.forEach((p) => done.add(p)));
-    return done;
-  }, [logs, revisionDay]);
+  // Includes pages revised ahead for today (lib/aheadCredit).
+  const donePagesToday = useMemo(
+    () => new Set(creditedOnDay(logs, revisionDay)),
+    [logs, revisionDay],
+  );
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
@@ -499,6 +508,8 @@ export default function DashboardScreen() {
           leftovers={leftovers.length}
           onCarryOver={handleCarryOver}
           carrying={carrying}
+          ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
+          onAhead={() => aheadNext && navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day })}
         />
 
         {showKahfCard && (
