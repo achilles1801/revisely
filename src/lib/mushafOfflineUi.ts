@@ -34,7 +34,7 @@ export function describeMushaf(s: MushafStatus): { value: string; subtitle: stri
     case 'downloading':
       return { value: percent, subtitle: `Downloading · ${pages}` };
     case 'pending':
-      return s.bytes > 0
+      return s.pages > 0 || s.textReady
         ? { value: percent, subtitle: `Downloads on ${over} · ${pages}` }
         : { value: '', subtitle: `Downloads on ${over} · ${formatMegabytes(s.totalBytes)}` };
     case 'waiting-for-wifi':
@@ -71,7 +71,8 @@ export function mushafMenuActions(s: MushafStatus): SheetAction[] {
       onPress: () => downloadNow(s),
     });
   }
-  if (s.bytes > 0) {
+  // Something of the download is here (a few suras read since Remove don't count).
+  if (s.pages > 0 || s.textReady) {
     actions.push({
       key: 'remove',
       label: 'Remove from this phone',

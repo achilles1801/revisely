@@ -2,6 +2,7 @@
 const mockFiles = new Map<string, string>();
 const mockDirs = new Set<string>();
 const mockExcluded: string[] = [];
+let mockWriteFails: (uri: string) => boolean = () => false;
 
 jest.mock('expo-file-system', () => {
   const join = (parts: unknown[]) =>
@@ -21,6 +22,7 @@ jest.mock('expo-file-system', () => {
       mockFiles.set(this.uri, '');
     }
     write(text: string) {
+      if (mockWriteFails(this.uri)) throw new Error('No space left on device');
       mockFiles.set(this.uri, text);
     }
     async text() {
@@ -127,6 +129,7 @@ beforeEach(() => {
   mockFiles.clear();
   mockDirs.clear();
   mockExcluded.length = 0;
+  mockWriteFails = () => false;
   __resetSaheehForTests();
   version = '1.1.2';
   offline = false;
@@ -319,6 +322,83 @@ describe('the whole translation', () => {
     // Read again later: kept again.
     await getSaheehVerse(1, 1);
     expect(saheehSurasOnPhone()).toBe(1);
+  });
+});
+
+describe('keeping it at the latest version, and failing well', () => {
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  };
+
+  it('a sura read is fetched again when QuranEnc has a newer version: no offline download needed', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1_000_000_000_000);
+    await getSaheehVerse(2, 1);
+    await settle();
+    version = '1.1.3';
+    jest.spyOn(Date, 'now').mockReturnValue(1_000_000_000_000 + 25 * 3_600_000);
+    __resetSaheehForTests(); // a later launch
+    fetched = [];
+    // Shown at once from the phone, with its own version…
+    expect(await getSaheehVerse(2, 1)).toMatchObject({ text: 'v1.1.2 2:1[7]', version: '1.1.2' });
+    await settle();
+    // …then the list says 1.1.3, and the sura comes again.
+    expect(fetched.sort()).toEqual([LIST, sura(2)].sort());
+    expect(await getSaheehVerse(2, 1)).toMatchObject({ text: 'v1.1.3 2:1[7]', version: '1.1.3' });
+    expect(mockFiles.has(`${DIR}/002-1.1.3.json`)).toBe(true);
+    expect(mockFiles.has(`${DIR}/002-1.1.2.json`)).toBe(false);
+  });
+
+  it('a list that can’t be read is asked once, not before every sura', async () => {
+    (global as any).fetch = jest.fn(async (url: string) => {
+      fetched.push(url);
+      if (url === LIST) return { ok: false, status: 500, json: async () => ({}) };
+      const n = Number(/\/(\d+)$/.exec(url)![1]);
+      return { ok: true, status: 200, json: async () => suraResponse(n) };
+    });
+    await downloadSaheeh();
+    expect(saheehSurasOnPhone()).toBe(114);
+    expect(fetched.filter((u) => u === LIST)).toHaveLength(1);
+    expect((await getSaheehVerse(9, 1)).version).toBe(SAHEEH_KNOWN.version);
+  });
+
+  it('carries on past a sura that fails every time, and says it failed', async () => {
+    failSura = (n) => n === 40;
+    await expect(downloadSaheeh()).rejects.toThrow();
+    expect(saheehSurasOnPhone()).toBe(113);
+    expect(hasSaheehSura(40)).toBe(false);
+  });
+
+  it('stops after three failures in a row (QuranEnc in trouble)', async () => {
+    failSura = (n) => n > 10;
+    await expect(downloadSaheeh()).rejects.toThrow();
+    expect(saheehSurasOnPhone()).toBe(10);
+    expect(fetched.filter((u) => u.includes('/sura/')).length).toBeLessThan(16);
+  });
+
+  it('a sura that can’t be kept (a full phone) is a failure for the download, but still shown when read', async () => {
+    mockWriteFails = (uri) => uri.includes('/050-');
+    await expect(downloadSaheeh()).rejects.toThrow();
+    expect(hasSaheehSura(50)).toBe(false);
+    expect((await getSaheehVerse(50, 1)).text).toBe('v1.1.2 50:1[7]');
+  });
+
+  it('the download doesn’t hold the whole translation in memory', async () => {
+    await getSaheehVerse(1, 1);
+    await downloadSaheeh();
+    expect(peekSaheehVerse(1, 1)).not.toBeNull();
+    expect(peekSaheehVerse(2, 1)).toBeNull();
+    expect((await getSaheehVerse(2, 1)).text).toBe('v1.1.2 2:1[7]');
+  });
+
+  it('a clock set back (a list read “in the future”) doesn’t stop the checks', async () => {
+    mockFiles.set(`${DIR}/info.json`, JSON.stringify({ ...SAHEEH_KNOWN, checkedAt: Date.now() + 30 * 86_400_000 }));
+    expect(await latestSaheehInfo()).toMatchObject({ version: '1.1.2' });
+    expect(fetched).toEqual([LIST]);
+  });
+
+  it('a version that couldn’t be a file name is not used', async () => {
+    version = '1.2/../x';
+    expect((await latestSaheehInfo()).version).toBe(SAHEEH_KNOWN.version);
   });
 });
 

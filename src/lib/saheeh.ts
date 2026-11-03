@@ -18,8 +18,12 @@
 //   about 1 MB) downloads with the offline mushaf (lib/mushafOffline).
 //   info.json keeps QuranEnc's own description of it (title, description,
 //   version, last update).
-// - QuranEnc's list of translations is read at most once a day; a sura from an
-//   older version is downloaded again, and shown with its own version until then.
+// - QuranEnc's list of translations is read at most once a day (on any
+//   connection, whenever a sura is read). A sura from an older version is
+//   fetched again as soon as it is read, and by the offline download; until
+//   then it is shown with its own version. The sura endpoint carries no
+//   version, so a sura fetched before the list has been read is labelled with
+//   the last version known and fetched again if the list says otherwise.
 //
 // Copies served by alquran.cloud (the app's source before Nov 2026) had no
 // licence; their cached files are deleted.
@@ -40,7 +44,13 @@ export const SAHEEH_SURAS = 114;
 export const SAHEEH_BYTES = 1_093_165;
 const TIMEOUT_MS = 20_000;
 const CHECK_EVERY_MS = 24 * 3_600_000;
+/** After the list couldn't be read, it isn't asked again for this long. */
+const RECHECK_AFTER_FAILURE_MS = 10 * 60_000;
 const WORKERS = 2;
+/** The download stops after this many suras fail in a row. */
+const MAX_FAILURES_IN_A_ROW = 3;
+/** A version as it may appear in a file name. */
+const VERSION = /^[\w.-]{1,32}$/;
 
 /** QuranEnc's description of the translation (its list), with when it was read. */
 export interface SaheehInfo {
@@ -79,11 +89,13 @@ export interface SaheehVerse {
 
 const memory = new Map<number, SuraFile>();
 const loading = new Map<number, Promise<SuraFile>>();
+const refreshing = new Set<number>();
 /** Sura → the version of its file on the phone. Null until the folder is read. */
 let index: Map<number, string> | null = null;
 let info: SaheehInfo | null = null;
 let infoRead = false;
 let checking: Promise<SaheehInfo> | null = null;
+let checkFailedAt = 0;
 let backupExcluded = false;
 let generation = 0;
 const listeners = new Set<() => void>();
@@ -229,21 +241,37 @@ function readInfo(): SaheehInfo | null {
   return info;
 }
 
+/** The last version read from QuranEnc's list, or the one this release knows. */
+function knownInfo(): SaheehInfo {
+  return readInfo() ?? SAHEEH_KNOWN;
+}
+
+/** Within `ms` after `at` (a clock set back counts as outside). */
+function within(at: number, ms: number): boolean {
+  const age = Date.now() - at;
+  return age >= 0 && age < ms;
+}
+
 /**
- * The newest version, from QuranEnc's list (read at most once a day). If the
- * list can't be read: the last one read, or the one this release knows.
+ * The newest version, from QuranEnc's list (read at most once a day; after a
+ * failure, not again for 10 minutes). If the list can't be read: the last one
+ * read, or the one this release knows.
  */
 export function latestSaheehInfo(): Promise<SaheehInfo> {
   const known = readInfo();
-  if (known && Date.now() - known.checkedAt < CHECK_EVERY_MS) return Promise.resolve(known);
+  if (known && within(known.checkedAt, CHECK_EVERY_MS)) return Promise.resolve(known);
+  if (checkFailedAt > 0 && within(checkFailedAt, RECHECK_AFTER_FAILURE_MS)) return Promise.resolve(knownInfo());
   if (!checking) {
+    const gen = generation;
     checking = (async () => {
       try {
         const json = (await getJson(`${API}/translations/list/en`)) as {
           translations?: Partial<SaheehInfo>[];
         };
         const entry = json?.translations?.find((t) => t.key === SAHEEH_KEY);
-        if (!entry || typeof entry.version !== 'string') throw new Error('Saheeh International is not in the list');
+        if (!entry || typeof entry.version !== 'string' || !VERSION.test(entry.version)) {
+          throw new Error('Saheeh International is not in the list');
+        }
         const next: SaheehInfo = {
           key: SAHEEH_KEY,
           version: entry.version,
@@ -252,17 +280,20 @@ export function latestSaheehInfo(): Promise<SaheehInfo> {
           description: String(entry.description ?? ''),
           checkedAt: Date.now(),
         };
+        checkFailedAt = 0;
+        // Removed meanwhile: nothing is written back.
+        if (gen !== generation) return next;
         info = next;
         try {
-          const f = new File(ensureDir(), 'info.json');
-          f.write(JSON.stringify(next));
+          new File(ensureDir(), 'info.json').write(JSON.stringify(next));
         } catch (err) {
           logger.warn('Could not save the translation info', err);
         }
         return next;
       } catch (err) {
         logger.warn('Could not read QuranEnc’s list', err);
-        return readInfo() ?? SAHEEH_KNOWN;
+        checkFailedAt = Date.now();
+        return knownInfo();
       }
     })().finally(() => {
       checking = null;
@@ -273,6 +304,7 @@ export function latestSaheehInfo(): Promise<SaheehInfo> {
 
 function store(file: SuraFile, gen: number): void {
   if (gen !== generation) return;
+  if (!VERSION.test(file.version)) throw new Error('Unexpected translation version');
   const d = ensureDir();
   const name = fileName(file.sura, file.version);
   // Written beside it and moved in, so a file there is always whole.
@@ -297,21 +329,32 @@ function store(file: SuraFile, gen: number): void {
   listeners.forEach((l) => l());
 }
 
-/** One sura from QuranEnc, stored on the phone. */
-async function fetchSura(sura: number): Promise<SuraFile> {
+/** Keeps a sura in memory, unless a newer version is there already. */
+function remember(file: SuraFile): SuraFile {
+  const current = memory.get(file.sura);
+  if (current && compareVersions(current.version, file.version) > 0) return current;
+  memory.set(file.sura, file);
+  return file;
+}
+
+/**
+ * One sura from QuranEnc, stored on the phone with `version`. For the offline
+ * download (`strict`), a sura that can't be stored is a failure, and it is kept
+ * in memory only if it was there already (the whole translation would hold
+ * ~1 MB for the session); for the reader, the text is shown anyway.
+ */
+async function fetchSura(sura: number, version: string, strict: boolean): Promise<SuraFile> {
   const gen = generation;
-  const [latest, json] = await Promise.all([
-    latestSaheehInfo(),
-    getJson(`${API}/translation/sura/${SAHEEH_KEY}/${sura}`),
-  ]);
-  const file: SuraFile = { key: SAHEEH_KEY, version: latest.version, sura, verses: parseSuraResponse(json, sura) };
+  const json = await getJson(`${API}/translation/sura/${SAHEEH_KEY}/${sura}`);
+  const file: SuraFile = { key: SAHEEH_KEY, version, sura, verses: parseSuraResponse(json, sura) };
   try {
     store(file, gen);
   } catch (err) {
+    if (strict) throw err;
     logger.warn('Could not keep a sura of the translation', err);
   }
-  if (gen === generation) memory.set(sura, file);
-  return file;
+  if (gen !== generation || (strict && !memory.has(sura))) return file;
+  return remember(file);
 }
 
 async function readSura(sura: number): Promise<SuraFile | null> {
@@ -323,8 +366,10 @@ async function readSura(sura: number): Promise<SuraFile | null> {
     const count = getSurahDisplay(sura)?.ayahCount;
     if (parsed?.sura === sura && Array.isArray(parsed.verses) && parsed.verses.length === count) return parsed;
   } catch {
-    // Unreadable: fetched again below.
+    // Unreadable (or replaced by a newer version meanwhile): see below.
   }
+  // Only if it is still the file on record: the download may have replaced it.
+  if (suraIndex().get(sura) !== version) return null;
   try {
     if (f.exists) f.delete();
   } catch {
@@ -334,22 +379,42 @@ async function readSura(sura: number): Promise<SuraFile | null> {
   return null;
 }
 
+/**
+ * QuranEnc may have a newer version than the one this sura was kept with:
+ * asked once a day at most, on any connection, and the sura fetched again if so
+ * (its terms: keep it at the latest version). Never fails.
+ */
+function refreshIfOutdated(sura: number, version: string): void {
+  if (refreshing.has(sura)) return;
+  refreshing.add(sura);
+  const gen = generation;
+  latestSaheehInfo()
+    .then((latest) =>
+      gen === generation && compareVersions(latest.version, version) > 0
+        ? fetchSura(sura, latest.version, false)
+        : undefined,
+    )
+    .catch(() => undefined)
+    .finally(() => refreshing.delete(sura));
+}
+
 function loadSura(sura: number): Promise<SuraFile> {
   const known = memory.get(sura);
   if (known) return Promise.resolve(known);
-  let pending = loading.get(sura);
-  if (!pending) {
-    pending = (async () => {
-      const stored = await readSura(sura);
-      if (stored) {
-        memory.set(sura, stored);
-        return stored;
-      }
-      return fetchSura(sura);
-    })().finally(() => loading.delete(sura));
-    loading.set(sura, pending);
-  }
-  return pending;
+  const pending = loading.get(sura);
+  if (pending) return pending;
+  const load: Promise<SuraFile> = (async () => {
+    const stored = await readSura(sura);
+    // Not waiting for QuranEnc's list: labelled with the last version known,
+    // and fetched again below if the list says there is a newer one.
+    const file = stored ? remember(stored) : await fetchSura(sura, knownInfo().version, false);
+    refreshIfOutdated(sura, file.version);
+    return file;
+  })().finally(() => {
+    if (loading.get(sura) === load) loading.delete(sura);
+  });
+  loading.set(sura, load);
+  return load;
 }
 
 /** One verse: from memory, the phone, or QuranEnc (and then kept). */
@@ -377,28 +442,37 @@ export function hasSaheehSura(sura: number): boolean {
   return memory.has(sura) || suraIndex().has(sura);
 }
 
+/** A sura older than `version`, or not on the phone. */
+function outdated(sura: number, version: string): boolean {
+  const have = suraIndex().get(sura);
+  return !have || compareVersions(have, version) < 0;
+}
+
 /**
  * Downloads every sura not on the phone at the newest version (lib/mushafOffline).
- * Throws if any failed; the rest are kept. `stillWanted` is asked before each sura.
+ * Carries on past a failed sura; stops after 3 in a row. Throws if any failed
+ * (the rest are kept). `stillWanted` is asked before each sura.
  */
 export async function downloadSaheeh(stillWanted: () => boolean = () => true): Promise<void> {
   const latest = await latestSaheehInfo();
-  const idx = suraIndex();
   const todo: number[] = [];
-  for (let s = 1; s <= SAHEEH_SURAS; s++) if (idx.get(s) !== latest.version) todo.push(s);
+  for (let s = 1; s <= SAHEEH_SURAS; s++) if (outdated(s, latest.version)) todo.push(s);
   if (todo.length === 0) return;
   let next = 0;
   let failed = 0;
+  let inARow = 0;
   await Promise.all(
     Array.from({ length: WORKERS }, async () => {
-      while (next < todo.length && failed === 0 && stillWanted()) {
+      while (next < todo.length && inARow < MAX_FAILURES_IN_A_ROW && stillWanted()) {
         const sura = todo[next++];
+        // A sura read meanwhile (at the newest version) needn't come again.
+        if (!outdated(sura, latest.version)) continue;
         try {
-          // A sura read meanwhile (at the newest version) needn't come again.
-          if (suraIndex().get(sura) === latest.version) continue;
-          await fetchSura(sura);
+          await fetchSura(sura, latest.version, true);
+          inARow = 0;
         } catch (err) {
           failed++;
+          inARow++;
           logger.warn('Translation download failed', err);
         }
       }
@@ -412,6 +486,7 @@ export function removeSaheeh(): void {
   generation++;
   memory.clear();
   loading.clear();
+  refreshing.clear();
   try {
     const d = dir();
     if (d.exists) d.delete();
@@ -469,10 +544,12 @@ export function saheehSegments(text: string, footnotes: string): TextSegment[] {
 export function __resetSaheehForTests(): void {
   memory.clear();
   loading.clear();
+  refreshing.clear();
   index = null;
   info = null;
   infoRead = false;
   checking = null;
+  checkFailedAt = 0;
   backupExcluded = false;
   generation = 0;
   listeners.clear();

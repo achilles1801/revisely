@@ -378,6 +378,9 @@ async function fetchText(part: TextPart, gen: number): Promise<boolean> {
       arabicHere = gen === generation && hasArabicText();
     } else {
       await downloadSaheeh(() => mayRun(gen));
+      // Stopped between suras (the network, the app leaving): carries on next run.
+      if (!mayRun(gen)) return false;
+      if (saheehSurasOnPhone() < SAHEEH_SURAS) throw new Error('Some suras were not kept');
     }
     textAttempt[part] = 0;
     return true;
@@ -415,16 +418,17 @@ async function runOnce(): Promise<void> {
   clearRetry();
   const missing: number[] = [];
   for (let p = 1; p <= PAGE_COUNT; p++) if (!present.has(p)) missing.push(p);
-  if (missing.length > 0 && !roomFor(missing[0])) {
-    noSpace = true;
-    return;
-  }
   noSpace = false;
   failedRun = false;
   downloading = true;
   publish();
   try {
+    // The text first (~3 MB): it comes even when the pages don't fit.
     const textOk = await fetchTexts(gen);
+    if (missing.length > 0 && !roomFor(missing[0])) {
+      noSpace = true;
+      return;
+    }
     let next = 0;
     let failures = 0;
     let inARow = 0;

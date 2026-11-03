@@ -63,6 +63,7 @@ import {
   downloadArabicText,
   getArabicVerse,
   getPageEdition,
+  hasArabicForPage,
   hasArabicText,
   parseQuranResponse,
   removeArabicText,
@@ -151,6 +152,19 @@ describe('the whole Arabic text', () => {
     );
     expect(await getArabicVerse(604, 114, 21)).toBe('114:21');
     expect(fetched).toEqual([]);
+    // Written again with the notice, once.
+    const file = JSON.parse(mockFiles.get('file:///documents/quran-text/quran-uthmani.json') as string);
+    expect(file.notice).toBe(TANZIL_NOTICE);
+    expect(Object.keys(file.pages)).toHaveLength(604);
+  });
+
+  it("knows whether a page's Arabic is on the phone (the whole text, or the page read before)", async () => {
+    expect(hasArabicForPage(48)).toBe(false);
+    mockFiles.set('cache/translation/quran-uthmani/48.json', '[]');
+    expect(hasArabicForPage(48)).toBe(true);
+    expect(hasArabicForPage(49)).toBe(false);
+    await downloadArabicText();
+    expect(hasArabicForPage(49)).toBe(true);
   });
 
   it('names its source with a link to tanzil.net', () => {

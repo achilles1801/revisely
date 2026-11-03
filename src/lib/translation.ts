@@ -261,7 +261,18 @@ function loadArabicText(): Promise<boolean> {
         const file = arabicFile();
         if (!file.exists) return false;
         const parsed = JSON.parse(await file.text()) as ArabicFile | Record<number, TranslatedAyah[]>;
-        fillMemory('pages' in parsed && 'notice' in parsed ? (parsed as ArabicFile).pages : (parsed as Record<number, TranslatedAyah[]>));
+        if ('pages' in parsed && 'notice' in parsed) {
+          fillMemory((parsed as ArabicFile).pages);
+        } else {
+          const pages = parsed as Record<number, TranslatedAyah[]>;
+          fillMemory(pages);
+          // Downloaded before the notice was kept with it (Nov 2 2026): written again with it.
+          try {
+            writeArabicFile(pages);
+          } catch (err) {
+            logger.warn('Could not add the notice to the Arabic text', err);
+          }
+        }
         return true;
       } catch (err) {
         logger.warn('Could not read the Arabic text', err);
@@ -273,6 +284,33 @@ function loadArabicText(): Promise<boolean> {
     });
   }
   return arabicLoaded;
+}
+
+/** Writes the whole Arabic text with Tanzil's notice, beside the file and moved in (a file there is always whole). */
+function writeArabicFile(pages: Record<number, TranslatedAyah[]>): void {
+  const dir = textDir();
+  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+  const partial = new File(dir, `${ARABIC_FILE}.part`);
+  if (partial.exists) partial.delete();
+  partial.create();
+  const contents: ArabicFile = { notice: TANZIL_NOTICE, source: 'https://tanzil.net', pages };
+  partial.write(JSON.stringify(contents));
+  const target = arabicFile();
+  if (target.exists) target.delete();
+  partial.move(target);
+}
+
+/**
+ * This page's Arabic is on the phone or in memory (the whole text, or the page
+ * read before), so the verse sheet can show its verses offline.
+ */
+export function hasArabicForPage(page: number): boolean {
+  if (memory.has(`${ARABIC_EDITION}/${page}`) || hasArabicText()) return true;
+  try {
+    return new File(new Directory(Paths.cache, 'translation', ARABIC_EDITION), `${page}.json`).exists;
+  } catch {
+    return false;
+  }
 }
 
 /** The whole Arabic text is on the phone. */
@@ -304,15 +342,7 @@ export async function downloadArabicText(stillWanted: () => boolean = () => true
       logger.warn('Could not keep the Arabic text out of backups', err);
     }
   }
-  // Written beside it and moved in, so a file there is always whole.
-  const partial = new File(dir, `${ARABIC_FILE}.part`);
-  if (partial.exists) partial.delete();
-  partial.create();
-  const contents: ArabicFile = { notice: TANZIL_NOTICE, source: 'https://tanzil.net', pages: byPage };
-  partial.write(JSON.stringify(contents));
-  const target = arabicFile();
-  if (target.exists) target.delete();
-  partial.move(target);
+  writeArabicFile(byPage);
   fillMemory(byPage);
   arabicLoaded = Promise.resolve(true);
 }

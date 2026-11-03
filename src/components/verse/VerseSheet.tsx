@@ -29,6 +29,7 @@ import {
   creditLine,
   DEFAULT_TRANSLATION_ID,
   getVerseText,
+  hasArabicForPage,
   isTranslationAvailable,
   pickerTitle,
   CLEAR_QURAN_ID,
@@ -40,7 +41,7 @@ import {
 } from '../../lib/translation';
 import { clearQuranErrorHint, clearQuranSegments } from '../../lib/clearQuran';
 import { hasSaheehSura, saheehFootnotes, saheehSegments } from '../../lib/saheeh';
-import { knownOffline } from '../../lib/networkState';
+import { knownOffline, onNetworkState } from '../../lib/networkState';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
@@ -159,6 +160,19 @@ export function VerseSheet({
   onCloseRef.current = onClose;
   const visibleRef = useRef(verse != null);
   visibleRef.current = verse != null;
+  // The connection: what an error says follows it, and a verse that couldn't
+  // load is tried again when it comes back.
+  const [, setNetworkChanges] = useState(0);
+  const failedRef = useRef(false);
+  useEffect(
+    () =>
+      onNetworkState((now, before) => {
+        if (!visibleRef.current) return;
+        setNetworkChanges((n) => n + 1);
+        if (now.connected && before?.connected !== true && failedRef.current) setAttempt((a) => a + 1);
+      }),
+    [],
+  );
   const reduceMotion = useReduceMotion();
 
   // The drag, on the UI thread: the sheet follows the finger down.
@@ -278,6 +292,12 @@ export function VerseSheet({
   }
   const prev = verse ? previousVerse(verse) : null;
   const next = verse ? nextVerse(verse) : null;
+  failedRef.current = view.status === 'error';
+  // Offline, with this page's Arabic here: The Clear Quran® is what's missing,
+  // and Saheeh International can show the verse if its sura is here too.
+  const offline = view.status === 'error' && knownOffline();
+  const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
+  const saheehHere = arabicHere && !!verse && hasSaheehSura(verse.sura);
 
   return (
     <Modal visible={verse != null} transparent animationType="slide" onRequestClose={onClose}>
@@ -483,7 +503,7 @@ export function VerseSheet({
               )}
               {view.status === 'error' && (
                 <View style={styles.center} testID="verse-error">
-                  {translation.id === CLEAR_QURAN_ID && knownOffline() ? (
+                  {translation.id === CLEAR_QURAN_ID && arabicHere ? (
                     // Offline: kept only as read (its terms), so a verse not read before can't
                     // show. Saheeh International can, once it's on the phone; only if chosen.
                     <>
@@ -491,11 +511,15 @@ export function VerseSheet({
                         The Clear Quran® needs the internet
                       </Text>
                       <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
-                        {verse && hasSaheehSura(verse.sura)
+                        {saheehHere
                           ? 'Saheeh International is available offline.'
                           : "Verses you've read before show offline. Try again once you're online."}
                       </Text>
                     </>
+                  ) : offline ? (
+                    <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
+                      This verse isn't downloaded yet. It shows when you're back online.
+                    </Text>
                   ) : translation.id === CLEAR_QURAN_ID ? (
                     // Only ever this, or its own text: never another translation under its name.
                     <>
@@ -506,13 +530,11 @@ export function VerseSheet({
                     </>
                   ) : (
                     <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
-                      {knownOffline()
-                        ? "This verse isn't downloaded yet. It shows when you're back online."
-                        : "Couldn't load this verse. Check your connection."}
+                      Couldn't load this verse. Check your connection.
                     </Text>
                   )}
                   <View style={styles.errorActions}>
-                    {translation.id === CLEAR_QURAN_ID && knownOffline() && verse && hasSaheehSura(verse.sura) && (
+                    {translation.id === CLEAR_QURAN_ID && saheehHere && (
                       <PillButton
                         title="Show Saheeh International"
                         variant="outline"

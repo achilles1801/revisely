@@ -352,6 +352,29 @@ describe('the offline mushaf download', () => {
     expect(getMushafStatus().phase).toBe('complete');
   });
 
+  it('a translation download that left suras out is a failure, tried again later', async () => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
+    const saheeh = jest.requireMock('../saheeh');
+    const real = saheeh.downloadSaheeh;
+    saheeh.downloadSaheeh = async () => {
+      mockSaheehCalls++;
+      mockSaheeh = 100;
+    };
+    try {
+      setNetworkState(WIFI);
+      await prepareMushafOffline();
+      startMushafOffline();
+      await settle();
+      expect(getMushafStatus().phase).toBe('error');
+      saheeh.downloadSaheeh = real;
+      jest.advanceTimersByTime(61_000);
+      await settle();
+      expect(getMushafStatus().phase).toBe('complete');
+    } finally {
+      saheeh.downloadSaheeh = real;
+    }
+  });
+
   it('once everything is here, each run still asks for a newer version of the translation', async () => {
     for (let p = 1; p <= 604; p++) mockPhone.add(p);
     mockArabic = true;
@@ -376,13 +399,15 @@ describe('the offline mushaf download', () => {
     expect(getMushafStatus().bytes - before).toBe(Math.round(1_093_165 / 2));
   });
 
-  it('needs room for the next page and a margin', async () => {
+  it('needs room for the next page and a margin; the text (~3 MB) still comes', async () => {
     mockFree = 100_000_000;
     setNetworkState(WIFI);
     await prepareMushafOffline();
     startMushafOffline();
     await settle();
     expect(mockDownloaded).toEqual([]);
+    expect(mockArabic).toBe(true);
+    expect(mockSaheeh).toBe(114);
     expect(getMushafStatus().phase).toBe('no-space');
     expect(describeMushaf(getMushafStatus()).subtitle).toBe('Not enough free space · 0 of 604 pages');
   });

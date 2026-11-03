@@ -41,8 +41,10 @@ jest.mock('../../../lib/translation', () => {
     // Nothing is in memory unless a test says so; fetching ahead is only recorded.
     peekVerseText: jest.fn(() => null),
     prefetchVerseNeighbours: jest.fn(),
+    hasArabicForPage: (page: number) => mockHasArabicForPage(page),
   };
 });
+const mockHasArabicForPage = jest.fn((_page: number) => true);
 
 const mockHasSaheehSura = jest.fn((_sura: number) => true);
 jest.mock('../../../lib/saheeh', () => ({
@@ -372,6 +374,7 @@ describe('VerseSheet: The Clear Quran', () => {
     beforeEach(() => {
       setNetworkState({ connected: false, type: 'none' });
       mockHasSaheehSura.mockReset().mockReturnValue(true);
+      mockHasArabicForPage.mockReset().mockReturnValue(true);
     });
     afterEach(() => __resetNetworkStateForTests());
 
@@ -395,6 +398,28 @@ describe('VerseSheet: The Clear Quran', () => {
       expect(screen.queryByText('Saheeh International is available offline.')).toBeNull();
       expect(screen.getByText(/Try again once you're online/)).toBeTruthy();
       expect(screen.queryByText('Show Saheeh International')).toBeNull();
+    });
+
+    it('the Arabic of that page isn’t here either: not downloaded yet, and no Saheeh offer it can’t keep', async () => {
+      mockHasArabicForPage.mockReturnValue(false);
+      getVerseText.mockImplementationOnce(() => Promise.reject(new ClearQuranError('NETWORK', 'offline')));
+      render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 280 })} translationId="en.khattab" />));
+      expect(
+        await screen.findByText("This verse isn't downloaded yet. It shows when you're back online.", {}, { timeout: 10_000 }),
+      ).toBeTruthy();
+      expect(mockHasArabicForPage).toHaveBeenCalledWith(48);
+      expect(screen.queryByText('The Clear Quran® needs the internet')).toBeNull();
+      expect(screen.queryByText('Show Saheeh International')).toBeNull();
+    });
+
+    it('loads again by itself when the connection comes back', async () => {
+      getVerseText
+        .mockImplementationOnce(() => Promise.reject(new ClearQuranError('NETWORK', 'offline')))
+        .mockImplementationOnce(tcqVerse('O believers!'));
+      render(wrap(<VerseSheet {...props({ page: 50, sura: 2, ayah: 280 })} translationId="en.khattab" />));
+      expect(await screen.findByText('The Clear Quran® needs the internet', {}, { timeout: 10_000 })).toBeTruthy();
+      await act(async () => setNetworkState({ connected: true, type: 'wifi' }));
+      expect(await screen.findByText('O believers!', {}, { timeout: 10_000 })).toBeTruthy();
     });
 
     it('Saheeh International not downloaded yet: says so', async () => {

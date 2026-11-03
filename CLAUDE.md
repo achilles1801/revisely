@@ -283,8 +283,9 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
   and loads it by itself when the connection is back.
 - **Text offline:** the whole Arabic (Tanzil's Uthmani via alquran.cloud) is downloaded with the
   pages (`downloadArabicText`, one request), so Copy and Share and the verse sheet's Arabic work
-  offline; the file keeps Tanzil's notice (`TANZIL_NOTICE`), as its terms ask of every copy (files
-  from before Nov 3 2026 hold the pages alone and still load). Saheeh International, now QuranEnc's
+  offline; the file keeps Tanzil's notice (`TANZIL_NOTICE`, word for word from
+  tanzil.net/docs/text_license), as its terms ask of every copy (a file from before Nov 3 2026 holds
+  the pages alone; it is written again with the notice the first time it loads). Saheeh International, now QuranEnc's
   licensed copy (#80, below), is downloaded whole too. The Clear Quran stays as the owner decided on
   Oct 27 2026 (cached as read, 30 + 30 days, never the whole of it): its terms (attribution, no
   changes, a revocable licence, rate limits; public page theclearquran.org/organizations/api) don't
@@ -315,10 +316,18 @@ June 2025).
 - **Storage:** `Documents/translations/english_saheeh/NNN-<version>.json`, one file per sura (written
   to `.part` and moved in), as soon as a sura is read, and all 114 with the offline mushaf. Out of
   iCloud backups on iOS. The old alquran.cloud cache (`Caches/translation/en.sahih`) is deleted.
-- **Versions:** QuranEnc's list (`/api/v1/translations/list/en`) is read at most once a day; a sura
-  of an older version is shown with its own version until the download (every run of
-  `mushafOffline`, even when everything is here) replaces it. Without the list, the last version read
-  or `SAHEEH_KNOWN` labels a sura.
+- **Versions:** QuranEnc's list (`/api/v1/translations/list/en`) is read at most once a day (after a
+  failure, not again for 10 minutes; a clock set back doesn't stop it). A sura of an older version is
+  shown with its own version and fetched again as soon as it is read, on any connection
+  (`refreshIfOutdated`), whether or not the offline download runs; the download (every run of
+  `mushafOffline`, even when everything is here) replaces the rest. The sura endpoint has no version:
+  a sura read before the list is labelled with the last version known (`SAHEEH_KNOWN` on a fresh
+  install) and fetched again if the list says otherwise.
+- **Failures:** the download carries on past a failed sura and stops after 3 in a row; a sura that
+  can't be stored (a full phone) is a failure there (the reader still shows it). The text downloads
+  before the free-space check for pages, so it comes even when the pages don't fit. The verse sheet
+  offers Saheeh International offline only when that sura and that page's Arabic are both on the
+  phone (`hasArabicForPage`), and reloads by itself when the connection comes back.
 - **Requests:** the API sits behind Cloudflare and answers 403 to Python's urllib (its user agent);
   the phones' (CFNetwork, okhttp) and curl get 200. 114 requests, about 1 MB gzipped, ~6 s.
 - The Arabic's source is credited in the verse sheet too: "Arabic text: Tanzil Project · tanzil.net"
