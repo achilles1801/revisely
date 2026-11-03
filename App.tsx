@@ -11,6 +11,7 @@ import { RecordingBackupController } from './src/components/RecordingBackupContr
 import { MushafOfflineController } from './src/components/MushafOfflineController';
 import { WidgetSync } from './src/components/WidgetSync';
 import { PrayerSync } from './src/components/prayer/PrayerSync';
+import { RevisionRemindersSync } from './src/components/RevisionRemindersSync';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
 import { AndroidSystemTheme } from './src/components/AndroidSystemTheme';
@@ -110,6 +111,7 @@ function App() {
                   <MushafOfflineController />
                   <WidgetSync />
                   <PrayerSync />
+                  <RevisionRemindersSync />
                 </BottomSheetModalProvider>
               </AppProvider>
             </AuthProvider>

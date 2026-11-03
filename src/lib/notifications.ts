@@ -3,7 +3,12 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
-import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID, REMINDER_CHANNEL_ID } from './notificationChannels';
+import {
+  PRAYER_CHANNEL_ID,
+  PRAYER_SILENT_CHANNEL_ID,
+  REMINDER_CHANNEL_ID,
+  REMINDER_SILENT_CHANNEL_ID,
+} from './notificationChannels';
 
 export { REMINDER_CHANNEL_ID };
 
@@ -18,9 +23,9 @@ Notifications.setNotificationHandler({
 
 /**
  * Android's notification channels, as Settings → Apps → Revisely → Notifications
- * lists them. The daily reminder and the reading timer use 'default' (its id since
- * the first version; it was also named "default"); prayer notifications theirs, with
- * a silent one (lib/notificationChannels). Without a channel a scheduled
+ * lists them. The revision reminders and the reading timer use 'default' (its id since
+ * the first version; it was also named "default"); the silent revision reminders
+ * and prayer notifications theirs, each with a silent one (lib/notificationChannels). Without a channel a scheduled
  * notification went to expo-notifications' "Miscellaneous". Recitation's controls
  * (expo-audio) use its own channel, which it creates only when it is missing and
  * names after its id: made here first, it has a name.
@@ -33,10 +38,17 @@ export async function ensureAndroidChannels(): Promise<void> {
     await Promise.all([
       Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
         name: 'Reminders',
-        description: 'Your daily revision reminder and the reading timer.',
+        description: 'Your revision reminders and the reading timer.',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: NOTIFICATION_LIGHT_COLOR,
+      }),
+      Notifications.setNotificationChannelAsync(REMINDER_SILENT_CHANNEL_ID, {
+        name: 'Reminders (silent)',
+        description: 'Revision reminders set to go quietly: overnight, and the congratulation.',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: null,
+        enableVibrate: false,
       }),
       Notifications.setNotificationChannelAsync(PRAYER_CHANNEL_ID, {
         name: 'Prayer times',
@@ -95,56 +107,6 @@ export async function registerForPushNotificationsAsync() {
   } catch (error) {
     logger.log('Error getting push token:', error);
   }
-}
-
-/** The daily reminder's identifier: scheduling it again replaces it. */
-export const DAILY_REMINDER_ID = 'daily-reminder';
-
-// Before it had a name, the reminder was scheduled without an identifier, and
-// expo-notifications gave it a random UUID. Every other notification the app
-// schedules has a name (the reading timer's is 'reading-timer-complete'), so a
-// UUID is an old reminder. Give any new notification a name too.
-const UNNAMED = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * Cancels the daily reminder and nothing else. It used to cancel every
- * scheduled notification, which took the reading timer's "session complete"
- * with it (the reminder is rescheduled at each launch).
- */
-export async function cancelDailyReminder(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(DAILY_REMINDER_ID).catch(() => {});
-  try {
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    await Promise.all(
-      scheduled
-        .filter((n) => UNNAMED.test(n.identifier))
-        .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})),
-    );
-  } catch (error) {
-    logger.log('Could not list scheduled notifications:', error);
-  }
-}
-
-export async function scheduleDailyReminder(time: string, enabled: boolean) {
-  await cancelDailyReminder();
-  if (!enabled) return;
-
-  const [hours, minutes] = time.split(':').map(Number);
-
-  await Notifications.scheduleNotificationAsync({
-    identifier: DAILY_REMINDER_ID,
-    content: {
-      title: 'Revisely',
-      body: 'Time for your daily Quran revision',
-      sound: true,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: hours,
-      minute: minutes,
-      channelId: REMINDER_CHANNEL_ID,
-    },
-  });
 }
 
 export async function scheduleDangerAlert(juz: number, enabled: boolean) {
