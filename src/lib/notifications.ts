@@ -9,16 +9,14 @@ import {
   REMINDER_CHANNEL_ID,
   REMINDER_SILENT_CHANNEL_ID,
 } from './notificationChannels';
+import { notificationBehavior } from './prayer/soundPreview';
 
 export { REMINDER_CHANNEL_ID };
 
+// Shown with its sound while the app is open; a prayer sound's preview is only
+// heard (lib/prayer/soundPreview).
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => notificationBehavior(notification),
 });
 
 /**

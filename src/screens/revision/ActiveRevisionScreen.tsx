@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
-  Alert,
   AppState,
   SafeAreaView,
   StyleSheet,
@@ -14,7 +13,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { PillButton } from '../../components/v2/PillButton';
-import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
@@ -57,7 +55,6 @@ import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
@@ -284,10 +281,11 @@ export default function ActiveRevisionScreen() {
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (beside the page, never over it); another
   // tap, or turning the page, puts them away.
-  // Every page revised: the controls stay up, with Submit.
-  const submitVisible =
-    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
-  const chrome = useReaderChrome({ locked: submitVisible });
+  // Every page revised: the session is complete, and the controls stay up
+  // (Back is the way out; there is no Submit or End session).
+  const allDone =
+    !!assignment && assignment.pages.length > 0 && assignment.pages.every((p) => completedPages.has(p));
+  const chrome = useReaderChrome({ locked: allDone });
   const tapHint = useTapHint();
   const dismissHint = tapHint.dismiss;
   const toggleChrome = chrome.toggle;
@@ -408,9 +406,9 @@ export default function ActiveRevisionScreen() {
   // Every way out saves. The Back arrow does, but the iOS edge swipe and
   // Android's back button close the screen without it, and the timer above
   // stops with the screen: a page marked in its last seconds was lost.
-  const commitOnLeaveRef = useRef(commitPendingPages);
-  commitOnLeaveRef.current = commitPendingPages;
-  useEffect(() => () => void commitOnLeaveRef.current(), []);
+  const commitRef = useRef(commitPendingPages);
+  commitRef.current = commitPendingPages;
+  useEffect(() => () => void commitRef.current(), []);
 
   // ===== Timer =====
   // The app has one timer (in the controls under the page, and Home's top bar
@@ -511,91 +509,26 @@ export default function ActiveRevisionScreen() {
     },
     [assignedPages, completedPages, handleAdvance, haptics],
   );
-  // Saved as soon as the last page is in (the render after the swipe).
+  // ===== The session completes =====
+  // When the last page is marked (a swipe onto the end card, the check, Jump or
+  // mark in bulk, or recited through), the session is complete: saved at once,
+  // and its recording finished ("Recording saved · View"), as Submit did. A
+  // Record after that carries on the day's recording; Back before the end
+  // leaves it paused for when the session is reopened. Only a mark completes
+  // it: a day already done when the screen opens finishes nothing.
+  const recorderRef = useRef(recorder);
+  recorderRef.current = recorder;
+  const prevMarksRef = useRef(completedPages);
   useEffect(() => {
-    if (celebrate > 0) commitPendingPages();
-    // Only when a swipe finishes the session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [celebrate]);
-
-  // ===== End session =====
-
-  const finishRecording = recorder.finish;
-  const submittingRef = useRef(false);
-  const submitSession = useCallback(async () => {
-    // Once: a second tap while this runs would log twice and go back twice.
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-    try {
-      // Ending the session ends its recording (leaving without ending keeps it,
-      // paused, for when the session is reopened).
-      await finishRecording();
-      await commitPendingPages();
-      const pagesRevised = Array.from(completedPages).filter(
-        (p) => !silentlySavedRef.current.has(p),
-      );
-      const pagesSkipped = assignedPages.filter(
-        (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
-      );
-      const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
-
-      const updatedPages = pages.map((p) => {
-        if (pagesRevised.includes(p.pageNumber)) {
-          return {
-            ...p,
-            lastRevisedDate: new Date().toISOString(),
-            totalRevisionCount: p.totalRevisionCount + 1,
-            skipCount: 0,
-          };
-        }
-        if (pagesSkipped.includes(p.pageNumber)) {
-          return { ...p, skipCount: p.skipCount + 1 };
-        }
-        return p;
-      });
-
-      if (changedPageNumbers.length > 0) {
-        await updatePages(updatedPages, changedPageNumbers);
-      }
-
-      if (pagesRevised.length > 0) {
-        const durationDelta = Math.max(
-          0,
-          Math.round((Date.now() - lastSaveTimeRef.current) / 60_000),
-        );
-        const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
-          ([page, rating]) => ({ page, rating }),
-        );
-        await addLog({
-          date: sessionDay ?? getCurrentRevisionDay(user!),
-          assignedPages: assignedPages,
-          pagesRevised,
-          pagesSkipped,
-          weaknessUpdates: weaknessUpdatesArray,
-          durationMinutes: durationDelta,
-        });
-        pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
-        lastSaveTimeRef.current = Date.now();
-        haptics.success();
-      }
-
-      navigation.goBack();
-    } finally {
-      submittingRef.current = false;
-    }
-  }, [
-    commitPendingPages,
-    completedPages,
-    assignedPages,
-    pages,
-    updatePages,
-    localRatings,
-    addLog,
-    user,
-    navigation,
-    finishRecording,
-    haptics,
-  ]);
+    const prev = prevMarksRef.current;
+    prevMarksRef.current = completedPages;
+    if (prev === completedPages || assignedPages.length === 0) return;
+    const doneWith = (marks: Set<number>) => assignedPages.every((p) => marks.has(p));
+    if (doneWith(prev) || !doneWith(completedPages)) return;
+    void commitRef.current();
+    // Only a recording in progress (idle, finish would wait for the next one).
+    if (recorderRef.current.phase !== 'idle') void recorderRef.current.finish();
+  }, [completedPages, assignedPages]);
 
   const viewerPages = useMemo(
     () => assignedPages,
@@ -657,23 +590,9 @@ export default function ActiveRevisionScreen() {
     setUndoState(null);
   };
 
-  // ===== End session =====
-
-  const handleEndSession = () => {
-    if (completedCount === 0) {
-      Alert.alert(
-        'No pages revised',
-        "You haven't marked any pages. End the session anyway?",
-        [
-          { text: 'Continue', style: 'cancel' },
-          { text: 'End session', style: 'destructive', onPress: submitSession },
-        ],
-      );
-    } else {
-      submitSession();
-    }
-  };
-
+  // ===== Back =====
+  // Saves and leaves; reopening the session resumes at the first page not yet
+  // revised. Leaving any other way saves too (above).
   const handleSaveAndBack = async () => {
     if (saving) return;
     setSaving(true);
@@ -726,23 +645,10 @@ export default function ActiveRevisionScreen() {
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
-    {
-      key: 'save',
-      label: saving ? 'Saving…' : 'Save and exit',
-      icon: 'save-outline',
-      onPress: handleSaveAndBack,
-    },
-    {
-      key: 'end',
-      label: 'End session',
-      icon: 'flag-outline',
-      destructive: true,
-      onPress: handleEndSession,
-    },
   ];
 
   const palette = getReadPalette(isDark);
-  const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
+  const crowded = recorder.phase !== 'idle' || timer != null;
   const compact = width < 430 && crowded;
   const recordButton = <RecordButton recorder={recordButtonRecorder} />;
   const timerChip = (
@@ -753,16 +659,6 @@ export default function ActiveRevisionScreen() {
       }}
     />
   );
-  const submitButton = submitVisible ? (
-    <PressableScale
-      onPress={handleEndSession}
-      style={[styles.submit, { backgroundColor: theme.accent }]}
-      accessibilityRole="button"
-      accessibilityLabel="Submit session"
-    >
-      <Text style={styles.submitText}>Submit</Text>
-    </PressableScale>
-  ) : undefined;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
@@ -872,7 +768,6 @@ export default function ActiveRevisionScreen() {
                 surface={{ background: palette.control, border: palette.divider }}
                 record={recordButton}
                 timer={timerChip}
-                trailing={submitButton}
               />
             ) : (
               <PlayerCapsule
@@ -882,7 +777,6 @@ export default function ActiveRevisionScreen() {
                 surface={{ background: palette.control, border: palette.divider }}
                 record={recordButton}
                 timer={timerChip}
-                trailing={submitButton}
               />
             )}
           </View>
@@ -925,7 +819,6 @@ export default function ActiveRevisionScreen() {
               total={totalPages}
               done={completedCount}
               celebrate={celebrate}
-              onEnd={handleEndSession}
             />
           }
           onReachEnd={handleReachEnd}
@@ -1076,12 +969,4 @@ const makeStyles = (theme: ThemeColors) =>
       fontWeight: '500',
       fontVariant: ['tabular-nums'],
     },
-    submit: {
-      height: 36,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    submitText: { color: theme.onAccent, fontWeight: '700', fontSize: 14 },
   });
