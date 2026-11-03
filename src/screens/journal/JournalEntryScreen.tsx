@@ -380,10 +380,6 @@ export default function JournalEntryScreen() {
             />
           </ThreadRow>
 
-          <Text style={[typeV2.meta, v2.legend, { color: palette.secondary }]}>
-            p = page · L = line · write it however you like
-          </Text>
-
           {exists && (
             <Tap
               onPress={handleDelete}
@@ -460,12 +456,12 @@ const v2 = StyleSheet.create({
     borderWidth: 1,
   },
   suggestionText: { flexShrink: 1 },
-  legend: { textAlign: 'center', paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 16 },
   deleteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
     minHeight: 52,
+    marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: layoutV2.gutter,
     borderTopWidth: layoutV2.hairline,

@@ -88,6 +88,8 @@ describe('the daily log in the new design', () => {
     expect(screen.getByTestId('journal-notes-input').props.maxFontSizeMultiplier).toBeUndefined();
     // Nothing to delete on a new day.
     expect(screen.queryByTestId('journal-delete')).toBeNull();
+    // No shorthand hint under the notes (#172).
+    expect(screen.queryByText(/p = page/)).toBeNull();
   });
 
   it('Save is the one solid pill: off until something changes, then saves and leaves', async () => {
