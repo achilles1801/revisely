@@ -93,6 +93,31 @@ jest.mock('../../../components/recite/usePauseListener', () => ({
   },
 }));
 
+// The recorder: the real hook, unless a test gives one (a recording in progress).
+let mockRecorder: Record<string, unknown> | null = null;
+jest.mock('../../../hooks/useVoiceRecorder', () => {
+  const actual = jest.requireActual('../../../hooks/useVoiceRecorder');
+  return {
+    ...actual,
+    useVoiceRecorder: (opts: unknown) => mockRecorder ?? actual.useVoiceRecorder(opts),
+  };
+});
+function recordingInProgress() {
+  mockRecorder = {
+    phase: 'recording',
+    recording: true,
+    paused: false,
+    level: 0,
+    elapsedMs: 0,
+    start: jest.fn(async () => undefined),
+    resume: jest.fn(async () => undefined),
+    pause: jest.fn(async () => undefined),
+    finish: jest.fn(async () => undefined),
+    leave: jest.fn(async () => undefined),
+  };
+  return mockRecorder as { finish: jest.Mock };
+}
+
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
@@ -196,6 +221,7 @@ beforeEach(() => {
   mockFollow.status = 'finding';
   mockFollow.active = false;
   mockModelState = { status: 'missing', error: null };
+  mockRecorder = null;
 });
 
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
@@ -341,14 +367,26 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
   });
 
-  it('with every page revised, the controls stay up with Submit (a swipe or tap doesn’t hide them)', () => {
+  it('with every page revised, the controls stay up with Back (a swipe or tap doesn’t hide them); no Submit', () => {
     setup(DAY_PAGES);
     render(<ActiveRevisionScreen />);
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
-    expect(within(byTestId('reader-footer')).getByLabelText('Submit session')).toBeTruthy();
     act(() => mockPager.onUserSwipe?.());
     fireEvent.press(screen.getByLabelText('The page'));
-    expect(within(byTestId('reader-footer')).getByLabelText('Submit session')).toBeTruthy();
+    expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+    expect(screen.getByLabelText('Back')).toBeTruthy();
+    expect(screen.queryByLabelText('Submit session')).toBeNull();
+    expect(screen.queryByText('Submit')).toBeNull();
+  });
+
+  it('the menu has no Save and exit or End session', () => {
+    setup([332, 333]);
+    render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(screen.getByLabelText('Session menu'));
+    expect(screen.getByText('Jump or mark in bulk')).toBeTruthy();
+    expect(screen.queryByText('Save and exit')).toBeNull();
+    expect(screen.queryByText('End session')).toBeNull();
   });
 
   it('arriving on the last page marks nothing and leaves the controls as they were (the end card is next)', () => {
@@ -404,13 +442,14 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [582] }));
   });
 
-  it('pages left: the last page is marked (with Undo), no confetti; the card counts and offers End session', async () => {
+  it('pages left: the last page is marked (with Undo), no confetti; the card counts, with no button', async () => {
     setup([331, 332, 333, 334, 335]);
     render(<ActiveRevisionScreen />);
     await finish();
     expect(screen.getByText('Page 340 marked as revised')).toBeTruthy();
     expect(screen.getByText('6 of 10 revised')).toBeTruthy();
-    expect(screen.getByTestId('session-end-end')).toBeTruthy();
+    expect(screen.getByText('Swipe back for the pages left.')).toBeTruthy();
+    expect(screen.queryByText('End session')).toBeNull();
     expect(screen.queryByTestId('confetti', { includeHiddenElements: true })).toBeNull();
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
@@ -455,29 +494,99 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('finished: the header names the last page, Submit is in the controls (not twice), and ends the session', async () => {
+  it('finished: the header names the last page; Back leaves (saved once, nothing skipped)', async () => {
     setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
     render(<ActiveRevisionScreen />);
     await finish();
     expect(screen.getByText(/^Page 340 ·/)).toBeTruthy();
-    expect(screen.queryByTestId('session-end-end')).toBeNull();
-    expect(screen.getAllByLabelText('Submit session')).toHaveLength(1);
+    expect(screen.queryByText('Submit')).toBeNull();
     await act(async () => {
-      fireEvent.press(within(byTestId('reader-footer')).getByLabelText('Submit session'));
+      fireEvent.press(screen.getByLabelText('Back'));
     });
     expect(mockNavigation.goBack).toHaveBeenCalled();
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340], pagesSkipped: [] }));
   });
 
-  it('pages left: End session on the card ends it (the rest skipped)', async () => {
+  it('pages left: Back saves what was marked and skips nothing (reopening resumes at the first page left)', async () => {
     setup([331, 332, 333, 334, 335]);
     render(<ActiveRevisionScreen />);
     await finish();
+    fireEvent.press(screen.getByLabelText('The page'));
     await act(async () => {
-      fireEvent.press(screen.getByTestId('session-end-end'));
+      fireEvent.press(screen.getByLabelText('Back'));
     });
-    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
-    expect(mockApp.updatePages).toHaveBeenLastCalledWith(expect.any(Array), [336, 337, 338, 339]);
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340], pagesSkipped: [] }));
+    expect(mockApp.updatePages).toHaveBeenCalledTimes(1);
+    expect(mockApp.updatePages).toHaveBeenCalledWith(expect.any(Array), [340]);
     expect(mockNavigation.goBack).toHaveBeenCalled();
+  });
+});
+
+// With Submit and End session gone, the last page marked completes the session.
+describe('ActiveRevisionScreen — the session completes on its last page', () => {
+  it('the check on the last page left saves at once (no waiting for the 5-second save)', async () => {
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    act(() => mockPager.onPageChange?.(340));
+    fireEvent.press(screen.getByLabelText('The page'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
+  });
+
+  it('a recording in progress is finished when the session completes, as Submit did', async () => {
+    const recorder = recordingInProgress();
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(recorder.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages left: the recording is not finished (Back leaves it paused for later)', async () => {
+    const recorder = recordingInProgress();
+    setup([331, 332, 333, 334, 335]);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    fireEvent.press(screen.getByLabelText('The page'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Back'));
+    });
+    expect(recorder.finish).not.toHaveBeenCalled();
+  });
+
+  it('a day already done when the screen opens finishes nothing and saves nothing', async () => {
+    const recorder = recordingInProgress();
+    setup(DAY_PAGES);
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      unmount();
+    });
+    expect(recorder.finish).not.toHaveBeenCalled();
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+  });
+
+  it('unchecking a page and checking it again completes it again, but saves once', async () => {
+    const recorder = recordingInProgress();
+    setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    act(() => mockPager.onPageChange?.(340));
+    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    });
+    expect(mockApp.addLog).toHaveBeenCalledTimes(1);
+    expect(recorder.finish).toHaveBeenCalledTimes(2);
   });
 });
 

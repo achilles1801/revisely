@@ -6,28 +6,24 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { typeV2 } from '../../theme/v2';
 import { Confetti } from '../v2/Confetti';
-import { PillButton } from '../v2/PillButton';
 
 /**
  * After a revision session's last page, as one more page: swiping onto it
  * marks the last page done (ActiveRevisionScreen). Every page done: "Revision
  * complete"; when the swipe finished the session (`celebrate` goes
  * up) a burst of confetti in the accent's colours, or with Reduce Motion the
- * check fading in; Submit is in the controls. Pages left: how many are done,
- * and End session.
+ * check fading in. Pages left: how many are done. There is no button: the
+ * session is saved as it goes, and Back leaves it.
  */
 export function SessionEndCard({
   total,
   done,
   celebrate,
-  onEnd,
 }: {
   total: number;
   done: number;
   /** Goes up each time a swipe finished the session. */
   celebrate: number;
-  /** End session, with pages left (every page done, Submit is in the controls). */
-  onEnd: () => void;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -65,13 +61,9 @@ export function SessionEndCard({
         <Text style={[typeV2.body, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {complete
             ? `${total} ${total === 1 ? 'page' : 'pages'} revised today`
-            : 'Swipe back for the pages left, or end the session here.'}
+            : 'Swipe back for the pages left.'}
         </Text>
       </View>
-      {/* Every page done: Submit is in the controls, which stay up. */}
-      {complete ? null : (
-        <PillButton title="End session" variant="outline" onPress={onEnd} testID="session-end-end" />
-      )}
     </View>
   );
 }
