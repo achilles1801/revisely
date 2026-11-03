@@ -27,6 +27,7 @@ import * as Updates from 'expo-updates';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import InstallSource from '../../modules/install-source';
 import { logger } from './logger';
+import { notePendingUpdate } from './updates/ota';
 
 export const PREVIEW_CHANNEL = 'preview';
 type Channel = typeof PREVIEW_CHANNEL | 'production';
@@ -76,7 +77,10 @@ export function applyUpdateChannel(isTester: boolean): Channel | null {
     if (last !== channel && (last != null || channel === PREVIEW_CHANNEL)) {
       try {
         const r = await Updates.checkForUpdateAsync();
-        if (r.isAvailable) await Updates.fetchUpdateAsync();
+        if (r.isAvailable) {
+          const fetched = await Updates.fetchUpdateAsync();
+          if (fetched?.isNew && fetched.manifest?.id) notePendingUpdate(fetched.manifest.id);
+        }
       } catch (err) {
         logger.warn('Could not fetch the update for the new channel', err);
       }

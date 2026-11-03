@@ -31,6 +31,7 @@ import { queueChange } from '../lib/offline/queue';
 import { autoId } from '../lib/offline/apply';
 import { alertSessionSaved } from '../components/timer/sessionSavedAlert';
 import { logger } from '../lib/logger';
+import { setBusy } from '../lib/updates/busy';
 import { REMINDER_CHANNEL_ID } from '../lib/notificationChannels';
 import { ReadingTimerMode } from '../types';
 
@@ -127,6 +128,13 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     if (!(await finish())) return;
     alertSessionSaved(t.date, t.targetSeconds ?? 0, 'Session complete');
   }, [finish]);
+
+  // A restart for an update waits while a timer is on (lib/updates/busy).
+  const timerOn = timer != null;
+  useEffect(() => {
+    setBusy('timer', timerOn);
+  }, [timerOn]);
+  useEffect(() => () => setBusy('timer', false), []);
 
   // Restore a timer that was running when the app was closed.
   useEffect(() => {

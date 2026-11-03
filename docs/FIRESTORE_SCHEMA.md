@@ -19,6 +19,8 @@ firestore/
 │       │   └── {pageNumber}/        # Individual page progress (604 docs)
 │       └── sessions/
 │           └── {date}/              # Daily revision sessions
+└── config/
+    └── app                          # Supported and latest app versions (read by every install)
 ```
 
 ## Document Schemas
@@ -258,6 +260,32 @@ interface FirestoreUsageStats {
 }
 ```
 
+### 7. App Config Document
+
+**Path:** `config/app`
+
+The oldest version each platform still supports, and the version on Google Play
+(`src/lib/updates/storeUpdates.ts`; rules in `src/lib/updates/versions.ts`). Every
+install reads it, before sign-in too; no client can write it. Only
+`functions/scripts/set-app-config.js` (admin SDK) does. Anything that isn't a
+version string (`1.0.4`) is ignored by the app.
+
+```typescript
+interface FirestoreAppConfig {
+  minSupported?: {
+    ios?: string;     // below it: "Update required", once the App Store has a version that meets it
+    android?: string; // the same, once latest.android meets it
+  };
+  latest?: {
+    android?: string; // Google Play's production version; newer than installed: offered once
+  };
+  updatedAt?: Timestamp;
+}
+```
+
+The App Store's version comes from Apple's public lookup instead. TestFlight and
+App Review installs ignore the document.
+
 ## Query Patterns
 
 ### Primary Queries (Indexed)
@@ -341,6 +369,7 @@ Firestore automatically creates single-field indexes for:
 ## Security Rules Summary
 
 - Users can only read/write their own data
+- `config/app` is readable by anyone and writable by no client
 - Cannot change `uid`, `createdAt`, or `pageNumber`
 - Session state can only progress forward (NOT_STARTED -> IN_PROGRESS -> COMPLETED)
 - All numeric fields have range validation

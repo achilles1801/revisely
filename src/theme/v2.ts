@@ -370,6 +370,10 @@ export interface ThemeColors {
  */
 export const NOTIFICATION_LIGHT_COLOR = '#292524';
 
+/** The launch screen's ground (app.config.js, expo-splash-screen: #000000 in
+ *  both appearances), also behind the icon while the app restarts into an update. */
+export const SPLASH_GROUND = '#000000';
+
 /** The palette under the older token names. */
 export function v2ThemeColors(isDark: boolean, accent: AccentName = 'jade'): ThemeColors {
   const p = paletteV2(isDark, accent);

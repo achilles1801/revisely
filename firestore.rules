@@ -7,7 +7,7 @@ rules_version = '2';
  * - Users can only access their own data
  * - All writes require authentication
  * - Data validation at the database level
- * - No public read/write access
+ * - No public access, except reading config/app (below)
  *
  * Collection Structure:
  * - users/{userId} - User profile and settings
@@ -16,6 +16,7 @@ rules_version = '2';
  * - users/{userId}/journal/{day} - Daily log (a day's block, and entries/{id}: its timestamped notes)
  * - users/{userId}/readingSessions/{id} - Reading timer sessions
  * - users/{userId}/stats/usage - Time spent in the app
+ * - config/app - Supported and latest app versions (read by every install)
  */
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -566,6 +567,18 @@ service cloud.firestore {
                        incomingData().message.size() > 0 &&
                        incomingData().message.size() <= 5000;
       allow read, update, delete: if false;
+    }
+
+    // ========================================================================
+    // APP CONFIG
+    // ========================================================================
+    // config/app: the oldest supported version on each platform and the
+    // version on Google Play (src/lib/updates/storeUpdates.ts). Every install
+    // reads it, before sign-in too; only the admin SDK writes it
+    // (functions/scripts/set-app-config.js).
+    match /config/app {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ========================================================================
