@@ -17,7 +17,6 @@ import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
-import { useHaptics } from '../../design/haptics';
 import { AccentSetting } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
@@ -68,8 +67,6 @@ import { shareIcon } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MINUTES = [0, 15, 30, 45];
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -205,13 +202,10 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (user) setLocalUser(user);
   }, [user]);
-  const [showTimeModal, setShowTimeModal] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
-  const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
   const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
@@ -355,14 +349,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSaveTime = async () => {
-    const newTime = `${tempHour.toString().padStart(2, '0')}:${tempMinute
-      .toString()
-      .padStart(2, '0')}`;
-    await updateUser({ reminderTime: newTime });
-    setShowTimeModal(false);
-  };
-
   const handleSignOut = () => {
     // Changes made offline and not yet sent wait on this phone for this
     // account's next sign-in here (lib/offline).
@@ -444,13 +430,6 @@ export default function SettingsScreen() {
         },
       ],
     );
-  };
-
-  const formatTime = (time: string) => {
-    const [hour, minute] = time.split(':').map(Number);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
   };
 
   return (
@@ -749,21 +728,6 @@ export default function SettingsScreen() {
               />
             }
           />
-          <Row
-            icon="time-outline"
-            label="Reminder time"
-            value={formatTime(localUser.reminderTime)}
-            onPress={
-              localUser.notificationsEnabled
-                ? () => {
-                    const [h, m] = localUser.reminderTime.split(':').map(Number);
-                    setTempHour(h);
-                    setTempMinute(m);
-                    setShowTimeModal(true);
-                  }
-                : undefined
-            }
-          />
         </Section>
 
         <Section title="Appearance">
@@ -906,15 +870,6 @@ export default function SettingsScreen() {
         />
       ) : null}
 
-      <ReminderTimeSheetV2
-        visible={showTimeModal}
-        hour={tempHour}
-        minute={tempMinute}
-        onHour={setTempHour}
-        onMinute={setTempMinute}
-        onCancel={() => setShowTimeModal(false)}
-        onSave={handleSaveTime}
-      />
       <TextSheetV2
         visible={showNameModal}
         title="Display name"
@@ -948,90 +903,6 @@ export default function SettingsScreen() {
         testID="feedback-sheet"
       />
     </SafeAreaView>
-  );
-}
-
-/**
- * The new design's reminder time: a v2 Sheet (Cancel, the title, Save), the
- * hours in a column that scrolls, the minutes beside it. The chosen one sits on
- * the accent's tint.
- */
-function ReminderTimeSheetV2({
-  visible,
-  hour,
-  minute,
-  onHour,
-  onMinute,
-  onCancel,
-  onSave,
-}: {
-  visible: boolean;
-  hour: number;
-  minute: number;
-  onHour: (h: number) => void;
-  onMinute: (m: number) => void;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  const { palette } = useTheme();
-  const haptics = useHaptics();
-  const column = (label: string, values: number[], value: number, onPick: (v: number) => void) => (
-    <View style={v2.timeColumn}>
-      <Text style={[typeV2.meta, v2.timeLabel, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-        {label}
-      </Text>
-      <ScrollView style={v2.timeScroll} showsVerticalScrollIndicator={false} testID={`time-${label.toLowerCase()}s`}>
-        {values.map((v) => {
-          const selected = v === value;
-          const text = v.toString().padStart(2, '0');
-          return (
-            <Tap
-              key={v}
-              onPress={() => {
-                if (selected) return;
-                haptics.selection();
-                onPick(v);
-              }}
-              style={[v2.timeOption, selected && { backgroundColor: palette.accentSubtle }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} ${text}`}
-              accessibilityState={{ selected }}
-              testID={`time-${label.toLowerCase()}-${v}`}
-            >
-              <Text
-                style={[
-                  typeV2.sheetTitle,
-                  typeV2.numeral,
-                  v2.timeText,
-                  { color: selected ? palette.accentText : palette.secondary, fontWeight: selected ? '600' : '400' },
-                ]}
-                maxFontSizeMultiplier={1.4}
-              >
-                {text}
-              </Text>
-            </Tap>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-  return (
-    <Sheet
-      visible={visible}
-      onClose={onCancel}
-      title="Reminder time"
-      left={{ label: 'Cancel', onPress: onCancel, testID: 'time-cancel' }}
-      right={{ label: 'Save', onPress: onSave, strong: true, testID: 'time-save' }}
-      testID="time-sheet"
-    >
-      <View style={v2.timePicker}>
-        {column('Hour', HOURS, hour, onHour)}
-        <Text style={[typeV2.title, v2.timeColon, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          :
-        </Text>
-        {column('Minute', MINUTES, minute, onMinute)}
-      </View>
-    </Sheet>
   );
 }
 
@@ -1160,12 +1031,5 @@ const v2 = StyleSheet.create({
   input: { borderRadius: radiusV2.media, paddingHorizontal: 14, paddingVertical: 12 },
   // A minimum, not a height: the field grows with its text and with Dynamic Type.
   inputMultiline: { minHeight: 140 },
-  timePicker: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 },
-  timeColumn: { alignItems: 'center', width: 104 },
-  timeLabel: { marginBottom: 8 },
-  timeScroll: { maxHeight: 220, width: '100%' },
-  timeOption: { paddingVertical: 8, borderRadius: radiusV2.chip, marginVertical: 1 },
-  timeText: { textAlign: 'center' },
-  timeColon: { marginHorizontal: 8, marginTop: 28 },
 });
 

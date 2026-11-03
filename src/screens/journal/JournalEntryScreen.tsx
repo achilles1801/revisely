@@ -59,8 +59,8 @@ const KIND_OPTIONS: { value: JournalKind; label: string }[] = [
 ];
 
 const PLACEHOLDER: Record<JournalKind, string> = {
-  memorization: 'e.g. 1/2 p3, 4L p4',
-  revision: 'e.g. 5p Maryam + Taha',
+  memorization: 'e.g. Al-Mulk, or pages 562–564',
+  revision: 'e.g. Maryam and Taha, or pages 305–321',
   note: 'How did it go? Mistakes to watch, ayat to repeat…',
 };
 

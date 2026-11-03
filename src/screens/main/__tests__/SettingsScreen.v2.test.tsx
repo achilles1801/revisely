@@ -107,23 +107,12 @@ describe('Settings in the new design: its sheets and rows', () => {
     expect(flat(screen.getByText(/^Revisely · v/).props.style).color).toBe(palette.secondary);
   });
 
-  it('reminder time: a v2 sheet, the chosen hour on the accent tint, Save schedules it', async () => {
+  it('Notifications is the Enable notifications switch only: no Reminder time row or sheet', async () => {
     await renderV2();
-    fireEvent.press(screen.getByLabelText('Reminder time, 8:00 AM'));
-    await act(async () => {});
-    const sheet = flat(screen.getByTestId('time-sheet').props.style);
-    expect(sheet.backgroundColor).toBe(palette.sheet);
-    expect(sheet.borderTopLeftRadius).toBe(20);
-    expect(within(screen.getByTestId('time-sheet')).getByText('Reminder time')).toBeTruthy();
-    expect(flat(screen.getByTestId('time-hour-8').props.style).backgroundColor).toBe(palette.accentSubtle);
-    expect(flat(screen.getByTestId('time-hour-9').props.style).backgroundColor).toBeUndefined();
-    fireEvent.press(screen.getByTestId('time-hour-9'));
-    fireEvent.press(screen.getByTestId('time-minute-30'));
-    expect(flat(screen.getByTestId('time-hour-9').props.style).backgroundColor).toBe(palette.accentSubtle);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('time-save'));
-    });
-    expect(mockSaveUser).toHaveBeenCalledWith(expect.objectContaining({ reminderTime: '09:30' }));
+    expect(screen.getByText('Enable notifications')).toBeTruthy();
+    expect(screen.queryByText('Reminder time')).toBeNull();
+    expect(screen.queryByLabelText(/Reminder time/)).toBeNull();
+    expect(screen.queryByTestId('time-sheet')).toBeNull();
   });
 
   it('display name: a field on the quiet fill, saved from the header', async () => {

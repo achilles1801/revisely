@@ -99,6 +99,17 @@ describe('the daily log: notes with their times', () => {
     expect(screen.getByTestId('journal-send').props.accessibilityState).toMatchObject({ disabled: true });
   });
 
+  it('Memorized and Revised suggest in words, never the p/L shorthand', async () => {
+    await renderScreen();
+    const placeholder = () => screen.getByTestId('journal-text-input').props.placeholder as string;
+    const shorthand = /\bp ?=|\bL ?=|\b\d+ ?[pL]\b|\bp\.? ?\d|\bL ?\d|\d\/\d/;
+    expect(placeholder()).toBe('e.g. Al-Mulk, or pages 562–564');
+    expect(placeholder()).not.toMatch(shorthand);
+    fireEvent.press(screen.getByText('Revised'));
+    expect(placeholder()).toBe('e.g. Maryam and Taha, or pages 305–321');
+    expect(placeholder()).not.toMatch(shorthand);
+  });
+
   it('lists the notes oldest first, each with its kind, its time and its ⋯ menu', async () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [rev, memo]));
     await renderScreen();
@@ -216,7 +227,8 @@ describe('adding, editing and deleting notes', () => {
     fireEvent.press(screen.getByText('Revised'));
     const chip = screen.getByTestId('journal-suggestion');
     fireEvent.press(chip);
-    expect(screen.getByTestId('journal-text-input').props.value).not.toBe('');
+    // In words, not the old "2p" shorthand.
+    expect(screen.getByTestId('journal-text-input').props.value).toMatch(/^2 pages\b/);
     expect(screen.getByLabelText('Minutes').props.value).toBe('25');
   });
 });

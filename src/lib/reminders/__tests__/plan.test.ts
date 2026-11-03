@@ -1,6 +1,6 @@
 import { dayTimes } from '../../prayer/times';
 import { DEFAULT_PRAYER_PREFS } from '../../prayer/prefs';
-import { planRevisionReminders, REVISION_REMINDER_PREFIX, type PlanReminderInput } from '../plan';
+import { morningTime, planRevisionReminders, REVISION_REMINDER_PREFIX, type PlanReminderInput } from '../plan';
 import { assignedOn, logFor, PLACE, pages, quranData, user as makeUser } from '../__fixtures__/reminderFixtures';
 
 const settings = { method: 'NorthAmerica', highLatitude: 'recommended' as const, madhab: 'standard' as const, adjustments: DEFAULT_PRAYER_PREFS.adjustments };
@@ -30,6 +30,18 @@ describe('planRevisionReminders', () => {
     expect(list).toHaveLength(6);
     expect(list.every((r) => r.id.startsWith(REVISION_REMINDER_PREFIX))).toBe(true);
     expect(new Set(list.map((r) => r.id)).size).toBe(6);
+  });
+
+  it('morning is 8:00 AM when the account has no time (Settings no longer offers one)', () => {
+    for (const reminderTime of [undefined, '', 'soon', '25:00', '8:75']) {
+      const u = { ...makeUser(), reminderTime } as unknown as PlanReminderInput['user'];
+      expect(times(todayOf(plan({ now: at(7), user: u })))[0]).toBe('morning@28:8:00');
+    }
+  });
+
+  it('a time picked before is kept, with no setting for it', () => {
+    const list = plan({ now: at(6), user: makeUser({ reminderTime: '06:30' }) });
+    expect(times(todayOf(list))).toEqual(['morning@28:6:30', 'midday@28:15:00', 'evening@28:23:00']);
   });
 
   it('midday is 20 minutes after Asr at the prayer place', () => {
@@ -98,5 +110,15 @@ describe('planRevisionReminders', () => {
 
   it('plans nothing when no pages are assigned', () => {
     expect(plan({ now: at(7), pages: [] })).toEqual([]);
+  });
+});
+
+describe('morningTime', () => {
+  it('reads HH:mm and falls back to 8:00', () => {
+    expect(morningTime({ reminderTime: '07:15' })).toEqual({ hour: 7, minute: 15 });
+    expect(morningTime({ reminderTime: '7:05' })).toEqual({ hour: 7, minute: 5 });
+    expect(morningTime({})).toEqual({ hour: 8, minute: 0 });
+    expect(morningTime({ reminderTime: null })).toEqual({ hour: 8, minute: 0 });
+    expect(morningTime({ reminderTime: '24:00' })).toEqual({ hour: 8, minute: 0 });
   });
 });

@@ -21,7 +21,7 @@ export interface ReminderCopyInput {
   juzPlan: boolean;
   /** The name to greet by ('' hides it). */
   name: string;
-  /** The Reminder time is before noon: "Good morning", else "Today's revision". */
+  /** The morning reminder is before noon: "Good morning", else "Today's revision". */
   beforeNoon: boolean;
   /** Today's pages, in mushaf order. */
   all: number[];
