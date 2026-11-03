@@ -13,6 +13,10 @@ import type { FirestorePage, FirestoreSession, FirestoreUser, PageStatus, Weakne
 import { tsFromMillis } from './codec';
 import { mergeAhead } from '../aheadCredit';
 
+/** The `ahead` field only where there is credit: a session without it writes as before. */
+const aheadField = (ahead: Record<string, number[]> | undefined) =>
+  ahead && Object.keys(ahead).length > 0 ? { ahead } : {};
+
 /** User document fields: absolute values; "notifications.enabled" style keys for nested ones. */
 export type UserFields = Record<string, unknown>;
 
@@ -226,7 +230,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
       pagesRevised,
       pagesSkipped,
       weaknessUpdates,
-      ahead: mergeAhead(existing.ahead, op.ahead),
+      ...(existing.ahead !== undefined || op.ahead ? aheadField(mergeAhead(existing.ahead, op.ahead)) : {}),
       durationMinutes: Math.max(1, addedMinutes(existing.durationMinutes ?? 0, op)),
       // The rules forbid going back from completed.
       state: completed ? 'COMPLETED' : 'IN_PROGRESS',
@@ -262,7 +266,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     ...base,
     pagesRevised: [...new Set(op.pagesRevised)],
     pagesSkipped: op.pagesSkipped,
-    ahead: mergeAhead(undefined, op.ahead),
+    ...aheadField(mergeAhead(undefined, op.ahead)),
     durationMinutes: Math.max(1, op.durationAtLeast || 1),
     state: revisedHere >= total ? 'COMPLETED' : 'IN_PROGRESS',
     completionPercentage: safePercent(revisedHere, total),
@@ -279,7 +283,7 @@ export function applySessionEdit(existing: FirestoreSession | null, op: SessionE
     ...existing,
     pagesRevised,
     pagesSkipped: op.pagesSkipped,
-    ahead: op.ahead ?? existing.ahead,
+    ...(op.ahead !== undefined ? { ahead: op.ahead } : {}),
     // The rules take minutes above 0, or none.
     durationMinutes: op.durationMinutes != null && op.durationMinutes > 0 ? op.durationMinutes : null,
     weaknessUpdates: weaknessDocs(op.weaknessUpdates),
@@ -297,7 +301,7 @@ export function sessionUpdateData(s: FirestoreSession): Record<string, unknown> 
     completionPercentage: s.completionPercentage,
     assignedPages: s.assignedPages,
     totalAssignedPages: s.totalAssignedPages,
-    ahead: s.ahead ?? {},
+    ...(s.ahead !== undefined ? { ahead: s.ahead } : {}),
   };
 }
 

@@ -147,7 +147,8 @@ describe('session merges keep the credit', () => {
     expect(sessionUpdateData({ ahead: { '2026-01-06': [9] } } as unknown as FirestoreSession).ahead).toEqual({
       '2026-01-06': [9],
     });
-    expect(sessionUpdateData({} as FirestoreSession).ahead).toEqual({});
+    // Without credit the update leaves the field out, as before pages could be revised ahead.
+    expect(sessionUpdateData({} as FirestoreSession)).not.toHaveProperty('ahead');
   });
 });
 
