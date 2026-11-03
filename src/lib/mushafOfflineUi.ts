@@ -1,4 +1,5 @@
-// What Settings → Offline mushaf says for each state of the download.
+// What Settings → Offline mushaf says for each state of the download: the
+// pages, the Arabic text and Saheeh International (lib/mushafOffline).
 
 import { useSyncExternalStore } from 'react';
 import { Alert } from 'react-native';
@@ -20,16 +21,20 @@ export function formatMegabytes(bytes: number): string {
 
 /** The row's value (right) and the line under its label. */
 export function describeMushaf(s: MushafStatus): { value: string; subtitle: string } {
-  const pages = `${s.pages} of ${s.total} pages`;
+  // While the pages are done and the text isn't, the progress names the text.
+  const pages = s.pages >= s.total && !s.textReady ? 'the text and translation' : `${s.pages} of ${s.total} pages`;
   const percent = `${s.totalBytes > 0 ? Math.floor((s.bytes / s.totalBytes) * 100) : 0}%`;
   const over = s.prefs.cellular ? 'Wi-Fi or mobile data' : 'Wi-Fi';
   switch (s.phase) {
     case 'complete':
-      return { value: 'Downloaded', subtitle: `All ${s.total} pages on this phone · ${formatMegabytes(s.bytes)}` };
+      return {
+        value: 'Downloaded',
+        subtitle: `All ${s.total} pages and Saheeh International · ${formatMegabytes(s.bytes)}`,
+      };
     case 'downloading':
       return { value: percent, subtitle: `Downloading · ${pages}` };
     case 'pending':
-      return s.pages > 0
+      return s.bytes > 0
         ? { value: percent, subtitle: `Downloads on ${over} · ${pages}` }
         : { value: '', subtitle: `Downloads on ${over} · ${formatMegabytes(s.totalBytes)}` };
     case 'waiting-for-wifi':
@@ -39,14 +44,14 @@ export function describeMushaf(s: MushafStatus): { value: string; subtitle: stri
     case 'paused':
       return {
         value: 'Download',
-        subtitle: s.pages > 0 ? `${pages} on this phone` : `Not on this phone · ${formatMegabytes(s.totalBytes)}`,
+        subtitle: s.pages > 0 ? `${s.pages} of ${s.total} pages on this phone` : `Not on this phone · ${formatMegabytes(s.totalBytes)}`,
       };
     case 'no-space':
       return { value: percent, subtitle: `Not enough free space · ${pages}` };
     case 'error':
-      return { value: percent, subtitle: `Some pages didn't download · tries again soon` };
+      return { value: percent, subtitle: `Some of it didn't download · tries again soon` };
     default:
-      return { value: '', subtitle: 'Every page, for reading offline' };
+      return { value: '', subtitle: 'Every page and Saheeh International, for reading offline' };
   }
 }
 
@@ -66,7 +71,7 @@ export function mushafMenuActions(s: MushafStatus): SheetAction[] {
       onPress: () => downloadNow(s),
     });
   }
-  if (s.pages > 0) {
+  if (s.bytes > 0) {
     actions.push({
       key: 'remove',
       label: 'Remove from this phone',
@@ -75,7 +80,7 @@ export function mushafMenuActions(s: MushafStatus): SheetAction[] {
       onPress: () =>
         Alert.alert(
           'Remove the offline mushaf?',
-          `This frees ${formatMegabytes(s.bytes)}. Pages you open still download as you read.`,
+          `This frees ${formatMegabytes(s.bytes)}. Pages and translations you open still download as you read.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Remove', style: 'destructive', onPress: () => void removeMushafDownload() },

@@ -44,7 +44,14 @@ jest.mock('../../../lib/translation', () => {
   };
 });
 
+const mockHasSaheehSura = jest.fn((_sura: number) => true);
+jest.mock('../../../lib/saheeh', () => ({
+  ...jest.requireActual('../../../lib/saheeh'),
+  hasSaheehSura: (sura: number) => mockHasSaheehSura(sura),
+}));
+
 import { Dimensions } from 'react-native';
+import { __resetNetworkStateForTests, setNetworkState } from '../../../lib/networkState';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
@@ -320,17 +327,83 @@ describe('VerseSheet: The Clear Quran', () => {
     );
     expect(screen.getByText('O believers!')).toBeTruthy();
     expect(screen.getByTestId('translation-credit')).toBeTruthy();
-    // And back: the credit goes with its text.
+    // And back: the credit goes with its text, and Saheeh's comes with its own.
     rerender(wrap(<VerseSheet {...p} translationId="en.sahih" />));
     expect(screen.queryByText('O believers!')).toBeNull();
     expect(screen.queryByTestId('translation-credit')).toBeNull();
+    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
+    expect(screen.queryByText('The Clear Quran® by Dr. Mustafa Khattab')).toBeNull();
+    expect(screen.getByText('Saheeh International, issued by Noor International Center')).toBeTruthy();
   });
 
-  it('with Saheeh International: no credit line, its name under the verse as before', async () => {
-    render(wrap(<VerseSheet {...props({ page: 48, sura: 2, ayah: 282 })} />));
-    await screen.findByText(/THE LAST WORDS/, {}, { timeout: 10_000 });
-    expect(screen.queryByTestId('translation-credit')).toBeNull();
-    expect(screen.getByText('Saheeh International')).toBeTruthy();
+  it('Saheeh International: its text with raised markers, its footnotes as given, and the credit QuranEnc asks for', async () => {
+    getVerseText.mockImplementationOnce((page: number, sura: number, ayah: number) =>
+      Promise.resolve({
+        sura,
+        ayah,
+        surahName: 'Al-Fatihah',
+        arabic: 'بِسۡمِ',
+        translation: 'In the name of Allāh,[2] the Entirely Merciful, the Especially Merciful.[3]',
+        translationName: 'Saheeh International',
+        footnotes: '[2] Allāh is a proper name.\n[3] Ar-Raḥmān and ar-Raḥeem are two names of Allāh.',
+        version: '1.1.2',
+      }),
+    );
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    render(wrap(<VerseSheet {...props({ page: 1, sura: 1, ayah: 1 })} />));
+    await screen.findByTestId('verse-translation', {}, { timeout: 10_000 });
+    expect(screen.queryByText(/\[2\]/)).toBeNull();
+    expect(screen.getByText(/In the name of Allāh,/)).toBeTruthy();
+    expect(screen.getAllByText('²').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Allāh is a proper name\./)).toBeTruthy();
+    expect(screen.getByText(/Ar-Raḥmān and ar-Raḥeem are two names of Allāh\./)).toBeTruthy();
+    // The publisher, the version and QuranEnc.com, pinned under the verse.
+    expect(screen.getByText('Saheeh International, issued by Noor International Center · v1.1.2')).toBeTruthy();
+    fireEvent.press(screen.getByText('QuranEnc.com'));
+    expect(open).toHaveBeenCalledWith('https://quranenc.com/en/browse/english_saheeh');
+    // The Arabic's source, with Tanzil's link.
+    expect(screen.getByText('Arabic text: Tanzil Project · ')).toBeTruthy();
+    fireEvent.press(screen.getByText('tanzil.net'));
+    expect(open).toHaveBeenCalledWith('https://tanzil.net');
+    open.mockRestore();
+  });
+
+  describe('offline', () => {
+    beforeEach(() => {
+      setNetworkState({ connected: false, type: 'none' });
+      mockHasSaheehSura.mockReset().mockReturnValue(true);
+    });
+    afterEach(() => __resetNetworkStateForTests());
+
+    it('a verse not read before: it needs the internet; Saheeh International is offline, one tap away', async () => {
+      getVerseText.mockImplementationOnce(() => Promise.reject(new ClearQuranError('NETWORK', 'offline')));
+      const p = props({ page: 50, sura: 2, ayah: 280 });
+      render(wrap(<VerseSheet {...p} translationId="en.khattab" />));
+      expect(await screen.findByText('The Clear Quran® needs the internet', {}, { timeout: 10_000 })).toBeTruthy();
+      expect(screen.getByText('Saheeh International is available offline.')).toBeTruthy();
+      expect(mockHasSaheehSura).toHaveBeenCalledWith(2);
+      fireEvent.press(screen.getByText('Show Saheeh International'));
+      expect(p.onChangeTranslation).toHaveBeenCalledWith('en.sahih');
+      expect(screen.getByText('Try again')).toBeTruthy();
+    });
+
+    it('Saheeh International not on the phone either: no promise it can’t keep', async () => {
+      mockHasSaheehSura.mockReturnValue(false);
+      getVerseText.mockImplementationOnce(() => Promise.reject(new ClearQuranError('NETWORK', 'offline')));
+      render(wrap(<VerseSheet {...props({ page: 50, sura: 2, ayah: 280 })} translationId="en.khattab" />));
+      expect(await screen.findByText('The Clear Quran® needs the internet', {}, { timeout: 10_000 })).toBeTruthy();
+      expect(screen.queryByText('Saheeh International is available offline.')).toBeNull();
+      expect(screen.getByText(/Try again once you're online/)).toBeTruthy();
+      expect(screen.queryByText('Show Saheeh International')).toBeNull();
+    });
+
+    it('Saheeh International not downloaded yet: says so', async () => {
+      getVerseText.mockImplementationOnce(() => Promise.reject(new Error('Network request failed')));
+      render(wrap(<VerseSheet {...props({ page: 50, sura: 2, ayah: 280 })} />));
+      expect(
+        await screen.findByText("This verse isn't downloaded yet. It shows when you're back online.", {}, { timeout: 10_000 }),
+      ).toBeTruthy();
+    });
   });
 
   it('the picker lists "The Clear Quran® — Dr. Mustafa Khattab", English · theclearquran.org, and it can be chosen', async () => {
@@ -341,6 +414,8 @@ describe('VerseSheet: The Clear Quran', () => {
     fireEvent.press(screen.getByText('Select translation'));
     expect(screen.getByText('theclearquran.org')).toBeTruthy();
     expect(screen.getByText('English · theclearquran.org')).toBeTruthy();
+    expect(screen.getByText('Saheeh International — Noor International Center')).toBeTruthy();
+    expect(screen.getByText('English · QuranEnc.com')).toBeTruthy();
     expect(screen.queryByText(/Not available yet/)).toBeNull();
     fireEvent.press(screen.getByText('The Clear Quran® — Dr. Mustafa Khattab'));
     expect(p.onChangeTranslation).toHaveBeenCalledWith('en.khattab');

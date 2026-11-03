@@ -131,8 +131,16 @@ describe('VerseSheet in the new design', () => {
     for (const label of ['Close', 'Previous verse', 'Next verse', 'More']) {
       expect(insideScroll(screen.getByLabelText(label))).toBe(false);
     }
-    // Saheeh: its name under the verse, quiet.
-    expect(flatText('Saheeh International').color).toBe(palette.secondary);
+    // Saheeh: its credit pinned under the verse, quiet, with QuranEnc's link.
+    expect(insideScroll(screen.getByTestId('translation-credit'))).toBe(false);
+    expect(flatText('Saheeh International, issued by Noor International Center').color).toBe(palette.secondary);
+    expect(StyleSheet.flatten(screen.getByText('QuranEnc.com').props.style).color).toBe(palette.link);
+    // The Arabic's source, in the verse's part, quiet, with Tanzil's link.
+    expect(insideScroll(screen.getByTestId('arabic-credit'))).toBe(true);
+    expect(flatText('Arabic text: Tanzil Project · ').color).toBe(palette.secondary);
+    const tanzil = screen.getByText('tanzil.net');
+    expect(tanzil.props.accessibilityRole).toBe('link');
+    expect(StyleSheet.flatten(tanzil.props.style).color).toBe(palette.link);
   });
 
   it('The Clear Quran: its text exactly as given, the credit and its link pinned under the verse', async () => {

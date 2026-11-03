@@ -243,7 +243,7 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
   the system never empties. Before, pages were cached as read in the caches directory, which iOS and
   Android may clear; `migrateLegacyPages` moves those over once (2 s after launch) and they are read
   from there until then. The reader saves the pages it opens to the same folder.
-- **Backups:** on iOS the folder (and `Documents/quran-text`) is kept out of iCloud backups with
+- **Backups:** on iOS the folder (and `Documents/quran-text`, `Documents/translations`) is kept out of iCloud backups with
   `RecitationAudio.excludeFromBackup`, which every binary on runtime 2df7a2f0 has (builds 31/32);
   `xattr -l` shows `com_apple_backup_excludeItem` on it. Android has no way to do that from
   JavaScript (expo-file-system writes only to files/ and cache/), so the pages are in Auto Backup's
@@ -252,7 +252,8 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
   `dataExtractionRules`): a native change for the next build.
 - **Sizes** (`src/data/mushafSizes.json`, from `node scripts/mushaf-sizes.js`; run it again if the
   images in Storage change): iOS (the originals) 247 MB, Android w1080 135 MB, w1440 191 MB; the
-  Arabic text 2 MB more.
+  Arabic text (1.8 MB) and Saheeh International (1.1 MB) come on top, so Settings says 250, 138 and
+  194 MB (`ARABIC_TEXT_BYTES`, `SAHEEH_BYTES`, measured Nov 2 2026).
 - **The download** (`mushafOffline`, started by `MushafOfflineController` 20 s after launch with
   someone signed in): Wi-Fi only (metered Wi-Fi, a hotspot on Android, counts as mobile data),
   unless "Download over mobile data" is on or "Download now" was confirmed over it once; only in the
@@ -273,19 +274,55 @@ Every page is downloaded to the phone, so the reader and revision sessions work 
   (a decoding failure from memory can hit a whole file: "Couldn't load page N", Try again); the
   download hears it (`onPageRemoved`) and fetches it again.
 - **Settings → Mushaf:** "Offline mushaf" (status and %, a menu with Download now and Remove from
-  this phone) and "Download over mobile data". Remove deletes the pages and the Arabic text and turns
-  the download off (kept on this phone, `@revisely_mushaf_offline:v1`) until Download now; pages the
-  reader opens are still kept.
+  this phone) and "Download over mobile data". "Downloaded" means every page, the Arabic and every
+  sura of Saheeh International; the text downloads first. Remove deletes all three and turns the
+  download off (kept on this phone, `@revisely_mushaf_offline:v1`) until Download now; pages and
+  suras the reader opens are still kept.
 - **A page not on the phone:** online, it downloads (or loads from Storage, as before); offline
   (`networkState`, fed from NetInfo), the reader shows "Page N isn't downloaded yet" with Try again,
   and loads it by itself when the connection is back.
-- **Text offline:** the whole Arabic (Tanzil's Uthmani via alquran.cloud, verbatim copies allowed)
-  is downloaded with the pages (`downloadArabicText`, one request), so Copy and Share and the verse
-  sheet's Arabic work offline. Saheeh International stays cached as read (caches directory): we have
-  no licence for alquran.cloud's copy (#80), so it isn't downloaded whole. The Clear Quran stays as
-  the owner decided on Oct 27 2026 (cached as read, 30 + 30 days, never the whole of it). Surah and
-  juz data and the verse boxes are bundled. Recitation streams from everyayah.com and needs a
-  connection.
+- **Text offline:** the whole Arabic (Tanzil's Uthmani via alquran.cloud) is downloaded with the
+  pages (`downloadArabicText`, one request), so Copy and Share and the verse sheet's Arabic work
+  offline; the file keeps Tanzil's notice (`TANZIL_NOTICE`), as its terms ask of every copy (files
+  from before Nov 3 2026 hold the pages alone and still load). Saheeh International, now QuranEnc's
+  licensed copy (#80, below), is downloaded whole too. The Clear Quran stays as the owner decided on
+  Oct 27 2026 (cached as read, 30 + 30 days, never the whole of it): its terms (attribution, no
+  changes, a revocable licence, rate limits; public page theclearquran.org/organizations/api) don't
+  allow more. Offline, a verse of it not read before shows "The Clear Quran® needs the internet",
+  "Saheeh International is available offline." and a Show Saheeh International button (which sets
+  the account's translation) when that sura is on the phone. Surah and juz data and the verse boxes
+  are bundled. Recitation streams from everyayah.com and needs a connection.
+
+### Saheeh International (QuranEnc.com, licensed; `lib/saheeh`)
+
+From Nov 2026 (#80) Saheeh International comes from QuranEnc.com's API
+(`https://quranenc.com/api/v1/translation/sura/english_saheeh/<n>`), not alquran.cloud, which has no
+licence for individual translations. QuranEnc lists it as `english_saheeh`, "English Translation -
+Noor International Center" (Noor International issues Saheeh International), v1.1.2 (last update
+June 2025).
+- **Terms** ("Terms and Policies" on every translation's page, quranenc.com/en/browse/english_saheeh;
+  read Nov 2 2026): translations can be downloaded and re-published if (1) nothing is modified, added
+  or deleted; (2) the publisher and the source (QuranEnc.com) are clearly named; (3) the version is
+  mentioned; (4) the transcript information stays inside the document; (5) notes on the translation
+  go to QuranEnc (`POST /api/v1/translations/note`, if the app ever takes notes); (6) it is updated to
+  the latest version; (7) no inappropriate advertisements are shown with it.
+- **What the app does for them:** each verse's translation and footnotes are kept exactly as given.
+  The verse sheet shows `[n]` markers that have a footnote as raised numbers (`saheehSegments`;
+  bracketed words like "[All] praise" stay) and the footnotes under the verse (`saheehFootnotes`).
+  The pinned credit is `creditLine`: "Saheeh International, issued by Noor International Center ·
+  v1.1.2" and the link QuranEnc.com (its page). `info.json` keeps QuranEnc's title, description,
+  version and last update with the files.
+- **Storage:** `Documents/translations/english_saheeh/NNN-<version>.json`, one file per sura (written
+  to `.part` and moved in), as soon as a sura is read, and all 114 with the offline mushaf. Out of
+  iCloud backups on iOS. The old alquran.cloud cache (`Caches/translation/en.sahih`) is deleted.
+- **Versions:** QuranEnc's list (`/api/v1/translations/list/en`) is read at most once a day; a sura
+  of an older version is shown with its own version until the download (every run of
+  `mushafOffline`, even when everything is here) replaces it. Without the list, the last version read
+  or `SAHEEH_KNOWN` labels a sura.
+- **Requests:** the API sits behind Cloudflare and answers 403 to Python's urllib (its user agent);
+  the phones' (CFNetwork, okhttp) and curl get 200. 114 requests, about 1 MB gzipped, ~6 s.
+- The Arabic's source is credited in the verse sheet too: "Arabic text: Tanzil Project · tanzil.net"
+  (`ARABIC_CREDIT`, at the end of the verse), as Tanzil's terms ask.
 
 ## Runtime version is a fingerprint
 
@@ -501,8 +538,9 @@ mistake-detection branch had found the same fit). All 604 pages were measured ag
 images; the rest match within a few units. After regenerating, run `scripts/check-ayah-bounds.py`
 on the images (its header says how to fetch them): it fails on a page whose boxes miss its ink.
 `ayahBounds.test` holds measured ink for pages 3, 4, 50, 300 and 604, and `MushafPager.test` that
-a box is the bounds × the page's scale, drawn in the image's own frame, at any phone size. Translations: Saheeh International from api.alquran.cloud,
-and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below). Both are in the privacy policy.
+a box is the bounds × the page's scale, drawn in the image's own frame, at any phone size. Translations: Saheeh International from QuranEnc.com
+(licensed, see Offline mushaf), and The Clear Quran® (Dr. Mustafa Khattab) through our worker (below).
+Both are in the privacy policy, with alquran.cloud for the Arabic.
 
 **Copy and Share** (the held-verse menu; `lib/verseShare.ts`): the verse's Arabic, the verse sheet's
 own (`getArabicVerse`, alquran.cloud `quran-uthmani`, basmala stripped as the sheet does), then
@@ -850,8 +888,9 @@ To rotate one (or after a leak: revoke the old key in the portal first):
 - **Today** (small, medium; Lock Screen rectangular, circular, inline): today's pages, juz and
   surahs, pages left or done, the streak. Tap: `revisely://today` (the session), or `revisely://home`
   once done. **Verse of the day** (small, medium): a short verse from `verses.json`, the same for
-  everyone on a date, Arabic (Amiri, bundled in the extension) and the reference only (Saheeh
-  International isn't licensed, #80; The Clear Quran® is API-only). Tap: `revisely://read?page=N`.
+  everyone on a date, Arabic (Amiri, bundled in the extension) and the reference only (it predates
+  the licensed Saheeh International, #80, which could now be added with QuranEnc's credit and
+  version: a native change; The Clear Quran® is API-only). Tap: `revisely://read?page=N`.
   `scripts/widget-verses.ts` builds the list from api.alquran.cloud, as the verse sheet shows it.
   **Qibla** (small, Lock Screen circular): a fixed dial, north up, with the Kaaba at the bearing,
   "Qibla 58° NE" and the distance to Makkah. WidgetKit can't read the compass, so it doesn't turn

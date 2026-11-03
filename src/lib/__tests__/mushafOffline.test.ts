@@ -1,4 +1,4 @@
-// The page store and the Arabic text, faked: pages "download" at once unless told otherwise.
+// The page store, the Arabic text and Saheeh International, faked: they "download" at once unless told otherwise.
 const mockPhone = new Set<number>();
 let mockFail: (page: number) => boolean = () => false;
 let mockStored: ((page: number) => void) | null = null;
@@ -10,6 +10,10 @@ let mockArabic = false;
 let mockArabicFails = false;
 let mockFree: number | null = 10e9;
 let mockBeforeDownload: (page: number) => void = () => undefined;
+let mockSaheeh = 0;
+let mockSaheehFails = false;
+let mockSaheehCalls = 0;
+let mockSaheehChange: (() => void) | null = null;
 
 jest.mock('../pageCache', () => ({
   PAGE_COUNT: 604,
@@ -51,6 +55,29 @@ jest.mock('../translation', () => ({
     mockArabic = false;
   },
 }));
+jest.mock('../saheeh', () => ({
+  SAHEEH_SURAS: 114,
+  SAHEEH_BYTES: 1_093_165,
+  saheehSurasOnPhone: () => mockSaheeh,
+  onSaheehChange: (l: () => void) => {
+    mockSaheehChange = l;
+    return () => {
+      mockSaheehChange = null;
+    };
+  },
+  downloadSaheeh: async (stillWanted: () => boolean = () => true) => {
+    mockSaheehCalls++;
+    await Promise.resolve();
+    if (mockSaheehFails) throw new Error('offline');
+    if (stillWanted()) {
+      mockSaheeh = 114;
+      mockSaheehChange?.();
+    }
+  },
+  removeSaheeh: () => {
+    mockSaheeh = 0;
+  },
+}));
 jest.mock('expo-file-system', () => ({
   Paths: {
     get availableDiskSpace() {
@@ -63,6 +90,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import sizes from '../../data/mushafSizes.json';
 import {
   __resetMushafOfflineForTests,
+  ARABIC_TEXT_BYTES,
   downloadMushafNow,
   getMushafStatus,
   prepareMushafOffline,
@@ -79,7 +107,8 @@ import { __resetPageImageSetForTests } from '../quranImages';
 const WIFI = { connected: true, type: 'wifi' };
 const CELLULAR = { connected: true, type: 'cellular' };
 const OFFLINE = { connected: false, type: 'none' };
-const FULL_BYTES = (sizes.full as number[]).reduce((a, b) => a + b, 0);
+const PAGE_BYTES = (sizes.full as number[]).reduce((a, b) => a + b, 0);
+const FULL_BYTES = PAGE_BYTES + ARABIC_TEXT_BYTES + 1_093_165;
 
 async function settle() {
   for (let i = 0; i < 5; i++) {
@@ -103,6 +132,10 @@ beforeEach(async () => {
   mockArabicFails = false;
   mockFree = 10e9;
   mockBeforeDownload = () => undefined;
+  mockSaheeh = 0;
+  mockSaheehFails = false;
+  mockSaheehCalls = 0;
+  mockSaheehChange = null;
   await AsyncStorage.clear();
 });
 
@@ -111,7 +144,7 @@ afterEach(() => {
 });
 
 describe('the offline mushaf download', () => {
-  it('waits for the start, then downloads every page and the Arabic text on Wi-Fi', async () => {
+  it('waits for the start, then downloads every page, the Arabic text and Saheeh International on Wi-Fi', async () => {
     setNetworkState(WIFI);
     await prepareMushafOffline();
     await settle();
@@ -122,10 +155,15 @@ describe('the offline mushaf download', () => {
     await settle();
     expect(mockPhone.size).toBe(604);
     expect(mockArabic).toBe(true);
+    expect(mockSaheeh).toBe(114);
     const s = getMushafStatus();
     expect(s.phase).toBe('complete');
+    expect(s.textReady).toBe(true);
     expect(s.bytes).toBe(FULL_BYTES);
-    expect(describeMushaf(s)).toEqual({ value: 'Downloaded', subtitle: 'All 604 pages on this phone · 247\u00A0MB' });
+    expect(describeMushaf(s)).toEqual({
+      value: 'Downloaded',
+      subtitle: 'All 604 pages and Saheeh International · 250\u00A0MB',
+    });
   });
 
   it('downloads only the pages it doesn’t have, in order', async () => {
@@ -240,7 +278,7 @@ describe('the offline mushaf download', () => {
     await settle();
     expect(getMushafStatus().phase).toBe('error');
     expect(mockPhone.size).toBe(598);
-    expect(describeMushaf(getMushafStatus()).subtitle).toBe("Some pages didn't download · tries again soon");
+    expect(describeMushaf(getMushafStatus()).subtitle).toBe("Some of it didn't download · tries again soon");
 
     mockFail = () => false;
     jest.advanceTimersByTime(60_000);
@@ -255,26 +293,87 @@ describe('the offline mushaf download', () => {
     startMushafOffline();
     await settle();
     expect(mockPhone.size).toBe(604);
+    expect(mockSaheeh).toBe(114);
     expect(mockArabic).toBe(false);
+    // Not done until the text is here too.
+    expect(getMushafStatus().phase).toBe('error');
+    expect(getMushafStatus().textReady).toBe(false);
   });
 
   it('gets the Arabic text on a later run when every page is already here', async () => {
     jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
     for (let p = 1; p <= 604; p++) mockPhone.add(p);
+    mockSaheeh = 114;
     mockArabicFails = true;
     setNetworkState(WIFI);
     await prepareMushafOffline();
     startMushafOffline();
     await settle();
     expect(mockArabic).toBe(false);
-    expect(getMushafStatus().phase).toBe('complete');
+    expect(getMushafStatus().phase).toBe('error');
+    expect(describeMushaf(getMushafStatus()).subtitle).toBe("Some of it didn't download · tries again soon");
     mockArabicFails = false;
-    // After its backoff (a minute after the first failure).
+    // After its backoff (a minute after the first failure), on the retry timer.
     jest.advanceTimersByTime(61_000);
-    setMushafActive(true);
     await settle();
     expect(mockArabic).toBe(true);
     expect(mockDownloaded).toEqual([]);
+    expect(getMushafStatus().phase).toBe('complete');
+  });
+
+  it('pages done, text still coming: the progress names the text', async () => {
+    for (let p = 1; p <= 604; p++) mockPhone.add(p);
+    setNetworkState(WIFI);
+    await prepareMushafOffline();
+    const s = getMushafStatus();
+    expect(s.phase).toBe('pending');
+    expect(describeMushaf({ ...s, phase: 'downloading' }).subtitle).toBe('Downloading · the text and translation');
+    expect(describeMushaf(s).value).toBe('98%');
+  });
+
+  it('tries Saheeh International again later when it fails, and is done once it comes', async () => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
+    mockSaheehFails = true;
+    setNetworkState(WIFI);
+    await prepareMushafOffline();
+    startMushafOffline();
+    await settle();
+    expect(mockPhone.size).toBe(604);
+    expect(mockSaheehCalls).toBe(1);
+    expect(getMushafStatus().phase).toBe('error');
+    // Not again before its backoff, however often a run starts.
+    setMushafActive(true);
+    await settle();
+    expect(mockSaheehCalls).toBe(1);
+    mockSaheehFails = false;
+    jest.advanceTimersByTime(61_000);
+    await settle();
+    expect(mockSaheehCalls).toBe(2);
+    expect(getMushafStatus().phase).toBe('complete');
+  });
+
+  it('once everything is here, each run still asks for a newer version of the translation', async () => {
+    for (let p = 1; p <= 604; p++) mockPhone.add(p);
+    mockArabic = true;
+    mockSaheeh = 114;
+    setNetworkState(WIFI);
+    await prepareMushafOffline();
+    startMushafOffline();
+    await settle();
+    expect(getMushafStatus().phase).toBe('complete');
+    expect(mockSaheehCalls).toBe(1);
+    expect(mockArabicCalls).toBe(0);
+    expect(mockDownloaded).toEqual([]);
+  });
+
+  it('counts suras read in the verse sheet', async () => {
+    setNetworkState(CELLULAR);
+    await prepareMushafOffline();
+    const before = getMushafStatus().bytes;
+    mockSaheeh = 57;
+    mockSaheehChange?.();
+    await new Promise((r) => setTimeout(r, 450));
+    expect(getMushafStatus().bytes - before).toBe(Math.round(1_093_165 / 2));
   });
 
   it('needs room for the next page and a margin', async () => {
@@ -388,8 +487,9 @@ describe('the offline mushaf download', () => {
     await removeMushafDownload();
     expect(mockPhone.size).toBe(0);
     expect(mockArabic).toBe(false);
+    expect(mockSaheeh).toBe(0);
     expect(getMushafStatus().phase).toBe('paused');
-    expect(describeMushaf(getMushafStatus())).toEqual({ value: 'Download', subtitle: 'Not on this phone · 247\u00A0MB' });
+    expect(describeMushaf(getMushafStatus())).toEqual({ value: 'Download', subtitle: 'Not on this phone · 250\u00A0MB' });
 
     setNetworkState(CELLULAR);
     setNetworkState(WIFI);
@@ -417,7 +517,7 @@ describe('the offline mushaf download', () => {
 });
 
 describe('describeMushaf', () => {
-  const base = { total: 604, totalBytes: FULL_BYTES, prefs: { auto: true, cellular: false } };
+  const base = { total: 604, totalBytes: FULL_BYTES, textReady: false, prefs: { auto: true, cellular: false } };
   it('shows the progress while downloading', () => {
     expect(describeMushaf({ ...base, phase: 'downloading', pages: 302, bytes: FULL_BYTES / 2 })).toEqual({
       value: '50%',
@@ -426,11 +526,11 @@ describe('describeMushaf', () => {
   });
   it('says how it will download before it starts', () => {
     expect(describeMushaf({ ...base, phase: 'pending', pages: 0, bytes: 0 }).subtitle).toBe(
-      'Downloads on Wi-Fi · 247\u00A0MB',
+      'Downloads on Wi-Fi · 250\u00A0MB',
     );
     expect(
       describeMushaf({ ...base, prefs: { auto: true, cellular: true }, phase: 'pending', pages: 0, bytes: 0 }).subtitle,
-    ).toBe('Downloads on Wi-Fi or mobile data · 247\u00A0MB');
+    ).toBe('Downloads on Wi-Fi or mobile data · 250\u00A0MB');
   });
   it('formats sizes as the system does', () => {
     expect(formatMegabytes(135_200_000)).toBe('135\u00A0MB');

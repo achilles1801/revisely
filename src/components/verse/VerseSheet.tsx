@@ -25,6 +25,9 @@ import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { getSurahDisplay } from '../../lib/quranData';
 import {
+  ARABIC_CREDIT,
+  creditLine,
+  DEFAULT_TRANSLATION_ID,
   getVerseText,
   isTranslationAvailable,
   pickerTitle,
@@ -36,6 +39,8 @@ import {
   VerseText,
 } from '../../lib/translation';
 import { clearQuranErrorHint, clearQuranSegments } from '../../lib/clearQuran';
+import { hasSaheehSura, saheehFootnotes, saheehSegments } from '../../lib/saheeh';
+import { knownOffline } from '../../lib/networkState';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
@@ -458,17 +463,11 @@ export function VerseSheet({
                             <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                               {pickerTitle(t)}
                             </Text>
-                            {t.credit ? (
-                              // Credited as in the sheet: the publisher's site.
-                              <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                                {available ? `${t.language} · ` : 'Not available yet · '}
-                                <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
-                              </Text>
-                            ) : (
-                              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                                {available ? `${t.language} · ${t.author}` : `${t.author} · not available yet`}
-                              </Text>
-                            )}
+                            {/* Credited as in the sheet: the source's site. */}
+                            <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                              {available ? `${t.language} · ` : 'Not available yet · '}
+                              <Text style={styles.creditLink}>{t.credit.linkLabel}</Text>
+                            </Text>
                           </View>
                           {chosen && <Ionicons name="checkmark" size={20} color={palette.text} />}
                         </Tap>
@@ -484,7 +483,20 @@ export function VerseSheet({
               )}
               {view.status === 'error' && (
                 <View style={styles.center} testID="verse-error">
-                  {translation.id === CLEAR_QURAN_ID ? (
+                  {translation.id === CLEAR_QURAN_ID && knownOffline() ? (
+                    // Offline: kept only as read (its terms), so a verse not read before can't
+                    // show. Saheeh International can, once it's on the phone; only if chosen.
+                    <>
+                      <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
+                        The Clear Quran® needs the internet
+                      </Text>
+                      <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
+                        {verse && hasSaheehSura(verse.sura)
+                          ? 'Saheeh International is available offline.'
+                          : "Verses you've read before show offline. Try again once you're online."}
+                      </Text>
+                    </>
+                  ) : translation.id === CLEAR_QURAN_ID ? (
                     // Only ever this, or its own text: never another translation under its name.
                     <>
                       <Text style={[typeV2.name, { color: palette.text }]}>Couldn't load translation</Text>
@@ -494,10 +506,22 @@ export function VerseSheet({
                     </>
                   ) : (
                     <Text style={[typeV2.body, v2Only.centerText, { color: palette.secondary }]}>
-                      Couldn't load this verse. Check your connection.
+                      {knownOffline()
+                        ? "This verse isn't downloaded yet. It shows when you're back online."
+                        : "Couldn't load this verse. Check your connection."}
                     </Text>
                   )}
-                  <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
+                  <View style={styles.errorActions}>
+                    {translation.id === CLEAR_QURAN_ID && knownOffline() && verse && hasSaheehSura(verse.sura) && (
+                      <PillButton
+                        title="Show Saheeh International"
+                        variant="outline"
+                        onPress={() => onChangeTranslation(DEFAULT_TRANSLATION_ID)}
+                        testID="verse-use-saheeh"
+                      />
+                    )}
+                    <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
+                  </View>
                 </View>
               )}
               {view.status === 'ready' && (
@@ -527,34 +551,60 @@ export function VerseSheet({
                       {view.text.arabic}
                     </Text>
                     <Text style={styles.translation} testID="verse-translation">
-                      {translation.id === CLEAR_QURAN_ID
-                        ? // Exactly as given; its footnote markers shown as raised numbers.
-                          clearQuranSegments(view.text.translation).map((seg, i) =>
-                            'footnote' in seg ? (
-                              <Text key={i} style={styles.footnote}>
-                                {seg.footnote}
-                              </Text>
-                            ) : (
-                              seg.text
-                            ),
-                          )
-                        : view.text.translation}
+                      {/* Exactly as given; footnote markers shown as raised numbers. */}
+                      {(translation.id === CLEAR_QURAN_ID
+                        ? clearQuranSegments(view.text.translation)
+                        : saheehSegments(view.text.translation, view.text.footnotes ?? '')
+                      ).map((seg, i) =>
+                        'footnote' in seg ? (
+                          <Text key={i} style={styles.footnote}>
+                            {seg.footnote}
+                          </Text>
+                        ) : (
+                          seg.text
+                        ),
+                      )}
                     </Text>
-                    {/* A credited translation has its credit pinned below instead. */}
-                    {!translation.credit && <Text style={styles.source}>{view.text.translationName}</Text>}
+                    {view.text.footnotes ? (
+                      // Saheeh International's footnotes, as given (its terms: nothing cut).
+                      <View style={styles.footnotes} testID="verse-footnotes">
+                        {saheehFootnotes(view.text.footnotes).map((f, i) => (
+                          <Text key={i} style={styles.footnoteText}>
+                            {f.mark ? <Text style={styles.footnote}>{`${f.mark} `}</Text> : null}
+                            {f.text}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : null}
+                    {/* The Arabic's source, as Tanzil's terms ask; the translation's credit is pinned below. */}
+                    <View style={styles.arabicCredit} testID="arabic-credit">
+                      <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
+                        {`${ARABIC_CREDIT.text} · `}
+                      </Text>
+                      <Text
+                        style={styles.creditLink}
+                        maxFontSizeMultiplier={CHROME_TEXT_SCALE}
+                        onPress={() => Linking.openURL(ARABIC_CREDIT.url).catch(() => undefined)}
+                        accessibilityRole="link"
+                        accessibilityLabel={`${ARABIC_CREDIT.linkLabel}, opens the website`}
+                        suppressHighlighting={false}
+                      >
+                        {ARABIC_CREDIT.linkLabel}
+                      </Text>
+                    </View>
                   </ScrollView>
                 </GestureDetector>
               )}
-              {view.status === 'ready' && translation.credit && (
+              {view.status === 'ready' && (
                 // Pinned under the verse, however long it is: always in view.
                 <View style={styles.credit} testID="translation-credit">
                   <Text style={styles.creditText} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-                    {translation.credit.text}
+                    {creditLine(translation, view.text.version)}
                   </Text>
                   <Text
                     style={styles.creditLink}
                     maxFontSizeMultiplier={CHROME_TEXT_SCALE}
-                    onPress={() => Linking.openURL(translation.credit!.url).catch(() => undefined)}
+                    onPress={() => Linking.openURL(translation.credit.url).catch(() => undefined)}
                     accessibilityRole="link"
                     accessibilityLabel={`${translation.credit.linkLabel}, opens the website`}
                     suppressHighlighting={false}
@@ -654,8 +704,12 @@ const makeStylesV2 = (p: PaletteV2) =>
     },
     // Reading text: grows with Dynamic Type, uncapped.
     translation: { ...typeV2.body, fontSize: 18, lineHeight: 27, color: p.text },
-    source: { ...typeV2.meta, color: p.secondary, marginTop: layoutV2.gutter },
     footnote: { color: p.accentText },
+    footnotes: { marginTop: 12, gap: 8 },
+    // Reading text too: grows with Dynamic Type, uncapped.
+    footnoteText: { ...typeV2.body, fontSize: 14, lineHeight: 20, color: p.secondary },
+    arabicCredit: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', marginTop: layoutV2.gutter },
+    errorActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
     credit: {
       borderTopWidth: layoutV2.hairline,
       borderTopColor: p.separator,
