@@ -66,6 +66,7 @@ import {
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
+import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 
 const NO_PAGES: number[] = [];
 
@@ -92,6 +93,11 @@ export default function ActiveRevisionScreen() {
     sessionDayRef.current = getCurrentRevisionDay(user);
   }
   const sessionDay = sessionDayRef.current;
+
+  // Opening a session lifts the revision reminders off the lock screen.
+  useEffect(() => {
+    dismissPresentedRevisionReminders();
+  }, []);
 
   const assignment = useMemo(() => {
     if (!user || !sessionDay) return null;

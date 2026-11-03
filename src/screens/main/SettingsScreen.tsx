@@ -51,7 +51,6 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { scheduleDailyReminder } from '../../lib/notifications';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
@@ -316,7 +315,6 @@ export default function SettingsScreen() {
 
   const handleNotificationToggle = async (enabled: boolean) => {
     await updateUser({ notificationsEnabled: enabled });
-    await scheduleDailyReminder(localUser.reminderTime, enabled);
   };
 
   const handleSaveName = async () => {
@@ -362,7 +360,6 @@ export default function SettingsScreen() {
       .toString()
       .padStart(2, '0')}`;
     await updateUser({ reminderTime: newTime });
-    await scheduleDailyReminder(newTime, localUser.notificationsEnabled);
     setShowTimeModal(false);
   };
 

@@ -20,7 +20,6 @@ import {
   savedPlansToFirestore,
   timestampToISOString,
 } from '../lib/schedulePersistence';
-import { scheduleDailyReminder } from '../lib/notifications';
 import { logger } from '../lib/logger';
 import { applyUpdateChannel } from '../lib/updateChannel';
 import { ensureOnServer, retryDelayMs } from '../lib/userDoc';
@@ -358,7 +357,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // this session. The OS notification scheduler is per-device, so a fresh
   // install or a new device won't have any schedule even if the Firestore
   // profile says notifications are on — this rehydrates it.
-  const lastScheduledUserIdRef = useRef<string | null>(null);
 
   // ============================================================================
   // RESET ON THE SERVER (lib/offline/reset): what the phone holds from before
@@ -510,7 +508,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCacheChecked(null);
       setServerReachable(null);
       hasSelfHealedOnLoad.current = false;
-      lastScheduledUserIdRef.current = null;
       return;
     }
 
@@ -865,20 +862,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hasSelfHealedOnLoad.current = true;
     syncPagesFromLogs(pages, logs).catch((err) => logger.warn('Self-heal failed', err));
   }, [forThisUid, pages, logs, syncPagesFromLogs]);
-
-  // Rehydrate the daily reminder once per user identity per session. Settings
-  // and onboarding already schedule on mutation; this only covers cold starts
-  // on a device whose OS scheduler is empty (fresh install, new phone,
-  // sign-in to an existing account). Gated on onboardingComplete so we don't
-  // schedule against default placeholders for users still in the flow.
-  useEffect(() => {
-    if (!user || !onboardingComplete) return;
-    if (lastScheduledUserIdRef.current === user.id) return;
-    lastScheduledUserIdRef.current = user.id;
-    scheduleDailyReminder(user.reminderTime, user.notificationsEnabled).catch(
-      (err) => logger.error('Failed to rehydrate daily reminder:', err),
-    );
-  }, [user, onboardingComplete]);
 
   // ============================================================================
   // LOAD DATA (pull to refresh)
