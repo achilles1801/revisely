@@ -4,16 +4,14 @@ import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
 import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID, REMINDER_CHANNEL_ID } from './notificationChannels';
+import { notificationBehavior } from './prayer/soundPreview';
 
 export { REMINDER_CHANNEL_ID };
 
+// Shown with its sound while the app is open; a prayer sound's preview is only
+// heard (lib/prayer/soundPreview).
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => notificationBehavior(notification),
 });
 
 /**
