@@ -11,11 +11,16 @@
 //   where it was: a page is either whole on the phone or not there.
 // - Failed pages are tried again on the next run: the connection coming back,
 //   the app coming to the front, or a timer (1, 5, 15 minutes).
-// - The whole Arabic text (lib/translation, ~2 MB) comes first; if that fails it
-//   is tried again on a later run, no sooner than its own backoff.
+// - The text comes first: the whole Arabic (lib/translation, ~1.8 MB) and Saheeh
+//   International (lib/saheeh, ~1.1 MB, its 114 suras from QuranEnc.com). Each
+//   failure is tried again on a later run, no sooner than its own backoff. Once
+//   everything is here, a run still asks whether QuranEnc has a newer version
+//   of the translation (at most once a day), as its terms require, and
+//   downloads it quietly. The Clear Quran® is never downloaded whole (its terms
+//   don't allow it): it stays cached as read (lib/clearQuran).
 // - A page the reader found broken (pageCache.onPageRemoved) is downloaded again.
 // - "Remove from this phone" deletes it all and turns the download off until
-//   "Download now"; pages the reader opens are still kept.
+//   "Download now"; pages and suras the reader opens are still kept.
 //
 // The choices are kept on this phone (not the account): the pages are this
 // phone's.
@@ -34,6 +39,7 @@ import {
 } from './pageCache';
 import { pageImageSet } from './quranImages';
 import { downloadArabicText, hasArabicText, removeArabicText } from './translation';
+import { downloadSaheeh, onSaheehChange, removeSaheeh, SAHEEH_BYTES, SAHEEH_SURAS, saheehSurasOnPhone } from './saheeh';
 import { NetworkState, networkState, onNetworkState, onUnmeteredNetwork } from './networkState';
 import { logger } from './logger';
 
@@ -63,11 +69,16 @@ export interface MushafStatus {
   phase: MushafPhase;
   pages: number;
   total: number;
-  /** On the phone, by the size table. */
+  /** The Arabic text and the whole of Saheeh International are on the phone too. */
+  textReady: boolean;
+  /** On the phone, by the size table (pages and text). */
   bytes: number;
   totalBytes: number;
   prefs: MushafPrefs;
 }
+
+/** The whole Arabic text on the phone (measured Nov 2 2026). */
+export const ARABIC_TEXT_BYTES = 1_784_369;
 
 const PREFS_KEY = '@revisely_mushaf_offline:v1';
 const DEFAULT_PREFS: MushafPrefs = { auto: true, cellular: false };
@@ -92,8 +103,10 @@ let downloading = false;
 let failedRun = false;
 let noSpace = false;
 let attempt = 0;
-let arabicAttempt = 0;
-let arabicRetryAt = 0;
+type TextPart = 'arabic' | 'saheeh';
+let textAttempt: Record<TextPart, number> = { arabic: 0, saheeh: 0 };
+let textRetryAt: Record<TextPart, number> = { arabic: 0, saheeh: 0 };
+let arabicHere = false;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void)[] = [];
 
@@ -104,7 +117,7 @@ function sizeTable(): number[] {
 }
 
 function totalBytes(): number {
-  return sizeTable().reduce((a, b) => a + b, 0);
+  return sizeTable().reduce((a, b) => a + b, 0) + ARABIC_TEXT_BYTES + SAHEEH_BYTES;
 }
 
 function bytesOnPhone(): number {
@@ -113,7 +126,13 @@ function bytesOnPhone(): number {
   present.forEach((p) => {
     n += table[p - 1] ?? 0;
   });
-  return n;
+  if (arabicHere) n += ARABIC_TEXT_BYTES;
+  return n + Math.round((SAHEEH_BYTES * saheehSurasOnPhone()) / SAHEEH_SURAS);
+}
+
+/** The Arabic and every sura of Saheeh International (any version) are here. */
+function textOnPhone(): boolean {
+  return arabicHere && saheehSurasOnPhone() >= SAHEEH_SURAS;
 }
 
 function canUseNetwork(net: NetworkState | null): boolean {
@@ -127,7 +146,7 @@ function mayRun(gen: number): boolean {
 
 function phaseNow(): MushafPhase {
   if (!prepared) return 'unknown';
-  if (present.size >= PAGE_COUNT) return 'complete';
+  if (present.size >= PAGE_COUNT && textOnPhone()) return 'complete';
   if (!prefs.auto) return 'paused';
   const net = networkState();
   if (downloading && mayRun(generation)) return 'downloading';
@@ -142,6 +161,7 @@ let status: MushafStatus = {
   phase: 'unknown',
   pages: 0,
   total: PAGE_COUNT,
+  textReady: false,
   bytes: 0,
   totalBytes: 0,
   prefs: DEFAULT_PREFS,
@@ -159,6 +179,7 @@ function publish(): void {
     phase: phaseNow(),
     pages: present.size,
     total: PAGE_COUNT,
+    textReady: prepared && textOnPhone(),
     bytes,
     totalBytes: total,
     prefs,
@@ -166,11 +187,16 @@ function publish(): void {
   const same =
     next.phase === status.phase &&
     next.pages === status.pages &&
+    next.bytes === status.bytes &&
+    next.textReady === status.textReady &&
     next.totalBytes === status.totalBytes &&
     next.prefs === status.prefs;
   if (same) return;
   const onlyProgress =
-    next.phase === status.phase && next.prefs === status.prefs && next.totalBytes === status.totalBytes;
+    next.phase === status.phase &&
+    next.prefs === status.prefs &&
+    next.textReady === status.textReady &&
+    next.totalBytes === status.totalBytes;
   const now = Date.now();
   if (onlyProgress && now - lastPublish < PROGRESS_EVERY_MS) {
     trailing ??= setTimeout(() => {
@@ -223,7 +249,10 @@ export function prepareMushafOffline(): Promise<void> {
       }
       migrateLegacyPages();
       present = pagesOnPhone();
+      arabicHere = hasArabicText();
       unsubscribe.push(
+        // A sura read in the verse sheet counts too.
+        onSaheehChange(() => publish()),
         onPageStored((page) => {
           present.add(page);
           publish();
@@ -269,6 +298,8 @@ export async function downloadMushafNow({ overMobileData = false } = {}): Promis
   failedRun = false;
   noSpace = false;
   attempt = 0;
+  textAttempt = { arabic: 0, saheeh: 0 };
+  textRetryAt = { arabic: 0, saheeh: 0 };
   started = true;
   if (!prefs.auto) await savePrefs({ ...prefs, auto: true });
   requestMushafDownload();
@@ -293,6 +324,8 @@ export async function removeMushafDownload(): Promise<void> {
   clearRetry();
   removeAllPages();
   removeArabicText();
+  removeSaheeh();
+  arabicHere = false;
   present = new Set();
   await savePrefs({ ...prefs, auto: false });
 }
@@ -302,10 +335,14 @@ function clearRetry() {
   retryTimer = null;
 }
 
-function scheduleRetry() {
+/** The next run: after the backoff, or `after` ms (waiting only for the text's own backoff). */
+function scheduleRetry(after?: number) {
   clearRetry();
-  const delay = RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)];
-  attempt++;
+  let delay = after;
+  if (delay == null) {
+    delay = RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)];
+    attempt++;
+  }
   retryTimer = setTimeout(() => {
     retryTimer = null;
     requestMushafDownload();
@@ -327,40 +364,71 @@ function roomFor(page: number): boolean {
   return free == null || free >= SPACE_MARGIN + (sizeTable()[page - 1] ?? 0);
 }
 
-/** The whole Arabic text, unless it's here or failed too recently. */
-async function fetchArabicText(gen: number): Promise<void> {
-  if (hasArabicText() || Date.now() < arabicRetryAt) return;
+/**
+ * One part of the text, unless it failed too recently: the Arabic (if it isn't
+ * here) or Saheeh International (the suras missing or older than QuranEnc's
+ * newest version). False if it isn't all here and up to date.
+ */
+async function fetchText(part: TextPart, gen: number): Promise<boolean> {
+  if (part === 'arabic' && arabicHere) return true;
+  if (Date.now() < textRetryAt[part]) return false;
   try {
-    await downloadArabicText(() => gen === generation);
-    arabicAttempt = 0;
+    if (part === 'arabic') {
+      await downloadArabicText(() => gen === generation);
+      arabicHere = gen === generation && hasArabicText();
+    } else {
+      await downloadSaheeh(() => mayRun(gen));
+      // Stopped between suras (the network, the app leaving): carries on next run.
+      if (!mayRun(gen)) return false;
+      if (saheehSurasOnPhone() < SAHEEH_SURAS) throw new Error('Some suras were not kept');
+    }
+    textAttempt[part] = 0;
+    return true;
   } catch (err) {
-    logger.warn('Arabic text download failed', err);
-    arabicRetryAt = Date.now() + RETRY_MS[Math.min(arabicAttempt, RETRY_MS.length - 1)];
-    arabicAttempt++;
+    logger.warn(part === 'arabic' ? 'Arabic text download failed' : 'Translation download failed', err);
+    textRetryAt[part] = Date.now() + RETRY_MS[Math.min(textAttempt[part], RETRY_MS.length - 1)];
+    textAttempt[part]++;
+    return false;
+  } finally {
+    publish();
   }
+}
+
+/** Until the first text part may be tried again. */
+function textRetryDelay(): number {
+  const now = Date.now();
+  const waits = (['arabic', 'saheeh'] as TextPart[]).map((p) => textRetryAt[p] - now).filter((w) => w > 0);
+  return Math.max(1_000, waits.length > 0 ? Math.min(...waits) : RETRY_MS[0]);
+}
+
+async function fetchTexts(gen: number): Promise<boolean> {
+  const arabic = await fetchText('arabic', gen);
+  const saheeh = mayRun(gen) ? await fetchText('saheeh', gen) : false;
+  return arabic && saheeh;
 }
 
 async function runOnce(): Promise<void> {
   const gen = generation;
   if (!mayRun(gen)) return;
-  if (present.size >= PAGE_COUNT) {
-    // Every page is here; the Arabic text may have failed before.
-    await fetchArabicText(gen);
+  if (present.size >= PAGE_COUNT && textOnPhone()) {
+    // Everything is here: QuranEnc may have a newer version (asked once a day).
+    await fetchTexts(gen);
     return;
   }
   clearRetry();
   const missing: number[] = [];
   for (let p = 1; p <= PAGE_COUNT; p++) if (!present.has(p)) missing.push(p);
-  if (!roomFor(missing[0])) {
-    noSpace = true;
-    return;
-  }
   noSpace = false;
   failedRun = false;
   downloading = true;
   publish();
   try {
-    await fetchArabicText(gen);
+    // The text first (~3 MB): it comes even when the pages don't fit.
+    const textOk = await fetchTexts(gen);
+    if (missing.length > 0 && !roomFor(missing[0])) {
+      noSpace = true;
+      return;
+    }
     let next = 0;
     let failures = 0;
     let inARow = 0;
@@ -384,7 +452,7 @@ async function runOnce(): Promise<void> {
         }
       }),
     );
-    if (gen !== generation || present.size >= PAGE_COUNT) {
+    if (gen !== generation || (present.size >= PAGE_COUNT && textOnPhone())) {
       attempt = 0;
       return;
     }
@@ -395,9 +463,9 @@ async function runOnce(): Promise<void> {
     }
     // Stopped by the network, the app leaving or the settings: it carries on
     // when they allow it. Otherwise some pages failed: later.
-    if (mayRun(gen) && (failures > 0 || next < missing.length)) {
+    if (mayRun(gen) && (failures > 0 || next < missing.length || !textOk)) {
       failedRun = true;
-      scheduleRetry();
+      scheduleRetry(failures > 0 || next < missing.length ? undefined : textRetryDelay());
     }
   } finally {
     downloading = false;
@@ -449,11 +517,12 @@ export function __resetMushafOfflineForTests(): void {
   failedRun = false;
   noSpace = false;
   attempt = 0;
-  arabicAttempt = 0;
-  arabicRetryAt = 0;
+  textAttempt = { arabic: 0, saheeh: 0 };
+  textRetryAt = { arabic: 0, saheeh: 0 };
+  arabicHere = false;
   if (trailing) clearTimeout(trailing);
   trailing = null;
   lastPublish = 0;
-  status = { ...status, phase: 'unknown', pages: 0, prefs: DEFAULT_PREFS };
+  status = { ...status, phase: 'unknown', pages: 0, textReady: false, bytes: 0, prefs: DEFAULT_PREFS };
   listeners.clear();
 }

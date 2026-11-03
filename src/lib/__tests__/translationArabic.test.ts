@@ -59,12 +59,15 @@ jest.mock('../clearQuran', () => ({
 import { Platform } from 'react-native';
 import {
   __resetTranslationForTests,
+  ARABIC_CREDIT,
   downloadArabicText,
   getArabicVerse,
   getPageEdition,
+  hasArabicForPage,
   hasArabicText,
   parseQuranResponse,
   removeArabicText,
+  TANZIL_NOTICE,
 } from '../translation';
 
 /** alquran.cloud's /v1/quran/quran-uthmani, made up: 114 surahs, 6236 verses over 604 pages. */
@@ -132,10 +135,40 @@ describe('the whole Arabic text', () => {
     expect(fetched).toEqual([]);
   });
 
-  it('is never used for a translation', async () => {
+  it("keeps Tanzil's notice with the text, as its terms ask of every copy", async () => {
     await downloadArabicText();
-    await expect(getPageEdition(300, 'en.sahih')).rejects.toThrow();
-    expect(fetched.at(-1)).toBe('https://api.alquran.cloud/v1/page/300/en.sahih');
+    const file = JSON.parse(mockFiles.get('file:///documents/quran-text/quran-uthmani.json') as string);
+    expect(file.notice).toBe(TANZIL_NOTICE);
+    expect(file.notice).toContain('Copyright (C) 2007-2021 Tanzil Project');
+    expect(file.notice).toContain('CHANGING IT IS NOT ALLOWED');
+    expect(file.source).toBe('https://tanzil.net');
+    expect(Object.keys(file.pages)).toHaveLength(604);
+  });
+
+  it('still reads a file downloaded before the notice was kept in it (Nov 2 2026)', async () => {
+    mockFiles.set(
+      'file:///documents/quran-text/quran-uthmani.json',
+      JSON.stringify(parseQuranResponse(wholeQuran())),
+    );
+    expect(await getArabicVerse(604, 114, 21)).toBe('114:21');
+    expect(fetched).toEqual([]);
+    // Written again with the notice, once.
+    const file = JSON.parse(mockFiles.get('file:///documents/quran-text/quran-uthmani.json') as string);
+    expect(file.notice).toBe(TANZIL_NOTICE);
+    expect(Object.keys(file.pages)).toHaveLength(604);
+  });
+
+  it("knows whether a page's Arabic is on the phone (the whole text, or the page read before)", async () => {
+    expect(hasArabicForPage(48)).toBe(false);
+    mockFiles.set('cache/translation/quran-uthmani/48.json', '[]');
+    expect(hasArabicForPage(48)).toBe(true);
+    expect(hasArabicForPage(49)).toBe(false);
+    await downloadArabicText();
+    expect(hasArabicForPage(49)).toBe(true);
+  });
+
+  it('names its source with a link to tanzil.net', () => {
+    expect(ARABIC_CREDIT).toEqual({ text: 'Arabic text: Tanzil Project', linkLabel: 'tanzil.net', url: 'https://tanzil.net' });
   });
 
   it('is removed with the offline mushaf', async () => {

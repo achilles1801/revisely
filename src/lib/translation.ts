@@ -1,29 +1,34 @@
 // Verse text for the verse sheet: the Arabic (Uthmani) and a chosen translation.
 //
-// Sources: the public alquran.cloud API, which numbers pages the same way as the
-// Madani mushaf images. Each edition is fetched once per page and then read from
-// the caches directory; a verse carried over from the previous page is listed
-// under that page by the API, so it is fetched on its own.
+// The Arabic is Tanzil Project's Uthmani text, from the public alquran.cloud API,
+// which numbers pages the same way as the Madani mushaf images. It is fetched
+// once per page and then read from the caches directory; a verse carried over
+// from the previous page is listed under that page by the API, so it is fetched
+// on its own. It is also downloaded whole with the offline mushaf
+// (downloadArabicText: one request, ~2 MB) and kept in the documents directory,
+// so the verse sheet's Arabic and Copy / Share work offline. Tanzil's terms
+// allow verbatim copies if the source is named with a link to tanzil.net
+// (ARABIC_CREDIT, under every verse in the sheet) and its notice stays in every
+// copy (TANZIL_NOTICE, in the downloaded file).
 //
-// The Arabic (Uthmani, Tanzil's text) is also downloaded whole with the offline
-// mushaf (downloadArabicText: one request, ~2 MB) and kept in the documents
-// directory, so the verse sheet's Arabic and Copy / Share work offline. Its
-// terms allow verbatim copies. Saheeh International is not downloaded whole:
-// we have no licence for the copy alquran.cloud serves (#80), so it stays
-// cached as read.
-//
-// Translations are listed in TRANSLATIONS. The Clear Quran® (Dr. Mustafa
-// Khattab) is licensed: its text comes from The Clear Quran API through our
-// worker (lib/clearQuran), is kept on the phone only as read (lib/clearQuran,
-// the owner's decision of Oct 27 2026), never the whole of it, and its
-// publisher requires the credit line (`credit`) wherever it is shown. One that
-// is not `available` is shown in the picker as unavailable.
+// Translations are listed in TRANSLATIONS, each with the credit its licence
+// requires (shown with the text and in the picker):
+// - Saheeh International comes from QuranEnc.com (lib/saheeh), whose terms let
+//   it be downloaded and kept: it is kept on the phone as read, and whole with
+//   the offline mushaf. Its credit names the version shown (creditLine).
+// - The Clear Quran® (Dr. Mustafa Khattab) comes from The Clear Quran API
+//   through our worker (lib/clearQuran), is kept on the phone only as read (the
+//   owner's decision of Oct 27 2026), never the whole of it: its terms don't
+//   allow more. Offline, a verse not read before can't be shown, and the sheet
+//   says so (pointing to Saheeh International when that is on the phone).
+// One that is not `available` is shown in the picker as unavailable.
 
 import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import RecitationAudio from '../../modules/recitation-audio';
 import { logger } from './logger';
 import { getClearQuranVerse, peekClearQuranVerse, prefetchClearQuran, prefetchClearQuranAround } from './clearQuran';
+import { getSaheehVerse, peekSaheehVerse, prefetchSaheeh, SAHEEH_PAGE_URL } from './saheeh';
 import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
 
 export interface TranslationInfo {
@@ -31,11 +36,17 @@ export interface TranslationInfo {
   name: string;
   author: string;
   language: string;
-  /** alquran.cloud edition identifier. */
-  edition: string | null;
+  /** Where its text comes from: lib/saheeh (QuranEnc.com) or lib/clearQuran. */
+  source: 'quranenc' | 'clearquran';
   available: boolean;
   /** Required attribution, shown with the text and in the picker. */
-  credit?: { text: string; linkLabel: string; url: string };
+  credit: Credit;
+}
+
+export interface Credit {
+  text: string;
+  linkLabel: string;
+  url: string;
 }
 
 export const CLEAR_QURAN_ID = 'en.khattab';
@@ -44,17 +55,23 @@ export const TRANSLATIONS: TranslationInfo[] = [
   {
     id: 'en.sahih',
     name: 'Saheeh International',
-    author: 'Saheeh International',
+    author: 'Noor International Center',
     language: 'English',
-    edition: 'en.sahih',
+    source: 'quranenc',
     available: true,
+    // QuranEnc's terms: the publisher, the source and the version (creditLine).
+    credit: {
+      text: 'Saheeh International, issued by Noor International Center',
+      linkLabel: 'QuranEnc.com',
+      url: SAHEEH_PAGE_URL,
+    },
   },
   {
     id: CLEAR_QURAN_ID,
     name: 'The Clear Quran®',
     author: 'Dr. Mustafa Khattab',
     language: 'English',
-    edition: null,
+    source: 'clearquran',
     available: true,
     credit: {
       text: 'The Clear Quran® by Dr. Mustafa Khattab',
@@ -74,8 +91,36 @@ export function isTranslationAvailable(t: TranslationInfo): boolean {
 
 /** Shown in the picker: "The Clear Quran® — Dr. Mustafa Khattab". */
 export function pickerTitle(t: TranslationInfo): string {
-  return t.credit ? `${t.name} — ${t.author}` : t.name;
+  return `${t.name} — ${t.author}`;
 }
+
+/** The credit under a verse: with the version of the text shown, when it has one. */
+export function creditLine(t: TranslationInfo, version?: string): string {
+  return version ? `${t.credit.text} · v${version}` : t.credit.text;
+}
+
+/** The Arabic's source, as Tanzil's terms ask: named, with a link to tanzil.net. */
+export const ARABIC_CREDIT: Credit = {
+  text: 'Arabic text: Tanzil Project',
+  linkLabel: 'tanzil.net',
+  url: 'https://tanzil.net',
+};
+
+/** Tanzil's notice (tanzil.net/docs/text_license), kept in every copy of its text (the downloaded file). */
+export const TANZIL_NOTICE = [
+  'Tanzil Quran Text',
+  'Copyright (C) 2007-2021 Tanzil Project',
+  'License: Creative Commons Attribution 3.0',
+  '',
+  'This copy of the Quran text is carefully produced, highly verified and continuously monitored by a group of specialists in Tanzil Project.',
+  '',
+  'TERMS OF USE:',
+  '- Permission is granted to copy and distribute verbatim copies of this text, but CHANGING IT IS NOT ALLOWED.',
+  '- This Quran text can be used in any website or application, provided that its source (Tanzil Project) is clearly indicated, and a link is made to tanzil.net to enable users to keep track of changes.',
+  '- This copyright notice shall be included in all verbatim copies of the text, and shall be reproduced appropriately in all files derived from or containing substantial portion of this text.',
+  '',
+  'Please check updates at: http://tanzil.net/updates/',
+].join('\n');
 
 /** The translation to use for a saved choice, falling back to the default. */
 export function resolveTranslation(id: string | null | undefined): TranslationInfo {
@@ -124,10 +169,7 @@ export function parsePageResponse(json: unknown): TranslatedAyah[] {
 }
 
 /** Every verse that starts on `pageNumber`, in one edition. */
-export async function getPageEdition(
-  pageNumber: number,
-  edition: string = 'en.sahih',
-): Promise<TranslatedAyah[]> {
+export async function getPageEdition(pageNumber: number, edition: string): Promise<TranslatedAyah[]> {
   const key = `${edition}/${pageNumber}`;
   const known = memory.get(key);
   if (known) return known;
@@ -198,6 +240,13 @@ export function parseQuranResponse(json: unknown): Record<number, TranslatedAyah
   return byPage;
 }
 
+/** The downloaded file: Tanzil's notice with the text (files from before Nov 3 2026 hold only `pages`'s content). */
+interface ArabicFile {
+  notice: string;
+  source: string;
+  pages: Record<number, TranslatedAyah[]>;
+}
+
 let arabicLoaded: Promise<boolean> | null = null;
 
 function fillMemory(byPage: Record<number, TranslatedAyah[]>) {
@@ -211,7 +260,19 @@ function loadArabicText(): Promise<boolean> {
       try {
         const file = arabicFile();
         if (!file.exists) return false;
-        fillMemory(JSON.parse(await file.text()) as Record<number, TranslatedAyah[]>);
+        const parsed = JSON.parse(await file.text()) as ArabicFile | Record<number, TranslatedAyah[]>;
+        if ('pages' in parsed && 'notice' in parsed) {
+          fillMemory((parsed as ArabicFile).pages);
+        } else {
+          const pages = parsed as Record<number, TranslatedAyah[]>;
+          fillMemory(pages);
+          // Downloaded before the notice was kept with it (Nov 2 2026): written again with it.
+          try {
+            writeArabicFile(pages);
+          } catch (err) {
+            logger.warn('Could not add the notice to the Arabic text', err);
+          }
+        }
         return true;
       } catch (err) {
         logger.warn('Could not read the Arabic text', err);
@@ -223,6 +284,33 @@ function loadArabicText(): Promise<boolean> {
     });
   }
   return arabicLoaded;
+}
+
+/** Writes the whole Arabic text with Tanzil's notice, beside the file and moved in (a file there is always whole). */
+function writeArabicFile(pages: Record<number, TranslatedAyah[]>): void {
+  const dir = textDir();
+  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+  const partial = new File(dir, `${ARABIC_FILE}.part`);
+  if (partial.exists) partial.delete();
+  partial.create();
+  const contents: ArabicFile = { notice: TANZIL_NOTICE, source: 'https://tanzil.net', pages };
+  partial.write(JSON.stringify(contents));
+  const target = arabicFile();
+  if (target.exists) target.delete();
+  partial.move(target);
+}
+
+/**
+ * This page's Arabic is on the phone or in memory (the whole text, or the page
+ * read before), so the verse sheet can show its verses offline.
+ */
+export function hasArabicForPage(page: number): boolean {
+  if (memory.has(`${ARABIC_EDITION}/${page}`) || hasArabicText()) return true;
+  try {
+    return new File(new Directory(Paths.cache, 'translation', ARABIC_EDITION), `${page}.json`).exists;
+  } catch {
+    return false;
+  }
 }
 
 /** The whole Arabic text is on the phone. */
@@ -254,14 +342,7 @@ export async function downloadArabicText(stillWanted: () => boolean = () => true
       logger.warn('Could not keep the Arabic text out of backups', err);
     }
   }
-  // Written beside it and moved in, so a file there is always whole.
-  const partial = new File(dir, `${ARABIC_FILE}.part`);
-  if (partial.exists) partial.delete();
-  partial.create();
-  partial.write(JSON.stringify(byPage));
-  const target = arabicFile();
-  if (target.exists) target.delete();
-  partial.move(target);
+  writeArabicFile(byPage);
   fillMemory(byPage);
   arabicLoaded = Promise.resolve(true);
 }
@@ -282,11 +363,6 @@ export function __resetTranslationForTests(): void {
   memory.clear();
   singleAyahs.clear();
   arabicLoaded = null;
-}
-
-/** Kept for the existing callers. */
-export function getPageTranslation(pageNumber: number): Promise<TranslatedAyah[]> {
-  return getPageEdition(pageNumber, 'en.sahih');
 }
 
 const singleAyahs = new Map<string, TranslatedAyah>();
@@ -318,11 +394,6 @@ export async function getAyahEdition(
   return result;
 }
 
-/** Kept for the existing callers: one verse in Saheeh International. */
-export function getAyahTranslation(page: number, sura: number, ayah: number) {
-  return getAyahEdition(page, sura, ayah, 'en.sahih');
-}
-
 export interface VerseText {
   sura: number;
   ayah: number;
@@ -330,6 +401,9 @@ export interface VerseText {
   arabic: string;
   translation: string;
   translationName: string;
+  /** Saheeh International: its footnotes ("[n] …" lines, as given) and the version shown. */
+  footnotes?: string;
+  version?: string;
 }
 
 function compose(
@@ -338,15 +412,16 @@ function compose(
   ayah: number,
   arabic: TranslatedAyah,
   translation: string,
-  surahName: string,
+  extra?: { footnotes: string; version: string },
 ): VerseText {
   return {
     sura,
     ayah,
-    surahName,
+    surahName: arabic.surahName,
     arabic: stripBismillah(arabic.text, sura, ayah),
     translation,
     translationName: t.name,
+    ...(extra ? { footnotes: extra.footnotes, version: extra.version } : {}),
   };
 }
 
@@ -364,13 +439,13 @@ export async function getVerseText(
       getAyahEdition(page, sura, ayah, ARABIC_EDITION),
       getClearQuranVerse(sura, ayah),
     ]);
-    return compose(t, sura, ayah, arabic, text, arabic.surahName);
+    return compose(t, sura, ayah, arabic, text);
   }
-  const [arabic, translated] = await Promise.all([
+  const [arabic, saheeh] = await Promise.all([
     getAyahEdition(page, sura, ayah, ARABIC_EDITION),
-    getAyahEdition(page, sura, ayah, t.edition as string),
+    getSaheehVerse(sura, ayah),
   ]);
-  return compose(t, sura, ayah, arabic, translated.text, translated.surahName);
+  return compose(t, sura, ayah, arabic, saheeh.text, saheeh);
 }
 
 /** A verse's Arabic (Uthmani), exactly as the verse sheet shows it. */
@@ -400,10 +475,10 @@ export function peekVerseText(
   if (!arabic) return null;
   if (t.id === CLEAR_QURAN_ID) {
     const text = peekClearQuranVerse(sura, ayah);
-    return text === undefined ? null : compose(t, sura, ayah, arabic, text, arabic.surahName);
+    return text === undefined ? null : compose(t, sura, ayah, arabic, text);
   }
-  const translated = peekAyahEdition(page, sura, ayah, t.edition as string);
-  return translated ? compose(t, sura, ayah, arabic, translated.text, translated.surahName) : null;
+  const saheeh = peekSaheehVerse(sura, ayah);
+  return saheeh ? compose(t, sura, ayah, arabic, saheeh.text, saheeh) : null;
 }
 
 /** Starts loading a verse's Arabic and translation (a press and hold on it). Never fails. */
@@ -411,13 +486,13 @@ export function prefetchVerseText(page: number, sura: number, ayah: number, tran
   const t = resolveTranslation(translationId);
   getAyahEdition(page, sura, ayah, ARABIC_EDITION).catch(() => undefined);
   if (t.id === CLEAR_QURAN_ID) prefetchClearQuran(sura, ayah);
-  else getAyahEdition(page, sura, ayah, t.edition as string).catch(() => undefined);
+  else prefetchSaheeh(sura);
 }
 
 /**
  * The verses before and after `v`, loaded while it is shown, so previous / next
  * shows at once. The Clear Quran looks two verses ahead (its next block takes
- * seconds); the rest comes by page, so one verse is enough.
+ * seconds); Saheeh International comes by sura, so one verse is enough.
  */
 export function prefetchVerseNeighbours(v: VerseKey, translationId?: string | null): void {
   for (const n of [nextVerse(v), previousVerse(v)]) {

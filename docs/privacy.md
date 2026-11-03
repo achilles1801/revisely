@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-10-29**
+**Last updated: 2026-11-02**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
@@ -78,13 +78,14 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **Apple Inc.** | App Store, Apple Push Notification service, Sign in with Apple, App Attest | United States |
 | **Sentry / Functional Software, Inc.** | Crash and error reporting, problem reports | United States |
 | **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
-| **AlQuran Cloud (Islamic Network)** | Verse text and English translations | Not specified |
+| **AlQuran Cloud (Islamic Network)** | The Qur'an's Arabic text (Tanzil Project's text) | Not specified |
+| **QuranEnc.com** | The Saheeh International translation | Not specified |
 | **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
 | **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
 | **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
 | **Stripe, Inc.** | Payment processing for donations on revisely.app | United States |
 
-When you press and hold a verse, the app requests that verse's Arabic text and translation from AlQuran Cloud (api.alquran.cloud), and when you play a verse, its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again.
+When you press and hold a verse, the app requests that verse's Arabic text from AlQuran Cloud (api.alquran.cloud) and, with Saheeh International, its translation from QuranEnc.com; when you play a verse, it requests its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page, surah or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again. So that the Qur'an can be read offline, the app also downloads, on Wi-Fi unless you allow mobile data, the mushaf's page images (from our Cloud Storage), the whole Arabic text from AlQuran Cloud and the whole Saheeh International translation from QuranEnc.com, and asks QuranEnc.com about once a day whether the translation has a newer version; Settings → Offline mushaf removes them from your device.
 
 If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse, with the verses around it, from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only verse numbers, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. So that text isn't requested again, our server keeps The Clear Quran® text it has fetched for up to 60 days, and the app keeps the text of verses you have read on your device for up to 60 days, in its private cache folder (not backed up or shared; deleting the app removes it). This is the translation's text only, nothing about you.
 
