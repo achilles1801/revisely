@@ -269,9 +269,9 @@ export function sumJournalMinutes(
 }
 
 /**
- * Describe a set of revised pages in journal shorthand: "4p Maryam",
- * "5p Maryam + Taha", or "12p An-Naba – Al-Infitar" when many surahs are
- * covered.
+ * Describe a set of revised pages in words: "4 pages, Maryam",
+ * "5 pages, Maryam and Taha", or "12 pages, An-Naba to Al-Infitar" when many
+ * surahs are covered.
  */
 export function summarizeRevisedPages(pages: number[]): string {
   const unique = [...new Set(pages)].sort((a, b) => a - b);
@@ -284,10 +284,10 @@ export function summarizeRevisedPages(pages: number[]): string {
     }
   }
 
-  const count = `${unique.length}p`;
+  const count = unique.length === 1 ? '1 page' : `${unique.length} pages`;
   if (surahs.length === 0) return count;
-  if (surahs.length <= 2) return `${count} ${surahs.join(' + ')}`;
-  return `${count} ${surahs[0]} – ${surahs[surahs.length - 1]}`;
+  if (surahs.length <= 2) return `${count}, ${surahs.join(' and ')}`;
+  return `${count}, ${surahs[0]} to ${surahs[surahs.length - 1]}`;
 }
 
 // ---------------------------------------------------------------------------

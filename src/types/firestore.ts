@@ -81,7 +81,10 @@ export const DEFAULT_WEAKNESS_RATING: WeaknessRating = 4;
 export interface NotificationSettings {
   /** Whether notifications are enabled */
   enabled: boolean;
-  /** Daily reminder time in HH:mm format */
+  /**
+   * The morning reminder's time, HH:mm. No longer set in the app (08:00 for new
+   * accounts); a time picked before is kept (lib/reminders morningTime).
+   */
   reminderTime: string;
 }
 

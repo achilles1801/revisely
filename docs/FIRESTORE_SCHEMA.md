@@ -183,7 +183,7 @@ interface WeaknessUpdate {
 
 **Path:** `users/{userId}/journal/{date}`
 
-The user's personal daily log (the "Daily log" screen). Document ID is the date string (YYYY-MM-DD), so there's at most one entry per day. Text fields are free-form shorthand ("1/2 p3", "5p Maryam + Taha").
+The user's personal daily log (the "Daily log" screen). Document ID is the date string (YYYY-MM-DD), so there's at most one entry per day. Text fields are free-form ("Al-Mulk", "Maryam and Taha, pages 305–321").
 
 ```typescript
 interface FirestoreJournalEntry {

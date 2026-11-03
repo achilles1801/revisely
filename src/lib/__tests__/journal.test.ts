@@ -248,21 +248,21 @@ describe('summarizeRevisedPages', () => {
 
   it('names a single surah', () => {
     // Pages 305–308 are all within Maryam.
-    expect(summarizeRevisedPages([305, 306, 307, 308])).toBe('4p Maryam');
+    expect(summarizeRevisedPages([305, 306, 307, 308])).toBe('4 pages, Maryam');
   });
 
   it('joins two surahs', () => {
     // Page 312 holds the end of Maryam and the start of Taha.
-    expect(summarizeRevisedPages([311, 312, 313])).toBe('3p Maryam + Taha');
+    expect(summarizeRevisedPages([311, 312, 313])).toBe('3 pages, Maryam and Taha');
   });
 
   it('collapses many surahs into a range', () => {
     const result = summarizeRevisedPages([582, 583, 584, 585, 586]);
-    expect(result).toMatch(/^5p .+ – .+$/);
+    expect(result).toMatch(/^5 pages, .+ to .+$/);
   });
 
   it('dedupes pages', () => {
-    expect(summarizeRevisedPages([306, 306])).toBe('1p Maryam');
+    expect(summarizeRevisedPages([306, 306])).toBe('1 page, Maryam');
   });
 });
 

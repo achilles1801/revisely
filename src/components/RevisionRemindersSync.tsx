@@ -15,10 +15,9 @@ import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
 /**
  * Keeps the revision reminders (lib/reminders) current. Renders nothing.
  * They are worked out from what Home shows and rebuilt whenever that changes:
- * a session saved, the plan or pages edited, the settings (Reminder time,
- * notifications on or off), the place for Asr, the app coming back, and the
- * revision day rolling over. Cleared when signed out, or when notifications are
- * off or not allowed. Never while the account is still loading.
+ * a session saved, the plan or pages edited, notifications on or off, the
+ * place for Asr, the app coming back, and the revision day rolling over.
+ * Cleared when signed out, or when notifications are off or not allowed. Never while the account is still loading.
  */
 export function RevisionRemindersSync() {
   const { user, pages, logs, loading, onboardingComplete } = useApp();

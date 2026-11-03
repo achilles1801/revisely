@@ -2,7 +2,8 @@
 // done, planned from what the app knows now. Pure: lib/reminders/sync schedules
 // the result, and the copy comes from lib/reminders/copy.
 //
-// - Morning: the Reminder time (Settings), each revision day.
+// - Morning: 8:00 AM, each revision day (an account that picked another time
+//   when Settings still offered one keeps it; see morningTime).
 // - Midday: 20 minutes after Asr (the prayer place), or 3:00 PM without one.
 // - Evening: an hour before the revision day ends (midnight, or fajr when
 //   "Start day at fajr" is on). Between midnight and fajr it is passive: no
@@ -25,6 +26,19 @@ const MIDDAY_AFTER_ASR_MS = 20 * 60_000;
 const NO_PLACE_MIDDAY = { hour: 15, minute: 0 };
 const HOUR_MS = 3_600_000;
 const MERGE_WITHIN_MS = 30 * 60_000;
+const DEFAULT_MORNING = { hour: 8, minute: 0 };
+
+/**
+ * The morning reminder's clock time: 8:00 AM, or the time the account picked
+ * before Settings stopped offering one (kept, with no way to change it).
+ */
+export function morningTime(user: { reminderTime?: string | null }): { hour: number; minute: number } {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(user.reminderTime ?? '');
+  if (!m) return DEFAULT_MORNING;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  return hour < 24 && minute < 60 ? { hour, minute } : DEFAULT_MORNING;
+}
 
 export interface PlannedReminder {
   id: string;
@@ -84,7 +98,7 @@ interface Slot {
 
 /** The reminders that fall inside the revision day, after now, merged when close. */
 function slotsFor(rev: Revision, input: PlanReminderInput): Slot[] {
-  const [hour, minute] = input.user.reminderTime.split(':').map(Number);
+  const { hour, minute } = morningTime(input.user);
   const inDay = (at: Date) =>
     at.getTime() > input.now.getTime() && at.getTime() >= rev.start.getTime() && at.getTime() < rev.end.getTime();
   const slots: Slot[] = [];
@@ -122,7 +136,7 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   // As Home and the widget: done once as many pages were revised as are assigned.
   const doneToday = todayRevised.size > 0 && todayRevised.size >= todayPages.length;
   const streak = aliveStreak(new Set(input.logs.map((l) => l.date)), today.day);
-  const beforeNoon = Number(user.reminderTime.split(':')[0]) < 12;
+  const beforeNoon = morningTime(user).hour < 12;
   const juzPlan = user.scheduleMode === 'juz';
 
   const planned: PlannedReminder[] = [];
