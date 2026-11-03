@@ -7,3 +7,9 @@ export const REMINDER_CHANNEL_ID = 'default';
  */
 export const PRAYER_CHANNEL_ID = 'prayer';
 export const PRAYER_SILENT_CHANNEL_ID = 'prayer-silent';
+
+/**
+ * Android's channel for the revision reminders that are silent (overnight, and
+ * every congratulation): its sound is off, so it has its own, like the prayer one.
+ */
+export const REMINDER_SILENT_CHANNEL_ID = 'reminders-silent';

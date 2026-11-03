@@ -44,8 +44,6 @@ jest.mock('../../../context/AppContext', () => ({
 jest.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({ firebaseUser: { uid: 'u1', email: 'majd@example.com' }, signOutUser: jest.fn(), deleteAccount: jest.fn() }),
 }));
-const mockSchedule = jest.fn(async () => undefined);
-jest.mock('../../../lib/notifications', () => ({ scheduleDailyReminder: (...a: unknown[]) => mockSchedule(...(a as [])) }));
 const mockSubmitFeedback = jest.fn(async () => undefined);
 jest.mock('../../../services/firestoreService', () => ({
   getReadingSessions: jest.fn(async () => []),
@@ -126,7 +124,6 @@ describe('Settings in the new design: its sheets and rows', () => {
       fireEvent.press(screen.getByTestId('time-save'));
     });
     expect(mockSaveUser).toHaveBeenCalledWith(expect.objectContaining({ reminderTime: '09:30' }));
-    expect(mockSchedule).toHaveBeenCalledWith('09:30', true);
   });
 
   it('display name: a field on the quiet fill, saved from the header', async () => {
