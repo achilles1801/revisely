@@ -150,14 +150,34 @@ export interface RevisionLog {
 // One day in the user's personal memorization/revision journal. Free-form text
 // on purpose — huffaz already have their own shorthand ("1/2 p3", "4L p4",
 // "5p Maryam + Taha") and the journal should record it as written.
+export type JournalKind = 'memorization' | 'revision' | 'note';
+
+/**
+ * One timestamped line in a day's log: written at `at` (ms since epoch), made
+ * on the phone, kept as it was written (an edit changes its text, not its time).
+ */
+export interface JournalNote {
+  id: string;
+  at: number;
+  kind: JournalKind;
+  text: string;
+  minutes: number | null;
+}
+
+/**
+ * A revision day's log. `entries` are the day's notes, oldest first; the
+ * memorization / revision / notes fields and minutes are summaries of them
+ * (see journalDayFromEntries), so the day-level views read them as before.
+ */
 export interface JournalEntry {
-  date: string;                     // YYYY-MM-DD, also the document ID
+  date: string;                     // YYYY-MM-DD
+  entries: JournalNote[];
   memorization: string;
   memorizationMinutes: number | null;
   revision: string;
   revisionMinutes: number | null;
   notes: string;
-  /** Last save time (ms since epoch); undefined for unsaved drafts. */
+  /** Last entry time (ms since epoch); undefined when the day has none. */
   updatedAt?: number;
 }
 

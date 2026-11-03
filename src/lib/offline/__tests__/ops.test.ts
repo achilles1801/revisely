@@ -3,10 +3,13 @@
 // minutes above 0, assigned pages only grow).
 import { Timestamp } from 'firebase/firestore';
 import type { FirestorePage, FirestoreSession, FirestoreUser } from '../../../types/firestore';
+import type { JournalNote } from '../../../types';
+import { emptyJournalEntry, journalDayFromEntries } from '../../journal';
 import {
   applySessionEdit,
   mergeSessionAdd,
   overlayAccount,
+  overlayJournal,
   overlayPages,
   overlaySessions,
   overlayUser,
@@ -156,5 +159,72 @@ describe('the phone’s storage format', () => {
     expect(back.list).toEqual([1]);
     expect(decode('{not json')).toBeNull();
     expect(decode(null)).toBeNull();
+  });
+});
+
+describe('overlayJournal (timestamped notes waiting on this phone)', () => {
+  const note = (id: string, over: Partial<JournalNote> = {}): JournalNote => ({
+    id,
+    at: AT,
+    kind: 'note',
+    text: id,
+    minutes: null,
+    ...over,
+  });
+  const day = (date: string, notes: JournalNote[]) => journalDayFromEntries(date, notes);
+  const change = (op: OutboxOp, at = AT) => entry(op, at);
+
+  it('an added note shows in its day, next to the notes already there', () => {
+    const base = [day('2026-11-02', [note('a', { at: AT - 1000 })])];
+    const out = overlayJournal(base, [change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('b', { at: AT }) })]);
+    expect(out[0].entries.map((n) => n.id)).toEqual(['a', 'b']);
+  });
+
+  it('a note added to a day that was never read creates that day', () => {
+    const out = overlayJournal([], [change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('a') })]);
+    expect(out.map((d) => [d.date, d.entries.length])).toEqual([['2026-11-02', 1]]);
+  });
+
+  it('an edit replaces the note with the same id; a delete removes it', () => {
+    const base = [day('2026-11-02', [note('a', { text: 'old' }), note('b')])];
+    const out = overlayJournal(base, [
+      change({ kind: 'journal.entry.edit', date: '2026-11-02', entry: note('a', { text: 'new' }) }),
+      change({ kind: 'journal.entry.delete', date: '2026-11-02', id: 'b' }),
+    ]);
+    expect(out[0].entries).toEqual([note('a', { text: 'new' })]);
+  });
+
+  it('a day left with no notes drops out of the list', () => {
+    const base = [day('2026-11-02', [note('a')])];
+    expect(overlayJournal(base, [change({ kind: 'journal.entry.delete', date: '2026-11-02', id: 'a' })])).toEqual([]);
+  });
+
+  it('a change to one day leaves the others as they were', () => {
+    const other = day('2026-11-01', [note('z')]);
+    const out = overlayJournal([day('2026-11-02', []), other], [
+      change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('a') }),
+    ]);
+    expect(out.find((d) => d.date === '2026-11-01')).toBe(other);
+  });
+
+  it('a day-level change queued by an older version reads as the day’s legacy note', () => {
+    const base = [day('2026-11-02', [note('a', { at: AT - 1000 }), note('legacy', { text: 'old block' })])];
+    const out = overlayJournal(base, [
+      change({
+        kind: 'journal.save',
+        entry: { ...emptyJournalEntry('2026-11-02'), memorization: '1/2 p3', notes: '' },
+        isNew: false,
+      }),
+    ]);
+    expect(out[0].entries.map((n) => [n.id, n.text])).toEqual([
+      ['a', 'a'],
+      ['legacy', '1/2 p3'],
+    ]);
+  });
+
+  it('a date filter returns only that day, and nothing is waiting when there is no change', () => {
+    const base = [day('2026-11-02', [note('a')]), day('2026-11-01', [note('b')])];
+    expect(overlayJournal(base, [], '2026-11-01').map((d) => d.date)).toEqual(['2026-11-01']);
+    expect(overlayJournal(base, [])).toBe(base);
   });
 });

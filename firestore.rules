@@ -13,7 +13,7 @@ rules_version = '2';
  * - users/{userId} - User profile and settings
  * - users/{userId}/pages/{pageNumber} - Page progress (604 documents)
  * - users/{userId}/sessions/{sessionId} - Daily revision sessions
- * - users/{userId}/journal/{day} - Daily log entries
+ * - users/{userId}/journal/{day} - Daily log (a day's block, and entries/{id}: its timestamped notes)
  * - users/{userId}/readingSessions/{id} - Reading timer sessions
  * - users/{userId}/stats/usage - Time spent in the app
  */
@@ -399,6 +399,13 @@ service cloud.firestore {
       match /journal/{day} {
         allow read, delete: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidJournalEntry(day);
+
+        // Timestamped notes of the day (lib/journal). The count per day is
+        // kept by the app: rules can't count documents.
+        match /entries/{entryId} {
+          allow read, delete: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidJournalNote(day, entryId, userId);
+        }
       }
 
       // ======================================================================
@@ -506,6 +513,24 @@ service cloud.firestore {
       return value == null || (value is int && isInRange(value, 0, 1440));
     }
 
+    // A timestamped note (users/{uid}/journal/{day}/entries/{id}). Text caps
+    // by kind mirror src/lib/journal.ts; the note stored for a migrated day
+    // can run past the typed limit (JOURNAL_NOTE_STORED_MAX).
+    function isValidJournalNote(day, noteId, userId) {
+      let data = incomingData();
+      return data.keys().hasOnly(['id', 'uid', 'day', 'at', 'kind', 'text', 'minutes']) &&
+             data.keys().hasAll(['id', 'uid', 'day', 'at', 'kind', 'text', 'minutes']) &&
+             data.id == noteId &&
+             data.uid == userId &&
+             data.day == day &&
+             isValidDateString(data.day) &&
+             data.at is int && data.at > 0 &&
+             data.kind in ['memorization', 'revision', 'note'] &&
+             data.text is string &&
+             (data.kind == 'note' ? data.text.size() <= 5500 : data.text.size() <= 200) &&
+             isValidJournalMinutes(data.minutes);
+    }
+
     function isValidJournalEntry(day) {
       let data = incomingData();
       return data.keys().hasOnly([
@@ -546,6 +571,12 @@ service cloud.firestore {
     // ========================================================================
     // DEFAULT DENY
     // ========================================================================
+
+    // Every note of an account at once (the daily log's list): a
+    // collection-group query must filter on uid, so only its own notes read.
+    match /{path=**}/entries/{entryId} {
+      allow read: if isOwner(resource.data.uid);
+    }
 
     // Deny all other access
     match /{document=**} {

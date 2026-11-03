@@ -12,7 +12,7 @@ import {
   weekTitle,
 } from '../activityHeatmap';
 import { buildActivityItems, filterActivityItems } from '../activityItems';
-import { emptyJournalEntry } from '../journal';
+import { emptyJournalEntry, journalDayFromEntries } from '../journal';
 import type { ReadingSession, RevisionLog } from '../../types';
 
 const log = (date: string, pages: number[], durationMinutes: number | null = null): RevisionLog => ({
@@ -121,7 +121,9 @@ describe('activity items (Recent and See all)', () => {
     logs: [log('2026-10-26', range(503, 20), 41), log('2026-10-20', [])],
     readings: [reading('2026-10-25', 12, range(293, 12), 2_000), reading('2026-10-25', 5, [], 1_000)],
     journal: [
-      { ...emptyJournalEntry('2026-10-24'), memorization: '1/2 p3', memorizationMinutes: 30 },
+      journalDayFromEntries('2026-10-24', [
+        { id: 'n1', at: new Date(2026, 9, 24, 7, 12).getTime(), kind: 'memorization', text: '1/2 p3', minutes: 30 },
+      ]),
       emptyJournalEntry('2026-10-23'),
     ],
     recordings: [{ id: 'rec1', day: '2026-10-26', createdAt: 5_000, durationMs: 312_000, kind: 'revision', pageMarks: [{ page: 503 }] }],
@@ -139,7 +141,7 @@ describe('activity items (Recent and See all)', () => {
     expect(items[1].detail).toBe('Page 503 · During revision');
     expect(items[2].detail).toBe('Pages 293–304 · Al-Isra to Al-Kahf');
     expect(items[3].detail).toBe('Timed session');
-    expect(items[4].detail).toBe('Memorized 1/2 p3 · 30 min');
+    expect(items[4].detail).toBe('7:12 am · Memorized 1/2 p3 · 30 min');
   });
 
   it('search matches every word, across pages, surahs, dates and notes; filters by kind and date', () => {

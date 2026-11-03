@@ -1,21 +1,110 @@
-import { JournalEntry, User } from '../types';
+import { JournalEntry, JournalKind, JournalNote, User } from '../types';
 import { getSurahsForPage } from './quranData';
 import { getRevisionDayForUser } from './fajrBoundary';
 
 // Limits mirrored in firestore.rules — keep them in sync.
 export const JOURNAL_TEXT_MAX = 200;
 export const JOURNAL_NOTES_MAX = 5000;
+/**
+ * The most a stored note may hold. A note typed in the app stays within
+ * JOURNAL_NOTES_MAX; a day migrated from the single block can run longer,
+ * since its memorization and revision lines are joined under the notes.
+ */
+export const JOURNAL_NOTE_STORED_MAX = 5500;
 export const JOURNAL_MINUTES_MAX = 1440;
+/** Notes per revision day. Rules can't count them, so the app enforces this. */
+export const JOURNAL_ENTRIES_PER_DAY = 50;
+/** The id of a day's single block once it is read as an entry (before any new entry). */
+export const LEGACY_NOTE_ID = 'legacy';
+
+export const JOURNAL_KIND_LABELS: Record<JournalKind, string> = {
+  memorization: 'Memorization',
+  revision: 'Revision',
+  note: 'Note',
+};
+
+/** The longest text a note of this kind may hold. */
+export function journalTextMax(kind: JournalKind): number {
+  return kind === 'note' ? JOURNAL_NOTES_MAX : JOURNAL_TEXT_MAX;
+}
 
 export function emptyJournalEntry(date: string): JournalEntry {
   return {
     date,
+    entries: [],
     memorization: '',
     memorizationMinutes: null,
     revision: '',
     revisionMinutes: null,
     notes: '',
   };
+}
+
+/**
+ * A day's log from its notes: the notes oldest first, and the memorization /
+ * revision / notes summaries joined from them. `notes` may come in any order.
+ */
+export function journalDayFromEntries(date: string, notes: JournalNote[]): JournalEntry {
+  const entries = [...notes].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  const texts = (kind: JournalKind) =>
+    entries
+      .filter((n) => n.kind === kind && n.text.trim() !== '')
+      .map((n) => n.text.trim())
+      .join('\n');
+  const minutes = (kind: JournalKind) => {
+    const parts = entries.filter((n) => n.kind === kind && n.minutes != null);
+    return parts.length === 0 ? null : parts.reduce((sum, n) => sum + (n.minutes ?? 0), 0);
+  };
+  return {
+    date,
+    entries,
+    memorization: texts('memorization'),
+    memorizationMinutes: minutes('memorization'),
+    revision: texts('revision'),
+    revisionMinutes: minutes('revision'),
+    notes: texts('note'),
+    updatedAt: entries.length > 0 ? Math.max(...entries.map((n) => n.at)) : undefined,
+  };
+}
+
+/**
+ * A day's single block (written before timestamped entries) read as one
+ * entry at `at`, or none when the block is empty. Its memorization and
+ * revision lines are labelled inside the text when they sit with notes.
+ */
+export function legacyJournalNotes(
+  block: Pick<JournalEntry, 'memorization' | 'memorizationMinutes' | 'revision' | 'revisionMinutes' | 'notes'>,
+  at: number,
+): JournalNote[] {
+  const memorization = block.memorization.trim();
+  const revision = block.revision.trim();
+  const notes = block.notes.trim();
+  const minutesSum =
+    block.memorizationMinutes == null && block.revisionMinutes == null
+      ? null
+      : Math.min((block.memorizationMinutes ?? 0) + (block.revisionMinutes ?? 0), JOURNAL_MINUTES_MAX);
+  if (!memorization && !revision && !notes && minutesSum == null) return [];
+
+  let kind: JournalKind = 'note';
+  let text = notes;
+  if (memorization && !revision && !notes) {
+    kind = 'memorization';
+    text = memorization;
+  } else if (revision && !memorization && !notes) {
+    kind = 'revision';
+    text = revision;
+  } else if (!memorization && !revision) {
+    text = notes;
+  } else {
+    text = [memorization && `Memorized: ${memorization}`, revision && `Revised: ${revision}`, notes]
+      .filter(Boolean)
+      .join('\n');
+  }
+  return [{ id: LEGACY_NOTE_ID, at, kind, text, minutes: minutesSum }];
+}
+
+export function isJournalNoteEmpty(note: JournalNote): boolean {
+  return note.text.trim() === '' && note.minutes == null;
 }
 
 export function isJournalEntryEmpty(entry: JournalEntry): boolean {
@@ -28,12 +117,31 @@ export function isJournalEntryEmpty(entry: JournalEntry): boolean {
   );
 }
 
-/** Sum of both time columns, or null when neither was filled in. */
+/**
+ * The day's minutes: the sum over its notes once it has any, otherwise the
+ * two time columns. Null when none was filled in.
+ */
 export function journalTotalMinutes(entry: JournalEntry): number | null {
+  if (entry.entries.length > 0) {
+    const withMinutes = entry.entries.filter((n) => n.minutes != null);
+    return withMinutes.length === 0 ? null : withMinutes.reduce((sum, n) => sum + (n.minutes ?? 0), 0);
+  }
   if (entry.memorizationMinutes == null && entry.revisionMinutes == null) {
     return null;
   }
   return (entry.memorizationMinutes ?? 0) + (entry.revisionMinutes ?? 0);
+}
+
+/**
+ * The clock time a note was written: "7:12 am". A note written after midnight
+ * but before the day's fajr belongs to the day before, so its weekday follows
+ * the time: "12:40 am Tue".
+ */
+export function formatEntryTime(at: number, day: string): string {
+  const d = new Date(at);
+  const clock = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  if (toDay(d) === day) return clock;
+  return `${clock} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
 }
 
 /** "45m", "1h", "1h 5m". */

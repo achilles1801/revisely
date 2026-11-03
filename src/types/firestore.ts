@@ -258,10 +258,12 @@ export interface UpdateUserInput {
 // ============================================================================
 
 /**
- * One day of the user's personal memorization/revision journal
+ * One day of the user's personal memorization/revision journal.
  *
  * Collection: users/{userId}/journal/{date}
- * Document ID: The date (YYYY-MM-DD), so there is at most one entry per day.
+ * Document ID: The date (YYYY-MM-DD). Since timestamped entries (#167) the
+ * day's text lives in its entries subcollection; these fields hold a day's
+ * legacy single block until the day's first new entry moves it there.
  */
 export interface FirestoreJournalEntry {
   /** YYYY-MM-DD — also the document ID */
@@ -276,6 +278,25 @@ export interface FirestoreJournalEntry {
   notes: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+/**
+ * One timestamped entry in a day's log.
+ *
+ * Collection: users/{userId}/journal/{date}/entries/{entryId}
+ * `uid` and `day` repeat the path so the entries of an account can be read
+ * with one collection-group query.
+ */
+export interface FirestoreJournalNote {
+  id: string;
+  uid: string;
+  /** YYYY-MM-DD: the revision day the entry belongs to. */
+  day: string;
+  /** Clock time it was written (ms since epoch). */
+  at: number;
+  kind: 'memorization' | 'revision' | 'note';
+  text: string;
+  minutes: number | null;
 }
 
 // ============================================================================

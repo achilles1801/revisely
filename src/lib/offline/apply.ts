@@ -49,6 +49,11 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
       return firestoreService.updateReadingSessionPages(op.id, op.pages, uid);
     case 'reading.delete':
       return firestoreService.deleteReadingSession(op.id, uid);
+    case 'journal.entry.add':
+    case 'journal.entry.edit':
+      return firestoreService.applyJournalNote(op.date, { kind: 'put', note: { ...op.entry } }, uid);
+    case 'journal.entry.delete':
+      return firestoreService.applyJournalNote(op.date, { kind: 'delete', id: op.id }, uid);
     case 'journal.save':
       return firestoreService.saveJournalEntry({ ...op.entry }, op.isNew, uid);
     case 'journal.delete':
