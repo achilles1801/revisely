@@ -7,9 +7,9 @@ import ActivityAllScreen from '../ActivityAllScreen';
 import { paletteLight } from '../../../theme/v2';
 import { monthTitle, weekStart, weekTitle } from '../../../lib/activityHeatmap';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { emptyJournalEntry, shiftDay } from '../../../lib/journal';
+import { journalDayFromEntries, shiftDay } from '../../../lib/journal';
 import { getRevisionDayForUser } from '../../../lib/fajrBoundary';
-import type { JournalEntry, ReadingSession, RevisionLog, User } from '../../../types';
+import type { JournalEntry, JournalNote, ReadingSession, RevisionLog, User } from '../../../types';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -69,7 +69,7 @@ jest.mock('../../../lib/offline/queue', () => ({
   queueChange: (...a: unknown[]) => mockQueue.queueChange(...a),
   withPendingReadings: (list: unknown) => list,
   withPendingJournal: (list: unknown) => list,
-  pendingJournalEntry: () => undefined,
+  withPendingJournalDay: (_date: string, base: unknown) => base ?? null,
 }));
 
 jest.mock('../../../components/EditSessionModal', () => {
@@ -113,8 +113,14 @@ function reading(date: string, hour: number, minutes: number, pages: number[] = 
   };
 }
 
-function entry(date: string, overrides: Partial<JournalEntry>): JournalEntry {
-  return { ...emptyJournalEntry(date), ...overrides };
+/** A day's log with one note per field given, written at 9:00 that day. */
+function entry(date: string, fields: { memorization?: string; revision?: string; notes?: string }): JournalEntry {
+  const at = new Date(`${date}T09:00:00`).getTime();
+  const notes: JournalNote[] = [];
+  if (fields.memorization) notes.push({ id: `m-${date}`, at, kind: 'memorization', text: fields.memorization, minutes: null });
+  if (fields.revision) notes.push({ id: `r-${date}`, at: at + 60_000, kind: 'revision', text: fields.revision, minutes: null });
+  if (fields.notes) notes.push({ id: `n-${date}`, at: at + 120_000, kind: 'note', text: fields.notes, minutes: null });
+  return journalDayFromEntries(date, notes);
 }
 
 beforeEach(() => {
@@ -232,7 +238,7 @@ describe('<ActivityAllScreen /> (See all)', () => {
     render(<ActivityAllScreen />);
     expect(await screen.findByText('Revised 3 pages')).toBeTruthy();
     expect(screen.getByText('Read for 15 min')).toBeTruthy();
-    expect(screen.getByTestId(`item-log-${day(2)}`)).toBeTruthy();
+    expect(screen.getByTestId(`item-log-${day(2)}-m-${day(2)}`)).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('activity-search'), 'kahf');
     expect(screen.queryByText('Revised 3 pages')).toBeNull();
@@ -242,7 +248,7 @@ describe('<ActivityAllScreen /> (See all)', () => {
     fireEvent.press(screen.getByLabelText('Clear search'));
 
     fireEvent.press(screen.getByTestId('filter-log'));
-    expect(screen.getByTestId(`item-log-${day(2)}`)).toBeTruthy();
+    expect(screen.getByTestId(`item-log-${day(2)}-m-${day(2)}`)).toBeTruthy();
     expect(screen.queryByText('Read for 15 min')).toBeNull();
     fireEvent.press(screen.getByTestId('filter-all'));
     fireEvent.press(screen.getByText('Read for 15 min'));
@@ -254,7 +260,7 @@ describe('<ActivityAllScreen /> (See all)', () => {
     render(<ActivityAllScreen />);
     expect(await screen.findByText('Revised 3 pages')).toBeTruthy();
     expect(screen.queryByText('Read for 15 min')).toBeNull();
-    expect(screen.queryByTestId(`item-log-${day(2)}`)).toBeNull();
+    expect(screen.queryByTestId(`item-log-${day(2)}-m-${day(2)}`)).toBeNull();
   });
 });
 
@@ -270,10 +276,12 @@ describe('<ActivityDayScreen /> in the new design (a thread)', () => {
     expect(screen.getByText('1 revision session · 2 timed · daily log')).toBeTruthy();
     expect(screen.getByText('Pages 60–61')).toBeTruthy();
     expect(screen.getByText('Add pages')).toBeTruthy();
-    expect(screen.getByText('Revision: Juz 3 again')).toBeTruthy();
+    expect(screen.getByText('Revision')).toBeTruthy();
+    expect(screen.getByText('Juz 3 again')).toBeTruthy();
     expect(screen.getByText('Tired')).toBeTruthy();
-    // day → revision → 25m → 10m → daily log: 1 + 2 + 2 + 2 + 1 line segments.
-    expect(screen.getAllByTestId('thread-line', { includeHiddenElements: true })).toHaveLength(8);
+    // day → revision → 25m → 10m → the log's two notes (revised, then a note):
+    // one reply each, so two more line segments than a single block had.
+    expect(screen.getAllByTestId('thread-line', { includeHiddenElements: true })).toHaveLength(10);
     // The completed revision session is the jade done mark.
     expect(screen.getAllByTestId('mark-done', { includeHiddenElements: true })).toHaveLength(1);
   });

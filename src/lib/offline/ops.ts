@@ -10,6 +10,8 @@
 // the user sees is what the server ends up with.
 
 import type { FirestorePage, FirestoreSession, FirestoreUser, PageStatus, WeaknessRating } from '../../types/firestore';
+import type { JournalEntry, JournalNote } from '../../types';
+import { journalDayFromEntries, LEGACY_NOTE_ID, legacyJournalNotes } from '../journal';
 import { tsFromMillis } from './codec';
 import { mergeAhead } from '../aheadCredit';
 
@@ -86,6 +88,12 @@ export type OutboxOp =
     }
   | { kind: 'reading.pages'; id: string; pages: number[] }
   | { kind: 'reading.delete'; id: string }
+  // A note in a day's log. Values are absolute, so each op is repeatable.
+  | { kind: 'journal.entry.add'; date: string; entry: JournalNote }
+  | { kind: 'journal.entry.edit'; date: string; entry: JournalNote }
+  | { kind: 'journal.entry.delete'; date: string; id: string }
+  // Changes queued before a day's log had timestamped entries (one block per
+  // day): still applied, read as the day's legacy entry.
   | {
       kind: 'journal.save';
       entry: {
@@ -340,4 +348,50 @@ export function overlayAccount(
     else if (e.op.kind === 'pages') pages = overlayPages(pages, e.op.pages);
   }
   return { user, pages, sessions: overlaySessions(base.sessions, entries) };
+}
+
+// ============================================================================
+// JOURNAL
+// ============================================================================
+
+/**
+ * The day summaries with the journal changes still waiting laid over them
+ * (added, edited and deleted notes; a day's block from an older change). A
+ * day with no notes left is dropped. `date` limits the result to that day.
+ */
+export function overlayJournal(days: JournalEntry[], entries: OutboxEntry[], date?: string): JournalEntry[] {
+  const notesByDay = new Map<string, JournalNote[]>();
+  for (const d of days) notesByDay.set(d.date, [...d.entries]);
+  const touched = new Set<string>();
+  const notesOf = (day: string) => notesByDay.get(day) ?? [];
+  for (const e of entries) {
+    const op = e.op;
+    if (op.kind === 'journal.entry.add' || op.kind === 'journal.entry.edit') {
+      notesByDay.set(op.date, [...notesOf(op.date).filter((n) => n.id !== op.entry.id), op.entry]);
+      touched.add(op.date);
+    } else if (op.kind === 'journal.entry.delete') {
+      notesByDay.set(op.date, notesOf(op.date).filter((n) => n.id !== op.id));
+      touched.add(op.date);
+    } else if (op.kind === 'journal.save') {
+      const others = notesOf(op.entry.date).filter((n) => n.id !== LEGACY_NOTE_ID);
+      notesByDay.set(op.entry.date, [...others, ...legacyJournalNotes(op.entry, e.at)]);
+      touched.add(op.entry.date);
+    } else if (op.kind === 'journal.delete') {
+      notesByDay.set(op.date, []);
+      touched.add(op.date);
+    }
+  }
+  if (touched.size === 0 && date === undefined) return days;
+
+  const out: JournalEntry[] = [];
+  for (const d of days) {
+    if (touched.has(d.date)) continue;
+    if (date === undefined || d.date === date) out.push(d);
+  }
+  for (const day of touched) {
+    if (date !== undefined && day !== date) continue;
+    const notes = notesOf(day);
+    if (notes.length > 0) out.push(journalDayFromEntries(day, notes));
+  }
+  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }

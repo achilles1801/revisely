@@ -20,10 +20,17 @@ import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
-import { pendingJournalEntry, queueChange, withPendingReadings } from '../../lib/offline/queue';
+import { queueChange, withPendingJournalDay, withPendingReadings } from '../../lib/offline/queue';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
-import { formatJournalDayRelative, formatMinutes, isJournalEntryEmpty, journalTotalMinutes } from '../../lib/journal';
+import {
+  formatEntryTime,
+  formatJournalDayRelative,
+  formatMinutes,
+  isJournalEntryEmpty,
+  JOURNAL_KIND_LABELS,
+} from '../../lib/journal';
+import { JOURNAL_KIND_ICONS } from '../journal/journalKinds';
 import { formatDuration, formatPageRanges } from '../../lib/readingTimer';
 import { getQuranData } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
@@ -101,14 +108,11 @@ export default function ActivityDayScreen() {
     const [r, j] = await Promise.allSettled([
       firestoreService.getReadingSessionsForDay(date).then((list) => withPendingReadings(list, { date })),
       firestoreService.getJournalEntry(date).then(
-        (entry) => {
-          const waiting = pendingJournalEntry(date);
-          return waiting === undefined ? entry : waiting;
-        },
+        (entry) => withPendingJournalDay(date, entry),
         // Offline and not in Firestore's memory: a change waiting here still shows.
         (err) => {
-          const waiting = pendingJournalEntry(date);
-          if (waiting !== undefined) return waiting;
+          const waiting = withPendingJournalDay(date, null);
+          if (waiting) return waiting;
           throw err;
         },
       ),
@@ -182,7 +186,6 @@ export default function ActivityDayScreen() {
   };
 
   const openJournal = () => navigation.navigate('JournalEntry', { date });
-  const journalTotal = journal ? journalTotalMinutes(journal) : null;
 
   // Opened from "Recording saved · View": scroll to the recordings once laid out.
   const onRecordingsLayout = (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
@@ -267,28 +270,32 @@ export default function ActivityDayScreen() {
       onMenu: () => setTimedMenu(r),
       a11y: `Timed session, ${formatDuration(r.durationSeconds)}. Edit pages`,
     })),
-    {
-      key: 'journal',
-      mark: <Mark size="reply" icon="create-outline" />,
-      name: 'Daily log',
-      meta: journalTotal != null ? formatMinutes(journalTotal) : journal ? undefined : 'Nothing written',
-      body: journal ? (
-        <>
-          {(journal.memorization.trim() !== '' || journal.memorizationMinutes != null) && (
-            <RowText numberOfLines={3}>{`Memorization: ${journal.memorization.trim() || '—'}`}</RowText>
-          )}
-          {(journal.revision.trim() !== '' || journal.revisionMinutes != null) && (
-            <RowText numberOfLines={3}>{`Revision: ${journal.revision.trim() || '—'}`}</RowText>
-          )}
-          {journal.notes.trim() !== '' && <RowText secondary numberOfLines={4}>{journal.notes.trim()}</RowText>}
-        </>
-      ) : undefined,
-      footer: journal ? undefined : (
-        <PillButton title="Write" size="sm" variant="outline" icon="create-outline" onPress={openJournal} />
-      ),
-      onPress: openJournal,
-      a11y: journal ? 'Daily log. Edit' : 'Daily log: nothing written. Write',
-    },
+    // One row per note, in the order they were written.
+    ...(journal
+      ? journal.entries.map((n): Reply => {
+          const text = n.text.trim();
+          const time = formatEntryTime(n.at, date);
+          return {
+            key: `journal-${n.id}`,
+            mark: <Mark size="reply" icon={JOURNAL_KIND_ICONS[n.kind]} />,
+            name: JOURNAL_KIND_LABELS[n.kind],
+            meta: n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time,
+            body: text ? <RowText numberOfLines={4}>{text}</RowText> : undefined,
+            onPress: openJournal,
+            a11y: `Daily log, ${JOURNAL_KIND_LABELS[n.kind]} at ${time}. Open the log`,
+          };
+        })
+      : [
+          {
+            key: 'journal',
+            mark: <Mark size="reply" icon="create-outline" />,
+            name: 'Daily log',
+            meta: 'Nothing written',
+            footer: <PillButton title="Write" size="sm" variant="outline" icon="create-outline" onPress={openJournal} />,
+            onPress: openJournal,
+            a11y: 'Daily log: nothing written. Write',
+          } as Reply,
+        ]),
   ];
   const parts = [
     revisions.length > 0 ? `${revisions.length} revision ${revisions.length === 1 ? 'session' : 'sessions'}` : null,

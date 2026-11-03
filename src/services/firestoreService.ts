@@ -12,6 +12,7 @@
  */
 
 import {
+  collectionGroup,
   doc,
   setDoc,
   getDoc,
@@ -42,6 +43,7 @@ import {
   FirestorePage,
   FirestoreSession,
   FirestoreJournalEntry,
+  FirestoreJournalNote,
   FirestoreReadingSession,
   FirestoreUsageStats,
   CreateUserInput,
@@ -54,7 +56,8 @@ import {
   DEFAULT_USER_SETTINGS,
   DEFAULT_WEAKNESS_RATING,
 } from '../types/firestore';
-import { JournalEntry, ReadingSession } from '../types';
+import { JournalEntry, JournalNote, ReadingSession } from '../types';
+import { journalDayFromEntries, legacyJournalNotes, LEGACY_NOTE_ID } from '../lib/journal';
 import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
 
@@ -497,46 +500,153 @@ function getJournalRef(date: string, userId?: string): DocumentReference {
   return doc(db, 'users', uid, 'journal', date);
 }
 
-function journalFromFirestore(data: FirestoreJournalEntry): JournalEntry {
+function getJournalNoteRef(date: string, noteId: string, userId?: string) {
+  const uid = userId || getCurrentUserId();
+  return doc(db, 'users', uid, 'journal', date, 'entries', noteId);
+}
+
+/** Start of a revision day in local time: the fallback when a block has no createdAt. */
+function localMidnight(date: string): number {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
+}
+
+/** When a day's single block was first written (its one entry's time). */
+function legacyBlockAt(data: FirestoreJournalEntry, date: string): number {
+  return data.createdAt?.toMillis?.() ?? data.updatedAt?.toMillis?.() ?? localMidnight(date);
+}
+
+/** A day's block as the entry it reads as (none when it is empty or already moved). */
+function legacyNotesOf(data: FirestoreJournalEntry, date: string): JournalNote[] {
+  return legacyJournalNotes(
+    {
+      memorization: data.memorization ?? '',
+      memorizationMinutes: data.memorizationMinutes ?? null,
+      revision: data.revision ?? '',
+      revisionMinutes: data.revisionMinutes ?? null,
+      notes: data.notes ?? '',
+    },
+    legacyBlockAt(data, date),
+  );
+}
+
+/** Notes read from Firestore, with a day's block as its legacy note (a note with the same id wins). */
+function mergeNotes(legacy: JournalNote[], notes: JournalNote[]): JournalNote[] {
+  const byId = new Map(legacy.map((n) => [n.id, n] as const));
+  for (const n of notes) byId.set(n.id, n);
+  return [...byId.values()];
+}
+
+function noteFromFirestore(id: string, data: FirestoreJournalNote): JournalNote {
+  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null };
+}
+
+function noteToFirestore(note: JournalNote, uid: string, date: string): FirestoreJournalNote {
   return {
-    date: data.date,
-    memorization: data.memorization ?? '',
-    memorizationMinutes: data.memorizationMinutes ?? null,
-    revision: data.revision ?? '',
-    revisionMinutes: data.revisionMinutes ?? null,
-    notes: data.notes ?? '',
-    updatedAt: data.updatedAt?.toMillis?.(),
+    id: note.id,
+    uid,
+    day: date,
+    at: note.at,
+    kind: note.kind,
+    text: note.text,
+    minutes: note.minutes,
   };
 }
 
-/** Most recent journal entries, newest first. */
+/** The day summaries of one account: its day blocks and its notes, newest day first. */
+function journalDaysFrom(
+  dayDocs: { id: string; data: () => unknown }[],
+  noteDocs: { id: string; data: () => unknown }[],
+): JournalEntry[] {
+  const notesByDay = new Map<string, JournalNote[]>();
+  for (const d of dayDocs) {
+    const legacy = legacyNotesOf(d.data() as FirestoreJournalEntry, d.id);
+    if (legacy.length > 0) notesByDay.set(d.id, legacy);
+  }
+  for (const n of noteDocs) {
+    const data = n.data() as FirestoreJournalNote;
+    const list = (notesByDay.get(data.day) ?? []).filter((x) => x.id !== n.id);
+    list.push(noteFromFirestore(n.id, data));
+    notesByDay.set(data.day, list);
+  }
+  return [...notesByDay]
+    .map(([date, notes]) => journalDayFromEntries(date, notes))
+    .filter((day) => day.entries.length > 0)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/** Daily logs, newest day first: the days' summaries built from their timestamped notes. */
 export async function getJournalEntries(
-  limitCount: number = 120,
+  limitCount: number = 400,
   userId?: string,
 ): Promise<JournalEntry[]> {
   const uid = userId || getCurrentUserId();
-  const q = query(
-    collection(db, 'users', uid, 'journal'),
-    orderBy('date', 'desc'),
-    limit(limitCount),
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => journalFromFirestore(d.data() as FirestoreJournalEntry));
+  const [dayDocs, noteDocs] = await Promise.all([
+    getDocs(query(collection(db, 'users', uid, 'journal'), orderBy('date', 'desc'), limit(limitCount))),
+    getDocs(query(collectionGroup(db, 'entries'), where('uid', '==', uid))),
+  ]);
+  return journalDaysFrom(dayDocs.docs, noteDocs.docs);
 }
 
+/** One day's log: its notes oldest first, null when it has none. */
 export async function getJournalEntry(
   date: string,
   userId?: string,
 ): Promise<JournalEntry | null> {
-  const snapshot = await getDoc(getJournalRef(date, userId));
-  return snapshot.exists()
-    ? journalFromFirestore(snapshot.data() as FirestoreJournalEntry)
-    : null;
+  const dayRef = getJournalRef(date, userId);
+  const [dayDoc, noteDocs] = await Promise.all([getDoc(dayRef), getDocs(collection(dayRef, 'entries'))]);
+  const legacy = dayDoc.exists() ? legacyNotesOf(dayDoc.data() as FirestoreJournalEntry, date) : [];
+  const notes = mergeNotes(
+    legacy,
+    noteDocs.docs.map((n) => noteFromFirestore(n.id, n.data() as FirestoreJournalNote)),
+  );
+  return notes.length > 0 ? journalDayFromEntries(date, notes) : null;
 }
 
-/** Create or overwrite the entry for `entry.date` (one entry per day). */
+/** A change to one note in a day's log. */
+export type JournalNoteChange = { kind: 'put'; note: JournalNote } | { kind: 'delete'; id: string };
+
+const EMPTY_JOURNAL_BLOCK = {
+  memorization: '',
+  memorizationMinutes: null,
+  revision: '',
+  revisionMinutes: null,
+  notes: '',
+};
+
+/**
+ * Write one note of a day's log. A day still in its single block moves that
+ * block into its first entry in the same transaction (the block's fields are
+ * cleared, so it isn't read twice). Repeating a change gives the same result.
+ */
+export async function applyJournalNote(
+  date: string,
+  change: JournalNoteChange,
+  userId?: string,
+): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  const dayRef = getJournalRef(date, uid);
+  await runTransaction(db, async (tx) => {
+    const daySnap = await tx.get(dayRef);
+    const legacy = daySnap.exists() ? legacyNotesOf(daySnap.data() as FirestoreJournalEntry, date) : [];
+    if (legacy.length > 0) {
+      const deletingIt = change.kind === 'delete' && change.id === LEGACY_NOTE_ID;
+      if (!deletingIt) {
+        tx.set(getJournalNoteRef(date, LEGACY_NOTE_ID, uid), noteToFirestore(legacy[0], uid, date));
+      }
+      tx.set(dayRef, EMPTY_JOURNAL_BLOCK, { merge: true });
+    }
+    if (change.kind === 'delete') {
+      tx.delete(getJournalNoteRef(date, change.id, uid));
+    } else {
+      tx.set(getJournalNoteRef(date, change.note.id, uid), noteToFirestore(change.note, uid, date));
+    }
+  });
+}
+
+/** Changes queued before timestamped entries: the whole day as one block. */
 export async function saveJournalEntry(
-  entry: JournalEntry,
+  entry: Pick<JournalEntry, 'date' | 'memorization' | 'memorizationMinutes' | 'revision' | 'revisionMinutes' | 'notes'>,
   isNew: boolean,
   userId?: string,
 ): Promise<void> {
@@ -553,8 +663,14 @@ export async function saveJournalEntry(
   await setDoc(getJournalRef(entry.date, userId), data, { merge: true });
 }
 
+/** Deletes a day's log: its block and every note in it. */
 export async function deleteJournalEntry(date: string, userId?: string): Promise<void> {
-  await deleteDoc(getJournalRef(date, userId));
+  const dayRef = getJournalRef(date, userId);
+  const notes = await getDocs(collection(dayRef, 'entries'));
+  const batch = writeBatch(db);
+  for (const n of notes.docs) batch.delete(n.ref);
+  batch.delete(dayRef);
+  await batch.commit();
 }
 
 // ============================================================================

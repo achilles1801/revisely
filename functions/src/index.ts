@@ -21,7 +21,8 @@ const adminDb = getFirestore();
  *     that if it fails nothing else is gone yet and a retry starts over.
  *  2. users/{uid}/pages/* — page progress docs
  *  3. users/{uid}/sessions/* — session docs
- *  4. users/{uid}/journal/* — daily journal entries
+ *  4. users/{uid}/journal/* — daily journal entries, and their notes
+ *     (journal/{day}/entries/*, found by uid: a day can have notes and no day doc)
  *  5. users/{uid}/readingSessions/* — reading timer sessions
  *  6. users/{uid}/stats/* — app usage totals
  *  7. users/{uid}/_quota/* — legacy rate-limit counter docs (if any)
@@ -57,6 +58,15 @@ export const deleteUserAccount = onCall(
 
     await deleteSubcollection('pages');
     await deleteSubcollection('sessions');
+    // Notes first, found across every day by uid: a day can hold notes without
+    // a day document, so deleting the day documents alone would leave them.
+    while (true) {
+      const notes = await adminDb.collectionGroup('entries').where('uid', '==', uid).limit(400).get();
+      if (notes.empty) break;
+      const batch = adminDb.batch();
+      for (const doc of notes.docs) batch.delete(doc.ref);
+      await batch.commit();
+    }
     await deleteSubcollection('journal');
     await deleteSubcollection('readingSessions');
     await deleteSubcollection('stats');

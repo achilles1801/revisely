@@ -1,5 +1,8 @@
 import {
   emptyJournalEntry,
+  formatEntryTime,
+  journalDayFromEntries,
+  legacyJournalNotes,
   filterJournalEntries,
   formatJournalDay,
   formatJournalMonth,
@@ -292,5 +295,93 @@ describe('journal filtering & sorting', () => {
     expect(dates('oldest')).toEqual(['2026-08-01', '2026-08-31', '2026-09-20', '2026-09-29']);
     expect(dates('recentlyLogged')).toEqual(['2026-09-20', '2026-08-31', '2026-09-29', '2026-08-01']);
     expect(dates('mostTime')).toEqual(['2026-09-20', '2026-09-29', '2026-08-31', '2026-08-01']);
+  });
+});
+
+describe('journalDayFromEntries', () => {
+  const at = (h: number, m: number) => new Date(2026, 9, 20, h, m).getTime();
+
+  it('puts the notes oldest first and joins their text per kind', () => {
+    const day = journalDayFromEntries('2026-10-20', [
+      { id: 'b', at: at(12, 0), kind: 'revision', text: '5p Maryam', minutes: 10 },
+      { id: 'a', at: at(7, 12), kind: 'memorization', text: '1/2 p3', minutes: 20 },
+      { id: 'c', at: at(9, 0), kind: 'memorization', text: '  ', minutes: null },
+      { id: 'd', at: at(9, 30), kind: 'note', text: 'Tired', minutes: null },
+    ]);
+    expect(day.entries.map((n) => n.id)).toEqual(['a', 'c', 'd', 'b']);
+    expect(day.memorization).toBe('1/2 p3');
+    expect(day.memorizationMinutes).toBe(20);
+    expect(day.revision).toBe('5p Maryam');
+    expect(day.revisionMinutes).toBe(10);
+    expect(day.notes).toBe('Tired');
+    expect(day.updatedAt).toBe(at(12, 0));
+  });
+
+  it('a day with no notes has no time and no last entry', () => {
+    const day = journalDayFromEntries('2026-10-20', []);
+    expect(day.entries).toEqual([]);
+    expect(day.updatedAt).toBeUndefined();
+    expect(journalTotalMinutes(day)).toBeNull();
+    expect(isJournalEntryEmpty(day)).toBe(true);
+  });
+
+  it('totals the minutes of every note, notes included', () => {
+    const day = journalDayFromEntries('2026-10-20', [
+      { id: 'a', at: at(7, 0), kind: 'memorization', text: 'x', minutes: 20 },
+      { id: 'b', at: at(8, 0), kind: 'note', text: 'y', minutes: 5 },
+    ]);
+    expect(journalTotalMinutes(day)).toBe(25);
+  });
+});
+
+describe('legacyJournalNotes', () => {
+  const at = 1_700_000_000_000;
+  const block = (over: Partial<JournalEntry> = {}) => ({
+    memorization: '',
+    memorizationMinutes: null,
+    revision: '',
+    revisionMinutes: null,
+    notes: '',
+    ...over,
+  });
+
+  it('is none for an empty block', () => {
+    expect(legacyJournalNotes(block(), at)).toEqual([]);
+  });
+
+  it('reads one memorization-only or revision-only block as that kind, at createdAt', () => {
+    expect(legacyJournalNotes(block({ memorization: '1/2 p3', memorizationMinutes: 20 }), at)).toEqual([
+      { id: 'legacy', at, kind: 'memorization', text: '1/2 p3', minutes: 20 },
+    ]);
+    expect(legacyJournalNotes(block({ revision: '5p Maryam', revisionMinutes: null }), at)).toEqual([
+      { id: 'legacy', at, kind: 'revision', text: '5p Maryam', minutes: null },
+    ]);
+  });
+
+  it('labels the memorization and revision lines inside a note when they sit with notes, and sums the minutes', () => {
+    const [n] = legacyJournalNotes(
+      block({ memorization: '1/2 p3', memorizationMinutes: 20, revision: '5p Maryam', revisionMinutes: 10, notes: 'Tired' }),
+      at,
+    );
+    expect(n).toEqual({
+      id: 'legacy',
+      at,
+      kind: 'note',
+      text: 'Memorized: 1/2 p3\nRevised: 5p Maryam\nTired',
+      minutes: 30,
+    });
+  });
+
+  it('keeps the sum within a day', () => {
+    const [n] = legacyJournalNotes(block({ memorizationMinutes: 1440, revisionMinutes: 1440 }), at);
+    expect(n.minutes).toBe(1440);
+  });
+});
+
+describe('formatEntryTime', () => {
+  it('is the clock time on its own day, with the weekday once it falls on another day', () => {
+    const late = new Date(2026, 9, 21, 0, 40).getTime();
+    expect(formatEntryTime(new Date(2026, 9, 20, 7, 12).getTime(), '2026-10-20')).toBe('7:12 am');
+    expect(formatEntryTime(late, '2026-10-20')).toBe('12:40 am Wed');
   });
 });

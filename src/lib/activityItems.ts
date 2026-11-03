@@ -1,7 +1,7 @@
-import type { JournalEntry, ReadingSession, RevisionLog, User } from '../types';
+import type { JournalEntry, JournalNote, ReadingSession, RevisionLog, User } from '../types';
 import { isRevisionActivity, normalizeReadingSession } from './activity';
 import { formatMinutesShort } from './activityHeatmap';
-import { isJournalEntryEmpty, JournalFilter, journalFilterRange, journalTotalMinutes } from './journal';
+import { formatEntryTime, isJournalNoteEmpty, JournalFilter, journalFilterRange } from './journal';
 import { describePageRuns, describeSurahRuns, pageRuns } from './pageRanges';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
@@ -140,19 +140,21 @@ function recordingItem(r: RecordingItemSource): ActivityItem {
   }, pages);
 }
 
-function logItem(e: JournalEntry): ActivityItem {
-  const minutes = journalTotalMinutes(e);
+/** One note of a day's log: its time, what it says, its minutes. */
+function logItem(day: JournalEntry, note: JournalNote): ActivityItem {
+  const text = note.text.trim();
+  const said =
+    note.kind === 'memorization' ? `Memorized ${text}` : note.kind === 'revision' ? `Revised ${text}` : text;
   const parts = [
-    e.memorization.trim() ? `Memorized ${e.memorization.trim()}` : null,
-    e.revision.trim() ? `Revised ${e.revision.trim()}` : null,
-    e.notes.trim() || null,
-    minutes ? formatMinutesShort(minutes) : null,
+    formatEntryTime(note.at, day.date),
+    said || null,
+    note.minutes ? formatMinutesShort(note.minutes) : null,
   ].filter(Boolean);
   return item({
-    key: `log-${e.date}`,
+    key: `log-${day.date}-${note.id}`,
     kind: 'log',
-    day: e.date,
-    at: e.updatedAt ?? 0,
+    day: day.date,
+    at: note.at,
     title: 'Daily log',
     detail: parts.join(' · '),
   });
@@ -222,7 +224,10 @@ export function buildActivityItems(
     if (s) out.push(readingItem(s));
   }
   for (const r of recordings) if (DAY_RE.test(r.day)) out.push(recordingItem(r));
-  for (const e of journal) if (DAY_RE.test(e.date) && !isJournalEntryEmpty(e)) out.push(logItem(e));
+  for (const day of journal) {
+    if (!DAY_RE.test(day.date)) continue;
+    for (const note of day.entries) if (!isJournalNoteEmpty(note)) out.push(logItem(day, note));
+  }
   return out.sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.at - a.at));
 }
 

@@ -8,7 +8,7 @@
 
 import type { JournalEntry, ReadingSession } from '../../types';
 import { enqueue, pendingEntries } from './outbox';
-import type { OutboxEntry, OutboxOp } from './ops';
+import { overlayJournal, type OutboxEntry, type OutboxOp } from './ops';
 import { requestFlush } from './sync';
 
 let account: string | null = null;
@@ -50,32 +50,18 @@ export function withPendingReadings(
   return out === list ? list : [...out].sort((a, b) => b.startedAt - a.startedAt);
 }
 
-/** The day's log with a change still waiting: the entry, null if deleted, undefined if none waits. */
-export function pendingJournalEntry(date: string, uid: string | null = account): JournalEntry | null | undefined {
-  let result: JournalEntry | null | undefined;
-  for (const e of pendingEntries(uid)) {
-    const op = e.op;
-    if (op.kind === 'journal.save' && op.entry.date === date) result = { ...op.entry, updatedAt: e.at };
-    else if (op.kind === 'journal.delete' && op.date === date) result = null;
-  }
-  return result;
+/** One day's log with the notes still waiting laid over it; null when it has none. */
+export function withPendingJournalDay(
+  date: string,
+  base: JournalEntry | null,
+  uid: string | null = account,
+): JournalEntry | null {
+  return overlayJournal(base ? [base] : [], pendingEntries(uid), date)[0] ?? null;
 }
 
-/** Daily log entries with the changes still waiting (newest first). */
+/** Daily logs (one per day, newest first) with the notes still waiting laid over them. */
 export function withPendingJournal(list: JournalEntry[], uid: string | null = account): JournalEntry[] {
-  let out = list;
-  for (const e of pendingEntries(uid)) {
-    const op = e.op;
-    if (op.kind === 'journal.save') {
-      const entry: JournalEntry = { ...op.entry, updatedAt: e.at };
-      out = out.some((j) => j.date === entry.date)
-        ? out.map((j) => (j.date === entry.date ? entry : j))
-        : [...out, entry];
-    } else if (op.kind === 'journal.delete') {
-      out = out.filter((j) => j.date !== op.date);
-    }
-  }
-  return out === list ? list : [...out].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return overlayJournal(list, pendingEntries(uid));
 }
 
 /** Seconds of app use still waiting to be added on the server. */
