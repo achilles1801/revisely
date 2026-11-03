@@ -46,6 +46,44 @@ file is the release mechanics and the traps behind them.
   Firestore rules or `.md` files publish nothing (`paths-ignore` in both workflows). Firebase rules and functions still deploy by hand
   (`firebase deploy`, see README).
 
+## How updates reach phones
+
+- **OTA** (`src/lib/updates/ota.ts`, started in `App.tsx`). On its own, expo-updates downloads in
+  the background and runs the update from the next cold start, which on iOS can be days away.
+  - **At launch** the splash stays up while the app checks, for at most 2.5 s. An update downloaded
+    by then is applied before Home shows, behind a reload screen that matches the splash (#000000
+    and the icon). The splash always goes by 4 s.
+  - **Back in front**, it checks again if the last check was 10 minutes ago or more.
+  - **Applying later:** an update that has downloaded is applied when the user comes back after 15
+    minutes or more away, unless a restart would interrupt something.
+    - "Something" is `lib/updates/busy.ts`: a recording session, a recitation, a timer, or any
+      screen but a tab's own (Dashboard, ReadIndex, Insights). So no session, reader, editor,
+      onboarding or sign-in screen is ever restarted under the user.
+  - **Banner:** otherwise Home shows "Update ready · Restart" with ✕ (`components/updates/UpdateBanner`),
+    only for an update that was already waiting at an earlier visit.
+    - Restart is hidden while busy.
+    - ✕ hides the banner for that update; the update still applies at the next safe moment.
+- **Store versions** (`lib/updates/storeUpdates.ts`, rules in `versions.ts`).
+  - **iOS:** once a day, Apple's public lookup (`itunes.apple.com/lookup?bundleId=…`, nothing about
+    the user). A newer version than the binary's opens "New version available · Update"
+    (`StoreUpdateSheet`) on Home: once per version, never while busy.
+  - **Android:** what Play has comes from `config/app` `latest.android`; Play In-App Updates needs a
+    native module (planned for 1.0.4).
+  - Development, TestFlight and App Review (a sandbox receipt) never see either, so a reviewer is
+    never blocked.
+- **Forced updates:** Firestore `config/app` `minSupported.ios` / `.android`. Below the minimum the
+  whole app is "Update required" (`UpdateRequired`) with no way past it.
+  - It applies only once the store has a version that meets the minimum: on iOS the listing must
+    show it, on Android `latest.android` must be at least it.
+  - It waits for a recording or a recitation to stop.
+  - Phones read `config/app` at launch and every 6 h, and keep a copy for offline use.
+  - Set it with
+    `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-app-config.js`
+    (`--show`, `--latest-android V`, `--min-ios V`, `--min-android V`, `--clear-min`). It refuses a
+    minimum the store doesn't have yet, unless `--force`.
+  - After a release reaches Play's production track, set `--latest-android` to it.
+  - The rule (`match /config/app`: anyone reads, no client writes) went live on 2026-11-03.
+
 ## Health (Sentry → GitHub → Claude)
 
 - Every launch is a Sentry session labelled with the JavaScript it ran (`src/lib/releaseInfo.ts`):

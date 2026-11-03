@@ -989,7 +989,15 @@ export function pageAt(marks: PageMark[], ms: number): number | null {
 // would play into the recording), but may play while the session is paused.
 let recordingOwner: string | null = null;
 let capturing = false;
+const sessionListeners = new Set<() => void>();
 export const hasRecordingSession = () => recordingOwner != null;
+/** Called whenever a recording session starts or ends (lib/updates/busy). */
+export function onRecordingSessionChange(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
 export const isRecordingActive = () => capturing;
 export const setCapturing = (on: boolean) => {
   capturing = on;
@@ -997,7 +1005,9 @@ export const setCapturing = (on: boolean) => {
 /** Take the microphone for `owner`; false if another screen is recording. */
 export function acquireRecording(owner: string): boolean {
   if (recordingOwner != null && recordingOwner !== owner) return false;
+  const changed = recordingOwner !== owner;
   recordingOwner = owner;
+  if (changed) sessionListeners.forEach((l) => l());
   return true;
 }
 /** Give the microphone back (only its owner can). */
@@ -1005,6 +1015,7 @@ export function releaseRecording(owner: string): void {
   if (recordingOwner === owner) {
     recordingOwner = null;
     capturing = false;
+    sessionListeners.forEach((l) => l());
   }
 }
 

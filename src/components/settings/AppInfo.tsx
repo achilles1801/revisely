@@ -10,6 +10,7 @@ import { spacing } from '../../theme/spacing';
 import { currentRelease, diagnosticLines, ReleaseInfo } from '../../lib/releaseInfo';
 import { sendTestError, triggerTestNativeCrash } from '../../lib/sentry';
 import { logger } from '../../lib/logger';
+import { applyUpdate, notePendingUpdate } from '../../lib/updates/ota';
 
 export type UpdateCheckResult = 'up-to-date' | 'downloaded' | 'unavailable' | 'error';
 
@@ -24,6 +25,8 @@ export async function checkForUpdateNow(): Promise<{ result: UpdateCheckResult; 
     // A roll back to the built-in version counts as an update waiting too.
     if (!check.isAvailable && !check.isRollBackToEmbedded) return { result: 'up-to-date' };
     const fetched = await Updates.fetchUpdateAsync();
+    const id = fetched.manifest?.id ?? (fetched.isRollBackToEmbedded ? 'embedded' : null);
+    if (id) notePendingUpdate(id);
     return { result: fetched.isNew || fetched.isRollBackToEmbedded ? 'downloaded' : 'up-to-date' };
   } catch (err) {
     logger.warn('Manual update check failed', err);
@@ -62,7 +65,7 @@ export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo 
     if (result === 'downloaded') {
       Alert.alert('Update downloaded', 'It runs the next time Revisely starts.', [
         { text: 'Later', style: 'cancel' },
-        { text: 'Restart now', onPress: () => Updates.reloadAsync().catch(() => undefined) },
+        { text: 'Restart now', onPress: () => void applyUpdate() },
       ]);
     } else if (result === 'up-to-date') {
       Alert.alert('Up to date', 'This is the latest version for this build.');
