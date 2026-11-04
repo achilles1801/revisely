@@ -471,6 +471,22 @@ hard-coded token was deleted from the console on 2026-10-27.
 
 ## CI
 
+- **Behaviour first.** `BEHAVIOUR.md` lists every rule the app keeps for its users, each with an id.
+  The scenario and property tests in `tests/scenarios/` check them (how to run and write them:
+  `tests/scenarios/README.md`). Scenarios run the real providers, Home and the session screen against
+  the Auth and Firestore emulators (real rules), with a test clock and time zone. Property tests
+  (fast-check) cover the schedule and day functions. `Scenarios` in CI (`scenarios.yml`) runs both,
+  and `preview.yml` builds and publishes nothing unless it passes.
+  - **Every bug fix adds a scenario** that fails without the fix and names the rule it keeps
+    (`[DAY-2]` in its title). The "Behaviour spec" check (`spec.yml`) fails a fix PR (branch `fix/`,
+    `hotfix/`, `claude/issue-`, or a title starting "Fix") that changes `src/` without one. Only the
+    `no-scenario` label, with the reason in the PR, lets one through.
+  - A rule changed on purpose changes in `BEHAVIOUR.md` first, in the same PR as its tests.
+  - `KNOWN BUG` tests (`it.failing`) pin bugs that are still open; `BEHAVIOUR.md` lists them. A fix
+    turns its test red, and the PR makes it an ordinary test.
+  - `node tests/scenarios/check-spec.js` fails when a rule has no test, or a test names an unknown id.
+  - The suite has its own `package.json` (fast-check), so it changes neither the app's dependencies
+    nor the fingerprint.
 - "Secret scan" (`scripts/check-secrets.sh`): `git grep` over tracked files for high-signal secret
   patterns (private keys, Google/Anthropic/OpenAI/GitHub/Sentry/AWS/Slack/Stripe/Expo tokens, The
   Clear Quran keys, App Check debug-token assignments), printing paths and lines, never the match.

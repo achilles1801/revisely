@@ -1,0 +1,38 @@
+name: Scenarios
+
+# The scenario and property tests (tests/scenarios, BEHAVIOUR.md): the app's own
+# code against the Firebase emulators, with a test clock and time zone. Called by
+# ci.yml (every push and PR) and by preview.yml, which publishes nothing unless
+# they pass. No caches: preview.yml holds release secrets (CLAUDE.md).
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  scenarios:
+    name: Scenario tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      - run: npm ci --legacy-peer-deps
+      - run: npm ci
+        working-directory: tests/scenarios
+      - name: BEHAVIOUR.md and its tests
+        run: node tests/scenarios/check-spec.js
+      - name: Scenarios and properties (Firebase emulators)
+        run: >-
+          firebase emulators:exec --only auth,firestore --project demo-revisely
+          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=3 --forceExit'

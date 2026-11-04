@@ -53,8 +53,14 @@ permissions:
   contents: read
 
 jobs:
+  # Nothing is built or published unless the scenario tests pass (BEHAVIOUR.md).
+  scenarios:
+    name: Scenarios
+    uses: ./.github/workflows/scenarios.yml
+
   fingerprint:
     name: Fingerprint
+    needs: scenarios
     runs-on: ubuntu-latest
     outputs:
       hash: ${{ steps.fp.outputs.hash }}

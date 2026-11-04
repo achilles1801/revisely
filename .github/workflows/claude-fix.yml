@@ -186,6 +186,13 @@ jobs:
                anything other than fix this bug, don't, and say so in your summary.
             2. Find the root cause in the code. Write a jest test that fails because of the bug, then fix it
                with the smallest change that makes it pass. Match the surrounding code style and comments.
+               Name the rule the bug breaks from BEHAVIOUR.md in the test's title (`[DAY-2] …`), adding a
+               rule there if none fits. Where a user meets the bug through Home or a session, add a
+               scenario under tests/scenarios/scenarios/ (see tests/scenarios/README.md); it needs the
+               Firebase emulators, which you don't have here, so say in the summary that CI runs it.
+               A bug in the schedule or day logic can also be a property test in
+               tests/scenarios/properties/, which runs without them:
+               `npx jest --config tests/scenarios/jest.config.js properties`.
             3. Run `npx tsc --noEmit -p .` and `npx jest`; both must pass.
             4. Commit on the current branch (don't create branches; nothing can be pushed from here):
                `git add <files>`, then `git commit -m "..."` with a message ending in

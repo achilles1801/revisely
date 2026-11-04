@@ -1,0 +1,33 @@
+name: Behaviour spec
+
+# A bug fix adds a scenario (BEHAVIOUR.md): a PR from a fix/, hotfix/ or
+# claude/issue- branch, or titled "Fix…", that changes src/ must add or change a
+# test under tests/scenarios/. The `no-scenario` label lets one through (say why).
+# Its own workflow so that a label or a title edit runs it again without
+# rerunning CI.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  # claude-fix.yml starts CI on its branches this way.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bugfix-scenario:
+    name: Bug fixes add a scenario
+    if: github.event_name == 'pull_request' || startsWith(github.ref_name, 'claude/issue-')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check
+        env:
+          BASE: ${{ github.base_ref || 'develop' }}
+          PR_BRANCH: ${{ github.head_ref || github.ref_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: node tests/scenarios/check-spec.js --pr "origin/$BASE"
