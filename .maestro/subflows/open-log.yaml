@@ -1,0 +1,10 @@
+# Home → Activity → Log today: the daily log for today.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: open-activity
+- tapOn: "Log today"
+- extendedWaitUntil:
+    visible:
+      id: journal-composer
+    timeout: 15000

@@ -1,0 +1,100 @@
+# Recordings: one made in a session, found from "Recording saved · View", kept
+# across a cold start, played, and deleted. The audio is whatever the device's
+# microphone hears.
+# Rules (BEHAVIOUR.md): none yet; recordings have no rule there.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+- tapOn:
+    id: today-cta
+- extendedWaitUntil:
+    visible:
+      id: session-quiet-count
+    timeout: 15000
+- runFlow: ../subflows/show-controls.yaml
+- tapOn:
+    id: record-start
+- extendedWaitUntil:
+    visible:
+      id: record-stop
+    timeout: 10000
+# About three seconds of recording (Maestro has no sleep).
+- extendedWaitUntil:
+    visible:
+      id: e2e-never-shown
+    timeout: 3000
+    optional: true
+- tapOn:
+    id: record-stop
+- extendedWaitUntil:
+    visible: "Recording saved"
+    timeout: 10000
+- tapOn: "View"
+- runFlow: ../subflows/backup-notice.yaml
+# Activity's day: the recording, at the app's time (12:00 on the test clock).
+- extendedWaitUntil:
+    visible:
+      text: "Revision recording, 12:0[0-9].PM"
+    timeout: 15000
+# A few seconds long (more on a slow machine).
+- assertVisible:
+    id: recording-time-.*
+    text: "0:(0[1-9]|[1-5][0-9])"
+
+# Kept across a cold start: Home → Activity → the day.
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-v2
+    timeout: 10000
+# The calendar follows the test clock: November 3 holds the recording.
+- assertVisible:
+    id: heat-2026-11-03
+    text: ".*1 recording"
+- tapOn:
+    id: heat-2026-11-03
+- runFlow:
+    when:
+      visible:
+        id: heat-day-line
+    commands:
+      - tapOn:
+          id: heat-day-line
+- extendedWaitUntil:
+    visible:
+      text: "Revision recording, 12:0[0-9].PM"
+    timeout: 15000
+
+# Play, then pause.
+- tapOn:
+    id: recording-play-.*
+- extendedWaitUntil:
+    visible: "Pause recording"
+    timeout: 10000
+- tapOn: "Pause recording"
+- extendedWaitUntil:
+    visible: "Play recording"
+    timeout: 10000
+
+# Delete: hold the recording, Delete recording, confirm.
+- longPressOn:
+    text: "Revision recording, .*"
+- tapOn: "Delete recording"
+- extendedWaitUntil:
+    visible: "Delete this recording\\?"
+    timeout: 5000
+- tapOn:
+    text: "(?i)delete"
+    below:
+      text: "Delete this recording\\?"
+- extendedWaitUntil:
+    notVisible:
+      text: "Revision recording, .*"
+    timeout: 10000

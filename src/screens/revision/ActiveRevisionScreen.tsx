@@ -898,7 +898,12 @@ export default function ActiveRevisionScreen() {
         isDark={isDark}
         quietHeader={
           <View style={styles.quietHeader}>
-            <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+            <Text
+              style={[styles.quietText, { color: palette.textSecondary }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
+              testID="session-quiet-count"
+            >
               {hidden ? 'Hidden' : `Juz ${currentJuz}`} · {viewDone}/{totalPages}
             </Text>
             {hidden ? (
@@ -932,13 +937,23 @@ export default function ActiveRevisionScreen() {
           <View style={styles.header}>
             <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
-              <Text style={[styles.title, typeV2.name, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text
+                style={[styles.title, typeV2.name, { color: palette.textPrimary }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                testID="session-title"
+              >
                 {aheadView ? `Revising ahead · ${weekdayLabel(viewDay)}` : `Revising ${scopeLabel}`}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
                   · {viewDone}/{totalPages}
                 </Text>
               </Text>
-              <Text style={[styles.subtitle, typeV2.meta, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text
+                style={[styles.subtitle, typeV2.meta, { color: palette.textSecondary }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                testID="session-page"
+              >
                 Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
               </Text>
             </View>

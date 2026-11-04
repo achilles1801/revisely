@@ -1,0 +1,87 @@
+# The daily log: a note added, edited and deleted, each kept across a cold start.
+# Rules (BEHAVIOUR.md): none yet; the daily log has no rule there.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/open-log.yaml
+
+# Add.
+- tapOn:
+    id: pill-note
+- runFlow: ../subflows/log-input.yaml
+- inputText: Juz 30 felt steady today
+- runFlow: ../subflows/keyboard-done.yaml
+- tapOn:
+    id: journal-send
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 10000
+
+# Kept: a cold start, then back to the log.
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
+
+# Edit: hold the note, Edit, change the text, Save.
+- longPressOn:
+    id: journal-note-.*
+    text: "Note, Juz 30 felt steady today, .*"
+- tapOn: "Edit"
+- runFlow: ../subflows/log-input.yaml
+- eraseText: 60
+- inputText: An-Naba needs another look
+- runFlow: ../subflows/keyboard-done.yaml
+- tapOn:
+    id: journal-send
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, An-Naba needs another look, .*"
+    timeout: 10000
+- assertNotVisible:
+    text: "Note, Juz 30 felt steady today, .*"
+
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, An-Naba needs another look, .*"
+    timeout: 15000
+
+# Delete: swipe the note left, Delete, confirm.
+- swipe:
+    from:
+      id: journal-note-.*
+      text: "Note, An-Naba needs another look, .*"
+    direction: LEFT
+- tapOn:
+    id: journal-note-.*-delete
+- extendedWaitUntil:
+    visible: "Delete this entry\\?"
+    timeout: 5000
+- tapOn:
+    text: "(?i)delete"
+    below:
+      text: "Delete this entry\\?"
+- extendedWaitUntil:
+    notVisible:
+      id: journal-note-.*
+      text: "Note, .*"
+    timeout: 10000
+
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/open-log.yaml
+- assertNotVisible:
+    id: journal-note-.*
+    text: "Note, .*"

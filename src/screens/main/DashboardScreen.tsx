@@ -471,8 +471,8 @@ export default function DashboardScreen() {
         right={
           <>
             <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => openPrayer('qibla')} testID="open-qibla" />
-            <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} />
-            <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} />
+            <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} testID="open-activity" />
+            <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} testID="open-settings" />
           </>
         }
         // Three icons on the right: both sides widen so the salam stays centred.

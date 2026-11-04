@@ -1,0 +1,13 @@
+# Swipes the session (or reader) to its next page: the mushaf runs right to left,
+# so the next page comes in from the left. COUNT times (default 1).
+appId: com.revisionbuddy.app
+---
+- repeat:
+    times: ${COUNT}
+    commands:
+      - swipe:
+          start: 12%, 50%
+          end: 88%, 50%
+          duration: 250
+      - waitForAnimationToEnd:
+          timeout: 2000

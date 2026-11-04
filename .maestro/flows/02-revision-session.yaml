@@ -1,0 +1,110 @@
+# Today's revision session: leaving with nothing marked, swiping pages, leaving
+# and coming back, the check, and finishing on the end card. Day one is pages
+# 1, 582–590 (subflows/onboard.yaml).
+# Rules (BEHAVIOUR.md): SESS-1, SESS-2, SESS-3
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+
+# SESS-3: leaving with nothing marked saves nothing.
+- tapOn:
+    id: today-cta
+- extendedWaitUntil:
+    visible:
+      id: session-quiet-count
+      text: "Juz 1 · 0/10"
+    timeout: 15000
+- runFlow: ../subflows/show-controls.yaml
+- assertVisible:
+    id: session-page
+    text: "Page 1 · .*"
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-cta
+      text: "Start revision"
+    timeout: 10000
+- assertVisible:
+    id: today-title
+    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+
+# SESS-1: swiping off a page marks it revised (1, 582, 583).
+- tapOn:
+    id: today-cta
+- extendedWaitUntil:
+    visible:
+      id: session-quiet-count
+      text: "Juz 1 · 0/10"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/next-page.yaml
+    env:
+      COUNT: 3
+- assertVisible:
+    id: session-quiet-count
+    text: "Juz 30 · 3/10"
+- runFlow: ../subflows/show-controls.yaml
+# SESS-3: Back saves what was marked; Home continues at the first page not done.
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at An.Nazi.at, p..584.*"
+    timeout: 10000
+- assertVisible:
+    id: today-summary
+    text: ".*3 of 10 pages done"
+- assertVisible:
+    id: today-cta
+    text: "Continue revision"
+
+# SESS-1: the check marks and unmarks the page on screen.
+- tapOn:
+    id: today-cta
+- extendedWaitUntil:
+    visible:
+      id: session-quiet-count
+      text: "Juz 30 · 3/10"
+    timeout: 15000
+- runFlow: ../subflows/show-controls.yaml
+- assertVisible:
+    id: session-page
+    text: "Page 584 · .*"
+- tapOn: "Mark current page as revised"
+- assertVisible:
+    id: session-title
+    text: ".*4/10"
+- tapOn: "Unmark current page"
+- assertVisible:
+    id: session-title
+    text: ".*3/10"
+
+# The rest (584–590), the last by swiping onto the end card.
+- runFlow:
+    file: ../subflows/next-page.yaml
+    env:
+      COUNT: 7
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: 10 pages revised today
+
+# SESS-2: every page is in: Home says Done.
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 10.pages"
+    timeout: 10000
+- assertVisible:
+    id: today-cta
+    text: "Review session"

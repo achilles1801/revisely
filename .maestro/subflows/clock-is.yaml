@@ -1,0 +1,8 @@
+# Checks the app's clock is at AT's date and hour (it runs on from there).
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: e2e-status
+      text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+    timeout: 15000

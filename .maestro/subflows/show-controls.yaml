@@ -1,0 +1,16 @@
+# The session opens with its controls hidden, and they hide again while pages
+# are swiped; a tap on the page shows them. (High on the page: E2E builds load no
+# page images, and "Try again" sits in the middle.)
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      notVisible:
+        id: session-title
+    commands:
+      - tapOn:
+          point: 50%, 30%
+      - extendedWaitUntil:
+          visible:
+            id: session-title
+          timeout: 5000

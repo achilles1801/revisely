@@ -34,17 +34,22 @@ import {
 import Constants from 'expo-constants';
 import { User, UserPage, RevisionLog } from '../types';
 
-// Firebase configuration from environment variables
+// Firebase configuration from environment variables. An E2E build
+// (EXPO_PUBLIC_E2E=1, .maestro/README.md) uses a demo project on the emulators
+// instead; every other build drops that branch (the variable is inlined).
 const extra = Constants.expoConfig?.extra;
-const firebaseConfig = {
-  apiKey: extra?.firebase?.apiKey,
-  authDomain: extra?.firebase?.authDomain,
-  projectId: extra?.firebase?.projectId,
-  storageBucket: extra?.firebase?.storageBucket,
-  messagingSenderId: extra?.firebase?.messagingSenderId,
-  appId: extra?.firebase?.appId,
-  measurementId: extra?.firebase?.measurementId,
-};
+const firebaseConfig =
+  process.env.EXPO_PUBLIC_E2E === '1'
+    ? require('./e2e/firebase').E2E_FIREBASE_CONFIG
+    : {
+        apiKey: extra?.firebase?.apiKey,
+        authDomain: extra?.firebase?.authDomain,
+        projectId: extra?.firebase?.projectId,
+        storageBucket: extra?.firebase?.storageBucket,
+        messagingSenderId: extra?.firebase?.messagingSenderId,
+        appId: extra?.firebase?.appId,
+        measurementId: extra?.firebase?.measurementId,
+      };
 
 // Initialize Firebase only if not already initialized
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -66,6 +71,11 @@ try {
 // ever failed with "unimplemented"). The app keeps its own copy of the account
 // and an outbox of changes on the phone instead (src/lib/offline).
 const db = getFirestore(app);
+
+// E2E builds: the Auth and Firestore emulators, before anything uses either.
+if (process.env.EXPO_PUBLIC_E2E === '1') {
+  require('./e2e/firebase').connectEmulators(auth, db);
+}
 
 export { auth, db };
 export type { FirebaseUser };

@@ -8,7 +8,10 @@
 type Rewrite = (url: string) => string;
 
 export function nativeRequestUrl(url: string): string {
-  if (!__DEV__) return url;
+  // E2E builds (EXPO_PUBLIC_E2E=1) install the same hook to stay off the real
+  // services (src/lib/e2e/network). In release builds the whole test folds to
+  // true at bundle time, and the URL is returned as it is.
+  if (!__DEV__ && process.env.EXPO_PUBLIC_E2E !== '1') return url;
   const rewrite = (globalThis as { __reviselyDevNativeUrl?: Rewrite }).__reviselyDevNativeUrl;
   return typeof rewrite === 'function' ? rewrite(url) : url;
 }

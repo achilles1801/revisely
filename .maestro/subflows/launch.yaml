@@ -1,0 +1,16 @@
+# A fresh install of the E2E app (clearState), its clock set, on the auth screen.
+#   env CLOCK: the phone's wall time, e.g. 2026-11-03T12:00 (src/lib/e2e/clock.ts)
+appId: com.revisionbuddy.app
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible:
+      id: auth
+    timeout: 60000
+- runFlow:
+    file: clock.yaml
+    env:
+      AT: ${CLOCK}

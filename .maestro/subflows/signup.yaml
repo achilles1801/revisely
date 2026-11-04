@@ -1,0 +1,33 @@
+# Signs up with email and password (the Auth emulator), on to onboarding.
+# Leaves the address in output.email.
+appId: com.revisionbuddy.app
+---
+- evalScript: ${output.email = 'e2e' + Date.now() + '@example.com'}
+- tapOn:
+    id: auth-switch-mode
+- extendedWaitUntil:
+    visible:
+      id: auth-name
+    timeout: 5000
+- tapOn:
+    id: auth-name
+- inputText: E2E
+- tapOn:
+    id: auth-email
+- inputText: ${output.email}
+- tapOn:
+    id: auth-password
+- inputText: e2e-password
+- tapOn:
+    id: auth-confirm-password
+- inputText: e2e-password
+# Maestro's hideKeyboard can't dismiss it here: a tap on the title does.
+- tapOn:
+    id: auth-title
+- tapOn:
+    id: auth-submit
+# SYNC-4: the new account loads at once, with no relaunch.
+- extendedWaitUntil:
+    visible:
+      id: welcome
+    timeout: 30000

@@ -117,7 +117,13 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
             Resets at {resetsAt}
           </Text>
         </View>
-        <SettingSwitch value={enabled} onValueChange={handleToggle} disabled={busy} accessibilityLabel="Start day at fajr" />
+        <SettingSwitch
+          value={enabled}
+          onValueChange={handleToggle}
+          disabled={busy}
+          accessibilityLabel="Start day at fajr"
+          testID="fajr-boundary-switch"
+        />
       </View>
       {/* In Settings → Prayer the method is under Calculation (shared with prayer times). */}
       {enabled && !compact && (

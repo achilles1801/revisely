@@ -1,0 +1,12 @@
+# Moves the clock to AT and cold-starts the app, so every screen reads the new time.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: clock.yaml
+    env:
+      AT: ${AT}
+- runFlow: relaunch.yaml
+- runFlow:
+    file: clock-is.yaml
+    env:
+      AT: ${AT}

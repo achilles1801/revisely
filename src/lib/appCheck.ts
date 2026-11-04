@@ -20,6 +20,9 @@ const DEBUG_TOKEN: string | undefined = __DEV__
 
 export async function setupAppCheck(): Promise<void> {
   if (initialized) return;
+  // E2E builds (EXPO_PUBLIC_E2E=1) talk only to the emulators, which don't
+  // check App Check; every other build drops this line (the variable is inlined).
+  if (process.env.EXPO_PUBLIC_E2E === '1') return;
 
   const appCheck = (firebase as any).appCheck();
   const provider = appCheck.newReactNativeFirebaseAppCheckProvider();
@@ -46,6 +49,7 @@ export async function setupAppCheck(): Promise<void> {
 }
 
 export async function getAppCheckToken(): Promise<string | null> {
+  if (process.env.EXPO_PUBLIC_E2E === '1') return null;
   try {
     if (!initialized) await setupAppCheck();
     const result = await (firebase as any).appCheck().getToken();
