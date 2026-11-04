@@ -6,17 +6,22 @@ appId: com.revisionbuddy.app
     clearState: true
     permissions:
       all: allow
-# A link prompt left from an earlier flow would cover the app.
-- runFlow:
-    when:
-      platform: iOS
-      visible: "Open"
+# Until the auth screen shows. A link prompt left from earlier (iOS) would cover
+# it: confirm it if it comes up.
+- repeat:
+    while:
+      notVisible:
+        id: auth
+    times: 20
     commands:
-      - tapOn: "Open"
-- extendedWaitUntil:
-    visible:
-      id: auth
-    timeout: 60000
+      - runFlow: open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: auth
+          timeout: 5000
+          optional: true
+- assertVisible:
+    id: auth
 - runFlow:
     file: clock.yaml
     env:

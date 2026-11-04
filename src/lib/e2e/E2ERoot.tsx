@@ -5,10 +5,11 @@
 // took, and a failed flow's screenshots say what time the app thought it was.
 
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { e2eReady } from './install';
 import { clockLabel, onClockChange } from './clock';
 import { isOffline, onNetworkChange } from './network';
+import NetInfo from '@react-native-community/netinfo';
 import { paletteV2 } from '../../theme/v2';
 
 function zoneName(): string {
@@ -19,9 +20,17 @@ function zoneName(): string {
   }
 }
 
-/** "e2e 2026-11-03 00:30 America/Chicago" (+ " offline"). Changes once a minute at most. */
+/** What NetInfo last said: false when it saw no connection (or no internet). */
+let netInfoUp = true;
+
+/**
+ * "e2e 2026-11-03 00:30 America/Chicago", then " offline" while the E2E network
+ * switch is off, and " · net down" while NetInfo sees no connection (which side
+ * is stuck, when a flow waits for the app to come back online). Changes once a
+ * minute at most otherwise.
+ */
 export function statusText(): string {
-  return `e2e ${clockLabel()} ${zoneName()}${isOffline() ? ' offline' : ''}`;
+  return `e2e ${clockLabel()} ${zoneName()}${isOffline() ? ' offline' : ''}${netInfoUp ? '' : ' · net down'}`;
 }
 
 function Status() {
@@ -31,10 +40,15 @@ function Status() {
     const timer = setInterval(update, 1000);
     const offClock = onClockChange(update);
     const offNet = onNetworkChange(update);
+    const offNetInfo = NetInfo.addEventListener((s) => {
+      netInfoUp = s.isConnected !== false && s.isInternetReachable !== false;
+      update();
+    });
     return () => {
       clearInterval(timer);
       offClock();
       offNet();
+      offNetInfo();
     };
   }, []);
   return (
@@ -67,7 +81,9 @@ export function withE2E<P extends object>(App: React.ComponentType<P>): React.Co
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  status: { position: 'absolute', left: 4, bottom: 1 },
+  // Android can lay the window out a status bar's height too low after a quick
+  // relaunch, which hid a line at the very foot: higher there.
+  status: { position: 'absolute', left: 4, bottom: Platform.OS === 'android' ? 32 : 1 },
   // The light theme's grey reads on either ground; small enough to stay out of the way.
   text: { fontSize: 9, color: paletteV2(false).secondary },
 });

@@ -47,6 +47,11 @@ if [ -z "$DEVICE" ]; then
   fi
 fi
 
+# `# e2e-ci-skip: ios — why` in a flow: not run on that platform in CI (CI set).
+ci_skips() {
+  [ -n "${CI:-}" ] && grep -Eq "^# e2e-ci-skip:.*\b$PLATFORM\b" "$1"
+}
+
 zone_of() {
   local z
   z=$(sed -n 's/^# e2e-zone: *\([^ ]*\).*/\1/p' "$1" | head -1)
@@ -110,6 +115,11 @@ summary="| Flow | Zone | Result | Time |\n| --- | --- | --- | --- |\n"
 for flow in "${FLOWS[@]}"; do
   name=$(basename "$flow" .yaml)
   zone=$(zone_of "$flow")
+  if ci_skips "$flow"; then
+    echo "▷ $name skipped in CI on $PLATFORM: $(sed -n 's/^# e2e-ci-skip: *//p' "$flow" | head -1)"
+    summary+="| $name | $zone | skipped in CI | |\n"
+    continue
+  fi
   result=failed
   start=$(date +%s)
   for attempt in $(seq 0 "$RETRIES"); do

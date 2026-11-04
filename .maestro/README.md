@@ -35,7 +35,8 @@ The test clock starts on Tuesday, 3 November 2026.
   port and fails at once. So the session shows "Couldn't load page" where the mushaf would be; the
   pages still swipe and count. NetInfo checks reachability against the Auth emulator.
 - **A status line** at the foot of every screen (`e2e-status`): the app's time, the phone's zone,
-  and "offline" when the E2E network switch is off. Flows read it; failure screenshots show it.
+  "offline" when the E2E network switch is off, and "net down" while NetInfo sees no connection.
+  Flows read it; failure screenshots show it.
 - Every other build drops all of it. Each use is behind `process.env.EXPO_PUBLIC_E2E === '1'`, which
   the bundler inlines (as `undefined` when unset), so the test and the `require` behind it fold away
   in release bundles. Check: `npx expo export --platform ios --clear` without the variable, then
@@ -141,6 +142,10 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 - **iOS:** the Simulator shares the computer's network and has no airplane mode, so the E2E build's
   switch makes the emulators unreachable from the app (`subflows/network.yaml`); NetInfo's
   reachability check fails with them, and the app sees what a phone without a connection sees.
+- In CI, `06-offline` runs on Android only (`# e2e-ci-skip: ios`): on the macOS runner's simulator
+  the app stayed "Offline" for minutes after the switch came back on, also after coming back to the
+  front, while on a Mac it takes seconds. Whether that is the runner or the app on a slow device is
+  open; the status line now says whether NetInfo or Firestore is the side still down.
 - `06-offline` checks the server itself (`scripts/server-session.js`): Maestro reads the session
   from the Firestore emulator's REST API with its admin token, "Bearer owner", which only the
   emulators accept.

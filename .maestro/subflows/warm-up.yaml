@@ -7,22 +7,21 @@ appId: com.revisionbuddy.app
     clearState: true
     permissions:
       all: allow
-- extendedWaitUntil:
-    visible:
-      id: auth
-    timeout: 180000
-- openLink: revisely://e2e/clock?at=now
-- runFlow:
-    when:
-      platform: iOS
+- repeat:
+    while:
+      notVisible:
+        id: auth
+    times: 36
     commands:
+      - runFlow: open-link-prompt.yaml
       - extendedWaitUntil:
-          visible: "Open"
-          timeout: 20000
+          visible:
+            id: auth
+          timeout: 5000
           optional: true
-      - runFlow:
-          when:
-            visible: "Open"
-          commands:
-            - tapOn: "Open"
+# A clock link, until it has taken (on iOS, once its prompt is confirmed).
+- runFlow:
+    file: clock.yaml
+    env:
+      AT: 2000-01-01T00:00
 - stopApp
