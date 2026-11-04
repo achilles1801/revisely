@@ -28,12 +28,14 @@ function daysBetween(a: string, b: string): number {
  * The Fajr that falls on a calendar day, for the account's location and method.
  * The app's own calculation (getFajrTimeFor, as the Prayer sheet) gives the
  * minutes; it is asked for the days around, and the one on `day` is taken,
- * since for some places (Kiritimati) it answers with the next day's Fajr.
+ * so that the test doesn't rely on the app picking the right day (it once didn't,
+ * near the date line).
  */
 export function fajrOn(day: string, user: Pick<User, 'locationCoords' | 'fajrCalculationMethod'>): Date {
   for (const delta of [0, -1, 1]) {
     const fajr = getFajrTimeFor(local(addDays(day, delta)), user as User);
-    if (fajr && dayOf(fajr) === day) return fajr;
+    // Before 10:00: a Fajr, not adhan's noon "Fajr" on the days the transit crosses 00:00 UTC.
+    if (fajr && dayOf(fajr) === day && fajr.getHours() < 10) return fajr;
   }
   throw new Error(`no Fajr on ${day}`);
 }
@@ -63,8 +65,6 @@ interface Case {
   city: { latitude: number; longitude: number };
   /** The day the plan is made, at 20:00 (after Fajr, before midnight): the plan's day 0. */
   start: string;
-  /** With the Fajr boundary on, the rule is broken here (the test is it.failing until fixed). */
-  knownBugWithFajr?: string;
 }
 
 // Each zone's week spans its daylight-saving change where it has one.
@@ -73,21 +73,12 @@ export const CASES: Case[] = [
   { name: 'New York, spring forward', zone: ZONES.newYork, city: CITIES.newYork, start: '2026-03-05' }, // Mar 8
   { name: 'London', zone: ZONES.london, city: CITIES.london, start: '2026-10-22' }, // BST → GMT on Oct 25
   { name: 'Sydney', zone: ZONES.sydney, city: CITIES.sydney, start: '2026-10-01' }, // AEST → AEDT on Oct 4
-  {
-    name: 'Kiritimati (UTC+14)',
-    zone: ZONES.kiritimati,
-    city: CITIES.kiritimati,
-    start: '2026-11-02',
-    // KNOWN BUG: lib/prayer/times dayTimes(place, date) passes the local date to
-    // adhan, which works out the times of the solar day at that longitude
-    // (−157°, ten and a half hours behind UTC) and returns them as instants. In
-    // UTC+14 those land on the next local day: "Fajr on Nov 3" is Nov 4 05:13.
-    // getRevisionDayForUser compares now with that, so after the real Fajr it
-    // still says yesterday, and a plan made in the evening starts a day early.
-    // Every place whose zone is about a day off its longitude has it (Kiribati's
-    // Line Islands, Samoa, Tonga), as does a saved location far from the phone's zone.
-    knownBugWithFajr: 'Fajr for a local date falls on the next day in UTC+14 (adhan, lib/prayer/times)',
-  },
+  // Fixed Nov 2026 (was a known bug): near the date line the app took another
+  // day's Fajr (lib/prayer/times dayTimes), so after Fajr it was still yesterday.
+  { name: 'Kiritimati (UTC+14)', zone: ZONES.kiritimati, city: CITIES.kiritimati, start: '2026-11-02' },
+  // The sun's transit at Suva crosses 00:00 UTC in Oct–Nov: adhan's set for the
+  // phone's date was the next day's, and on some days its "Fajr" was at noon.
+  { name: 'Suva, Fiji (UTC+12)', zone: ZONES.fiji, city: CITIES.suva, start: '2026-11-02' },
   { name: 'Baker Island (UTC−12)', zone: ZONES.bakerIsland, city: { latitude: 0.19, longitude: -176.48 }, start: '2026-11-02' },
   { name: 'Kathmandu (UTC+5:45)', zone: ZONES.kathmandu, city: CITIES.kathmandu, start: '2026-11-02' },
   { name: 'Reykjavik (64°N)', zone: ZONES.reykjavik, city: CITIES.reykjavik, start: '2026-11-02' },
@@ -109,13 +100,12 @@ const MOMENTS: { label: string; at: Moment; how: 'cold start' | 'from the backgr
 export function describeWeeks(names: string[]): void {
   const cases = CASES.filter((c) => names.includes(c.name));
   if (cases.length !== names.length) throw new Error(`unknown case in ${names.join(', ')}`);
-  describe.each(cases)('$name', ({ zone, city, start, knownBugWithFajr }) => {
+  describe.each(cases)('$name', ({ zone, city, start }) => {
     describe.each([
       { fajr: true, rule: 'DAY-2' },
       { fajr: false, rule: 'DAY-1' },
     ])('Fajr boundary $fajr', ({ fajr, rule }) => {
-      const test = fajr && knownBugWithFajr ? it.failing : it;
-      test(`${fajr && knownBugWithFajr ? 'KNOWN BUG: ' : ''}[${rule}] [DAY-3] [DAY-5] [DAY-6] [SESS-2] a week opened at every time of day: today's pages, saved to the right day, tomorrow next`, async () => {
+      it(`[${rule}] [DAY-3] [DAY-5] [DAY-6] [SESS-2] a week opened at every time of day: today's pages, saved to the right day, tomorrow next`, async () => {
         setZone(zone);
         setNow(`${start} 20:00`);
         const phone = new Phone();

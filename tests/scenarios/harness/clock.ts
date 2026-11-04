@@ -127,6 +127,7 @@ export function addDays(day: string, delta: number): string {
 export const ZONES = {
   utc: 'UTC',
   kiritimati: 'Pacific/Kiritimati', // UTC+14, the first to reach a date
+  fiji: 'Pacific/Fiji', // UTC+12 at 178°E: the sun's transit crosses 00:00 UTC in Oct–Nov
   bakerIsland: 'Etc/GMT+12', // UTC−12, the last (POSIX sign is inverted)
   newYork: 'America/New_York', // DST: 2nd Sunday of March, 1st of November
   london: 'Europe/London', // DST: last Sunday of March and of October

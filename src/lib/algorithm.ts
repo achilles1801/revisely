@@ -86,16 +86,35 @@ export function calendarDaysBetween(a: Date, b: Date): number {
  * page sequence. Carrying pages over with "Keep daily amount" adds to the shift:
  * every day keeps its size and the pages flow back by that many. Off days stay
  * off.
+ *
+ * A plan can hold a page on two neighbouring days (a page shared by the surah
+ * ending one day and the one starting the next). A window covering both copies
+ * takes the page once and goes on to the next page, so a day never holds a page
+ * twice and still keeps its size.
+ *
+ * `skip`: the day's first slots that carried pages stand in for (the carry-over's
+ * skip, lib/carryOver), passed over by position; the rest of the day is read on
+ * from there. Counting them before the repeats are taken out keeps today's own
+ * pages when a page sits both at the end of yesterday and the start of today.
  */
-function shiftedCycleDay(days: number[][], dayIndex: number, shift: number): number[] {
+function shiftedCycleDay(days: number[][], dayIndex: number, shift: number, skip = 0): number[] {
   const size = days[dayIndex].length;
-  if (!shift || size === 0) return [...days[dayIndex]];
+  if (size === 0) return [];
+  if (!shift) return days[dayIndex].slice(skip);
   const flat = days.flat();
   const total = flat.length;
   let pos = 0;
   for (let i = 0; i < dayIndex; i++) pos += days[i].length;
   const start = (((pos - shift) % total) + total) % total;
-  return Array.from({ length: size }, (_, i) => flat[(start + i) % total]);
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (let i = skip; i < total && out.length < size - skip; i++) {
+    const page = flat[(start + i) % total];
+    if (seen.has(page)) continue;
+    seen.add(page);
+    out.push(page);
+  }
+  return out;
 }
 
 function startOfDay(date: Date): Date {
@@ -145,6 +164,16 @@ export function getPagesScheduledForDate(
   date: Date,
   memorizedPages: UserPage[],
 ): number[] {
+  return scheduledFrom(user, date, memorizedPages, 0);
+}
+
+/** The day's scheduled pages after its first `skip` slots (see shiftedCycleDay). */
+function scheduledFrom(
+  user: User,
+  date: Date,
+  memorizedPages: UserPage[],
+  skip: number,
+): number[] {
   if (memorizedPages.length === 0) return [];
 
   // Custom plan is an explicit user override and wins over either default
@@ -158,13 +187,13 @@ export function getPagesScheduledForDate(
       ((daysSinceStart % user.customPlan.days.length) +
         user.customPlan.days.length) %
       user.customPlan.days.length;
-    return shiftedCycleDay(user.customPlan.days, idx, user.scheduleShiftPages ?? 0);
+    return shiftedCycleDay(user.customPlan.days, idx, user.scheduleShiftPages ?? 0, skip);
   }
 
   // Juz mode: cycle through juz that contain memorized pages, returning the
   // memorized subset of each selected juz.
   if (user.scheduleMode === 'juz' && (user.dailyJuzCount ?? 0) > 0) {
-    return juzModePagesForDate(user, date, memorizedPages);
+    return juzModePagesForDate(user, date, memorizedPages, skip);
   }
 
   const sortedPageNumbers = [...memorizedPages]
@@ -182,7 +211,7 @@ export function getPagesScheduledForDate(
   const shift = user.scheduleShiftPages ?? 0;
   const cycleOffset = ((daysSinceStart * perDay - shift) % total + total) % total;
   const result: number[] = [];
-  for (let i = 0; i < perDay; i++) {
+  for (let i = skip; i < perDay; i++) {
     result.push(sortedPageNumbers[(cycleOffset + i) % total]);
   }
   return result;
@@ -199,6 +228,7 @@ function juzModePagesForDate(
   user: User,
   date: Date,
   memorizedPages: UserPage[],
+  skip = 0,
 ): number[] {
   const juz = juzModeCycle(user, memorizedPages);
   if (!juz) return [];
@@ -209,9 +239,7 @@ function juzModePagesForDate(
 
   // The juz pattern repeats every cycle.length days; a shift moves within it.
   const dayIndex = daysSinceStart % juz.cycle.length;
-  const shift = user.scheduleShiftPages ?? 0;
-  if (!shift) return [...juz.cycle[dayIndex]];
-  return shiftedCycleDay(juz.cycle, dayIndex, shift);
+  return shiftedCycleDay(juz.cycle, dayIndex, user.scheduleShiftPages ?? 0, skip);
 }
 
 /**
@@ -620,12 +648,11 @@ export function getPagesForDay(
   date: Date,
   memorizedPages: UserPage[],
 ): number[] {
-  const scheduled = getPagesScheduledForDate(user, date, memorizedPages);
   const carry = user.carryOver;
-  if (!carry || carry.day !== dateToISODay(date)) return scheduled;
+  if (!carry || carry.day !== dateToISODay(date)) return getPagesScheduledForDate(user, date, memorizedPages);
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
   const carried = carry.pages.filter((p) => memorized.has(p));
-  const rest = scheduled.slice(carry.skip ?? 0).filter((p) => !carried.includes(p));
+  const rest = scheduledFrom(user, date, memorizedPages, carry.skip ?? 0).filter((p) => !carried.includes(p));
   return [...carried, ...rest];
 }
 

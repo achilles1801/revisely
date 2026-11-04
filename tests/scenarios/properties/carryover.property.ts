@@ -221,7 +221,7 @@ describe('[CARRY-2] carry-over, Keep daily amount (shift)', () => {
     );
   });
 
-  it('keeps every later day’s size, and the next day with pages starts with today’s displaced end', () => {
+  it('keeps every later day’s size, and the next day with pages starts with today’s displaced end (each page once in the plan)', () => {
     fc.assert(
       fc.property(setupArb, pickArb, (s, pick) => {
         useZone(s.zone);
@@ -235,7 +235,11 @@ describe('[CARRY-2] carry-over, Keep daily amount (shift)', () => {
           expect(getPagesForDay(next, d, s.mem).length).toBe(getPagesForDay(s.user, d, s.mem).length);
         }
         const after = nextDayWithPages(s.user, s.mem, s.today);
-        if (after) {
+        // A plan with a page on two days takes that page once where a day's
+        // window covers both copies (SCHED-6), so the pages after it move up;
+        // the schedule properties cover that. Here, plans that hold each page once.
+        const flat = s.user.customPlan?.days.flat() ?? [];
+        if (after && new Set(flat).size === flat.length) {
           const old = getPagesForDay(s.user, after, s.mem);
           expect(getPagesForDay(next, after, s.mem)).toEqual([...scheduled.slice(scheduled.length - skip), ...old].slice(0, old.length));
         }
@@ -326,18 +330,15 @@ describe('[CARRY-5] carry-over and the plan editor', () => {
     return { saved, unchangedDays: Math.max(1, shown.length - 1) };
   }
 
-  // KNOWN BUG: after "Keep daily amount" carries scattered leftovers (yesterday
-  // revised a later page but not an earlier one), opening the plan editor and
-  // saving an edit to a later day adds yesterday's revised page back to today.
-  // The editor shows today's scheduled day with the shift folded in, which
-  // starts with yesterday's last `skip` pages; settleCarryOverForNewPlan sets
-  // skip to 0, and userWithNewSchedule keeps that carry-over because today's
-  // scheduled pages look unchanged. Today becomes leftovers + that whole day,
-  // so the revised pages of yesterday's tail come back.
-  // Minimal: custom plan [[1,2,3],[4,5,6],[7,8,9]] from 2026-10-15, today
-  // 2026-10-17, yesterday [4,5,6] with 5 revised. Leftovers [4,6], today
-  // [4,6,7]. Edit day 3 and save. Expected today [4,6,7]. Actual [4,6,5,7].
-  it.failing('KNOWN BUG: saving an edit to a later day keeps today and the days before the edit as they were', () => {
+  // Was a known bug (fixed Nov 2026, carryOver.settleCarryOverForNewPlan):
+  // after "Keep daily amount" carried scattered leftovers (yesterday revised a
+  // later page but not an earlier one), saving an edit to a later day added
+  // yesterday's revised page back to today. The editor shows today's day with
+  // the shift folded in, starting with yesterday's last `skip` pages; saving set
+  // skip to 0, so those pages came back: plan [[1,2,3],[4,5,6],[7,8,9]] from
+  // 2026-10-15, today 10-17, yesterday [4,5,6] with 5 revised, leftovers [4,6],
+  // today [4,6,7]; after the save it was [4,6,5,7].
+  it('saving an edit to a later day keeps today and the days before the edit as they were', () => {
     fc.assert(
       fc.property(setupArb, pickArb, (s, pick) => {
         useZone(s.zone);
@@ -352,7 +353,6 @@ describe('[CARRY-5] carry-over and the plan editor', () => {
       }),
       {
         numRuns: runs(300),
-        endOnFailure: true,
         examples: [
           [
             {
@@ -369,7 +369,7 @@ describe('[CARRY-5] carry-over and the plan editor', () => {
     );
   });
 
-  it.failing('KNOWN BUG example: scattered leftovers [4,6], save an edit to day 3: today gains page 5', () => {
+  it('example: scattered leftovers [4,6], save an edit to day 3: today stays [4,6,7], without page 5', () => {
     const user = userWith({ customPlan: customPlan([[1, 2, 3], [4, 5, 6], [7, 8, 9]], '2026-10-15') });
     const mem = memorizedPages(range(1, 9));
     const today = new Date(2026, 9, 17);

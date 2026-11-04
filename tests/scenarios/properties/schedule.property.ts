@@ -247,19 +247,32 @@ describe('[SCHED-3] [SCHED-6] custom plan', () => {
     );
   });
 
-  it('with a shift of k keeps every day’s size, and one cycle reads the plan’s pages k earlier', () => {
+  it('with a shift of k keeps every day’s size', () => {
     fc.assert(
       fc.property(customArb, fc.nat({ max: 50 }), (c, cycles) => {
         useZone(c.zone);
         const user = customUser(c);
         const mem = memorizedPages(c.pages);
         const n = c.days.length;
-        // Any whole cycle from the start (cycles later) reads the same.
         const first = dayAt(parseDay(user.customPlan!.cycleStartDate), cycles * n);
         const cycle = scheduledDaysFrom(user, mem, first, n);
         expect(cycle.map((d) => d.length)).toEqual(c.days.map((d) => d.length));
-        const flat = c.days.flat();
-        expect(cycle.flat()).toEqual(flat.length ? rotateBack(flat, c.shift) : []);
+      }),
+      { numRuns: runs(300) },
+    );
+  });
+
+  it('with a shift of k, one cycle reads the plan’s pages k earlier when the plan holds each page once', () => {
+    fc.assert(
+      fc.property(distinctPlanArb, fc.nat({ max: 2000 }), fc.nat({ max: 50 }), zoneArb, ({ days, start }, shift, cycles, zone) => {
+        useZone(zone);
+        const user = userWith({ customPlan: customPlan(days, dayOf(dayFromIndex(start))), scheduleShiftPages: shift });
+        const mem = memorizedPages(days.flat());
+        const n = days.length;
+        // Any whole cycle from the start (cycles later) reads the same.
+        const first = dayAt(parseDay(user.customPlan!.cycleStartDate), cycles * n);
+        const flat = days.flat();
+        expect(scheduledDaysFrom(user, mem, first, n).flat()).toEqual(flat.length ? rotateBack(flat, shift) : []);
       }),
       { numRuns: runs(300) },
     );
@@ -277,15 +290,13 @@ describe('[SCHED-3] [SCHED-6] custom plan', () => {
     );
   });
 
-  // KNOWN BUG: a carry-over shift ("Keep daily amount") reads each day as a
-  // window over the plan's flat page sequence (algorithm.shiftedCycleDay).
-  // When the plan has a page on two neighbouring days (a page shared by the
-  // surah ending one day and the surah starting the next, or a page the user
-  // put on both), a shifted window can cover both copies: that day holds the
-  // page twice, and the next cycle shows it twice in the session.
-  // Minimal: custom plan [[1,2],[2,3]] (no day repeats a page), shift 1. Day 1
-  // of the cycle. Expected: no page twice. Actual: [2, 2].
-  it.failing('KNOWN BUG: with a shift, never puts a page twice on one day (plans may repeat a page on different days)', () => {
+  // Was a known bug (fixed Nov 2026, algorithm.shiftedCycleDay): a shift reads
+  // each day as a window over the plan's flat page sequence. When the plan has a
+  // page on two neighbouring days (a page shared by the surah ending one day and
+  // the surah starting the next), a shifted window could cover both copies, and
+  // that day held the page twice: [[1,2],[2,3]] with shift 1 gave day 1 [2, 2].
+  // The window now takes the page once and goes on to the next page.
+  it('with a shift, never puts a page twice on one day (plans may repeat a page on different days)', () => {
     fc.assert(
       fc.property(customArb, fc.nat({ max: 900 }), (c, j) => {
         useZone(c.zone);
@@ -295,13 +306,37 @@ describe('[SCHED-3] [SCHED-6] custom plan', () => {
       }),
       {
         numRuns: runs(300),
-        endOnFailure: true,
         examples: [[{ zone: 'UTC', pages: [1, 2, 3], start: 0, shift: 1, days: [[1, 2], [2, 3]] }, 1]],
       },
     );
   });
 
-  it.failing('KNOWN BUG example: one leftover carried with Keep daily amount; next cycle a day shows page 582 twice', () => {
+  it('with a shift, a day reads the plan’s pages in order from k pages earlier, each page once', () => {
+    fc.assert(
+      fc.property(customArb, fc.nat({ max: 900 }), (c, j) => {
+        useZone(c.zone);
+        const user = customUser(c);
+        const n = c.days.length;
+        const idx = j % n;
+        const day = c.days[idx];
+        const pages = getPagesScheduledForDate(user, dayAt(parseDay(user.customPlan!.cycleStartDate), j), memorizedPages(c.pages));
+        if (day.length === 0 || c.shift === 0) return;
+        // By hand: the plan's pages in order, from k before this day's first, each taken once.
+        const flat = c.days.flat();
+        let pos = 0;
+        for (let i = 0; i < idx; i++) pos += c.days[i].length;
+        const expected: number[] = [];
+        for (let i = 0; expected.length < day.length && i < flat.length; i++) {
+          const p = flat[(((pos - c.shift + i) % flat.length) + flat.length) % flat.length];
+          if (!expected.includes(p)) expected.push(p);
+        }
+        expect(pages).toEqual(expected);
+      }),
+      { numRuns: runs(300) },
+    );
+  });
+
+  it('example: one leftover carried with Keep daily amount; a cycle later no day shows page 582 twice', () => {
     const plan = customPlan([[1, 2, 3], [580, 581, 582], [582, 583, 584]], '2026-10-15');
     const user = userWith({ customPlan: plan });
     const mem = memorizedPages([1, 2, 3, 580, 581, 582, 583, 584]);
@@ -314,6 +349,8 @@ describe('[SCHED-3] [SCHED-6] custom plan', () => {
     // Oct 20 is the same plan day as Oct 17, a cycle later.
     const oct20 = getPagesForDay(carried, new Date(2026, 9, 20), mem);
     expect(oct20).toEqual([...new Set(oct20)]);
+    // Window [582, 582, 583] takes 582 once and goes on to 584.
+    expect(oct20).toEqual([582, 583, 584]);
   });
 
   it('opens in the editor on today’s day: rotateCustomPlanToToday = the live days from today', () => {

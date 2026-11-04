@@ -205,6 +205,21 @@ export class Session {
     await this.app.idle(30);
   }
 
+  /** A swipe back to the page before (nothing is marked, as on the phone). */
+  async swipeBack(): Promise<void> {
+    const state = pagerState();
+    const props = state.props;
+    if (!props || state.current == null) throw new Error('no page on screen');
+    const i = props.pages.indexOf(state.current);
+    if (i <= 0) throw new Error('no page before this one');
+    await this.app.act(async () => {
+      props.onUserSwipe?.();
+      state.current = props.pages[i - 1];
+      props.onPageChange?.(state.current, i - 1);
+    });
+    await this.app.idle(30);
+  }
+
   /** Revises `n` pages from the one on screen: each is checked by swiping on from it, the last onto the end card if it is the last. */
   async swipeThrough(n = this.pages().length): Promise<void> {
     for (let k = 0; k < n; k++) await this.swipe();

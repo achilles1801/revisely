@@ -35,6 +35,7 @@ import {
   increment,
   DocumentReference,
   onSnapshot,
+  Query,
   Unsubscribe,
 } from 'firebase/firestore';
 import type { BackupListing, CloudRecording } from '../lib/recordings';
@@ -268,6 +269,35 @@ export async function getUserFromServer(userId?: string): Promise<FirestoreUser 
   return snapshot.exists() ? (snapshot.data() as FirestoreUser) : null;
 }
 
+/**
+ * A query's documents as they change, and once more when the server confirms
+ * what came from the cache (`fromCache` turning false). The app waits for the
+ * server's answer (AppContext ignores cached snapshots), and without
+ * `includeMetadataChanges` Firestore sends nothing when only that changes: the
+ * 604 pages a sign-up writes just before listening came once, from the cache,
+ * and a new account stayed on "loading" until the app was relaunched (SYNC-4,
+ * fixed Nov 2026). Snapshots that change nothing but pending-write flags are
+ * not passed on, so a write isn't answered twice.
+ */
+function onQuerySnapshot<T>(
+  q: Query,
+  callback: (docs: T[], meta: { fromCache: boolean }) => void,
+  onError: (error: unknown) => void,
+): Unsubscribe {
+  let lastFromCache: boolean | null = null;
+  return onSnapshot(
+    q,
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      const fromCache = snapshot.metadata.fromCache;
+      if (fromCache === lastFromCache && snapshot.docChanges().length === 0) return;
+      lastFromCache = fromCache;
+      callback(snapshot.docs.map((d) => d.data() as T), { fromCache });
+    },
+    onError,
+  );
+}
+
 // ============================================================================
 // PAGE OPERATIONS
 // ============================================================================
@@ -357,15 +387,10 @@ export function subscribeToPages(
   onError?: (error: unknown) => void,
 ): Unsubscribe {
   const q = query(getPagesCollectionRef(userId), orderBy('pageNumber', 'asc'));
-  return onSnapshot(
-    q,
-    (snapshot) =>
-      callback(snapshot.docs.map((d) => d.data() as FirestorePage), { fromCache: snapshot.metadata.fromCache }),
-    (error) => {
-      logger.error('subscribeToPages failed', error);
-      onError?.(error);
-    },
-  );
+  return onQuerySnapshot<FirestorePage>(q, callback, (error) => {
+    logger.error('subscribeToPages failed', error);
+    onError?.(error);
+  });
 }
 
 /** Whether the user has any page documents, asked of the server (not the local cache). */
@@ -454,15 +479,10 @@ export function subscribeToSessions(
   onError?: (error: unknown) => void,
 ): Unsubscribe {
   const q = query(getSessionsCollectionRef(userId), orderBy('date', 'desc'), limit(limitCount));
-  return onSnapshot(
-    q,
-    (snapshot) =>
-      callback(snapshot.docs.map((d) => d.data() as FirestoreSession), { fromCache: snapshot.metadata.fromCache }),
-    (error) => {
-      logger.error('subscribeToSessions failed', error);
-      onError?.(error);
-    },
-  );
+  return onQuerySnapshot<FirestoreSession>(q, callback, (error) => {
+    logger.error('subscribeToSessions failed', error);
+    onError?.(error);
+  });
 }
 
 /**

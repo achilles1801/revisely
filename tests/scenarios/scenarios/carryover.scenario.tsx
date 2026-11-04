@@ -1,7 +1,7 @@
 // Carrying pages over (BEHAVIOUR.md, CARRY-*) and missed days (SCHED-5).
 
 import { setNow, setZone, ZONES } from '../harness/clock';
-import { CITIES, newAccount, pagesRange } from '../harness/account';
+import { CITIES, newAccount, pagesRange, saveCustomPlan, saveEditedPlan } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
@@ -153,6 +153,53 @@ describe('missed days', () => {
     await partMonday(phone, 5);
     const { app, home } = await openHome(phone, '2026-11-03 09:00');
     expect(home.carryOver()).toBeNull();
+    await app.close();
+  });
+});
+
+describe('the plan editor', () => {
+  it('[CARRY-5] [CARRY-2] scattered leftovers, then an edit to a later day saved: today stays as it was, without the page revised yesterday', async () => {
+    const phone = await account({});
+    // A custom plan from Monday: Mon 1–3, Tue 4–6, Wed 7–9.
+    let { app, home } = await openHome(phone, '2026-11-02 20:30');
+    await saveCustomPlan(app, [[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+    let session = await home.startSession();
+    expect(session.pages()).toEqual([1, 2, 3]);
+    await session.swipeThrough(3);
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+
+    // Tuesday: page 5 only. Swiping on marks 4 and 5; back on 4, the check comes off.
+    ({ app, home } = await openHome(phone, '2026-11-03 18:00'));
+    session = await home.startSession();
+    expect(session.pages()).toEqual([4, 5, 6]);
+    await session.swipe();
+    await session.swipe();
+    await session.swipeBack();
+    await session.swipeBack();
+    await session.uncheck();
+    await session.back();
+    await app.untilSynced();
+    expect(app.app.logs.find((l) => l.date === '2026-11-03')?.pagesRevised).toEqual([5]);
+    await app.close();
+
+    // Wednesday: 4 and 6 are added; today is 4, 6, then Wednesday's 7 (8 and 9 move on).
+    ({ app, home } = await openHome(phone, '2026-11-04 09:00'));
+    expect(home.carryOver()).not.toBeNull();
+    await home.tap('today-carry-over');
+    await app.untilSynced();
+    await app.until(() => home.carryOver() == null, 'the offer to go');
+    expect(await todaysSession(home)).toEqual([4, 6, 7]);
+
+    // The plan editor: the last day reordered, saved. Today is untouched; 5 doesn't come back.
+    await saveEditedPlan(app, (shown) => shown.map((d, i) => (i === shown.length - 1 ? [...d].reverse() : d)));
+    expect(await todaysSession(home)).toEqual([4, 6, 7]);
+    expect(home.detail()).toMatch(/2 from yesterday first/);
+    await app.close();
+
+    ({ app, home } = await openHome(phone, '2026-11-04 12:00'));
+    expect(await todaysSession(home)).toEqual([4, 6, 7]);
     await app.close();
   });
 });

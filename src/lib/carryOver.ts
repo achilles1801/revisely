@@ -166,15 +166,13 @@ export function applyCarryOver(
 }
 
 /**
- * The user after saving a new plan in the editor. The editor showed the shifted
- * schedule, so the shift is now part of the plan; pages carried into today stay
- * today, on top of the new plan's first day.
+ * The user after saving a plan from the editor. The editor showed the shifted
+ * schedule, so the shift is now part of the plan. Today's carry-over stays as
+ * it is, `skip` included: the plan's day for today is the day the editor
+ * showed, which starts with the `skip` pages the leftovers stand in for
+ * (yesterday's end, revised or carried). Setting `skip` to 0 brought those back
+ * into today, a page revised yesterday among them (CARRY-5, fixed Nov 2026).
  */
-export function settleCarryOverForNewPlan(user: User, today: string): User {
-  const carry = user.carryOver;
-  return {
-    ...user,
-    ...(user.scheduleShiftPages ? { scheduleShiftPages: 0 } : {}),
-    ...(carry && carry.day === today && carry.skip ? { carryOver: { ...carry, skip: 0 } } : {}),
-  };
+export function settleCarryOverForNewPlan(user: User): User {
+  return user.scheduleShiftPages ? { ...user, scheduleShiftPages: 0 } : user;
 }
