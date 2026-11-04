@@ -130,6 +130,13 @@ function recordingInProgress() {
   return mockRecorder as { finish: jest.Mock };
 }
 
+// The day's recordings (Listen back on the end card).
+let mockRecordings: unknown[] = [];
+jest.mock('../../../lib/recordings', () => {
+  const actual = jest.requireActual('../../../lib/recordings');
+  return { ...actual, listRecordings: jest.fn(async () => mockRecordings) };
+});
+
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
@@ -234,6 +241,7 @@ beforeEach(() => {
   mockFollow.active = false;
   mockModelState = { status: 'missing', error: null };
   mockRecorder = null;
+  mockRecordings = [];
 });
 
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
@@ -926,5 +934,84 @@ describe('ActiveRevisionScreen — hidden pages, word by word', () => {
     expect(mockFollow.active).toBe(false);
     expect(mockListener.active).toBe(true);
     expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
+  });
+});
+
+// "They have to go find that recording in Activity": the end card offers it.
+describe('ActiveRevisionScreen — Listen back on the end card', () => {
+  const recording = (day: string, extra: Record<string, unknown> = {}) => ({
+    id: 'rec-1',
+    kind: 'revision',
+    day,
+    createdAt: 1,
+    durationMs: 60_000,
+    pageMarks: [{ atMs: 0, page: 339 }, { atMs: 30_000, page: 340 }],
+    uri: '',
+    segments: [],
+    sizeBytes: 0,
+    backedUp: false,
+    ...extra,
+  });
+
+  it('a recorded session: Listen back opens the recording over its pages', async () => {
+    const log = setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    mockRecordings = [recording(log.date)];
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    fireEvent.press(screen.getByTestId('session-end-listen-back'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ListenBack', { recordingId: 'rec-1' });
+  });
+
+  it('pages left: offered too', async () => {
+    const log = setup([331, 332]);
+    mockRecordings = [recording(log.date)];
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('3 of 10 revised')).toBeTruthy();
+    expect(screen.getByTestId('session-end-listen-back')).toBeTruthy();
+  });
+
+  it('not recorded (or only another day, or a reading): no button', async () => {
+    const log = setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
+    mockRecordings = [recording('2020-01-01'), recording(log.date, { id: 'r2', kind: 'reading' })];
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.getByText('Revision complete')).toBeTruthy();
+    expect(screen.queryByTestId('session-end-listen-back')).toBeNull();
+  });
+
+  it('while recording: not offered (it would play into the recording)', async () => {
+    const log = setup([331, 332]);
+    mockRecordings = [recording(log.date)];
+    recordingInProgress();
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    expect(screen.queryByTestId('session-end-listen-back')).toBeNull();
+  });
+});
+
+// Variant B: while recording the recorder is the whole capsule.
+describe('ActiveRevisionScreen — the recorder in the controls', () => {
+  it('recording: the recorder takes the capsule (the player steps aside); paused, the player is back', async () => {
+    setup([331, 332]);
+    const recorder = recordingInProgress() as unknown as Record<string, unknown>;
+    Object.assign(recorder, { baseMs: 5_000, segmentStartedAt: Date.now() });
+    const view = render(<ActiveRevisionScreen />);
+    fireEvent.press(screen.getByLabelText('The page'));
+    expect(screen.getByTestId('record-pill-recording')).toBeTruthy();
+    expect(screen.queryByLabelText('Play from this page')).toBeNull();
+
+    Object.assign(recorder, { phase: 'paused', recording: false, paused: true, segmentStartedAt: null });
+    view.rerender(<ActiveRevisionScreen />);
+    expect(screen.getByTestId('record-pill-paused')).toBeTruthy();
+    expect(screen.getByLabelText('Play from this page')).toBeTruthy();
   });
 });

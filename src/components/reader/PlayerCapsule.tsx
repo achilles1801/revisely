@@ -49,6 +49,12 @@ interface PlayerCapsuleProps {
   compact?: boolean;
   /** Its surface, from the reader's palette. */
   surface: { background: string; border: string };
+  /**
+   * A recording is under way (RecordButton's recorderTakesCapsule): `record`
+   * is the whole capsule, and the timer (and `trailing`) sit in a small
+   * capsule beside it.
+   */
+  recording?: boolean;
 }
 
 /**
@@ -57,8 +63,24 @@ interface PlayerCapsuleProps {
  * stop · speed · previous · play/pause · next · Audio Options (the verse
  * itself is highlighted on the page). Then recording and the timer.
  */
-export function PlayerCapsule({ player, page, record, timer, trailing, compact, surface }: PlayerCapsuleProps) {
+export function PlayerCapsule({ player, page, record, timer, trailing, compact, surface, recording }: PlayerCapsuleProps) {
   const { theme } = useTheme();
+  const frame = { backgroundColor: surface.background, borderColor: surface.border, borderWidth: StyleSheet.hairlineWidth };
+  if (recording && record) {
+    return (
+      <View style={styles.row}>
+        <View style={[styles.capsule, styles.recorder, frame]} testID="player-capsule">
+          {record}
+        </View>
+        {timer || trailing ? (
+          <View style={[styles.capsule, frame]} testID="player-capsule-side">
+            {timer}
+            {trailing}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
   const { state } = player;
   const active = state.status !== 'idle' && state.verse != null;
   const playing = state.status === 'playing';
@@ -194,6 +216,9 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
 }
 
 const styles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // The recorder fills it, with its own padding.
+  recorder: { flex: 1, paddingHorizontal: 0, minWidth: 0 },
   capsule: {
     height: CAPSULE_HEIGHT,
     flexDirection: 'row',

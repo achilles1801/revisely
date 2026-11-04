@@ -117,6 +117,25 @@ describe('<RecordingsList /> playback', () => {
     expect(p.seekTo).toHaveBeenCalledWith(1); // 11 s on the timeline = 1 s into segment 2
   });
 
+  it('› opens Listen back from the start, stopping what plays here', async () => {
+    const onOpen = jest.fn();
+    render(
+      <ThemeProvider>
+        <RecordingsList day="2026-10-19" onOpen={onOpen} />
+      </ThemeProvider>,
+    );
+    fireEvent.press(await screen.findByLabelText('Play recording'));
+    fireEvent.press(screen.getByLabelText('Listen back with the pages'));
+    expect(mockPlayers[0].pause).toHaveBeenCalled();
+    expect(screen.getByLabelText('Play recording')).toBeTruthy();
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+  });
+
+  it('without a way to Listen back, no ›', async () => {
+    await renderList();
+    expect(screen.queryByLabelText('Listen back with the pages')).toBeNull();
+  });
+
   it('a recitation starting stops playback, leaving the session active', async () => {
     fireEvent.press(await renderList());
     const { claimAudio } = require('../../../lib/audioFocus');
@@ -196,7 +215,7 @@ describe('<RecordingsList /> recordings in the backup', () => {
     const { Alert } = require('react-native');
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await renderList();
-    fireEvent.press(screen.getByTestId('recording-r1-menu'));
+    fireEvent(screen.getByTestId('recording-r1'), 'longPress');
     fireEvent.press(screen.getByTestId('sheet-action-delete'));
     // The menu's action runs once it has gone (iOS: onDismiss).
     const { Modal } = jest.requireActual('react-native');

@@ -15,7 +15,8 @@ import { PillButton } from '../v2/PillButton';
  * up) a burst of confetti in the accent's colours, or with Reduce Motion the
  * check fading in. Pages left: how many are done. The session is saved as it
  * goes, and Back leaves it. When every page is done and a next revision day
- * exists, Keep going continues into its pages (#168).
+ * exists, Keep going continues into its pages (#168). A session that was
+ * recorded offers Listen back: the recording over its pages.
  */
 export function SessionEndCard({
   total,
@@ -24,6 +25,7 @@ export function SessionEndCard({
   dayLabel = 'today',
   next,
   onKeepGoing,
+  onListenBack,
 }: {
   total: number;
   done: number;
@@ -34,6 +36,8 @@ export function SessionEndCard({
   /** The next revision day's pages (Keep going), or none at the end of the cycle. */
   next?: { label: string; pages: number } | null;
   onKeepGoing?: () => void;
+  /** The session was recorded: play it back over its pages. */
+  onListenBack?: () => void;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -81,6 +85,15 @@ export function SessionEndCard({
           </Text>
           <PillButton title="Keep going" onPress={onKeepGoing} testID="session-end-keep-going" />
         </View>
+      ) : null}
+      {onListenBack ? (
+        <PillButton
+          title="Listen back"
+          icon="headset-outline"
+          variant="outline"
+          onPress={onListenBack}
+          testID="session-end-listen-back"
+        />
       ) : null}
     </View>
   );

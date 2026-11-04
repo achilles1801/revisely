@@ -59,6 +59,9 @@ export const VOICE_PRESET: RecordingOptions = {
 
 export type RecorderPhase = 'idle' | 'starting' | 'recording' | 'paused' | 'finishing';
 
+/** Readings kept for the live bars (12 s at LEVEL_SAMPLE_MS). */
+export const LIVE_LEVELS = 120;
+
 interface Options {
   kind: RecordingKind;
   /** Revision day the recording belongs to. */
@@ -112,6 +115,13 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   const marksRef = useRef<PageMark[]>([]);
   // The microphone's level over the stretch in progress (its waveform).
   const levelsRef = useRef(createLevelBuffer());
+  // Listeners of each reading's level (subscribeLevel), the latest readings
+  // (recentLevels) and the latest in dBFS (level()). One reading serves them
+  // all: on Android the level is the peak since the last read, so a second
+  // reader would split the peaks between them.
+  const levelListeners = useRef(new Set<(level: number) => void>());
+  const recentRef = useRef<number[]>([]);
+  const lastDbRef = useRef<number | null>(null);
   const dayRef = useRef(day);
   const recordingIdRef = useRef<string | null>(null);
   const createdAtRef = useRef(0);
@@ -328,6 +338,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
       recordingIdRef.current = existing?.id ?? null;
       baseRef.current = existing?.durationMs ?? 0;
       marksRef.current = existing ? [...existing.pageMarks] : [];
+      recentRef.current = [];
       await startSegment();
       buzz();
     } catch (err) {
@@ -496,18 +507,49 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
   // average power in dBFS when metering is on (VOICE_PRESET); without it
   // nothing is kept, and the recording is drawn flat.
   useEffect(() => {
-    if (phase !== 'recording') return;
+    if (phase !== 'recording') {
+      lastDbRef.current = null;
+      return;
+    }
     const id = setInterval(() => {
       if (phaseRef.current !== 'recording') return;
+      let db: number | undefined;
       try {
-        const db = recorder.getStatus().metering;
-        if (typeof db === 'number' && Number.isFinite(db)) addLevel(levelsRef.current, dbToLevel(db));
+        db = recorder.getStatus().metering;
       } catch {
         // Released (the screen is closing): the stretch keeps what it has.
+        return;
       }
+      const metered = typeof db === 'number' && Number.isFinite(db);
+      lastDbRef.current = metered ? (db as number) : null;
+      // Without metering the live bars are dots (0), never made up.
+      const level = metered ? dbToLevel(db as number) : 0;
+      if (metered) addLevel(levelsRef.current, level);
+      const recent = recentRef.current;
+      recent.push(level);
+      if (recent.length > LIVE_LEVELS) recent.splice(0, recent.length - LIVE_LEVELS);
+      // The live bars (components/recordings/LiveWaveform) read this same
+      // reading; they don't poll the recorder of their own.
+      levelListeners.current.forEach((listen) => {
+        try {
+          listen(level);
+        } catch (err) {
+          logger.warn('Level listener failed', err);
+        }
+      });
     }, LEVEL_SAMPLE_MS);
     return () => clearInterval(id);
   }, [phase, recorder]);
+
+  /** Each reading's level (0–1) while recording, as it is read; returns how to stop. */
+  const subscribeLevel = useCallback((listen: (level: number) => void) => {
+    levelListeners.current.add(listen);
+    return () => {
+      levelListeners.current.delete(listen);
+    };
+  }, []);
+  /** The latest readings (0–1), oldest first: the live bars start full. */
+  const recentLevels = useCallback(() => recentRef.current.slice(), []);
 
   // An interruption that leaves the app active (an alarm, Siri) pauses the
   // recorder without an event: notice it and pause the session too.
@@ -538,6 +580,9 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
    *  recite mode listens through it instead of opening the microphone again. */
   const level = useCallback((): number | null => {
     if (phaseRef.current !== 'recording') return null;
+    if (lastDbRef.current != null) return lastDbRef.current;
+    // Before the first reading (or without metering): read it here, as before,
+    // so the listener never takes this for "not recording" and opens its own.
     try {
       const db = recorder.getStatus().metering;
       return typeof db === 'number' && Number.isFinite(db) ? db : null;
@@ -560,5 +605,7 @@ export function useVoiceRecorder({ kind, day, currentPage, onSaved, onFinished }
     pause: () => pause(false),
     resume,
     finish,
+    subscribeLevel,
+    recentLevels,
   };
 }
