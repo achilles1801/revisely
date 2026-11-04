@@ -256,8 +256,16 @@ export class OpenApp {
       renders: this.renders.n,
       signedIn: !!u.firebaseUser,
       authLoading: u.isLoading,
-      user: a.user ? { anchor: a.user.scheduleAnchorDate, perDay: a.user.dailyPageCapacity } : a.user,
+      user: a.user
+        ? {
+            anchor: a.user.scheduleAnchorDate,
+            perDay: a.user.dailyPageCapacity,
+            plan: a.user.customPlan?.days.length ?? 0,
+            carry: a.user.carryOver ?? null,
+          }
+        : a.user,
       pages: a.pages.length,
+      memorized: a.pages.filter((p: { status: string }) => p.status === 'memorized').length,
       logs: a.logs.length,
       loading: a.loading,
       onboardingComplete: a.onboardingComplete,

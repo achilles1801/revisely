@@ -144,6 +144,10 @@ export class Home {
         // Still on Home: the press was lost; tap again.
       }
     }
+    const route = nav.current?.getCurrentRoute?.()?.name;
+    if (route !== 'ActiveRevision') {
+      throw new Error(`"${testID}" opened ${route ?? 'nothing'}, not the session. Home said: ${this.today()}\n${this.app.describe()}`);
+    }
     await session.ready();
     return session;
   }
