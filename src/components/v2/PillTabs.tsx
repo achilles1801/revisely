@@ -9,11 +9,14 @@ export function PillTabs<T extends string>({
   options,
   value,
   onChange,
+  disabled = false,
   testID,
 }: {
   options: { value: T; label: string; icon?: keyof typeof Ionicons.glyphMap; count?: number }[];
   value: T;
   onChange: (value: T) => void;
+  /** Locks the choice (the value still shows); no press changes it. */
+  disabled?: boolean;
   testID?: string;
 }) {
   const haptics = useHaptics();
@@ -29,8 +32,9 @@ export function PillTabs<T extends string>({
             icon={o.icon}
             size="sm"
             variant={selected ? 'solid' : 'outline'}
+            disabled={disabled}
             onPress={() => {
-              if (selected) return;
+              if (selected || disabled) return;
               haptics.selection();
               onChange(o.value);
             }}
