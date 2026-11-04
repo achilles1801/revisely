@@ -84,7 +84,7 @@ export default function DashboardScreen() {
   const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const { user, pages, logs, updateLog, deleteLog, loadData, error, saveUser } = useApp();
+  const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser } = useApp();
   const { firebaseUser } = useAuth();
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
@@ -325,7 +325,19 @@ export default function DashboardScreen() {
   };
 
   const handleSaveSession = async (updatedLog: RevisionLog) => {
-    await updateLog(updatedLog);
+    if (updatedLog.id) {
+      await updateLog(updatedLog);
+    } else {
+      // A review of a day with no session yet (see handleCtaPress) is saved as its first session.
+      await addLog({
+        date: updatedLog.date,
+        assignedPages: updatedLog.assignedPages,
+        pagesRevised: updatedLog.pagesRevised,
+        pagesSkipped: updatedLog.pagesSkipped,
+        weaknessUpdates: updatedLog.weaknessUpdates,
+        durationMinutes: updatedLog.durationMinutes,
+      });
+    }
     setShowEditModal(false);
     setSelectedLog(null);
     setSelectedSessionPages([]);
@@ -333,7 +345,8 @@ export default function DashboardScreen() {
 
   const handleDeleteSession = async () => {
     if (selectedLog) {
-      await deleteLog(selectedLog.id);
+      // A review with no session yet has nothing to delete.
+      if (selectedLog.id) await deleteLog(selectedLog.id);
       setShowEditModal(false);
       setSelectedLog(null);
       setSelectedSessionPages([]);
@@ -342,11 +355,21 @@ export default function DashboardScreen() {
 
   const handleCtaPress = () => {
     if (todayStatus.status === 'completed') {
-      const todayLog = logs.find(
-        (log) => log.date === revisionDay,
-      );
       // The review is the day's done pages: the same set Home counts as Done.
-      if (todayLog) handleEditSession(todayLog, [...doneOnDay(logs, revisionDay)].sort((a, b) => a - b));
+      const done = [...doneOnDay(logs, revisionDay)].sort((a, b) => a - b);
+      const todayLog = logs.find((log) => log.date === revisionDay);
+      // Done only by pages revised ahead from an earlier session: no session of
+      // today yet, so the review opens as a new one, with those pages checked.
+      const draft: RevisionLog = {
+        id: '',
+        date: revisionDay,
+        assignedPages: assignment.pages,
+        pagesRevised: done,
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 0,
+      };
+      handleEditSession(todayLog ?? draft, done);
     } else if (assignment.totalPages === 0) {
       navigation.navigate('Memorization', { edit: true });
     } else {

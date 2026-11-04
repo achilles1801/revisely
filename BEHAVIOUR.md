@@ -60,6 +60,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199).
+  A day done only by pages revised ahead (no session of its own) still opens its review with those
+  pages checked; saving it makes that day's session.
 
 ## Revising ahead
 
