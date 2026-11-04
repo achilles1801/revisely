@@ -733,18 +733,21 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
   - The simulator's dev client predates the key, so it can't show background play: check on a
     TestFlight build.
   - **Android's notification can outlive its service** (expo-audio 1.1's `AudioControlsService`;
-    a closed tester's Samsung, Nov 3 2026). Swiping the app away from recents makes Media3's
-    `onTaskRemoved` pause the player and stop the service; expo-audio's `onDestroy` leaves its
-    listener on our player, and the player's next move posts a notification for the dead session
-    (no buttons, a still progress bar) under the fallback id 369280525
-    (`"expo_audio_channel".hashCode()`), which nothing cancels, even after the app closes. Until
-    expo-audio is patched (native, a build), `lib/recitation` on Android frees its player
-    (`remove()` + `release()`) instead of `setActiveForLockScreen(false)`, which, once the
-    service is gone, starts it again with no notification. It also checks the notification
-    (`lib/mediaNotification`, through expo-notifications) at launch, when the app comes back, on a
-    pause from outside and on each verse with the app away: it dismisses orphans and pauses a
-    recitation whose notification is gone, so ▶ starts a new player and a new notification.
-    A paused recitation's notification still can't be swiped away; that needs the native fix.
+    a closed tester's Samsung, Nov 3 2026; reproduced on an emulator Nov 4). Swiping the app away
+    from recents makes Media3's `onTaskRemoved` pause the player and stop the service. expo-audio's
+    paused post lands after the system has removed the service's notification, leaving a
+    notification that can't be swiped away (`NO_CLEAR`), for a dead session: no buttons, a still
+    progress bar, and it outlives the app. The screens then unmount and `MainNavigator` stops the
+    recitation; `setActiveForLockScreen(false)` started the dead service again with nothing to
+    show, and Android killed the app 30 s later (`ForegroundServiceDidNotStartInTimeException`).
+    Until expo-audio is patched (native, a build), `lib/recitation` on Android frees its player
+    (`remove()` + `release()`) instead of `setActiveForLockScreen(false)`, and dismisses any media
+    notification still on show once it has let go of the lock screen (`lib/mediaNotification`,
+    through expo-notifications): right after a stop, at launch and when the app comes back. With
+    the app away React Native's timers stand still on Android, so after a stop it reads again and
+    again for 2 s instead of waiting. Coming back, it also pauses a recitation whose notification
+    has lost its service, so ▶ starts a new player and notification. A paused notification still
+    can't be swiped away; that needs the native fix.
 - `v2/WheelPicker`'s `contentOffset` is where it starts, set once. Changing it after mount moved
   the wheel a second row on a phone (a test covers it). Maestro can't tap a wheel's rows by id (the
   wheel is one adjustable element for VoiceOver): tap by point. Maestro takes whole-number

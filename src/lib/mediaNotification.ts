@@ -1,21 +1,29 @@
 // Android: the media notification expo-audio 1.1 shows for a recitation (its
-// AudioControlsService) can outlive what it controls.
-//
-// Swiping the app away makes Media3's MediaSessionService.onTaskRemoved pause the
-// player and stop the service (expo-audio bypasses Media3's own notification
-// manager, so Media3 never counts the playback as ongoing). expo-audio's onDestroy
-// releases the session but leaves its listener on our player, still marked as on
-// the lock screen. The next thing that player does (a resume, the next verse)
-// makes that listener post the notification again for a session that no longer
-// exists: no buttons, a progress bar that doesn't move, under the id expo-audio
-// falls back to when it has no player ("expo_audio_channel".hashCode() in Java),
-// which nothing cancels. It stays after the app is closed.
+// AudioControlsService) can outlive what it controls. Seen on an emulator, Nov 4
+// 2026, swiping the app away from recents while a verse plays:
+// - Media3's MediaSessionService.onTaskRemoved pauses the player and stops the
+//   service (expo-audio bypasses Media3's own notification manager, so Media3
+//   never counts the playback as ongoing).
+// - expo-audio posts the paused notification as the service goes; the system
+//   removes the service's notification, then that post lands: a plain
+//   notification that can't be swiped away (NO_CLEAR), for a session that no
+//   longer exists, so no buttons and a progress bar that doesn't move. Nothing
+//   cancels it; it outlives the app.
+// - The app's screens unmount and stop the recitation; clearing the lock screen
+//   (setActiveForLockScreen(false)) then starts the service again with nothing to
+//   show, and Android kills the app 30 s later
+//   (ForegroundServiceDidNotStartInTimeException).
+// - expo-audio's onDestroy also leaves its listener on our player, and once it has
+//   no player it posts under a fallback id ("expo_audio_channel".hashCode() in
+//   Java), which nothing cancels either.
 //
 // Until expo-audio itself is fixed (a native change), lib/recitation works around
-// it: it frees its player rather than clearing the lock screen (clearing it once
-// the service is gone starts the service again with nothing to show), checks that
-// the notification is still there when the app comes back or is paused from
-// outside, and dismisses the orphan.
+// it: it frees its player rather than clearing the lock screen, dismisses any
+// media notification still on show once it has let go of the lock screen (right
+// after a stop, at launch and when the app comes back), and when the app comes
+// back pauses a recitation whose notification has lost its service. With the
+// app away React Native's timers stand still on Android, so right after a stop
+// it reads what is on show again and again for a moment instead of waiting.
 
 import * as Notifications from 'expo-notifications';
 
@@ -41,21 +49,21 @@ export function foreignNotificationId(identifier: string): { id: number; tagged:
 }
 
 export interface MediaNotifications {
-  /** expo-audio's notification is up, backed by its service. */
-  live: boolean;
-  /** Identifiers of orphans (see above), to dismiss. */
+  /** Identifiers of expo-audio's media notifications on show (live or left over). */
+  media: string[];
+  /** Identifiers of notifications at its fallback id: never live. */
   orphans: string[];
 }
 
 /** expo-audio's notifications on show now (Android). */
 export async function readMediaNotifications(): Promise<MediaNotifications> {
-  const out: MediaNotifications = { live: false, orphans: [] };
+  const out: MediaNotifications = { media: [], orphans: [] };
   for (const n of await Notifications.getPresentedNotificationsAsync()) {
     const identifier = n.request.identifier;
     const foreign = foreignNotificationId(identifier);
     if (!foreign || foreign.tagged) continue;
     if (foreign.id === ORPHAN_NOTIFICATION_ID) out.orphans.push(identifier);
-    else if (isMediaStyle(n.request.content.data)) out.live = true;
+    else if (isMediaStyle(n.request.content.data)) out.media.push(identifier);
   }
   return out;
 }

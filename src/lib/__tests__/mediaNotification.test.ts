@@ -36,17 +36,22 @@ describe('mediaNotification', () => {
     expect(foreignNotificationId('daily-reminder')).toBeNull();
   });
 
-  it('tells the live media notification from an orphan, and ignores everything else', async () => {
-    expect(await readMediaNotifications()).toEqual({ live: false, orphans: [] });
+  it('finds expo-audio\'s media notifications and its orphans, and ignores everything else', async () => {
+    expect(await readMediaNotifications()).toEqual({ media: [], orphans: [] });
     mockShown.push(
       { request: { identifier: 'daily-reminder', content: { data: {} } } },
       { request: { identifier: foreign(42), content: { data: { 'android.template': 'android.app.Notification$BigTextStyle' } } } },
+      { request: { identifier: foreign(43, 'tagged'), content: { data: media } } },
     );
-    expect(await readMediaNotifications()).toEqual({ live: false, orphans: [] });
+    expect(await readMediaNotifications()).toEqual({ media: [], orphans: [] });
     mockShown.push({ request: { identifier: foreign(ORPHAN_NOTIFICATION_ID), content: { data: media } } });
-    expect(await readMediaNotifications()).toEqual({ live: false, orphans: [foreign(ORPHAN_NOTIFICATION_ID)] });
-    mockShown.push({ request: { identifier: foreign(-987654), content: { data: media } } });
-    expect(await readMediaNotifications()).toEqual({ live: true, orphans: [foreign(ORPHAN_NOTIFICATION_ID)] });
+    expect(await readMediaNotifications()).toEqual({ media: [], orphans: [foreign(ORPHAN_NOTIFICATION_ID)] });
+    // As the emulator showed it: id = the player's hash, the platform MediaStyle template.
+    mockShown.push({ request: { identifier: foreign(79963736), content: { data: media } } });
+    expect(await readMediaNotifications()).toEqual({
+      media: [foreign(79963736)],
+      orphans: [foreign(ORPHAN_NOTIFICATION_ID)],
+    });
   });
 
   it('dismisses by identifier', async () => {

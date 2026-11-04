@@ -209,8 +209,13 @@ export interface RecitationState {
 
 export const LOAD_TIMEOUT_MS = 15_000;
 
-/** Android: how long after a pause from outside (or a verse starting) with the app away its notification is checked. */
+/** Android, the app in front: how long after a stop the notification is checked again. */
 export const NOTIFICATION_CHECK_MS = 1_500;
+/** Android, the app away: how long after a stop it keeps looking (React Native's timers stand still then). */
+export const NOTIFICATION_SWEEP_MS = 2_000;
+const NOTIFICATION_SWEEP_READS = 60;
+// However long the first reads take (the screens are coming down then).
+const NOTIFICATION_SWEEP_MIN_READS = 3;
 /** Android: a notification younger than this may not be up yet. */
 export const NOTIFICATION_SETTLE_MS = 3_000;
 
@@ -372,8 +377,13 @@ export class Recitation {
     NowPlayingCommands?.setEnabled(false);
     // Android frees the player instead: that ends the session if its service is
     // still there, and does nothing if it isn't, where clearing the lock screen
-    // would start the service again with nothing to show (lib/mediaNotification).
-    if (isAndroid()) return this.releasePlayer();
+    // would start the service again with nothing to show and Android would kill
+    // the app (lib/mediaNotification). A notification left behind is dismissed.
+    if (isAndroid()) {
+      this.releasePlayer();
+      this.sweepLeftOvers();
+      return;
+    }
     try {
       this.player?.setActiveForLockScreen(false);
     } catch (err) {
@@ -398,7 +408,8 @@ export class Recitation {
 
   /**
    * Android: whether the notification is still backed by its service
-   * (lib/mediaNotification). Orphans are dismissed. A recitation whose
+   * (lib/mediaNotification). Off the lock screen, any media notification still
+   * on show is left over and dismissed, as are orphans. A recitation whose
    * notification is gone is paused and its player freed, so ▶ starts afresh.
    */
   private async checkNotification() {
@@ -420,9 +431,10 @@ export class Recitation {
 
   private async checkNotificationOnce() {
     try {
-      const { live, orphans } = await readMediaNotifications();
-      if (orphans.length) await dismissNotifications(orphans);
-      if (!this.onLockScreen || live) return;
+      const { media, orphans } = await readMediaNotifications();
+      const leftOver = this.onLockScreen ? orphans : [...media, ...orphans];
+      if (leftOver.length) await dismissNotifications(leftOver);
+      if (!this.onLockScreen || media.length) return;
       const { status } = this.state;
       const settled = Date.now() - this.lockScreenSince >= NOTIFICATION_SETTLE_MS;
       // Playing with no notification may only mean Revisely's notifications are
@@ -433,8 +445,24 @@ export class Recitation {
     }
   }
 
-  private checkNotificationSoon() {
-    setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS);
+  /**
+   * A notification left behind lands a moment after its service goes. With the
+   * app in front, checks a moment later find it. With the app away (swiped from
+   * recents, the screens unmounting) React Native's timers stand still on
+   * Android, so it reads what is on show again and again for a moment instead.
+   */
+  private sweepLeftOvers() {
+    if (this.appActive) {
+      setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS);
+      setTimeout(() => void this.checkNotification(), NOTIFICATION_CHECK_MS * 4);
+      return;
+    }
+    void (async () => {
+      const until = Date.now() + NOTIFICATION_SWEEP_MS;
+      for (let i = 0; i < NOTIFICATION_SWEEP_READS && (i < NOTIFICATION_SWEEP_MIN_READS || Date.now() < until); i++) {
+        await this.checkNotificationOnce();
+      }
+    })();
   }
 
   private lostNotification() {
@@ -442,8 +470,8 @@ export class Recitation {
     NowPlayingCommands?.setEnabled(false);
     this.releasePlayer();
     this.pause();
-    // Freeing the player may let one last orphan through.
-    this.checkNotificationSoon();
+    // What is left on show goes.
+    this.sweepLeftOvers();
   }
 
   /**
@@ -534,8 +562,6 @@ export class Recitation {
       this.applySpeed();
       player.play();
       this.showNowPlaying(verse);
-      // With the app away (e.g. the next verse after a swipe from recents).
-      if (isAndroid() && !this.appActive) this.checkNotificationSoon();
     } catch (err) {
       logger.warn('Recitation failed to start', err);
       this.set({ status: 'error', verse });
@@ -639,10 +665,9 @@ export class Recitation {
       this.set({ status: 'playing', verse });
     } else if (!s.playing && status === 'playing' && !s.isBuffering) {
       // Paused from outside: an interruption (call, Siri, another app),
-      // headphones unplugged, or Pause on the lock screen. On Android also the
-      // app swiped away from recents, which takes the notification's service.
+      // headphones unplugged, or Pause on the lock screen (on Android also the
+      // app swiped away from recents, after which its screens stop it).
       this.set({ status: 'paused', verse });
-      if (isAndroid() && !this.appActive) this.checkNotificationSoon();
     } else if (s.playing && status === 'paused' && this.started) {
       // Playing again from outside: ▶ on the lock screen, or a call ended.
       this.set({ status: 'playing', verse });

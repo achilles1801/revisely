@@ -39,7 +39,7 @@ jest.mock('react-native', () => ({
 }));
 
 // Android's media notification (lib/mediaNotification): what is on show.
-let mockMedia: { live: boolean; orphans: string[] } = { live: true, orphans: [] };
+let mockMedia: { media: string[]; orphans: string[] } = { media: [], orphans: [] };
 const mockDismiss = jest.fn((_ids: string[]) => Promise.resolve());
 jest.mock('../mediaNotification', () => ({
   readMediaNotifications: () => Promise.resolve(mockMedia),
@@ -65,6 +65,7 @@ import {
   LOAD_TIMEOUT_MS,
   NOTIFICATION_CHECK_MS,
   NOTIFICATION_SETTLE_MS,
+  NOTIFICATION_SWEEP_MS,
   RECITERS,
   Recitation,
   recitationUrl,
@@ -500,31 +501,61 @@ describe('Audio Options: repeats, pauses, speed', () => {
 describe('recitation on Android: its notification (lib/mediaNotification)', () => {
   const v = (sura: number, ayah: number) => ({ sura, ayah });
   const last = () => mockPlayers[mockPlayers.length - 1];
-  // Lets the notification check's awaits run.
+  // Lets the notification checks' awaits run.
   const settle = async () => {
-    for (let i = 0; i < 10; i++) await Promise.resolve();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
+  // Lets a sweep with the app away run out (its clock is Date.now, faked here).
+  const endSweep = async () => {
+    await settle();
+    jest.advanceTimersByTime(NOTIFICATION_SWEEP_MS);
+    for (let i = 0; i < 4; i++) await settle();
   };
   const toBackground = () => mockAppState.forEach((l) => l('background'));
   const toForeground = () => mockAppState.forEach((l) => l('active'));
 
   beforeEach(() => {
     mockPlatform.OS = 'android';
-    mockMedia = { live: true, orphans: [] };
+    mockMedia = { media: ['live'], orphans: [] };
     mockDismiss.mockClear();
   });
   afterEach(() => {
     mockPlatform.OS = 'ios';
   });
 
-  it('stop frees the player rather than clearing the lock screen; the next verse gets a new one', () => {
+  it('swiped away from recents: the screens stop it; the player is freed, the service never restarted, the notification left behind dismissed', async () => {
+    const r = new Recitation();
+    r.play(v(79, 8));
+    const p = mockPlayers[0];
+    p.emit({ playing: true });
+    toBackground();
+    // Android pauses the player and stops the service; the screens unmount
+    // (MainNavigator stops the recitation); a paused notification lands after.
+    p.emit({ playing: false });
+    r.stop();
+    mockMedia = { media: ['left-over'], orphans: [] };
+    expect(p.setActiveForLockScreen).not.toHaveBeenCalledWith(false);
+    expect(p.remove).toHaveBeenCalled();
+    expect(p.release).toHaveBeenCalled();
+    // No timers needed: React Native's stand still with the app away.
+    await settle();
+    expect(mockDismiss).toHaveBeenCalledWith(['left-over']);
+    await endSweep();
+    expect(r.getState().status).toBe('idle');
+  });
+
+  it('stop with the app in front frees the player too, looks again a moment later, and the next verse gets a new player', async () => {
     const r = new Recitation();
     r.play(v(2, 13));
     const p = mockPlayers[0];
     p.emit({ playing: true });
     r.stop();
     expect(p.setActiveForLockScreen).not.toHaveBeenCalledWith(false);
-    expect(p.remove).toHaveBeenCalled();
     expect(p.release).toHaveBeenCalled();
+    mockMedia = { media: ['left-over'], orphans: [] };
+    jest.advanceTimersByTime(NOTIFICATION_CHECK_MS);
+    await settle();
+    expect(mockDismiss).toHaveBeenCalledWith(['left-over']);
     r.play(v(2, 14));
     expect(last()).not.toBe(p);
     expect(last().setActiveForLockScreen).toHaveBeenCalledWith(
@@ -544,39 +575,26 @@ describe('recitation on Android: its notification (lib/mediaNotification)', () =
     expect(p.release).toHaveBeenCalled();
   });
 
-  it('an orphan left by an earlier run is dismissed at launch', async () => {
-    mockMedia = { live: false, orphans: ['orphan'] };
+  it('a notification left by an earlier run is dismissed at launch', async () => {
+    mockMedia = { media: ['left-over'], orphans: ['orphan'] };
     new Recitation();
     await settle();
-    expect(mockDismiss).toHaveBeenCalledWith(['orphan']);
+    expect(mockDismiss).toHaveBeenCalledWith(['left-over', 'orphan']);
   });
 
-  it('swiped away from recents while playing: paused, the player freed, the orphan dismissed; ▶ starts afresh', async () => {
+  it('while on the lock screen only orphans are dismissed, never the notification itself', async () => {
     const r = new Recitation();
     r.play(v(79, 8));
-    const p = mockPlayers[0];
-    p.emit({ playing: true });
-    jest.advanceTimersByTime(NOTIFICATION_SETTLE_MS);
-    toBackground();
-    // Android pauses the player and stops the service; an orphan may follow.
-    mockMedia = { live: false, orphans: ['orphan'] };
-    p.emit({ playing: false });
-    expect(r.getState().status).toBe('paused');
-    jest.advanceTimersByTime(NOTIFICATION_CHECK_MS);
+    mockPlayers[0].emit({ playing: true });
+    mockMedia = { media: ['live'], orphans: ['orphan'] };
+    toForeground();
     await settle();
     expect(mockDismiss).toHaveBeenCalledWith(['orphan']);
-    expect(p.release).toHaveBeenCalled();
-    expect(r.getState()).toMatchObject({ status: 'paused', verse: v(79, 8) });
-    // Back in the app, ▶: a new player and a new notification, same verse.
-    mockMedia = { live: true, orphans: [] };
-    toForeground();
-    r.resume();
-    expect(last()).not.toBe(p);
-    expect(last().replace).toHaveBeenCalledWith({ uri: recitationUrl(v(79, 8)) });
-    expect(last().setActiveForLockScreen).toHaveBeenCalledWith(true, expect.anything(), expect.anything());
+    expect(mockDismiss).not.toHaveBeenCalledWith(expect.arrayContaining(['live']));
+    expect(r.getState().status).toBe('playing');
   });
 
-  it('Pause on the notification with the app away keeps it, and ▶ there plays on', async () => {
+  it('Pause and ▶ on the notification with the app away keep it, and coming back changes nothing', async () => {
     const r = new Recitation();
     r.play(v(79, 8));
     const p = mockPlayers[0];
@@ -584,14 +602,15 @@ describe('recitation on Android: its notification (lib/mediaNotification)', () =
     jest.advanceTimersByTime(NOTIFICATION_SETTLE_MS);
     toBackground();
     p.emit({ playing: false });
-    jest.advanceTimersByTime(NOTIFICATION_CHECK_MS);
+    expect(r.getState().status).toBe('paused');
+    toForeground();
     await settle();
     expect(p.release).not.toHaveBeenCalled();
     p.emit({ playing: true });
     expect(r.getState().status).toBe('playing');
   });
 
-  it('back in the app after a swipe while paused: the stale player goes before ▶ can touch it', async () => {
+  it('back in the app with the service gone while paused: the stale player goes before ▶ can touch it', async () => {
     const r = new Recitation();
     r.play(v(79, 8));
     const p = mockPlayers[0];
@@ -599,14 +618,29 @@ describe('recitation on Android: its notification (lib/mediaNotification)', () =
     r.pause();
     jest.advanceTimersByTime(NOTIFICATION_SETTLE_MS);
     toBackground();
-    mockMedia = { live: false, orphans: [] };
+    mockMedia = { media: [], orphans: [] };
     toForeground();
     await settle();
     expect(p.release).toHaveBeenCalled();
     expect(r.getState().status).toBe('paused');
     r.resume();
     expect(last()).not.toBe(p);
+    expect(last().replace).toHaveBeenCalledWith({ uri: recitationUrl(v(79, 8)) });
     expect(p.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('back in the app with an orphan and no notification: paused, its player freed', async () => {
+    const r = new Recitation();
+    r.play(v(79, 8));
+    const p = mockPlayers[0];
+    p.emit({ playing: true });
+    toBackground();
+    mockMedia = { media: [], orphans: ['orphan'] };
+    toForeground();
+    await settle();
+    expect(mockDismiss).toHaveBeenCalledWith(['orphan']);
+    expect(p.release).toHaveBeenCalled();
+    expect(r.getState()).toMatchObject({ status: 'paused', verse: v(79, 8) });
   });
 
   it('playing with no notification on show (notifications off) goes on', async () => {
@@ -616,31 +650,11 @@ describe('recitation on Android: its notification (lib/mediaNotification)', () =
     p.emit({ playing: true });
     jest.advanceTimersByTime(NOTIFICATION_SETTLE_MS);
     toBackground();
-    mockMedia = { live: false, orphans: [] };
+    mockMedia = { media: [], orphans: [] };
     toForeground();
     await settle();
     expect(p.release).not.toHaveBeenCalled();
     expect(r.getState().status).toBe('playing');
-  });
-
-  it('the next verse after a swipe during the pause after a verse: the orphan it brings stops it', async () => {
-    const r = new Recitation();
-    r.setOptions({ pauseFactor: 1 });
-    r.play(v(2, 1));
-    const p = mockPlayers[0];
-    p.emit({ playing: true, duration: 4 });
-    jest.advanceTimersByTime(NOTIFICATION_SETTLE_MS);
-    p.emit({ didJustFinish: true, duration: 4 });
-    toBackground();
-    // The service went with the swipe; the next verse starts on the old player.
-    mockMedia = { live: false, orphans: ['orphan'] };
-    jest.advanceTimersByTime(4000);
-    expect(r.getState()).toMatchObject({ status: 'loading', verse: v(2, 2) });
-    jest.advanceTimersByTime(NOTIFICATION_CHECK_MS);
-    await settle();
-    expect(mockDismiss).toHaveBeenCalledWith(['orphan']);
-    expect(p.release).toHaveBeenCalled();
-    expect(r.getState()).toMatchObject({ status: 'paused', verse: v(2, 2) });
   });
 
   it('iOS is as before: stop clears the lock screen and keeps the player', () => {
