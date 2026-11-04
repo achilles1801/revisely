@@ -38,10 +38,10 @@ import {
   SPLASH_CAP_MS,
   appStateChangeForTests as appState,
   applyUpdate,
-  bannerState,
+  offerState,
   checkForUpdate,
   checkForUpdateNow,
-  dismissBanner,
+  postponeUpdateOffer,
   markUiReady,
   notePendingUpdate,
   resetOtaForTests,
@@ -152,7 +152,7 @@ describe('at launch', () => {
     await jest.advanceTimersByTimeAsync(10_000);
     expect(mockReload).not.toHaveBeenCalled();
     // Downloaded while the user is in: Home offers the restart at once.
-    expect(bannerState()).toEqual({ visible: true, updateId: 'late-update' });
+    expect(offerState()).toEqual({ visible: true, updateId: 'late-update' });
   });
 
   it('the splash goes by the cap whatever happens', async () => {
@@ -185,7 +185,7 @@ describe('coming back to the app', () => {
     startOtaUpdates();
     markUiReady();
     await jest.advanceTimersByTimeAsync(5000);
-    expect(bannerState().updateId).toBe('late-update');
+    expect(offerState().updateId).toBe('late-update');
     server(null);
     jest.clearAllMocks();
   }
@@ -200,7 +200,7 @@ describe('coming back to the app', () => {
     await launchedWithLateUpdate();
     await away(APPLY_AFTER_AWAY_MS - MIN);
     expect(mockReload).not.toHaveBeenCalled();
-    expect(bannerState()).toEqual({ visible: true, updateId: 'late-update' });
+    expect(offerState()).toEqual({ visible: true, updateId: 'late-update' });
   });
 
   it.each([['recording'], ['recitation'], ['timer'], ['screen']])(
@@ -210,7 +210,7 @@ describe('coming back to the app', () => {
       mockBusy = [reason];
       await away(3 * 60 * MIN);
       expect(mockReload).not.toHaveBeenCalled();
-      expect(bannerState().visible).toBe(true);
+      expect(offerState().visible).toBe(true);
     },
   );
 
@@ -231,7 +231,7 @@ describe('coming back to the app', () => {
     server('found-on-return');
     await away(APPLY_AFTER_AWAY_MS);
     expect(mockReload).not.toHaveBeenCalled();
-    expect(bannerState()).toEqual({ visible: true, updateId: 'found-on-return' });
+    expect(offerState()).toEqual({ visible: true, updateId: 'found-on-return' });
     // Next return, long enough away: applied.
     await away(APPLY_AFTER_AWAY_MS);
     expect(mockReload).toHaveBeenCalledTimes(1);
@@ -250,9 +250,9 @@ describe("expo-updates' own download (at launch, natively)", () => {
   it('counts as waiting: the banner shows, and it applies after 15 minutes away', async () => {
     startOtaUpdates();
     await jest.advanceTimersByTimeAsync(0);
-    expect(bannerState().visible).toBe(false);
+    expect(offerState().visible).toBe(false);
     mockNativeListener!({ context: { isUpdatePending: true, downloadedManifest: { id: 'native-download' } } });
-    expect(bannerState()).toEqual({ visible: true, updateId: 'native-download' });
+    expect(offerState()).toEqual({ visible: true, updateId: 'native-download' });
     await away(APPLY_AFTER_AWAY_MS);
     expect(mockReload).toHaveBeenCalledTimes(1);
   });
@@ -260,13 +260,13 @@ describe("expo-updates' own download (at launch, natively)", () => {
   it('one already downloaded when the app starts is picked up too', async () => {
     mockContext = { isUpdatePending: true, downloadedManifest: { id: 'before-start' } };
     startOtaUpdates();
-    expect(bannerState().updateId).toBe('before-start');
+    expect(offerState().updateId).toBe('before-start');
   });
 
   it('a downloading or checking state is not an update', async () => {
     startOtaUpdates();
     mockNativeListener!({ context: { isUpdatePending: false, isDownloading: true } });
-    expect(bannerState().updateId).toBeNull();
+    expect(offerState().updateId).toBeNull();
   });
 });
 
@@ -282,7 +282,7 @@ describe('checkForUpdateNow (Settings)', () => {
     server('manual');
     expect(await settle(checkForUpdateNow())).toEqual({ result: 'ready' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(bannerState()).toEqual({ visible: true, updateId: 'manual' });
+    expect(offerState()).toEqual({ visible: true, updateId: 'manual' });
   });
 
   it('nothing new and nothing waiting: up to date', async () => {
@@ -307,22 +307,34 @@ describe('checkForUpdateNow (Settings)', () => {
   });
 });
 
-describe('the banner', () => {
-  it('shows as soon as an update has downloaded; ✕ hides it for that update; a later one shows again', async () => {
+describe('the offer (UpdateReadySheet)', () => {
+  it('offered as soon as an update has downloaded; Later puts it off until the next cold start', async () => {
     notePendingUpdate('u1');
-    expect(bannerState().visible).toBe(true);
-    dismissBanner();
-    expect(bannerState().visible).toBe(false);
+    expect(offerState()).toEqual({ visible: true, updateId: 'u1' });
+    postponeUpdateOffer();
+    expect(offerState()).toEqual({ visible: false, updateId: 'u1' });
     await away(MIN);
-    expect(bannerState().visible).toBe(false);
+    expect(offerState().visible).toBe(false);
+    // A newer one in the same run: still not offered.
     notePendingUpdate('u2');
-    expect(bannerState()).toEqual({ visible: true, updateId: 'u2' });
+    expect(offerState()).toEqual({ visible: false, updateId: 'u2' });
+    // Next cold start (memory gone): offered again.
+    resetOtaForTests();
+    notePendingUpdate('u2');
+    expect(offerState().visible).toBe(true);
+  });
+
+  it('Later still lets it apply on return after 15 minutes away', async () => {
+    notePendingUpdate('u1');
+    postponeUpdateOffer();
+    await away(APPLY_AFTER_AWAY_MS);
+    expect(mockReload).toHaveBeenCalledTimes(1);
   });
 
   it('the update already running is never pending', async () => {
     notePendingUpdate('running-update');
     await away(MIN);
-    expect(bannerState()).toEqual({ visible: false, updateId: null });
+    expect(offerState()).toEqual({ visible: false, updateId: null });
   });
 });
 

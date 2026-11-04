@@ -22,7 +22,7 @@ import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } f
 import * as firestoreService from '../../services/firestoreService';
 import { queueChange, withPendingReadings } from '../../lib/offline/queue';
 import { OfflineNote } from '../../components/offline/OfflineNote';
-import { UpdateBanner } from '../../components/updates/UpdateBanner';
+import { UpdateReadySheet } from '../../components/updates/UpdateReadySheet';
 import { StoreUpdateSheet } from '../../components/updates/StoreUpdateSheet';
 import { autoId } from '../../lib/offline/apply';
 import { logger } from '../../lib/logger';
@@ -491,7 +491,6 @@ export default function DashboardScreen() {
         {/* No line under the header: one across the glow ended it in a hard
             edge, at rest and while pulling (it read as a box). */}
         <OfflineNote />
-        <UpdateBanner />
         {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
           <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
         ) : null}
@@ -545,6 +544,7 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
+      <UpdateReadySheet />
       <StoreUpdateSheet />
       <JumpSheet
         visible={jumpOpen}

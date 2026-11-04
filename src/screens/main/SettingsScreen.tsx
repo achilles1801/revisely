@@ -47,6 +47,7 @@ import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
+import { showsUpdateTools } from '../../lib/updates/testerTools';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
@@ -818,7 +819,7 @@ export default function SettingsScreen() {
             label="Terms of Service"
             onPress={() => Linking.openURL('https://revisely.app/terms/')}
           />
-          <AppInfo />
+          <AppInfo tools={showsUpdateTools(user)} />
         </Section>
 
         {firebaseUser && (
