@@ -789,8 +789,11 @@ choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
   instant) until removed in the picker. "Remove from this phone" under Offline mushaf removes both.
 - Hidden recite mode needs line and word data, which only the 1405 pages have: its button is hidden
   for the 1441 print (`MushafEdition.reciteData`).
-- Credits are in the picker. A Tajweed (Dar al-Maʿrifah) print waits on permission from the
-  publisher and Quran.com (being asked, Nov 2026); it would be another edition with its own folder.
+- **The picker** is a row per print (thumbnail, name, "On this phone" / "n of 604 pages" / "153 MB to
+  download", a check) and one credit line per publisher (`mushafCredits`; both prints are the King
+  Fahd Complex's, so one line). No explanations: the owner had the page-numbers note removed (Nov 3
+  2026). A Tajweed (Dar al-Maʿrifah) print waits on permission from the publisher and Quran.com
+  (being asked, Nov 2026); it would be another edition with its own folder and credit.
 
 ## Android (Google Play)
 
@@ -1116,7 +1119,8 @@ classic default), and a fresh install starts in light.
     can be typed: tap the clock or the length, a number pad, 1–480 minutes (`parseMinutes`); the
     card rises above the keyboard. "Open the Quran" is a small link where it applies.
   - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
-    what a control does (e.g. Keep daily amount).
+    what a control does (e.g. Keep daily amount). No paragraphs of explanation in sheets either
+    (the Mushaf picker's was removed, Nov 3 2026).
 - **Accents** (Settings → Appearance → Accent, a row like Theme: label on the left, the three pills
   on the right, swatches only on narrow screens or large text): **Indigo (the default)**, Crimson and Jade. The
   choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it follows the
