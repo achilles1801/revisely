@@ -8,9 +8,12 @@
 // - An update downloaded earlier is applied when the user comes back after
 //   APPLY_AFTER_AWAY_MS or more away, unless a restart would interrupt something
 //   (busy.ts: a recording, a recitation, a timer, a screen other than a tab's own).
-// - Otherwise Home shows "Update ready · Restart" (components/updates/UpdateBanner),
-//   but only for an update that was already waiting the last time the app came
-//   to the front: one that arrived during this visit waits quietly.
+// - Otherwise Home shows "Update ready · Restart" (components/updates/UpdateBanner)
+//   as soon as one has downloaded, hidden while a recording, recitation or timer
+//   goes on. "Downloaded" counts expo-updates' own launch download as well as
+//   this file's checks: the native state is followed (addUpdatesStateChangeListener).
+// - "Check for updates" in Settings (checkForUpdateNow) downloads what it finds
+//   and always ends with an update ready to restart into, or none.
 // A restart shows the launch screen's ground and icon (the reload screen).
 // Nothing here runs in development or where updates are off.
 
@@ -37,12 +40,8 @@ const SPLASH_ICON = require('../../../assets/splash-icon.png');
 
 interface Pending {
   updateId: string;
-  /** Which time in front (`visit`) it downloaded in. */
-  visit: number;
 }
 
-/** Each cold start is visit 1; every return to the front adds one. */
-let visit = 1;
 let pending: Pending | null = null;
 let dismissed: string | null = null;
 let lastCheckAt: number | null = null;
@@ -65,8 +64,15 @@ export function otaEnabled(): boolean {
 export function notePendingUpdate(updateId: string): void {
   if (!updateId || updateId === Updates.updateId) return;
   if (pending?.updateId === updateId) return;
-  pending = { updateId, visit };
+  pending = { updateId };
   notify();
+}
+
+/** What expo-updates itself has downloaded (its launch download included): pending too. */
+function followNativeState(context: Updates.UpdatesNativeStateMachineContext | undefined): void {
+  if (!context?.isUpdatePending) return;
+  const id = context.downloadedManifest?.id ?? (context.rollback ? 'embedded' : null);
+  if (id) notePendingUpdate(id);
 }
 
 /**
@@ -112,6 +118,35 @@ function reloadScreenOptions(): Updates.ReloadScreenOptions {
     spinner: { enabled: false },
     fade: true,
   };
+}
+
+export type ManualCheckResult = 'ready' | 'up-to-date' | 'unavailable' | 'error';
+
+/**
+ * Settings → Check for updates: ask now (whatever the interval), download what
+ * is found, and say whether an update is ready to restart into (also one that
+ * had downloaded before). Never just "there is one".
+ */
+export async function checkForUpdateNow(): Promise<{ result: ManualCheckResult; error?: string }> {
+  if (!otaEnabled()) return { result: 'unavailable' };
+  if (inFlight) await inFlight; // a check under way finishes first (it never throws)
+  lastCheckAt = Date.now();
+  try {
+    const check = await Updates.checkForUpdateAsync();
+    // A roll back to the built-in version counts as an update waiting too.
+    if (check.isAvailable || check.isRollBackToEmbedded) {
+      const fetched = await Updates.fetchUpdateAsync();
+      const id = fetched.manifest?.id ?? (fetched.isRollBackToEmbedded ? 'embedded' : null);
+      if (id && (fetched.isNew || fetched.isRollBackToEmbedded)) notePendingUpdate(id);
+    }
+  } catch (err) {
+    logger.warn('Manual update check failed', err);
+    followNativeState(Updates.latestContext);
+    if (pending) return { result: 'ready' };
+    return { result: 'error', error: err instanceof Error ? err.message : String(err) };
+  }
+  followNativeState(Updates.latestContext);
+  return { result: pending ? 'ready' : 'up-to-date' };
 }
 
 /** Restart into the update waiting. False if it couldn't (development, or the reload failed). */
@@ -170,8 +205,6 @@ function onAppStateChange(next: AppStateStatus) {
   if (next !== 'active' || backgroundAt == null) return;
   const away = now - backgroundAt;
   backgroundAt = null;
-  visit += 1;
-  notify();
   if (pending && away >= APPLY_AFTER_AWAY_MS && busyReasons().length === 0) {
     void applyUpdate();
     return;
@@ -192,16 +225,22 @@ export function startOtaUpdates(): void {
     if (r !== 'applied') maybeHideSplash(); // applied: the reload screen covers the switch
   });
   AppState.addEventListener('change', onAppStateChange);
+  try {
+    followNativeState(Updates.latestContext);
+    Updates.addUpdatesStateChangeListener((event) => followNativeState(event.context));
+  } catch (err) {
+    logger.warn('Could not follow the update state', err);
+  }
 }
 
 export interface UpdateBannerState {
-  /** An update has waited since an earlier visit, and wasn't dismissed. */
+  /** An update has downloaded, and wasn't dismissed. */
   visible: boolean;
   updateId: string | null;
 }
 
 export function bannerState(): UpdateBannerState {
-  const show = !!pending && pending.visit < visit && dismissed !== pending.updateId;
+  const show = !!pending && dismissed !== pending.updateId;
   return { visible: show, updateId: pending?.updateId ?? null };
 }
 
@@ -235,7 +274,6 @@ export function useUpdateBanner(): UpdateBannerState {
 
 /** For tests. */
 export function resetOtaForTests(): void {
-  visit = 1;
   pending = null;
   dismissed = null;
   lastCheckAt = null;
@@ -250,5 +288,6 @@ export function resetOtaForTests(): void {
   listeners.clear();
 }
 
-/** For tests: what AppState would send. */
+/** For tests: what AppState would send, and expo-updates' native state. */
 export const appStateChangeForTests = onAppStateChange;
+export const nativeStateForTests = followNativeState;

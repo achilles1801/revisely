@@ -59,10 +59,17 @@ file is the release mechanics and the traps behind them.
     - "Something" is `lib/updates/busy.ts`: a recording session, a recitation, a timer, or any
       screen but a tab's own (Dashboard, ReadIndex, Insights). So no session, reader, editor,
       onboarding or sign-in screen is ever restarted under the user.
-  - **Banner:** otherwise Home shows "Update ready · Restart" with ✕ (`components/updates/UpdateBanner`),
-    only for an update that was already waiting at an earlier visit.
-    - Restart is hidden while busy.
+  - **Banner:** otherwise Home shows "Update ready · Restart" with ✕ (`components/updates/UpdateBanner`)
+    as soon as an update has downloaded (Nov 4 2026; before, it waited for the next visit).
+    - "Downloaded" includes expo-updates' own background download at launch: `ota.ts` follows the
+      native state (`addUpdatesStateChangeListener`, `latestContext.isUpdatePending`), not only its
+      own checks. Before, such an update showed nothing until a cold start.
+    - The whole row is hidden while a recording, a recitation or a timer goes on.
     - ✕ hides the banner for that update; the update still applies at the next safe moment.
+  - **Settings → App info → Check for updates** (or a long press on the row; `checkForUpdateNow`)
+    downloads what it finds and always ends in "Update ready · Restart to update", including for
+    an update that had downloaded before. While one waits, the details show "Restart to update" in
+    place of "Check for updates".
 - **Store versions** (`lib/updates/storeUpdates.ts`, rules in `versions.ts`).
   - **iOS:** once a day, Apple's public lookup (`itunes.apple.com/lookup?bundleId=…`, nothing about
     the user). A newer version than the binary's opens "New version available · Update"

@@ -22,6 +22,7 @@ jest.mock('../../../lib/sentry', () => ({
 }));
 
 import { AppInfo, appInfoSummary, checkForUpdateNow, showsTestActions } from '../AppInfo';
+import { notePendingUpdate, resetOtaForTests } from '../../../lib/updates/ota';
 
 const base: ReleaseInput = {
   version: '1.0.2',
@@ -42,6 +43,7 @@ const wrap = (ui: React.ReactElement) => render(<ThemeProvider>{ui}</ThemeProvid
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetOtaForTests();
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   g.__DEV__ = false;
 });
@@ -84,32 +86,53 @@ describe('App info', () => {
     expect(await screen.findByText(/couldn’t start/)).toBeTruthy();
   });
 
-  it('long-press checks for an update, downloads it and offers a restart', async () => {
+  it('long-press checks for an update, downloads it and offers the restart at once', async () => {
     mockCheck.mockResolvedValue({ isAvailable: true });
-    mockFetch.mockResolvedValue({ isNew: true });
+    mockFetch.mockResolvedValue({ isNew: true, manifest: { id: 'new-update' } });
     wrap(<AppInfo release={describeRelease(base)} />);
     const row = await screen.findByLabelText(/App info/);
     await act(async () => {
       fireEvent(row, 'longPress');
     });
-    const [title, , buttons] = (Alert.alert as jest.Mock).mock.calls.at(-1);
-    expect(title).toBe('Update downloaded');
-    buttons.find((b: any) => b.text === 'Restart now').onPress();
+    const [title, message, buttons] = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    expect(title).toBe('Update ready');
+    expect(message).toBe('Restart Revisely to use it.');
+    expect(buttons.map((b: any) => b.text)).toEqual(['Later', 'Restart to update']);
+    buttons.find((b: any) => b.text === 'Restart to update').onPress();
+    expect(mockReload).toHaveBeenCalled();
+  });
+
+  it('with an update waiting, the details offer the restart instead of a check', async () => {
+    notePendingUpdate('waiting-update');
+    wrap(<AppInfo release={describeRelease(base)} />);
+    fireEvent.press(await screen.findByLabelText(/App info/));
+    expect(screen.queryByText('Check for updates')).toBeNull();
+    fireEvent.press(screen.getByTestId('app-info-restart'));
     expect(mockReload).toHaveBeenCalled();
   });
 });
 
 describe('checkForUpdateNow', () => {
-  it('up to date, downloaded, and errors', async () => {
+  it('up to date, ready, and errors', async () => {
     mockCheck.mockResolvedValueOnce({ isAvailable: false });
     expect((await checkForUpdateNow()).result).toBe('up-to-date');
     mockCheck.mockResolvedValueOnce({ isAvailable: true });
-    mockFetch.mockResolvedValueOnce({ isNew: true });
-    expect((await checkForUpdateNow()).result).toBe('downloaded');
+    mockFetch.mockResolvedValueOnce({ isNew: true, manifest: { id: 'u1' } });
+    expect((await checkForUpdateNow()).result).toBe('ready');
+    resetOtaForTests();
     mockCheck.mockResolvedValueOnce({ isAvailable: false, isRollBackToEmbedded: true });
     mockFetch.mockResolvedValueOnce({ isNew: false, isRollBackToEmbedded: true });
-    expect((await checkForUpdateNow()).result).toBe('downloaded');
+    expect((await checkForUpdateNow()).result).toBe('ready');
+    resetOtaForTests();
     mockCheck.mockRejectedValueOnce(new Error('offline'));
     expect(await checkForUpdateNow()).toEqual({ result: 'error', error: 'offline' });
+  });
+
+  it('an update downloaded earlier is ready, even when the server has nothing newer', async () => {
+    notePendingUpdate('downloaded-before');
+    mockCheck.mockResolvedValueOnce({ isAvailable: false });
+    expect((await checkForUpdateNow()).result).toBe('ready');
+    mockCheck.mockRejectedValueOnce(new Error('offline'));
+    expect((await checkForUpdateNow()).result).toBe('ready');
   });
 });

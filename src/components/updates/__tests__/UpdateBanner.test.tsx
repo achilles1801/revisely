@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 describe('<UpdateBanner />', () => {
-  it('nothing unless an update has waited since an earlier visit', () => {
+  it('nothing unless an update has downloaded', () => {
     mockBanner = { visible: false, updateId: 'u1' };
     render(<UpdateBanner />);
     expect(screen.queryByTestId('update-banner')).toBeNull();
@@ -46,12 +46,10 @@ describe('<UpdateBanner />', () => {
     expect(mockApply).not.toHaveBeenCalled();
   });
 
-  it.each([['recording'], ['recitation'], ['timer']])('no Restart while busy (%s): it says when it applies', (reason) => {
+  it.each([['recording'], ['recitation'], ['timer']])('hidden while busy (%s): it applies at the next safe moment', (reason) => {
     mockBusy = [reason];
     render(<UpdateBanner />);
-    expect(screen.queryByTestId('update-banner-restart')).toBeNull();
-    expect(screen.getByText('Update ready · applies next time you open Revisely')).toBeTruthy();
-    expect(screen.getByLabelText('Dismiss')).toBeTruthy();
+    expect(screen.queryByTestId('update-banner')).toBeNull();
   });
 
   it('being on Home is no reason to hide Restart', () => {
