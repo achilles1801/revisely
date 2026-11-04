@@ -100,9 +100,17 @@ describe('today: what it already holds', () => {
     expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual([21, 582, ...range(1, 10)]);
   });
 
-  it('pages carried into today stay in it; the old carry-over shift is replaced', () => {
+  it('pages carried into today and not revised are dropped: they were the old start’s, and the new start is today', () => {
     const carried = { ...baseUser, scheduleShiftPages: 1, carryOver: { day: TODAY_KEY, pages: [600], skip: 1 } };
     const r = jumpTo(carried, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30))!;
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual(range(1, 10));
+  });
+
+  it('pages carried into today and revised today stay in it, first', () => {
+    const carried = { ...baseUser, carryOver: { day: TODAY_KEY, pages: [600], skip: 0 } };
+    const logs = [log(TODAY_KEY, [600], [600])];
+    const r = jumpTo(carried, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30, logs))!;
     expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [600], skip: 0 });
     expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual([600, ...range(1, 10)]);
   });

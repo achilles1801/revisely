@@ -13,9 +13,10 @@
 //       juz pattern can't land on it (two juz a day over an odd split), the page
 //       offset as above.
 // Today follows the Fajr day (revisionDate). Pages already revised today stay
-// counted, and pages already carried into today stay in it (the same rule as a
-// new plan, lib/planChange): they go first, then the new start's pages. With
-// neither, carry-over is left alone, so yesterday's leftovers are still offered.
+// counted and go first, then the new start's pages. Pages carried into today and
+// not yet revised are dropped (they were the old start's), so the jump takes
+// effect at once. Otherwise carry-over is left alone, so yesterday's leftovers are
+// still offered.
 
 import { getPagesForJuz, getPagesForSurah, getSurah, getSurahDisplay } from './quranData';
 import {
@@ -171,11 +172,12 @@ export function jumpTo(before: User, target: JumpTarget, ctx: JumpContext): Jump
       : jumpPages(user, ctx, pages);
   if (!moved) return null;
 
-  // Today: what was revised and what was carried in stay; the rest is the new start's.
+  // Today: what was revised today stays counted, and goes first. Pages carried into
+  // today and not revised belong to the start being jumped from, so they are dropped:
+  // a carry left in front of the new start would hold today where it was.
   const today = dateToLocalISODay(ctx.revisionDate);
   const memorizedSet = new Set(ctx.memorized.map((p) => p.pageNumber));
-  const carried = user.carryOver?.day === today ? user.carryOver.pages : [];
-  const keep = [...new Set([...carried, ...revisedOn(ctx.logs, today)])].filter((p) => memorizedSet.has(p));
+  const keep = [...new Set(revisedOn(ctx.logs, today))].filter((p) => memorizedSet.has(p));
   const carryOver =
     keep.length > 0 || user.carryOver?.day === today ? { day: today, pages: keep, skip: 0 } : user.carryOver;
 
