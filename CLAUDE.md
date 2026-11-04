@@ -67,10 +67,27 @@ file is the release mechanics and the traps behind them.
   - **iOS:** once a day, Apple's public lookup (`itunes.apple.com/lookup?bundleId=…`, nothing about
     the user). A newer version than the binary's opens "New version available · Update"
     (`StoreUpdateSheet`) on Home: once per version, never while busy.
-  - **Android:** what Play has comes from `config/app` `latest.android`; Play In-App Updates needs a
-    native module (planned for 1.0.4).
+  - **Android:** what Play has comes from `config/app` (Play has no public lookup; Play In-App
+    Updates needs a native module, planned for 1.0.4). Builds compare by version code
+    (`Application.nativeBuildVersion`), so a new build of the same version is offered too, named
+    "1.0.3 (6)".
+    - `testing.android` `{version, code}`: Play's internal testing track. Written by itself: once
+      `android-build.yml` has uploaded a build, its `available` job waits 10 minutes (internal
+      testing has no review), reads the track (`scripts/play.js latest internal --json`) and posts
+      it to the `playBuildAvailable` function with the job's GitHub OIDC token. The function
+      (`functions/src/playAvailable.ts`) accepts only this repository's `android-build.yml` on
+      develop or `release/*` (push or by hand) and only a higher version code. Nothing for
+      Firestore is stored in GitHub. Callers of `android-build.yml` must grant `id-token: write`.
+    - Only `previewTester` accounts compare against it (`setStoreTester`, from AppContext with the
+      update channel): they are the internal testers, as on iOS. A tester who isn't on Play's
+      internal testing list would be offered a build Play doesn't show them, and wouldn't get
+      `preview` updates for it either. Closed-testing-only testers aren't offered testing builds:
+      Play's API can't say when a closed-testing review has passed.
+    - `latest.android` + `latest.androidCode`: production, for everyone. Set by hand once a release
+      is out to everyone (`play.js rollout 1` prints the command): review state and staged
+      rollouts aren't in Play's API either.
   - Development, TestFlight and App Review (a sandbox receipt) never see either, so a reviewer is
-    never blocked.
+    never blocked. Android is never exempt (only `__DEV__`): internal and closed testers see it.
 - **Forced updates:** Firestore `config/app` `minSupported.ios` / `.android`. Below the minimum the
   whole app is "Update required" (`UpdateRequired`) with no way past it.
   - It applies only once the store has a version that meets the minimum: on iOS the listing must
@@ -79,9 +96,13 @@ file is the release mechanics and the traps behind them.
   - Phones read `config/app` at launch and every 6 h, and keep a copy for offline use.
   - Set it with
     `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-app-config.js`
-    (`--show`, `--latest-android V`, `--min-ios V`, `--min-android V`, `--clear-min`). It refuses a
-    minimum the store doesn't have yet, unless `--force`.
-  - After a release reaches Play's production track, set `--latest-android` to it.
+    (`--show`, `--latest-android V [--latest-android-code N]`, `--min-ios V`, `--min-android V`,
+    `--clear-min`). It refuses a minimum the store doesn't have yet, unless `--force`.
+  - After a release reaches everyone on Play's production track, set `--latest-android` and
+    `--latest-android-code` to it.
+  - `playBuildAvailable` deploys by hand like the other functions
+    (`firebase deploy --only functions:playBuildAvailable`); it is public and checks the token
+    itself. Its URL is in `android-build.yml`.
   - The rule (`match /config/app`: anyone reads, no client writes) went live on 2026-11-03.
 
 ## Health (Sentry → GitHub → Claude)

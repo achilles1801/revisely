@@ -162,6 +162,7 @@ jobs:
     if: ${{ vars.ANDROID_RELEASES == 'true' && vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
     permissions:
       contents: write # pushes the android-fp/<hash> tag
+      id-token: write # android-build.yml's available job proves itself to playBuildAvailable
     uses: ./.github/workflows/android-build.yml
     with:
       submit: true

@@ -22,6 +22,7 @@ import {
 } from '../lib/schedulePersistence';
 import { logger } from '../lib/logger';
 import { applyUpdateChannel } from '../lib/updateChannel';
+import { setStoreTester } from '../lib/updates/storeUpdates';
 import { ensureOnServer, retryDelayMs } from '../lib/userDoc';
 import * as Sentry from '@sentry/react-native';
 import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
@@ -739,6 +740,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!userId && !signedOut) return;
     const channel = applyUpdateChannel(!!userId && previewTester);
     if (channel) Sentry.setTag('update_channel', channel);
+    // Android testers are offered Play's internal testing builds too (storeUpdates).
+    setStoreTester(!!userId && previewTester);
   }, [userId, previewTester, signedOut]);
 
   // ============================================================================

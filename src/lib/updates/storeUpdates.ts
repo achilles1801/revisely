@@ -5,8 +5,12 @@
 // - iOS asks Apple's public lookup (itunes.apple.com/lookup, by bundle id; it
 //   carries nothing about the user) at most once a day, and hourly while a
 //   minimum waits for the listing to catch up.
-// - Android reads what Play has from Firestore config/app (`latest.android`):
-//   Play has no public lookup, and In-App Updates needs a native module (1.0.4).
+// - Android reads what Play has from Firestore config/app: Play has no public
+//   lookup, and In-App Updates needs a native module (1.0.4). `latest.android`
+//   is production; `testing.android` is internal testing, written when
+//   android-build.yml has put a build there, and counts for previewTester
+//   accounts only (the internal testers). Builds compare by version code, so a
+//   new build of the same version is offered too.
 // - The minimum is config/app's `minSupported`, set with
 //   functions/scripts/set-app-config.js. It blocks only if the store already has
 //   a version that meets it.
@@ -59,6 +63,7 @@ interface Saved<T> {
 let config: Saved<AppConfig> | null = null;
 let listing: Saved<StoreListing | null> | null = null;
 let offered: string | null = null;
+let tester = false;
 let loaded = false;
 let started = false;
 let refreshing: Promise<void> | null = null;
@@ -76,10 +81,19 @@ function exempt(): boolean {
   }
 }
 
+/** Android's version code ("5"); null on iOS, where the build number means nothing to the App Store. */
+function installedCode(): number | null {
+  if (Platform.OS !== 'android') return null;
+  const code = Number(Application.nativeBuildVersion);
+  return Number.isInteger(code) && code > 0 ? code : null;
+}
+
 function input(): StoreInput {
   return {
     platform: Platform.OS === 'ios' ? 'ios' : 'android',
     installed: Application.nativeApplicationVersion ?? null,
+    installedCode: installedCode(),
+    tester,
     osVersion: Platform.OS === 'ios' ? String(Platform.Version) : null,
     exempt: exempt(),
     config: config?.value ?? EMPTY_CONFIG,
@@ -184,6 +198,13 @@ export function startStoreChecks(): void {
   });
 }
 
+/** Whether the signed-in account is a `previewTester` (AppContext, with the update channel). */
+export function setStoreTester(isTester: boolean): void {
+  if (tester === isTester) return;
+  tester = isTester;
+  notify();
+}
+
 /** The offer was shown: not again for this version. */
 export function markOffered(version: string): void {
   offered = version;
@@ -238,6 +259,7 @@ export function resetStoreForTests(): void {
   config = null;
   listing = null;
   offered = null;
+  tester = false;
   loaded = false;
   started = false;
   refreshing = null;
