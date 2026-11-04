@@ -85,6 +85,14 @@ How the tests are made: `tests/scenarios/README.md`.
 - **CARRY-5.** Saving an edit to the plan (not a new plan) leaves today's pages as they are, unless
   the edit changes today itself.
 
+## The daily log
+
+- **LOG-1.** Every note added to a day's log stays, each as its own entry with its text; adding one
+  never replaces another.
+- **LOG-2.** Editing a note changes only that note; deleting one removes only it. Both reach every
+  phone.
+- **LOG-3.** A note written between midnight and Fajr (boundary on) belongs to the revision day.
+
 ## Offline, devices and accounts
 
 - **SYNC-1.** Offline, the app works from the copy on the phone. Changes reach the server, in order,
@@ -93,6 +101,10 @@ How the tests are made: `tests/scenarios/README.md`.
   offline.
 - **SYNC-3.** Another device signed in to the account sees the changes once they have synced.
 - **SYNC-4.** A new account loads right after sign-up, with no relaunch.
+- **RESET-1.** After the owner resets an account (`functions/scripts/reset-account.js`), every phone
+  shows it as new. A change a phone made offline before the reset never reaches the server.
+- **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
+  phone revised, in one session for the day.
 
 ## Known bugs
 

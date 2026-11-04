@@ -30,6 +30,9 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm ci
         working-directory: tests/scenarios
+      # firebase-admin, for the owner's scripts the scenarios run (harness/admin.ts).
+      - run: npm ci
+        working-directory: functions
       - name: BEHAVIOUR.md and its tests
         run: node tests/scenarios/check-spec.js
       - name: Scenarios and properties (Firebase emulators)
