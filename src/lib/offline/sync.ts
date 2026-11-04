@@ -123,8 +123,9 @@ async function run(uid: string): Promise<void> {
   if (api?.beforeSend) {
     try {
       await api.beforeSend(uid);
-    } catch {
+    } catch (err) {
       // Offline, or the server can't be read yet: nothing is sent until it can.
+      logger.log('[sync] not sending yet: the server can’t be read', err);
       scheduleRetry(uid);
       return;
     }
@@ -138,6 +139,7 @@ async function run(uid: string): Promise<void> {
     } catch (err) {
       const kind = classifyError(err);
       if (kind === 'later') {
+        logger.log(`[sync] ${head.op.kind} waits: ${(err as { code?: string } | null)?.code ?? 'no code'}`);
         scheduleRetry(uid);
         return;
       }
@@ -164,6 +166,7 @@ async function run(uid: string): Promise<void> {
       continue;
     }
     transientStreak.delete(uid);
+    logger.log(`[sync] ${head.op.kind} sent`);
     await Promise.all(
       [...appliedListeners].map((l) =>
         Promise.resolve()

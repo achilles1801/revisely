@@ -22,6 +22,7 @@ export function restartFirestore(): Promise<void> {
   if (!restarting) {
     restarting = (async () => {
       try {
+        logger.log('[net] restarting Firestore’s connection');
         await disableNetwork(db);
         await enableNetwork(db);
       } catch (err) {
@@ -43,11 +44,13 @@ export function watchConnectivity(onChange: (offline: boolean) => void, onBack: 
   const unsubNet = NetInfo.addEventListener((s) => {
     const next = netOffline(s);
     const cameBack = offline === true && !next;
+    if (next !== offline) logger.log(`[net] NetInfo: ${next ? 'offline' : 'online'} (${s.type}, reachable ${String(s.isInternetReachable)})`);
     offline = next;
     onChange(next);
     if (cameBack) onBack();
   });
   const appState = AppState.addEventListener('change', (s) => {
+    if (s === 'active') logger.log('[net] back in front');
     if (s === 'active') onBack();
   });
   return () => {

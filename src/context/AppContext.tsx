@@ -638,6 +638,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const unsubscribeUser = firestoreService.subscribeToUser(
       (fsUser, { fromCache }) => {
         if (!active) return;
+        if (serverReachableRef.current !== !fromCache) logger.log(`[net] the user document is ${fromCache ? 'from the cache' : 'from the server'}`);
         setServerReachable(!fromCache);
         // Firestore's memory, not the server: the copy on the phone stands.
         if (fromCache) return;

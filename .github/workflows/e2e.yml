@@ -14,16 +14,17 @@ name: E2E
 # JavaScript-only change rebuilds only the bundle (.maestro/scripts/embed-js.sh).
 #
 # Scheduled runs start from main (CLAUDE.md) and test develop.
+#
+# A required check for merges into develop: the job named `E2E` at the end. It
+# runs on every pull request into develop, so it can never wait for a run that
+# never starts; when nothing that goes into the app (or into these flows)
+# changed, `changes` says so and the platform jobs are skipped, and `E2E` passes
+# without them. A run started by hand on part of the matrix (one platform, some
+# flows) reports as "E2E (partial run)", never as the check itself.
 
 on:
   pull_request:
     branches: [develop]
-    paths:
-      - 'src/**'
-      - 'App.tsx'
-      - 'index.ts'
-      - '.maestro/**'
-      - '.github/workflows/e2e.yml'
   schedule:
     # 07:30 UTC: the small hours in Chicago.
     - cron: '30 7 * * *'
@@ -34,6 +35,14 @@ on:
         type: choice
         options: [both, ios, android]
         default: both
+      flows:
+        description: Only these flows (a glob in .maestro/flows, e.g. 06-*); empty for all
+        type: string
+        default: ''
+      debug:
+        description: Firestore's debug log in the app's log (for a flow being looked into)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -50,26 +59,87 @@ env:
   # The emulators, as Maestro (on the runner) sees them: firebase.json's ports.
   E2E_AUTH_URL: http://127.0.0.1:9099
   E2E_FIRESTORE_URL: http://127.0.0.1:8080
-  # One rerun of a failed flow; a pass on a rerun is reported as a warning.
+  # One rerun of a failed flow; a pass on a rerun is reported as a warning, and
+  # the job keeps its results (screenshots, logs) as for a failure.
   E2E_RETRIES: '1'
+  # A run by hand with `debug`: Firestore's debug log goes into the app's log
+  # (src/lib/e2e/firebase.ts), which run.sh keeps for each failed attempt.
+  EXPO_PUBLIC_E2E_FIRESTORE_DEBUG: ${{ inputs.debug && '1' || '' }}
 
 jobs:
+  # Whether this pull request changes anything the flows exercise: everything
+  # that goes into the app (the complement of .github/scripts/app-hash.sh's
+  # list), the flows, this workflow, and what the emulators load
+  # (firestore.rules, firebase.json). Scheduled and manual runs always run.
+  changes:
+    name: E2E (what changed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+      ios_shards: ${{ steps.shards.outputs.ios }}
+      android_flows: ${{ steps.shards.outputs.android }}
+    steps:
+      # The iOS jobs: two of about 22 minutes' flows each, the long ones (03,
+      # 04) apart. A run by hand with `flows`: one job (and Android) with those.
+      - id: shards
+        env:
+          ONLY: ${{ inputs.flows }}
+        run: |
+          if [ -n "$ONLY" ]; then
+            case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
+            jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]' | sed 's/^/ios=/' >> "$GITHUB_OUTPUT"
+            echo "android=.maestro/flows/$ONLY" >> "$GITHUB_OUTPUT"
+          else
+            echo 'ios=[{"name":"01 02 03 08","flows":".maestro/flows/0[1238]-*.yaml"},{"name":"04 05 06 07","flows":".maestro/flows/0[4567]-*.yaml"}]' >> "$GITHUB_OUTPUT"
+            echo "android=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "A $EVENT run: every flow runs."
+            exit 0
+          fi
+          # Renames count by both names. The API lists at most 3000 files: a
+          # bigger change runs the flows.
+          gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/files.txt"
+          app=false
+          if [ "$(wc -l < "$RUNNER_TEMP/files.txt")" -ge 3000 ]; then app=true; fi
+          while IFS= read -r f; do
+            case "$f" in
+              .maestro/*|.github/workflows/e2e.yml|firestore.rules|firebase.json) app=true ;;
+              docs/*|tests/*|functions/*|worker/*|store/*|scripts/*|.github/*) ;;
+              *.md|firestore.indexes.json|wrangler.jsonc) ;;
+              *) app=true ;;
+            esac
+            if [ "$app" = true ]; then echo "Goes into the app or the flows: $f"; break; fi
+          done < "$RUNNER_TEMP/files.txt"
+          [ "$app" = true ] || echo "Nothing here goes into the app or the flows: the flows are skipped."
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+
   ios:
     name: E2E (iOS Simulator, ${{ matrix.shard.name }})
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.platform != 'android' }}
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' && (github.event_name != 'workflow_dispatch' || inputs.platform != 'android') }}
     runs-on: macos-26
     timeout-minutes: 50
-    # The macOS runner takes 4–9 minutes a flow: two jobs of about 22 minutes'
-    # flows each, the long ones (03, 04) apart. (A third job often waited for a
+    # The macOS runner takes 4–9 minutes a flow. (A third job often waited for a
     # macOS runner until GitHub gave up on it.)
+    # (A run by hand with some flows: one job with those; `changes` picks.)
     strategy:
       fail-fast: false
       matrix:
-        shard:
-          - name: 01 02 03 08
-            flows: .maestro/flows/0[1238]-*.yaml
-          - name: 04 05 06 07
-            flows: .maestro/flows/0[4567]-*.yaml
+        shard: ${{ fromJSON(needs.changes.outputs.ios_shards) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -185,7 +255,7 @@ jobs:
         run: bash .maestro/run.sh ios $FLOWS
 
       - name: Keep the results
-        if: failure() || cancelled()
+        if: failure() || cancelled() || hashFiles('.maestro/build/results/**/attempt-failed') != ''
         uses: actions/upload-artifact@v4
         with:
           name: e2e-ios-${{ strategy.job-index }}-${{ github.run_id }}
@@ -199,7 +269,8 @@ jobs:
 
   android:
     name: E2E (Android emulator)
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.platform != 'ios' }}
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' && (github.event_name != 'workflow_dispatch' || inputs.platform != 'ios') }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -300,9 +371,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # The action runs each line of `script` on its own: one line.
+      # The action runs each line of `script` on its own: one line. $E2E_FLOWS
+      # (a run by hand with some flows) is a glob, expanded there.
       - name: Run the flows
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          E2E_FLOWS: ${{ needs.changes.outputs.android_flows }}
         with:
           api-level: 34
           target: google_apis
@@ -310,10 +384,10 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
-          script: adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android
+          script: adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android $E2E_FLOWS
 
       - name: Keep the results
-        if: failure() || cancelled()
+        if: failure() || cancelled() || hashFiles('.maestro/build/results/**/attempt-failed') != ''
         uses: actions/upload-artifact@v4
         with:
           name: e2e-android-${{ github.run_id }}
@@ -324,3 +398,34 @@ jobs:
           retention-days: 7
           # Maestro keeps its screenshots under a .maestro folder.
           include-hidden-files: true
+
+  # The required check: green when every platform job that had to run passed,
+  # or when nothing in the change goes into the app (they were skipped).
+  e2e:
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform != 'both' || inputs.flows != '') && 'E2E (partial run)' || 'E2E' }}
+    needs: [changes, ios, android]
+    # Also after a failure or a cancellation, so the check is never missing.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          APP: ${{ needs.changes.outputs.app }}
+          IOS: ${{ needs.ios.result }}
+          ANDROID: ${{ needs.android.result }}
+          EVENT: ${{ github.event_name }}
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          echo "changes: $CHANGES (app: $APP), iOS: $IOS, Android: $ANDROID"
+          if [ "$CHANGES" != success ]; then echo "::error::Couldn't tell what changed ($CHANGES)."; exit 1; fi
+          if [ "$APP" != true ]; then echo "Nothing that goes into the app changed: no flows to run."; exit 0; fi
+          expect() { # platform result
+            if [ "$EVENT" = workflow_dispatch ] && [ -n "$PLATFORM" ] && [ "$PLATFORM" != both ] && [ "$PLATFORM" != "$1" ]; then return 0; fi
+            if [ "$2" != success ]; then echo "::error::E2E on $1: $2"; return 1; fi
+          }
+          ok=0
+          expect ios "$IOS" || ok=1
+          expect android "$ANDROID" || ok=1
+          exit $ok

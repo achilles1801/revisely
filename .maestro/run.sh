@@ -70,13 +70,19 @@ set_android_zone() {
   fi
 }
 
-# What the device saw, for a failed flow: a screenshot and the app's log.
+# What the device saw, for a failed flow: a screenshot and the app's logs.
+# app.log is the E2E build's own log (src/lib/e2e/log.ts): everything the app's
+# JavaScript said, which an iOS release build doesn't pass to the system log
+# (only console.error reaches it). Android's logcat has it (ReactNativeJS).
 save_device_state() {
   local out=$1
   if [ "$PLATFORM" = ios ]; then
     xcrun simctl io "$DEVICE" screenshot "$out/device.png" >/dev/null 2>&1 || true
     xcrun simctl spawn "$DEVICE" log show --last 5m --style compact \
       --predicate 'process == "Revisely"' > "$out/device.log" 2>&1 || true
+    local data
+    data=$(xcrun simctl get_app_container "$DEVICE" com.revisionbuddy.app data 2>/dev/null) &&
+      cp "$data/Documents/e2e-log.txt" "$out/app.log" 2>/dev/null || true
   else
     adb -s "$DEVICE" exec-out screencap -p > "$out/device.png" 2>/dev/null || true
     adb -s "$DEVICE" logcat -d > "$out/logcat.txt" 2>&1 || true
@@ -132,6 +138,8 @@ for flow in "${FLOWS[@]}"; do
       break
     fi
     save_device_state "$out"
+    # The workflow keeps the results of a job with a failed attempt (a pass on a retry too).
+    touch "$out/attempt-failed"
     tail -25 "$out/maestro.log" | sed 's/^/    /'
   done
   secs=$(( $(date +%s) - start ))
