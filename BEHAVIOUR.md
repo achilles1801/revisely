@@ -91,6 +91,15 @@ How the tests are made: `tests/scenarios/README.md`.
 - **CARRY-5.** Saving an edit to the plan (not a new plan) leaves today's pages as they are, unless
   the edit changes today itself.
 
+## Jump to…
+
+- **JUMP-1.** Jump to… starts today at the chosen juz, surah or page, earlier or later than today's
+  start, and the days after carry on from it. The start moves at once.
+- **JUMP-2.** The session holds today's pages from that start. Pages behind it are not in the session.
+- **JUMP-3.** A jump drops pages carried into today that are not yet revised: they were the old start's.
+  Pages revised today stay counted and go first. (Changed Nov 2026: a carry kept the old start in place,
+  so Jump to an earlier juz did nothing.)
+
 ## The daily log
 
 - **LOG-1.** Every note added to a day's log stays, each as its own entry with its text; adding one
