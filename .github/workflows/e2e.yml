@@ -25,6 +25,11 @@ name: E2E
 on:
   pull_request:
     branches: [develop]
+  # Keeps the native builds where pull requests can restore them: a cache saved
+  # by one PR is that PR's alone, but one saved on develop is open to every PR
+  # into it. A push only builds what isn't kept yet; it runs no flows.
+  push:
+    branches: [develop]
   schedule:
     # 07:30 UTC: the small hours in Chicago.
     - cron: '30 7 * * *'
@@ -88,8 +93,12 @@ jobs:
       - id: shards
         env:
           ONLY: ${{ inputs.flows }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if [ -n "$ONLY" ]; then
+          if [ "$EVENT" = push ]; then
+            echo 'ios=[{"name":"native build","flows":""}]' >> "$GITHUB_OUTPUT"
+            echo "android=" >> "$GITHUB_OUTPUT"
+          elif [ -n "$ONLY" ]; then
             case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
             jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]' | sed 's/^/ios=/' >> "$GITHUB_OUTPUT"
             echo "android=.maestro/flows/$ONLY" >> "$GITHUB_OUTPUT"
@@ -132,9 +141,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && (github.event_name != 'workflow_dispatch' || inputs.platform != 'android') }}
     runs-on: macos-26
-    timeout-minutes: 50
-    # The macOS runner takes 4–9 minutes a flow. (A third job often waited for a
-    # macOS runner until GitHub gave up on it.)
+    timeout-minutes: 80
+    # The macOS runner takes 4–9 minutes a flow, and a native build about 20
+    # (when the fingerprint has none kept: a native change). (A third job often
+    # waited for a macOS runner until GitHub gave up on it.)
     # (A run by hand with some flows: one job with those; `changes` picks.)
     strategy:
       fail-fast: false
@@ -169,6 +179,7 @@ jobs:
       # Started now, finished later: a new simulator's first boot takes minutes,
       # which the install and the build hide.
       - name: Boot a simulator
+        if: github.event_name != 'push'
         id: sim
         run: |
           RUNTIME=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | sort_by(.version) | last | .identifier')
@@ -211,16 +222,18 @@ jobs:
 
       # A kept build: this commit's JavaScript into it.
       - name: Bundle this commit's JavaScript
-        if: steps.cache.outputs.cache-hit == 'true'
+        if: github.event_name != 'push' && steps.cache.outputs.cache-hit == 'true'
         run: bash .maestro/scripts/embed-js.sh ios .maestro/build/Revisely.app
 
       - name: Firebase CLI and Maestro
+        if: github.event_name != 'push'
         run: |
           npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Start the Firebase emulators
+        if: github.event_name != 'push'
         # Twice if need be: on a busy runner the Firestore emulator can miss the
         # CLI's own one-minute start limit.
         run: |
@@ -240,6 +253,7 @@ jobs:
 
       # Booted (above) while the app was built: the first boot of a new simulator takes minutes.
       - name: Install the app on the simulator
+        if: github.event_name != 'push'
         env:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
@@ -247,6 +261,7 @@ jobs:
           xcrun simctl install "$UDID" .maestro/build/Revisely.app
 
       - name: Run the flows
+        if: github.event_name != 'push'
         env:
           E2E_DEVICE: ${{ steps.sim.outputs.udid }}
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
@@ -272,7 +287,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && (github.event_name != 'workflow_dispatch' || inputs.platform != 'ios') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 80
     steps:
       # An Android build needs about 15 GB; the image ships tools this job never uses.
       - name: Free disk space
@@ -337,10 +352,11 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: Bundle this commit's JavaScript
-        if: steps.cache.outputs.cache-hit == 'true'
+        if: github.event_name != 'push' && steps.cache.outputs.cache-hit == 'true'
         run: bash .maestro/scripts/embed-js.sh android .maestro/build/revisely-e2e.apk
 
       - name: Firebase CLI and Maestro
+        if: github.event_name != 'push'
         run: |
           npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
           curl -fsSL "https://get.maestro.mobile.dev" | bash
@@ -348,6 +364,7 @@ jobs:
 
       # The emulator sees this computer's 127.0.0.1 as 10.0.2.2.
       - name: Start the Firebase emulators
+        if: github.event_name != 'push'
         # Twice if need be: on a busy runner the Firestore emulator can miss the
         # CLI's own one-minute start limit.
         run: |
@@ -366,6 +383,7 @@ jobs:
           exit 1
 
       - name: Enable KVM
+        if: github.event_name != 'push'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -374,6 +392,7 @@ jobs:
       # The action runs each line of `script` on its own: one line. $E2E_FLOWS
       # (a run by hand with some flows) is a glob, expanded there.
       - name: Run the flows
+        if: github.event_name != 'push'
         uses: reactivecircus/android-emulator-runner@v2
         env:
           E2E_FLOWS: ${{ needs.changes.outputs.android_flows }}

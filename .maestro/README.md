@@ -2,7 +2,23 @@
 
 The real app on the iOS Simulator and the Android emulator, driven by Maestro, against the Firebase
 emulators, at a time and in a time zone each flow sets. CI runs them (`.github/workflows/e2e.yml`)
-on PRs into `develop` that touch the app's JavaScript, every night, and by hand.
+on every PR into `develop`, every night, and by hand.
+
+**`E2E` is a required check for merges into `develop`.** It is the workflow's last job:
+- **Skipped flows:** its `changes` job reads the PR's files. When nothing in them goes into the app
+  or the flows, the iOS and Android jobs are skipped and `E2E` passes. "Goes into" means anything
+  outside `.github/scripts/app-hash.sh`'s ignore list, plus `.maestro/`, `e2e.yml`,
+  `firestore.rules` and `firebase.json`.
+- **Never missing:** it runs after a failure or a cancellation too, so a PR never waits for a check
+  that won't come.
+- **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`), reports
+  as `E2E (partial run)` and can't stand in for the check. `debug` there adds Firestore's own log to
+  the app's log.
+- **Claude's PRs:** `claude-fix` starts it on its branch, with CI, since a PR opened by the workflow
+  token starts no workflow.
+
+A flaky flow is fixed, not skipped. Each failed flow is run once more (`E2E_RETRIES`). A pass on that
+retry is a warning on the run, and the job keeps its results as for a failure.
 
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,
@@ -181,6 +197,12 @@ Things that bit:
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
 
-A failed flow keeps Maestro's log and screenshots, a screenshot of the device and the app's log
-(logcat on Android, the unified log on iOS) in `.maestro/build/results/<platform>/<flow>/`; CI
-uploads the folder.
+A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
+in `.maestro/build/results/<platform>/<flow>/`:
+- `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
+  JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
+  An iOS release build passes only `console.error` to the unified log.
+- `device.log` (iOS): the unified log.
+- `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
+
+CI uploads the folder for a job with any failed attempt.
