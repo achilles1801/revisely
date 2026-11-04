@@ -36,6 +36,7 @@ const mockQueue = {
   queueChange: jest.fn(async () => ({})),
   withPendingJournalDay: jest.fn((_date: string, base: unknown) => base ?? null),
 };
+jest.mock('../../../lib/clipboard', () => ({ copyText: jest.fn() }));
 jest.mock('../../../lib/offline/queue', () => ({
   queueChange: (...a: unknown[]) => mockQueue.queueChange(...(a as [])),
   withPendingJournalDay: (...a: unknown[]) => mockQueue.withPendingJournalDay(...(a as [string, unknown])),
@@ -47,6 +48,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 import { JOURNAL_ENTRIES_PER_DAY, journalDayFromEntries, summarizeRevisedPages } from '../../../lib/journal';
 import type { JournalNote } from '../../../types';
+import { copyText } from '../../../lib/clipboard';
 
 const palette = paletteV2(false, DEFAULT_ACCENT);
 const AT = new Date(2026, 9, 20, 7, 12).getTime();
@@ -65,11 +67,21 @@ async function renderScreen() {
 }
 
 // An ActionSheet runs its action once the sheet has closed.
-async function chooseMenuAction(key: 'edit' | 'delete') {
+async function chooseMenuAction(key: 'edit' | 'copy' | 'delete') {
   fireEvent.press(await screen.findByTestId(`sheet-action-${key}`));
   await act(async () => {
     screen.UNSAFE_getAllByType(Modal).forEach((m) => m.props.onDismiss?.());
   });
+}
+
+// A press and hold on a note (VoiceOver's "Options") opens its menu.
+function holdNote(id: string) {
+  fireEvent(screen.getByTestId(`journal-note-${id}`), 'accessibilityAction', { nativeEvent: { actionName: 'options' } });
+}
+
+// A swipe to the left reveals Delete; VoiceOver's "Delete" does the same, and it asks first.
+function swipeDeleteNote(id: string) {
+  fireEvent(screen.getByTestId(`journal-note-${id}`), 'accessibilityAction', { nativeEvent: { actionName: 'delete' } });
 }
 
 async function pressSend() {
@@ -117,7 +129,7 @@ describe('the daily log: notes with their times', () => {
     expect(placeholder()).not.toMatch(shorthand);
   });
 
-  it('lists the notes oldest first, each with its kind, its time and its ⋯ menu', async () => {
+  it('lists the notes oldest first, each with its kind and its time', async () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [rev, memo]));
     await renderScreen();
     expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
@@ -125,7 +137,7 @@ describe('the daily log: notes with their times', () => {
     expect(screen.getByText('7:12 am · 20m')).toBeTruthy();
     expect(screen.getByText('10:12 am')).toBeTruthy();
     expect(screen.getByText('1/2 p3')).toBeTruthy();
-    expect(screen.getByLabelText('Revision options')).toBeTruthy();
+    expect(screen.getByLabelText('Revision, 5p Maryam, 10:12 am')).toBeTruthy();
     expect(screen.getByTestId('journal-delete')).toBeTruthy();
   });
 
@@ -172,7 +184,7 @@ describe('adding, editing and deleting notes', () => {
   it('Edit from a note\'s ⋯ loads it into the composer and saves the same id and time', async () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
     await renderScreen();
-    fireEvent.press(screen.getByLabelText('Memorization options'));
+    holdNote('n1');
     await chooseMenuAction('edit');
     expect(screen.getByText('Editing memorization')).toBeTruthy();
     expect(screen.getByTestId('journal-text-input').props.value).toBe('1/2 p3');
@@ -188,7 +200,7 @@ describe('adding, editing and deleting notes', () => {
   it('clearing an edited note deletes it', async () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
     await renderScreen();
-    fireEvent.press(screen.getByLabelText('Memorization options'));
+    holdNote('n1');
     await chooseMenuAction('edit');
     fireEvent.changeText(screen.getByTestId('journal-text-input'), '');
     fireEvent.changeText(screen.getByLabelText('Minutes'), '');
@@ -200,8 +212,7 @@ describe('adding, editing and deleting notes', () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
     const alert = jest.spyOn(Alert, 'alert');
     await renderScreen();
-    fireEvent.press(screen.getByLabelText('Memorization options'));
-    await chooseMenuAction('delete');
+    swipeDeleteNote('n1');
     const buttons = alert.mock.calls.at(-1)?.[2] ?? [];
     await act(async () => {
       await buttons.find((b) => b.text === 'Delete')?.onPress?.();
@@ -330,7 +341,7 @@ describe('each kind has its own draft', () => {
   it('while a note is being edited the kind tabs are locked, and Save edits that note only', async () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
     await renderScreen();
-    fireEvent.press(screen.getByLabelText('Memorization options'));
+    holdNote('n1');
     await chooseMenuAction('edit');
     fireEvent.press(screen.getByText('Note'));
     expect(screen.getByText('Editing memorization')).toBeTruthy();
@@ -350,12 +361,57 @@ describe('each kind has its own draft', () => {
     await renderScreen();
     fireEvent.press(screen.getByText('Revised'));
     fireEvent.changeText(screen.getByTestId('journal-text-input'), 'half-written revision');
-    fireEvent.press(screen.getByLabelText('Memorization options'));
+    holdNote('n1');
     await chooseMenuAction('edit');
     fireEvent.press(screen.getByTestId('journal-cancel-edit'));
     expect(screen.queryByText('Editing memorization')).toBeNull();
     expect(screen.getByTestId('journal-text-input').props.value).toBe('half-written revision');
     expect(mockQueue.queueChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('a note: hold for its menu, swipe for Delete', () => {
+  it('the hold menu offers Edit and Copy; Delete is the swipe, not a menu item', async () => {
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+    await renderScreen();
+    holdNote('n1');
+    expect(await screen.findByTestId('sheet-action-edit')).toBeTruthy();
+    expect(screen.getByTestId('sheet-action-copy')).toBeTruthy();
+    expect(screen.queryByTestId('sheet-action-delete')).toBeNull();
+  });
+
+  it('Copy puts the note text on the clipboard', async () => {
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+    await renderScreen();
+    holdNote('n1');
+    await chooseMenuAction('copy');
+    expect(copyText).toHaveBeenCalledWith('1/2 p3');
+    expect(mockQueue.queueChange).not.toHaveBeenCalled();
+  });
+
+  it('a note with only minutes has no Copy', async () => {
+    const minutesOnly: JournalNote = { id: 'm1', at: AT, kind: 'memorization', text: '', minutes: 15 };
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [minutesOnly]));
+    await renderScreen();
+    holdNote('m1');
+    expect(await screen.findByTestId('sheet-action-edit')).toBeTruthy();
+    expect(screen.queryByTestId('sheet-action-copy')).toBeNull();
+  });
+
+  it('the swipe Delete confirms before it queues the delete', async () => {
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+    const alert = jest.spyOn(Alert, 'alert');
+    await renderScreen();
+    swipeDeleteNote('n1');
+    expect(alert).toHaveBeenCalledWith('Delete this entry?', expect.any(String), expect.any(Array));
+    expect(mockQueue.queueChange).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it('no ⋯ button is left on a note', async () => {
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+    await renderScreen();
+    expect(screen.queryByLabelText(/options$/)).toBeNull();
   });
 });
 
