@@ -1,6 +1,7 @@
 import {
   applyCarryOver,
   findLeftoverPages,
+  findLeftovers,
   hasCarriedOver,
   settleCarryOverForNewPlan,
 } from '../carryOver';
@@ -73,15 +74,68 @@ describe('findLeftoverPages', () => {
     expect(findLeftoverPages(logs, TODAY, [3, 4, 5], memorizedSet)).toEqual([]);
   });
 
-  it('ignores a day with no session, and days before the lookback', () => {
-    const logs = [log('2026-10-15', [1, 2, 3], [1])];
+  it('ignores days before the lookback', () => {
+    // Four days before TODAY: outside the three-day lookback.
+    const logs = [log('2026-10-13', [1, 2, 3], [1])];
     expect(findLeftoverPages(logs, TODAY, [], memorizedSet)).toEqual([]);
-    expect(findLeftoverPages(logs, TODAY, [], memorizedSet, 2)).toEqual([2, 3]);
+    expect(findLeftoverPages(logs, TODAY, [], memorizedSet, 4)).toEqual([2, 3]);
+  });
+
+  it('a day with no session gives nothing when there is no schedule for it', () => {
+    expect(findLeftoverPages([], TODAY, [], memorizedSet)).toEqual([]);
   });
 
   it('drops pages that are no longer memorized', () => {
     const logs = [log('2026-10-16', [1, 2, 3], [1])];
     expect(findLeftoverPages(logs, TODAY, [], new Set([1, 2]))).toEqual([2]);
+  });
+});
+
+describe('findLeftovers: a day missed entirely', () => {
+  // The schedule gives each day its pages (scheduledOn); a day with a log uses the log's.
+  // TODAY is Oct 17, so Oct 14 is three days back, Oct 16 yesterday.
+  const scheduled: Record<string, number[]> = {
+    '2026-10-14': [7, 8],
+    '2026-10-15': [1, 2, 3],
+    '2026-10-16': [4, 5, 6],
+  };
+  const scheduledOn = (d: string) => scheduled[d] ?? [];
+
+  it('offers a missed day in full, from the schedule, and says it was missed', () => {
+    const got = findLeftovers([], TODAY, [], memorizedSet, 3, scheduledOn);
+    expect(got.pages).toEqual([7, 8, 1, 2, 3, 4, 5, 6]);
+    expect(got.days).toEqual([
+      { day: '2026-10-14', ago: 3, missed: true },
+      { day: '2026-10-15', ago: 2, missed: true },
+      { day: '2026-10-16', ago: 1, missed: true },
+    ]);
+  });
+
+  it('leaves out pages already in today’s session', () => {
+    const got = findLeftovers([], TODAY, [7, 8, 9], memorizedSet, 3, scheduledOn);
+    expect(got.pages).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('a partly revised day offers only what is left, and is not called missed', () => {
+    const logs = [log('2026-10-15', [1, 2, 3], [1])];
+    const got = findLeftovers(logs, TODAY, [], memorizedSet, 3, scheduledOn);
+    expect(got.pages).toEqual([7, 8, 2, 3, 4, 5, 6]);
+    expect(got.days).toEqual([
+      { day: '2026-10-14', ago: 3, missed: true },
+      { day: '2026-10-15', ago: 2, missed: false },
+      { day: '2026-10-16', ago: 1, missed: true },
+    ]);
+  });
+
+  it('a page revised today is not offered from an earlier day', () => {
+    const logs = [log(TODAY, [5], [5])];
+    const got = findLeftovers(logs, TODAY, [], memorizedSet, 3, scheduledOn);
+    expect(got.pages).toEqual([7, 8, 1, 2, 3, 4, 6]);
+  });
+
+  it('a day with nothing scheduled (an off day) gives no days', () => {
+    const got = findLeftovers([], TODAY, [], memorizedSet, 1, () => []);
+    expect(got).toEqual({ pages: [], days: [] });
   });
 });
 

@@ -78,12 +78,16 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## Carrying pages over
 
-- **CARRY-1.** Pages left in yesterday's session (started, not finished) are offered on Home ("from
-  yesterday"), once a day.
+- **CARRY-1.** Pages left over from the last three revision days are offered on Home, once a day, as
+  one line above today's action with "Add to today" beneath it: "Left yesterday · Revise p. 3–5" for a
+  day started and not finished, "Missed yesterday · Revise p. 1–5" for a day with no session, and
+  "Missed 3 days · Revise pp. …" when several days come to more than one. Earlier days are not offered.
 - **CARRY-2.** Keep daily amount (`shift`, the default): today keeps its size. The leftovers come
   first, and the rest of the plan slides back by as many pages.
 - **CARRY-3.** Add (`add`): the leftovers go on top of today's pages, and nothing else moves.
-- **CARRY-4.** A day with no session carries nothing over: a missed day is not added to the next.
+- **CARRY-4.** A missed day (no session) is offered like the rest, but not added: nothing moves until the
+  user taps "Add to today". Adding makes them today's pages; if they are still unrevised the day after,
+  they are offered again. (Changed Nov 2026: a missed day used to vanish.)
 - **CARRY-5.** Saving an edit to the plan (not a new plan) leaves today's pages as they are, unless
   the edit changes today itself.
 

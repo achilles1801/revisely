@@ -80,8 +80,6 @@ function leftoversByRule(c: { today: string; memorized: number[]; todaysPages: n
   for (let back = c.lookback; back >= 1; back--) {
     const day = addDays(c.today, -back);
     const dayLogs = c.logs.filter((l) => l.date === day && (l.assignedPages?.length ?? 0) > 0);
-    // Started: a session of that day (with its assignment) revised something.
-    if (!dayLogs.some((l) => l.pagesRevised.length > 0)) continue;
     for (const l of dayLogs) {
       for (const p of l.assignedPages!) {
         if (revisedOn(p, day) || credited(p, day)) continue;
@@ -108,7 +106,7 @@ describe('[CARRY-1] [CARRY-4] leftover pages', () => {
           const undoneOn = days.filter(
             (day) =>
               c.logs.some((l) => l.date === day && (l.assignedPages ?? []).includes(p)) &&
-              c.logs.some((l) => l.date === day && (l.assignedPages?.length ?? 0) > 0 && l.pagesRevised.length > 0) &&
+              c.logs.some((l) => l.date === day && (l.assignedPages?.length ?? 0) > 0) &&
               !c.logs.some((l) => l.date >= day && l.date <= c.today && l.pagesRevised.includes(p)) &&
               !c.logs.some((l) => (l.ahead?.[day] ?? []).includes(p)),
           );
@@ -128,11 +126,11 @@ describe('[CARRY-1] [CARRY-4] leftover pages', () => {
     );
   });
 
-  it('carries nothing from a day with no session (a missed day isn’t carried)', () => {
+  it('takes nothing from a day with no session on the logs alone: a missed day comes from its schedule (CARRY-1, leftoversFor)', () => {
     fc.assert(
       fc.property(leftoverCaseArb, (c) => {
-        // Every session of the lookback days revised nothing: nothing was started.
-        const logs = c.logs.map((l) => (l.date < c.today ? { ...l, pagesRevised: [], ahead: undefined } : l));
+        // No session on the lookback days: the logs alone give nothing.
+        const logs = c.logs.filter((l) => l.date >= c.today);
         expect(findLeftoverPages(logs, c.today, c.todaysPages, new Set(c.memorized), c.lookback)).toEqual([]);
         // And with no sessions at all.
         expect(findLeftoverPages([], c.today, c.todaysPages, new Set(c.memorized), c.lookback)).toEqual([]);

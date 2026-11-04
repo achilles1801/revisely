@@ -56,7 +56,8 @@ import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
-import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
+import { catchUpLine } from '../../lib/todayLines';
+import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
 import { creditedOnDay, doneOnDay } from '../../lib/aheadCredit';
 import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { JumpSheet } from '../../components/home/JumpSheet';
@@ -182,15 +183,12 @@ export default function DashboardScreen() {
     return { plan, lead };
   }, [user, pages, logs, assignment, revisionDay, todayStatus.status]);
 
-  // Pages from yesterday's session that were never revised, offered as
-  // "Add to today". Empty once they are in today's assignment.
-  const leftovers = useMemo(() => {
-    // Once a day: after carrying over, today's leftovers are part of today.
-    if (!assignment || hasCarriedOver(user, revisionDay)) return [];
-    const memorized = new Set(
-      pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
-    );
-    return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
+  // Pages from the last few revision days that were never revised (a day with
+  // no session at all counts as missed), offered as "Add to today". Empty once
+  // they are in today's assignment.
+  const leftovers = useMemo<Leftovers>(() => {
+    if (!user || !assignment) return { pages: [], days: [] };
+    return leftoversFor(user, logs, revisionDay, assignment.pages, pages.filter((p) => p.status === 'memorized'));
   }, [logs, revisionDay, assignment, pages, user]);
 
   // How many of today's pages came from yesterday (they come first: "4 from yesterday first").
@@ -408,12 +406,12 @@ export default function DashboardScreen() {
 
   const handleCarryOver = async () => {
     // The ref stops a double tap before the state update re-renders.
-    if (!user || carryingRef.current || leftovers.length === 0) return;
+    if (!user || carryingRef.current || leftovers.pages.length === 0) return;
     carryingRef.current = true;
     setCarrying(true);
     try {
       const memorized = pages.filter((p) => p.status === 'memorized');
-      await saveUser(applyCarryOver(user, memorized, leftovers, revisionDate));
+      await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate));
     } catch {
       Alert.alert("Couldn't update today's session", 'Please try again.');
     } finally {
@@ -530,7 +528,7 @@ export default function DashboardScreen() {
           onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
           onJump={() => setJumpOpen(true)}
-          leftovers={leftovers.length}
+          catchUp={catchUpLine(leftovers)}
           onCarryOver={handleCarryOver}
           carrying={carrying}
           ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
