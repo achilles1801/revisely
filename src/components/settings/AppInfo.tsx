@@ -9,29 +9,16 @@ import { Tap } from '../v2/Tap';
 import { spacing } from '../../theme/spacing';
 import { currentRelease, diagnosticLines, ReleaseInfo } from '../../lib/releaseInfo';
 import { sendTestError, triggerTestNativeCrash } from '../../lib/sentry';
-import { logger } from '../../lib/logger';
-import { applyUpdate, notePendingUpdate } from '../../lib/updates/ota';
+import { applyUpdate, checkForUpdateNow, useUpdateBanner } from '../../lib/updates/ota';
 
-export type UpdateCheckResult = 'up-to-date' | 'downloaded' | 'unavailable' | 'error';
+export { checkForUpdateNow };
 
-/**
- * Check for an update now and download it if there is one. Updates run from the
- * next start; "downloaded" means one is waiting.
- */
-export async function checkForUpdateNow(): Promise<{ result: UpdateCheckResult; error?: string }> {
-  if (__DEV__ || !Updates.isEnabled) return { result: 'unavailable' };
-  try {
-    const check = await Updates.checkForUpdateAsync();
-    // A roll back to the built-in version counts as an update waiting too.
-    if (!check.isAvailable && !check.isRollBackToEmbedded) return { result: 'up-to-date' };
-    const fetched = await Updates.fetchUpdateAsync();
-    const id = fetched.manifest?.id ?? (fetched.isRollBackToEmbedded ? 'embedded' : null);
-    if (id) notePendingUpdate(id);
-    return { result: fetched.isNew || fetched.isRollBackToEmbedded ? 'downloaded' : 'up-to-date' };
-  } catch (err) {
-    logger.warn('Manual update check failed', err);
-    return { result: 'error', error: err instanceof Error ? err.message : String(err) };
-  }
+/** The alert after "Check for updates" found one: it has downloaded, so the only step left is the restart. */
+export function offerRestart(): void {
+  Alert.alert('Update ready', 'Restart Revisely to use it.', [
+    { text: 'Later', style: 'cancel' },
+    { text: 'Restart to update', style: 'default', onPress: () => void applyUpdate() },
+  ]);
 }
 
 /** One line summary for the row: "1.0.2 (19) · preview · update 84b0091f". */
@@ -54,6 +41,8 @@ export function showsTestActions(r: ReleaseInfo): boolean {
 export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo }) {
   const { palette } = useTheme();
   const { lastCheckForUpdateTimeSinceRestart } = Updates.useUpdates();
+  // An update downloaded (by the check here or by itself): the restart stays one tap away.
+  const { updateId: waiting } = useUpdateBanner();
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const lines = diagnosticLines(release, lastCheckForUpdateTimeSinceRestart ?? null);
@@ -62,11 +51,8 @@ export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo 
     setChecking(true);
     const { result, error } = await checkForUpdateNow();
     setChecking(false);
-    if (result === 'downloaded') {
-      Alert.alert('Update downloaded', 'It runs the next time Revisely starts.', [
-        { text: 'Later', style: 'cancel' },
-        { text: 'Restart now', onPress: () => void applyUpdate() },
-      ]);
+    if (result === 'ready') {
+      offerRestart();
     } else if (result === 'up-to-date') {
       Alert.alert('Up to date', 'This is the latest version for this build.');
     } else if (result === 'unavailable') {
@@ -132,7 +118,11 @@ export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo 
             </Text>
           ))}
           <View style={styles.actions}>
-            <Action label="Check for updates" onPress={check} />
+            {waiting ? (
+              <PillButton title="Restart to update" onPress={() => void applyUpdate()} size="sm" testID="app-info-restart" />
+            ) : (
+              <Action label="Check for updates" onPress={check} />
+            )}
             <Action label="Share" onPress={share} />
           </View>
           {testActions && <View style={styles.actions}>{testActions}</View>}

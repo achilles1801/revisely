@@ -2,11 +2,20 @@ let mockEnabled = true;
 const mockCheck = jest.fn();
 const mockFetch = jest.fn();
 const mockReload = jest.fn((_o?: unknown) => Promise.resolve());
+let mockContext: Record<string, unknown> | undefined;
+let mockNativeListener: ((e: { context: Record<string, unknown> }) => void) | null = null;
 jest.mock('expo-updates', () => ({
   get isEnabled() {
     return mockEnabled;
   },
   updateId: 'running-update',
+  get latestContext() {
+    return mockContext;
+  },
+  addUpdatesStateChangeListener: (l: (e: { context: Record<string, unknown> }) => void) => {
+    mockNativeListener = l;
+    return { remove: () => undefined };
+  },
   checkForUpdateAsync: () => mockCheck(),
   fetchUpdateAsync: () => mockFetch(),
   reloadAsync: (o: unknown) => mockReload(o),
@@ -31,6 +40,7 @@ import {
   applyUpdate,
   bannerState,
   checkForUpdate,
+  checkForUpdateNow,
   dismissBanner,
   markUiReady,
   notePendingUpdate,
@@ -66,6 +76,8 @@ beforeEach(() => {
   g.__DEV__ = false;
   mockEnabled = true;
   mockBusy = [];
+  mockContext = undefined;
+  mockNativeListener = null;
   server(null);
   jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() } as never);
 });
@@ -139,8 +151,8 @@ describe('at launch', () => {
     expect(mockHide).toHaveBeenCalledTimes(1);
     await jest.advanceTimersByTimeAsync(10_000);
     expect(mockReload).not.toHaveBeenCalled();
-    // Downloaded during this visit: no banner yet.
-    expect(bannerState()).toEqual({ visible: false, updateId: 'late-update' });
+    // Downloaded while the user is in: Home offers the restart at once.
+    expect(bannerState()).toEqual({ visible: true, updateId: 'late-update' });
   });
 
   it('the splash goes by the cap whatever happens', async () => {
@@ -184,7 +196,7 @@ describe('coming back to the app', () => {
     expect(mockReload).toHaveBeenCalledTimes(1);
   });
 
-  it('back sooner: no restart, and Home shows the banner (it waited since the last visit)', async () => {
+  it('back sooner: no restart, and Home still shows the banner', async () => {
     await launchedWithLateUpdate();
     await away(APPLY_AFTER_AWAY_MS - MIN);
     expect(mockReload).not.toHaveBeenCalled();
@@ -212,14 +224,14 @@ describe('coming back to the app', () => {
     expect(mockCheck).toHaveBeenCalledTimes(2);
   });
 
-  it('an update found on return waits for the next visit (no restart under the user)', async () => {
+  it('an update found on return is offered on Home, not applied under the user', async () => {
     startOtaUpdates();
     markUiReady();
     await jest.advanceTimersByTimeAsync(0);
     server('found-on-return');
     await away(APPLY_AFTER_AWAY_MS);
     expect(mockReload).not.toHaveBeenCalled();
-    expect(bannerState()).toEqual({ visible: false, updateId: 'found-on-return' });
+    expect(bannerState()).toEqual({ visible: true, updateId: 'found-on-return' });
     // Next return, long enough away: applied.
     await away(APPLY_AFTER_AWAY_MS);
     expect(mockReload).toHaveBeenCalledTimes(1);
@@ -231,21 +243,79 @@ describe('coming back to the app', () => {
     await jest.advanceTimersByTimeAsync(APPLY_AFTER_AWAY_MS);
     appState('active');
     expect(mockReload).not.toHaveBeenCalled();
+  });
+});
+
+describe("expo-updates' own download (at launch, natively)", () => {
+  it('counts as waiting: the banner shows, and it applies after 15 minutes away', async () => {
+    startOtaUpdates();
+    await jest.advanceTimersByTimeAsync(0);
     expect(bannerState().visible).toBe(false);
+    mockNativeListener!({ context: { isUpdatePending: true, downloadedManifest: { id: 'native-download' } } });
+    expect(bannerState()).toEqual({ visible: true, updateId: 'native-download' });
+    await away(APPLY_AFTER_AWAY_MS);
+    expect(mockReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('one already downloaded when the app starts is picked up too', async () => {
+    mockContext = { isUpdatePending: true, downloadedManifest: { id: 'before-start' } };
+    startOtaUpdates();
+    expect(bannerState().updateId).toBe('before-start');
+  });
+
+  it('a downloading or checking state is not an update', async () => {
+    startOtaUpdates();
+    mockNativeListener!({ context: { isUpdatePending: false, isDownloading: true } });
+    expect(bannerState().updateId).toBeNull();
+  });
+});
+
+describe('checkForUpdateNow (Settings)', () => {
+  /** Settle a promise that waits on the (fake-timed) server. */
+  async function settle<T>(p: Promise<T>): Promise<T> {
+    await jest.advanceTimersByTimeAsync(10);
+    return p;
+  }
+
+  it('downloads what it finds, whatever the interval, and says it is ready', async () => {
+    await settle(checkForUpdate(true));
+    server('manual');
+    expect(await settle(checkForUpdateNow())).toEqual({ result: 'ready' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(bannerState()).toEqual({ visible: true, updateId: 'manual' });
+  });
+
+  it('nothing new and nothing waiting: up to date', async () => {
+    expect(await settle(checkForUpdateNow())).toEqual({ result: 'up-to-date' });
+  });
+
+  it('what expo-updates downloaded by itself is ready too', async () => {
+    mockContext = { isUpdatePending: true, downloadedManifest: { id: 'native' } };
+    expect(await settle(checkForUpdateNow())).toEqual({ result: 'ready' });
+  });
+
+  it('offline: an error, unless an update is already waiting', async () => {
+    mockCheck.mockImplementation(() => Promise.reject(new Error('offline')));
+    expect(await settle(checkForUpdateNow())).toEqual({ result: 'error', error: 'offline' });
+    notePendingUpdate('waiting');
+    expect(await settle(checkForUpdateNow())).toEqual({ result: 'ready' });
+  });
+
+  it('development: unavailable', async () => {
+    g.__DEV__ = true;
+    expect(await checkForUpdateNow()).toEqual({ result: 'unavailable' });
   });
 });
 
 describe('the banner', () => {
-  it('✕ hides it for that update; a later one shows again', async () => {
+  it('shows as soon as an update has downloaded; ✕ hides it for that update; a later one shows again', async () => {
     notePendingUpdate('u1');
-    await away(MIN);
     expect(bannerState().visible).toBe(true);
     dismissBanner();
     expect(bannerState().visible).toBe(false);
     await away(MIN);
     expect(bannerState().visible).toBe(false);
     notePendingUpdate('u2');
-    await away(MIN);
     expect(bannerState()).toEqual({ visible: true, updateId: 'u2' });
   });
 
