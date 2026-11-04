@@ -44,8 +44,9 @@ export interface Leftovers {
  * Pages scheduled on the previous `lookbackDays` revision days that have not
  * been revised since. A day with a session plans the pages of that session; a
  * day with no session plans what the schedule gave it (`scheduledOn`), so a
- * day missed entirely is offered in full. Pages of the day already revised, or
- * already in today's session, are left out. Oldest day first, in session order.
+ * day missed entirely is offered in full. A page revised at any point in the
+ * window (or already in today's session) is left out, whichever day it was
+ * scheduled for. Oldest day first, in session order.
  */
 export function findLeftovers(
   logs: RevisionLog[],
@@ -75,7 +76,7 @@ export function findLeftovers(
     const before = out.pages.length;
     for (const p of planned) {
       const revised = revisedSince.get(p);
-      if (revised && revised >= day) continue;
+      if (revised) continue; // revised since the window opened, on or after this day or not
       if (exclude.has(p) || !memorized.has(p)) continue;
       exclude.add(p);
       out.pages.push(p);

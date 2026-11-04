@@ -127,6 +127,15 @@ describe('findLeftovers: a day missed entirely', () => {
     ]);
   });
 
+  it('a page revised after its scheduled day is not offered from that day', () => {
+    // Oct 14 revised page 1, which the schedule had on Oct 15 (missed). It was
+    // revised since, so it is not left over.
+    const logs = [log('2026-10-14', [], [1])];
+    const got = findLeftovers(logs, TODAY, [], memorizedSet, 3, scheduledOn);
+    expect(got.pages).not.toContain(1);
+    expect(got.pages).toEqual([7, 8, 2, 3, 4, 5, 6]);
+  });
+
   it('a page revised today is not offered from an earlier day', () => {
     const logs = [log(TODAY, [5], [5])];
     const got = findLeftovers(logs, TODAY, [], memorizedSet, 3, scheduledOn);
