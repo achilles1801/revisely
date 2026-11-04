@@ -1,10 +1,15 @@
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { useTheme } from '../../context/ThemeContext';
-import { typeV2 } from '../../theme/v2';
+import React, { useMemo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import { useTheme } from "../../context/ThemeContext";
+import { typeV2 } from "../../theme/v2";
 
 /** The width of the red action a row slides open. */
 export const SWIPE_ACTION_WIDTH = 84;
@@ -24,9 +29,10 @@ export function SwipeRow({
   children,
   onDelete,
   onHold,
-  deleteLabel = 'Delete',
+  deleteLabel = "Delete",
   actions = [],
   accessibilityLabel,
+  accessible = true,
   testID,
 }: {
   children: React.ReactNode;
@@ -36,6 +42,9 @@ export function SwipeRow({
   /** Extra VoiceOver actions on the row (the menu's actions are added for it). */
   actions?: RowAction[];
   accessibilityLabel?: string;
+  /** Off when the row holds its own buttons (they need VoiceOver's focus); the
+   *  caller then offers Delete and the menu from one of its own elements. */
+  accessible?: boolean;
   testID?: string;
 }) {
   const { palette } = useTheme();
@@ -53,10 +62,15 @@ export function SwipeRow({
         start.value = x.value;
       })
       .onUpdate((e) => {
-        x.value = Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, start.value + e.translationX));
+        x.value = Math.max(
+          -SWIPE_ACTION_WIDTH,
+          Math.min(0, start.value + e.translationX),
+        );
       })
       .onEnd((e) => {
-        const open = x.value < -SWIPE_ACTION_WIDTH / 2 || (e.velocityX < -500 && x.value < 0);
+        const open =
+          x.value < -SWIPE_ACTION_WIDTH / 2 ||
+          (e.velocityX < -500 && x.value < 0);
         x.value = withSpring(open ? -SWIPE_ACTION_WIDTH : 0, SPRING);
       });
 
@@ -79,18 +93,22 @@ export function SwipeRow({
     return Gesture.Race(swipe, hold, tap);
   }, [x, start, onHold]);
 
-  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const rowStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }],
+  }));
 
   const close = () => {
     x.value = withSpring(0, SPRING);
   };
   const a11yActions = [
     ...actions.map((a) => ({ name: a.name, label: a.label })),
-    { name: 'delete', label: deleteLabel },
+    { name: "delete", label: deleteLabel },
   ];
-  const onAccessibilityAction = (event: { nativeEvent: { actionName: string } }) => {
+  const onAccessibilityAction = (event: {
+    nativeEvent: { actionName: string };
+  }) => {
     const { actionName } = event.nativeEvent;
-    if (actionName === 'delete') return onDelete();
+    if (actionName === "delete") return onDelete();
     actions.find((a) => a.name === actionName)?.onPress();
   };
 
@@ -108,17 +126,19 @@ export function SwipeRow({
           testID={testID ? `${testID}-delete` : undefined}
         >
           <Ionicons name="trash-outline" size={22} color={palette.onRedFill} />
-          <Text style={[typeV2.meta, { color: palette.onRedFill }]}>{deleteLabel}</Text>
+          <Text style={[typeV2.meta, { color: palette.onRedFill }]}>
+            {deleteLabel}
+          </Text>
         </Pressable>
       </View>
       <GestureDetector gesture={gesture}>
         <Animated.View
           style={[styles.row, { backgroundColor: palette.bg }, rowStyle]}
           testID={testID}
-          accessible
-          accessibilityLabel={accessibilityLabel}
-          accessibilityActions={a11yActions}
-          onAccessibilityAction={onAccessibilityAction}
+          accessible={accessible}
+          accessibilityLabel={accessible ? accessibilityLabel : undefined}
+          accessibilityActions={accessible ? a11yActions : undefined}
+          onAccessibilityAction={accessible ? onAccessibilityAction : undefined}
         >
           {children}
         </Animated.View>
@@ -128,13 +148,17 @@ export function SwipeRow({
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'relative', overflow: 'hidden' },
-  action: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', justifyContent: 'center' },
+  wrap: { position: "relative", overflow: "hidden" },
+  action: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
   actionInner: {
     width: SWIPE_ACTION_WIDTH,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 4,
   },
   row: {},
