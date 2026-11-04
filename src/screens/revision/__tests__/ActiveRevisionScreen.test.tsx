@@ -25,6 +25,7 @@ const mockPager: {
   onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
   onAdvance?: (leftPage: number, currentPage: number) => void;
   pages?: number[];
+  initialPage?: number;
   pageOverlay?: (page: number, scale: number) => React.ReactNode;
   onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
 } = {};
@@ -35,6 +36,7 @@ jest.mock('../../../components/MushafPager', () => {
   return {
     MushafPager: (props: {
       pages?: number[];
+      initialPage?: number;
       onTap?: () => void;
       onUserSwipe?: () => void;
       onPageChange?: (p: number) => void;
@@ -45,6 +47,7 @@ jest.mock('../../../components/MushafPager', () => {
       onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
     }) => {
       mockPager.pages = props.pages;
+      mockPager.initialPage = props.initialPage;
       mockPager.onAdvance = props.onAdvance;
       mockPager.onUserSwipe = props.onUserSwipe;
       mockPager.onPageChange = props.onPageChange;
@@ -657,11 +660,47 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(screen.queryByTestId('session-end-keep-going')).toBeNull();
   });
 
-  it('Home’s “starts at” line opens the session with that day’s pages after today’s', () => {
+  it('Home’s “starts at” line opens on that day’s first page, with today’s pages behind it', () => {
     setupTwoDays(DAY_PAGES);
     mockRouteParams = { aheadDay: tomorrow() };
     render(<ActiveRevisionScreen />);
     expect(mockPager.pages).toEqual([...DAY_PAGES, ...NEXT]);
+    // The pager starts there (not on today's first page), and the page on
+    // screen is tomorrow's: its check reflects tomorrow, not today.
+    expect(mockPager.initialPage).toBe(NEXT[0]);
+    expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+  });
+
+  it('a day revised ahead earlier opens on its first page already checked', () => {
+    setupTwoDays(DAY_PAGES);
+    mockApp.logs = [
+      ...mockApp.logs,
+      {
+        id: 'earlier',
+        date: today(),
+        assignedPages: [],
+        pagesRevised: [NEXT[0]],
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 5,
+        ahead: { [tomorrow()]: [NEXT[0]] },
+      },
+    ];
+    mockRouteParams = { aheadDay: tomorrow() };
+    render(<ActiveRevisionScreen />);
+    expect(mockPager.initialPage).toBe(NEXT[0]);
+    expect(screen.getByLabelText('Unmark current page')).toBeTruthy();
+  });
+
+  it('Keep going moves the page on screen to the next day’s first page', async () => {
+    setupTwoDays(DAY_PAGES);
+    render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(340, true);
+    });
+    fireEvent.press(screen.getByTestId('session-end-keep-going'));
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
   });
 });

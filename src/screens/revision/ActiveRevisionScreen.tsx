@@ -57,6 +57,7 @@ import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
+import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
@@ -72,6 +73,12 @@ import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 
 const NO_PAGES: number[] = [];
+
+/** The pages of a planned day that are already credited to it (revised ahead earlier). */
+function creditedPagesOf(logs: RevisionLog[], plan: RevisionDayPlan): number[] {
+  const credited = creditedOnDay(logs, plan.day);
+  return plan.pages.filter((p) => credited.has(p));
+}
 
 const AUTO_SAVE_INTERVAL_MS = 5000;
 // Under the page, with the controls: the capsule.
@@ -110,9 +117,21 @@ export default function ActiveRevisionScreen() {
     return generateDailyAssignment(pages, quranData, user, new Date(y, m - 1, d));
   }, [user, pages, sessionDay]);
 
+  // Home's "Tomorrow starts at …" (#168) opens on that day's pages, after
+  // today's. Planned here, at mount, when the user is already loaded: the pager
+  // then starts on the day's first page with no jump (and no flash of today's).
+  // Otherwise the effect below adds the day as soon as the user is there.
+  const openAheadDay = route.params?.aheadDay;
+  const [openedAhead] = useState<RevisionDayPlan | null>(() => {
+    if (!user || !sessionDay || !openAheadDay || openAheadDay <= sessionDay) return null;
+    const plan = revisionDayPlan(user, pages, openAheadDay);
+    return plan.pages.length > 0 ? plan : null;
+  });
+  const openedCredited = openedAhead ? creditedPagesOf(logs, openedAhead) : NO_PAGES;
+
   // Keep going (#168): the revision days after today, each with its pages, in
   // order. The session's pages are today's, then these.
-  const [aheadDays, setAheadDays] = useState<RevisionDayPlan[]>([]);
+  const [aheadDays, setAheadDays] = useState<RevisionDayPlan[]>(() => (openedAhead ? [openedAhead] : []));
   const sections = useMemo(
     () => [{ day: sessionDay ?? '', pages: assignment?.pages ?? [] }, ...aheadDays],
     [sessionDay, assignment, aheadDays],
@@ -151,12 +170,14 @@ export default function ActiveRevisionScreen() {
   }, [logs, smartTrackingEnabled, sessionDay]);
 
   const [completedPages, setCompletedPages] = useState<Set<number>>(
-    () => new Set(alreadyRevisedToday),
+    () => new Set([...alreadyRevisedToday, ...openedCredited]),
   );
   const [localRatings, setLocalRatings] = useState<Map<number, number>>(
     () => new Map(ratingsFromTodaysLogs),
   );
-  const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(null);
+  const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(
+    () => openedAhead?.pages[0] ?? null,
+  );
   const [sessionStartTime] = useState(Date.now());
   const [saving, setSaving] = useState(false);
 
@@ -328,7 +349,7 @@ export default function ActiveRevisionScreen() {
     message: string;
   } | null>(null);
 
-  const silentlySavedRef = useRef<Set<number>>(new Set(alreadyRevisedToday));
+  const silentlySavedRef = useRef<Set<number>>(new Set([...alreadyRevisedToday, ...openedCredited]));
   const lastSaveTimeRef = useRef<number>(sessionStartTime);
   // The save currently running, so an exit can wait for it and then save
   // again instead of silently skipping (which used to drop late changes).
@@ -591,10 +612,9 @@ export default function ActiveRevisionScreen() {
     pagerRef.current?.scrollToPage(page);
   }, [aheadDays]);
 
-  // Home's "Tomorrow starts at …" opens the session at that day (#168): once,
-  // when the session opens, its pages come after today's.
-  const openedAheadRef = useRef(false);
-  const openAheadDay = route.params?.aheadDay;
+  // Home's "Tomorrow starts at …" (#168) when the user wasn't loaded at mount:
+  // the day is added once they are (planned at mount otherwise, above).
+  const openedAheadRef = useRef(openedAhead != null);
   useEffect(() => {
     if (openedAheadRef.current || !user || !sessionDay || !openAheadDay) return;
     if (openAheadDay <= sessionDay) return;
@@ -732,7 +752,10 @@ export default function ActiveRevisionScreen() {
   const completedCount = sessionPages.filter((p) => completedPages.has(p)).length;
   const todaysPages = assignment.pages;
 
+  // Opened from "Tomorrow starts at …": that day's first page. Otherwise the
+  // first of today's not yet revised.
   const resumePage =
+    openedAhead?.pages[0] ??
     assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
     assignment.pages[0];
   const displayPageNumber = currentPageNumber || resumePage;

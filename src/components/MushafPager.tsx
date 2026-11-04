@@ -370,6 +370,9 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
     currentIndexRef.current = idx;
     // Defer scroll until after layout — getItemLayout makes it cheap.
     setTimeout(() => {
+      // A jump made meanwhile (scrollToPage) is where the pager belongs: this
+      // scroll must not pull it back to the starting page.
+      if (currentIndexRef.current !== idx) return;
       listRef.current?.scrollToIndex({ index: idx, animated: false });
     }, 50);
   }, [initialPage, pages]);

@@ -153,6 +153,29 @@ describe('<MushafPager /> scrollToPage', () => {
   });
 });
 
+describe('<MushafPager /> the start-up scroll', () => {
+  it('a jump made before the start-up scroll settles is where the pager stays', () => {
+    jest.useFakeTimers();
+    try {
+      const ref = createRef<MushafPagerHandle>();
+      render(<MushafPager ref={ref} pages={PAGES} initialPage={1} />);
+      const list = screen.UNSAFE_getByType(FlatList);
+      const scroll = jest.spyOn(list.instance, 'scrollToIndex');
+      // Ahead of the start-up scroll (which waits for layout) the session moves
+      // on to another day's first page.
+      act(() => {
+        ref.current!.scrollToPage(8);
+      });
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+      expect(scroll).toHaveBeenLastCalledWith({ index: 7, animated: false });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('<MushafPager /> turning the page by swiping', () => {
   function setupSwipe() {
     const order: string[] = [];
