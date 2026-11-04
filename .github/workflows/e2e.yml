@@ -173,6 +173,8 @@ jobs:
             .maestro/build/xcodebuild.log
             ${{ runner.temp }}/emulators.log
           retention-days: 7
+          # Maestro keeps its screenshots under a .maestro folder.
+          include-hidden-files: true
 
   android:
     name: E2E (Android emulator)
@@ -291,3 +293,5 @@ jobs:
             .maestro/build/gradle.log
             ${{ runner.temp }}/emulators.log
           retention-days: 7
+          # Maestro keeps its screenshots under a .maestro folder.
+          include-hidden-files: true

@@ -16,8 +16,11 @@ appId: com.revisionbuddy.app
       id: session-quiet-count
     timeout: 15000
 - runFlow: ../subflows/show-controls.yaml
+# While recording, the screen never settles (a live timer and waveform): don't
+# wait for it after these taps.
 - tapOn:
     id: record-start
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: record-stop
@@ -30,6 +33,7 @@ appId: com.revisionbuddy.app
     optional: true
 - tapOn:
     id: record-stop
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible: "Recording saved"
     timeout: 10000
@@ -71,10 +75,10 @@ appId: com.revisionbuddy.app
     visible:
       text: "(?i)Revision recording, 12:0[0-9].pm"
     timeout: 15000
-# A few seconds long (more on a slow machine).
+# Not empty: a few seconds long (more on a slow machine).
 - assertVisible:
     id: recording-time-.*
-    text: "0:(0[1-9]|[1-5][0-9])"
+    text: "(0:0[1-9]|0:[1-5][0-9]|[1-9][0-9]*:[0-5][0-9])"
 
 # Kept across a cold start: Home → Activity → the day.
 - runFlow: ../subflows/relaunch.yaml

@@ -6,6 +6,13 @@ appId: com.revisionbuddy.app
     clearState: true
     permissions:
       all: allow
+# A link prompt left from an earlier flow would cover the app.
+- runFlow:
+    when:
+      platform: iOS
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
 - extendedWaitUntil:
     visible:
       id: auth

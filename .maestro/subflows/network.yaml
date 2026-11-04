@@ -20,6 +20,4 @@ appId: com.revisionbuddy.app
       platform: iOS
     commands:
       - openLink: revisely://e2e/network?offline=${OFFLINE}
-      - tapOn:
-          text: "Open"
-          optional: true
+      - runFlow: open-link-prompt.yaml

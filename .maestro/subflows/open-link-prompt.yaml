@@ -1,0 +1,19 @@
+# iOS asks "Open in “Revisely”?" before opening a custom-scheme link, the first
+# time on a simulator (it remembers the answer). The prompt can take a moment
+# to come up, and left open it stays over the app across relaunches: wait for
+# it a little, then confirm.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Open"
+          timeout: 3000
+          optional: true
+      - runFlow:
+          when:
+            visible: "Open"
+          commands:
+            - tapOn: "Open"

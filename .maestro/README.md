@@ -118,7 +118,8 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 - A screen already open keeps its day until the app does what it does on a phone: a timer, coming
   back to the front, or a relaunch. Flows move the clock and relaunch
   (`subflows/set-clock-and-relaunch.yaml`), then check the status line.
-- iOS asks "Open in Revisely?" for these links; `subflows/clock.yaml` confirms it.
+- iOS asks "Open in Revisely?" the first time a simulator opens one of these links, sometimes a
+  moment later; `subflows/open-link-prompt.yaml` waits for it and confirms.
 
 ## Time zones
 

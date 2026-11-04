@@ -4,14 +4,7 @@
 appId: com.revisionbuddy.app
 ---
 - openLink: revisely://e2e/clock?at=${AT}
-# iOS asks before opening a custom-scheme link.
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          text: "Open"
-          optional: true
+- runFlow: open-link-prompt.yaml
 # The status line (E2ERoot) shows the app's time: the date and the hour are enough.
 - extendedWaitUntil:
     visible:

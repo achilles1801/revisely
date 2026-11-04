@@ -65,8 +65,26 @@ set_android_zone() {
   fi
 }
 
+# What the device saw, for a failed flow: a screenshot and the app's log.
+save_device_state() {
+  local out=$1
+  if [ "$PLATFORM" = ios ]; then
+    xcrun simctl io "$DEVICE" screenshot "$out/device.png" >/dev/null 2>&1 || true
+    xcrun simctl spawn "$DEVICE" log show --last 5m --style compact \
+      --predicate 'process == "Revisely"' > "$out/device.log" 2>&1 || true
+  else
+    adb -s "$DEVICE" exec-out screencap -p > "$out/device.png" 2>/dev/null || true
+    adb -s "$DEVICE" logcat -d > "$out/logcat.txt" 2>&1 || true
+  fi
+}
+
 run_flow() {
   local flow=$1 zone=$2 out=$3
+  if [ "$PLATFORM" = android ]; then
+    adb -s "$DEVICE" logcat -c >/dev/null 2>&1
+    # A system dialog left up (a slow emulator's "isn't responding") would cover the app.
+    adb -s "$DEVICE" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
+  fi
   if [ "$PLATFORM" = ios ]; then
     SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
@@ -97,6 +115,7 @@ for flow in "${FLOWS[@]}"; do
       result=$([ "$attempt" -eq 0 ] && echo passed || echo "passed on retry $attempt")
       break
     fi
+    save_device_state "$out"
     tail -25 "$out/maestro.log" | sed 's/^/    /'
   done
   secs=$(( $(date +%s) - start ))
