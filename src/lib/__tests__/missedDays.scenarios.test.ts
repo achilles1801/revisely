@@ -159,6 +159,19 @@ describe('a partly done day', () => {
   });
 });
 
+describe('a day revised ahead is done, not missed', () => {
+  // Nov 2’s session revised its own pages and also Nov 3’s 11–15 ahead, so Nov 3
+  // had no session of its own and is done: nothing from it is offered.
+  const today = '2026-11-04';
+  const ahead = { ...session('2026-11-02', range(6, 10), range(6, 10)), ahead: { '2026-11-03': range(11, 15) } };
+  const logs = [session('2026-11-01', range(1, 5), range(1, 5)), ahead];
+
+  it('offers nothing from a day whose pages were all revised ahead', () => {
+    const got = leftoversFor(baseUser, logs, today, pagesFor(baseUser, today), memorizedPages);
+    expect(got).toEqual({ pages: [], days: [] });
+  });
+});
+
 describe('Fajr after midnight', () => {
   // Fajr in New York is about 05:50 on 4 Nov. Before it the revision day is still
   // Nov 3, so "yesterday" is Nov 2 and Nov 4’s pages are not yet today’s.
