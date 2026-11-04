@@ -126,6 +126,27 @@ function watchListenChannel(proto: { send: (...a: unknown[]) => unknown }): void
   let next = 0;
   proto.send = function e2eSend(this: XMLHttpRequest & { __e2eUrl?: string }, ...args: unknown[]) {
     const url = this.__e2eUrl ?? '';
+    // The forward channel (the handshake, and messages sent): what its responses
+    // hold, in case data comes there instead of on the back channel.
+    if (url.includes('/Listen/channel') && !url.includes('RID=rpc')) {
+      const rid = /[?&]RID=([^&]+)/.exec(url)?.[1] ?? '?';
+      this.addEventListener('readystatechange', () => {
+        if (this.readyState !== 4) return;
+        let text = '';
+        try {
+          text = this.responseText ?? '';
+        } catch {
+          return;
+        }
+        const ids = [...text.matchAll(/\[(\d+),\[/g)].map((m) => Number(m[1]));
+        // eslint-disable-next-line no-console
+        console.log(
+          `[e2e] listen forward channel RID ${rid}: ${this.status}, ${text.length} chars, ` +
+            `array ids ${ids.length ? `${ids[0]}…${ids[ids.length - 1]} (${ids.length})` : 'none'}; ` +
+            `head ${JSON.stringify(text.slice(0, 160))}`,
+        );
+      });
+    }
     if (url.includes('/Listen/channel') && url.includes('RID=rpc')) {
       const id = ++next;
       let offset = 0;
