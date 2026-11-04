@@ -137,7 +137,7 @@ export function MushafPickerSheet({ visible, onClose }: { visible: boolean; onCl
         >
           <Ionicons name="trash-outline" size={22} color={palette.red} />
           <Text style={[typeV2.body, styles.removeText, { color: palette.red }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-            Remove {MUSHAF_EDITIONS[o.edition].name} from this phone
+            Remove {MUSHAF_EDITIONS[o.edition].name}
           </Text>
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
             {formatMegabytes(o.bytes)}
