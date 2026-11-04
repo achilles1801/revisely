@@ -1,0 +1,65 @@
+# Onboarding as a user does it: in progress, Juz 30 marked memorized (pages
+# 582–604) beside Al-Fatihah (page 1, marked for you): 24 pages. 10 pages a
+# day (the default), the day resetting at BOUNDARY (midnight | fajr). The days
+# (SCHED-1): 1, 582–590 | 591–600 | 601–604, 1, 582–586 | 587–596 …
+# For fajr, set the location first (setLocation) and launch with location allowed.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: welcome-begin
+- tapOn:
+    id: journey-in_progress
+- tapOn:
+    id: journey-continue
+- extendedWaitUntil:
+    visible:
+      id: juz-selection
+    timeout: 10000
+# The list by juz (a tap made while the screen is still settling can be lost: check it took).
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: pill-juz
+      - assertVisible:
+          id: pill-juz
+          text: "Juz, selected"
+- scrollUntilVisible:
+    element:
+      id: juz-30-check
+    direction: DOWN
+    timeout: 30000
+# The check, and the count it changes (slow to show on a CI runner).
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: juz-selection-summary
+              text: "24 of 604 pages memorized"
+          commands:
+            - tapOn:
+                id: juz-30-check
+      - extendedWaitUntil:
+          visible:
+            id: juz-selection-summary
+            text: "24 of 604 pages memorized"
+          timeout: 10000
+- tapOn:
+    id: juz-continue
+- extendedWaitUntil:
+    visible:
+      id: schedule
+    timeout: 10000
+- assertVisible:
+    id: schedule-amount
+    text: "10"
+- tapOn:
+    id: pill-${BOUNDARY}
+- tapOn:
+    id: schedule-start
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 30000

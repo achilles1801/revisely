@@ -1,0 +1,28 @@
+# A fresh install of the E2E app (clearState), its clock set, on the auth screen.
+#   env CLOCK: the phone's wall time, e.g. 2026-11-03T12:00 (src/lib/e2e/clock.ts)
+appId: com.revisionbuddy.app
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+# Until the auth screen shows. A link prompt left from earlier (iOS) would cover
+# it: confirm it if it comes up.
+- repeat:
+    while:
+      notVisible:
+        id: auth
+    times: 20
+    commands:
+      - runFlow: open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: auth
+          timeout: 5000
+          optional: true
+- assertVisible:
+    id: auth
+- runFlow:
+    file: clock.yaml
+    env:
+      AT: ${CLOCK}

@@ -1,0 +1,45 @@
+# Sign-up through onboarding to Home: a new account, Al-Fatihah and Juz 30
+# (24 pages), 10 pages a day, the day at midnight. Home's Today post then shows
+# day one, and the next calendar day shows day two.
+# Rules (BEHAVIOUR.md): SCHED-1, SYNC-4, DAY-1
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/launch.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+- runFlow: ../subflows/signup.yaml
+# SYNC-4: straight on to onboarding, with no relaunch.
+- assertVisible:
+    id: welcome
+- runFlow:
+    file: ../subflows/onboard.yaml
+    env:
+      BOUNDARY: midnight
+# SCHED-1: day one is the first 10 memorized pages in page order: 1, 582–590.
+- assertVisible:
+    id: today-title
+    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+- assertVisible:
+    id: today-detail
+    text: "10.pages · then An.Naba, p..582"
+- assertVisible:
+    id: today-cta
+    text: "Start revision"
+# The account is on the server: a cold start shows the same day.
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Starts at Al.Fatihah, p..1[^0-9]*"
+    timeout: 20000
+# DAY-1: past midnight it is the next calendar day, and the plan moves on one day.
+- runFlow:
+    file: ../subflows/set-clock-and-relaunch.yaml
+    env:
+      AT: 2026-11-04T00:30
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Starts at At.Tariq, p..591.*"
+    timeout: 20000

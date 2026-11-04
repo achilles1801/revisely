@@ -1,0 +1,43 @@
+# Swipes the session on, page by page, until UNTIL: the day's count ("3/10"), as
+# the quiet header ("Juz 30 · 3/10") or the title ("Revising ahead · Wed · 3/10")
+# shows it, whichever is up; or "end" for the end card. The mushaf runs right
+# to left: the next page comes in from the left. A swipe that doesn't take (a
+# slow emulator) is simply made again, and none is made past the target.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      true: ${UNTIL == 'end'}
+    commands:
+      - repeat:
+          while:
+            notVisible:
+              id: session-end-card
+          times: 25
+          commands:
+            - swipe:
+                start: 12%, 50%
+                end: 88%, 50%
+                duration: 300
+            - waitForAnimationToEnd:
+                timeout: 3000
+      - assertVisible:
+          id: session-end-card
+- runFlow:
+    when:
+      true: ${UNTIL != 'end'}
+    commands:
+      - repeat:
+          while:
+            notVisible:
+              text: ".*· ${UNTIL}"
+          times: 25
+          commands:
+            - swipe:
+                start: 12%, 50%
+                end: 88%, 50%
+                duration: 300
+            - waitForAnimationToEnd:
+                timeout: 3000
+      - assertVisible:
+          text: ".*· ${UNTIL}"

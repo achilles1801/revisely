@@ -505,7 +505,16 @@ hard-coded token was deleted from the console on 2026-10-27.
   a current SDK for uploads; move the pin when the image or Apple's minimum changes.
 - Secret EAS variables are unreadable on the runner: the plist comes from `GOOGLE_SERVICE_INFO_PLIST`,
   and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
-- There is no Maestro job. The flows run locally (`npm run test:e2e:ios`) against a dev client.
+- **E2E** (`e2e.yml`, `.maestro/README.md`): Maestro flows on the iOS Simulator and the Android
+  emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
+  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On PRs into
+  `develop` that touch `src/`, `App.tsx`, `index.ts` or `.maestro/`, nightly (testing develop), and
+  by hand. The app is an E2E build: `EXPO_PUBLIC_E2E=1` at bundle time loads `src/lib/e2e/` (the
+  emulators, a hermetic network, the test clock `revisely://e2e/clock?at=…`); every other build
+  drops it, since the bundler inlines the variable. Keep new E2E code behind that test, and check a
+  release export has none of it. Its native build is cached per fingerprint: the workflow has no
+  secrets (demo Firebase config files) and publishes nothing. Run them locally with
+  `.maestro/scripts/` and `.maestro/run.sh`, never with a release build or `eas`.
 
 ## TestFlight
 

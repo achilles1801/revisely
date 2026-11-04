@@ -1,0 +1,27 @@
+# Opens today's session from Home and revises all of it, swiping the last page
+# onto the end card, then back to Home. FIRST: the quiet header at the start
+# ("Juz 1 · 0/10").
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: today-cta
+- extendedWaitUntil:
+    visible:
+      id: session-quiet-count
+      text: ${FIRST}
+    timeout: 15000
+- runFlow:
+    file: swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- runFlow: show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-cta
+      text: "Review session"
+    timeout: 10000

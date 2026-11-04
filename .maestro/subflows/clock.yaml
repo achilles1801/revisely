@@ -1,0 +1,26 @@
+# Sets the app's clock: AT is a wall time in the phone's zone (2026-11-03T00:30)
+# or an instant (…Z). Time runs on from there; the app reads it as a phone
+# would (a relaunch, coming back to the front). See .maestro/README.md.
+appId: com.revisionbuddy.app
+---
+- openLink: revisely://e2e/clock?at=${AT}
+# Until the status line (E2ERoot) shows the new time (the date and the hour are
+# enough). iOS asks "Open in “Revisely”?" the first time on a simulator, on a
+# slow one many seconds later: confirm it whenever it shows.
+- repeat:
+    while:
+      notVisible:
+        id: e2e-status
+        text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+    times: 20
+    commands:
+      - runFlow: open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: e2e-status
+            text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+          timeout: 3000
+          optional: true
+- assertVisible:
+    id: e2e-status
+    text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"

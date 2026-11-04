@@ -1,0 +1,27 @@
+# Types TEXT into the log's field, replacing what is there. On Android the field
+# shows its text, so the typing is checked, and done again if the keyboard
+# wasn't ready for it (a slow emulator).
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow: log-input.yaml
+      - eraseText: 80
+      - inputText: ${TEXT}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - retry:
+          maxRetries: 3
+          commands:
+            - tapOn:
+                id: journal-text-input
+            - eraseText: 80
+            - inputText: ${TEXT}
+            - assertVisible:
+                id: journal-text-input
+                text: ${TEXT}
+- runFlow: keyboard-done.yaml
