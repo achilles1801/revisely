@@ -166,3 +166,14 @@ Things that bit:
 - The mushaf runs right to left: the next page comes in from the left. Swipe until a count or the
   end card (`subflows/swipe-pages.yaml`), not a fixed number of times: on a slow emulator a swipe
   can be lost.
+- Android waits for the screen to settle after each command. A screen that never settles (a
+  recording's timer) needs `waitToSettleTimeoutMs` on the tap, or each tap takes a minute.
+- On Android, text typed into a field as it gains focus can be lost; `subflows/type-in-log.yaml`
+  checks the field and types again. Android also writes times as "12:23 pm" and may show dialog
+  buttons in capitals: match with `(?i)`.
+- One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
+  `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
+
+A failed flow keeps Maestro's log and screenshots, a screenshot of the device and the app's log
+(logcat on Android, the unified log on iOS) in `.maestro/build/results/<platform>/<flow>/`; CI
+uploads the folder.

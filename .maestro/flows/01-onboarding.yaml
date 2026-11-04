@@ -9,6 +9,9 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T12:00
 - runFlow: ../subflows/signup.yaml
+# SYNC-4: straight on to onboarding, with no relaunch.
+- assertVisible:
+    id: welcome
 - runFlow:
     file: ../subflows/onboard.yaml
     env:

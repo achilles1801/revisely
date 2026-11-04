@@ -29,11 +29,23 @@ appId: com.revisionbuddy.app
       id: juz-30-check
     direction: DOWN
     timeout: 30000
-- tapOn:
-    id: juz-30-check
-- assertVisible:
-    id: juz-selection-summary
-    text: "24 of 604 pages memorized"
+# The check, and the count it changes (slow to show on a CI runner).
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: juz-selection-summary
+              text: "24 of 604 pages memorized"
+          commands:
+            - tapOn:
+                id: juz-30-check
+      - extendedWaitUntil:
+          visible:
+            id: juz-selection-summary
+            text: "24 of 604 pages memorized"
+          timeout: 10000
 - tapOn:
     id: juz-continue
 - extendedWaitUntil:

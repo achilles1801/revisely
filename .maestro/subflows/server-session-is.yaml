@@ -1,12 +1,14 @@
-# Waits (up to ~30 s) until the server holds PAGES pages revised on DAY for
-# this flow's account (scripts/server-session.js), and fails if it never does.
+# Waits (up to about a minute) until the server holds PAGES pages revised on DAY
+# for this flow's account (scripts/server-session.js), and fails if it never
+# does. After airplane mode, Android's sync starts about 30 s after the
+# connection is back.
 appId: com.revisionbuddy.app
 ---
 - evalScript: ${output.serverPages = -2}
 - repeat:
     while:
       true: ${output.serverPages != Number(PAGES)}
-    times: 15
+    times: 30
     commands:
       - runScript:
           file: ../scripts/server-session.js

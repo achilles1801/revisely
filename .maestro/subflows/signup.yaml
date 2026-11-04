@@ -26,8 +26,10 @@ appId: com.revisionbuddy.app
     id: auth-title
 - tapOn:
     id: auth-submit
-# SYNC-4: the new account loads at once, with no relaunch.
+# SYNC-4: the new account loads at once, with no relaunch. (Asserted by the
+# caller: 01-onboarding fails on it; other flows go on, see new-account.yaml.)
 - extendedWaitUntil:
     visible:
       id: welcome
-    timeout: 30000
+    timeout: 60000
+    optional: true

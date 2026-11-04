@@ -7,6 +7,20 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: ${CLOCK}
 - runFlow: signup.yaml
+# SYNC-4 is a known bug (BEHAVIOUR.md): a new account can stay on "loading"
+# until a relaunch. 01-onboarding fails on it; flows testing other rules
+# relaunch, as the scenario tests do, and say so in their log.
+- runFlow:
+    when:
+      notVisible:
+        id: welcome
+    commands:
+      - evalScript: "${console.log('KNOWN BUG SYNC-4 - the new account stayed on loading, relaunching')}"
+      - runFlow: relaunch.yaml
+      - extendedWaitUntil:
+          visible:
+            id: welcome
+          timeout: 30000
 - runFlow:
     file: onboard.yaml
     env:

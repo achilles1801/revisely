@@ -55,10 +55,20 @@ env:
 
 jobs:
   ios:
-    name: E2E (iOS Simulator)
+    name: E2E (iOS Simulator, ${{ matrix.shard.name }})
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.platform != 'android' }}
     runs-on: macos-26
     timeout-minutes: 50
+    # The macOS runner takes 3–5 minutes a flow: two jobs of four keep each well
+    # under the timeout.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: flows 1–4
+            flows: .maestro/flows/0[1-4]-*.yaml
+          - name: flows 5–8
+            flows: .maestro/flows/0[5-8]-*.yaml
     steps:
       - uses: actions/checkout@v4
         with:
@@ -161,13 +171,15 @@ jobs:
         env:
           E2E_DEVICE: ${{ steps.sim.outputs.udid }}
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
-        run: bash .maestro/run.sh ios
+          FLOWS: ${{ matrix.shard.flows }}
+        # $FLOWS is a glob, expanded here.
+        run: bash .maestro/run.sh ios $FLOWS
 
       - name: Keep the results
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-ios-${{ github.run_id }}
+          name: e2e-ios-${{ strategy.job-index }}-${{ github.run_id }}
           path: |
             .maestro/build/results
             .maestro/build/xcodebuild.log
@@ -284,7 +296,7 @@ jobs:
           script: adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android
 
       - name: Keep the results
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-android-${{ github.run_id }}
