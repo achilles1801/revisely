@@ -7,7 +7,7 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { ScrollView } from 'react-native-gesture-handler';
@@ -292,7 +292,7 @@ export default function DashboardScreen() {
 
   if (!user || !assignment) {
     return (
-      <SafeAreaView style={styles.container}>
+      <TopSafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           {error ? (
             <>
@@ -308,7 +308,7 @@ export default function DashboardScreen() {
             <Text style={styles.loadingText}>Loading…</Text>
           )}
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
@@ -453,7 +453,7 @@ export default function DashboardScreen() {
   const memorized = memorizedText(pages);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <HeroGlow />
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
@@ -576,7 +576,7 @@ export default function DashboardScreen() {
       ) : (
         <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
       )}
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

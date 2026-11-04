@@ -2,13 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { ScrollView } from 'react-native-gesture-handler';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
+import { SwipeRow } from '../../components/v2/SwipeRow';
+import { copyText } from '../../lib/clipboard';
 import {
   RouteProp,
   useNavigation,
@@ -17,6 +19,7 @@ import {
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
@@ -83,6 +86,9 @@ export default function JournalEntryScreen() {
   const { user, logs } = useApp();
   const { palette } = useTheme();
   const haptics = useHaptics();
+  // This screen hides the tab bar, so the bottom is the home indicator's room
+  // plus one margin, counted once.
+  const insets = useSafeAreaInsets();
 
   // Fixed when the screen opens, so a note being written across fajr (or
   // midnight) still belongs to the day it was started on.
@@ -292,21 +298,33 @@ export default function JournalEntryScreen() {
   // Saving an edited note with nothing left in it deletes it.
   const canSend = (editing != null || text.trim() !== '' || minutesText !== '') && !saving && !loading && !loadFailed;
   const field = [typeV2.body, v2.field, { color: palette.text }];
+  // A hold on a note (or its VoiceOver action) opens this menu. Delete is the
+  // swipe: it confirms before it removes the note.
+  const openMenu = (note: JournalNote) => {
+    haptics.selection();
+    setMenuNote(note);
+  };
   const menuActions = menuNote
     ? [
         { key: 'edit', label: 'Edit', icon: 'create-outline' as const, onPress: () => startEdit(menuNote) },
-        {
-          key: 'delete',
-          label: 'Delete',
-          icon: 'trash-outline' as const,
-          destructive: true,
-          onPress: () => deleteNote(menuNote),
-        },
+        ...(menuNote.text.trim() !== ''
+          ? [
+              {
+                key: 'copy',
+                label: 'Copy',
+                icon: 'copy-outline' as const,
+                onPress: () => {
+                  copyText(menuNote.text.trim());
+                  haptics.selection();
+                },
+              },
+            ]
+          : []),
       ]
     : [];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         onBack={() => navigation.goBack()}
         center={
@@ -352,7 +370,7 @@ export default function JournalEntryScreen() {
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={v2.content}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           automaticallyAdjustKeyboardInsets
@@ -360,22 +378,28 @@ export default function JournalEntryScreen() {
         >
           {notes.map((n) => {
             const time = formatEntryTime(n.at, date);
-            const text = n.text.trim();
+            const body = n.text.trim();
+            const label = JOURNAL_KIND_LABELS[n.kind];
             return (
-              <ThreadRow
+              <SwipeRow
                 key={n.id}
-                mark={<Mark icon={JOURNAL_KIND_ICONS[n.kind]} />}
-                name={JOURNAL_KIND_LABELS[n.kind]}
-                meta={n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time}
-                onMenu={() => setMenuNote(n)}
-                menuLabel={`${JOURNAL_KIND_LABELS[n.kind]} options`}
-                lineAbove
-                lineBelow
-                separator={false}
                 testID={`journal-note-${n.id}`}
+                accessibilityLabel={`${label}${body ? `, ${body}` : ''}, ${time}`}
+                actions={[{ name: 'options', label: 'Options', onPress: () => openMenu(n) }]}
+                onHold={() => openMenu(n)}
+                onDelete={() => deleteNote(n)}
               >
-                {text ? <RowText numberOfLines={12}>{text}</RowText> : null}
-              </ThreadRow>
+                <ThreadRow
+                  mark={<Mark icon={JOURNAL_KIND_ICONS[n.kind]} />}
+                  name={label}
+                  meta={n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time}
+                  lineAbove
+                  lineBelow
+                  separator={false}
+                >
+                  {body ? <RowText numberOfLines={12}>{body}</RowText> : null}
+                </ThreadRow>
+              </SwipeRow>
             );
           })}
 
@@ -478,7 +502,7 @@ export default function JournalEntryScreen() {
         actions={menuActions}
         testID="journal-note-menu"
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 
@@ -513,7 +537,6 @@ const styles = StyleSheet.create({
 // The new design: rows on the ground, the fields borderless like a composer.
 const v2 = StyleSheet.create({
   titleBox: { alignItems: 'center' },
-  content: { paddingBottom: 48 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   field: { flex: 1, paddingVertical: 6, paddingHorizontal: 0 },
   // A minimum, not a height: the field grows with its text and with Dynamic Type.

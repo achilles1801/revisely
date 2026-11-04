@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -109,7 +109,7 @@ export default function ActivityAllScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar title="All activity" onBack={() => navigation.goBack()} separator />
       {loading ? (
         <View style={styles.center}>
@@ -146,7 +146,7 @@ export default function ActivityAllScreen() {
         onSelect={setRange}
         onClose={() => setRangeOpen(false)}
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

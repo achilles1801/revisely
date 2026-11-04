@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
@@ -125,7 +125,7 @@ export default function MemorizationScreen() {
     else navigation.goBack();
   };
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         title="Memorization"
         onBack={backV2}
@@ -223,7 +223,7 @@ export default function MemorizationScreen() {
           <PillButton size="lg" variant="outline" title="Later" onPress={() => setReviewPromptOpen(false)} testID="review-later" />
         </View>
       </Sheet>
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

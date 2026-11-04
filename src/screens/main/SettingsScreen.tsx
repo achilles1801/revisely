@@ -12,7 +12,7 @@ import {
   AccessibilityState,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
@@ -286,11 +286,11 @@ export default function SettingsScreen() {
 
   if (!localUser) {
     return (
-      <SafeAreaView style={styles.container}>
+      <TopSafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Loading…</Text>
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
@@ -438,7 +438,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <TopSafeAreaView style={styles.container}>
       <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
 
       <ScrollView contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
@@ -916,7 +916,7 @@ export default function SettingsScreen() {
         }}
         testID="feedback-sheet"
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 
