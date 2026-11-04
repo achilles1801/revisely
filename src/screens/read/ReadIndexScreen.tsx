@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's list, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { FlatList } from 'react-native-gesture-handler';
@@ -143,7 +143,7 @@ export default function ReadIndexScreen() {
     </View>
   );
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: v2Palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: v2Palette.bg }]}>
       <FlatList
         ref={listRef}
         data={juzGroups}
@@ -164,7 +164,7 @@ export default function ReadIndexScreen() {
         )}
         testID="read-index-v2"
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

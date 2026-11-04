@@ -7,6 +7,7 @@ import { Sheet } from '../v2/Sheet';
 import { PillButton } from '../v2/PillButton';
 import { markOffered, openStore, storeName, useStoreDecision } from '../../lib/updates/storeUpdates';
 import { useBusyReasons } from '../../lib/updates/busy';
+import { useUpdateOffer } from '../../lib/updates/ota';
 
 /** Home settles first. */
 export const OFFER_DELAY_MS = 1200;
@@ -20,16 +21,18 @@ export function StoreUpdateSheet() {
   const { offer } = useStoreDecision();
   const focused = useIsFocused();
   const busy = useBusyReasons().some((r) => r !== 'screen');
+  // An update that only needs a restart goes first (UpdateReadySheet): one sheet at a time.
+  const otaOffered = useUpdateOffer().visible;
   const [shown, setShown] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!offer || !focused || busy || shown) return;
+    if (!offer || !focused || busy || otaOffered || shown) return;
     const t = setTimeout(() => {
       setShown(offer);
       markOffered(offer);
     }, OFFER_DELAY_MS);
     return () => clearTimeout(t);
-  }, [offer, focused, busy, shown]);
+  }, [offer, focused, busy, otaOffered, shown]);
 
   const close = () => setShown(null);
   return (

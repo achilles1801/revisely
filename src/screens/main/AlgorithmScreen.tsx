@@ -7,7 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs).
 import { ScrollView } from 'react-native-gesture-handler';
@@ -280,11 +280,11 @@ export default function AlgorithmScreen() {
 
   if (!user) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer} testID="insights-loading">
           <ActivityIndicator color={palette.secondary} />
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
@@ -303,7 +303,7 @@ export default function AlgorithmScreen() {
   const emptyBrowse =
     browseMode === 'juz' ? 'Nothing memorized yet' : `No ${browseMode} match these filters`;
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
@@ -494,7 +494,7 @@ export default function AlgorithmScreen() {
         testID="strength-picker"
       />
       <PagePreviewSheet pageNumber={previewPage} onClose={() => setPreviewPage(null)} />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

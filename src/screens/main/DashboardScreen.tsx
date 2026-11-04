@@ -7,7 +7,7 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { ScrollView } from 'react-native-gesture-handler';
@@ -22,7 +22,7 @@ import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } f
 import * as firestoreService from '../../services/firestoreService';
 import { queueChange, withPendingReadings } from '../../lib/offline/queue';
 import { OfflineNote } from '../../components/offline/OfflineNote';
-import { UpdateBanner } from '../../components/updates/UpdateBanner';
+import { UpdateReadySheet } from '../../components/updates/UpdateReadySheet';
 import { StoreUpdateSheet } from '../../components/updates/StoreUpdateSheet';
 import { autoId } from '../../lib/offline/apply';
 import { logger } from '../../lib/logger';
@@ -292,7 +292,7 @@ export default function DashboardScreen() {
 
   if (!user || !assignment) {
     return (
-      <SafeAreaView style={styles.container}>
+      <TopSafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           {error ? (
             <>
@@ -308,7 +308,7 @@ export default function DashboardScreen() {
             <Text style={styles.loadingText}>Loading…</Text>
           )}
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
@@ -453,7 +453,7 @@ export default function DashboardScreen() {
   const memorized = memorizedText(pages);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <HeroGlow />
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
@@ -491,7 +491,6 @@ export default function DashboardScreen() {
         {/* No line under the header: one across the glow ended it in a hard
             edge, at rest and while pulling (it read as a box). */}
         <OfflineNote />
-        <UpdateBanner />
         {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
           <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
         ) : null}
@@ -545,6 +544,7 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
+      <UpdateReadySheet />
       <StoreUpdateSheet />
       <JumpSheet
         visible={jumpOpen}
@@ -576,7 +576,7 @@ export default function DashboardScreen() {
       ) : (
         <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
       )}
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

@@ -22,6 +22,8 @@ jest.mock('../../../lib/updates/storeUpdates', () => ({
 }));
 let mockBusy: string[] = [];
 jest.mock('../../../lib/updates/busy', () => ({ useBusyReasons: () => mockBusy }));
+let mockOtaOffered = false;
+jest.mock('../../../lib/updates/ota', () => ({ useUpdateOffer: () => ({ visible: mockOtaOffered, updateId: null }) }));
 
 import { OFFER_DELAY_MS, StoreUpdateSheet } from '../StoreUpdateSheet';
 
@@ -31,6 +33,7 @@ beforeEach(() => {
   mockFocused = true;
   mockOffer = '1.0.4';
   mockBusy = [];
+  mockOtaOffered = false;
 });
 afterEach(() => {
   jest.useRealTimers();
@@ -42,6 +45,17 @@ const settle = () =>
   });
 
 describe('<StoreUpdateSheet />', () => {
+  it('waits while an update that only needs a restart is offered (one sheet at a time)', () => {
+    mockOtaOffered = true;
+    const { rerender } = render(<StoreUpdateSheet />);
+    settle();
+    expect(screen.queryByText('New version available')).toBeNull();
+    mockOtaOffered = false;
+    rerender(<StoreUpdateSheet />);
+    settle();
+    expect(screen.getByText('New version available')).toBeTruthy();
+  });
+
   it('offers the new version on Home, once (marked as offered when it shows)', () => {
     render(<StoreUpdateSheet />);
     expect(screen.queryByText('New version available')).toBeNull();

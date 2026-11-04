@@ -9,7 +9,7 @@ import { Tap } from '../v2/Tap';
 import { spacing } from '../../theme/spacing';
 import { currentRelease, diagnosticLines, ReleaseInfo } from '../../lib/releaseInfo';
 import { sendTestError, triggerTestNativeCrash } from '../../lib/sentry';
-import { applyUpdate, checkForUpdateNow, useUpdateBanner } from '../../lib/updates/ota';
+import { applyUpdate, checkForUpdateNow, useUpdateOffer } from '../../lib/updates/ota';
 
 export { checkForUpdateNow };
 
@@ -34,15 +34,31 @@ export function showsTestActions(r: ReleaseInfo): boolean {
 }
 
 /**
- * Settings → About → App info: which build and update this is (what support
- * needs to know). Tap to see the details and share them; long-press to check for
- * an update now. TestFlight (preview) builds also get test-crash actions.
+ * Settings → About. For testers (`tools`, lib/updates/testerTools): App info,
+ * which build and update this is; tap to see the details and share them,
+ * long-press to check for an update now; preview builds also get test-crash
+ * actions. Everyone else: the version, nothing more (updates come by themselves).
  */
-export function AppInfo({ release = currentRelease() }: { release?: ReleaseInfo }) {
+export function AppInfo({ release = currentRelease(), tools = false }: { release?: ReleaseInfo; tools?: boolean }) {
+  return tools ? <AppInfoTools release={release} /> : <VersionRow release={release} />;
+}
+
+function VersionRow({ release }: { release: ReleaseInfo }) {
+  const { palette } = useTheme();
+  return (
+    <View style={v2.row} accessible accessibilityLabel={`Version ${release.versionLabel}`} testID="app-version">
+      <Ionicons name="information-circle-outline" size={24} color={palette.text} />
+      <Text style={[typeV2.body, styles.text, { color: palette.text }]}>Version</Text>
+      <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>{release.versionLabel}</Text>
+    </View>
+  );
+}
+
+function AppInfoTools({ release }: { release: ReleaseInfo }) {
   const { palette } = useTheme();
   const { lastCheckForUpdateTimeSinceRestart } = Updates.useUpdates();
   // An update downloaded (by the check here or by itself): the restart stays one tap away.
-  const { updateId: waiting } = useUpdateBanner();
+  const { updateId: waiting } = useUpdateOffer();
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const lines = diagnosticLines(release, lastCheckForUpdateTimeSinceRestart ?? null);

@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -303,7 +303,7 @@ export default function ActivityDayScreen() {
     journal ? 'daily log' : null,
   ].filter(Boolean);
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar title={label} onBack={() => navigation.goBack()} separator />
       {loading ? (
         <View style={styles.center}>
@@ -416,7 +416,7 @@ export default function ActivityDayScreen() {
           }}
         />
       )}
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

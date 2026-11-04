@@ -2,13 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { ScrollView } from 'react-native-gesture-handler';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
+import { SwipeRow } from '../../components/v2/SwipeRow';
+import { copyText } from '../../lib/clipboard';
 import {
   RouteProp,
   useNavigation,
@@ -17,6 +19,7 @@ import {
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
@@ -58,6 +61,14 @@ const KIND_OPTIONS: { value: JournalKind; label: string }[] = [
   { value: 'note', label: 'Note' },
 ];
 
+type Draft = { text: string; minutes: string };
+const EMPTY_DRAFT: Draft = { text: '', minutes: '' };
+const EMPTY_DRAFTS: Record<JournalKind, Draft> = {
+  memorization: EMPTY_DRAFT,
+  revision: EMPTY_DRAFT,
+  note: EMPTY_DRAFT,
+};
+
 const PLACEHOLDER: Record<JournalKind, string> = {
   memorization: 'e.g. Al-Mulk, or pages 562–564',
   revision: 'e.g. Maryam and Taha, or pages 305–321',
@@ -75,6 +86,9 @@ export default function JournalEntryScreen() {
   const { user, logs } = useApp();
   const { palette } = useTheme();
   const haptics = useHaptics();
+  // This screen hides the tab bar, so the bottom is the home indicator's room
+  // plus one margin, counted once.
+  const insets = useSafeAreaInsets();
 
   // Fixed when the screen opens, so a note being written across fajr (or
   // midnight) still belongs to the day it was started on.
@@ -93,11 +107,12 @@ export default function JournalEntryScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  // The composer: a new note, or the note being edited.
+  // The composer. Each kind keeps its own unsaved draft, so switching tabs never
+  // carries text across, and Add saves only the kind that is showing.
   const [kind, setKind] = useState<JournalKind>('memorization');
-  const [text, setText] = useState('');
-  const [minutesText, setMinutesText] = useState('');
-  const [editing, setEditing] = useState<JournalNote | null>(null);
+  const [drafts, setDrafts] = useState<Record<JournalKind, Draft>>(EMPTY_DRAFTS);
+  // A note being edited has a draft of its own, and its kind stays locked.
+  const [editing, setEditing] = useState<{ note: JournalNote; draft: Draft } | null>(null);
   // The note whose ⋯ menu is open.
   const [menuNote, setMenuNote] = useState<JournalNote | null>(null);
 
@@ -129,10 +144,24 @@ export default function JournalEntryScreen() {
 
   const notes = useMemo(() => day?.entries ?? [], [day]);
   const total = day ? journalTotalMinutes(day) : null;
-  const composerDirty = text.trim() !== '' || minutesText !== '';
+  // What the composer shows: the kind being edited, or the kind's own draft.
+  const composingKind: JournalKind = editing ? editing.note.kind : kind;
+  const draft = editing ? editing.draft : drafts[kind];
+  const text = draft.text;
+  const minutesText = draft.minutes;
+  const setDraft = (patch: Partial<Draft>) => {
+    if (editing) setEditing({ ...editing, draft: { ...editing.draft, ...patch } });
+    else setDrafts((all) => ({ ...all, [kind]: { ...all[kind], ...patch } }));
+  };
+  const setText = (value: string) => setDraft({ text: value });
+  const setMinutesText = (value: string) => setDraft({ minutes: value });
+
+  const unsavedDraft =
+    (editing != null) ||
+    Object.values(drafts).some((d) => d.text.trim() !== '' || d.minutes !== '');
 
   // Guards the back button and (on native-stack) the swipe-back gesture.
-  usePreventRemove(composerDirty && !saving, ({ data }) => {
+  usePreventRemove(unsavedDraft && !saving, ({ data }) => {
     Alert.alert('Discard changes?', "You haven't saved this note.", [
       { text: 'Keep editing', style: 'cancel' },
       {
@@ -143,7 +172,8 @@ export default function JournalEntryScreen() {
     ]);
   });
 
-  // Offer to fill a revision from the in-app session logged that day.
+  // Offer to fill a revision from the in-app session logged that day, until
+  // a revision with the same text is in the log: a session is added once.
   const sessionSuggestion = useMemo(() => {
     const log = logs.find((l) => l.date === date);
     if (!log || log.pagesRevised.length === 0) return null;
@@ -152,45 +182,55 @@ export default function JournalEntryScreen() {
       minutes: log.durationMinutes,
     };
   }, [logs, date]);
+  const suggestionAdded =
+    sessionSuggestion != null &&
+    (day?.entries ?? []).some((n) => n.kind === 'revision' && n.text.trim() === sessionSuggestion.text);
   const showSuggestion =
-    kind === 'revision' && sessionSuggestion != null && text.trim() === '' && minutesText === '' && !editing;
+    composingKind === 'revision' &&
+    sessionSuggestion != null &&
+    !suggestionAdded &&
+    text.trim() === '' &&
+    minutesText === '' &&
+    !editing;
 
-  const resetComposer = () => {
-    setText('');
-    setMinutesText('');
-    setEditing(null);
-  };
-
+  // Editing locks the tabs to the note's kind; Cancel or Save returns to the tab
+  // that was showing, with its draft as it was.
   const startEdit = (note: JournalNote) => {
-    setEditing(note);
-    setKind(note.kind);
-    setText(note.text);
-    setMinutesText(note.minutes?.toString() ?? '');
+    setEditing({
+      note,
+      draft: { text: note.text, minutes: note.minutes?.toString() ?? '' },
+    });
   };
 
   const handleSend = async () => {
-    const trimmed = text.trim().slice(0, journalTextMax(kind));
+    const sendKind = composingKind;
+    const trimmed = text.trim().slice(0, journalTextMax(sendKind));
     // The minutes are for memorization and revision; a note has none.
-    const minutes = kind === 'note' ? null : parseMinutesInput(minutesText);
+    const minutes = sendKind === 'note' ? null : parseMinutesInput(minutesText);
     setSaving(true);
     try {
-      if (trimmed === '' && minutes == null) {
-        // Clearing an edited note deletes it.
-        if (editing) await queueChange({ kind: 'journal.entry.delete', date, id: editing.id });
-      } else if (editing) {
-        const entry: JournalNote = { ...editing, kind, text: trimmed, minutes };
-        await queueChange({ kind: 'journal.entry.edit', date, entry });
+      if (editing) {
+        if (trimmed === '' && minutes == null) {
+          // Clearing an edited note deletes it.
+          await queueChange({ kind: 'journal.entry.delete', date, id: editing.note.id });
+        } else {
+          const entry: JournalNote = { ...editing.note, kind: sendKind, text: trimmed, minutes };
+          await queueChange({ kind: 'journal.entry.edit', date, entry });
+        }
+        setEditing(null);
       } else {
+        if (trimmed === '' && minutes == null) return;
         if ((day?.entries.length ?? 0) >= JOURNAL_ENTRIES_PER_DAY) {
           Alert.alert('This day is full', `A day holds up to ${JOURNAL_ENTRIES_PER_DAY} entries.`);
           setSaving(false);
           return;
         }
-        const entry: JournalNote = { id: autoId(), at: Date.now(), kind, text: trimmed, minutes };
+        // Always a new note with its own id and time: Add never replaces one.
+        const entry: JournalNote = { id: autoId(), at: Date.now(), kind: sendKind, text: trimmed, minutes };
         await queueChange({ kind: 'journal.entry.add', date, entry });
+        setDrafts((all) => ({ ...all, [sendKind]: EMPTY_DRAFT }));
       }
       haptics.success();
-      resetComposer();
       refreshDay();
     } catch (err) {
       logger.error('Failed to save journal note', err);
@@ -210,7 +250,7 @@ export default function JournalEntryScreen() {
           setSaving(true);
           try {
             await queueChange({ kind: 'journal.entry.delete', date, id: note.id });
-            if (editing?.id === note.id) resetComposer();
+            if (editing?.note.id === note.id) setEditing(null);
             refreshDay();
           } catch (err) {
             logger.error('Failed to delete journal note', err);
@@ -233,7 +273,7 @@ export default function JournalEntryScreen() {
           setSaving(true);
           try {
             for (const n of notes) await queueChange({ kind: 'journal.entry.delete', date, id: n.id });
-            resetComposer();
+            setEditing(null);
             refreshDay();
           } catch (err) {
             logger.error('Failed to delete journal day', err);
@@ -246,30 +286,45 @@ export default function JournalEntryScreen() {
     ]);
   };
 
+  // Fills the Revised draft only; the other kinds' drafts are left as they are.
   const fillFromSession = () => {
     if (!sessionSuggestion) return;
-    setText(sessionSuggestion.text);
-    setMinutesText(sessionSuggestion.minutes?.toString() ?? '');
+    setDrafts((all) => ({
+      ...all,
+      revision: { text: sessionSuggestion.text, minutes: sessionSuggestion.minutes?.toString() ?? '' },
+    }));
   };
 
   // Saving an edited note with nothing left in it deletes it.
   const canSend = (editing != null || text.trim() !== '' || minutesText !== '') && !saving && !loading && !loadFailed;
   const field = [typeV2.body, v2.field, { color: palette.text }];
+  // A hold on a note (or its VoiceOver action) opens this menu. Delete is the
+  // swipe: it confirms before it removes the note.
+  const openMenu = (note: JournalNote) => {
+    haptics.selection();
+    setMenuNote(note);
+  };
   const menuActions = menuNote
     ? [
         { key: 'edit', label: 'Edit', icon: 'create-outline' as const, onPress: () => startEdit(menuNote) },
-        {
-          key: 'delete',
-          label: 'Delete',
-          icon: 'trash-outline' as const,
-          destructive: true,
-          onPress: () => deleteNote(menuNote),
-        },
+        ...(menuNote.text.trim() !== ''
+          ? [
+              {
+                key: 'copy',
+                label: 'Copy',
+                icon: 'copy-outline' as const,
+                onPress: () => {
+                  copyText(menuNote.text.trim());
+                  haptics.selection();
+                },
+              },
+            ]
+          : []),
       ]
     : [];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         onBack={() => navigation.goBack()}
         center={
@@ -315,7 +370,7 @@ export default function JournalEntryScreen() {
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={v2.content}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           automaticallyAdjustKeyboardInsets
@@ -323,29 +378,35 @@ export default function JournalEntryScreen() {
         >
           {notes.map((n) => {
             const time = formatEntryTime(n.at, date);
-            const text = n.text.trim();
+            const body = n.text.trim();
+            const label = JOURNAL_KIND_LABELS[n.kind];
             return (
-              <ThreadRow
+              <SwipeRow
                 key={n.id}
-                mark={<Mark icon={JOURNAL_KIND_ICONS[n.kind]} />}
-                name={JOURNAL_KIND_LABELS[n.kind]}
-                meta={n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time}
-                onMenu={() => setMenuNote(n)}
-                menuLabel={`${JOURNAL_KIND_LABELS[n.kind]} options`}
-                lineAbove
-                lineBelow
-                separator={false}
                 testID={`journal-note-${n.id}`}
+                accessibilityLabel={`${label}${body ? `, ${body}` : ''}, ${time}`}
+                actions={[{ name: 'options', label: 'Options', onPress: () => openMenu(n) }]}
+                onHold={() => openMenu(n)}
+                onDelete={() => deleteNote(n)}
               >
-                {text ? <RowText numberOfLines={12}>{text}</RowText> : null}
-              </ThreadRow>
+                <ThreadRow
+                  mark={<Mark icon={JOURNAL_KIND_ICONS[n.kind]} />}
+                  name={label}
+                  meta={n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time}
+                  lineAbove
+                  lineBelow
+                  separator={false}
+                >
+                  {body ? <RowText numberOfLines={12}>{body}</RowText> : null}
+                </ThreadRow>
+              </SwipeRow>
             );
           })}
 
           <ThreadRow
             mark={<Mark icon={editing ? 'create-outline' : 'add-outline'} />}
-            name={editing ? `Editing ${JOURNAL_KIND_LABELS[editing.kind].toLowerCase()}` : 'New entry'}
-            meta={editing ? formatEntryTime(editing.at, date) : undefined}
+            name={editing ? `Editing ${JOURNAL_KIND_LABELS[composingKind].toLowerCase()}` : 'New entry'}
+            meta={editing ? formatEntryTime(editing.note.at, date) : undefined}
             lineAbove
             separator={false}
             testID="journal-composer"
@@ -367,22 +428,32 @@ export default function JournalEntryScreen() {
               ) : undefined
             }
           >
-            <PillTabs options={KIND_OPTIONS} value={kind} onChange={setKind} testID="journal-kind" />
+            <PillTabs
+              options={KIND_OPTIONS}
+              value={composingKind}
+              onChange={setKind}
+              disabled={editing != null}
+              testID="journal-kind"
+            />
             <View style={v2.fieldRow}>
               <TextInput
                 value={text}
                 onChangeText={setText}
-                placeholder={PLACEHOLDER[kind]}
+                placeholder={PLACEHOLDER[composingKind]}
                 placeholderTextColor={palette.secondary}
                 selectionColor={palette.accentText}
-                multiline={kind === 'note'}
-                maxLength={journalTextMax(kind)}
+                multiline={composingKind === 'note'}
+                maxLength={journalTextMax(composingKind)}
                 textAlignVertical="top"
-                style={[field, kind === 'note' && v2.notes]}
-                accessibilityLabel={kind === 'note' ? 'Note' : `What you ${kind === 'memorization' ? 'memorized' : 'revised'}`}
+                style={[field, composingKind === 'note' && v2.notes]}
+                accessibilityLabel={
+                  composingKind === 'note'
+                    ? 'Note'
+                    : `What you ${composingKind === 'memorization' ? 'memorized' : 'revised'}`
+                }
                 testID="journal-text-input"
               />
-              {kind !== 'note' && (
+              {composingKind !== 'note' && (
                 <MinutesFieldV2 value={minutesText} onChange={setMinutesText} label="Minutes" />
               )}
             </View>
@@ -392,7 +463,7 @@ export default function JournalEntryScreen() {
                   title="Cancel"
                   size="sm"
                   variant="outline"
-                  onPress={resetComposer}
+                  onPress={() => setEditing(null)}
                   testID="journal-cancel-edit"
                 />
               )}
@@ -431,7 +502,7 @@ export default function JournalEntryScreen() {
         actions={menuActions}
         testID="journal-note-menu"
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 
@@ -466,7 +537,6 @@ const styles = StyleSheet.create({
 // The new design: rows on the ground, the fields borderless like a composer.
 const v2 = StyleSheet.create({
   titleBox: { alignItems: 'center' },
-  content: { paddingBottom: 48 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   field: { flex: 1, paddingVertical: 6, paddingHorizontal: 0 },
   // A minimum, not a height: the field grows with its text and with Dynamic Type.
