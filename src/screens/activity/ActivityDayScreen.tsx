@@ -367,6 +367,7 @@ export default function ActivityDayScreen() {
               day={date}
               reloadKey={recordingsKey}
               highlightId={focusRecordingId}
+              onOpen={(r) => navigation.navigate('ListenBack', { recordingId: r.id })}
               header={
                 <Text style={[typeV2.name, v2.section, { color: palette.text }]} accessibilityRole="header">
                   Recordings

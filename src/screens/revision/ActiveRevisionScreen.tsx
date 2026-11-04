@@ -42,8 +42,10 @@ import {
 import type { AyahRef } from '../../lib/ayahBounds';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
-import { RecordButton } from '../../components/recordings/RecordButton';
+import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
+import { latestRevisionRecording } from '../../lib/listenBack';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { TimerChip } from '../../components/timer/TimerChip';
 import { ReaderFrame } from '../../components/reader/ReaderFrame';
@@ -204,6 +206,28 @@ export default function ActiveRevisionScreen() {
       null,
     onFinished: setSavedRecording,
   });
+
+  // Listen back: the end card offers the day's recording over its pages
+  // (ListenBackScreen), unless it is being recorded right now.
+  const [dayRecordingId, setDayRecordingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sessionDay) return;
+    let live = true;
+    const refresh = () => {
+      listRecordings()
+        .then((all) => {
+          if (live) setDayRecordingId(latestRevisionRecording(all, sessionDay)?.id ?? null);
+        })
+        .catch((err) => logger.warn('Could not list recordings', err));
+    };
+    refresh();
+    const off = onRecordingsChanged(refresh);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [sessionDay]);
+  const listenBackId = recorder.phase === 'idle' || recorder.phase === 'paused' ? dayRecordingId : null;
 
   // Reading or revising without touching the screen: don't let it lock.
   const isScreenFocused = useIsFocused();
@@ -851,8 +875,10 @@ export default function ActiveRevisionScreen() {
 
   const palette = getReadPalette(isDark);
   const crowded = recorder.phase !== 'idle' || timer != null;
-  const compact = width < 430 && crowded;
-  const recordButton = <RecordButton recorder={recordButtonRecorder} />;
+  // Recording: the recorder is the whole capsule, the timer beside it (compact).
+  const recordingLive = recorderTakesCapsule(recorder);
+  const compact = (width < 430 && crowded) || (recordingLive && timer != null);
+  const recordButton = <RecordButton recorder={recordButtonRecorder} crowded={timer != null} />;
   const timerChip = (
     <TimerChip
       compact={compact}
@@ -968,11 +994,12 @@ export default function ActiveRevisionScreen() {
                 nextDisabled={nextHiddenVerse(reveal, displayPageNumber) == null}
                 compact={compact}
                 surface={{ background: palette.control, border: palette.divider }}
-                record={recordButton}
+                record={<RecordButton recorder={recordButtonRecorder} layout="inline" />}
                 timer={timerChip}
               />
             ) : (
               <PlayerCapsule
+                recording={recordingLive}
                 player={verseActions.player}
                 page={displayPageNumber}
                 compact={compact}
@@ -1028,6 +1055,9 @@ export default function ActiveRevisionScreen() {
                   : null
               }
               onKeepGoing={keepGoing}
+              onListenBack={
+                listenBackId ? () => navigation.navigate('ListenBack', { recordingId: listenBackId }) : undefined
+              }
             />
           }
           onReachEnd={handleReachEnd}

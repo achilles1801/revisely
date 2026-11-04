@@ -1,19 +1,31 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AccessibilityActionEvent, GestureResponderEvent, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { fractionAt, hasLevels, playedBarCount } from '../../lib/waveform';
+import {
+  BAR_GAP,
+  BAR_STEP,
+  BAR_WIDTH,
+  DOT,
+  barCountFor,
+  barHeight,
+  fractionAt,
+  hasLevels,
+  playedBarCount,
+  waveformBars,
+} from '../../lib/waveform';
 
 /** The shortest bar: silence, or a stretch without levels. */
-export const MIN_BAR_HEIGHT = 3;
+export const MIN_BAR_HEIGHT = DOT;
 /** A drag shorter than this is a tap (it seeks where it lands). */
 const DRAG_SLOP = 6;
 
 /**
- * A recording's waveform with its playback progress: bars up to where it has
- * played in the accent (`accentText`), the rest in `track` (≥ 3:1 apart in
- * every accent and mode). Bars are 0–1 heights (lib/waveform), null where
- * there are no levels: a recording without any is drawn flat, never with
- * made-up bars.
+ * A recording's voice bars (Variant B): 3pt bars 3pt apart, as many as fit the
+ * width, each the loudest level under it (lib/waveform), 3 + (max − 3) ×
+ * level^1.1 tall, centred; a dot is silence. Playing (or paused part way):
+ * played in `text`, the rest in `track`. Not playing: all `secondary`. No
+ * levels (restored from the backup, or older): dots in `track`, never made-up
+ * bars. `ticks` mark moments (Listen back's page turns), 0–1.
  *
  * With `onSeek`, a tap seeks where it lands and a sideways drag scrubs, seeking
  * on release. A vertical drag is left to the scroll view around it (the touch
@@ -21,41 +33,55 @@ const DRAG_SLOP = 6;
  * seeks nothing. VoiceOver adjusts it in `seekStep`s.
  */
 export function AudioWaveform({
-  bars,
+  segments,
   progress,
+  active = true,
   onSeek,
-  height = 28,
+  height = 24,
+  ticks,
   seekStep = 0.1,
   accessibilityLabel = 'Playback position',
   valueText,
   testID,
 }: {
-  bars: (number | null)[];
+  /** The recording's segments (their lengths and levels). */
+  segments: { durationMs: number; levels?: unknown }[];
   /** Played, 0–1. */
   progress: number;
+  /** Playing or paused part way: played and unplayed tell apart. */
+  active?: boolean;
   /** A position chosen, 0–1. */
   onSeek?: (fraction: number) => void;
+  /** The tallest bar. */
   height?: number;
+  /** Moments marked with a thin line, 0–1. */
+  ticks?: number[];
   seekStep?: number;
   accessibilityLabel?: string;
   /** What VoiceOver reads as the position, e.g. "0:05 of 0:14". */
   valueText?: string;
   testID?: string;
 }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const width = useRef(0);
+  const [count, setCount] = useState(0);
   const startX = useRef(0);
   const dragging = useRef(false);
   const [scrub, setScrub] = useState<number | null>(null);
+  const bars = useMemo(() => waveformBars(segments, count), [segments, count]);
   const shown = scrub ?? progress;
-  const played = playedBarCount(shown, bars.length);
+  const lit = active || scrub != null;
+  const played = lit ? playedBarCount(shown, bars.length) : 0;
   const flat = !hasLevels(bars);
+  const span = count > 0 ? count * BAR_STEP - BAR_GAP : 0;
 
   const end = () => {
     dragging.current = false;
     setScrub(null);
   };
 
+  // Touches are measured across the bars, not the room around them.
+  const at = (x: number) => fractionAt(x - (width.current - span) / 2, span);
   const touch = onSeek
     ? {
         onStartShouldSetResponder: () => true,
@@ -67,10 +93,10 @@ export function AudioWaveform({
           const x = e.nativeEvent.locationX;
           if (!dragging.current && Math.abs(x - startX.current) < DRAG_SLOP) return;
           dragging.current = true;
-          setScrub(fractionAt(x, width.current));
+          setScrub(at(x));
         },
         onResponderRelease: (e: GestureResponderEvent) => {
-          const f = fractionAt(e.nativeEvent.locationX, width.current);
+          const f = at(e.nativeEvent.locationX);
           end();
           onSeek(f);
         },
@@ -86,11 +112,16 @@ export function AudioWaveform({
     if (step !== 0) onSeek(Math.max(0, Math.min(1, progress + step)));
   };
 
+  // Not playing: secondary, a little lighter on white.
+  const idle = { backgroundColor: palette.secondary, opacity: isDark ? 1 : 0.75 };
+  const offset = (width.current - span) / 2;
+
   return (
     <View
       style={{ height }}
       onLayout={(e: LayoutChangeEvent) => {
         width.current = e.nativeEvent.layout.width;
+        setCount(barCountFor(e.nativeEvent.layout.width));
       }}
       accessible
       accessibilityRole={onSeek ? 'adjustable' : 'progressbar'}
@@ -112,20 +143,36 @@ export function AudioWaveform({
             key={i}
             style={[
               styles.bar,
-              {
-                height: b == null ? MIN_BAR_HEIGHT : Math.max(MIN_BAR_HEIGHT, Math.round(b * height)),
-                backgroundColor: i < played ? palette.accentText : palette.track,
-              },
+              { height: flat ? DOT : barHeight(b, height) },
+              flat
+                ? { backgroundColor: palette.track }
+                : lit
+                  ? { backgroundColor: i < played ? palette.text : palette.track }
+                  : idle,
             ]}
             testID={testID ? `${testID}-bar` : undefined}
           />
         ))}
       </View>
+      {ticks && span > 0
+        ? ticks.map((f, i) => (
+            <View
+              key={`tick-${i}`}
+              pointerEvents="none"
+              style={[
+                styles.tick,
+                { height, left: offset + Math.max(0, Math.min(1, f)) * span - 0.5, backgroundColor: palette.secondary },
+              ]}
+              testID={testID ? `${testID}-tick` : undefined}
+            />
+          ))
+        : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bars: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  bar: { flex: 1, borderRadius: 1.5 },
+  bars: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: BAR_GAP },
+  bar: { width: BAR_WIDTH, borderRadius: BAR_WIDTH / 2 },
+  tick: { position: 'absolute', top: 0, width: 1, opacity: 0.6 },
 });

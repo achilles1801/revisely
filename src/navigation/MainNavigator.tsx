@@ -13,6 +13,7 @@ import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScre
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
+import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
@@ -55,6 +56,9 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. */
   ActivityDay: { date: string; focusRecordingId?: string };
+  // A recording played over the pages it was recorded on, from fromMs (ms
+  // into it; default the start).
+  ListenBack: { recordingId: string; fromMs?: number };
   // Everything done, searchable (new design's "See all"); kind preselects a filter.
   ActivityAll: { kind?: ActivityKind } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
@@ -85,6 +89,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'Memorization',
   'QuranReader',
   'JournalEntry',
+  'ListenBack',
 ]);
 
 function HomeStackNavigator() {
@@ -106,6 +111,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
+      <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
     </HomeStack.Navigator>

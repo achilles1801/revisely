@@ -95,6 +95,11 @@ export interface PaletteV2 extends AccentTokens {
   good: string;
   /** Marks, chips, the Cancel bar: a quiet fill on the ground. */
   fill: string;
+  /**
+   * A recording's voice bubble (Activity) and Listen back's bar: a step firmer
+   * than `fill`, so the bubble reads on the ground without an outline.
+   */
+  bubble: string;
   /** Sheets and menus. */
   sheet: string;
   /** A sheet's grab handle. */
@@ -127,6 +132,7 @@ const BASE_LIGHT: Base = {
   onRedFill: '#FFFFFF',
   good: '#0E6B5A',
   fill: '#F7F7F8',
+  bubble: '#F0F0F2',
   sheet: '#FFFFFF',
   handle: '#D1D5DB',
   track: '#D1D5DB',
@@ -147,6 +153,7 @@ const BASE_DARK: Base = {
   onRedFill: '#FFFFFF',
   good: '#4DBA9F',
   fill: '#181818',
+  bubble: '#1C1C1E',
   sheet: '#101010',
   handle: '#3A3A3C',
   track: '#333333',
