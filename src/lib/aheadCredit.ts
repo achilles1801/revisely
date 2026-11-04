@@ -72,6 +72,24 @@ export function mergeAhead(
   return out;
 }
 
+/**
+ * `ahead` kept to the pages revised here: credit for a later day exists only
+ * for a page the session has revised (checked), so a stale or partial map can
+ * never credit a page the session doesn't hold.
+ */
+export function aheadWithin(
+  ahead: Record<string, number[]> | undefined,
+  revised: readonly number[],
+): Record<string, number[]> {
+  const set = new Set(revised);
+  const out: Record<string, number[]> = {};
+  for (const [day, pages] of Object.entries(ahead ?? {})) {
+    const kept = pages.filter((p) => set.has(p));
+    if (kept.length > 0) out[day] = kept;
+  }
+  return out;
+}
+
 /** `ahead` without these pages, days left empty dropped. */
 export function removeAheadPages(
   ahead: Record<string, number[]> | undefined,

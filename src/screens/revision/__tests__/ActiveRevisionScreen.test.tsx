@@ -638,10 +638,8 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(mockPager.pages).toEqual([...DAY_PAGES, ...NEXT]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
 
-    // One page of the next day, then leave.
-    await act(async () => {
-      mockPager.onAdvance?.(341, 342);
-    });
+    // One page of the next day, checked, then leave.
+    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
     await act(async () => {
       unmount();
     });
@@ -658,6 +656,36 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     });
     expect(screen.getByText('Revision complete')).toBeTruthy();
     expect(screen.queryByTestId('session-end-keep-going')).toBeNull();
+  });
+
+  it('a swipe past a page of a later day credits nothing: only its check does', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onAdvance?.(NEXT[0], NEXT[1]);
+    });
+    await act(async () => {
+      mockPager.onAdvance?.(NEXT[1], NEXT[2]);
+    });
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+  });
+
+  it('the end card after a later day’s last page marks nothing', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    await act(async () => {
+      mockPager.onReachEnd?.(NEXT[2], true);
+    });
+    expect(screen.queryByText('Revision complete')).toBeNull();
+    await act(async () => {
+      unmount();
+    });
+    expect(mockApp.addLog).not.toHaveBeenCalled();
   });
 
   it('Home’s “starts at” line opens on that day’s first page, with today’s pages behind it', () => {

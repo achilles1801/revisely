@@ -13,11 +13,14 @@ import type { FirestorePage, FirestoreSession, FirestoreUser, PageStatus, Weakne
 import type { JournalEntry, JournalNote } from '../../types';
 import { journalDayFromEntries, LEGACY_NOTE_ID, legacyJournalNotes } from '../journal';
 import { tsFromMillis } from './codec';
-import { mergeAhead } from '../aheadCredit';
+import { aheadWithin, mergeAhead } from '../aheadCredit';
 
 /** The `ahead` field only where there is credit: a session without it writes as before. */
 const aheadField = (ahead: Record<string, number[]> | undefined) =>
   ahead && Object.keys(ahead).length > 0 ? { ahead } : {};
+/** As aheadField, but a session that had credit (`existing`) is written even when none is left, to clear it. */
+const sessionAheadField = (existing: Record<string, number[]> | undefined, ahead: Record<string, number[]>) =>
+  existing !== undefined || Object.keys(ahead).length > 0 ? { ahead } : {};
 
 /** User document fields: absolute values; "notifications.enabled" style keys for nested ones. */
 export type UserFields = Record<string, unknown>;
@@ -238,7 +241,8 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
       pagesRevised,
       pagesSkipped,
       weaknessUpdates,
-      ...(existing.ahead !== undefined || op.ahead ? aheadField(mergeAhead(existing.ahead, op.ahead)) : {}),
+      // Credit only for pages this session has revised (see aheadWithin).
+      ...sessionAheadField(existing.ahead, aheadWithin(mergeAhead(existing.ahead, op.ahead), pagesRevised)),
       durationMinutes: Math.max(1, addedMinutes(existing.durationMinutes ?? 0, op)),
       // The rules forbid going back from completed.
       state: completed ? 'COMPLETED' : 'IN_PROGRESS',
@@ -274,7 +278,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     ...base,
     pagesRevised: [...new Set(op.pagesRevised)],
     pagesSkipped: op.pagesSkipped,
-    ...aheadField(mergeAhead(undefined, op.ahead)),
+    ...aheadField(aheadWithin(mergeAhead(undefined, op.ahead), op.pagesRevised)),
     durationMinutes: Math.max(1, op.durationAtLeast || 1),
     state: revisedHere >= total ? 'COMPLETED' : 'IN_PROGRESS',
     completionPercentage: safePercent(revisedHere, total),
@@ -291,7 +295,7 @@ export function applySessionEdit(existing: FirestoreSession | null, op: SessionE
     ...existing,
     pagesRevised,
     pagesSkipped: op.pagesSkipped,
-    ...(op.ahead !== undefined ? { ahead: op.ahead } : {}),
+    ...(op.ahead !== undefined ? { ahead: aheadWithin(op.ahead, pagesRevised) } : {}),
     // The rules take minutes above 0, or none.
     durationMinutes: op.durationMinutes != null && op.durationMinutes > 0 ? op.durationMinutes : null,
     weaknessUpdates: weaknessDocs(op.weaknessUpdates),
