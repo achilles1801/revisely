@@ -80,8 +80,14 @@ export class Home {
     return this.text('today-ahead');
   }
 
+  /** The button that adds the catch-up pages to today ("Add to today"). */
   carryOver(): string | null {
     return this.text('today-carry-over');
+  }
+
+  /** The catch-up line above it: "Missed yesterday · Revise p. 1–5". */
+  catchUp(): string | null {
+    return this.text('today-catch-up');
   }
 
   async tap(testID: string): Promise<void> {
