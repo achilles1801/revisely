@@ -658,7 +658,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(screen.queryByTestId('session-end-keep-going')).toBeNull();
   });
 
-  it('a swipe past a page of a later day credits nothing: only its check does', async () => {
+  it('swiping off a later day’s page marks it, as a page of today', async () => {
     setupTwoDays(DAY_PAGES);
     mockRouteParams = { aheadDay: tomorrow() };
     const { unmount } = render(<ActiveRevisionScreen />);
@@ -666,7 +666,20 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
       mockPager.onAdvance?.(NEXT[0], NEXT[1]);
     });
     await act(async () => {
-      mockPager.onAdvance?.(NEXT[1], NEXT[2]);
+      unmount();
+    });
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [NEXT[0]], ahead: { [tomorrow()]: [NEXT[0]] } }),
+    );
+  });
+
+  it('a swipe off a page the screen is not showing credits nothing', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    // The screen shows NEXT[0]; a swipe that claims to leave NEXT[2] is a mismatch.
+    await act(async () => {
+      mockPager.onAdvance?.(NEXT[2], NEXT[0]);
     });
     await act(async () => {
       unmount();
@@ -674,18 +687,19 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(mockApp.addLog).not.toHaveBeenCalled();
   });
 
-  it('the end card after a later day’s last page marks nothing', async () => {
+  it('the end card after a later day’s last page marks it, as for today', async () => {
     setupTwoDays(DAY_PAGES);
     mockRouteParams = { aheadDay: tomorrow() };
     const { unmount } = render(<ActiveRevisionScreen />);
     await act(async () => {
       mockPager.onReachEnd?.(NEXT[2], true);
     });
-    expect(screen.queryByText('Revision complete')).toBeNull();
     await act(async () => {
       unmount();
     });
-    expect(mockApp.addLog).not.toHaveBeenCalled();
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: [NEXT[2]], ahead: { [tomorrow()]: [NEXT[2]] } }),
+    );
   });
 
   it('Home’s “starts at” line opens on that day’s first page, with today’s pages behind it', () => {

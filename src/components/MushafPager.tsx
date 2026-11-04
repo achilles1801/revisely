@@ -352,6 +352,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   // user made by swiping counts as advancing (and credits the page left), so a
   // jump or a recitation turning pages can never mark a page revised.
   const draggedRef = useRef(false);
+  // The page the list last reported on screen (never a programmatic jump's
+  // target), and the one a drag started on: a swipe credits the page it left.
+  const shownIndexRef = useRef<number | null>(null);
+  const dragFromRef = useRef<number | null>(null);
 
   // Download the pages around the starting one before they are swiped to (and
   // around the current one when another print is chosen).
@@ -413,6 +417,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       const newIndex = first.index;
       // The end card: leaving the last page by a swipe is how it is done.
       if (hasEnd && newIndex === pages.length) {
+        shownIndexRef.current = newIndex;
         const prevIndex = currentIndexRef.current;
         if (prevIndex === newIndex) return;
         jumpRef.current = null;
@@ -429,11 +434,15 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         if (newIndex === jump.from && newIndex !== jump.to && Date.now() < jump.until) return;
         jumpRef.current = null;
       }
+      shownIndexRef.current = newIndex;
       const prevIndex = currentIndexRef.current;
       if (newIndex === prevIndex) return;
       const newPage = pages[newIndex];
-      if (newIndex > prevIndex && onAdvance && draggedRef.current) {
-        const leftPage = pages[prevIndex];
+      // A swipe credits the page its drag started on, as the list showed it;
+      // a programmatic scroll never has a drag.
+      const from = dragFromRef.current;
+      if (draggedRef.current && from != null && newIndex > from && onAdvance) {
+        const leftPage = pages[from];
         if (leftPage != null && newPage != null) {
           onAdvance(leftPage, newPage);
         }
@@ -489,6 +498,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       showsHorizontalScrollIndicator={false}
       onViewableItemsChanged={handleViewableItemsChanged}
       onScrollBeginDrag={() => {
+        dragFromRef.current = shownIndexRef.current;
         draggedRef.current = true;
       }}
       viewabilityConfig={viewabilityConfig}
