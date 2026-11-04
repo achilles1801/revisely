@@ -72,8 +72,8 @@ const leftoverCaseArb = fc
 /** The leftovers by the rule, written out from the documentation (not the code). */
 function leftoversByRule(c: { today: string; memorized: number[]; todaysPages: number[]; lookback: number; logs: RevisionLog[] }) {
   const firstDay = addDays(c.today, -c.lookback);
-  const revisedOn = (p: number, from: string) =>
-    c.logs.some((l) => l.date >= from && l.date <= c.today && l.date >= firstDay && l.pagesRevised.includes(p));
+  // Revised at any point in the window, whichever day it was planned for.
+  const revisedOn = (p: number) => c.logs.some((l) => l.date >= firstDay && l.date <= c.today && l.pagesRevised.includes(p));
   const credited = (p: number, day: string) =>
     c.logs.some((l) => (l.date === day && l.pagesRevised.includes(p)) || (l.ahead?.[day] ?? []).includes(p));
   const out: number[] = [];
@@ -82,7 +82,7 @@ function leftoversByRule(c: { today: string; memorized: number[]; todaysPages: n
     const dayLogs = c.logs.filter((l) => l.date === day && (l.assignedPages?.length ?? 0) > 0);
     for (const l of dayLogs) {
       for (const p of l.assignedPages!) {
-        if (revisedOn(p, day) || credited(p, day)) continue;
+        if (revisedOn(p) || credited(p, day)) continue;
         if (c.todaysPages.includes(p) || !c.memorized.includes(p) || out.includes(p)) continue;
         out.push(p);
       }
@@ -92,7 +92,7 @@ function leftoversByRule(c: { today: string; memorized: number[]; todaysPages: n
 }
 
 describe('[CARRY-1] [CARRY-4] leftover pages', () => {
-  it('never returns today’s pages, a page not memorized, a page revised since its day, a duplicate or a page credited ahead to its day', () => {
+  it('never returns today’s pages, a page not memorized, a page revised in the window, a duplicate or a page credited ahead to its day', () => {
     fc.assert(
       fc.property(leftoverCaseArb, (c) => {
         const out = findLeftoverPages(c.logs, c.today, c.todaysPages, new Set(c.memorized), c.lookback);
