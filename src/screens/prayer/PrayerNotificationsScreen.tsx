@@ -58,7 +58,7 @@ export default function PrayerNotificationsScreen() {
       <View style={{ paddingTop: insets.top }}>
         <TopBar title="Prayer notifications" onBack={() => navigation.goBack()} separator />
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <GroupedSection
           header="Prayers"
           footer={

@@ -153,7 +153,7 @@ export default function ReadIndexScreen() {
         indicatorStyle={isDark ? 'white' : 'black'}
         keyExtractor={(item) => `juz-group-${item.juz}`}
         ListHeaderComponent={headerV2}
-        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         renderItem={({ item }) => (
           <View testID={`read-juz-${item.juz}`}>
             <SectionTitleV2 title={`Juz' ${item.juz}`} />

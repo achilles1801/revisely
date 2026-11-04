@@ -1,19 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
+import { runOnJS } from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
+import { useHaptics } from "../../design/haptics";
 import { typeV2 } from "../../theme/v2";
 
 /** The width of the red action a row slides open. */
 export const SWIPE_ACTION_WIDTH = 84;
-const SPRING = { damping: 22, stiffness: 240 };
 /** How long a finger rests before the row's menu opens (iOS's own is about this). */
 const HOLD_MS = 450;
 
@@ -22,8 +20,11 @@ export type RowAction = { name: string; label: string; onPress: () => void };
 /**
  * A list row that opens two ways, as in iMessage: a press and hold calls
  * `onHold` (the row's menu), and a swipe to the left slides the row over a red
- * `Delete` action. Tapping the action calls `onDelete`; a tap on the row or a
- * swipe back closes it. VoiceOver gets `actions` in place of the gestures.
+ * `Delete` action. The swipe is gesture handler's swipeable on Reanimated, so
+ * the row follows the finger on the UI thread, resists past the action, and
+ * snaps open or shut on release, with a tick as it reaches the action. Tapping
+ * the action calls `onDelete`; a tap on an open row closes it. VoiceOver gets
+ * `actions` in place of the gestures.
  */
 export function SwipeRow({
   children,
@@ -48,58 +49,34 @@ export function SwipeRow({
   testID?: string;
 }) {
   const { palette } = useTheme();
-  // 0 closed; -SWIPE_ACTION_WIDTH open. `start` is where the current drag began.
-  const x = useSharedValue(0);
-  const start = useSharedValue(0);
+  const haptics = useHaptics();
+  const swipeRef = useRef<SwipeableMethods>(null);
+  // Kept from the swipe's own events, so a hold on an open row does nothing.
+  const openRef = useRef(false);
 
   const gesture = useMemo(() => {
-    const swipe = Gesture.Pan()
-      // Only a swipe to the left (or back, when open) moves the row: a swipe
-      // right stays the screen's back gesture.
-      .activeOffsetX([-12, 12])
-      .failOffsetY([-10, 10])
-      .onStart(() => {
-        start.value = x.value;
-      })
-      .onUpdate((e) => {
-        x.value = Math.max(
-          -SWIPE_ACTION_WIDTH,
-          Math.min(0, start.value + e.translationX),
-        );
-      })
-      .onEnd((e) => {
-        const open =
-          x.value < -SWIPE_ACTION_WIDTH / 2 ||
-          (e.velocityX < -500 && x.value < 0);
-        x.value = withSpring(open ? -SWIPE_ACTION_WIDTH : 0, SPRING);
-      });
-
+    const openMenu = () => {
+      if (!openRef.current) onHold();
+    };
     const hold = Gesture.LongPress()
       .minDuration(HOLD_MS)
       .maxDistance(10)
       .onStart(() => {
-        if (x.value !== 0) return;
-        runOnJS(onHold)();
+        runOnJS(openMenu)();
       });
-
-    // A tap on the row, while it is open, closes it.
+    // A tap on an open row closes it; on a closed row it does nothing.
     const tap = Gesture.Tap()
       .maxDistance(10)
       .onEnd((_e, success) => {
-        if (!success || x.value === 0) return;
-        x.value = withSpring(0, SPRING);
+        if (success) runOnJS(closeRow)();
       });
+    return Gesture.Race(hold, tap);
 
-    return Gesture.Race(swipe, hold, tap);
-  }, [x, start, onHold]);
+    function closeRow() {
+      swipeRef.current?.close();
+    }
+  }, [onHold]);
 
-  const rowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value }],
-  }));
-
-  const close = () => {
-    x.value = withSpring(0, SPRING);
-  };
   const a11yActions = [
     ...actions.map((a) => ({ name: a.name, label: a.label })),
     { name: "delete", label: deleteLabel },
@@ -113,27 +90,43 @@ export function SwipeRow({
   };
 
   return (
-    <View style={styles.wrap}>
-      <View style={[styles.action, { backgroundColor: palette.redFill }]}>
-        <Pressable
-          onPress={() => {
-            close();
-            onDelete();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={deleteLabel}
-          style={styles.actionInner}
-          testID={testID ? `${testID}-delete` : undefined}
-        >
-          <Ionicons name="trash-outline" size={22} color={palette.onRedFill} />
-          <Text style={[typeV2.meta, { color: palette.onRedFill }]}>
-            {deleteLabel}
-          </Text>
-        </Pressable>
-      </View>
+    <ReanimatedSwipeable
+      ref={swipeRef}
+      friction={2}
+      rightThreshold={SWIPE_ACTION_WIDTH / 2}
+      overshootRight={false}
+      activeOffsetX={[-12, 12]}
+      failOffsetY={[-10, 10]}
+      onSwipeableWillOpen={() => haptics.selection()}
+      onSwipeableOpen={() => {
+        openRef.current = true;
+      }}
+      onSwipeableClose={() => {
+        openRef.current = false;
+      }}
+      renderRightActions={() => (
+        <View style={[styles.action, { backgroundColor: palette.redFill }]}>
+          <Pressable
+            onPress={() => {
+              swipeRef.current?.close();
+              onDelete();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={deleteLabel}
+            style={styles.actionInner}
+            testID={testID ? `${testID}-delete` : undefined}
+          >
+            <Ionicons name="trash-outline" size={22} color={palette.onRedFill} />
+            <Text style={[typeV2.meta, { color: palette.onRedFill }]}>
+              {deleteLabel}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    >
       <GestureDetector gesture={gesture}>
-        <Animated.View
-          style={[styles.row, { backgroundColor: palette.bg }, rowStyle]}
+        <View
+          style={{ backgroundColor: palette.bg }}
           testID={testID}
           accessible={accessible}
           accessibilityLabel={accessible ? accessibilityLabel : undefined}
@@ -141,16 +134,15 @@ export function SwipeRow({
           onAccessibilityAction={accessible ? onAccessibilityAction : undefined}
         >
           {children}
-        </Animated.View>
+        </View>
       </GestureDetector>
-    </View>
+    </ReanimatedSwipeable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: "relative", overflow: "hidden" },
   action: {
-    ...StyleSheet.absoluteFillObject,
+    width: SWIPE_ACTION_WIDTH,
     alignItems: "flex-end",
     justifyContent: "center",
   },
@@ -161,5 +153,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
-  row: {},
 });

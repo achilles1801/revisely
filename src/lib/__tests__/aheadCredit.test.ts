@@ -7,6 +7,7 @@ import {
   removeAheadPages,
 } from '../aheadCredit';
 import { recomputePagesFromLogs } from '../algorithm';
+import { doneOnDay, reviewedOn } from '../aheadCredit';
 import { removeRevisedPages } from '../revisionSession';
 import { applySessionEdit, mergeSessionAdd, sessionUpdateData } from '../offline/ops';
 import type { RevisionLog, UserPage } from '../../types';
@@ -216,5 +217,35 @@ describe('credit is only for pages the session has revised', () => {
     });
     expect(edited!.pagesRevised).toEqual([6]);
     expect(edited!.ahead).toEqual({});
+  });
+});
+
+// Review session (Nov 4 2026): the day's review is today's pages plus the pages
+// its sessions revised ahead, each once, and the Done count is that whole set.
+// Repro: Tuesday 3 Nov, fajr boundary on, Tuesday's session revised 6-9 and 235,
+// then revised ahead 236-240 for Wednesday 4 Nov (the scheduled set for that day).
+describe('the review of a day with pages revised ahead', () => {
+  const tuesday = {
+    id: 'tue',
+    date: '2026-11-03',
+    assignedPages: [6, 7, 8, 9, 235],
+    pagesRevised: [6, 7, 8, 9, 235, 236, 237, 238, 239, 240],
+    pagesSkipped: [],
+    weaknessUpdates: [],
+    durationMinutes: 30,
+    ahead: { '2026-11-04': [236, 237, 238, 239, 240] },
+  } as unknown as RevisionLog;
+
+  it('is every page the day revised, its own and the ahead ones, once each', () => {
+    const review = [...reviewedOn([tuesday], '2026-11-03')].sort((a, b) => a - b);
+    expect(review).toEqual([6, 7, 8, 9, 235, 236, 237, 238, 239, 240]);
+  });
+
+  it('the Done count is that whole set, not only today’s pages', () => {
+    expect(doneOnDay([tuesday], '2026-11-03').size).toBe(10);
+  });
+
+  it('a session on another day does not join this day’s review', () => {
+    expect([...reviewedOn([tuesday], '2026-11-04')]).toEqual([]);
   });
 });

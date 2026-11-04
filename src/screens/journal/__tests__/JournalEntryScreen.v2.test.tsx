@@ -1,6 +1,6 @@
 import React from 'react';
-import { Alert, Modal } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert, Keyboard, Modal } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 
@@ -37,6 +37,21 @@ const mockQueue = {
   withPendingJournalDay: jest.fn((_date: string, base: unknown) => base ?? null),
 };
 jest.mock('../../../lib/clipboard', () => ({ copyText: jest.fn() }));
+// The outbox tells the screen when a change has been written (see emitOutbox).
+let mockOutboxListeners: ((uid: string) => void)[] = [];
+jest.mock('../../../lib/offline/outbox', () => ({
+  subscribeOutbox: (fn: (uid: string) => void) => {
+    mockOutboxListeners.push(fn);
+    return () => {
+      mockOutboxListeners = mockOutboxListeners.filter((l) => l !== fn);
+    };
+  },
+}));
+async function emitOutbox(uid: string) {
+  await act(async () => {
+    mockOutboxListeners.forEach((l) => l(uid));
+  });
+}
 jest.mock('../../../lib/offline/queue', () => ({
   queueChange: (...a: unknown[]) => mockQueue.queueChange(...(a as [])),
   withPendingJournalDay: (...a: unknown[]) => mockQueue.withPendingJournalDay(...(a as [string, unknown])),
@@ -94,7 +109,8 @@ beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
   await AsyncStorage.setItem('@revisely_theme_v2', 'light');
-  mockApp.user = { createdAt: '2026-01-01T12:00:00.000Z', fajrBoundaryEnabled: false };
+  mockOutboxListeners = [];
+  mockApp.user = { id: 'u1', createdAt: '2026-01-01T12:00:00.000Z', fajrBoundaryEnabled: false };
   mockApp.logs = [];
   mockService.getJournalEntry.mockResolvedValue(null);
   mockQueue.queueChange.mockImplementation(async () => ({}));
@@ -436,5 +452,57 @@ describe('offline', () => {
     await renderScreen();
     expect(screen.queryByTestId('journal-offline')).toBeNull();
     expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+  });
+});
+
+// A fake server: a change written to it is visible to the next read of the day,
+// and the outbox then says so, as it does when a queued change is sent.
+function serverWithOutbox() {
+  const saved: JournalNote[] = [];
+  mockService.getJournalEntry.mockImplementation(async () =>
+    saved.length > 0 ? journalDayFromEntries('2026-10-20', [...saved]) : null,
+  );
+  mockQueue.queueChange.mockImplementation(async (...args: unknown[]) => {
+    const op = args[0] as QueuedOp;
+    if (op.kind === 'journal.entry.add' && op.entry) saved.push(op.entry);
+    await emitOutbox('u1');
+    return {};
+  });
+  return saved;
+}
+
+async function addNote(kind: 'memorization' | 'revision' | 'note', text: string) {
+  fireEvent.press(screen.getByTestId(`pill-${kind}`));
+  fireEvent.changeText(screen.getByTestId('journal-text-input'), text);
+  await pressSend();
+}
+
+describe('adding notes one after another: each one stays', () => {
+  it('a note saved stays in the list when the next one is added', async () => {
+    serverWithOutbox();
+    await renderScreen();
+    await addNote('note', 'first');
+    await addNote('note', 'second');
+    await waitFor(() => expect(screen.getAllByTestId(/^journal-note-[A-Za-z0-9]+$/)).toHaveLength(2));
+    expect(screen.getByText('first')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('second')).toBeTruthy());
+  });
+});
+
+describe('the keyboard: a Done key puts it away', () => {
+  it('the text and minutes fields carry the Done bar, which dismisses the keyboard', async () => {
+    await renderScreen();
+    expect(screen.getByTestId('journal-text-input').props.inputAccessoryViewID).toBe('journal-keyboard-done');
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    fireEvent.press(screen.getByTestId('journal-keyboard-done'));
+    expect(dismiss).toHaveBeenCalled();
+    dismiss.mockRestore();
+  });
+});
+
+describe('the bottom of the log: one margin, not iOS’s inset on top of it', () => {
+  it('the list leaves the inset to its own padding (iOS would add the home indicator again)', async () => {
+    await renderScreen();
+    expect(screen.getByTestId('journal-v2').props.contentInsetAdjustmentBehavior).toBe('never');
   });
 });

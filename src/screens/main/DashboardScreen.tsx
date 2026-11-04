@@ -57,7 +57,7 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
-import { creditedOnDay } from '../../lib/aheadCredit';
+import { creditedOnDay, doneOnDay, reviewedOn } from '../../lib/aheadCredit';
 import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -242,10 +242,8 @@ export default function DashboardScreen() {
 
   // Pages revised today: the Today post's page chips fill in as they're done.
   // Includes pages revised ahead for today (lib/aheadCredit).
-  const donePagesToday = useMemo(
-    () => new Set(creditedOnDay(logs, revisionDay)),
-    [logs, revisionDay],
-  );
+  // Also the pages today's sessions revised ahead, so "Done" counts the whole day.
+  const donePagesToday = useMemo(() => doneOnDay(logs, revisionDay), [logs, revisionDay]);
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
@@ -312,14 +310,15 @@ export default function DashboardScreen() {
     );
   }
 
-  const handleEditSession = (log: RevisionLog) => {
+  const handleEditSession = (log: RevisionLog, reviewPages?: number[]) => {
     // Prefer the day's actual assignedPages so the edit modal shows the
     // whole session, not just what the user marked. Fall back to
     // revised+skipped for legacy logs without the assignedPages field.
     const sessionPages =
-      log.assignedPages && log.assignedPages.length > 0
+      reviewPages ??
+      (log.assignedPages && log.assignedPages.length > 0
         ? [...log.assignedPages].sort((a, b) => a - b)
-        : [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b);
+        : [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b));
     setSelectedLog(log);
     setSelectedSessionPages(sessionPages);
     setShowEditModal(true);
@@ -346,7 +345,8 @@ export default function DashboardScreen() {
       const todayLog = logs.find(
         (log) => log.date === revisionDay,
       );
-      if (todayLog) handleEditSession(todayLog);
+      // The review is the day's whole work: today's pages and those revised ahead.
+      if (todayLog) handleEditSession(todayLog, [...reviewedOn(logs, revisionDay)].sort((a, b) => a - b));
     } else if (assignment.totalPages === 0) {
       navigation.navigate('Memorization', { edit: true });
     } else {
@@ -481,7 +481,7 @@ export default function DashboardScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         refreshControl={
           // Transparent: an opaque pull area cut Home's glow off in a hard line.
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />

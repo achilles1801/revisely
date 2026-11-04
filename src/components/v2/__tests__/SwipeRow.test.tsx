@@ -50,3 +50,24 @@ describe('SwipeRow', () => {
     expect(onHold).not.toHaveBeenCalled();
   });
 });
+
+describe('the swipe runs as gesture handler’s swipeable, on the UI thread', () => {
+  it('a row is a ReanimatedSwipeable: the drag follows the finger and snaps on release', async () => {
+    const ReanimatedSwipeable = require('react-native-gesture-handler/ReanimatedSwipeable').default;
+    const { UNSAFE_getByType } = await (async () => {
+      const onDelete = jest.fn();
+      const r = render(
+        <DesignProvider initial={{}}>
+          <ThemeProvider>
+            <SwipeRow testID="row" onDelete={onDelete} onHold={jest.fn()}>
+              <Text>a note</Text>
+            </SwipeRow>
+          </ThemeProvider>
+        </DesignProvider>,
+      );
+      await act(async () => {});
+      return r;
+    })();
+    expect(UNSAFE_getByType(ReanimatedSwipeable)).toBeTruthy();
+  });
+});

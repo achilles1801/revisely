@@ -20,6 +20,7 @@ import {
   getMissedScheduledRevisions,
   INSIGHTS_MIN_SESSIONS,
 } from '../../lib/algorithm';
+import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import {
   getQuranData,
   getSurahForPage,
@@ -124,7 +125,8 @@ export default function AlgorithmScreen() {
 
   const allPageRows = useMemo((): PageRow[] => {
     if (!user) return [];
-    const today = new Date();
+    // The revision day, not the calendar: between midnight and fajr it is still yesterday.
+    const today = getRevisionDateForUser(user);
 
     return memorizedPages
       .filter((p) => p.lastRevisedDate)
@@ -307,7 +309,7 @@ export default function AlgorithmScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
         testID="insights-v2"
       >

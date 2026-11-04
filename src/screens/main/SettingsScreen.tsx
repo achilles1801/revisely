@@ -441,7 +441,7 @@ export default function SettingsScreen() {
     <TopSafeAreaView style={styles.container}>
       <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
 
-      <ScrollView contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
         {firebaseUser && (
           <Section title="Account">
             <View style={v2.profileRow}>

@@ -103,3 +103,23 @@ export function removeAheadPages(
   }
   return out;
 }
+
+/**
+ * The pages a day's review covers: the pages its sessions revised, and the
+ * pages those sessions revised ahead for later days. Each page once. This is
+ * what "Review session" shows and counts, so the total is the day's whole work.
+ */
+export function reviewedOn(logs: readonly RevisionLog[], day: string): Set<number> {
+  const out = new Set<number>();
+  for (const log of logs) {
+    if (log.date !== day) continue;
+    for (const p of log.pagesRevised) out.add(p);
+    for (const pages of Object.values(log.ahead ?? {})) for (const p of pages) out.add(p);
+  }
+  return out;
+}
+
+/** Pages done for `day`: credited to it (see creditedOnDay) or reviewed in its own sessions. */
+export function doneOnDay(logs: readonly RevisionLog[], day: string): Set<number> {
+  return new Set([...creditedOnDay(logs, day), ...reviewedOn(logs, day)]);
+}

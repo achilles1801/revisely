@@ -143,7 +143,7 @@ export default function MemorizationScreen() {
       />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
         testID="memorization-v2"
       >
         <View style={[v2.summary, { borderBottomColor: palette.separator }]} testID="memorization-summary">
