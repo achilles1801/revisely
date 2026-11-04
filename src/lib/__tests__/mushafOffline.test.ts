@@ -1,8 +1,12 @@
 // The page store, the Arabic text and Saheeh International, faked: they "download" at once unless told otherwise.
+// Pages are kept per edition (lib/mushafEdition); mockPhone is the 1405 pages.
 const mockPhone = new Set<number>();
+const mockPhone1441 = new Set<number>();
+const mockPhoneOf = (edition: string) => (edition === 'madani1441' ? mockPhone1441 : mockPhone);
 let mockFail: (page: number) => boolean = () => false;
-let mockStored: ((page: number) => void) | null = null;
-let mockRemoved: ((page: number) => void) | null = null;
+let mockStored: ((page: number, edition: string) => void) | null = null;
+let mockRemoved: ((page: number, edition: string) => void) | null = null;
+const mockDownloadedEditions: string[] = [];
 let mockArabicCalls = 0;
 let mockDuringArabic: () => void = () => undefined;
 const mockDownloaded: number[] = [];
@@ -15,33 +19,43 @@ let mockSaheehFails = false;
 let mockSaheehCalls = 0;
 let mockSaheehChange: (() => void) | null = null;
 
-jest.mock('../pageCache', () => ({
-  PAGE_COUNT: 604,
-  cachePage: async (page: number) => {
-    mockBeforeDownload(page);
-    await Promise.resolve();
-    if (mockFail(page)) return null;
-    mockDownloaded.push(page);
-    mockPhone.add(page);
-    mockStored?.(page);
-    return `documents/mushaf/full/${page}.png`;
-  },
-  migrateLegacyPages: () => undefined,
-  onPageStored: (l: (page: number) => void) => {
-    mockStored = l;
-    return () => {
-      mockStored = null;
-    };
-  },
-  onPageRemoved: (l: (page: number) => void) => {
-    mockRemoved = l;
-    return () => {
-      mockRemoved = null;
-    };
-  },
-  pagesOnPhone: () => new Set(mockPhone),
-  removeAllPages: () => mockPhone.clear(),
-}));
+jest.mock('../pageCache', () => {
+  const mockSizes = require('../../data/mushafSizes.json');
+  const edition = () => require('../mushafEdition').getMushafEdition();
+  return {
+    PAGE_COUNT: 604,
+    cachePage: async (page: number, ed: string = edition()) => {
+      mockBeforeDownload(page);
+      await Promise.resolve();
+      if (mockFail(page)) return null;
+      mockDownloaded.push(page);
+      mockDownloadedEditions.push(ed);
+      mockPhoneOf(ed).add(page);
+      mockStored?.(page, ed);
+      return `documents/mushaf/full/${page}.png`;
+    },
+    migrateLegacyPages: () => undefined,
+    onPageStored: (l: (page: number, edition: string) => void) => {
+      mockStored = l;
+      return () => {
+        mockStored = null;
+      };
+    },
+    onPageRemoved: (l: (page: number, edition: string) => void) => {
+      mockRemoved = l;
+      return () => {
+        mockRemoved = null;
+      };
+    },
+    pagesOnPhone: (ed: string = edition()) => new Set(mockPhoneOf(ed)),
+    pageSizeTable: (ed: string = edition()) => (ed === 'madani1441' ? mockSizes['1441/w1440'] : mockSizes.full) ?? [],
+    removeAllPages: () => {
+      mockPhone.clear();
+      mockPhone1441.clear();
+    },
+    removeEditionPages: (ed: string) => mockPhoneOf(ed).clear(),
+  };
+});
 jest.mock('../translation', () => ({
   hasArabicText: () => mockArabic,
   downloadArabicText: async (stillWanted: () => boolean = () => true) => {
@@ -103,6 +117,8 @@ import {
 import { describeMushaf, formatMegabytes } from '../mushafOfflineUi';
 import { __resetNetworkStateForTests, setNetworkState } from '../networkState';
 import { __resetPageImageSetForTests } from '../quranImages';
+import { __resetMushafEditionForTests, setMushafEdition } from '../mushafEdition';
+import { otherEditionsOnPhone, removeOtherEditionPages } from '../mushafOffline';
 
 const WIFI = { connected: true, type: 'wifi' };
 const CELLULAR = { connected: true, type: 'cellular' };
@@ -121,8 +137,11 @@ beforeEach(async () => {
   __resetMushafOfflineForTests();
   __resetNetworkStateForTests();
   __resetPageImageSetForTests();
+  __resetMushafEditionForTests();
   mockPhone.clear();
+  mockPhone1441.clear();
   mockDownloaded.length = 0;
+  mockDownloadedEditions.length = 0;
   mockFail = () => false;
   mockStored = null;
   mockRemoved = null;
@@ -439,7 +458,7 @@ describe('the offline mushaf download', () => {
     await settle();
     mockPhone.delete(5);
     mockDownloaded.length = 0;
-    mockRemoved?.(5);
+    mockRemoved?.(5, 'madani1405');
     await settle();
     expect(mockDownloaded).toEqual([5]);
     expect(getMushafStatus().phase).toBe('complete');
@@ -482,7 +501,7 @@ describe('the offline mushaf download', () => {
   it('counts the pages the reader downloads', async () => {
     setNetworkState(CELLULAR);
     await prepareMushafOffline();
-    mockStored?.(5);
+    mockStored?.(5, 'madani1405');
     // Progress reaches the screen a moment later (a few times a second at most).
     await new Promise((r) => setTimeout(r, 450));
     expect(getMushafStatus().pages).toBe(1);
@@ -496,12 +515,61 @@ describe('the offline mushaf download', () => {
     const seen: number[] = [];
     onMushafStatus((s: { pages: number }) => seen.push(s.pages));
     jest.advanceTimersByTime(500);
-    for (let p = 1; p <= 10; p++) mockStored?.(p);
+    for (let p = 1; p <= 10; p++) mockStored?.(p, 'madani1405');
     expect(seen).toEqual([1]);
     jest.advanceTimersByTime(400);
     expect(seen).toEqual([1, 10]);
     setNetworkState(OFFLINE);
     expect(getMushafStatus().phase).toBe('offline');
+  });
+
+  it('moves to the 1441 print when it is chosen, keeping the 1405 pages until they are removed', async () => {
+    setNetworkState(WIFI);
+    await prepareMushafOffline();
+    startMushafOffline();
+    await settle();
+    expect(getMushafStatus().phase).toBe('complete');
+    mockDownloadedEditions.length = 0;
+
+    await setMushafEdition('madani1441');
+    await settle();
+    expect(mockPhone1441.size).toBe(604);
+    expect(new Set(mockDownloadedEditions)).toEqual(new Set(['madani1441']));
+    expect(mockPhone.size).toBe(604);
+    const s = getMushafStatus();
+    expect(s.phase).toBe('complete');
+    const bytes1441 = ((sizes as Record<string, number[]>)['1441/w1440'] ?? []).reduce((a, b) => a + b, 0);
+    expect(bytes1441).toBeGreaterThan(0);
+    expect(s.totalBytes).toBe(bytes1441 + ARABIC_TEXT_BYTES + 1_093_165);
+
+    expect(otherEditionsOnPhone()).toEqual([{ edition: 'madani1405', pages: 604, bytes: PAGE_BYTES }]);
+    removeOtherEditionPages('madani1405');
+    expect(mockPhone.size).toBe(0);
+    expect(otherEditionsOnPhone()).toEqual([]);
+    // The print chosen is never removed this way.
+    removeOtherEditionPages('madani1441');
+    expect(mockPhone1441.size).toBe(604);
+  });
+
+  it('counts only the pages of the print chosen', async () => {
+    setNetworkState(CELLULAR);
+    await prepareMushafOffline();
+    mockStored?.(5, 'madani1441');
+    await new Promise((r) => setTimeout(r, 450));
+    expect(getMushafStatus().pages).toBe(0);
+  });
+
+  it('a switch stops the run for the old print between pages', async () => {
+    setNetworkState(WIFI);
+    await prepareMushafOffline();
+    mockBeforeDownload = (page) => {
+      if (page === 3) void setMushafEdition('madani1441');
+    };
+    startMushafOffline();
+    await settle();
+    // The 1405 run stopped within a few pages; the 1441 print is all here.
+    expect(mockPhone.size).toBeLessThan(10);
+    expect(mockPhone1441.size).toBe(604);
   });
 
   it('removes everything and stays off until "Download now"', async () => {

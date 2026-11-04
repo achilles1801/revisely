@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Writes src/data/mushafSizes.json: the size in bytes of every page image in
-// each set (lib/quranImages: the originals, and Android's w1080 and w1440),
+// each set (lib/quranImages: the originals, Android's w1080 and w1440, and the
+// 1441 print's w1080 and w1440),
 // read from Storage with HEAD requests. The app uses it to show how much the
 // offline mushaf is and how much is left. Run it again whenever the images in
 // Storage change (scripts/build-mushaf-variants.py).
@@ -11,7 +12,14 @@ const fs = require('fs');
 const path = require('path');
 
 const BASE = 'https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf';
-const SETS = { full: '', w1080: 'w1080/', w1440: 'w1440/' };
+// The 1405 pages (the originals and Android's copies), then the 1441 print's two widths.
+const SETS = {
+  full: '',
+  w1080: 'w1080/',
+  w1440: 'w1440/',
+  '1441/w1080': '1441/w1080/',
+  '1441/w1440': '1441/w1440/',
+};
 const PAGES = 604;
 const PARALLEL = 16;
 

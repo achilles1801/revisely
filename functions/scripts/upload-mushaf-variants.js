@@ -11,6 +11,10 @@
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
  *     node scripts/upload-mushaf-variants.js /tmp/mushaf-out [--dry-run]
  *
+ * The 1441 print (scripts/build-mushaf-1441.py) goes under its own folder:
+ *     node scripts/upload-mushaf-variants.js /tmp/mushaf-1441 --prefix 1441 [--dry-run]
+ *   <dir>/w1080/NNN.png -> mushaf/1441/w1080/NNN.png (and w1440)
+ *
  * Safe to run again: an object already there with the same bytes is skipped.
  * One with different bytes is refused, never replaced: phones and caches keep
  * a page for a year, so changed pages go under a new set name (see the script
@@ -38,12 +42,17 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 const md5 = (file) => crypto.createHash('md5').update(fs.readFileSync(file)).digest('base64');
 
 async function main() {
-  const [dir, flag] = process.argv.slice(2);
-  if (!dir || (flag && flag !== '--dry-run')) {
-    console.error('Usage: node scripts/upload-mushaf-variants.js <dir> [--dry-run]');
+  const args = process.argv.slice(2);
+  const dir = args[0];
+  const dryRun = args.includes('--dry-run');
+  const p = args.indexOf('--prefix');
+  const prefix = p >= 0 ? args[p + 1] : '';
+  const known = new Set(['--dry-run', '--prefix', prefix]);
+  if (!dir || dir.startsWith('--') || (p >= 0 && !/^[0-9a-z]+$/.test(prefix || '')) || args.slice(1).some((a) => !known.has(a))) {
+    console.error('Usage: node scripts/upload-mushaf-variants.js <dir> [--prefix <folder>] [--dry-run]');
     process.exit(1);
   }
-  const dryRun = flag === '--dry-run';
+  const root = prefix ? `mushaf/${prefix}` : 'mushaf';
 
   // Every file first, so a partial build never half-uploads.
   const jobs = [];
@@ -55,7 +64,7 @@ async function main() {
         console.error(`Missing ${local}`);
         process.exit(1);
       }
-      jobs.push({ local, dest: `mushaf/${set}/${name}` });
+      jobs.push({ local, dest: `${root}/${set}/${name}` });
     }
   }
 

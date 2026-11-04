@@ -63,6 +63,8 @@ import { supportMailto } from '../../lib/contact';
 import { PillTabs } from '../../components/v2/PillTabs';
 import { setMushafCellular } from '../../lib/mushafOffline';
 import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
+import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
+import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
@@ -220,6 +222,8 @@ export default function SettingsScreen() {
   // value beside it would leave the label a word wide.
   const { fontScale } = useWindowDimensions();
   const [mushafMenu, setMushafMenu] = useState(false);
+  const [mushafPicker, setMushafPicker] = useState(false);
+  const edition = useMushafEdition();
   // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
   const prayerEnabled = prayerTimesEnabled(user);
   const prayerPrefs = usePrayerPrefs();
@@ -695,6 +699,14 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Mushaf">
+          <View testID="mushaf-edition-row">
+            <Row
+              icon="book-outline"
+              label="Mushaf"
+              value={mushafEdition(edition).name}
+              onPress={() => setMushafPicker(true)}
+            />
+          </View>
           <View testID="mushaf-offline-row">
             <Row
               icon="cloud-download-outline"
@@ -848,6 +860,7 @@ export default function SettingsScreen() {
         actions={[{ key: 'delete', label: 'Delete speech model', icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
         testID="speech-model-delete-menu"
       />
+      <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
       <ActionSheet
         visible={mushafMenu}
         onClose={() => setMushafMenu(false)}

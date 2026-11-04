@@ -72,3 +72,21 @@ describe('the device’s set', () => {
     expect(() => getQuranPageImageUrl(605)).toThrow();
   });
 });
+
+describe('the 1441 print', () => {
+  it('loads from mushaf/1441/, its widest copy standing in for the originals', () => {
+    expect(getQuranPageImageUrl(586, 'full', 'madani1441')).toBe(`${BASE}/1441/w1440/586.png`);
+    expect(getQuranPageImageUrl(586, 'w1080', 'madani1441')).toBe(`${BASE}/1441/w1080/586.png`);
+    expect(getQuranPageImageUrl(586, 'w1440', 'madani1441')).toBe(`${BASE}/1441/w1440/586.png`);
+    // The 1405 pages are where they always were.
+    expect(getQuranPageImageUrl(586, 'full', 'madani1405')).toBe(`${BASE}/586.png`);
+    expect(getQuranPageImageUrl(586, 'w1080', 'madani1405')).toBe(`${BASE}/w1080/586.png`);
+  });
+
+  it('draws as decoded on Android only', () => {
+    onDevice('ios', 440, 956, 3);
+    expect(pageImageProps()).toEqual({});
+    onDevice('android', 412, 915, 2.625);
+    expect(pageImageProps()).toEqual({ resizeMethod: 'none' });
+  });
+});

@@ -27,6 +27,7 @@ import { RecitePanel } from '../../components/recite/RecitePanel';
 import { usePauseListener } from '../../components/recite/usePauseListener';
 import { canFollowWords, useReciteFollow } from '../../components/recite/useReciteFollow';
 import { reciteModeEnabled } from '../../lib/recite/availability';
+import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { followLabel, WordByWordChip } from '../../components/recite/RecitePanel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
@@ -192,7 +193,10 @@ export default function ActiveRevisionScreen() {
   // a verse shows again when tapped, with Next verse, or when the reciter
   // pauses after it (usePauseListener). Each hide starts covered again; what
   // was shown on a page stays shown while it lasts.
-  const reciteAvailable = reciteModeEnabled(user);
+  // Hidden recite mode needs the lines and words of the print shown (lib/mushafEdition):
+  // the 1405 pages only, for now.
+  const edition = useMushafEdition();
+  const reciteAvailable = reciteModeEnabled(user) && mushafEdition(edition).reciteData;
   const [hidden, setHidden] = useState(false);
   const [reveal, setReveal] = useState<RevealState>(NOTHING_REVEALED);
   const [listenOn, setListenOn] = useState(true);

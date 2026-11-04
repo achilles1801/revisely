@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../context/AuthContext';
 import { prepareMushafOffline, setMushafActive, startMushafOffline } from '../lib/mushafOffline';
+import { loadMushafEdition } from '../lib/mushafEdition';
 import { setNetworkState } from '../lib/networkState';
 
 /** After the first screens have loaded: what is on the phone, and moving old cached pages. */
@@ -20,6 +21,8 @@ export function MushafOfflineController() {
   const signedIn = !!firebaseUser || !!provisionalUid;
 
   useEffect(() => {
+    // The print chosen (Settings → Mushaf), before the first page is drawn.
+    loadMushafEdition().catch(() => undefined);
     const prepare = setTimeout(() => {
       prepareMushafOffline().catch(() => undefined);
     }, PREPARE_DELAY_MS);
