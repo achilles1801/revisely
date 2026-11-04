@@ -3,7 +3,7 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange } from '../harness/account';
-import { Home, homeStack } from '../harness/screens';
+import { flatText, Home, homeStack } from '../harness/screens';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
 
@@ -186,6 +186,41 @@ describe('Keep going', () => {
     expect(home.ahead()).toMatch(/^Thu starts at .*p\. 16(?!\d)/);
     const opened = await home.openAhead();
     expect(opened.pages()).toEqual([...TUE, ...THU]);
+    await app.close();
+  });
+});
+
+describe('a day done only ahead', () => {
+  // Monday's keep going revised Tuesday's pages ahead, so Tuesday is done with no
+  // session of its own. Its review must open on those pages (Majd, Nov 4).
+  it('[AHEAD-2] [SESS-2] [SESS-4] Review session on a day done ahead opens with its done pages, and saving them makes its session', async () => {
+    const { phone } = await account();
+    let { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const session = await home.startSession();
+    await session.swipeThrough(5);
+    await session.keepGoing();
+    await session.swipeThrough(5);
+    await session.back();
+    await app.untilSynced();
+    expect(credit(app).map((c) => c.day)).toEqual(['2026-11-02']);
+    await app.close();
+
+    ({ app, home } = await openHome(phone, '2026-11-03 09:00'));
+    expect(home.title()).toMatch(/^Done · 5 pages/);
+    expect(home.carryOver()).toBeNull();
+    const { fireEvent } = app.mods.rtl;
+    await app.act(async () => {
+      fireEvent.press(app.screen.getByTestId('today-cta'));
+    });
+    // The review opens, on Tuesday's first page.
+    expect(app.screen.queryByTestId('edit-session')).not.toBeNull();
+    expect(flatText(app.screen.getByTestId('edit-session-page'))).toBe(String(TUE[0]));
+    // Close and save: Tuesday gets its own session with the five pages done.
+    await app.act(async () => {
+      fireEvent.press(app.screen.getByLabelText('Close and save'));
+    });
+    await app.untilSynced();
+    expect(credit(app).find((c) => c.day === '2026-11-03')?.revised).toEqual(TUE);
     await app.close();
   });
 });
