@@ -22,22 +22,27 @@
 // - "Remove from this phone" deletes it all and turns the download off until
 //   "Download now"; pages and suras the reader opens are still kept.
 //
+// - It downloads the print chosen in Settings → Mushaf (lib/mushafEdition).
+//   Choosing another one moves the download over to it; the other print's
+//   pages stay until removed (removeOtherEditionPages), so going back is instant.
+//
 // The choices are kept on this phone (not the account): the pages are this
 // phone's.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Paths } from 'expo-file-system';
-import sizes from '../data/mushafSizes.json';
 import {
   PAGE_COUNT,
   cachePage,
   migrateLegacyPages,
   onPageRemoved,
   onPageStored,
+  pageSizeTable,
   pagesOnPhone,
   removeAllPages,
+  removeEditionPages,
 } from './pageCache';
-import { pageImageSet } from './quranImages';
+import { getMushafEdition, MUSHAF_EDITION_ORDER, MushafEditionId, onMushafEdition } from './mushafEdition';
 import { downloadArabicText, hasArabicText, removeArabicText } from './translation';
 import { downloadSaheeh, onSaheehChange, removeSaheeh, SAHEEH_BYTES, SAHEEH_SURAS, saheehSurasOnPhone } from './saheeh';
 import { NetworkState, networkState, onNetworkState, onUnmeteredNetwork } from './networkState';
@@ -113,7 +118,7 @@ let unsubscribe: (() => void)[] = [];
 const listeners = new Set<(s: MushafStatus) => void>();
 
 function sizeTable(): number[] {
-  return (sizes as Record<string, number[]>)[pageImageSet()] ?? [];
+  return pageSizeTable(getMushafEdition());
 }
 
 function totalBytes(): number {
@@ -253,12 +258,26 @@ export function prepareMushafOffline(): Promise<void> {
       unsubscribe.push(
         // A sura read in the verse sheet counts too.
         onSaheehChange(() => publish()),
-        onPageStored((page) => {
+        onPageStored((page, edition) => {
+          if (edition !== getMushafEdition()) return;
           present.add(page);
           publish();
         }),
-        onPageRemoved((page) => {
+        onPageRemoved((page, edition) => {
+          if (edition !== getMushafEdition()) return;
           present.delete(page);
+          publish();
+          requestMushafDownload();
+        }),
+        // Another print: a run for the old one stops between pages, and one for
+        // the new one starts.
+        onMushafEdition(() => {
+          generation++;
+          failedRun = false;
+          noSpace = false;
+          attempt = 0;
+          clearRetry();
+          present = pagesOnPhone();
           publish();
           requestMushafDownload();
         }),
@@ -328,6 +347,41 @@ export async function removeMushafDownload(): Promise<void> {
   arabicHere = false;
   present = new Set();
   await savePrefs({ ...prefs, auto: false });
+}
+
+/** The print not chosen whose pages are (partly) on the phone, with their size, for Settings → Mushaf. */
+export interface OtherEditionPages {
+  edition: MushafEditionId;
+  pages: number;
+  bytes: number;
+}
+
+export function otherEditionsOnPhone(): OtherEditionPages[] {
+  const out: OtherEditionPages[] = [];
+  for (const edition of MUSHAF_EDITION_ORDER) {
+    if (edition === getMushafEdition()) continue;
+    let pages: Set<number>;
+    try {
+      pages = pagesOnPhone(edition);
+    } catch (err) {
+      logger.warn('Could not list the other mushaf’s pages', err);
+      continue;
+    }
+    if (pages.size === 0) continue;
+    const table = pageSizeTable(edition);
+    let bytes = 0;
+    pages.forEach((p) => {
+      bytes += table[p - 1] ?? 0;
+    });
+    out.push({ edition, pages: pages.size, bytes });
+  }
+  return out;
+}
+
+/** Remove a print that isn't the one chosen (the chosen one: Offline mushaf → Remove). */
+export function removeOtherEditionPages(edition: MushafEditionId): void {
+  if (edition === getMushafEdition()) return;
+  removeEditionPages(edition);
 }
 
 function clearRetry() {
@@ -409,6 +463,7 @@ async function fetchTexts(gen: number): Promise<boolean> {
 
 async function runOnce(): Promise<void> {
   const gen = generation;
+  const edition = getMushafEdition();
   if (!mayRun(gen)) return;
   if (present.size >= PAGE_COUNT && textOnPhone()) {
     // Everything is here: QuranEnc may have a newer version (asked once a day).
@@ -442,7 +497,7 @@ async function runOnce(): Promise<void> {
             full = true;
             break;
           }
-          const uri = await cachePage(page);
+          const uri = await cachePage(page, edition);
           if (uri) {
             inARow = 0;
           } else {

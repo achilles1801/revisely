@@ -101,8 +101,11 @@ import {
   pathOf,
   prefetchPages,
   removeAllPages,
+  removeEditionPages,
+  sizeKey,
 } from '../pageCache';
 import { __resetPageImageSetForTests } from '../quranImages';
+import { __setMushafEditionForTests } from '../mushafEdition';
 
 beforeEach(() => {
   mockFiles.clear();
@@ -342,5 +345,64 @@ describe('pagesAround', () => {
     const all = Array.from({ length: 604 }, (_, i) => i + 1);
     expect(pagesAround(all, 99)).toEqual([100, 101, 99, 102, 98, 103, 97]);
     expect(pagesAround(all, 0)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('the 1441 print (lib/mushafEdition)', () => {
+  afterEach(() => __setMushafEditionForTests('madani1405'));
+
+  it('keeps its pages in their own folder and downloads them from mushaf/1441/', async () => {
+    __setMushafEditionForTests('madani1441');
+    const uri = await cachePage(5);
+    // iOS: the widest copy (there are no originals of this print).
+    expect(uri).toBe('documents/mushaf/1441/w1440/005.png');
+    expect(mockDownloads[0]).toMatch(/\/mushaf\/1441\/w1440\/005\.png$/);
+    expect(sizeKey()).toBe('1441/w1440');
+    // The other print's page 5 is another file.
+    __setMushafEditionForTests('madani1405');
+    expect(getCachedPageUri(5)).toBeNull();
+    expect(getCachedPageUri(5, 'madani1441')).toBe(uri);
+    expect(sizeKey()).toBe('full');
+  });
+
+  it('says which print a stored page belongs to', async () => {
+    const stored: string[] = [];
+    onPageStored((p, edition) => stored.push(`${edition}:${p}`));
+    await cachePage(3);
+    await cachePage(3, 'madani1441');
+    expect(stored).toEqual(['madani1405:3', 'madani1441:3']);
+  });
+
+  it('lists and removes one print, keeping the other', async () => {
+    await cachePage(1);
+    await cachePage(2, 'madani1441');
+    expect([...pagesOnPhone('madani1405')]).toEqual([1]);
+    expect([...pagesOnPhone('madani1441')]).toEqual([2]);
+    removeEditionPages('madani1441');
+    expect([...pagesOnPhone('madani1441')]).toEqual([]);
+    expect(getCachedPageUri(2, 'madani1441')).toBeNull();
+    expect(getCachedPageUri(1)).toBe('documents/mushaf/full/001.png');
+    removeEditionPages('madani1405');
+    expect([...mockFiles]).toEqual([]);
+  });
+
+  it('removing everything takes both prints', async () => {
+    await cachePage(1);
+    await cachePage(1, 'madani1441');
+    removeAllPages();
+    expect([...mockFiles]).toEqual([]);
+  });
+
+  it('prefetches the print chosen; the old print’s queue is dropped', async () => {
+    mockFailing = new Set();
+    prefetchPages([10, 11, 12, 13, 14, 15]);
+    __setMushafEditionForTests('madani1441');
+    prefetchPages([20]);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const urls = mockDownloads.map((u) => u.replace(/^.*\/mushaf\//, ''));
+    // Three were already downloading; the rest of the 1405 queue never starts.
+    expect(urls.filter((u) => u.startsWith('1441/'))).toEqual(['1441/w1440/020.png']);
+    expect(urls.filter((u) => !u.startsWith('1441/')).length).toBe(3);
   });
 });

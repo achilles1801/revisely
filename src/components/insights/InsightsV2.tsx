@@ -11,6 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { getSurahForPage } from '../../lib/quranData';
 import { getQuranPageImageUrl, pageImageProps } from '../../lib/quranImages';
 import { getCachedPageUri } from '../../lib/pageCache';
+import { useMushafEdition } from '../../lib/mushafEdition';
 import { nativeRequestUrl } from '../../lib/devNetwork';
 import { fitPage } from '../../lib/pageFit';
 import { getReadPalette } from '../../theme/readPalette';
@@ -201,6 +202,8 @@ export function PagePreviewSheet({ pageNumber, onClose }: { pageNumber: number |
   if (pageNumber != null) last.current = pageNumber;
   const shown = last.current;
   const [loading, setLoading] = useState(true);
+  // The print chosen in Settings → Mushaf (its own images and aspect).
+  useMushafEdition();
 
   // As large as fits: the screen's width less the gutters, or the sheet's
   // height less its handle and title.

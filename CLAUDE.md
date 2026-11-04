@@ -758,7 +758,39 @@ new user field needs `firebase deploy --only firestore:rules` first, or those wr
 **Third-party content:** Qur'an page images are renderings of the Madani Mushaf made with the King
 Fahd Complex fonts (open-source quran.com-images). They are served from the Storage bucket at
 `mushaf/001.png` ... `mushaf/604.png` (public, immutable; `src/lib/quranImages.ts`). If App Review
-asks about rights to them, that is the answer; the Qur'an text itself is public domain.
+asks about rights to them, that is the answer; the Qur'an text itself is public domain. The 1441
+print's pages (below) are drawn from the King Fahd Complex's own vector files, which its rights page
+(dm.qurancomplex.gov.sa/rights/) lets anyone use free, in apps too.
+
+**Mushaf editions** (Settings → Mushaf, `lib/mushafEdition`, `components/mushaf/MushafPickerSheet`;
+Nov 3 2026): the 1405 pages (the default) or the King Fahd Complex's **Madani 1441** print. The
+choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
+- **Page numbers are shared.** 568 pages hold the same verses in both; the other 36 come in runs
+  (120–123, 144–145, 531–534, 564–565, 567–570, 575–576, 583–600) that begin and end on the same
+  verses, and every surah and juz starts on the same page (`ayahBounds1441.test` checks all of it).
+  So plans, sessions, memorized pages and Home stay on one numbering and nothing is mapped; only
+  what the reader draws and its verse lookups follow the edition: `ayahBounds` (`boundsFile`,
+  `versesOnPage`, `ayahRects`, `ayahAt`), `verses.pageOfVerse`, `firstSurahOnPage` (the reader's
+  header: 1441 page 586 begins in 'Abasa), the page aspect (`pageFit`). `quranData`'s tables stay
+  1405's.
+- **Images:** `scripts/build-mushaf-1441.py` renders `1441-AI-hafs.zip` (one Illustrator/PDF file a
+  page, with layers for the text, the verse numbers, the ornaments and the running heads) inside the
+  frame: a 254.4 × 410.4 pt window (aspect 0.620), without running heads or page numbers, as ink alpha
+  like the 1405 pages (the green discs and header boxes become a light 17%, so the dark tint works).
+  `mushaf/1441/w1080/` (111 MB) and `mushaf/1441/w1440/` (153 MB; iOS uses it, there are no
+  originals), 32-level palette PNGs. Uploaded with `upload-mushaf-variants.js --prefix 1441`, sizes
+  in `mushafSizes.json` (`1441/w1080`, `1441/w1440`). Immutable: changed pages need a new folder.
+- **Verse boxes:** `src/data/ayahBounds1441.json`, same format and 1024-wide space, measured from the
+  pages (15 rows 26.93 pt apart; pages 1–2 have 7; the green marker discs split each line; headers and
+  the basmala skipped). The verses come in order from `scripts/mushaf1441-page-starts.json`; the build
+  fails on any page whose discs and verses don't match one for one (all 604 match).
+- **On the phone:** `Documents/mushaf/1441/<set>/`; `pageCache` keys everything by edition, and the
+  offline download follows the edition chosen. The other print's pages stay (switching back is
+  instant) until removed in the picker. "Remove from this phone" under Offline mushaf removes both.
+- Hidden recite mode needs line and word data, which only the 1405 pages have: its button is hidden
+  for the 1441 print (`MushafEdition.reciteData`).
+- Credits are in the picker. A Tajweed (Dar al-Maʿrifah) print waits on permission from the
+  publisher and Quran.com (being asked, Nov 2026); it would be another edition with its own folder.
 
 ## Android (Google Play)
 

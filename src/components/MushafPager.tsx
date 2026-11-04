@@ -37,13 +37,14 @@ import {
 import { AyahRef, ayahAt, ayahRects } from '../lib/ayahBounds';
 import { Box, unionBox } from './verse/menuPlacement';
 import { fitPage, PageSize } from '../lib/pageFit';
+import { MushafEditionId, mushafEdition, useMushafEdition } from '../lib/mushafEdition';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Pages fill the screen width at the images' own aspect (2600×4206), so the
-// verse coordinates in ayahBounds map onto the rendered page by one scale factor.
-// Until the pager has measured itself: full width (the old behaviour).
-const DEFAULT_SIZE = fitPage(SCREEN_WIDTH, 0);
+// Pages fill the screen width at the images' own aspect (the 1405 pages are
+// 2600×4206; the 1441 print's 1440×2323), so the verse coordinates in
+// ayahBounds map onto the rendered page by one scale factor. Until the pager has
+// measured itself: full width (the old behaviour).
 // How long after scrollToPage a report of another page is taken as stale.
 const JUMP_SETTLE_MS = 500;
 // The end card's item in the list (page numbers are 1–604).
@@ -93,6 +94,8 @@ export interface MushafPagerHandle {
 
 interface PageItemProps {
   pageNumber: number;
+  /** The print drawn (lib/mushafEdition); a change remounts the page. */
+  edition: MushafEditionId;
   onTap?: () => void;
   /** A held verse: where the finger is, and the verse's lines on screen (both in window coordinates). */
   onLongPressAyah?: (ayah: AyahRef, point: { x: number; y: number }, verse?: Box | null) => void;
@@ -116,6 +119,7 @@ interface PageItemProps {
 
 const PageItem = React.memo(function PageItem({
   pageNumber,
+  edition,
   onTap,
   onLongPressAyah,
   highlight,
@@ -134,7 +138,7 @@ const PageItem = React.memo(function PageItem({
   // downloaded first; if that fails, the image loads straight from Storage as
   // it used to, unless the phone is offline: then it says the page isn't
   // downloaded yet, and tries again by itself once the connection is back.
-  const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber));
+  const [uri, setUri] = useState<string | null>(() => getCachedPageUri(pageNumber, edition));
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(false);
   // Couldn't be shown: 'offline' (not on the phone, no connection) or 'failed'.
@@ -144,22 +148,22 @@ const PageItem = React.memo(function PageItem({
   useEffect(() => {
     if (uri || missing) return;
     let live = true;
-    cachePage(pageNumber).then((local) => {
+    cachePage(pageNumber, edition).then((local) => {
       if (!live) return;
       if (local) setUri(local);
       else if (knownOffline()) setMissing('offline');
-      else setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber)));
+      else setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber, undefined, edition)));
     });
     return () => {
       live = false;
     };
-  }, [pageNumber, uri, missing, attempt]);
+  }, [pageNumber, edition, uri, missing, attempt]);
 
   const retry = useCallback(() => {
     setMissing(null);
-    setUri(getCachedPageUri(pageNumber));
+    setUri(getCachedPageUri(pageNumber, edition));
     setAttempt((a) => a + 1);
-  }, [pageNumber]);
+  }, [pageNumber, edition]);
 
   // Back online (or the page arrived meanwhile): try again.
   useEffect(() => {
@@ -280,18 +284,18 @@ const PageItem = React.memo(function PageItem({
               if (!isRemote) {
                 // A whole file that failed to decode (memory) stays; Try again
                 // shows it. A broken one is deleted (and downloaded again).
-                if (evictCachedPage(pageNumber, uri)) {
+                if (evictCachedPage(pageNumber, uri, edition)) {
                   setMissing('failed');
                   return;
                 }
                 // Moved meanwhile (the first launch's move out of the caches directory)?
-                const moved = getCachedPageUri(pageNumber);
+                const moved = getCachedPageUri(pageNumber, edition);
                 if (moved && moved !== uri) setUri(moved);
                 else if (knownOffline()) {
                   setUri(null);
                   setMissing('offline');
                 } else {
-                  setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber)));
+                  setUri(nativeRequestUrl(getQuranPageImageUrl(pageNumber, undefined, edition)));
                 }
               } else {
                 setMissing(knownOffline() ? 'offline' : 'failed');
@@ -331,8 +335,12 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
 ) {
   const { isDark, palette: v2 } = useTheme();
   const palette = getReadPalette(isDark);
+  const edition = useMushafEdition();
   const listRef = useRef<FlatList>(null);
-  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_SIZE);
+  // The space the pager has (unknown until it lays out: then the screen's width).
+  const [space, setSpace] = useState<{ width: number; height: number }>({ width: SCREEN_WIDTH, height: 0 });
+  const aspect = mushafEdition(edition).aspect;
+  const pageSize = useMemo<PageSize>(() => fitPage(space.width, space.height, aspect), [space, aspect]);
   const currentIndexRef = useRef(0);
   // Only auto-scroll on first mount. After that, the user drives position by
   // swiping; re-scrolling on every `pages` reference change would yank them
@@ -345,11 +353,13 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
   // jump or a recitation turning pages can never mark a page revised.
   const draggedRef = useRef(false);
 
-  // Download the pages around the starting one before they are swiped to.
+  // Download the pages around the starting one before they are swiped to (and
+  // around the current one when another print is chosen).
   useEffect(() => {
-    const idx = initialPage == null ? 0 : Math.max(0, pages.indexOf(initialPage));
-    prefetchPages(pagesAround(pages, idx));
-  }, [initialPage, pages]);
+    const start = initialPage == null ? 0 : Math.max(0, pages.indexOf(initialPage));
+    const idx = hasAutoScrolledRef.current ? currentIndexRef.current : start;
+    prefetchPages(pagesAround(pages, Math.min(idx, pages.length - 1)));
+  }, [initialPage, pages, edition]);
 
   useEffect(() => {
     if (hasAutoScrolledRef.current) return;
@@ -446,6 +456,7 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       ) : (
         <PageItem
           pageNumber={item}
+          edition={edition}
           onTap={onTap}
           onLongPressAyah={onLongPressAyah}
           highlight={highlightedAyah ?? null}
@@ -460,14 +471,14 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
           onTapVerse={onTapVerse}
         />
       ),
-    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard, pageOverlay, onTapVerse],
+    [onTap, onLongPressAyah, highlightedAyah, v2, palette, pageSize, endCard, pageOverlay, onTapVerse, edition],
   );
 
   return (
     <FlatList
       ref={listRef}
       data={data}
-      keyExtractor={(p) => (p === END ? 'mushaf-end' : `mushaf-${p}`)}
+      keyExtractor={(p) => (p === END ? 'mushaf-end' : `mushaf-${edition}-${p}`)}
       renderItem={renderItem}
       horizontal
       pagingEnabled
@@ -486,11 +497,10 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       initialNumToRender={3}
       maxToRenderPerBatch={3}
       windowSize={5}
-      extraData={`${extraData ?? ''}|${highlightedAyah ? `${highlightedAyah.page}:${highlightedAyah.sura}:${highlightedAyah.ayah}` : ''}|${pageSize.width}`}
+      extraData={`${extraData ?? ''}|${highlightedAyah ? `${highlightedAyah.page}:${highlightedAyah.sura}:${highlightedAyah.ayah}` : ''}|${pageSize.width}|${edition}`}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
-        const next = fitPage(width, height);
-        setPageSize((prev) => (prev.width === next.width ? prev : next));
+        setSpace((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
       }}
       style={{ backgroundColor: palette.pageBg }}
     />

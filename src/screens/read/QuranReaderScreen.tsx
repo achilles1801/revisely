@@ -31,6 +31,8 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { appendReadingHistory } from '../../lib/readingHistory';
+import { firstSurahOnPage } from '../../lib/verses';
+import { useMushafEdition } from '../../lib/mushafEdition';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
@@ -140,7 +142,9 @@ export default function QuranReaderScreen() {
 
   const juz = getJuzForPage(currentPage);
   const hizb = getHizbForPage(currentPage);
-  const firstSurah = getSurahsForPage(currentPage)[0];
+  // The surah at the top of the page drawn (the 1441 print's can differ; lib/mushafEdition).
+  const edition = useMushafEdition();
+  const firstSurah = useMemo(() => firstSurahOnPage(currentPage, edition), [currentPage, edition]);
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.

@@ -8,8 +8,13 @@
 // copies made at a phone's width instead (scripts/build-mushaf-variants.py,
 // mushaf/w1080/ and mushaf/w1440/) and draws them as decoded (`resizeMethod`
 // "none", pageImageProps).
+//
+// The 1441 print (lib/mushafEdition) lives under mushaf/1441/, drawn from the King Fahd
+// Complex's vector files at the two phone widths only (scripts/build-mushaf-1441.py):
+// mushaf/1441/w1080/ and mushaf/1441/w1440/. iOS takes w1440, wider than any iPhone screen.
 
 import { Dimensions, PixelRatio, Platform } from 'react-native';
+import { getMushafEdition, MushafEditionId, mushafEdition } from './mushafEdition';
 
 const BASE_URL = 'https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf';
 
@@ -41,8 +46,17 @@ export function pageImageSet(): PageImageSet {
   return deviceSet;
 }
 
+/**
+ * The set an edition's pages load from on this device: the device's own set, except that the
+ * 1441 print has no originals (its widest copy, w1440, takes their place).
+ */
+export function editionImageSet(edition: MushafEditionId = getMushafEdition(), set: PageImageSet = pageImageSet()): PageImageSet {
+  return set === 'full' && mushafEdition(edition).folder !== '' ? 'w1440' : set;
+}
+
 /** Props for an <Image> showing a page: on Android, draw the copy as decoded (no Fresco downsampling). */
 export function pageImageProps(): { resizeMethod?: 'none' } {
+  // iOS loads the originals, or for the 1441 print w1440, and shrinks them itself.
   return pageImageSet() === 'full' ? {} : { resizeMethod: 'none' };
 }
 
@@ -55,16 +69,24 @@ export function __resetPageImageSetForTests(): void {
  * Get the URL for a specific Quran page image
  * @param pageNumber - Page number (1-604)
  * @param set - which copy (default: this device's)
+ * @param edition - which print (default: the one chosen)
  * @returns URL string for the page image
  */
-export function getQuranPageImageUrl(pageNumber: number, set: PageImageSet = pageImageSet()): string {
+export function getQuranPageImageUrl(
+  pageNumber: number,
+  set: PageImageSet = pageImageSet(),
+  edition: MushafEditionId = getMushafEdition(),
+): string {
   if (pageNumber < 1 || pageNumber > 604) {
     throw new Error(`Invalid page number: ${pageNumber}. Must be between 1 and 604.`);
   }
 
   // Pages are named with leading zeros (001.png, 002.png, etc.)
   const paddedNumber = pageNumber.toString().padStart(3, '0');
-  return set === 'full' ? `${BASE_URL}/${paddedNumber}.png` : `${BASE_URL}/${set}/${paddedNumber}.png`;
+  const folder = mushafEdition(edition).folder;
+  const s = editionImageSet(edition, set);
+  const base = folder ? `${BASE_URL}/${folder}` : BASE_URL;
+  return s === 'full' ? `${base}/${paddedNumber}.png` : `${base}/${s}/${paddedNumber}.png`;
 }
 
 /**

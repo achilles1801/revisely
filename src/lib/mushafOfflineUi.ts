@@ -9,6 +9,7 @@ import {
   getMushafStatus,
   MushafStatus,
   onMushafStatus,
+  otherEditionsOnPhone,
   removeMushafDownload,
 } from './mushafOffline';
 import { networkState, onUnmeteredNetwork } from './networkState';
@@ -78,15 +79,18 @@ export function mushafMenuActions(s: MushafStatus): SheetAction[] {
       label: 'Remove from this phone',
       icon: 'trash-outline',
       destructive: true,
-      onPress: () =>
+      onPress: () => {
+        // Remove takes the other print's pages too (Settings → Mushaf); listed on the tap, not each render.
+        const freed = s.bytes + otherEditionsOnPhone().reduce((n, o) => n + o.bytes, 0);
         Alert.alert(
           'Remove the offline mushaf?',
-          `This frees ${formatMegabytes(s.bytes)}. Pages and translations you open still download as you read.`,
+          `This frees ${formatMegabytes(freed)}. Pages and translations you open still download as you read.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Remove', style: 'destructive', onPress: () => void removeMushafDownload() },
           ],
-        ),
+        );
+      },
     });
   }
   return actions;
