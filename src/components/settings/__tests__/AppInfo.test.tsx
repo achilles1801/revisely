@@ -58,7 +58,7 @@ describe('App info', () => {
   });
 
   it('shows the details on tap, without test actions on the App Store channel', async () => {
-    wrap(<AppInfo release={describeRelease(base)} />);
+    wrap(<AppInfo tools release={describeRelease(base)} />);
     fireEvent.press(await screen.findByLabelText(/App info/));
     expect(screen.getByText('Version 1.0.2 (19)')).toBeTruthy();
     expect(screen.getByText('Last update check: 2026-10-25 05:00 UTC')).toBeTruthy();
@@ -66,7 +66,7 @@ describe('App info', () => {
   });
 
   it('offers test errors and a test native crash on preview', async () => {
-    wrap(<AppInfo release={describeRelease({ ...base, channel: 'preview' })} />);
+    wrap(<AppInfo tools release={describeRelease({ ...base, channel: 'preview' })} />);
     fireEvent.press(await screen.findByLabelText(/App info/));
     fireEvent.press(screen.getByText('Send test error'));
     expect(mockTestError).toHaveBeenCalled();
@@ -82,14 +82,14 @@ describe('App info', () => {
   });
 
   it('warns when the last update could not start', async () => {
-    wrap(<AppInfo release={describeRelease({ ...base, isEmergencyLaunch: true, emergencyLaunchReason: 'x' })} />);
+    wrap(<AppInfo tools release={describeRelease({ ...base, isEmergencyLaunch: true, emergencyLaunchReason: 'x' })} />);
     expect(await screen.findByText(/couldn’t start/)).toBeTruthy();
   });
 
   it('long-press checks for an update, downloads it and offers the restart at once', async () => {
     mockCheck.mockResolvedValue({ isAvailable: true });
     mockFetch.mockResolvedValue({ isNew: true, manifest: { id: 'new-update' } });
-    wrap(<AppInfo release={describeRelease(base)} />);
+    wrap(<AppInfo tools release={describeRelease(base)} />);
     const row = await screen.findByLabelText(/App info/);
     await act(async () => {
       fireEvent(row, 'longPress');
@@ -104,11 +104,22 @@ describe('App info', () => {
 
   it('with an update waiting, the details offer the restart instead of a check', async () => {
     notePendingUpdate('waiting-update');
-    wrap(<AppInfo release={describeRelease(base)} />);
+    wrap(<AppInfo tools release={describeRelease(base)} />);
     fireEvent.press(await screen.findByLabelText(/App info/));
     expect(screen.queryByText('Check for updates')).toBeNull();
     fireEvent.press(screen.getByTestId('app-info-restart'));
     expect(mockReload).toHaveBeenCalled();
+  });
+});
+
+describe('regular users', () => {
+  it('see the version only: no update details, no check, no test actions', async () => {
+    wrap(<AppInfo release={describeRelease({ ...base, channel: 'preview' })} />);
+    expect(await screen.findByTestId('app-version')).toBeTruthy();
+    expect(screen.getByText('1.0.2 (19)')).toBeTruthy();
+    expect(screen.queryByTestId('app-info-v2')).toBeNull();
+    expect(screen.queryByText(/update 01a1574f/)).toBeNull();
+    expect(screen.queryByText('Check for updates')).toBeNull();
   });
 });
 

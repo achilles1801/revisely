@@ -59,17 +59,24 @@ file is the release mechanics and the traps behind them.
     - "Something" is `lib/updates/busy.ts`: a recording session, a recitation, a timer, or any
       screen but a tab's own (Dashboard, ReadIndex, Insights). So no session, reader, editor,
       onboarding or sign-in screen is ever restarted under the user.
-  - **Banner:** otherwise Home shows "Update ready · Restart" with ✕ (`components/updates/UpdateBanner`)
-    as soon as an update has downloaded (Nov 4 2026; before, it waited for the next visit).
+  - **Update sheet:** otherwise, as soon as an update has downloaded, "A new update is ready" opens
+    by itself (`components/updates/UpdateReadySheet`, mounted on Home; the tabs stay mounted, so
+    it opens over Read and Insights too). **Update now** restarts into it; **Later** puts it off
+    until the next cold start (it still applies at launch, or on return after 15 minutes away).
+    Nobody has to look for updates (owner, Nov 4 2026). It replaced the "Update ready · Restart" row.
+    - It opens only on a tab's main screen with nothing going on (every `busy.ts` reason, the
+      screen too), so never during a session, recording, recitation or timer: it waits for them to
+      end, then opens 1.2 s later.
     - "Downloaded" includes expo-updates' own background download at launch: `ota.ts` follows the
       native state (`addUpdatesStateChangeListener`, `latestContext.isUpdatePending`), not only its
-      own checks. Before, such an update showed nothing until a cold start.
-    - The whole row is hidden while a recording, a recitation or a timer goes on.
-    - ✕ hides the banner for that update; the update still applies at the next safe moment.
-  - **Settings → App info → Check for updates** (or a long press on the row; `checkForUpdateNow`)
-    downloads what it finds and always ends in "Update ready · Restart to update", including for
-    an update that had downloaded before. While one waits, the details show "Restart to update" in
-    place of "Check for updates".
+      own checks.
+    - The store's "New version available" waits while it is offered: one sheet at a time.
+  - **App info in Settings → About is for testers only** (`lib/updates/testerTools`: a `previewTester` account, a
+    TestFlight install, a development build). Testers get App info (build, channel, update, Share,
+    test crashes on preview) with **Check for updates** (or a long press on the row;
+    `checkForUpdateNow`), which downloads what it finds and always ends in "Update ready ·
+    Restart to update". While an update waits, the details show "Restart to update" in its place.
+    Everyone else sees only "Version 1.0.3 (5)".
 - **Store versions** (`lib/updates/storeUpdates.ts`, rules in `versions.ts`).
   - **iOS:** once a day, Apple's public lookup (`itunes.apple.com/lookup?bundleId=…`, nothing about
     the user). A newer version than the binary's opens "New version available · Update"

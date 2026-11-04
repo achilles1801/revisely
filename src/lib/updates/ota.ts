@@ -8,12 +8,14 @@
 // - An update downloaded earlier is applied when the user comes back after
 //   APPLY_AFTER_AWAY_MS or more away, unless a restart would interrupt something
 //   (busy.ts: a recording, a recitation, a timer, a screen other than a tab's own).
-// - Otherwise Home shows "Update ready · Restart" (components/updates/UpdateBanner)
-//   as soon as one has downloaded, hidden while a recording, recitation or timer
-//   goes on. "Downloaded" counts expo-updates' own launch download as well as
+// - Otherwise, as soon as one has downloaded, "A new update is ready · Update
+//   now" (components/updates/UpdateReadySheet) opens over a tab's main screen,
+//   never during a session, recording, recitation or timer (it waits until they
+//   end). Later puts it off until the next cold start. Nobody has to look for
+//   updates. "Downloaded" counts expo-updates' own launch download as well as
 //   this file's checks: the native state is followed (addUpdatesStateChangeListener).
-// - "Check for updates" in Settings (checkForUpdateNow) downloads what it finds
-//   and always ends with an update ready to restart into, or none.
+// - "Check for updates" in Settings (checkForUpdateNow, testers only) downloads
+//   what it finds and always ends with an update ready to restart into, or none.
 // A restart shows the launch screen's ground and icon (the reload screen).
 // Nothing here runs in development or where updates are off.
 
@@ -43,7 +45,8 @@ interface Pending {
 }
 
 let pending: Pending | null = null;
-let dismissed: string | null = null;
+/** Later in the update sheet: not offered again until the next cold start. */
+let later = false;
 let lastCheckAt: number | null = null;
 let inFlight: Promise<string | null> | null = null;
 let backgroundAt: number | null = null;
@@ -233,21 +236,21 @@ export function startOtaUpdates(): void {
   }
 }
 
-export interface UpdateBannerState {
-  /** An update has downloaded, and wasn't dismissed. */
+export interface UpdateOfferState {
+  /** An update has downloaded, and Later wasn't chosen since this cold start. */
   visible: boolean;
+  /** The update waiting, offered or not. */
   updateId: string | null;
 }
 
-export function bannerState(): UpdateBannerState {
-  const show = !!pending && dismissed !== pending.updateId;
-  return { visible: show, updateId: pending?.updateId ?? null };
+export function offerState(): UpdateOfferState {
+  return { visible: !!pending && !later, updateId: pending?.updateId ?? null };
 }
 
-/** ✕ on the banner: not again for this update (it still applies at a safe moment). */
-export function dismissBanner(): void {
-  if (!pending) return;
-  dismissed = pending.updateId;
+/** Later: not offered again until the next cold start (it still applies at launch, or back after 15 minutes away). */
+export function postponeUpdateOffer(): void {
+  if (later) return;
+  later = true;
   notify();
 }
 
@@ -258,12 +261,12 @@ export function subscribeOta(listener: () => void): () => void {
   };
 }
 
-export function useUpdateBanner(): UpdateBannerState {
-  const [state, setState] = useState<UpdateBannerState>(bannerState);
+export function useUpdateOffer(): UpdateOfferState {
+  const [state, setState] = useState<UpdateOfferState>(offerState);
   useEffect(() => {
     const update = () =>
       setState((prev) => {
-        const next = bannerState();
+        const next = offerState();
         return prev.visible === next.visible && prev.updateId === next.updateId ? prev : next;
       });
     update();
@@ -275,7 +278,7 @@ export function useUpdateBanner(): UpdateBannerState {
 /** For tests. */
 export function resetOtaForTests(): void {
   pending = null;
-  dismissed = null;
+  later = false;
   lastCheckAt = null;
   inFlight = null;
   backgroundAt = null;
