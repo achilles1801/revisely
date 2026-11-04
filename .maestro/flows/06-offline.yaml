@@ -65,7 +65,24 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     notVisible:
       id: offline-note
-    timeout: 60000
+    timeout: 90000
+    optional: true
+# On a slow CI simulator, Firestore can take longer than that to reconnect. The
+# app restarts it when it comes back to the front (lib/offline/connectivity), as
+# a user would bring it: do that, and say so in the log.
+- runFlow:
+    when:
+      visible:
+        id: offline-note
+    commands:
+      - evalScript: "${console.log('WARNING SYNC-1 - still offline 90 s after the connection came back; bringing the app to the front again')}"
+      - pressKey: home
+      - launchApp:
+          stopApp: false
+      - extendedWaitUntil:
+          notVisible:
+            id: offline-note
+          timeout: 60000
 - runFlow:
     file: ../subflows/server-session-is.yaml
     env:

@@ -99,6 +99,12 @@ run_flow() {
   fi
 }
 
+# The app's first launch, and iOS's one-time link prompt, before any flow.
+echo "▶ warm-up ($PLATFORM)"
+mkdir -p "$OUT/$PLATFORM"
+"$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1 ||
+  echo "  warm-up failed (see $OUT/$PLATFORM/warm-up.log); going on"
+
 failed=0
 summary="| Flow | Zone | Result | Time |\n| --- | --- | --- | --- |\n"
 for flow in "${FLOWS[@]}"; do

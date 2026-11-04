@@ -59,16 +59,18 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.platform != 'android' }}
     runs-on: macos-26
     timeout-minutes: 50
-    # The macOS runner takes 3–5 minutes a flow: two jobs of four keep each well
-    # under the timeout.
+    # The macOS runner takes 3–6 minutes a flow: three jobs of two or three keep
+    # each well under the timeout, the long flows (03, 04) apart.
     strategy:
       fail-fast: false
       matrix:
         shard:
-          - name: flows 1–4
-            flows: .maestro/flows/0[1-4]-*.yaml
-          - name: flows 5–8
-            flows: .maestro/flows/0[5-8]-*.yaml
+          - name: 01 02 08
+            flows: .maestro/flows/0[128]-*.yaml
+          - name: 03 04
+            flows: .maestro/flows/0[34]-*.yaml
+          - name: 05 06 07
+            flows: .maestro/flows/0[567]-*.yaml
     steps:
       - uses: actions/checkout@v4
         with:

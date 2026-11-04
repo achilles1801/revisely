@@ -96,7 +96,9 @@ You need Java 21 and the Firebase CLI (as for the rules tests), Maestro (`~/.mae
    E2E_DEVICE=emulator-5554 bash .maestro/run.sh android
    ```
 
-   `run.sh` runs one flow at a time in its own zone and prints a table. Results, Maestro's logs and
+   `run.sh` first launches the app once (its first launch on a new device is slow, and iOS asks
+   once per simulator before opening a `revisely://` link), then runs one flow at a time in its
+   own zone and prints a table. Results, Maestro's logs and
    screenshots go to `.maestro/build/results/<platform>/<flow>/`. With other emulator ports, add
    `E2E_AUTH_URL=http://127.0.0.1:19099 E2E_FIRESTORE_URL=http://127.0.0.1:18080`.
 

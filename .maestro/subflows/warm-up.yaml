@@ -1,0 +1,28 @@
+# Run once before the flows (run.sh): the app's first launch on a new device is
+# slow (Android compiles it), and iOS asks once per simulator before opening a
+# revisely:// link. Neither then costs a flow its first attempt.
+appId: com.revisionbuddy.app
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible:
+      id: auth
+    timeout: 180000
+- openLink: revisely://e2e/clock?at=now
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Open"
+          timeout: 20000
+          optional: true
+      - runFlow:
+          when:
+            visible: "Open"
+          commands:
+            - tapOn: "Open"
+- stopApp

@@ -3,12 +3,21 @@
 appId: com.revisionbuddy.app
 ---
 - evalScript: ${output.email = 'e2e' + Date.now() + '@example.com'}
-- tapOn:
-    id: auth-switch-mode
-- extendedWaitUntil:
-    visible:
-      id: auth-name
-    timeout: 5000
+# Sign up (a tap made while the screen settles can be lost: check it took).
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: auth-name
+          commands:
+            - tapOn:
+                id: auth-switch-mode
+      - extendedWaitUntil:
+          visible:
+            id: auth-name
+          timeout: 10000
 - tapOn:
     id: auth-name
 - inputText: E2E
