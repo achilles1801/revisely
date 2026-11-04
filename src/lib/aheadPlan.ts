@@ -36,10 +36,13 @@ export interface RevisionDayPlan {
 }
 
 /**
- * The next revision day after `after` that has pages to revise, for "Keep going".
- * Off days (an empty custom-plan day) are skipped. Stops (null) at the end of one
- * cycle: when the next day's pages were already taken (`taken`: this session's
- * pages so far), the schedule has come round again.
+ * The next revision day after `after` that still has pages to revise, for
+ * "Keep going" and "Tomorrow starts at". The plan holds only the pages not yet
+ * done on that day (a partly done day continues from its first page not done);
+ * a day whose pages are all done ahead is passed over. Off days (an empty
+ * custom-plan day) are skipped. Stops (null) at the end of one cycle: when the
+ * next day's pages were already taken (`taken`: this session's pages so far),
+ * the schedule has come round again.
  */
 export function nextRevisionDayPlan(
   user: User,
@@ -55,18 +58,29 @@ export function nextRevisionDayPlan(
     const scheduled = getPagesForDay(user, parseDay(day), memorized);
     if (scheduled.length === 0) continue;
     if (scheduled.some((p) => taken.has(p))) return null;
-    // A day already done ahead is passed over: Keep going moves to the next.
     const credited = index.get(day);
-    if (credited && scheduled.every((p) => credited.has(p))) continue;
-    return { day, pages: [...scheduled] };
+    const remaining = credited ? scheduled.filter((p) => !credited.has(p)) : scheduled;
+    if (remaining.length === 0) continue;
+    return { day, pages: remaining };
   }
   return null;
 }
 
-/** The pages of one revision day, as a plan (Home's "starts at" line opens it). */
-export function revisionDayPlan(user: User, pages: readonly UserPage[], day: string): RevisionDayPlan {
+/**
+ * The pages of one revision day still to revise, as a plan (Home's "starts at"
+ * line opens it). Pages of that day already done (`logs`, see creditedOnDay)
+ * are left out, so the session opens on the first page not yet done.
+ */
+export function revisionDayPlan(
+  user: User,
+  pages: readonly UserPage[],
+  day: string,
+  logs: readonly RevisionLog[] = [],
+): RevisionDayPlan {
   const memorized = pages.filter((p) => p.status === 'memorized');
-  return { day, pages: [...getPagesForDay(user, parseDay(day), memorized)] };
+  const credited = creditIndex(logs).get(day);
+  const scheduled = getPagesForDay(user, parseDay(day), memorized);
+  return { day, pages: credited ? scheduled.filter((p) => !credited.has(p)) : [...scheduled] };
 }
 
 /**
