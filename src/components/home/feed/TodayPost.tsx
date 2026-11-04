@@ -74,7 +74,7 @@ export function TodayPost({
   onEditSchedule,
   onMemorization,
   onJump,
-  leftovers,
+  catchUp,
   onCarryOver,
   carrying,
 }: {
@@ -95,7 +95,8 @@ export function TodayPost({
   onMemorization: () => void;
   /** Where today starts (Jump to…). */
   onJump: () => void;
-  leftovers: number;
+  /** The catch-up offer for pages missed on earlier days (catchUpLine), or none. */
+  catchUp: { title: string; label: string } | null;
   onCarryOver: () => void;
   carrying: boolean;
 }) {
@@ -166,22 +167,28 @@ export function TodayPost({
         testID="today-post"
         footer={
           <>
+            {catchUp ? (
+              // The missed pages come first: one line, then the button that adds them to today.
+              <View style={styles.catchUp}>
+                <Text style={[typeV2.body, { color: palette.secondary }]} {...fit} testID="today-catch-up">
+                  {catchUp.title}
+                </Text>
+                <PillButton
+                  title={carrying ? 'Adding…' : 'Add to today'}
+                  variant="outline"
+                  onPress={onCarryOver}
+                  disabled={carrying}
+                  accessibilityLabel={`${catchUp.label}. Add to today`}
+                  testID="today-carry-over"
+                />
+              </View>
+            ) : null}
             <PillButton
               title={lines.cta}
               onPress={onPrimary}
               variant={lines.solid ? 'solid' : 'outline'}
               testID="today-cta"
             />
-            {leftovers > 0 ? (
-              <PillButton
-                title={carrying ? 'Adding…' : `Add ${leftovers} from yesterday`}
-                variant="outline"
-                onPress={onCarryOver}
-                disabled={carrying}
-                accessibilityLabel={`Add ${leftovers} unrevised pages from yesterday to today`}
-                testID="today-carry-over"
-              />
-            ) : null}
             <Tap
               onPress={onMemorization}
               hitSlop={6}
@@ -234,6 +241,7 @@ export function TodayPost({
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  catchUp: { gap: 8 },
   shrink: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },

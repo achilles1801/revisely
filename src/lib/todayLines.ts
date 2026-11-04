@@ -16,11 +16,34 @@
 
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
+import type { Leftovers } from './carryOver';
 
 /** A no-break space: keeps "p. 542 ›" and "20 pages" together. */
 export const NBSP = '\u00A0';
 /** A no-break hyphen: a surah name never breaks at its "Al-". */
 export const NBHY = '\u2011';
+
+/**
+ * The catch-up offer, one line: "Missed yesterday · Revise p. 559–563". A day
+ * with some of its pages revised reads "Left" instead of "Missed". Several
+ * days say how many ("Missed 3 days"). Null when nothing is left over.
+ */
+export function catchUpLine(leftovers: Leftovers): { title: string; label: string } | null {
+  if (leftovers.pages.length === 0) return null;
+  const runs = runsInOrder([...leftovers.pages].sort((a, b) => a - b));
+  const span = (r: PageRun) => (r.first === r.last ? `${r.first}` : `${r.first}–${r.last}`);
+  const shown = runs.slice(0, 2).map(span).join(', ');
+  const more = runs.length > 2 ? ` and ${runs.length - 2} more` : '';
+  const missed = leftovers.days.every((d) => d.missed);
+  const when =
+    leftovers.days.length === 1
+      ? leftovers.days[0].ago === 1
+        ? 'yesterday'
+        : `${leftovers.days[0].ago} days ago`
+      : `${leftovers.days.length} days`;
+  const title = `${missed ? 'Missed' : 'Left'} ${when} · Revise ${runs.length > 1 ? 'pp.' : 'p.'}${NBSP}${shown}${more}`;
+  return { title, label: spoken(title) };
+}
 
 export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
