@@ -1,5 +1,6 @@
 import {
   aheadCreditFor,
+  aheadWithin,
   creditIndex,
   creditedOnDay,
   mergeAhead,
@@ -119,7 +120,7 @@ describe('session merges keep the credit', () => {
   });
 
   it('an edit replaces the whole ahead map; without one it stays', () => {
-    const existing = mergeSessionAdd(null, { ...add, ahead: { '2026-01-06': [9] } }, at);
+    const existing = mergeSessionAdd(null, { ...add, pagesRevised: [1, 9], ahead: { '2026-01-06': [9] } }, at);
     const kept = applySessionEdit(existing, {
       kind: 'session.edit',
       id: '2026-01-05',
@@ -160,5 +161,60 @@ describe('recomputePagesFromLogs', () => {
     const [page] = recomputePagesFromLogs(pages, [log('2026-01-05', [9], { '2026-01-06': [9] })]);
     expect(page.lastRevisedDate).toBe('2026-01-05');
     expect(page.totalRevisionCount).toBe(1);
+  });
+});
+
+describe('credit is only for pages the session has revised', () => {
+  const at = Date.UTC(2026, 10, 3, 10);
+  const add = {
+    kind: 'session.add' as const,
+    date: '2026-11-03',
+    assignedPages: [6, 235],
+    pagesRevised: [6],
+    pagesSkipped: [],
+    weaknessUpdates: [],
+    durationAtLeast: 5,
+    durationAdd: 5,
+  };
+
+  it('aheadWithin keeps only the revised pages, and drops days left empty', () => {
+    expect(aheadWithin({ '2026-11-04': [236, 237], '2026-11-05': [240] }, [237, 6])).toEqual({
+      '2026-11-04': [237],
+    });
+    expect(aheadWithin(undefined, [1])).toEqual({});
+  });
+
+  it('a new session never gets credit for a page it does not revise', () => {
+    const s = mergeSessionAdd(null, { ...add, ahead: { '2026-11-04': [236] } }, at);
+    expect(s.ahead).toBeUndefined();
+    expect(s.pagesRevised).toEqual([6]);
+  });
+
+  it('a merge into a session keeps only the credit for pages it revised', () => {
+    const existing = mergeSessionAdd(null, add, at);
+    const merged = mergeSessionAdd(existing, { ...add, pagesRevised: [235], ahead: { '2026-11-04': [236] } }, at);
+    expect(merged.pagesRevised).toEqual([6, 235]);
+    expect(merged.ahead).toBeUndefined();
+  });
+
+  it('an edit that unchecks a page drops its credit, even when the edit still names it', () => {
+    const existing = mergeSessionAdd(
+      null,
+      { ...add, pagesRevised: [6, 236], ahead: { '2026-11-04': [236] } },
+      at,
+    );
+    expect(existing.ahead).toEqual({ '2026-11-04': [236] });
+    const edited = applySessionEdit(existing, {
+      kind: 'session.edit',
+      id: '2026-11-03',
+      addRevised: [],
+      removeRevised: [236],
+      pagesSkipped: [],
+      durationMinutes: 5,
+      weaknessUpdates: [],
+      ahead: { '2026-11-04': [236] },
+    });
+    expect(edited!.pagesRevised).toEqual([6]);
+    expect(edited!.ahead).toEqual({});
   });
 });
