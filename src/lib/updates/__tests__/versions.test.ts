@@ -1,8 +1,11 @@
 import {
   EMPTY_CONFIG,
   StoreInput,
+  availableBuild,
   availableVersion,
   compareVersions,
+  offerLabel,
+  parseOfferLabel,
   isVersion,
   minimumAwaitsListing,
   parseAppConfig,
@@ -196,5 +199,83 @@ describe('availableVersion and minimumAwaitsListing', () => {
     expect(minimumAwaitsListing(ios({ config, installed: '1.0.5' }))).toBe(false);
     expect(minimumAwaitsListing(ios({ config, exempt: true }))).toBe(false);
     expect(minimumAwaitsListing(android({ config: { minSupported: { android: '1.0.9' }, latest: {} } }))).toBe(false);
+  });
+});
+
+describe('Android: version codes and internal testing', () => {
+  const testing = (version: string, code: number) => ({
+    minSupported: {},
+    latest: {},
+    testing: { android: { version, code } },
+  });
+
+  it('parseAppConfig keeps a version code and the internal testing build, and drops odd ones', () => {
+    expect(
+      parseAppConfig({ latest: { android: '1.0.4', androidCode: 7 }, testing: { android: { version: '1.0.4', code: 9 } } }),
+    ).toEqual({ minSupported: {}, latest: { android: '1.0.4', androidCode: 7 }, testing: { android: { version: '1.0.4', code: 9 } } });
+    expect(parseAppConfig({ latest: { androidCode: 7 }, testing: { android: { version: '1.0.4', code: '9' } } })).toEqual(EMPTY_CONFIG);
+    expect(parseAppConfig({ testing: { android: { version: 'x', code: 9 } } })).toEqual(EMPTY_CONFIG);
+    expect(parseAppConfig({ testing: { android: { version: '1.0.4', code: 1.5 } } })).toEqual(EMPTY_CONFIG);
+  });
+
+  it('a tester is offered the internal testing build; anyone else is not', () => {
+    const config = testing('1.0.4', 9);
+    expect(storeDecision(android({ config, installedCode: 5, tester: true })).offer).toBe('1.0.4');
+    expect(storeDecision(android({ config, installedCode: 5, tester: false })).offer).toBeNull();
+    expect(storeDecision(android({ config, installedCode: 5 })).offer).toBeNull();
+  });
+
+  it('a new build of the installed version is offered by its code, named with it', () => {
+    const config = testing('1.0.3', 6);
+    expect(storeDecision(android({ config, installedCode: 5, tester: true })).offer).toBe('1.0.3 (6)');
+    expect(storeDecision(android({ config, installedCode: 6, tester: true })).offer).toBeNull();
+    expect(storeDecision(android({ config, installedCode: 7, tester: true })).offer).toBeNull();
+    // Without the installed code (it can't be read), versions decide: the same version is nothing new.
+    expect(storeDecision(android({ config, installedCode: null, tester: true })).offer).toBeNull();
+  });
+
+  it('takes the newer of production and internal testing', () => {
+    const both = { minSupported: {}, latest: { android: '1.0.4', androidCode: 7 }, testing: { android: { version: '1.0.5', code: 9 } } };
+    expect(availableBuild(android({ config: both, installedCode: 5, tester: true }))).toEqual({ version: '1.0.5', code: 9 });
+    expect(availableBuild(android({ config: both, installedCode: 5, tester: false }))).toEqual({ version: '1.0.4', code: 7 });
+    const behind = { ...both, testing: { android: { version: '1.0.3', code: 5 } } };
+    expect(availableBuild(android({ config: behind, installedCode: 5, tester: true }))).toEqual({ version: '1.0.4', code: 7 });
+  });
+
+  it('once per build: a later build is offered again, the same or an older one is not', () => {
+    const config = testing('1.0.3', 6);
+    const base = { config, installedCode: 5, tester: true };
+    expect(storeDecision(android({ ...base, offered: '1.0.3 (6)' })).offer).toBeNull();
+    expect(storeDecision(android({ ...base, offered: '1.0.3 (5)' })).offer).toBe('1.0.3 (6)');
+    expect(storeDecision(android({ ...base, offered: '1.0.4' })).offer).toBeNull();
+    // 1.0.4 was offered while 1.0.3 was installed; with 1.0.4 (7) installed, its build 8 is new.
+    const later = testing('1.0.4', 8);
+    expect(storeDecision(android({ config: later, installed: '1.0.4', installedCode: 7, tester: true, offered: '1.0.4' })).offer).toBe('1.0.4 (8)');
+    // A new version after a build was offered.
+    expect(storeDecision(android({ config: testing('1.0.4', 7), installedCode: 6, tester: true, offered: '1.0.3 (6)' })).offer).toBe('1.0.4');
+  });
+
+  it('the minimum counts a tester build as what Play has', () => {
+    const config = { minSupported: { android: '1.0.4' }, latest: {}, testing: { android: { version: '1.0.4', code: 7 } } };
+    expect(storeDecision(android({ config, installedCode: 5, tester: true })).required).toEqual({ installed: '1.0.3', minimum: '1.0.4' });
+    expect(storeDecision(android({ config, installedCode: 5, tester: false })).required).toBeNull();
+  });
+
+  it('offer labels round-trip', () => {
+    expect(offerLabel({ version: '1.0.4', code: 7 }, '1.0.3')).toBe('1.0.4');
+    expect(offerLabel({ version: '1.0.3', code: 6 }, '1.0.3')).toBe('1.0.3 (6)');
+    expect(offerLabel({ version: '1.0.4', code: null }, '1.0.4')).toBe('1.0.4');
+    expect(parseOfferLabel('1.0.3 (6)')).toEqual({ version: '1.0.3', code: 6 });
+    expect(parseOfferLabel('1.0.4')).toEqual({ version: '1.0.4', code: null });
+    expect(parseOfferLabel('nonsense (6)')).toBeNull();
+    expect(parseOfferLabel(null)).toBeNull();
+  });
+
+  it('iOS ignores version codes and testing builds', () => {
+    expect(storeDecision(ios({ config: testing('9.0', 99), installedCode: 1, tester: true })).offer).toBe('1.0.4');
+  });
+
+  it('availableVersion is the version of that build', () => {
+    expect(availableVersion(android({ config: testing('1.0.3', 6), installedCode: 5, tester: true }))).toBe('1.0.3');
   });
 });

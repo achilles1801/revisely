@@ -1,4 +1,4 @@
-const { parseArgs, parseFraction, planPromote, planRollout, describeTracks } = require('../play');
+const { parseArgs, parseFraction, planPromote, planRollout, describeTracks, latestOnTrack, versionOf } = require('../play');
 
 const internalOnly = [
   { track: 'production', releases: [] },
@@ -84,5 +84,43 @@ describe('describeTracks', () => {
     expect(text).toContain('Internal testing (internal):\n  3 (1.0.3) — version code 3, completed');
     expect(text).toContain('Production (production):\n  nothing');
     expect(text).toContain('Open testing (beta):\n  nothing');
+  });
+});
+
+describe('latestOnTrack', () => {
+  it("gives a track's newest completed build with its version", () => {
+    expect(latestOnTrack(internalOnly, 'internal')).toEqual({ track: 'internal', version: '1.0.3', code: 3 });
+    expect(latestOnTrack(internalOnly, 'alpha')).toEqual({ track: 'alpha', version: '1.0.2', code: 2 });
+    expect(latestOnTrack(internalOnly, 'production')).toBeNull();
+  });
+
+  it('skips staged, halted and draft releases, and takes the highest code', () => {
+    const tracks = [
+      {
+        track: 'production',
+        releases: [
+          { name: '1.0.3', versionCodes: ['5'], status: 'completed' },
+          { name: '1.0.4', versionCodes: ['7'], status: 'inProgress', userFraction: 0.2 },
+          { name: '1.0.5', versionCodes: ['9'], status: 'draft' },
+        ],
+      },
+      { track: 'internal', releases: [{ name: '1.0.4', versionCodes: ['6', '8'], status: 'completed' }] },
+    ];
+    expect(latestOnTrack(tracks, 'production')).toEqual({ track: 'production', version: '1.0.3', code: 5 });
+    expect(latestOnTrack(tracks, 'internal')).toEqual({ track: 'internal', version: '1.0.4', code: 8 });
+  });
+
+  it('refuses an unknown track or a release with no version in its name', () => {
+    expect(() => latestOnTrack(internalOnly, 'beta2')).toThrow(/Unknown track/);
+    expect(() => latestOnTrack([{ track: 'internal', releases: [{ name: '5', versionCodes: ['5'], status: 'completed' }] }], 'internal')).toThrow(
+      /no version/,
+    );
+  });
+
+  it('versionOf reads both naming styles', () => {
+    expect(versionOf('1.0.3')).toBe('1.0.3');
+    expect(versionOf('5 (1.0.3)')).toBe('1.0.3');
+    expect(versionOf('5')).toBeNull();
+    expect(versionOf(undefined)).toBeNull();
   });
 });

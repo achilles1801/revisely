@@ -1,9 +1,21 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { setGlobalOptions } from 'firebase-functions/v2';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { setGlobalOptions, logger } from 'firebase-functions/v2';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import {
+  AUDIENCE,
+  BuildError,
+  CallerError,
+  GITHUB_JWKS_URL,
+  Jwks,
+  UnknownKeyError,
+  checkCaller,
+  nextTesting,
+  parseBuild,
+  verifyGithubToken,
+} from './playAvailable';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -85,5 +97,70 @@ export const deleteUserAccount = onCall(
     }
 
     return { ok: true };
+  },
+);
+
+let jwks: { value: Jwks; at: number } | null = null;
+
+/** GitHub's signing keys, kept for an hour (again at once for a key it doesn't have). */
+async function githubJwks(fresh = false): Promise<Jwks> {
+  if (!fresh && jwks && Date.now() - jwks.at < 3_600_000) return jwks.value;
+  const res = await fetch(GITHUB_JWKS_URL);
+  if (!res.ok) throw new Error(`GitHub's keys answered ${res.status}`);
+  const value = (await res.json()) as Jwks;
+  if (!Array.isArray(value?.keys)) throw new Error("GitHub's keys are not a key set");
+  jwks = { value, at: Date.now() };
+  return value;
+}
+
+/**
+ * A build is on Google Play's internal testing track: tell phones (config/app
+ * `testing.android`, offered to previewTester accounts on Android). Called only
+ * by android-build.yml's `available` job, with its GitHub OIDC token; see
+ * playAvailable.ts for who may call and what is written.
+ */
+export const playBuildAvailable = onRequest(
+  { invoker: 'public', maxInstances: 1, timeoutSeconds: 30 },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'POST only' });
+      return;
+    }
+    const header = req.get('authorization') ?? '';
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    try {
+      let claims;
+      try {
+        claims = verifyGithubToken(token, await githubJwks(), AUDIENCE);
+      } catch (err) {
+        if (!(err instanceof UnknownKeyError)) throw err;
+        claims = verifyGithubToken(token, await githubJwks(true), AUDIENCE);
+      }
+      checkCaller(claims);
+      const build = parseBuild(req.body);
+      const ref = adminDb.doc('config/app');
+      const result = await adminDb.runTransaction(async (tx) => {
+        const current = (await tx.get(ref)).get('testing.android');
+        const next = nextTesting(current, build);
+        if (!next) return { changed: false, testing: { version: current.version, code: current.code } };
+        tx.set(
+          ref,
+          { testing: { android: { ...next, at: FieldValue.serverTimestamp(), run: String(claims.run_id ?? '') } } },
+          { merge: true },
+        );
+        return { changed: true, testing: next };
+      });
+      logger.info('Play internal testing build', { ...result, ref: claims.ref, run: claims.run_id });
+      res.json(result);
+    } catch (err) {
+      if (err instanceof CallerError) {
+        res.status(403).json({ error: err.message });
+      } else if (err instanceof BuildError) {
+        res.status(400).json({ error: err.message });
+      } else {
+        logger.error('playBuildAvailable failed', err);
+        res.status(500).json({ error: 'internal' });
+      }
+    }
   },
 );

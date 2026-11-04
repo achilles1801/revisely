@@ -1,7 +1,11 @@
 let mockInstalled: string | null = '1.0.3';
+let mockBuild: string | null = '5';
 jest.mock('expo-application', () => ({
   get nativeApplicationVersion() {
     return mockInstalled;
+  },
+  get nativeBuildVersion() {
+    return mockBuild;
   },
 }));
 let mockInstallSource: { isTestFlight: () => boolean } | null = { isTestFlight: () => false };
@@ -38,6 +42,8 @@ import {
   openStore,
   refreshStoreState,
   resetStoreForTests,
+  setStoreTester,
+  subscribeStore,
 } from '../storeUpdates';
 
 const g = globalThis as { __DEV__?: boolean; fetch?: unknown };
@@ -58,6 +64,7 @@ beforeEach(async () => {
   g.fetch = fetchMock;
   jest.replaceProperty(Platform, 'OS', 'ios');
   mockInstalled = '1.0.3';
+  mockBuild = '5';
   mockInstallSource = { isTestFlight: () => false };
   mockConfig = null;
   mockConfigFails = false;
@@ -178,6 +185,29 @@ describe('Android', () => {
     mockConfig = { minSupported: { android: '1.0.4' }, latest: { android: '1.0.4' } };
     await refreshStoreState(0);
     expect(currentStoreDecision().required).toEqual({ installed: '1.0.3', minimum: '1.0.4' });
+  });
+
+  it('a tester (closed or internal testing) is offered the internal testing build, by version code', async () => {
+    mockConfig = { testing: { android: { version: '1.0.3', code: 6 } } };
+    await refreshStoreState(0);
+    expect(currentStoreDecision().offer).toBeNull(); // not a tester yet: production has nothing
+    const changed = jest.fn();
+    subscribeStore(changed);
+    setStoreTester(true);
+    expect(changed).toHaveBeenCalled();
+    expect(currentStoreDecision()).toEqual({ required: null, offer: '1.0.3 (6)' });
+    markOffered('1.0.3 (6)');
+    relaunch();
+    setStoreTester(true);
+    await refreshStoreState(HOUR);
+    expect(currentStoreDecision().offer).toBeNull();
+    // The next build is offered again.
+    mockConfig = { testing: { android: { version: '1.0.3', code: 7 } } };
+    await refreshStoreState(HOUR + CONFIG_EVERY_MS);
+    expect(currentStoreDecision().offer).toBe('1.0.3 (7)');
+    // Once it is installed, nothing.
+    mockBuild = '7';
+    expect(currentStoreDecision().offer).toBeNull();
   });
 
   it('opens Google Play', async () => {

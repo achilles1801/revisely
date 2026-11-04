@@ -8,15 +8,20 @@
  *                                that meets it (iOS: the App Store listing shows
  *                                it; Android: latest.android is at least it).
  *                                TestFlight and App Review are never blocked.
- *   latest.android               The version on Google Play's production track
- *                                (Play has no public lookup). Installs below it
- *                                are offered it once ("New version available").
- *                                iOS reads the App Store's version from Apple.
+ *   latest.android (+ .androidCode)  The version (and version code) on Google
+ *                                Play's production track, once it is out to
+ *                                everyone (Play has no public lookup). Installs
+ *                                below it are offered it once ("New version
+ *                                available"). iOS reads the App Store's from Apple.
+ *   testing.android              Not set here: the playBuildAvailable function
+ *                                writes it when android-build.yml has put a build
+ *                                on internal testing (offered to previewTester
+ *                                accounts only).
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
  *     node scripts/set-app-config.js --show
- *   ... node scripts/set-app-config.js --latest-android 1.0.4   # once Play's production track has it
+ *   ... node scripts/set-app-config.js --latest-android 1.0.4 --latest-android-code 7   # production, rolled out to all
  *   ... node scripts/set-app-config.js --min-ios 1.0.4 --min-android 1.0.4
  *   ... node scripts/set-app-config.js --clear-min               # nobody blocked
  *
@@ -45,6 +50,11 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--show') opts.show = true;
+    else if (a === '--latest-android-code') {
+      const v = argv[++i];
+      if (!/^[1-9]\d{0,9}$/.test(v || '')) throw new Error(`${a} needs a version code like 7 (got ${v ?? 'nothing'})`);
+      opts.latestAndroidCode = Number(v);
+    }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
     else if (flags[a]) {
@@ -70,7 +80,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V] [--clear-min] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--force]',
     );
     process.exit(1);
   }
@@ -87,7 +97,18 @@ async function main() {
   });
 
   const show = (data) => {
-    console.log(JSON.stringify({ minSupported: data.minSupported || {}, latest: data.latest || {} }, null, 2));
+    const testing = (data.testing || {}).android;
+    console.log(
+      JSON.stringify(
+        {
+          minSupported: data.minSupported || {},
+          latest: data.latest || {},
+          testing: testing ? { android: { version: testing.version, code: testing.code } } : {},
+        },
+        null,
+        2,
+      ),
+    );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
   const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin;
@@ -113,7 +134,15 @@ async function main() {
   if (opts.clearMin) update.minSupported = FieldValue.delete();
   if (opts.minIos) update['minSupported.ios'] = opts.minIos;
   if (opts.minAndroid) update['minSupported.android'] = opts.minAndroid;
-  if (opts.latestAndroid) update['latest.android'] = opts.latestAndroid;
+  if (opts.latestAndroidCode && !opts.latestAndroid) {
+    console.error('--latest-android-code goes with --latest-android.');
+    process.exit(1);
+  }
+  if (opts.latestAndroid) {
+    update['latest.android'] = opts.latestAndroid;
+    // A version alone clears the old code: it belonged to another build.
+    update['latest.androidCode'] = opts.latestAndroidCode || FieldValue.delete();
+  }
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
     process.exit(1);

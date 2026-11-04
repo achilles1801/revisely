@@ -12,6 +12,7 @@ name: Android build
 # (base64). It is written to a file only for the upload step, after the build, so no code from the
 # repository runs while it is on disk, and eas.json reads its path from PLAY_SERVICE_ACCOUNT_KEY_PATH.
 # Submission runs only when the repository variable ANDROID_SUBMIT is 'true'.
+# Once submitted, the available job tells phones (config/app testing.android, see below).
 # google-services.json is gitignored, so it comes from the GOOGLE_SERVICES_JSON repository secret
 # (base64) and is passed by path (GOOGLE_SERVICES_JSON, app.config.js); fingerprint.config.js ignores
 # it wherever it is, so the runtime matches the one Preview computed.
@@ -143,3 +144,52 @@ jobs:
       - name: Not submitted
         if: ${{ !(inputs.submit && vars.ANDROID_SUBMIT == 'true') }}
         run: echo "::notice title=Not submitted::The .aab is attached to this run (Artifacts). Google Play submission is off (repository variable ANDROID_SUBMIT)."
+
+  # Phones offer a new build ("New version available", src/lib/updates/storeUpdates.ts) once
+  # Firestore config/app says Google Play has it. Internal testing has no review: a completed
+  # release there reaches its testers within minutes, so after a wait this reads what the track
+  # holds (Play's answer, not what this run built) and hands it to the playBuildAvailable function.
+  # The function takes this job's GitHub OIDC token as proof (this repository's android-build.yml,
+  # develop or a release branch) and writes config/app testing.android, only ever forwards. No
+  # Firestore credential exists in GitHub. Only previewTester accounts are offered these builds.
+  # No dependencies are installed here: play.js uses Node's own modules.
+  available:
+    name: Offer it to testers (config/app)
+    needs: build
+    if: ${{ inputs.submit && vars.ANDROID_SUBMIT == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/play.js
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Give Play time to serve it
+        run: sleep 600
+
+      - name: Read the internal testing track
+        env:
+          KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          PLAY_SERVICE_ACCOUNT_JSON="$(echo "$KEY" | base64 -d)" node scripts/play.js latest internal --json > "$RUNNER_TEMP/build.json"
+          cat "$RUNNER_TEMP/build.json"
+
+      - name: Tell phones
+        env:
+          URL: https://us-central1-revision-buddy-3a398.cloudfunctions.net/playBuildAvailable
+        run: |
+          TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=revisely-play-available" | jq -r .value)
+          echo "::add-mask::$TOKEN"
+          RESULT=$(curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            --data @"$RUNNER_TEMP/build.json" "$URL")
+          echo "$RESULT"
+          echo "::notice title=config/app::$RESULT"
