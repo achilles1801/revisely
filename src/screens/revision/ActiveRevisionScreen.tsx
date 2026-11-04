@@ -126,7 +126,7 @@ export default function ActiveRevisionScreen() {
   const openAheadDay = route.params?.aheadDay;
   const [openedAhead] = useState<RevisionDayPlan | null>(() => {
     if (!user || !sessionDay || !openAheadDay || openAheadDay <= sessionDay) return null;
-    const plan = revisionDayPlan(user, pages, openAheadDay);
+    const plan = revisionDayPlan(user, pages, openAheadDay, logs);
     return plan.pages.length > 0 ? plan : null;
   });
   const openedCredited = openedAhead ? creditedPagesOf(logs, openedAhead) : NO_PAGES;
@@ -652,8 +652,8 @@ export default function ActiveRevisionScreen() {
     if (openedAheadRef.current || !user || !sessionDay || !openAheadDay) return;
     if (openAheadDay <= sessionDay) return;
     openedAheadRef.current = true;
-    addSection(revisionDayPlan(user, pages, openAheadDay));
-  }, [openAheadDay, user, pages, sessionDay, addSection]);
+    addSection(revisionDayPlan(user, pages, openAheadDay, logs));
+  }, [openAheadDay, user, pages, logs, sessionDay, addSection]);
   // Saved as soon as the last page is in (the render after the swipe).
   useEffect(() => {
     if (celebrate > 0) commitPendingPages();

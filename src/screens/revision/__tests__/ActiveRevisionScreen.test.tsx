@@ -722,7 +722,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
   });
 
-  it('a day revised ahead earlier opens on its first page already checked', () => {
+  it('a day partly revised ahead earlier opens on its first page not yet done', () => {
     setupTwoDays(DAY_PAGES);
     mockApp.logs = [
       ...mockApp.logs,
@@ -739,8 +739,9 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     ];
     mockRouteParams = { aheadDay: tomorrow() };
     render(<ActiveRevisionScreen />);
-    expect(mockPager.initialPage).toBe(NEXT[0]);
-    expect(screen.getByLabelText('Unmark current page')).toBeTruthy();
+    // The done page is not in the session: it opens on the next one, unchecked.
+    expect(mockPager.initialPage).toBe(NEXT[1]);
+    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
   });
 
   it('Keep going moves the page on screen to the next day’s first page', async () => {
