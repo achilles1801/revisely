@@ -152,13 +152,21 @@ jobs:
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Start the Firebase emulators
+        # Twice if need be: on a busy runner the Firestore emulator can miss the
+        # CLI's own one-minute start limit.
         run: |
-          nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
-          for i in $(seq 1 90); do
-            if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null; then echo ready; exit 0; fi
-            sleep 2
+          for attempt in 1 2; do
+            nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
+            for i in $(seq 1 90); do
+              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null; then echo ready; exit 0; fi
+              sleep 2
+            done
+            echo "::warning::The emulators didn't start (attempt $attempt)."
+            cat "$RUNNER_TEMP/emulators.log"
+            pkill -f "firebase emulators" || true
+            pkill -f cloud-firestore-emulator || true
+            sleep 5
           done
-          cat "$RUNNER_TEMP/emulators.log"
           exit 1
 
       # Booted (above) while the app was built: the first boot of a new simulator takes minutes.
@@ -270,13 +278,21 @@ jobs:
 
       # The emulator sees this computer's 127.0.0.1 as 10.0.2.2.
       - name: Start the Firebase emulators
+        # Twice if need be: on a busy runner the Firestore emulator can miss the
+        # CLI's own one-minute start limit.
         run: |
-          nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
-          for i in $(seq 1 90); do
-            if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null; then echo ready; exit 0; fi
-            sleep 2
+          for attempt in 1 2; do
+            nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
+            for i in $(seq 1 90); do
+              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null; then echo ready; exit 0; fi
+              sleep 2
+            done
+            echo "::warning::The emulators didn't start (attempt $attempt)."
+            cat "$RUNNER_TEMP/emulators.log"
+            pkill -f "firebase emulators" || true
+            pkill -f cloud-firestore-emulator || true
+            sleep 5
           done
-          cat "$RUNNER_TEMP/emulators.log"
           exit 1
 
       - name: Enable KVM
