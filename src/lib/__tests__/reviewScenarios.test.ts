@@ -9,6 +9,7 @@
 
 import { nextRevisionDayPlan, revisionDayPlan } from '../aheadPlan';
 import { doneOnDay, reviewedOn } from '../aheadCredit';
+import { todayLines } from '../todayLines';
 import { getRevisionDayForUser, getFajrTimeFor } from '../fajrBoundary';
 import type { RevisionLog, User, UserPage } from '../../types';
 
@@ -149,5 +150,34 @@ describe('Fajr after midnight: the revision day is still Tuesday', () => {
       day: WED,
       pages: [13, 14, 15],
     });
+  });
+});
+
+// Home's "Done · N" and "Review session" are one list: the day's done pages.
+// The count is that list's length, so the two cannot disagree.
+describe('Done · N matches the review list', () => {
+  const reviewList = (logs: RevisionLog[]) => [...doneOnDay(logs, TUE)].sort((a, b) => a - b);
+  const doneTitle = (logs: RevisionLog[]) => todayLines('completed', TODAY, doneOnDay(logs, TUE)).title.text;
+
+  it.each([
+    ['5 + 0', tuesdaySession(), 5],
+    ['5 + 2 (partial ahead day)', tuesdaySession({ [WED]: [11, 12] }), 7],
+    ['5 + 5 (full ahead day)', tuesdaySession({ [WED]: range(11, 15) }), 10],
+    ['5 + 7 (two days)', tuesdaySession({ [WED]: range(11, 15), [THU]: [16, 17] }), 12],
+  ])('%s: the title says the list’s count', (_name, logs, count) => {
+    expect(reviewList(logs)).toHaveLength(count);
+    expect(doneTitle(logs)).toBe(`Done · ${count}\u00a0pages`);
+  });
+
+  it('a page credited to the day by an earlier session is in the list and the count', () => {
+    // Monday's session revised page 6 ahead for Tuesday; Tuesday's own session revised 7–10.
+    const logs: RevisionLog[] = [
+      { id: 'mon', date: '2026-11-02', assignedPages: [1, 2, 3, 4, 5], pagesRevised: [1, 2, 3, 4, 5, 6],
+        pagesSkipped: [], weaknessUpdates: [], durationMinutes: 10, ahead: { [TUE]: [6] } } as unknown as RevisionLog,
+      { id: 'tue', date: TUE, assignedPages: TODAY, pagesRevised: [7, 8, 9, 10], pagesSkipped: [],
+        weaknessUpdates: [], durationMinutes: 10 } as unknown as RevisionLog,
+    ];
+    expect(reviewList(logs)).toEqual(TODAY);
+    expect(doneTitle(logs)).toBe('Done · 5\u00a0pages');
   });
 });

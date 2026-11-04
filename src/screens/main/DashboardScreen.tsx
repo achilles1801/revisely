@@ -57,7 +57,7 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
-import { creditedOnDay, doneOnDay, reviewedOn } from '../../lib/aheadCredit';
+import { creditedOnDay, doneOnDay } from '../../lib/aheadCredit';
 import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -345,8 +345,8 @@ export default function DashboardScreen() {
       const todayLog = logs.find(
         (log) => log.date === revisionDay,
       );
-      // The review is the day's whole work: today's pages and those revised ahead.
-      if (todayLog) handleEditSession(todayLog, [...reviewedOn(logs, revisionDay)].sort((a, b) => a - b));
+      // The review is the day's done pages: the same set Home counts as Done.
+      if (todayLog) handleEditSession(todayLog, [...doneOnDay(logs, revisionDay)].sort((a, b) => a - b));
     } else if (assignment.totalPages === 0) {
       navigation.navigate('Memorization', { edit: true });
     } else {

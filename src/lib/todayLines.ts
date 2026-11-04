@@ -128,7 +128,8 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
   const doneHere = ordered.filter((p) => done.has(p)).length;
 
   if (status === 'completed') {
-    const title = `Done · ${pages(Math.max(done.size, total))}`;
+    // The day's done pages, the same set "Review session" lists (see doneOnDay).
+    const title = `Done · ${pages(done.size)}`;
     const span = runs.length === 1 ? surahSpan(runs[0]) : to(firstSurah(runs[0].first), lastSurah(runs[runs.length - 1].last));
     const juz = runs.length === 1 ? juzSpan(ordered) : null;
     const detail = [span, juz].filter(Boolean).join(' · ');
