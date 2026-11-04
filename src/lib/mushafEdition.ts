@@ -23,43 +23,55 @@ export interface MushafEdition {
   id: MushafEditionId;
   /** As the picker and Settings name it. */
   name: string;
-  /** One line under the name in the picker. */
-  description: string;
   /** Its folder in Storage and on the phone under mushaf/ ('' = the root, the 1405 pages). */
   folder: string;
   /** Width / height of its page images. */
   aspect: number;
-  /** The credit the publisher asks for (the picker shows it). */
+  /** Whose pages these are, as the picker credits them (one line per publisher). */
   credit: string;
   /** Data for hidden recite mode (lines and words) exists for it. */
   reciteData: boolean;
 }
 
+const KING_FAHD_COMPLEX = 'King Fahd Glorious Qur’an Printing Complex, Madinah';
+
 export const MUSHAF_EDITIONS: Record<MushafEditionId, MushafEdition> = {
   madani1405: {
     id: 'madani1405',
     name: 'Madani 1405',
-    description: 'The classic Madani print',
     folder: '',
     aspect: 2600 / 4206,
-    credit: 'Pages rendered from the King Fahd Complex fonts by the quran.com-images project.',
+    // The Complex's 1405 print, drawn with its fonts by quran.com-images.
+    credit: KING_FAHD_COMPLEX,
     reciteData: true,
   },
   madani1441: {
     id: 'madani1441',
     name: 'Madani 1441',
-    description: 'The newer print, sharp on large screens',
     folder: '1441',
     // The window inside the frame that the build script draws (254.4 × 410.4 pt).
     aspect: madani1441.page.width / madani1441.page.height,
-    credit:
-      'Mushaf al-Madinah an-Nabawiyyah, 1441 AH, from the digital edition of the King Fahd Glorious Qur’an Printing Complex, Madinah.',
+    credit: KING_FAHD_COMPLEX,
     reciteData: false,
   },
 };
 
 /** In the picker, top to bottom. */
 export const MUSHAF_EDITION_ORDER: MushafEditionId[] = ['madani1405', 'madani1441'];
+
+/**
+ * The picker's credit lines, one per publisher: "Pages: <publisher>" while every print has the
+ * same one, otherwise "<names>: <publisher>" each.
+ */
+export function mushafCredits(order: MushafEditionId[] = MUSHAF_EDITION_ORDER): string[] {
+  const names = new Map<string, string[]>();
+  for (const id of order) {
+    const e = MUSHAF_EDITIONS[id];
+    names.set(e.credit, [...(names.get(e.credit) ?? []), e.name]);
+  }
+  if (names.size === 1) return [...names.keys()].map((credit) => `Pages: ${credit}`);
+  return [...names].map(([credit, who]) => `${who.join(', ')}: ${credit}`);
+}
 
 export const DEFAULT_MUSHAF_EDITION: MushafEditionId = 'madani1405';
 

@@ -6,6 +6,7 @@ import {
   loadMushafEdition,
   MUSHAF_EDITION_KEY,
   MUSHAF_EDITIONS,
+  mushafCredits,
   mushafEdition,
   onMushafEdition,
   setMushafEdition,
@@ -63,5 +64,23 @@ describe('mushafEdition', () => {
     expect(e.aspect).toBeCloseTo(254.4 / 410.4);
     expect(e.credit).toMatch(/King Fahd/);
     expect(e.reciteData).toBe(false);
+  });
+
+  it('credits each publisher once: one line while both prints are the Complex’s', () => {
+    expect(mushafCredits()).toEqual(['Pages: King Fahd Glorious Qur’an Printing Complex, Madinah']);
+    expect(mushafCredits(['madani1441'])).toEqual(['Pages: King Fahd Glorious Qur’an Printing Complex, Madinah']);
+  });
+
+  it('names the prints once their publishers differ', () => {
+    const before = MUSHAF_EDITIONS.madani1405.credit;
+    MUSHAF_EDITIONS.madani1405.credit = 'Another publisher';
+    try {
+      expect(mushafCredits()).toEqual([
+        'Madani 1405: Another publisher',
+        'Madani 1441: King Fahd Glorious Qur’an Printing Complex, Madinah',
+      ]);
+    } finally {
+      MUSHAF_EDITIONS.madani1405.credit = before;
+    }
   });
 });

@@ -38,16 +38,18 @@ beforeEach(async () => {
 });
 
 describe('<MushafPickerSheet />', () => {
-  it('lists both prints, the chosen one checked, with what is on the phone and the credits', async () => {
+  it('lists both prints, the chosen one checked, with what is on the phone and one credit line', async () => {
     render(<MushafPickerSheet visible onClose={jest.fn()} />);
     await act(async () => {});
     expect(screen.getByTestId('mushaf-edition-madani1405').props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByTestId('mushaf-edition-madani1441').props.accessibilityState).toEqual({ selected: false });
     expect(screen.getByText('On this phone')).toBeTruthy();
     expect(screen.getByTestId('mushaf-edition-madani1441').props.accessibilityHint).toBe('153\u00A0MB to download');
-    expect(screen.getByText(/Page numbers are the same in both/)).toBeTruthy();
-    expect(screen.getByTestId('mushaf-credit-madani1441')).toHaveTextContent(/King Fahd Glorious Qur.an Printing Complex/);
-    expect(screen.getByTestId('mushaf-credit-madani1405')).toHaveTextContent(/quran.com-images/);
+    expect(screen.getAllByTestId('mushaf-credit')).toHaveLength(1);
+    expect(screen.getByTestId('mushaf-credit')).toHaveTextContent('Pages: King Fahd Glorious Qur’an Printing Complex, Madinah');
+    // Nothing else: no explanation under the rows (the owner's rule).
+    expect(screen.queryByText(/Page numbers/)).toBeNull();
+    expect(screen.queryByText(/classic|newer|same in both/i)).toBeNull();
   });
 
   it('choosing a print keeps it on the phone', async () => {
