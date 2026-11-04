@@ -515,13 +515,9 @@ export default function ActiveRevisionScreen() {
 
   // ===== Swipe-to-credit =====
 
-  // Only today's pages are marked by a swipe. A page of a later day (revised
-  // ahead) is credited by its check alone: a swipe past it, or the end card
-  // after it, marks nothing.
   const handleAdvance = useCallback(
     (leftPage: number, _currentPage: number) => {
       if (!assignedPages.includes(leftPage)) return;
-      if (pageDays.get(leftPage) !== sessionDay) return;
       if (completedPages.has(leftPage)) return;
       markRevised(leftPage);
       if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -530,7 +526,16 @@ export default function ActiveRevisionScreen() {
         message: `Page ${leftPage} marked as revised`,
       });
     },
-    [assignedPages, completedPages, markRevised, pageDays, sessionDay],
+    [assignedPages, completedPages, markRevised],
+  );
+  // The pager's swipe: credited only for the page on screen, as the screen
+  // knows it (a page the screen doesn't show is never marked).
+  const handleSwipeAdvance = useCallback(
+    (leftPage: number, newPage: number) => {
+      if (currentPageNumber != null && leftPage !== currentPageNumber) return;
+      handleAdvance(leftPage, newPage);
+    },
+    [currentPageNumber, handleAdvance],
   );
 
   // ===== The end card, after the last page =====
@@ -544,7 +549,6 @@ export default function ActiveRevisionScreen() {
       // The header names the page just left, not where the session would resume.
       setCurrentPageNumber(lastPage);
       if (!bySwipe || !assignedPages.includes(lastPage) || completedPages.has(lastPage)) return;
-      if (pageDays.get(lastPage) !== sessionDay) return;
       // The day the page belongs to: finishing it is what the card celebrates.
       const dayPages = sections.find((s) => s.pages.includes(lastPage))?.pages ?? [];
       const finishes = dayPages.every((p) => p === lastPage || completedPages.has(p));
@@ -560,7 +564,7 @@ export default function ActiveRevisionScreen() {
         `Revision complete. ${dayPages.length} ${dayPages.length === 1 ? 'page' : 'pages'} revised.`,
       );
     },
-    [assignedPages, completedPages, handleAdvance, haptics, sections, pageDays, sessionDay],
+    [assignedPages, completedPages, handleAdvance, haptics, sections],
   );
   // ===== The session completes =====
   // When the last page is marked (a swipe onto the end card, the check, Jump or
@@ -1004,7 +1008,7 @@ export default function ActiveRevisionScreen() {
           pages={viewerPages}
           initialPage={resumePage}
           onPageChange={handlePageChange}
-          onAdvance={handleAdvance}
+          onAdvance={handleSwipeAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
           onTap={onTapPage}

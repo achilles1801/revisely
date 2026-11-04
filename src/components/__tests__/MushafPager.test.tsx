@@ -98,6 +98,7 @@ describe('<MushafPager /> scrollToPage', () => {
 
   it('swiping forward without a jump still fires onAdvance (unchanged)', () => {
     const { onAdvance, report, drag } = setup();
+    report(0); // the list reports the page it shows, as it does on mount
     drag();
     report(1);
     expect(onAdvance).toHaveBeenCalledWith(1, 2);
@@ -154,6 +155,63 @@ describe('<MushafPager /> scrollToPage', () => {
 });
 
 describe('<MushafPager /> the start-up scroll', () => {
+  it('a swipe credits the page it started on, as the list reported it', () => {
+    const { report, drag, onAdvance } = setup(1);
+    report(0);
+    drag();
+    report(1);
+    expect(onAdvance).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('a programmatic scroll credits nothing, even when the list then reports the new page', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report } = setup(5);
+      act(() => {
+        ref.current!.scrollToPage(10);
+      });
+      jest.advanceTimersByTime(200);
+      report(9);
+      report(10);
+      expect(onAdvance).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a swipe while a jump has not settled credits the page on screen, not the jump’s target', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report, drag } = setup(1);
+      report(0); // the list shows page 1
+      act(() => {
+        ref.current!.scrollToPage(10); // the jump's scroll has not reached the list yet
+      });
+      drag();
+      report(1); // the user swipes off page 1
+      expect(onAdvance).toHaveBeenCalledWith(1, 2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a swipe after a jump credits the page the list shows, not the jump’s index', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report, drag } = setup(1);
+      act(() => {
+        ref.current!.scrollToPage(10);
+      });
+      jest.advanceTimersByTime(200);
+      report(9); // the list settles on the jump's page
+      drag();
+      report(10); // swiped on to the next
+      expect(onAdvance).toHaveBeenCalledWith(10, 11);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('a jump made before the start-up scroll settles is where the pager stays', () => {
     jest.useFakeTimers();
     try {
