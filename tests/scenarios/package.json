@@ -1,0 +1,13 @@
+{
+  "name": "revisely-scenarios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scenario tests: the app's own state code against the Firebase emulators, with a test clock and time zone (see BEHAVIOUR.md).",
+  "scripts": {
+    "test": "firebase emulators:exec --config firebase.json --only auth,firestore --project demo-revisely 'npm run test:local'",
+    "test:local": "jest --config jest.config.js --runInBand"
+  },
+  "devDependencies": {
+    "fast-check": "^4.10.2"
+  }
+}

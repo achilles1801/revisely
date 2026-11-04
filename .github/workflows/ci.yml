@@ -42,6 +42,9 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci --legacy-peer-deps
+      # tests/scenarios is type-checked with the app; its one dependency (fast-check) is its own.
+      - run: npm ci
+        working-directory: tests/scenarios
       - run: npx tsc --noEmit
       # The Cloudflare worker (worker/, wrangler.jsonc): its own types.
       - run: npx tsc --noEmit -p worker
@@ -85,6 +88,15 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test -- --ci
+
+  # -----------------------------------------------------------------------
+  # Scenario and property tests (tests/scenarios, BEHAVIOUR.md): the app's own
+  # code and screens against the Firebase emulators, with a test clock and
+  # time zone. preview.yml runs the same before it publishes.
+  # -----------------------------------------------------------------------
+  scenarios:
+    name: Scenarios
+    uses: ./.github/workflows/scenarios.yml
 
   # -----------------------------------------------------------------------
   # Firestore security rules tests against the Firebase emulator.
