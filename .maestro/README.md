@@ -7,15 +7,15 @@ on PRs into `develop` that touch the app's JavaScript, every night, and by hand.
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,
 gestures, permissions, the keyboard, cold starts and the network. Each flow names the `BEHAVIOUR.md`
-rules it covers in its first lines; the daily log and recordings have no rules there yet.
+rules it covers in its first lines; recordings have no rule there yet.
 
 | Flow | What a user does | Rules |
 | --- | --- | --- |
 | `01-onboarding` | Sign up, onboarding, Home's first day; a cold start; past midnight | SCHED-1, SYNC-4, DAY-1 |
 | `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card | SESS-1, SESS-2, SESS-3 |
-| `03-revise-ahead` | Keep going; "Tomorrow starts at"; a day partly done ahead | AHEAD-1, -2, -3, -5, DAY-3 |
-| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead before Fajr | DAY-1, -2, -3, -5, AHEAD-1 |
-| `05-daily-log` | A note added, edited and deleted, each kept across a cold start | none yet |
+| `03-revise-ahead` | Keep going; "Tomorrow starts at"; a day partly done ahead | AHEAD-1, -2, -3, -5, DAY-3, SESS-4 |
+| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
+| `05-daily-log` | Two notes; one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2 |
 | `06-offline` | A session offline; a cold start offline; back online, the server has it | SYNC-1, SYNC-2, SESS-3 |
 | `07-recordings` | Record in a session, find it in Activity, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
@@ -162,4 +162,6 @@ Things that bit:
   found by its label (`subflows/log-input.yaml`).
 - Percentages in `point:` must be whole numbers (CLAUDE.md). Maestro has no sleep: an optional
   wait for an element that never shows (`e2e-never-shown`) stands in.
-- The mushaf runs right to left: the next page comes in from the left (`subflows/next-page.yaml`).
+- The mushaf runs right to left: the next page comes in from the left. Swipe until a count or the
+  end card (`subflows/swipe-pages.yaml`), not a fixed number of times: on a slow emulator a swipe
+  can be lost.

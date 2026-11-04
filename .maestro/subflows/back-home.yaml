@@ -1,0 +1,13 @@
+# Back (the top bar's) until Home shows.
+appId: com.revisionbuddy.app
+---
+- repeat:
+    while:
+      notVisible:
+        id: today-post
+    times: 4
+    commands:
+      - tapOn:
+          id: back
+- assertVisible:
+    id: today-post

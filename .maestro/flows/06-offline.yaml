@@ -27,9 +27,9 @@ appId: com.revisionbuddy.app
       text: "Juz 1 · 0/10"
     timeout: 15000
 - runFlow:
-    file: ../subflows/next-page.yaml
+    file: ../subflows/swipe-pages.yaml
     env:
-      COUNT: 3
+      UNTIL: 3/10
 - runFlow: ../subflows/show-controls.yaml
 - tapOn: "Back"
 # SYNC-1: the phone's copy shows it at once, and says it waits to sync.

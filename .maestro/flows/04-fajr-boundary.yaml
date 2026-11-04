@@ -5,7 +5,7 @@
 # Wednesday Nov 4 2026 is about 5:25 (North America method): 03:00 is before
 # it, 08:00 after. Days (subflows/onboard.yaml): Tuesday 1, 582–590; Wednesday
 # 591–600; Thursday 601–604, 1, 582–586.
-# Rules (BEHAVIOUR.md): DAY-1, DAY-2, DAY-3, DAY-5, AHEAD-1
+# Rules (BEHAVIOUR.md): DAY-1, DAY-2, DAY-3, DAY-5, AHEAD-1, LOG-3
 # e2e-zone: America/Chicago
 appId: com.revisionbuddy.app
 ---
@@ -27,7 +27,6 @@ appId: com.revisionbuddy.app
     file: ../subflows/session-day.yaml
     env:
       FIRST: "Juz 1 · 0/10"
-      COUNT: 10
 - assertVisible:
     id: today-title
     text: "Done · 10.pages"
@@ -60,6 +59,15 @@ appId: com.revisionbuddy.app
     text: "Page 591 · .*"
 - tapOn: "Back"
 
+# LOG-3: a note written at 03:00 belongs to Tuesday, the revision day.
+- runFlow: ../subflows/open-log.yaml
+- assertVisible: "Tue 11/3"
+- runFlow:
+    file: ../subflows/add-note.yaml
+    env:
+      TEXT: Written before Fajr
+- runFlow: ../subflows/back-home.yaml
+
 # DAY-1: with the boundary off, 03:00 Wednesday is Wednesday at once.
 - runFlow:
     file: ../subflows/fajr-switch.yaml
@@ -91,3 +99,8 @@ appId: com.revisionbuddy.app
       id: today-title
       text: "Starts at At.Tariq, p..591.*"
     timeout: 20000
+# LOG-3: Wednesday's log is empty; the 03:00 note is Tuesday's.
+- runFlow: ../subflows/open-log.yaml
+- assertVisible: "Wed 11/4"
+- assertNotVisible:
+    text: "Note, Written before Fajr, .*"

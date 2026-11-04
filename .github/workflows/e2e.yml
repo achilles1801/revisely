@@ -85,6 +85,19 @@ jobs:
           fi
           xcodebuild -version
 
+      # Started now, finished later: a new simulator's first boot takes minutes,
+      # which the install and the build hide.
+      - name: Boot a simulator
+        id: sim
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | sort_by(.version) | last | .identifier')
+          TYPE=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.productFamily == "iPhone") | .identifier] | map(select(test("iPhone-1[6-9]-Pro$"))) | last // empty')
+          [ -n "$TYPE" ] || TYPE=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.productFamily == "iPhone")] | last | .identifier')
+          UDID=$(xcrun simctl create "Revisely E2E" "$TYPE" "$RUNTIME")
+          xcrun simctl boot "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Booting $TYPE on $RUNTIME: $UDID"
+
       - run: npm ci --legacy-peer-deps
 
       - name: Fingerprint (the E2E build's native side)
@@ -136,18 +149,13 @@ jobs:
           cat "$RUNNER_TEMP/emulators.log"
           exit 1
 
-      - name: Boot a simulator
-        id: sim
+      # Booted (above) while the app was built: the first boot of a new simulator takes minutes.
+      - name: Install the app on the simulator
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
         run: |
-          RUNTIME=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | sort_by(.version) | last | .identifier')
-          TYPE=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.productFamily == "iPhone") | .identifier] | map(select(test("iPhone-1[6-9]-Pro$"))) | last // empty')
-          [ -n "$TYPE" ] || TYPE=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.productFamily == "iPhone")] | last | .identifier')
-          UDID=$(xcrun simctl create "Revisely E2E" "$TYPE" "$RUNTIME")
-          xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" .maestro/build/Revisely.app
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-          echo "Booted $TYPE on $RUNTIME: $UDID"
 
       - name: Run the flows
         env:

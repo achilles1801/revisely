@@ -41,9 +41,9 @@ appId: com.revisionbuddy.app
       text: "Juz 1 · 0/10"
     timeout: 15000
 - runFlow:
-    file: ../subflows/next-page.yaml
+    file: ../subflows/swipe-pages.yaml
     env:
-      COUNT: 3
+      UNTIL: 3/10
 - assertVisible:
     id: session-quiet-count
     text: "Juz 30 · 3/10"
@@ -85,9 +85,9 @@ appId: com.revisionbuddy.app
 
 # The rest (584–590), the last by swiping onto the end card.
 - runFlow:
-    file: ../subflows/next-page.yaml
+    file: ../subflows/swipe-pages.yaml
     env:
-      COUNT: 7
+      UNTIL: end
 - runFlow:
     file: ../subflows/end-card-is.yaml
     env:

@@ -1,5 +1,6 @@
-# The daily log: a note added, edited and deleted, each kept across a cold start.
-# Rules (BEHAVIOUR.md): none yet; the daily log has no rule there.
+# The daily log: two notes added, one edited and the other deleted, each change
+# kept across a cold start, and the other note left as it was.
+# Rules (BEHAVIOUR.md): LOG-1, LOG-2
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -9,19 +10,18 @@ appId: com.revisionbuddy.app
       BOUNDARY: midnight
 - runFlow: ../subflows/open-log.yaml
 
-# Add.
-- tapOn:
-    id: pill-note
-- runFlow: ../subflows/log-input.yaml
-- inputText: Juz 30 felt steady today
-- runFlow: ../subflows/keyboard-done.yaml
-- tapOn:
-    id: journal-send
-- extendedWaitUntil:
-    visible:
-      id: journal-note-.*
-      text: "Note, Juz 30 felt steady today, .*"
-    timeout: 10000
+# LOG-1: two notes, each its own entry.
+- runFlow:
+    file: ../subflows/add-note.yaml
+    env:
+      TEXT: Juz 30 felt steady today
+- runFlow:
+    file: ../subflows/add-note.yaml
+    env:
+      TEXT: Repeat Al-Mutaffifin twice
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, Juz 30 felt steady today, .*"
 
 # Kept: a cold start, then back to the log.
 - runFlow: ../subflows/relaunch.yaml
@@ -31,16 +31,19 @@ appId: com.revisionbuddy.app
       id: journal-note-.*
       text: "Note, Juz 30 felt steady today, .*"
     timeout: 15000
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
 
-# Edit: hold the note, Edit, change the text, Save.
+# LOG-2: editing one changes only it. Hold the note, Edit, change the text, Save.
 - longPressOn:
     id: journal-note-.*
     text: "Note, Juz 30 felt steady today, .*"
 - tapOn: "Edit"
-- runFlow: ../subflows/log-input.yaml
-- eraseText: 60
-- inputText: An-Naba needs another look
-- runFlow: ../subflows/keyboard-done.yaml
+- runFlow:
+    file: ../subflows/type-in-log.yaml
+    env:
+      TEXT: An-Naba needs another look
 - tapOn:
     id: journal-send
 - extendedWaitUntil:
@@ -50,20 +53,15 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertNotVisible:
     text: "Note, Juz 30 felt steady today, .*"
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
 
-- runFlow: ../subflows/relaunch.yaml
-- runFlow: ../subflows/open-log.yaml
-- extendedWaitUntil:
-    visible:
-      id: journal-note-.*
-      text: "Note, An-Naba needs another look, .*"
-    timeout: 15000
-
-# Delete: swipe the note left, Delete, confirm.
+# LOG-2: deleting one removes only it. Swipe the note left, Delete, confirm.
 - swipe:
     from:
       id: journal-note-.*
-      text: "Note, An-Naba needs another look, .*"
+      text: "Note, Repeat Al-Mutaffifin twice, .*"
     direction: LEFT
 - tapOn:
     id: journal-note-.*-delete
@@ -76,12 +74,21 @@ appId: com.revisionbuddy.app
       text: "Delete this entry\\?"
 - extendedWaitUntil:
     notVisible:
-      id: journal-note-.*
-      text: "Note, .*"
+      text: "Note, Repeat Al-Mutaffifin twice, .*"
     timeout: 10000
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, An-Naba needs another look, .*"
 
+# Both changes kept across a cold start.
 - runFlow: ../subflows/relaunch.yaml
 - runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, An-Naba needs another look, .*"
+    timeout: 15000
 - assertNotVisible:
-    id: journal-note-.*
-    text: "Note, .*"
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
+- assertNotVisible:
+    text: "Note, Juz 30 felt steady today, .*"

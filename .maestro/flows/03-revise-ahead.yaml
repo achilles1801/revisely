@@ -1,7 +1,7 @@
 # Revising ahead: Keep going on the end card, Home's "Tomorrow starts at", and a
 # day revised partly ahead needing only what's left. Tuesday is pages 1, 582–590,
 # Wednesday 591–600, Thursday 601–604, 1, 582–586 (subflows/onboard.yaml).
-# Rules (BEHAVIOUR.md): AHEAD-1, AHEAD-2, AHEAD-3, AHEAD-5, DAY-3
+# Rules (BEHAVIOUR.md): AHEAD-1, AHEAD-2, AHEAD-3, AHEAD-5, DAY-3, SESS-4
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -19,9 +19,9 @@ appId: com.revisionbuddy.app
       text: "Juz 1 · 0/10"
     timeout: 15000
 - runFlow:
-    file: ../subflows/next-page.yaml
+    file: ../subflows/swipe-pages.yaml
     env:
-      COUNT: 10
+      UNTIL: end
 - runFlow:
     file: ../subflows/end-card-is.yaml
     env:
@@ -41,14 +41,14 @@ appId: com.revisionbuddy.app
     text: "Page 591 · .*"
 # AHEAD-5: three of Wednesday's pages, swiped (591–593).
 - runFlow:
-    file: ../subflows/next-page.yaml
+    file: ../subflows/swipe-pages.yaml
     env:
-      COUNT: 3
+      UNTIL: 3/10
 - runFlow: ../subflows/show-controls.yaml
 - tapOn: "Back"
 
 # AHEAD-1: Home says Tuesday is done, and Wednesday goes on from its first page
-# not done. Done counts the day's review list: its 10 and the 3 revised ahead (#199).
+# not done. SESS-4: Done counts Tuesday's 10 and the 3 revised ahead in its session.
 - extendedWaitUntil:
     visible:
       id: today-title
@@ -79,9 +79,9 @@ appId: com.revisionbuddy.app
       text: "Juz 30 · 3/10"
     timeout: 15000
 - runFlow:
-    file: ../subflows/next-page.yaml
+    file: ../subflows/swipe-pages.yaml
     env:
-      COUNT: 7
+      UNTIL: end
 - runFlow:
     file: ../subflows/end-card-is.yaml
     env:
