@@ -489,6 +489,30 @@ describe('adding notes one after another: each one stays', () => {
   });
 });
 
+describe('reads of the day that answer out of order', () => {
+  it('[LOG-1] a note just sent stays when an older read of the day answers last', async () => {
+    // The outbox changes twice for one note: queued, then sent. The read that
+    // started when it was queued is slow and answers last, with the day as it
+    // was before (no note); the read after it was sent has it.
+    const later: ((v: unknown) => void)[] = [];
+    let reads = 0;
+    mockService.getJournalEntry.mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) return Promise.resolve(null); // the first load
+      if (reads === 2) return new Promise((resolve) => later.push(resolve)); // slow, stale
+      return Promise.resolve(journalDayFromEntries('2026-10-20', [memo]));
+    });
+    await renderScreen();
+    await emitOutbox('u1'); // queued
+    await emitOutbox('u1'); // sent
+    await waitFor(() => expect(screen.getByTestId('journal-note-n1')).toBeTruthy());
+    await act(async () => {
+      later.forEach((resolve) => resolve(null));
+    });
+    expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+  });
+});
+
 describe('the keyboard: a Done key puts it away', () => {
   it('the text and minutes fields carry the Done bar, which dismisses the keyboard', async () => {
     await renderScreen();
