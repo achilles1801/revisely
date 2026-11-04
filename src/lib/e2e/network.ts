@@ -37,8 +37,21 @@ export function reachable(url: string): boolean {
   return local && !offline;
 }
 
+// Firestore's back channels (the long GETs its streams read from) on iOS go to
+// 127.0.0.1 while everything else goes to localhost, so a back channel never
+// rides a kept-alive connection that the emulator is closing. On a slow CI
+// Simulator iOS sent the GET on the handshake's connection as the emulator
+// closed it, then retried it on a new one (a GET may be retried); the emulator
+// had already written the first messages into the dead connection and doesn't
+// send them again, so the stream lost them: the user document's, and the app
+// stayed "Offline" (06-offline). Plain HTTP/1.1 to the emulator only; the real
+// Firestore is HTTP/2, where a retried request is safe.
+const BACK_CHANNEL = /^http:\/\/localhost:(\d+)(\/google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel\?(?:.*&)?RID=rpc(?:&|$).*)$/;
+
 export function rewrite(url: string): string {
-  return reachable(url) ? url : CLOSED_PORT;
+  if (!reachable(url)) return CLOSED_PORT;
+  const back = Platform.OS === 'ios' ? BACK_CHANNEL.exec(url) : null;
+  return back ? `http://127.0.0.1:${back[1]}${back[2]}` : url;
 }
 
 export function isOffline(): boolean {

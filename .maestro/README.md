@@ -158,10 +158,21 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 - **iOS:** the Simulator shares the computer's network and has no airplane mode, so the E2E build's
   switch makes the emulators unreachable from the app (`subflows/network.yaml`); NetInfo's
   reachability check fails with them, and the app sees what a phone without a connection sees.
-- In CI, `06-offline` runs on Android only (`# e2e-ci-skip: ios`): on the macOS runner's simulator
-  the app stayed "Offline" for minutes after the switch came back on, also after coming back to the
-  front, while on a Mac it takes seconds. Whether that is the runner or the app on a slow device is
-  open; the status line now says whether NetInfo or Firestore is the side still down.
+- **Firestore's back channels go to `127.0.0.1` on iOS** (`rewrite` in `src/lib/e2e/network.ts`);
+  everything else goes to `localhost`. Until Nov 4 2026, `06-offline` was skipped on iOS in CI
+  because the app stayed "Offline" for minutes after coming back online. The cause was in the
+  connection to the emulator:
+  1. On the slow CI Simulator, iOS sent a stream's back-channel GET on the handshake's kept-alive
+     connection just as the emulator closed it.
+  2. CFNetwork retried the GET on a new connection.
+  3. The emulator had already written the first messages into the dead connection, and it doesn't
+     send them again (reproduced against a local emulator).
+  4. The stream lost the user document's messages and never came online.
+
+  This happens only over plain HTTP/1.1 to the emulator. The real Firestore is HTTP/2, where a
+  retried request is safe. With different hosts the two never share a connection. Debug a stream
+  with a run by hand with `debug`: the app's log then has Firestore's log and every back-channel
+  chunk.
 - `06-offline` checks the server itself (`scripts/server-session.js`): Maestro reads the session
   from the Firestore emulator's REST API with its admin token, "Bearer owner", which only the
   emulators accept.
