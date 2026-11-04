@@ -20,6 +20,7 @@ export function homeStack(mods: Booted): ReactElement {
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
+  const Journal = req<any>('src/screens/journal/JournalEntryScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const Stack = createNativeStackNavigator();
@@ -37,7 +38,8 @@ export function homeStack(mods: Booted): ReactElement {
       { screenOptions: { headerShown: false, animation: 'none' } },
       h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
       h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-      ...['Settings', 'Memorization', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'Insights'].map(
+      h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
+      ...['Settings', 'Memorization', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityDay', 'ActivityAll', 'Insights'].map(
         (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
       ),
     ),
@@ -213,6 +215,97 @@ export class Session {
   /** Back to Home (the session saves as it goes). */
   async back(): Promise<void> {
     await this.press('Back');
+    await this.app.idle(100);
+  }
+}
+
+/** The daily log of a day (JournalEntryScreen), as a user writes in it. */
+export class DailyLog {
+  constructor(private readonly app: OpenApp) {}
+
+  /** Opens the log of `date` ('YYYY-MM-DD'; today's revision day when left out), as Activity's day does. */
+  async open(date?: string): Promise<void> {
+    const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+    await this.app.act(async () => {
+      nav.current.navigate('JournalEntry', date ? { date } : undefined);
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('journal-composer') != null, 'the daily log to open');
+    // Confirmations (Delete this entry?) are answered yes.
+    const { Alert } = this.app.mods.require<typeof import('react-native')>('react-native');
+    (Alert as { alert: unknown }).alert = (_t: string, _m?: string, buttons?: { style?: string; onPress?: () => void }[]) =>
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+  }
+
+  /** The day's entries, oldest first: kind and text. */
+  entries(): { kind: string; text: string }[] {
+    const rows = this.app.screen.queryAllByTestId(/^journal-note-(?!menu)[^-]+$/);
+    return rows.map((r) => {
+      const label: string = r.props.accessibilityLabel ?? '';
+      const parts = label.split(', ');
+      return { kind: parts[0], text: parts.slice(1, -1).join(', ') };
+    });
+  }
+
+  private async press(el: unknown): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(el as never);
+    });
+    await this.app.idle(50);
+  }
+
+  /** Writes a note of `kind` ('Note', 'Revision', 'Memorization') and taps Add. */
+  async add(text: string, kind = 'Note'): Promise<void> {
+    const { fireEvent, within } = this.app.mods.rtl;
+    await this.press(within(this.app.screen.getByTestId('journal-kind')).getByText(kind));
+    await this.app.act(async () => {
+      fireEvent.changeText(this.app.screen.getByTestId('journal-text-input'), text);
+    });
+    await this.press(this.app.screen.getByTestId('journal-send'));
+    await this.app.until(() => this.entries().some((e) => e.text === text), `"${text}" to show in the log`);
+  }
+
+  private row(text: string) {
+    const row = this.app.screen
+      .queryAllByTestId(/^journal-note-(?!menu)[^-]+$/)
+      .find((r) => (r.props.accessibilityLabel ?? '').includes(`, ${text}, `));
+    if (!row) throw new Error(`no entry "${text}" in ${JSON.stringify(this.entries())}`);
+    return row;
+  }
+
+  /** Hold on an entry, Edit, change its text, Save. */
+  async edit(text: string, next: string): Promise<void> {
+    const { fireEvent, within } = this.app.mods.rtl;
+    const row = this.row(text);
+    await this.app.act(async () => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'options' } });
+    });
+    await this.app.idle(50);
+    await this.press(within(this.app.screen.getByTestId('journal-note-menu')).getByText('Edit'));
+    // A menu's action runs once the sheet has gone (v2/ActionSheet).
+    await this.app.until(() => this.app.screen.queryByLabelText('Save entry') != null, 'the note to be in the composer');
+    await this.app.act(async () => {
+      fireEvent.changeText(this.app.screen.getByTestId('journal-text-input'), next);
+    });
+    await this.press(this.app.screen.getByLabelText('Save entry'));
+    await this.app.until(() => this.entries().some((e) => e.text === next), `"${next}" to show in the log`);
+  }
+
+  /** Swipe an entry away (Delete, confirmed). */
+  async delete(text: string): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    const row = this.row(text);
+    await this.app.act(async () => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'delete' } });
+    });
+    await this.app.until(() => !this.entries().some((e) => e.text === text), `"${text}" to go`);
+  }
+
+  async back(): Promise<void> {
+    const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+    await this.app.act(async () => {
+      nav.current.goBack();
+    });
     await this.app.idle(100);
   }
 }

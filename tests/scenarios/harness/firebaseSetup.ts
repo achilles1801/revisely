@@ -69,3 +69,6 @@ jest.mock('expo-notifications', () => {
       k in t ? t[k] : k.startsWith('add') && k.endsWith('Listener') ? () => ({ remove: () => undefined }) : async () => undefined,
   });
 });
+
+// Modal with iOS's onShow and onDismiss (harness/modal).
+jest.mock('react-native/Libraries/Modal/Modal', () => require('./modal'));

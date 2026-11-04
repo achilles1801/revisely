@@ -204,7 +204,10 @@ file is the release mechanics and the traps behind them.
 
   Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
   `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
-  hand. `main` and `develop` are protected: PRs only, CI green.
+  hand.
+- `develop` requires CI green to merge (since Nov 4 2026): Secret scan, Typecheck, Unit +
+  component tests, Cloud Functions tests, Firestore rules tests and `Scenarios / Scenario tests`.
+  Admins can still bypass (`enforce_admins` off). `main` has no branch protection.
 - No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
   `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
   entry written by one run can be restored by another. Only CI, which holds no secrets, caches.

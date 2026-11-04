@@ -332,4 +332,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { encode, freshUser, freshPage };
+module.exports = { encode, freshUser, freshPage, reset };
