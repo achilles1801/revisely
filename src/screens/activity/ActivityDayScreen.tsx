@@ -312,7 +312,7 @@ export default function ActivityDayScreen() {
       ) : (
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+          contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

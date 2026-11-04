@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  InputAccessoryView,
+  Keyboard,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -25,6 +29,7 @@ import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { autoId } from '../../lib/offline/apply';
 import { queueChange, withPendingJournalDay } from '../../lib/offline/queue';
+import { subscribeOutbox } from '../../lib/offline/outbox';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
   JOURNAL_ENTRIES_PER_DAY,
@@ -97,7 +102,13 @@ export default function JournalEntryScreen() {
 
   // The day as Firestore has it, and the same day with the changes still
   // waiting on this phone laid over it.
-  const [base, setBase] = useState<JournalEntry | null>(null);
+  const [, setBaseState] = useState<JournalEntry | null>(null);
+  // The latest copy read from the server, for the handlers below (their closures can be older).
+  const baseRef = useRef<JournalEntry | null>(null);
+  const setBase = (entry: JournalEntry | null) => {
+    baseRef.current = entry;
+    setBaseState(entry);
+  };
   const [day, setDay] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -140,7 +151,26 @@ export default function JournalEntryScreen() {
   }, [date, attempt]);
 
   // After a change is queued: show the day again with it laid over.
-  const refreshDay = () => setDay(withPendingJournalDay(date, base));
+  const refreshDay = () => setDay(withPendingJournalDay(date, baseRef.current));
+
+  // A change leaves the outbox once it is written, and then only the server's
+  // copy of the day has it. So whenever the outbox changes, read the day again:
+  // otherwise the note just saved drops out of view and the next Add looks like
+  // it replaced it.
+  const uid = user?.id;
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeOutbox((changed) => {
+      if (changed !== uid) return;
+      firestoreService
+        .getJournalEntry(date)
+        .then((entry) => {
+          setBase(entry);
+          setDay(withPendingJournalDay(date, entry));
+        })
+        .catch(() => undefined); // offline: the changes still waiting stay laid over the last copy
+    });
+  }, [uid, date]);
 
   const notes = useMemo(() => day?.entries ?? [], [day]);
   const total = day ? journalTotalMinutes(day) : null;
@@ -368,9 +398,11 @@ export default function JournalEntryScreen() {
           />
         </View>
       ) : (
+        // iOS would add the home indicator's inset again: the padding below is the only one.
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           automaticallyAdjustKeyboardInsets
@@ -445,6 +477,7 @@ export default function JournalEntryScreen() {
                 multiline={composingKind === 'note'}
                 maxLength={journalTextMax(composingKind)}
                 textAlignVertical="top"
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 style={[field, composingKind === 'note' && v2.notes]}
                 accessibilityLabel={
                   composingKind === 'note'
@@ -495,6 +528,24 @@ export default function JournalEntryScreen() {
         </ScrollView>
       )}
 
+      {Platform.OS === 'ios' && (
+        // The bar above the keyboard: one Done key puts the keyboard away for
+        // a note or the minutes, whichever is typing.
+        <InputAccessoryView nativeID={KEYBOARD_DONE_ID}>
+          <View style={[styles.doneBar, { backgroundColor: palette.bg, borderTopColor: palette.separator }]}>
+            <Pressable
+              onPress={() => Keyboard.dismiss()}
+              accessibilityRole="button"
+              accessibilityLabel="Done"
+              testID="journal-keyboard-done"
+              hitSlop={8}
+            >
+              <Text style={[typeV2.body, { color: palette.accentText, fontWeight: '600' }]}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      )}
+
       <ActionSheet
         visible={menuNote != null}
         onClose={() => setMenuNote(null)}
@@ -518,6 +569,7 @@ function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (
         placeholderTextColor={palette.secondary}
         selectionColor={palette.accentText}
         keyboardType="number-pad"
+        inputAccessoryViewID={KEYBOARD_DONE_ID}
         maxLength={4}
         style={[typeV2.body, typeV2.numeral, v2.minutesInput, { color: palette.text }]}
         accessibilityLabel={label}
@@ -532,7 +584,17 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   failed: { gap: 12, paddingHorizontal: 32 },
   scroll: { flex: 1 },
+  doneBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: layoutV2.gutter,
+    paddingVertical: 8,
+    borderTopWidth: layoutV2.hairline,
+  },
 });
+
+/** The iOS keyboard bar with Done, shown above the note and minutes fields. */
+const KEYBOARD_DONE_ID = 'journal-keyboard-done';
 
 // The new design: rows on the ground, the fields borderless like a composer.
 const v2 = StyleSheet.create({
