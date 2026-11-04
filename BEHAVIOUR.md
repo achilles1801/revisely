@@ -106,6 +106,15 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 
+## Recitation
+
+- **AUDIO-1.** On Android, a recitation that stops leaves no notification behind: ■ or ✕ in the app,
+  the end of its range, and the app swiped away from recents (whose screens then stop it). A
+  notification left by an earlier run goes when the app starts. Stopping never makes Android close
+  the app.
+- **AUDIO-2.** On Android, Pause and ▶ on the recitation's notification work with the app away;
+  paused, the notification stays, and the app shows what was pressed.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
