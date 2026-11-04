@@ -75,3 +75,43 @@ it('[SCHED-4] reverse plan: from the end to the start, the same pages', async ()
   expect(seen[3]).toContain(1);
   expect(seen.flat().sort((a, b) => a - b)).toEqual(memorized);
 });
+
+it('[SCHED-6] [CARRY-2] a page on two neighbouring days, with pages carried over: no day holds it twice', async () => {
+  const phone = await account(pagesRange(1, 8), { dailyPageCapacity: 3 });
+  // Page 3 ends Monday and starts Tuesday (a page two surahs share).
+  setNow('2026-11-02 20:30');
+  let app = await phone.open(homeStack);
+  let home = new Home(app);
+  await home.ready();
+  await saveCustomPlan(app, [[1, 2, 3], [3, 4, 5], [6, 7, 8]]);
+  // Monday: page 1 only.
+  let session = await home.startSession();
+  expect(session.pages()).toEqual([1, 2, 3]);
+  await session.swipe();
+  await session.back();
+  await app.untilSynced();
+  await app.close();
+
+  // Tuesday: Monday's 2 is added (3 is Tuesday's own). Keep daily amount: 2, 3, 4; 5 moves on.
+  setNow('2026-11-03 09:00');
+  app = await phone.open(homeStack);
+  home = new Home(app);
+  await home.ready();
+  expect(home.carryOver()).not.toBeNull();
+  await home.tap('today-carry-over');
+  await app.untilSynced();
+  await app.until(() => home.carryOver() == null, 'the offer to go');
+  session = await home.startSession();
+  expect(session.pages()).toEqual([2, 3, 4]);
+  await session.swipeThrough(3);
+  await session.back();
+  await app.untilSynced();
+  await app.close();
+
+  // The next cycle, shifted back a page. Friday's window covers both copies of
+  // page 3 (it once showed 3, 3, 4): page 3 once, then 4 and 5.
+  expect(await sessionPagesOn(phone, '2026-11-05 09:00')).toEqual([8, 1, 2]);
+  expect(await sessionPagesOn(phone, '2026-11-06 09:00')).toEqual([3, 4, 5]);
+  const saturday = await sessionPagesOn(phone, '2026-11-07 09:00');
+  expect(new Set(saturday).size).toBe(saturday.length);
+});

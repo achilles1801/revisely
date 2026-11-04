@@ -24,7 +24,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **DAY-1.** With the Fajr boundary off, the revision day is the calendar day. It changes at local
   midnight.
 - **DAY-2.** With the boundary on, the revision day changes at Fajr: the Fajr the Prayer sheet shows,
-  for the saved location. From midnight until Fajr it is still the day before.
+  for the saved location. From midnight until Fajr it is still the day before. A day's prayers are the
+  ones whose Dhuhr falls on it, near the date line too.
 - **DAY-3.** Tomorrow is the revision day + 1, never the calendar day + 1. This holds for Home's
   "Tomorrow starts at", the end card's "Next" and Keep going.
 - **DAY-4.** A session keeps the revision day it opened on: it is saved to that day even when Fajr or
@@ -49,7 +50,8 @@ How the tests are made: `tests/scenarios/README.md`.
   same pages.
 - **SCHED-5.** The schedule doesn't move by itself. Days without a session don't pile up: the app
   opened after missed days shows that day's pages.
-- **SCHED-6.** A day never holds the same page twice.
+- **SCHED-6.** A day never holds the same page twice. A plan with a page on two neighbouring days,
+  shifted by a carry-over, takes that page once and the next page after it.
 
 ## A revision session
 
@@ -135,10 +137,14 @@ How the tests are made: `tests/scenarios/README.md`.
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
 ordinary test in the fix's PR.
 
-| Rule | What happens | Where | Test |
-| --- | --- | --- | --- |
-| DAY-2, DAY-8 | Near the date line (Kiritimati, Samoa, Tonga; Fiji in its summer), "today's Fajr" is another day's: the revision day stays a day behind after Fajr, or a day is skipped. `dayTimes` gives adhan the phone's local date, which adhan takes as the date of the sun's transit in UTC. | `src/lib/prayer/times.ts` `dayTimes` | `scenarios/day.scenario.tsx` (Kiritimati), `properties/day.property.ts` |
-| DAY-8 | With a saved location far from the phone's zone, `getNextRevisionDayStart` names a time when the day doesn't turn (widget days listed twice, reminders ending early). | `src/lib/fajrBoundary.ts` | `properties/day.property.ts` |
-| SCHED-6 | A carry-over shift on a custom plan that repeats a page on neighbouring days can put that page twice on one day. | `src/lib/algorithm.ts` `shiftedCycleDay` | `properties/schedule.property.ts` |
-| CARRY-5 | With scattered leftovers, saving an edit to a later day brings a page revised yesterday back into today. | `src/lib/carryOver.ts` `settleCarryOverForNewPlan`, `src/lib/planChange.ts` | `properties/carryover.property.ts` |
-| SYNC-4 | A new account can stay on "loading" until the app is relaunched: the pages' only snapshot was the phone's own write (from cache), and the server's answer never comes as one (`subscribeToPages` has no `includeMetadataChanges`). | `src/services/firestoreService.ts`, `src/context/AppContext.tsx` | `scenarios/sync.scenario.tsx` |
+None open.
+
+Fixed in November 2026 (the tests that pinned them are ordinary tests now):
+
+| Rule | What happened | Fix |
+| --- | --- | --- |
+| DAY-2, DAY-8 | Near the date line (Kiritimati, Samoa, Tonga; Fiji around October and November) "today's Fajr" was another day's, so after Fajr it was still yesterday, or a day was skipped. | `dayTimes` (`src/lib/prayer/times.ts`) takes the prayers whose Dhuhr falls on the day, and builds a day adhan skips from the days either side. |
+| DAY-8 | With a saved place far from the phone's zone, `getNextRevisionDayStart` named a time when the day doesn't turn (widget days listed twice, reminders ending early). | It returns the first midnight or Fajr at which the revision day changes (`src/lib/fajrBoundary.ts`). |
+| SCHED-6 | A carry-over shift on a custom plan with a page on two neighbouring days could put that page twice on one day. | A shifted day takes such a page once and goes on to the next (`shiftedCycleDay`, `src/lib/algorithm.ts`). |
+| CARRY-5 | With scattered leftovers, saving an edit to a later day brought a page revised yesterday back into today. | Saving keeps today's carry-over as it was (`settleCarryOverForNewPlan`, `src/lib/planChange.ts`). |
+| SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |

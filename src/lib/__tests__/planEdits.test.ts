@@ -4,7 +4,7 @@
 import { getPagesForDay, getPagesScheduledForDate, scheduledDaysFrom } from '../algorithm';
 import { applyCarryOver, settleCarryOverForNewPlan } from '../carryOver';
 import { insertDay, moveDay, removeDay, rotateCustomPlanToToday } from '../planBuilder';
-import { createCustomPlanFromDraft, dateToLocalISODay } from '../schedulePlans';
+import { createCustomPlanFromDraft } from '../schedulePlans';
 import { customPlanFromFirestore, customPlanToFirestore } from '../schedulePersistence';
 import type { User, UserPage } from '../../types';
 
@@ -50,7 +50,7 @@ const draft = [[1, 2, 3], [4, 5, 6], [], [7, 8, 9]];
 /** Save the edited draft as the editor does, and read the schedule back. */
 function save(user: User, days: number[][]): User {
   return {
-    ...settleCarryOverForNewPlan(user, dateToLocalISODay(today)),
+    ...settleCarryOverForNewPlan(user),
     customPlan: createCustomPlanFromDraft(days, 'forward', today),
   };
 }
@@ -152,8 +152,8 @@ describe('carry-over', () => {
     const moved = moveDay(shown, 3, 1);
     const saved = save(shifted, moved);
     expect(saved.scheduleShiftPages).toBe(0);
-    expect(saved.carryOver?.skip).toBe(0);
-    // Today still opens with the carried pages, on top of today's day.
+    // Today is as it was: the carried pages, then the rest of today's day.
+    expect(getPagesForDay(saved, today, memorized)).toEqual(getPagesForDay(shifted, today, memorized));
     expect(getPagesForDay(saved, today, memorized).slice(0, 2)).toEqual([2, 3]);
     expect(getPagesScheduledForDate(saved, day(1), memorized)).toEqual(moved[1]);
   });

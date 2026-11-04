@@ -96,18 +96,18 @@ it('[SYNC-1] [SYNC-3] two phones on different days: both days are kept', async (
   await other.close();
 });
 
-it.failing('KNOWN BUG: [SYNC-4] a new account loads after sign-up without a relaunch', async () => {
-  // AppContext ignores page snapshots from Firestore's cache. On sign-up the
-  // pages are written by this phone (AuthContext.signUp → createUser) while the
-  // pages listener is starting, so its only snapshot can be the local one
-  // (fromCache: true). subscribeToPages doesn't ask for metadata changes
-  // (includeMetadataChanges), so the server's confirmation never arrives as a
-  // snapshot, and the app stays on "loading" until it is relaunched.
+// Was a known bug (fixed Nov 2026, firestoreService onQuerySnapshot): the
+// pages written by sign-up (AuthContext.signUp → createUser) while the pages
+// listener was starting gave it only a cached snapshot, the server's
+// confirmation never came as a snapshot (no includeMetadataChanges), and the
+// app, which ignores cached page snapshots, stayed on "loading" until it was
+// relaunched. newAccount (harness/account.ts) checks the same in every scenario.
+it('[SYNC-4] a new account loads after sign-up without a relaunch', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-02 20:00');
   const phone = new Phone();
   const app = await phone.open();
   await app.act(() => app.auth.signUp(newEmail(), PASSWORD, 'New'));
-  await app.until(() => !!app.app.user && app.app.pages.length === 604, 'the new account to load', 30_000);
+  await app.until(() => !!app.app.user && app.app.pages.length === 604 && !app.app.loading, 'the new account to load', 30_000);
   await app.close();
 });

@@ -48,10 +48,13 @@ export function getRevisionDayForUser(
   if (!user || !user.fajrBoundaryEnabled || !user.locationCoords) {
     return formatLocalDay(now);
   }
-  const todaysFajr = getFajrTimeFor(now, user);
-  if (!todaysFajr) return formatLocalDay(now);
+  return revisionDayAt(now, (d) => getFajrTimeFor(d, user));
+}
 
-  if (now.getTime() < todaysFajr.getTime()) {
+/** The revision day at `now`, given each local day's Fajr: the day before until that day's Fajr. */
+function revisionDayAt(now: Date, fajrOf: (day: Date) => Date | null): string {
+  const todaysFajr = fajrOf(now);
+  if (todaysFajr && now.getTime() < todaysFajr.getTime()) {
     // Roll back to yesterday's date string.
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -74,8 +77,14 @@ export function getRevisionDateForUser(
 }
 
 /**
- * When the revision day next changes: the next fajr when the boundary is on,
- * otherwise the next local midnight.
+ * When the revision day next changes: the next local midnight with the boundary
+ * off; with it on, the first moment getRevisionDayForUser gives another day.
+ *
+ * That day only changes at a local midnight or at a day's Fajr, so those are
+ * the moments tried, in order. Usually it is the next Fajr. With a saved place
+ * far from the phone's zone a day's Fajr can fall the evening before, or the
+ * day before altogether; the day then turns at midnight, and a Fajr that comes
+ * first changes nothing (it used to be returned anyway).
  */
 export function getNextRevisionDayStart(
   user: User | null | undefined,
@@ -83,10 +92,17 @@ export function getNextRevisionDayStart(
 ): Date {
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   if (!user || !user.fajrBoundaryEnabled || !user.locationCoords) return midnight;
-  const todaysFajr = getFajrTimeFor(now, user);
-  if (todaysFajr && todaysFajr.getTime() > now.getTime()) return todaysFajr;
-  const tomorrowsFajr = getFajrTimeFor(midnight, user);
-  // Past already when the device's time zone is far from the saved location;
-  // the day then turns at midnight.
-  return tomorrowsFajr && tomorrowsFajr.getTime() > now.getTime() ? tomorrowsFajr : midnight;
+  // A day's Fajr depends only on its local date: worked out once a day here.
+  const known = new Map<string, Date | null>();
+  const fajrOf = (d: Date) => {
+    const key = formatLocalDay(d);
+    if (!known.has(key)) known.set(key, getFajrTimeFor(d, user));
+    return known.get(key)!;
+  };
+  const today = revisionDayAt(now, fajrOf);
+  const day = (k: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + k);
+  const moments = [day(1), day(2), ...[0, 1, 2].map((k) => fajrOf(day(k)))]
+    .filter((d): d is Date => d !== null && d.getTime() > now.getTime())
+    .sort((a, b) => a.getTime() - b.getTime());
+  return moments.find((d) => revisionDayAt(d, fajrOf) !== today) ?? midnight;
 }

@@ -23,6 +23,7 @@ export const CITIES = {
   reykjavik: { latitude: 64.15, longitude: -21.94 },
   kathmandu: { latitude: 27.72, longitude: 85.32 },
   kiritimati: { latitude: 1.87, longitude: -157.43 },
+  suva: { latitude: -18.14, longitude: 178.44 },
 } as const;
 
 export function pagesRange(from: number, to: number): number[] {
@@ -30,15 +31,15 @@ export function pagesRange(from: number, to: number): number[] {
 }
 
 /**
- * Signs up on `phone` and waits until the server holds the new account. The app
- * is then relaunched: a fresh sign-up can stay on "loading" until the next
- * launch (KNOWN BUG, scenarios/signup.scenario.tsx), and these scenarios start
- * from an account that exists.
+ * Signs up on `phone`, waits for the account to load in that same launch
+ * (SYNC-4: it once stayed on "loading" until a relaunch), then until the server
+ * holds it, and relaunches, so that scenarios start from an account that exists.
  */
 export async function signUpAndRelaunch(phone: Phone, email = newEmail()): Promise<OpenApp> {
   let app = phone.current ?? (await phone.open());
   await app.act(() => app.auth.signUp(email, 'scenario-password', 'Scenario'));
   phone.email = email;
+  await app.untilLoaded();
   const svc = app.mods.require<typeof import('../../../src/services/firestoreService')>('src/services/firestoreService');
   const uid = app.uid;
   const deadline = performance.now() + 45_000;
@@ -95,6 +96,33 @@ export async function saveCustomPlan(app: OpenApp, days: number[][], direction: 
   const memorized = app.app.pages.filter((p) => p.status === 'memorized');
   const plan = createCustomPlanFromDraft(days, direction, revisionDate);
   const next = userWithNewSchedule(user, { customPlan: plan }, { revisionDate, memorized, logs: app.app.logs, newPlan: true });
+  await app.act(() => app.app.saveUser(next));
+  await app.untilSynced();
+}
+
+/**
+ * An edit of the plan shown, saved from the plan editor (PlanEditScreen: the
+ * days it opens with, `initialState`, then handleSave with newPlan false).
+ * `edit` gets the days as the editor shows them (today first) and returns the
+ * days to save.
+ */
+export async function saveEditedPlan(app: OpenApp, edit: (shown: number[][]) => number[][]): Promise<void> {
+  const algorithm = app.mods.require<typeof import('../../../src/lib/algorithm')>('src/lib/algorithm');
+  const plans = app.mods.require<typeof import('../../../src/lib/schedulePlans')>('src/lib/schedulePlans');
+  const builder = app.mods.require<typeof import('../../../src/lib/planBuilder')>('src/lib/planBuilder');
+  const { userWithNewSchedule } = app.mods.require<typeof import('../../../src/lib/planChange')>('src/lib/planChange');
+  const { getRevisionDateForUser } = app.mods.require<typeof import('../../../src/lib/fajrBoundary')>('src/lib/fajrBoundary');
+  const user = app.app.user!;
+  const plan = user.customPlan;
+  if (!plan || plan.days.length === 0) throw new Error('saveEditedPlan: no custom plan to edit');
+  const revisionDate = getRevisionDateForUser(user);
+  const memorized = app.app.pages.filter((p) => p.status === 'memorized');
+  const shifted = (user.scheduleShiftPages ?? 0) > 0 && plan.cycleStartDate <= plans.dateToLocalISODay(revisionDate);
+  const shown = shifted
+    ? algorithm.scheduledDaysFrom(user, memorized, revisionDate, plan.days.length)
+    : builder.rotateCustomPlanToToday(plan, revisionDate);
+  const saved = plans.createCustomPlanFromDraft(edit(shown.map((d) => [...d])), plan.direction, revisionDate);
+  const next = userWithNewSchedule(user, { customPlan: saved }, { revisionDate, memorized, logs: app.app.logs, newPlan: false });
   await app.act(() => app.app.saveUser(next));
   await app.untilSynced();
 }

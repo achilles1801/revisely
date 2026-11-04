@@ -224,7 +224,7 @@ describe('applyCarryOver', () => {
     const shown = scheduledDaysFrom(shifted, memorized, today, 3);
     expect(shown).toEqual([[5, 6, 7], [8, 9, 1], [2, 3, 4]]);
     const saved: User = {
-      ...settleCarryOverForNewPlan(shifted, TODAY),
+      ...settleCarryOverForNewPlan(shifted),
       customPlan: { days: shown, cycleStartDate: TODAY, direction: 'forward' },
     };
     expect(saved.scheduleShiftPages).toBe(0);
