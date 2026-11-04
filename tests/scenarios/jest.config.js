@@ -28,6 +28,7 @@ module.exports = {
   // @firebase/util loads a .mjs file, which the preset's transform skips.
   transform: { ...preset.transform, '\\.mjs$': babel },
   testEnvironment: '<rootDir>/tests/scenarios/harness/environment.js',
-  testTimeout: 30000,
+  // A week of days is a minute on a CI runner.
+  testTimeout: 180000,
   collectCoverageFrom: base.collectCoverageFrom,
 };

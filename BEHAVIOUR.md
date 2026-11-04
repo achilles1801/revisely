@@ -58,17 +58,20 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SESS-2.** A day is done when all its pages are credited to it. Home then says Done, and the streak
   counts the day.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
+- **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
+  ahead in its sessions, and Review session opens exactly those (#199).
 
 ## Revising ahead
 
-- **AHEAD-1.** Once today is done, Home offers the next revision day ("Tomorrow starts at …"). Tapping
-  it opens the session on that day's first page, after today's pages.
+- **AHEAD-1.** Once today is done, Home offers the next revision day ("Tomorrow starts at …"), from its
+  first page not done yet. Tapping it opens the session there, after today's pages; the next day's
+  pages already done are left out (#198).
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
   That day then needs only the pages left, and is done when none are.
-- **AHEAD-3.** The end card's Keep going adds the next revision day's pages to the session. Done
-  again, it adds the day after. It stops at the end of a cycle.
+- **AHEAD-3.** The end card's Keep going adds the next revision day's pages not done yet to the
+  session. Done again, it adds the day after. It stops at the end of a cycle.
 - **AHEAD-4.** A day already done ahead is passed over: Keep going and Home's next line go to the day
-  after it. (The owner is deciding whether to keep this; see PR #197.)
+  after it (the owner's rule, #198).
 - **AHEAD-5.** A page is credited ahead only when it was revised in that session (checked or swiped).
 
 ## Carrying pages over

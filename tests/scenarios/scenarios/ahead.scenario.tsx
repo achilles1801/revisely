@@ -71,7 +71,7 @@ describe('done for the day', () => {
 });
 
 describe('revised ahead', () => {
-  it('[AHEAD-2] [AHEAD-5] [SESS-1] pages revised ahead count for their own day, which then needs only the rest', async () => {
+  it('[AHEAD-2] [AHEAD-5] [AHEAD-1] [SESS-1] [SESS-4] pages revised ahead count for their own day, which then needs only the rest', async () => {
     const { phone } = await account();
     let { app, home } = await openHome(phone, '2026-11-02 21:00');
     const session = await home.startSession();
@@ -84,6 +84,13 @@ describe('revised ahead', () => {
     await session.back();
     await app.untilSynced();
     expect(credit(app)).toEqual([{ day: '2026-11-02', revised: [...MON, 6, 7], ahead: { '2026-11-03': [6, 7] } }]);
+    // Done · 7 (Monday's five and the two ahead), and tomorrow goes on from its first page not done.
+    expect(home.title()).toMatch(/^Done · 7 pages/);
+    expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 8(?!\d)/);
+    const rest = await home.openAhead();
+    expect(rest.pages()).toEqual([...MON, 8, 9, 10]);
+    expect(rest.current()).toBe(8);
+    await rest.back();
     await app.close();
 
     // Tuesday: the day isn't done; the session holds its five pages, two already checked.

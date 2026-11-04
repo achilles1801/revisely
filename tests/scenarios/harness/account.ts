@@ -41,7 +41,7 @@ export async function signUpAndRelaunch(phone: Phone, email = newEmail()): Promi
   phone.email = email;
   const svc = app.mods.require<typeof import('../../../src/services/firestoreService')>('src/services/firestoreService');
   const uid = app.uid;
-  const deadline = performance.now() + 15_000;
+  const deadline = performance.now() + 45_000;
   while (!(await svc.pagesExistOnServer(uid)) || !(await svc.userDocExistsOnServer(uid))) {
     if (performance.now() > deadline) throw new Error('the new account never reached the server');
     await app.idle(100);

@@ -35,4 +35,4 @@ jobs:
       - name: Scenarios and properties (Firebase emulators)
         run: >-
           firebase emulators:exec --only auth,firestore --project demo-revisely
-          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=3 --forceExit'
+          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit'

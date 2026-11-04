@@ -230,7 +230,7 @@ export class OpenApp {
   }
 
   /** Waits until `pred()` holds, letting the app run in between. */
-  async until(pred: () => boolean, what: string, timeoutMs = 15_000): Promise<void> {
+  async until(pred: () => boolean, what: string, timeoutMs = 45_000): Promise<void> {
     const started = performance.now();
     for (;;) {
       let ok = false;

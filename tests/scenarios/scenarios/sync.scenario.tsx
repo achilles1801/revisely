@@ -108,6 +108,6 @@ it.failing('KNOWN BUG: [SYNC-4] a new account loads after sign-up without a rela
   const phone = new Phone();
   const app = await phone.open();
   await app.act(() => app.auth.signUp(newEmail(), PASSWORD, 'New'));
-  await app.until(() => !!app.app.user && app.app.pages.length === 604, 'the new account to load', 10_000);
+  await app.until(() => !!app.app.user && app.app.pages.length === 604, 'the new account to load', 30_000);
   await app.close();
 });
