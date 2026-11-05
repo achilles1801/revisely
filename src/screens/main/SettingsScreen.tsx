@@ -68,7 +68,10 @@ import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
 import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
+import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
 import { showsResetMyData } from '../../lib/testerReset';
+import { showsTestScenarios } from '../../lib/testScenarios';
+import { releaseSync } from '../../lib/offline/sync';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -210,6 +213,8 @@ export default function SettingsScreen() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [resetSheet, setResetSheet] = useState(false);
+  const [scenarioSheet, setScenarioSheet] = useState(false);
+  const syncHeld = useSyncHeld(firebaseUser?.uid);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [tempName, setTempName] = useState(user?.name ?? '');
@@ -836,6 +841,27 @@ export default function SettingsScreen() {
                 onPress={() => setResetSheet(true)}
               />
             </View>
+            {showsTestScenarios(user) && (
+              <View testID="test-scenario-row">
+                <Row
+                  icon="flask-outline"
+                  label="Load test scenario"
+                  subtitle="Replace your data with a ready-made situation"
+                  destructive
+                  onPress={() => setScenarioSheet(true)}
+                />
+              </View>
+            )}
+            {syncHeld && (
+              <View testID="held-changes-row">
+                <Row
+                  icon="cloud-upload-outline"
+                  label="Send held changes"
+                  subtitle="The test scenario's changes wait on this phone until now"
+                  onPress={() => firebaseUser && releaseSync(firebaseUser.uid)}
+                />
+              </View>
+            )}
           </Section>
         )}
 
@@ -880,6 +906,9 @@ export default function SettingsScreen() {
       />
       <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
       {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
+      {showsTestScenarios(user) ? (
+        <TestScenarioSheet visible={scenarioSheet} onClose={() => setScenarioSheet(false)} />
+      ) : null}
       <ActionSheet
         visible={mushafMenu}
         onClose={() => setMushafMenu(false)}

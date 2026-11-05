@@ -293,3 +293,41 @@ describe('Settings: Reset my data (testers)', () => {
     expect(screen.getByTestId('reset-data-confirm').props.accessibilityState).toMatchObject({ disabled: true });
   });
 });
+
+describe('Settings: Load test scenario (testers)', () => {
+  afterEach(() => {
+    delete mockUser.previewTester;
+    jest.requireActual('../../../lib/offline/sync').releaseSync('u1');
+  });
+
+  it('changes held by the Offline queue scenario: a row sends them', async () => {
+    mockUser.previewTester = true;
+    const sync = jest.requireActual('../../../lib/offline/sync');
+    sync.holdSync('u1');
+    await renderV2();
+    expect(screen.getByTestId('held-changes-row')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByText('Send held changes'));
+    });
+    expect(sync.isSyncHeld('u1')).toBe(false);
+    expect(screen.queryByTestId('held-changes-row')).toBeNull();
+  });
+
+  it('not a previewTester account: no row', async () => {
+    await renderV2();
+    expect(screen.queryByTestId('test-scenario-row')).toBeNull();
+    expect(screen.queryByText('Load test scenario')).toBeNull();
+  });
+
+  it('a previewTester account: the row, in red, opens the scenario sheet', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    const label = screen.getByText('Load test scenario');
+    expect(flat(label.props.style).color).toBe(palette.red);
+    await act(async () => {
+      fireEvent.press(label);
+    });
+    expect(screen.getByTestId('test-scenario-hafiz')).toBeTruthy();
+    expect(screen.getByTestId('test-scenario-confirm').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});

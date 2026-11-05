@@ -1,4 +1,4 @@
-import { PACE_MIN_ITEMS, consistency, coverage, dayMarks, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace } from '../activityInsights';
+import { PACE_MIN_ITEMS, consistency, coverage, dayMarks, dayPattern, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace } from '../activityInsights';
 
 const TODAY = '2026-11-10';
 
@@ -46,12 +46,37 @@ describe('Activity Insights (C3)', () => {
 
   it('day marks: the ring is the share of the day’s assigned pages revised; memorized, read and note as dots', () => {
     const marks = dayMarks('2026-11-09', {
-      revised: [{ day: '2026-11-09', countsFor: '2026-11-09', pages: [1, 2], minutes: null }],
+      revised: [{ day: '2026-11-09', countsFor: '2026-11-09', pages: [1, 2], assigned: [1, 2], minutes: null }],
       memorized: [{ day: '2026-11-09', pages: [3] }],
       read: [],
       noteDays: new Set(['2026-11-09']),
     });
     expect(marks).toEqual({ ring: 1, memorized: true, read: false, note: true });
     expect(dayMarks('2026-11-08', { revised: [], memorized: [], read: [], noteDays: new Set() }).ring).toBeNull();
+  });
+
+  it('the ring is the share of the assigned pages revised, not of the revised ones', () => {
+    const marks = dayMarks('2026-11-09', {
+      revised: [{ day: '2026-11-09', countsFor: '2026-11-09', pages: [1, 2], assigned: [1, 2, 3, 4], minutes: null }],
+      memorized: [],
+      read: [],
+      noteDays: new Set(),
+    });
+    expect(marks.ring).toBe(0.5);
+  });
+
+  it('the preview gives a day’s blocks with their figures', () => {
+    const p = dayPreview('2026-11-09', {
+      revised: [{ day: '2026-11-09', countsFor: '2026-11-09', pages: [1, 2], assigned: [1, 2, 3], minutes: 34 }],
+      memorized: [{ day: '2026-11-09', pages: [9] }],
+      read: [{ day: '2026-11-09', pages: [5, 6], minutes: 18 }],
+      noteDays: new Set(['2026-11-09']),
+    });
+    expect(p).toEqual({ revised: { done: 2, assigned: 3, minutes: 34 }, memorizedPages: 1, readPages: 2, readMinutes: 18, notes: true });
+  });
+
+  it('the consistency picture: one entry per day of the window, oldest first, true where there was an item', () => {
+    const p = dayPattern([{ day: '2026-11-10' }, { day: '2026-11-08' }], '2026-11-10', 3);
+    expect(p).toEqual([true, false, true]);
   });
 });

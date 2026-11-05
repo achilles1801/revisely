@@ -7,6 +7,7 @@
 // recording files, which keeps the backup it is given.
 // Usage (harness/admin.ts):
 //   node testerReset.js reset <uid> '<data json>' [--no-app-check]
+//   node testerReset.js scenario <uid> '<data json>' --now <ms> [--no-app-check]
 //   node testerReset.js mark-tester <uid>
 const fs = require('fs');
 const path = require('path');
@@ -69,14 +70,31 @@ function memoryBucket() {
     app: process.argv.includes('--no-app-check') ? undefined : { appId: 'scenario' },
     data: JSON.parse(json ?? '{}'),
   };
+  const authUser = async (id) => {
+    const u = await admin.auth().getUser(id);
+    return { uid: u.uid, email: u.email ?? null, displayName: u.displayName ?? null, photoURL: u.photoURL ?? null };
+  };
+  // The server's clock: the scenario's (the phone's fake one) when given, so that
+  // its checks of the phone's clock and its rate limit go by the scenario's time.
+  const nowAt = process.argv.indexOf('--now');
+  const fakeNow = nowAt > 0 ? Number(process.argv[nowAt + 1]) : null;
+  const bucket = memoryBucket();
+  const store = adminResetStore(db, bucket);
+  if (fakeNow != null) {
+    // The same firebase-admin the function's code loads (functions/node_modules).
+    const { Timestamp } = createRequire(path.join(functions, 'src/index.ts'))('firebase-admin/firestore');
+    store.now = () => ({ stamp: Timestamp.fromMillis(fakeNow), ms: fakeNow, iso: new Date(fakeNow).toISOString() });
+  }
   try {
-    const result = await handleResetMyData(request, {
-      store: adminResetStore(db, memoryBucket()),
-      authUser: async (id) => {
-        const u = await admin.auth().getUser(id);
-        return { uid: u.uid, email: u.email ?? null, displayName: u.displayName ?? null, photoURL: u.photoURL ?? null };
-      },
-    });
+    let result;
+    if (mode === 'scenario') {
+      // Load test scenario (functions loadTestScenario): the same reset, then the seed.
+      const { handleLoadTestScenario } = load(path.join(functions, 'src/testScenarios.ts'));
+      const { adminScenarioWriter } = load(path.join(functions, 'src/testScenariosAdmin.ts'));
+      result = await handleLoadTestScenario(request, { store, writer: adminScenarioWriter(db, bucket), authUser });
+    } else {
+      result = await handleResetMyData(request, { store, authUser });
+    }
     console.log(JSON.stringify({ result }));
   } catch (err) {
     console.log(JSON.stringify({ error: { status: err.code ?? 'internal', message: err.message } }));

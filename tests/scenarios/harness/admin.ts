@@ -52,6 +52,35 @@ export function serveResetMyData(opts: { appCheck?: boolean } = {}): { calls: nu
   return served;
 }
 
+/**
+ * The loadTestScenario callable, as the app calls it: the ID token's uid is the
+ * caller, the function's own code runs (harness/testerReset.js scenario), with
+ * the scenario's clock as the server's (Storage is an in-memory bucket). Restore
+ * with the returned function.
+ */
+export function serveLoadTestScenario(): { calls: number; results: Record<string, unknown>[]; restore: () => void } {
+  const real = global.fetch;
+  const served = { calls: 0, results: [] as Record<string, unknown>[], restore: () => void (global.fetch = real) };
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (!url.endsWith('/loadTestScenario')) return real(input as RequestInfo, init);
+    served.calls += 1;
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    const token = (headers.Authorization ?? '').replace(/^Bearer /, '');
+    const claims = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8') || '{}');
+    const uid = claims.user_id ?? claims.sub;
+    const data = JSON.parse(String(init?.body ?? '{}')).data ?? {};
+    const answer = uid
+      ? testerReset(['scenario', uid, JSON.stringify(data), '--now', String(Date.now())])
+      : { error: { status: 'unauthenticated', message: 'Must be signed in.' } };
+    served.results.push(answer);
+    const status = answer.error ? 400 : 200;
+    const body = JSON.stringify(answer);
+    return { ok: !answer.error, status, text: async () => body, json: async () => answer } as unknown as Response;
+  }) as typeof fetch;
+  return served;
+}
+
 /** functions/scripts/reset-account.js for this account (harness/adminReset.js). */
 export function resetAccount(email: string): Record<string, unknown> {
   const { execFileSync } = jest.requireActual<typeof import('child_process')>('child_process');
