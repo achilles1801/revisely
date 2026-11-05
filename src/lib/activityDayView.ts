@@ -74,7 +74,7 @@ export function buildDayView(
   memorized: Set<number>,
 ): DayView {
   const own = input.revisions.filter((r) => r.day === day && r.countsFor === day);
-  const credits = input.revisions.filter((r) => r.day === day && r.countsFor !== day);
+  const credits = input.revisions.filter((r) => r.day === day && r.countsFor !== day && r.pages.length > 0);
   const revised = own.flatMap((r) => r.pages);
   const assigned = own.flatMap((r) => r.assigned);
   const revisedBlock: RevisedBlock = {

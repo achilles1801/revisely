@@ -147,6 +147,10 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AUDIO-2.** On Android, Pause and ▶ on the recitation's notification work with the app away;
   paused, the notification stays, and the app shows what was pressed.
 
+- **ACT-2.** A day's Revised block is built from its revision items: one per day, with the pages revised
+  ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
+  under the Revised block. Shown to preview testers while the Activity blocks are built.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
