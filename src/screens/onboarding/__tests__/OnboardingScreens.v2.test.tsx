@@ -34,9 +34,25 @@ jest.mock('../../../lib/notifications', () => ({
   scheduleDailyReminder: jest.fn(async () => undefined),
 }));
 // The browser has its own owner and tests; here it only has to be there.
+// The browser stands in for its rows; "mark Juz 2" does what its check does:
+// the pages it covers go into the selection, on top of what is there.
 jest.mock('../../../components/MemorizationBrowser', () => {
-  const { Text } = require('react-native');
-  return { MemorizationBrowser: () => <Text testID="memorization-browser">browser</Text> };
+  const { Pressable, Text } = require('react-native');
+  return {
+    MemorizationBrowser: ({ pendingChanges, onChange }: { pendingChanges: Map<number, string>; onChange: (m: Map<number, string>) => void }) => (
+      <>
+        <Text testID="memorization-browser">browser</Text>
+        <Pressable
+          testID="mark-juz-2"
+          onPress={() => {
+            const next = new Map(pendingChanges);
+            for (let p = 22; p <= 41; p++) next.set(p, 'memorized');
+            onChange(next);
+          }}
+        />
+      </>
+    ),
+  };
 });
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
@@ -198,6 +214,26 @@ describe('<JuzSelectionScreen /> in the new design', () => {
     });
     expect(mockApp.updatePages).toHaveBeenCalled();
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Schedule', { journeyStage: 'in_progress' });
+  });
+
+  it('a juz marked before the pages have loaded is kept when they arrive, and saved', async () => {
+    // A new account on a slow connection: its 604 pages aren't here yet.
+    mockApp.pages = [];
+    await show(v2(<JuzSelectionScreen />));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('mark-juz-2'));
+    });
+    mockApp.pages = Array.from({ length: 604 }, (_, i) => page(i + 1));
+    await act(async () => {
+      screen.rerender(v2(<JuzSelectionScreen />));
+    });
+    // Page 1 (in progress starts there) and Juz 2's 20 pages, 22–41.
+    expect(screen.getByTestId('juz-selection-summary')).toHaveTextContent('21 of 604 pages memorized');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('juz-continue'));
+    });
+    const [, changed] = (mockApp.updatePages as jest.Mock).mock.calls[0] as [UserPage[], number[]];
+    expect([...changed].sort((a, b) => a - b)).toEqual([1, ...Array.from({ length: 20 }, (_, i) => 22 + i)]);
   });
 
   it('nothing marked: Continue is off', async () => {
