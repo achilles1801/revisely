@@ -38,6 +38,11 @@ How the tests are made: `tests/scenarios/README.md`.
   day the user is in, not the calendar day.
 - **DAY-8.** Wherever the phone is, and whatever location is saved, the revision day moves on one day at
   a time. It turns at the Fajr of that morning (or at midnight), and no day is skipped or repeated.
+- **DAY-9.** Activity shows everything on the revision day it was done: sessions, pages revised ahead,
+  daily-log notes, timed readings and recordings. Something done between midnight and Fajr (boundary
+  on) shows on the day before, with no other weekday named, and nothing shows on a day that hasn't
+  started. Pages revised ahead still count for the day they're scheduled on (AHEAD-2), on Home and in
+  the schedule, but Activity lists them on the day they were revised.
 
 ## The schedule
 
@@ -120,6 +125,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **LOG-2.** Editing a note changes only that note; deleting one removes only it. Both reach every
   phone.
 - **LOG-3.** A note written between midnight and Fajr (boundary on) belongs to the revision day.
+- **LOG-4.** The log writes what is added at once: a note or a revised portion shows as soon as it is sent, stays
+  while the server catches up, and the first note of a day shows without leaving the log.
 
 ## Offline, devices and accounts
 
@@ -147,6 +154,14 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AUDIO-2.** On Android, Pause and ▶ on the recitation's notification work with the app away;
   paused, the notification stays, and the app shows what was pressed.
 
+## Activity
+
+- **ACT-1.** A memorized page is filed under the same revision day as everything else in Activity: the
+  day it is in, turning at Fajr when the user has the Fajr boundary on and a location (the moment before
+  that day's Fajr belongs to the day before). Otherwise it is the calendar day in the user's own time
+  zone, which is the zone their revision sessions were written in (the offset under which each session's
+  `createdAt` falls on its `date`); with no sessions, the saved location's zone, then UTC. (Changed Nov 5
+  2026: memorized items used to have no Fajr shift; Majd chose one day rule for all of Activity.)
 - **ACT-2.** A day's Revised block is built from its revision items: one per day, with the pages revised
   ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
   under the Revised block. Shown to preview testers while the Activity blocks are built.
