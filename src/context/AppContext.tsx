@@ -29,7 +29,7 @@ import { deleteRecordings, isRevisionRecordingOf } from '../lib/recordings';
 import { useAuth } from './AuthContext';
 import { clearAccount, readAccount, writeAccountPart, AccountPart } from '../lib/offline/accountCache';
 import { enqueue, loadOutbox, pendingEntries, removeEntries, subscribeOutbox } from '../lib/offline/outbox';
-import { resetMark, staleEntries, wasReset } from '../lib/offline/reset';
+import { noteResetAdopted, resetMark, staleEntries, wasReset } from '../lib/offline/reset';
 import { configureSync, onApplied, requestFlush } from '../lib/offline/sync';
 import { applyEntry } from '../lib/offline/apply';
 import {
@@ -378,7 +378,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const stale = staleEntries(pendingEntries(forUid), r.basis, server);
       r.basis = server;
       r.checked = true;
-      if (!reset) return;
+      if (!reset) {
+        noteResetAdopted(forUid, server);
+        return;
+      }
       logger.log('The account was reset on the server; dropping what this phone held from before', {
         changes: stale.length,
       });
@@ -401,6 +404,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           stale.map((e) => e.id),
         ),
       ]);
+      // What is queued from now on is built on the reset data (lib/testScenarios waits for this).
+      noteResetAdopted(forUid, server);
     },
     [mutateBase],
   );

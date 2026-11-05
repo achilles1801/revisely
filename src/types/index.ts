@@ -162,6 +162,8 @@ export interface JournalNote {
   kind: JournalKind;
   text: string;
   minutes: number | null;
+  /** The item this note hangs off (Activity spec section 2): `revision:<day>`, `memorization:<day>`, `read:<id>`. */
+  tag?: string | null;
 }
 
 /**

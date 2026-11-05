@@ -47,7 +47,9 @@ import {
   summarizeRevisedPages,
 } from '../../lib/journal';
 import { logger } from '../../lib/logger';
-import { missedFromSession } from '../../lib/activityAdd';
+import { memorizeSuggestion, missedFromSession } from '../../lib/activityAdd';
+import { describePageRuns, pageRuns } from '../../lib/pageRanges';
+import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
 import { ActionSheet } from '../../components/v2/ActionSheet';
@@ -70,7 +72,7 @@ const KIND_OPTIONS: { value: JournalKind; label: string }[] = [
   { value: 'note', label: 'Note' },
 ];
 
-type Draft = { text: string; minutes: string };
+type Draft = { text: string; minutes: string; tag?: string | null };
 const EMPTY_DRAFT: Draft = { text: '', minutes: '' };
 const EMPTY_DRAFTS: Record<JournalKind, Draft> = {
   memorization: EMPTY_DRAFT,
@@ -248,6 +250,7 @@ export default function JournalEntryScreen() {
   // What the composer shows: the kind being edited, or the kind's own draft.
   const composingKind: JournalKind = editing ? editing.note.kind : kind;
   const draft = editing ? editing.draft : drafts[kind];
+  const noteTag = draft.tag ?? null;
   const text = draft.text;
   const minutesText = draft.minutes;
   const setDraft = (patch: Partial<Draft>) => {
@@ -288,6 +291,43 @@ export default function JournalEntryScreen() {
   const suggestionAdded =
     sessionSuggestion != null &&
     (day?.entries ?? []).some((n) => n.kind === 'revision' && n.text.trim() === sessionSuggestion.text);
+  // The items a note can be tagged to (d8): the day's Revised, its memorizations and its reads.
+  const [tagOptions, setTagOptions] = useState<{ tag: string; label: string }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => firestoreService.getActivityItemsForDay(date))
+      .then((items) => {
+        if (cancelled) return;
+        setTagOptions([
+          ...(items.revisions.some((r) => r.countsFor === date) ? [{ tag: tagFor('revision', date), label: 'Revised' }] : []),
+          ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: 'Memorized' })),
+          ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: 'Read' })),
+        ]);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
+  // The Memorized suggestion (C4): pages read today that aren't memorized yet.
+  const [readToday, setReadToday] = useState<number[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    firestoreService
+      .getReadingSessionsForDay(date)
+      .then((list) => !cancelled && setReadToday(list.flatMap((r) => r.pages)))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
+  const memorizeSugg = useMemo(() => {
+    const memorized = new Set((allPages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+    return memorizeSuggestion(readToday, memorized);
+  }, [readToday, allPages]);
+  const showMemorizeSuggestion =
+    composingKind === 'memorization' && memorizeSugg.length > 0 && text.trim() === '' && !editing;
   const showSuggestion =
     composingKind === 'revision' &&
     sessionSuggestion != null &&
@@ -317,7 +357,13 @@ export default function JournalEntryScreen() {
           // Clearing an edited note deletes it.
           await queueChange({ kind: 'journal.entry.delete', date, id: editing.note.id });
         } else {
-          const entry: JournalNote = { ...editing.note, kind: sendKind, text: trimmed, minutes };
+          const entry: JournalNote = {
+            ...editing.note,
+            kind: sendKind,
+            text: trimmed,
+            minutes,
+            ...(sendKind === 'note' && noteTag ? { tag: noteTag } : {}),
+          };
           await queueChange({ kind: 'journal.entry.edit', date, entry });
         }
         setEditing(null);
@@ -329,7 +375,14 @@ export default function JournalEntryScreen() {
           return;
         }
         // Always a new note with its own id and time: Add never replaces one.
-        const entry: JournalNote = { id: autoId(), at: Date.now(), kind: sendKind, text: trimmed, minutes };
+        const entry: JournalNote = {
+          id: autoId(),
+          at: Date.now(),
+          kind: sendKind,
+          text: trimmed,
+          minutes,
+          ...(sendKind === 'note' && noteTag ? { tag: noteTag } : {}),
+        };
         await queueChange({ kind: 'journal.entry.add', date, entry });
         setDrafts((all) => ({ ...all, [sendKind]: EMPTY_DRAFT }));
       }
@@ -530,6 +583,37 @@ export default function JournalEntryScreen() {
                     {sessionSuggestion.minutes != null ? ` · ${formatMinutes(sessionSuggestion.minutes)}` : ''}
                   </Text>
                 </Tap>
+              ) : showMemorizeSuggestion ? (
+                <Tap
+                  onPress={() => setDraft({ text: describePageRuns(pageRuns(memorizeSugg)) })}
+                  style={[v2.suggestion, { borderColor: palette.outline }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fill with the pages you read today"
+                  testID="journal-memorize-suggestion"
+                >
+                  <Ionicons name="sparkles-outline" size={14} color={palette.text} />
+                  <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
+                    Read today, not memorized: {describePageRuns(pageRuns(memorizeSugg))}
+                  </Text>
+                </Tap>
+              ) : composingKind === 'note' && tagOptions.length > 0 && !editing ? (
+                <View style={v2.tagRow} testID="journal-tag-picker">
+                  {[{ tag: null as string | null, label: 'Untagged' }, ...tagOptions].map((o) => {
+                    const chosen = noteTag === o.tag;
+                    return (
+                      <Tap
+                        key={o.tag ?? 'untagged'}
+                        onPress={() => setDraft({ tag: o.tag })}
+                        style={[v2.suggestion, { borderColor: chosen ? palette.primary : palette.outline }]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: chosen }}
+                        accessibilityLabel={`Tag: ${o.label}`}
+                      >
+                        <Text style={[typeV2.meta, { color: palette.text }]}>{o.label}</Text>
+                      </Tap>
+                    );
+                  })}
+                </View>
               ) : undefined
             }
           >
@@ -671,6 +755,7 @@ const KEYBOARD_DONE_ID = 'journal-keyboard-done';
 
 // The new design: rows on the ground, the fields borderless like a composer.
 const v2 = StyleSheet.create({
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: layoutV2.gutter, paddingVertical: 8 },
   titleBox: { alignItems: 'center' },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   field: { flex: 1, paddingVertical: 6, paddingHorizontal: 0 },

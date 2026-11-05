@@ -579,7 +579,7 @@ function mergeNotes(legacy: JournalNote[], notes: JournalNote[]): JournalNote[] 
 }
 
 function noteFromFirestore(id: string, data: FirestoreJournalNote): JournalNote {
-  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null };
+  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null, tag: data.tag ?? null };
 }
 
 function noteToFirestore(note: JournalNote, uid: string, date: string): FirestoreJournalNote {
@@ -591,6 +591,7 @@ function noteToFirestore(note: JournalNote, uid: string, date: string): Firestor
     kind: note.kind,
     text: note.text,
     minutes: note.minutes,
+    ...(note.tag ? { tag: note.tag } : {}),
   };
 }
 
@@ -771,7 +772,7 @@ export async function getActivityItemsForDay(
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
-  reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
+  reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
   const [rev, mem, read] = await Promise.all([
@@ -793,8 +794,13 @@ export async function getActivityItemsForDay(
       };
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
-    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
   };
+}
+
+/** Removes a memorization item (C4): its pages are un-marked by their own change. */
+export async function deleteMemorizationItem(id: string, userId: string): Promise<void> {
+  await deleteDoc(doc(collection(db, 'users', userId, 'memorizations'), id));
 }
 
 /** Writes (or replaces) a session's Read item (C2 dual write). */
@@ -985,6 +991,35 @@ export async function resetMyDataOnServer(): Promise<TesterResetResult> {
   if (!user) throw new Error('No signed-in user.');
   const out = (await callFunction(user, 'resetMyData', { confirm: 'RESET' })) as { result?: TesterResetResult } | null;
   if (!out?.result?.ok) throw new Error('The reset did not answer as expected.');
+  return out.result;
+}
+
+/** What loadTestScenario answers (functions/src/testScenarios.ts). */
+export interface TestScenarioResult extends TesterResetResult {
+  scenario: string;
+  /** The revision day the scenario was built around. */
+  today: string;
+  seeded: Record<string, number>;
+  /** The reset's mark (ms). */
+  resetAt: number;
+  /** Changes for this phone to queue and hold (the offline-queue scenario): outbox ops. */
+  outbox: Record<string, unknown>[];
+}
+
+/**
+ * Reset the signed-in account and load a test scenario into it (testers only;
+ * the function checks previewTester itself). lib/testScenarios does the phone's part.
+ */
+export async function loadTestScenarioOnServer(data: {
+  scenario: string;
+  context: Record<string, unknown>;
+}): Promise<TestScenarioResult> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No signed-in user.');
+  const out = (await callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data })) as {
+    result?: TestScenarioResult;
+  } | null;
+  if (!out?.result?.ok) throw new Error('The scenario did not answer as expected.');
   return out.result;
 }
 
