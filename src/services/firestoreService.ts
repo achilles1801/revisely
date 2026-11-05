@@ -579,7 +579,7 @@ function mergeNotes(legacy: JournalNote[], notes: JournalNote[]): JournalNote[] 
 }
 
 function noteFromFirestore(id: string, data: FirestoreJournalNote): JournalNote {
-  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null };
+  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null, tag: data.tag ?? null };
 }
 
 function noteToFirestore(note: JournalNote, uid: string, date: string): FirestoreJournalNote {
@@ -591,6 +591,7 @@ function noteToFirestore(note: JournalNote, uid: string, date: string): Firestor
     kind: note.kind,
     text: note.text,
     minutes: note.minutes,
+    ...(note.tag ? { tag: note.tag } : {}),
   };
 }
 
