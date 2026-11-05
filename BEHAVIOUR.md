@@ -124,6 +124,10 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SYNC-4.** A new account loads right after sign-up, with no relaunch.
 - **RESET-1.** After the owner resets an account (`functions/scripts/reset-account.js`), every phone
   shows it as new. A change a phone made offline before the reset never reaches the server.
+- **RESET-2.** A tester (`previewTester`) can reset their own data from Settings (Reset my data, typed
+  RESET): a backup only the owner can read is taken first, then the account is as new, onboarding
+  next, still signed in, with nothing of before on the phone. No other account can, and not again
+  within 10 minutes.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 

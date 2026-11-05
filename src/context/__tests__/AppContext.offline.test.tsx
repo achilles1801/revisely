@@ -42,6 +42,7 @@ jest.mock('../../services/firestoreService', () => {
   return {
     userUpdateFields: actual.userUpdateFields,
     isDeletingAccount: () => false,
+    isResettingAccount: () => false,
     subscribeToUser: (cb: never, _uid: string, onError: never) => {
       mockListeners.user = cb;
       mockListeners.userError = onError;

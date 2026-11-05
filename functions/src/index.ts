@@ -16,6 +16,8 @@ import {
   parseBuild,
   verifyGithubToken,
 } from './playAvailable';
+import { RESET_CALL_OPTIONS, ResetError, ResetResult, handleResetMyData } from './testerReset';
+import { adminResetStore } from './testerResetAdmin';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -99,6 +101,29 @@ export const deleteUserAccount = onCall(
     return { ok: true };
   },
 );
+
+/**
+ * "Reset my data" (Settings, testers only): the caller's account starts again
+ * as new, after a backup only an admin can read. Who may, how often and in what
+ * order: testerReset.ts. App Check is required.
+ */
+export const resetMyData = onCall(RESET_CALL_OPTIONS, async (request): Promise<ResetResult> => {
+  try {
+    const result = await handleResetMyData(request, {
+      store: adminResetStore(adminDb, getStorage().bucket()),
+      authUser: async (uid) => {
+        const u = await getAuth().getUser(uid);
+        return { uid: u.uid, email: u.email ?? null, displayName: u.displayName ?? null, photoURL: u.photoURL ?? null };
+      },
+    });
+    logger.info('Tester reset', { backup: result.backup, deleted: result.deleted, files: result.files });
+    return result;
+  } catch (err) {
+    if (err instanceof ResetError) throw new HttpsError(err.code, err.message);
+    logger.error('resetMyData failed', err);
+    throw new HttpsError('internal', 'The reset did not finish. Try again; anything already reset stays reset.');
+  }
+});
 
 let jwks: { value: Jwks; at: number } | null = null;
 
