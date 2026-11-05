@@ -41,6 +41,8 @@ interface RecordingsListProps {
   highlightId?: string;
   /** "›": Listen back, the recording over its pages, from the start. */
   onOpen?: (recording: RecordingMeta) => void;
+  /** Shown when the day has none; null shows nothing (inside a block, where the block says so). */
+  emptyText?: string | null;
 }
 
 const KIND_LABEL: Record<RecordingKind, string> = {
@@ -63,7 +65,7 @@ export function RecordingsList({
   header,
   reloadKey,
   highlightId,
-  onOpen,
+  onOpen,  emptyText,
 }: RecordingsListProps) {
   const { palette } = useTheme();
   const haptics = useHaptics();
@@ -134,7 +136,7 @@ export function RecordingsList({
   useKeepScreenOn(playingId != null && !paused);
 
   if (items.length === 0) {
-    if (!loaded) return null;
+    if (!loaded || emptyText === null) return null;
     return (
       <>
         {header ? <View style={styles.gutter}>{header}</View> : null}
@@ -147,7 +149,7 @@ export function RecordingsList({
           ]}
           testID="recordings-none"
         >
-          No recordings on this day
+          {emptyText ?? 'No recordings on this day'}
         </Text>
       </>
     );

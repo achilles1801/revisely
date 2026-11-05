@@ -14,6 +14,8 @@ import { stripCells, strengthCounts } from '../../lib/activityDayParts';
 import { getFajrTimeFor } from '../../lib/fajrBoundary';
 import { ProgressRing, PageStrip, StrengthCounts, WindowFooter } from './DayParts';
 import { ThreadBranch } from './ThreadBranch';
+import { RecordingsList } from '../recordings/RecordingsList';
+import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
@@ -48,6 +50,8 @@ interface Props {
   onDeleteRevised: (log: RevisionLog) => void;
   /** A memorization item of the day: deleting it un-marks its pages (the screen does that). */
   onDeleteMemorized: (item: { id: string; day: string; pages: number[] }) => void;
+  /** Opens a recording (Listen back). */
+  onOpenRecording: (id: string) => void;
 }
 
 /** Destructive actions confirm first, and name what goes (Activity spec section 3). */
@@ -69,6 +73,7 @@ export function DayBlocks({
   revisedLog,
   onDeleteRevised,
   onDeleteMemorized,
+  onOpenRecording,
 }: Props) {
   const { pages, user } = useApp();
   const { palette } = useTheme();
@@ -107,12 +112,19 @@ export function DayBlocks({
     });
   const [items, setItems] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsForDay>> | null>(null);
 
+  // The day's recordings hang off their block: revision ones under Revised, reading ones under Read.
+  const [recs, setRecs] = useState<RecordingMeta[]>([]);
   const load = () => {
     firestoreService
       .getActivityItemsForDay(day)
       .then(setItems)
       .catch((err) => logger.warn('Could not load the day’s Activity items', err));
+    listRecordings()
+      .then((all) => setRecs(all.filter((r) => r.day === day)))
+      .catch((err) => logger.warn('Could not list the day’s recordings', err));
   };
+  const revRecs = recs.filter((r) => r.kind === 'revision');
+  const readRecs = recs.filter((r) => r.kind === 'reading');
   useActivityReload(load);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
@@ -140,7 +152,7 @@ export function DayBlocks({
   if (!view) return null;
 
   const [revised, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
-  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0;
+  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
@@ -218,6 +230,11 @@ export function DayBlocks({
               ))}
             </ThreadBranch>
           )}
+          {revRecs.length > 0 && (
+            <ThreadBranch>
+              <RecordingsList day={day} kind="revision" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />
+            </ThreadBranch>
+          )}
         </ThreadRow>
       )}
       {hasMemorized && (
@@ -266,7 +283,7 @@ export function DayBlocks({
           )}
         </ThreadRow>
       )}
-      {readItems.items.length > 0 && (
+      {(readItems.items.length > 0 || readRecs.length > 0) && (
         <ThreadRow
           mark={<Mark size="reply" icon="stopwatch-outline" />}
           name="Read"
@@ -294,6 +311,11 @@ export function DayBlocks({
               </Tap>
             );
           })}</ThreadBranch>
+          {readRecs.length > 0 && (
+            <ThreadBranch>
+              <RecordingsList day={day} kind="reading" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />
+            </ThreadBranch>
+          )}
         </ThreadRow>
       )}
       {notes.length > 0 && (
