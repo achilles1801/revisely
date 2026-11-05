@@ -45,6 +45,8 @@ export interface WeaknessChange {
 export type OutboxOp =
   | { kind: 'user'; fields: UserFields }
   | { kind: 'pages'; pages: PageFields[] }
+  /** A memorization item is removed (its pages are un-marked by the pages change beside it). */
+  | { kind: 'memorization.delete'; day: string; id: string }
   | {
       kind: 'session.add';
       date: string;

@@ -797,6 +797,11 @@ export async function getActivityItemsForDay(
   };
 }
 
+/** Removes a memorization item (C4): its pages are un-marked by their own change. */
+export async function deleteMemorizationItem(id: string, userId: string): Promise<void> {
+  await deleteDoc(doc(collection(db, 'users', userId, 'memorizations'), id));
+}
+
 /** Writes (or replaces) a session's Read item (C2 dual write). */
 export async function setReadItem(item: { id: string }, userId: string): Promise<void> {
   await setDoc(doc(collection(db, 'users', userId, 'reads'), item.id), item);

@@ -1,7 +1,7 @@
 // Activity's add menu rules (ACT-5) and undoable deletes (ACT-6), from lib/activityAdd.
 
 import fc from 'fast-check';
-import { memorizeSuggestion, missedFromSession, UndoQueue } from '../../../src/lib/activityAdd';
+import { memorizeSuggestion, missedFromSession, pagesToUnmark, UndoQueue } from '../../../src/lib/activityAdd';
 import { runs } from './fixtures';
 
 const pagesArb = fc.uniqueArray(fc.integer({ min: 1, max: 604 }), { maxLength: 15 });
@@ -61,3 +61,19 @@ describe('undoable deletes (ACT-6)', () => {
     );
   });
 });
+
+describe('removing a memorization (ACT-7)', () => {
+  it('[ACT-7] only pages still memorized are un-marked, each once, in order', () => {
+    fc.assert(
+      fc.property(pagesArb, pagesArb, (entry, memo) => {
+        const memorized = new Set(memo);
+        const out = pagesToUnmark(entry, memorized);
+        for (const p of out) expect(memorized.has(p)).toBe(true);
+        expect(new Set(out).size).toBe(out.length);
+        expect(out).toEqual([...out].sort((a, b) => a - b));
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
