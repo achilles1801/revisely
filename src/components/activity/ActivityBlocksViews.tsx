@@ -10,7 +10,9 @@ import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { getQuranData } from '../../lib/quranData';
 import { monthGrid, monthTitle, shiftMonth } from '../../lib/activityHeatmap';
-import { coverage, consistency, dayMarks, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace, PACE_MIN_ITEMS, type Memorized, type Read, type Revised } from '../../lib/activityInsights';
+import { coverage, consistency, dayMarks, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace, PACE_MIN_ITEMS, type Memorized, type Read, type Revised } from '../../lib/activityInsights';
+import { ProgressRing } from './DayParts';
+import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
@@ -54,7 +56,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
   const juzByPage = useMemo(() => new Map(getQuranData().map((q) => [q.pageNumber, q.juzNumber])), []);
 
-  const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, minutes: r.minutes })), [data]);
+  const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
   const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
   const read: Read[] = useMemo(() => (data?.reads ?? []).map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), [data]);
 
@@ -99,7 +101,6 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
               {row.map((d, c) => {
                 if (!d) return <RNView key={c} style={styles.cell} />;
                 const m = marksByDay.get(d);
-                const level = m?.ring == null ? 0 : m.ring >= 1 ? 3 : m.ring >= 0.5 ? 2 : 1;
                 const isPicked = picked === d;
                 return (
                   <Tap
@@ -110,9 +111,16 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={`${d}${m?.memorized ? ', memorized' : ''}${m?.read ? ', read' : ''}${m?.note ? ', note' : ''}`}
-                    style={[styles.cell, styles.dayCell, { backgroundColor: palette.heat[level], borderColor: isPicked || d === today ? palette.secondary : 'transparent' }]}
+                    style={[styles.cell, styles.dayCell, { borderColor: isPicked || d === today ? palette.secondary : 'transparent' }]}
                   >
-                    <Text style={[typeV2.meta, { color: palette.heatInk[level] }]}>{Number(d.slice(8))}</Text>
+                    <RNView style={styles.ringWrap}>
+                      {m?.ring != null && (
+                        <RNView style={styles.ring}>
+                          <ProgressRing fraction={m.ring} done={m.ring >= 1} size={32} />
+                        </RNView>
+                      )}
+                      <Text style={[typeV2.meta, { color: palette.text }]}>{Number(d.slice(8))}</Text>
+                    </RNView>
                     <RNView style={styles.dots}>
                       {m?.memorized && <RNView style={[styles.dot, { backgroundColor: palette.primary }]} />}
                       {m?.read && <RNView style={[styles.dot, { backgroundColor: palette.text }]} />}
@@ -123,6 +131,10 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
               })}
             </RNView>
           ))}
+          <DayPreview
+            day={picked ?? today}
+            data={{ revised, memorized, read, noteDays }}
+          />
         </RNView>
       ) : (
         <Insights
@@ -135,6 +147,30 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
           itemDays={[...revised.map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), ...read]}
         />
       )}
+    </RNView>
+  );
+}
+
+/** The picked day under the grid: its blocks, with the same icons and figures as the day view. */
+function DayPreview({ day, data }: { day: string; data: { revised: Revised[]; memorized: Memorized[]; read: Read[]; noteDays: Set<string> } }) {
+  const { palette } = useTheme();
+  const p = dayPreview(day, data);
+  const rows: { key: string; icon: React.ComponentProps<typeof Ionicons>['name']; name: string; figure?: string; sub?: string }[] = [];
+  if (p.revised) rows.push({ key: 'revised', icon: 'checkmark-circle-outline', name: 'Revised', figure: `${p.revised.done} of ${p.revised.assigned}`, sub: p.revised.minutes != null ? `${p.revised.minutes} min` : undefined });
+  if (p.memorizedPages > 0) rows.push({ key: 'memorized', icon: 'bookmark-outline', name: 'Memorized', figure: `${p.memorizedPages} ${p.memorizedPages === 1 ? 'page' : 'pages'}` });
+  if (p.readPages > 0) rows.push({ key: 'read', icon: 'stopwatch-outline', name: 'Read', figure: `${p.readPages} ${p.readPages === 1 ? 'page' : 'pages'}`, sub: p.readMinutes ? `${p.readMinutes} min` : undefined });
+  if (p.notes) rows.push({ key: 'notes', icon: 'create-outline', name: 'Notes' });
+  if (rows.length === 0) return <Text style={[typeV2.meta, { color: palette.secondary, paddingTop: 8 }]}>Nothing on this day</Text>;
+  return (
+    <RNView style={styles.preview} testID="activity-day-preview">
+      {rows.map((r) => (
+        <RNView key={r.key} style={styles.previewRow}>
+          <Ionicons name={r.icon} size={16} color={palette.secondary} />
+          <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>{r.name}</Text>
+          {r.sub ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{r.sub}</Text> : null}
+          {r.figure ? <Text style={[typeV2.name, { color: palette.text }]}>{r.figure}</Text> : null}
+        </RNView>
+      ))}
     </RNView>
   );
 }
@@ -197,6 +233,10 @@ function Figure({ label, value, note, palette }: { label: string; value: string;
 }
 
 const styles = StyleSheet.create({
+  ringWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', top: 0, left: 0 },
+  preview: { marginTop: 12, gap: 10 },
+  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad },
   pad: { paddingHorizontal: layoutV2.gutter, paddingVertical: layoutV2.rowPad },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
