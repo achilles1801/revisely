@@ -114,18 +114,40 @@ export class Home {
 
   /** Opens today's session (the Today post's button). */
   async startSession(): Promise<Session> {
-    resetPager();
-    await this.tap('today-cta');
-    const session = new Session(this.app);
-    await session.ready();
-    return session;
+    return this.open('today-cta');
   }
 
   /** "Tomorrow starts at …": opens the session on the next day's pages. */
   async openAhead(): Promise<Session> {
+    return this.open('today-ahead');
+  }
+
+  /**
+   * Taps a button that opens the session, and waits for it. A snapshot that
+   * lands between finding the button and pressing it (the server's copy of a
+   * change just saved) can draw Home again, and the press then reaches a button
+   * that is gone; the phone would take the next tap. So while Home is still
+   * the screen shown, the button is found again and pressed again (at most
+   * twice more), as a user would.
+   */
+  private async open(testID: string): Promise<Session> {
     resetPager();
-    await this.tap('today-ahead');
     const session = new Session(this.app);
+    const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+    const onHome = () => nav.current?.getCurrentRoute?.()?.name === 'Dashboard';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await this.tap(testID);
+      try {
+        await this.app.until(() => !onHome(), 'the session screen to open', 10_000);
+        break;
+      } catch {
+        // Still on Home: the press was lost; tap again.
+      }
+    }
+    const route = nav.current?.getCurrentRoute?.()?.name;
+    if (route !== 'ActiveRevision') {
+      throw new Error(`"${testID}" opened ${route ?? 'nothing'}, not the session. Home said: ${this.today()}\n${this.app.describe()}`);
+    }
     await session.ready();
     return session;
   }
@@ -135,8 +157,8 @@ export class Home {
 export class Session {
   constructor(private readonly app: OpenApp) {}
 
-  async ready(): Promise<void> {
-    await this.app.until(() => (pagerState().props?.pages.length ?? 0) > 0, 'the session to hold pages');
+  async ready(timeoutMs?: number): Promise<void> {
+    await this.app.until(() => (pagerState().props?.pages.length ?? 0) > 0, 'the session to hold pages', timeoutMs);
   }
 
   /** Every page the session holds, in order (today's, then any later days'). */
