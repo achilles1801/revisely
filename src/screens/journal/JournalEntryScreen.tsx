@@ -188,6 +188,7 @@ export default function JournalEntryScreen() {
   }, [uid, date]);
 
   const notes = useMemo(() => day?.entries ?? [], [day]);
+  useEffect(() => { console.log('[diag] render notes', JSON.stringify(notes.map((n) => n.text))); }, [notes]);
   const total = day ? journalTotalMinutes(day) : null;
   // What the composer shows: the kind being edited, or the kind's own draft.
   const composingKind: JournalKind = editing ? editing.note.kind : kind;

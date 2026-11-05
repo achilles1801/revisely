@@ -89,7 +89,7 @@ it('[LOG-3] [DAY-2] after midnight, before Fajr, a note goes to the revision day
   await app.close();
 });
 
-it('[LOG-1] two notes sent back to back, the second before the first has shown: both stay', async () => {
+for (let rep = 0; rep < 8; rep++) it(`[LOG-1] two notes sent back to back ${rep}`, async () => {
   setZone(ZONES.london);
   setNow('2026-11-02 20:00');
   const phone = new Phone();
@@ -114,6 +114,7 @@ it('[LOG-1] two notes sent back to back, the second before the first has shown: 
   await send('second');
   await opened.until(() => log.entries().length === 2, 'both notes in the log');
   await opened.untilSynced();
+  console.log('[diag] rows', JSON.stringify(opened.screen.queryAllByTestId(/journal-note/).map((r) => r.props.testID)));
   // The clock stands still, so both notes share a time: the order is by id, not checked here.
   expect(log.entries().map((e) => e.text).sort()).toEqual(['first', 'second']);
   await log.back();
