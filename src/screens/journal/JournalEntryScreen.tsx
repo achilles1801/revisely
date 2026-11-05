@@ -47,6 +47,7 @@ import {
   summarizeRevisedPages,
 } from '../../lib/journal';
 import { logger } from '../../lib/logger';
+import { missedFromSession } from '../../lib/activityAdd';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
 import { ActionSheet } from '../../components/v2/ActionSheet';
@@ -95,7 +96,7 @@ const MAX_REREADS = 6;
 export default function JournalEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
-  const { user, logs } = useApp();
+  const { user, logs, pages: allPages } = useApp();
   const { palette } = useTheme();
   const haptics = useHaptics();
   // This screen hides the tab bar, so the bottom is the home indicator's room
@@ -127,7 +128,8 @@ export default function JournalEntryScreen() {
 
   // The composer. Each kind keeps its own unsaved draft, so switching tabs never
   // carries text across, and Add saves only the kind that is showing.
-  const [kind, setKind] = useState<JournalKind>('memorization');
+  // Opened from the Activity add menu on that kind's tab (C4); the default is Memorized.
+  const [kind, setKind] = useState<JournalKind>(route.params?.kind ?? 'memorization');
   const [drafts, setDrafts] = useState<Record<JournalKind, Draft>>(EMPTY_DRAFTS);
   // A note being edited has a draft of its own, and its kind stays locked.
   const [editing, setEditing] = useState<{ note: JournalNote; draft: Draft } | null>(null);
@@ -273,14 +275,16 @@ export default function JournalEntryScreen() {
 
   // Offer to fill a revision from the in-app session logged that day, until
   // a revision with the same text is in the log: a session is added once.
+  // Only what the session missed (its skipped pages, not revised): the pages it did
+  // are already in the day's Revised block, so copying them would be a second entry.
   const sessionSuggestion = useMemo(() => {
     const log = logs.find((l) => l.date === date);
-    if (!log || log.pagesRevised.length === 0) return null;
-    return {
-      text: summarizeRevisedPages(log.pagesRevised),
-      minutes: log.durationMinutes,
-    };
-  }, [logs, date]);
+    if (!log) return null;
+    const memorized = new Set((allPages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+    const missed = missedFromSession(log, memorized);
+    if (missed.length === 0) return null;
+    return { text: summarizeRevisedPages(missed), minutes: null as number | null };
+  }, [logs, date, allPages]);
   const suggestionAdded =
     sessionSuggestion != null &&
     (day?.entries ?? []).some((n) => n.kind === 'revision' && n.text.trim() === sessionSuggestion.text);
