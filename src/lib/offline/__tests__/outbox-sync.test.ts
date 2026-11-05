@@ -9,7 +9,17 @@ import {
   resetOutboxForTests,
   clearOutbox,
 } from '../outbox';
-import { configureSync, requestFlush, resetSyncForTests, settleSync, onApplied, classifyError } from '../sync';
+import {
+  configureSync,
+  requestFlush,
+  resetSyncForTests,
+  settleSync,
+  onApplied,
+  classifyError,
+  holdSync,
+  releaseSync,
+  isSyncHeld,
+} from '../sync';
 import type { OutboxEntry } from '../ops';
 
 jest.mock('../../logger', () => ({ logger: { log: jest.fn(), warn: jest.fn(), error: jest.fn() } }));
@@ -235,5 +245,35 @@ describe('sync', () => {
     expect(classifyError({ code: 'deadline-exceeded' })).toBe('later');
     expect(classifyError({ code: 'permission-denied' })).toBe('permission');
     expect(classifyError({ code: 'not-found' })).toBe('refused');
+  });
+});
+
+describe('held changes (testers: Load test scenario → Offline queue)', () => {
+  it('nothing is sent while held; releasing sends them, in order', async () => {
+    holdSync('u1');
+    expect(isSyncHeld('u1')).toBe(true);
+    await enqueue('u1', usage(1));
+    await enqueue('u1', usage(2));
+    requestFlush('u1');
+    await settleSync('u1');
+    expect(apply).not.toHaveBeenCalled();
+    expect(pendingEntries('u1')).toHaveLength(2);
+
+    releaseSync('u1');
+    await settleSync('u1');
+    expect(isSyncHeld('u1')).toBe(false);
+    expect(apply.mock.calls.map(([, e]) => e.op)).toEqual([usage(1), usage(2)]);
+    expect(pendingEntries('u1')).toEqual([]);
+  });
+
+  it('the hold ends with the app: after a restart the changes go', async () => {
+    holdSync('u1');
+    await enqueue('u1', usage(3));
+    restartApp();
+    configure();
+    await loadOutbox('u1');
+    requestFlush('u1');
+    await settleSync('u1');
+    expect(apply.mock.calls.map(([, e]) => e.op)).toEqual([usage(3)]);
   });
 });

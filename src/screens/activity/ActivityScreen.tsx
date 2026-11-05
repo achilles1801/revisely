@@ -29,6 +29,7 @@ import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { missedFromSession } from '../../lib/activityAdd';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Activity'>;
 
@@ -44,7 +45,7 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logs, saveUser } = useApp();
+  const { user, logs, pages, saveUser } = useApp();
   const { palette } = useTheme();
   const tabFootprint = useTabBarFootprint();
 
@@ -75,7 +76,15 @@ export default function ActivityScreen() {
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
   // The + menu (C4, previewTester): one add per kind, each on its own composer tab.
   const [addOpen, setAddOpen] = useState(false);
+  // "From your session" (d5): on top when today's session missed pages it can add.
+  const todaysLog = logs.find((l) => l.date === today);
+  const missed = todaysLog
+    ? missedFromSession(todaysLog, new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)))
+    : [];
   const addMenuActions = [
+    ...(missed.length > 0
+      ? [{ key: 'session', label: 'From your session', icon: 'sparkles-outline' as const, subtitle: `${missed.length} ${missed.length === 1 ? 'page' : 'pages'} it missed`, onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'revision' }) }]
+      : []),
     { key: 'revision', label: 'Revised', icon: 'checkmark-circle-outline' as const, subtitle: 'Pages you revised, or missed', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'revision' }) },
     { key: 'memorization', label: 'Memorized', icon: 'bookmark-outline' as const, subtitle: 'Pages you have memorized', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'memorization' }) },
     { key: 'read', label: 'Read', icon: 'stopwatch-outline' as const, subtitle: 'A timed reading session', onPress: () => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read') },
