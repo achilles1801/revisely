@@ -100,8 +100,11 @@ How the tests are made: `tests/scenarios/README.md`.
   start, and the days after carry on from it. The start moves at once.
 - **JUMP-2.** The session holds today's pages from that start. Pages behind it are not in the session.
 - **JUMP-3.** A jump drops pages carried into today that are not yet revised: they were the old start's.
-  Pages revised today stay counted and go first. (Changed Nov 2026: a carry kept the old start in place,
-  so Jump to an earlier juz did nothing.)
+  Pages revised in today's own session stay counted and go first. Pages revised ahead for today from an
+  earlier day are dropped too, and a jump leaves no carry-over offered for today. (Changed Nov 2026: a
+  carry kept the old start in place, so Jump to an earlier juz did nothing. Changed Nov 5 2026: pages
+  revised ahead for today came back in front of the new start, and a leftover offer made after the jump
+  was added in front of it: Jump to p. 1 showed pages 236–240 first.)
 
 ## The daily log
 
