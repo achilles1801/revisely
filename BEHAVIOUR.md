@@ -189,6 +189,9 @@ How the tests are made: `tests/scenarios/README.md`.
   is strong. The counts on a day's Revised block are these classes, over the day's revised pages (a page with
   no rating counts as 4, strong). Confirmed by Majd, Nov 2026.
 
+- **ACT-9.** A day's Activity items load when the day opens and again when its screen regains focus, not
+  on their own: a render never starts another load (it looped and froze the app, Nov 2026).
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
