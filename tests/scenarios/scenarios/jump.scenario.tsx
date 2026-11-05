@@ -152,7 +152,8 @@ describe('Jump to… with pages revised ahead for today', () => {
       await session.swipeThrough(session.pages().length);
       await session.back();
       const ahead = await home.openAhead();
-      expect(ahead.pages()).toEqual([...range(542, 561), ...range(562, 581)]);
+      // Wednesday's pages alone (Tuesday's are not behind them).
+      expect(ahead.pages()).toEqual(range(562, 581));
       await ahead.swipeThrough(3);
       await ahead.back();
       await app.untilSynced();

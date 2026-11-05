@@ -7,7 +7,7 @@ import {
   removeAheadPages,
 } from '../aheadCredit';
 import { recomputePagesFromLogs } from '../algorithm';
-import { doneOnDay, reviewedOn } from '../aheadCredit';
+import { doneOnDay, reviewedOn, reviewPagesInOrder } from '../aheadCredit';
 import { removeRevisedPages } from '../revisionSession';
 import { applySessionEdit, mergeSessionAdd, sessionUpdateData } from '../offline/ops';
 import type { RevisionLog, UserPage } from '../../types';
@@ -247,5 +247,50 @@ describe('the review of a day with pages revised ahead', () => {
 
   it('a session on another day does not join this day’s review', () => {
     expect([...reviewedOn([tuesday], '2026-11-04')]).toEqual([]);
+  });
+});
+
+describe('the review’s order (Majd, Nov 5 2026)', () => {
+  const sorted = (s: Iterable<number>) => [...s].sort((a, b) => a - b);
+
+  it('the day’s own pages first, in its order, then the pages revised ahead, day by day', () => {
+    // Tuesday is 582–590 and 1 (a juz plan wraps); Wednesday 591–593 and Thursday 601 revised ahead.
+    const assigned = [582, 583, 584, 585, 586, 587, 588, 589, 590, 1];
+    const tuesday = log('2026-11-03', [...assigned, 601, 591, 592, 593], {
+      '2026-11-05': [601],
+      '2026-11-04': [591, 592, 593],
+    });
+    const order = reviewPagesInOrder([tuesday], '2026-11-03', assigned);
+    expect(order).toEqual([...assigned, 591, 592, 593, 601]);
+    // The same pages as Home's "Done · N".
+    expect(sorted(order)).toEqual(sorted(doneOnDay([tuesday], '2026-11-03')));
+  });
+
+  it('the repro day: today’s 6–9 and 235, then Wednesday’s 236–240', () => {
+    const tuesday = log('2026-11-03', [6, 7, 8, 9, 235, 236, 237, 238, 239, 240], {
+      '2026-11-04': [236, 237, 238, 239, 240],
+    });
+    expect(reviewPagesInOrder([tuesday], '2026-11-03', [6, 7, 8, 9, 235])).toEqual([
+      6, 7, 8, 9, 235, 236, 237, 238, 239, 240,
+    ]);
+  });
+
+  it('pages revised ahead for the day in an earlier session are the day’s own', () => {
+    const monday = log('2026-11-02', [1, 2, 3, 6, 7], { '2026-11-03': [6, 7] });
+    const tue = log('2026-11-03', [8, 9, 10, 11], { '2026-11-04': [11] });
+    const order = reviewPagesInOrder([monday, tue], '2026-11-03', [6, 7, 8, 9, 10]);
+    expect(order).toEqual([6, 7, 8, 9, 10, 11]);
+    expect(sorted(order)).toEqual(sorted(doneOnDay([monday, tue], '2026-11-03')));
+  });
+
+  it('a day done only ahead: its pages, in its order', () => {
+    const monday = log('2026-11-02', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], { '2026-11-03': [6, 7, 8, 9, 10] });
+    expect(reviewPagesInOrder([monday], '2026-11-03', [6, 7, 8, 9, 10])).toEqual([6, 7, 8, 9, 10]);
+  });
+
+  it('several sessions of the day: every page once', () => {
+    const a = log('2026-11-03', [6, 7]);
+    const b = { ...log('2026-11-03', [8, 9, 10, 11, 12], { '2026-11-04': [11, 12] }), id: 'b' };
+    expect(reviewPagesInOrder([a, b], '2026-11-03', [6, 7, 8, 9, 10])).toEqual([6, 7, 8, 9, 10, 11, 12]);
   });
 });

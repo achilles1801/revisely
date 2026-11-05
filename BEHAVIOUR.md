@@ -61,19 +61,22 @@ How the tests are made: `tests/scenarios/README.md`.
   counts the day.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
-  ahead in its sessions, and Review session opens exactly those (#199).
+  ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,
+  in the day's order, then the pages revised ahead, the earliest later day first (Nov 5 2026).
   A day done only by pages revised ahead (no session of its own) still opens its review with those
   pages checked; saving it makes that day's session.
 
 ## Revising ahead
 
 - **AHEAD-1.** Once today is done, Home offers the next revision day ("Tomorrow starts at …"), from its
-  first page not done yet. Tapping it opens the session there, after today's pages; the next day's
-  pages already done are left out (#198).
+  first page not done yet. Tapping it opens that day's pages alone, as if it were that day's session:
+  today's pages are not behind them (Nov 5 2026). The next day's pages already done are left out
+  (#198).
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
   That day then needs only the pages left, and is done when none are.
-- **AHEAD-3.** The end card's Keep going adds the next revision day's pages not done yet to the
-  session. Done again, it adds the day after. It stops at the end of a cycle.
+- **AHEAD-3.** The end card's Keep going goes on to the next revision day's pages not done yet,
+  which the session then holds alone (the day before is not behind them). Done again, it goes on
+  to the day after. It stops at the end of a cycle. Mark in bulk works on the day on screen.
 - **AHEAD-4.** A day already done ahead is passed over: Keep going and Home's next line go to the day
   after it (the owner's rule, #198).
 - **AHEAD-5.** A page is credited ahead only when it was revised in that session (checked or swiped).
