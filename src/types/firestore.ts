@@ -299,6 +299,8 @@ export interface FirestoreJournalNote {
   at: number;
   kind: 'memorization' | 'revision' | 'note';
   text: string;
+  /** The item this note is tagged to (see JournalNote.tag). */
+  tag?: string | null;
   minutes: number | null;
 }
 
