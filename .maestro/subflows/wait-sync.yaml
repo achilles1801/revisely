@@ -1,0 +1,12 @@
+# Eight seconds, for a change just made in the daily log to be sent and the day
+# read again from the server; the flow then checks the change is still shown.
+# A note that showed when added but dropped out once it was sent (or a deleted
+# one that came back) is the bug of #213 and #220 (Nov 5): the check right after
+# the tap alone missed it whenever the server's copy came late.
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: e2e-never-shown
+    timeout: 8000
+    optional: true
