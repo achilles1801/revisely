@@ -19,9 +19,13 @@ appId: com.revisionbuddy.app
     file: ../subflows/add-note.yaml
     env:
       TEXT: Repeat Al-Mutaffifin twice
-- assertVisible:
-    id: journal-note-.*
-    text: "Note, Juz 30 felt steady today, .*"
+# The first note is checked with a wait: the second note's send can still be
+# landing, and a note that truly vanished still fails after the timeout.
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
 
 # Kept: a cold start, then back to the log.
 - runFlow: ../subflows/relaunch.yaml
