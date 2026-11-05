@@ -141,12 +141,12 @@ function recordingItem(r: RecordingItemSource): ActivityItem {
 }
 
 /** One note of a day's log: its time, what it says, its minutes. */
-function logItem(day: JournalEntry, note: JournalNote): ActivityItem {
+function logItem(day: JournalEntry, note: JournalNote, user?: User | null): ActivityItem {
   const text = note.text.trim();
   const said =
     note.kind === 'memorization' ? `Memorized ${text}` : note.kind === 'revision' ? `Revised ${text}` : text;
   const parts = [
-    formatEntryTime(note.at, day.date),
+    formatEntryTime(note.at, day.date, user),
     said || null,
     note.minutes ? formatMinutesShort(note.minutes) : null,
   ].filter(Boolean);
@@ -167,8 +167,9 @@ function weekdayName(day: string): string {
 
 /**
  * A session's pages revised ahead (lib/aheadCredit): one item on the day they
- * were revised ("Revised ahead for Wed") and one on the day they count for
- * ("Done ahead on Tue").
+ * were revised ("Revised ahead for Wed"). Nothing goes on the day they count
+ * for: Activity shows what was done on each day, and that day may not have
+ * started yet (DAY-9). Home and the schedule still count them for it.
  */
 function aheadItems(log: RevisionLog): ActivityItem[] {
   const out: ActivityItem[] = [];
@@ -185,15 +186,6 @@ function aheadItems(log: RevisionLog): ActivityItem[] {
       at,
       title: `Revised ahead for ${weekdayName(day)} · ${plural(pages.length, 'page')}`,
       detail,
-    }, pages));
-    out.push(item({
-      key: `ahead-to-${log.id}-${day}`,
-      kind: 'revision',
-      day,
-      at,
-      title: `Done ahead on ${weekdayName(log.date)}`,
-      detail,
-      done: true,
     }, pages));
   }
   return out;
@@ -226,7 +218,7 @@ export function buildActivityItems(
   for (const r of recordings) if (DAY_RE.test(r.day)) out.push(recordingItem(r));
   for (const day of journal) {
     if (!DAY_RE.test(day.date)) continue;
-    for (const note of day.entries) if (!isJournalNoteEmpty(note)) out.push(logItem(day, note));
+    for (const note of day.entries) if (!isJournalNoteEmpty(note)) out.push(logItem(day, note, user));
   }
   return out.sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.at - a.at));
 }

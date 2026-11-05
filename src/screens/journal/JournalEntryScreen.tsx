@@ -496,7 +496,7 @@ export default function JournalEntryScreen() {
           testID="journal-v2"
         >
           {notes.map((n) => {
-            const time = formatEntryTime(n.at, date);
+            const time = formatEntryTime(n.at, date, user);
             const body = n.text.trim();
             const label = JOURNAL_KIND_LABELS[n.kind];
             return (
@@ -525,7 +525,7 @@ export default function JournalEntryScreen() {
           <ThreadRow
             mark={<Mark icon={editing ? 'create-outline' : 'add-outline'} />}
             name={editing ? `Editing ${JOURNAL_KIND_LABELS[composingKind].toLowerCase()}` : 'New entry'}
-            meta={editing ? formatEntryTime(editing.note.at, date) : undefined}
+            meta={editing ? formatEntryTime(editing.note.at, date, user) : undefined}
             lineAbove
             separator={false}
             testID="journal-composer"
