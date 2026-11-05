@@ -10,7 +10,9 @@
  * touched; nothing in the payload names an account.
  *
  * How often: one finished reset per RESET_GAP_MS, and RESET_ATTEMPTS_PER_DAY
- * attempts a day (UTC), kept in adminResets/<uid> (closed to clients).
+ * attempts a day (UTC), kept in adminResets/<uid> (closed to clients). Loading a
+ * test scenario (testScenarios.ts) resets the same way, with limits of its own
+ * kept beside them (`scenario` in the same document).
  *
  * Order: back up everything, read the backup back, and only then change
  * anything. A failed backup changes nothing. A reset that fails half way can be
@@ -20,6 +22,24 @@
 export const RESET_CONFIRM = 'RESET';
 export const RESET_GAP_MS = 10 * 60_000;
 export const RESET_ATTEMPTS_PER_DAY = 10;
+
+/** What a claim is for: Reset my data, or Load test scenario (a reset, then a seed). */
+export type ClaimKind = 'reset' | 'scenario';
+
+export interface ClaimLimits {
+  gapMs: number;
+  perDay: number;
+  /** "You <did> less than N minutes ago" */
+  did: string;
+  /** "That's N <many> today" */
+  many: string;
+}
+
+export const CLAIM_LIMITS: Record<ClaimKind, ClaimLimits> = {
+  reset: { gapMs: RESET_GAP_MS, perDay: RESET_ATTEMPTS_PER_DAY, did: 'reset', many: 'resets' },
+  // A tester tries several scenarios in a row: a short gap, more a day.
+  scenario: { gapMs: 2 * 60_000, perDay: 30, did: 'loaded a test scenario', many: 'test scenarios' },
+};
 const TOTAL_PAGES = 604;
 /** Never reset these, tester or not (App Review signs in with it). */
 const PROTECTED_EMAILS = ['applereview@revisely.app'];
@@ -58,17 +78,27 @@ export interface ResetLog {
   lastDoneAt?: number | null;
 }
 
-/** Whether a reset may start now, and the log to write if so. */
-export function claimReset(log: ResetLog | null, nowMs: number): { ok: true; next: ResetLog } | { ok: false; reason: string } {
+/**
+ * Whether a reset (or a scenario load) may start now, and the log to write if
+ * so. `log` is the kind's own: adminResets/<uid> for a reset, its `scenario`
+ * map for a scenario.
+ */
+export function claimReset(
+  log: ResetLog | null,
+  nowMs: number,
+  kind: ClaimKind = 'reset',
+): { ok: true; next: ResetLog } | { ok: false; reason: string } {
+  const limits = CLAIM_LIMITS[kind];
   const day = new Date(nowMs).toISOString().slice(0, 10);
   const last = log?.lastDoneAt ?? null;
-  if (last != null && nowMs - last < RESET_GAP_MS) {
-    const minutes = Math.ceil((RESET_GAP_MS - (nowMs - last)) / 60_000);
-    return { ok: false, reason: `You reset less than 10 minutes ago. Try again in ${minutes} min.` };
+  if (last != null && nowMs - last < limits.gapMs) {
+    const minutes = Math.ceil((limits.gapMs - (nowMs - last)) / 60_000);
+    const gap = Math.round(limits.gapMs / 60_000);
+    return { ok: false, reason: `You ${limits.did} less than ${gap} minutes ago. Try again in ${minutes} min.` };
   }
   const attempts = log?.day === day ? (log.attempts ?? 0) : 0;
-  if (attempts >= RESET_ATTEMPTS_PER_DAY) {
-    return { ok: false, reason: `That's ${RESET_ATTEMPTS_PER_DAY} resets today. Try again tomorrow (UTC).` };
+  if (attempts >= limits.perDay) {
+    return { ok: false, reason: `That's ${limits.perDay} ${limits.many} today. Try again tomorrow (UTC).` };
   }
   return { ok: true, next: { day, attempts: attempts + 1, lastDoneAt: last } };
 }
@@ -153,7 +183,7 @@ export interface ResetStore {
   now(): { stamp: unknown; ms: number; iso: string };
   readUser(uid: string): Promise<Record<string, unknown> | null>;
   /** Applies claimReset in a transaction on adminResets/<uid>; throws ResetError when refused. */
-  claim(uid: string, nowMs: number): Promise<void>;
+  claim(uid: string, nowMs: number, kind?: ClaimKind): Promise<void>;
   /** Every document and recording file of the account, copied to the backup and read back. */
   backup(uid: string, stampIso: string): Promise<BackupSummary>;
   /** users/<uid> replaced by `user` (never deleted: an open app would make one without previewTester). */
@@ -170,8 +200,8 @@ export interface ResetStore {
   tombstoneRecordings(uid: string, now: unknown): Promise<number>;
   /** The files under recordings/<uid>/ in Storage deleted; returns how many. */
   deleteRecordingFiles(uid: string): Promise<number>;
-  /** The reset finished: adminResets/<uid>.lastDoneAt. */
-  finish(uid: string, nowMs: number): Promise<void>;
+  /** The reset finished: adminResets/<uid>.lastDoneAt (or the scenario's). */
+  finish(uid: string, nowMs: number, kind?: ClaimKind): Promise<void>;
 }
 
 export interface ResetResult {
@@ -183,12 +213,32 @@ export interface ResetResult {
   files: number;
 }
 
+/**
+ * What a scenario load adds to a reset (testScenarios.ts): checks of its own
+ * before anything is claimed, the user document it ends with, and the seeding.
+ */
+export interface ResetExtras {
+  kind?: ClaimKind;
+  /** Shown to an account that isn't a tester. */
+  testersOnly?: string;
+  /** Throws a ResetError to refuse; runs after the account checks, before the claim. */
+  validate?: (now: { ms: number }) => void;
+  /** The user document to end with, from sign-up's. */
+  userFor?: (fresh: Record<string, unknown>) => Record<string, unknown>;
+  /**
+   * Writes the scenario after the reset. The user document is written after it,
+   * last, so a phone sees the new reset mark once everything is in place.
+   */
+  seed?: (uid: string, now: { stamp: unknown; ms: number }) => Promise<Record<string, number>>;
+}
+
 /** The reset itself, for `uid` only, once the caller is known to be signed in with App Check. */
 export async function resetTesterAccount(
   store: ResetStore,
   auth: AuthInfo,
   data: unknown,
-): Promise<ResetResult> {
+  extras: ResetExtras = {},
+): Promise<ResetResult & { seeded?: Record<string, number>; resetAt: number }> {
   const uid = auth.uid;
   if (!uid) throw new ResetError('unauthenticated', 'Must be signed in.');
   const confirm = (data as { confirm?: unknown } | null | undefined)?.confirm;
@@ -198,11 +248,13 @@ export async function resetTesterAccount(
   }
   const user = await store.readUser(uid);
   if (!user || user.previewTester !== true) {
-    throw new ResetError('permission-denied', 'Reset my data is for testers only.');
+    throw new ResetError('permission-denied', extras.testersOnly ?? 'Reset my data is for testers only.');
   }
 
   const now = store.now();
-  await store.claim(uid, now.ms);
+  extras.validate?.(now);
+  const kind = extras.kind ?? 'reset';
+  await store.claim(uid, now.ms, kind);
 
   let backup: BackupSummary;
   try {
@@ -211,13 +263,20 @@ export async function resetTesterAccount(
     throw new ResetError('internal', `The backup failed, so nothing was changed. ${(err as Error).message ?? ''}`.trim());
   }
 
-  await store.replaceUser(uid, freshUser(auth, now.stamp, now.iso));
+  const fresh = freshUser(auth, now.stamp, now.iso);
+  const next = extras.userFor ? extras.userFor(fresh) : fresh;
+  if (!extras.seed) await store.replaceUser(uid, next);
   const pages = await store.resetPages(uid, now.stamp);
   const deleted = await store.deleteHistory(uid);
   const recordings = await store.tombstoneRecordings(uid, now.stamp);
   const files = await store.deleteRecordingFiles(uid);
-  await store.finish(uid, now.ms);
-  return { ok: true, backup, pages, deleted, recordings, files };
+  let seeded: Record<string, number> | undefined;
+  if (extras.seed) {
+    seeded = await extras.seed(uid, now);
+    await store.replaceUser(uid, next);
+  }
+  await store.finish(uid, now.ms, kind);
+  return { ok: true, backup, pages, deleted, recordings, files, resetAt: now.ms, ...(seeded ? { seeded } : {}) };
 }
 
 /** What the callable passes in (a CallableRequest's parts this needs). */

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Firestore and Storage security rules tests run against the Firebase emulators.",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore,storage --project=revisley-rules-test 'jest --runInBand'",
+    "test": "../../scripts/emulators.sh exec firestore,storage revisley-rules-test 'jest --runInBand'",
     "test:local": "jest --runInBand"
   },
   "devDependencies": {

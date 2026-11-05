@@ -12,11 +12,14 @@ cd tests/scenarios && npm ci
 ```
 
 ```bash
-firebase emulators:exec --only auth,firestore --project demo-revisely 'cd tests/scenarios && npx jest --config jest.config.js --maxWorkers=4 --forceExit'
+scripts/emulators.sh exec auth,firestore demo-revisely 'cd tests/scenarios && npx jest --config jest.config.js --maxWorkers=4 --forceExit'
 ```
 
-Run it from the repository root, where `firebase.json` is. To run one file, add its name after
-`--forceExit` (for example `ahead`). The property tests alone need no emulators:
+Run it from the repository root. To run one file, add its name after `--forceExit` (for example
+`ahead`). Always start the emulators through `scripts/emulators.sh`, never `firebase emulators:*`
+directly: it takes the shared lock, so two sessions never run on one set of ports. To run beside
+another worktree, give this one its own ports with `REVISELY_EMU_PORT_BASE=auto` (stable per
+worktree path); the harness reads them from the environment the script sets. The property tests alone need no emulators:
 
 ```bash
 npx jest --config tests/scenarios/jest.config.js properties

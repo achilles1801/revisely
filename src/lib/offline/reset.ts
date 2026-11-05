@@ -9,6 +9,50 @@
 import type { OutboxEntry } from './ops';
 import { millisOf } from './codec';
 
+// The mark each account's data on this phone is now built on, once AppProvider
+// has checked it against the server's (and dropped what was from before).
+const adopted = new Map<string, number | null>();
+const adoptWaiters = new Set<() => void>();
+
+/** AppProvider: the phone's data for `uid` is now built on the server's mark `mark`. */
+export function noteResetAdopted(uid: string, mark: number | null): void {
+  adopted.set(uid, mark);
+  adoptWaiters.forEach((w) => w());
+}
+
+/**
+ * Resolves once the phone has taken in a reset with mark `mark` (or a later one):
+ * a change queued after that is built on the new data, so it isn't dropped as
+ * stale. Rejects after `timeoutMs`.
+ */
+export function whenResetAdopted(uid: string, mark: number, timeoutMs = 30_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const now = adopted.get(uid);
+      if (now != null && now >= mark) {
+        done();
+        resolve();
+      }
+    };
+    const timer = setTimeout(() => {
+      done();
+      reject(new Error('This phone didn’t get the new account in time. Close the app, open it, and load the scenario again.'));
+    }, timeoutMs);
+    const done = () => {
+      clearTimeout(timer);
+      adoptWaiters.delete(check);
+    };
+    adoptWaiters.add(check);
+    check();
+  });
+}
+
+/** Tests. */
+export function resetAdoptedForTests(): void {
+  adopted.clear();
+  adoptWaiters.clear();
+}
+
 /** The account's reset mark (ms), or null if it was never reset. */
 export function resetMark(user: { dataResetAt?: unknown } | null | undefined): number | null {
   return millisOf(user?.dataResetAt);

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Scenario tests: the app's own state code against the Firebase emulators, with a test clock and time zone (see BEHAVIOUR.md).",
   "scripts": {
-    "test": "firebase emulators:exec --config firebase.json --only auth,firestore --project demo-revisely 'npm run test:local'",
+    "test": "../../scripts/emulators.sh exec auth,firestore demo-revisely 'npm run test:local'",
     "test:local": "jest --config jest.config.js --runInBand"
   },
   "devDependencies": {
