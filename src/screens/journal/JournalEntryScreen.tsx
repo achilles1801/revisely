@@ -49,6 +49,7 @@ import {
 import { logger } from '../../lib/logger';
 import { memorizeSuggestion, missedFromSession } from '../../lib/activityAdd';
 import { parsePageRange } from '../../lib/memorizationLog';
+import { RangePickerSheet } from '../../components/memorization/RangePickerSheet';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
@@ -292,6 +293,7 @@ export default function JournalEntryScreen() {
     (day?.entries ?? []).some((n) => n.kind === 'revision' && n.text.trim() === sessionSuggestion.text);
   // The Memorized suggestion (C4): pages read today that aren't memorized yet.
   const [readToday, setReadToday] = useState<number[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     firestoreService
@@ -516,7 +518,7 @@ export default function JournalEntryScreen() {
         </View>
       ) : (
         // iOS would add the home indicator's inset again: the padding below is the only one.
-        <ScrollView
+      <ScrollView
           style={styles.scroll}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           contentInsetAdjustmentBehavior="never"
@@ -590,6 +592,7 @@ export default function JournalEntryScreen() {
               ) : undefined
             }
           >
+            <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
             <PillTabs
               options={KIND_OPTIONS}
               value={composingKind}
@@ -599,6 +602,13 @@ export default function JournalEntryScreen() {
             />
             {composingKind === 'memorization' && !editing && (
               <View style={v2.fieldRow}>
+                <PillButton
+                  size="sm"
+                  variant="outline"
+                  title="Surah or juz"
+                  onPress={() => setPickerOpen(true)}
+                  testID="memorize-pick"
+                />
                 <TextInput
                   value={draft.from ?? ''}
                   onChangeText={(v) => setDraft({ from: v.replace(/[^0-9]/g, '') })}
@@ -707,6 +717,7 @@ export default function JournalEntryScreen() {
         actions={menuActions}
         testID="journal-note-menu"
       />
+    <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
     </TopSafeAreaView>
   );
 }
