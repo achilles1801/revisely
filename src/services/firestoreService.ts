@@ -39,6 +39,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import type { BackupListing, CloudRecording } from '../lib/recordings';
+import type { RevisionItem } from '../lib/revisionItems';
 import {
   FirestoreUser,
   FirestorePage,
@@ -489,26 +490,46 @@ export function subscribeToSessions(
  * Merges a change into a day's session on the server: reads what is there
  * (another phone may have added to it), merges, and creates or updates it.
  * `merge` returns null to leave it alone (an edit of a session that's gone).
+ * Resolves with the session as the server now has it, or null when left alone.
  */
 export async function mergeSessionOnServer(
   sessionId: string,
   merge: (existing: FirestoreSession | null) => FirestoreSession | null,
   updateData: (merged: FirestoreSession) => Record<string, unknown>,
   userId: string,
-): Promise<void> {
+): Promise<FirestoreSession | null> {
   const ref = getSessionRef(sessionId, userId);
+  let result: FirestoreSession | null = null;
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const existing = snap.exists() ? (snap.data() as FirestoreSession) : null;
     const merged = merge(existing);
+    result = merged;
     if (!merged) return;
     if (existing) tx.update(ref, { ...updateData(merged), updatedAt: serverTimestamp() });
     else tx.set(ref, { ...merged, updatedAt: serverTimestamp() });
   });
+  return result;
 }
 
 export async function deleteSession(sessionId: string, userId?: string): Promise<void> {
   await deleteDoc(getSessionRef(sessionId, userId));
+}
+
+/**
+ * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
+ * written, and any other item of that day is deleted (an edit that dropped an
+ * ahead credit, or a deleted session). Items of other days are not touched.
+ */
+export async function replaceRevisionItems(day: string, items: RevisionItem[], userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  const itemsRef = collection(db, 'users', uid, 'revisions');
+  const existing = await getDocs(query(itemsRef, where('day', '==', day)));
+  const keep = new Set(items.map((i) => i.id));
+  const batch = writeBatch(db);
+  for (const item of items) batch.set(doc(itemsRef, item.id), item);
+  for (const d of existing.docs) if (!keep.has(d.id)) batch.delete(d.ref);
+  await batch.commit();
 }
 
 // ============================================================================

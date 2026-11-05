@@ -1,6 +1,9 @@
 // How each outbox change reaches the server (sync.ts calls this, oldest first).
 
 import * as firestoreService from '../../services/firestoreService';
+import type { FirestoreSession } from '../../types/firestore';
+import { logger } from '../logger';
+import { revisionItemsFor } from '../revisionItems';
 import type { OutboxEntry } from './ops';
 import { applySessionEdit, mergeSessionAdd, pageUpdateData, sessionUpdateData } from './ops';
 
@@ -10,6 +13,20 @@ export function autoId(): string {
   let id = '';
   for (let i = 0; i < 20; i++) id += chars.charAt(Math.floor(Math.random() * chars.length));
   return id;
+}
+
+/**
+ * Dual write (Activity spec, section 7): the day's Revised items beside the
+ * session. Best effort: the session is already saved, and the backfill brings
+ * back any item that didn't get written, so a failure here must not hold the
+ * change in the outbox.
+ */
+async function mirrorRevisionItems(uid: string, day: string, session: FirestoreSession | null): Promise<void> {
+  try {
+    await firestoreService.replaceRevisionItems(day, session ? revisionItemsFor(session, uid) : [], uid);
+  } catch (err) {
+    logger.warn('Activity items were not written for a session', err);
+  }
 }
 
 export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void> {
@@ -22,15 +39,17 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
         op.pages.map((p) => ({ pageNumber: p.pageNumber, data: pageUpdateData(p) })),
         uid,
       );
-    case 'session.add':
-      return firestoreService.mergeSessionOnServer(
+    case 'session.add': {
+      const session = await firestoreService.mergeSessionOnServer(
         op.date,
         (existing) => mergeSessionAdd(existing, op, entry.at),
         sessionUpdateData,
         uid,
       );
-    case 'session.edit':
-      return firestoreService.mergeSessionOnServer(
+      return mirrorRevisionItems(uid, op.date, session);
+    }
+    case 'session.edit': {
+      const session = await firestoreService.mergeSessionOnServer(
         op.id,
         (existing) => applySessionEdit(existing, op),
         (s) => ({
@@ -41,8 +60,11 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
         }),
         uid,
       );
+      return mirrorRevisionItems(uid, op.id, session);
+    }
     case 'session.delete':
-      return firestoreService.deleteSession(op.id, uid);
+      await firestoreService.deleteSession(op.id, uid);
+      return mirrorRevisionItems(uid, op.id, null);
     case 'reading.add':
       return firestoreService.putReadingSession(op.id, op.session, entry.at, uid);
     case 'reading.pages':
