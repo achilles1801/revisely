@@ -27,7 +27,7 @@ jest.mock('@react-navigation/native', () => ({
 
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
-const mockService = { getJournalEntry: jest.fn(), readingsForDay: jest.fn(() => Promise.resolve([])) };
+const mockService = { getJournalEntry: jest.fn(), readingsForDay: jest.fn((): Promise<unknown[]> => Promise.resolve([])) };
 jest.mock('../../../services/firestoreService', () => ({
   getJournalEntry: (...a: unknown[]) => mockService.getJournalEntry(...(a as [])),
   getReadingSessionsForDay: (...a: unknown[]) => mockService.readingsForDay(...(a as [])),
