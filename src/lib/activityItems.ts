@@ -2,7 +2,7 @@ import type { JournalEntry, JournalNote, ReadingSession, RevisionLog, User } fro
 import { isRevisionActivity, normalizeReadingSession } from './activity';
 import { formatMinutesShort } from './activityHeatmap';
 import { formatEntryTime, isJournalNoteEmpty, JournalFilter, journalFilterRange } from './journal';
-import { describePageRuns, describeSurahRuns, pageRuns } from './pageRanges';
+import { describePageRuns, describeRevised, describeSurahRuns, pageRuns } from './pageRanges';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
 
@@ -93,7 +93,18 @@ function item(base: Omit<ActivityItem, 'search'>, pages: number[] = []): Activit
   return { ...base, search: ` ${words(text.join(' '))}` };
 }
 
-export function revisionItem(log: RevisionLog): ActivityItem {
+/** The pages a session revised for its own day: revised, less those credited ahead to later days. */
+export function ownRevised(log: RevisionLog): number[] {
+  const ahead = new Set(Object.values(log.ahead ?? {}).flat());
+  return log.pagesRevised.filter((p) => !ahead.has(p));
+}
+
+/** How items name what was revised: `juzPlan` is the account's plan (scheduleMode 'juz'). */
+export interface ActivityLabelOptions {
+  juzPlan?: boolean;
+}
+
+export function revisionItem(log: RevisionLog, opts: ActivityLabelOptions = {}): ActivityItem {
   const pages = sessionPages(log);
   const total = pageRuns(pages).reduce((n, r) => n + r.last - r.first + 1, 0);
   const revised = log.pagesRevised.length;
@@ -106,7 +117,11 @@ export function revisionItem(log: RevisionLog): ActivityItem {
     at: Number.MAX_SAFE_INTEGER,
     title: total > revised ? `Revised ${revised} of ${plural(total, 'page')}` : `Revised ${plural(revised, 'page')}`,
     // The time before the surahs, which a narrow line cuts off first.
-    detail: [describePageRuns(pageRuns(pages)), minutes, describeSurahRuns(pageRuns(pages))].filter(Boolean).join(' · '),
+    detail: [
+      describePageRuns(pageRuns(pages)),
+      minutes,
+      describeRevised(pages, { juzPlan: opts.juzPlan, revised: ownRevised(log) }),
+    ].filter(Boolean).join(' · '),
     done: total > 0 && revised >= total,
     log,
   }, pages);
@@ -170,12 +185,12 @@ function weekdayName(day: string): string {
  * were revised ("Revised ahead for Wed") and one on the day they count for
  * ("Done ahead on Tue").
  */
-function aheadItems(log: RevisionLog): ActivityItem[] {
+function aheadItems(log: RevisionLog, opts: ActivityLabelOptions = {}): ActivityItem[] {
   const out: ActivityItem[] = [];
   for (const [day, pages] of Object.entries(log.ahead ?? {})) {
     if (!DAY_RE.test(day) || pages.length === 0) continue;
     const runs = pageRuns(pages);
-    const detail = [describePageRuns(runs), describeSurahRuns(runs)].filter(Boolean).join(' · ');
+    const detail = [describePageRuns(runs), describeRevised(pages, { juzPlan: opts.juzPlan })].filter(Boolean).join(' · ');
     // Just after the session's own item on its day.
     const at = Number.MAX_SAFE_INTEGER - 1;
     out.push(item({
@@ -215,9 +230,10 @@ export function buildActivityItems(
   user?: User | null,
 ): ActivityItem[] {
   const out: ActivityItem[] = [];
+  const labels: ActivityLabelOptions = { juzPlan: user?.scheduleMode === 'juz' };
   for (const log of logs) {
     if (!isRevisionActivity(log) || !DAY_RE.test(log.date)) continue;
-    out.push(revisionItem(log), ...aheadItems(log));
+    out.push(revisionItem(log, labels), ...aheadItems(log, labels));
   }
   for (const raw of readings) {
     const s = normalizeReadingSession(raw, user);
