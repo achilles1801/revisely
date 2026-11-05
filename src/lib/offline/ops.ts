@@ -47,6 +47,8 @@ export type OutboxOp =
   | { kind: 'pages'; pages: PageFields[] }
   /** A memorization item is removed (its pages are un-marked by the pages change beside it). */
   | { kind: 'memorization.delete'; day: string; id: string }
+  /** A Revised item added by hand (Activity's add sheet): one write, never merged. */
+  | { kind: 'revision.add'; item: import('../revisionItems').RevisionItem }
   | {
       kind: 'session.add';
       date: string;
