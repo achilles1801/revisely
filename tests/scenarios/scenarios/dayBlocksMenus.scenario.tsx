@@ -18,8 +18,8 @@ jest.mock('../../../src/context/ThemeContext', () => ({
 jest.mock('../../../src/services/firestoreService', () => ({
   getActivityItemsForDay: jest.fn(async () => ({ revisions: [], memorized: [], reads: [] })),
 }));
-jest.mock('../../../src/components/v2/ActionSheet', () => ({
-  ActionSheet: (props: unknown) => {
+jest.mock('../../../src/components/v2/ContextMenu', () => ({
+  ContextMenu: (props: unknown) => {
     (globalThis as { __sheet?: unknown }).__sheet = props;
     return null;
   },
