@@ -133,6 +133,14 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AUDIO-2.** On Android, Pause and ▶ on the recitation's notification work with the app away;
   paused, the notification stays, and the app shows what was pressed.
 
+## Activity
+
+- **ACT-1.** A memorized page is filed under the calendar date, in the user's own time zone, on
+  which it was marked memorized. There is no Fajr shift: memorized timestamps are coarse. The zone is
+  the one the user's revision sessions were written in (the offset under which each session's
+  `createdAt` falls on its `date`). With no sessions, it is the saved location's zone, estimated from
+  its longitude; with neither, UTC.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
