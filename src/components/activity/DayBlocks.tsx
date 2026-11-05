@@ -10,6 +10,9 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { buildDayView, type DayView, type RevisedBlock } from '../../lib/activityDayView';
+import { stripCells, strengthCounts } from '../../lib/activityDayParts';
+import { getFajrTimeFor } from '../../lib/fajrBoundary';
+import { ProgressRing, PageStrip, StrengthCounts, WindowFooter } from './DayParts';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
@@ -66,7 +69,7 @@ export function DayBlocks({
   onDeleteRevised,
   onDeleteMemorized,
 }: Props) {
-  const { pages } = useApp();
+  const { pages, user } = useApp();
   const { palette } = useTheme();
   // A note swiped away goes at once, with Undo; the delete is saved after the undo
   // window (C4). Leaving the screen saves any delete still waiting.
@@ -112,6 +115,23 @@ export function DayBlocks({
   useActivityReload(load);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
+  const ratingByPage = useMemo(() => new Map(pages.map((p) => [p.pageNumber, p.weaknessRating])), [pages]);
+  // The window the day covers: Fajr to Fajr when the Fajr boundary is on, else midnight.
+  const dayWindow = useMemo(() => {
+    if (!user?.fajrBoundaryEnabled || !user.locationCoords) return null;
+    const [y, m, d] = day.split('-').map(Number);
+    const from = getFajrTimeFor(new Date(y, m - 1, d), user);
+    const to = getFajrTimeFor(new Date(y, m - 1, d + 1), user);
+    return from && to ? { from, to } : null;
+  }, [day, user]);
+  const footerText = useMemo(() => {
+    const [y, m, d] = day.split('-').map(Number);
+    const weekday = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' });
+    const fmt = (x: Date) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return dayWindow
+      ? `${weekday} runs Fajr to Fajr, ${fmt(dayWindow.from)} to ${fmt(dayWindow.to)}`
+      : `${weekday} runs midnight to midnight`;
+  }, [day, dayWindow]);
   const view: DayView | null = useMemo(
     () => (items ? buildDayView(day, { ...items, reads: [], notes: [] }, memorizedSet) : null),
     [items, day, memorizedSet],
@@ -128,7 +148,12 @@ export function DayBlocks({
     <>
       {hasRevised && (
         <ThreadRow
-          mark={<Mark size="reply" icon="checkmark-circle-outline" done={revised.assigned.length > 0 && revised.revised.length >= revised.assigned.length} />}
+          mark={
+            <ProgressRing
+              fraction={revised.assigned.length > 0 ? revised.revised.length / revised.assigned.length : 0}
+              done={revised.assigned.length > 0 && revised.revised.length >= revised.assigned.length}
+            />
+          }
           name="Revised"
           meta={
             revised.assigned.length > 0
@@ -139,7 +164,20 @@ export function DayBlocks({
           separator={false}
           testID="activity-block-revised"
         >
-          {revised.revised.length > 0 && (
+          {revised.assigned.length > 0 && (
+            <>
+              <PageStrip
+                cells={stripCells(
+                  revised.assigned,
+                  revised.revised,
+                  revised.skipped,
+                  new Set(revised.assigned.filter((p) => (ratingByPage.get(p) ?? 4) <= 2)),
+                )}
+              />
+              <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
+            </>
+          )}
+          {revised.assigned.length === 0 && revised.revised.length > 0 && (
             <Tap
               onLongPress={() =>
                 revisedLog &&
@@ -277,6 +315,7 @@ export function DayBlocks({
           ))}
         </ThreadRow>
       )}
+      <WindowFooter text={footerText} />
       <UndoToast
         visible={toast != null}
         message="Note deleted"

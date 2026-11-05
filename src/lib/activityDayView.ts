@@ -39,6 +39,8 @@ export interface RevisedBlock {
   /** Pages revised on the day (own item), and how many were assigned. */
   revised: number[];
   assigned: number[];
+  /** Assigned pages the session skipped (the strip's hollow cells). */
+  skipped: number[];
   /** Pages revised ahead for a later day, one line each. */
   credits: { countsFor: string; pages: number[] }[];
   /** "Juz 12" when the session covered a whole juz, else null. */
@@ -77,10 +79,12 @@ export function buildDayView(
   const credits = input.revisions.filter((r) => r.day === day && r.countsFor !== day && r.pages.length > 0);
   const revised = own.flatMap((r) => r.pages);
   const assigned = own.flatMap((r) => r.assigned);
+  const skipped = own.flatMap((r) => r.skipped);
   const revisedBlock: RevisedBlock = {
     kind: 'revised',
     revised,
     assigned,
+    skipped,
     credits: credits.map((c) => ({ countsFor: c.countsFor, pages: c.pages })),
     juzLabel: assigned.length > 0 ? juzLabelFor(revised, assigned, memorized) : null,
   };
