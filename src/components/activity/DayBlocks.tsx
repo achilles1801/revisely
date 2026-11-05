@@ -24,9 +24,6 @@ import { Tap } from '../v2/Tap';
 import { ActionSheet, type SheetAction } from '../v2/ActionSheet';
 import { copyText } from '../../lib/clipboard';
 import { queueChange } from '../../lib/offline/queue';
-import { UndoQueue } from '../../lib/activityAdd';
-import { SwipeRow } from '../v2/SwipeRow';
-import { UndoToast } from '../revision/UndoToast';
 import { formatMinutes } from '../../lib/journal';
 import { Mark } from '../v2/Mark';
 import { RowText, ThreadRow } from '../v2/ThreadRow';
@@ -53,6 +50,8 @@ interface Props {
   onDeleteMemorized: (item: { id: string; day: string; pages: number[] }) => void;
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
+  /** Deletes a timed session (the screen confirms first). */
+  onDeleteReading: (session: ReadingSession) => void;
 }
 
 /** "8:05 – 8:23 AM": from the start to the start plus the minutes; the start alone when not known. */
@@ -92,31 +91,10 @@ export function DayBlocks({
   onDeleteRevised,
   onDeleteMemorized,
   onOpenRecording,
+  onDeleteReading,
 }: Props) {
   const { pages, user } = useApp();
   const { palette } = useTheme();
-  // A note swiped away goes at once, with Undo; the delete is saved after the undo
-  // window (C4). Leaving the screen saves any delete still waiting.
-  const undoQueue = useRef(new UndoQueue());
-  const [gone, setGone] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
-  useEffect(() => () => undoQueue.current.flush(), []);
-  const deleteNote = (id: string) => {
-    setGone((g) => new Set(g).add(id));
-    setToast(id);
-    undoQueue.current.schedule(`note-${id}`, () => {
-      void queueChange({ kind: 'journal.entry.delete', date: day, id });
-    });
-  };
-  const undoDelete = (id: string) => {
-    undoQueue.current.undo(`note-${id}`);
-    setGone((g) => {
-      const next = new Set(g);
-      next.delete(id);
-      return next;
-    });
-    setToast(null);
-  };
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
   const menuFor = (title: string, text: string, edit?: () => void, del?: () => void) =>
@@ -128,12 +106,23 @@ export function DayBlocks({
         ...(del ? [{ key: 'delete', label: 'Delete', icon: 'trash-outline' as const, destructive: true, onPress: del }] : []),
       ],
     });
+  // A block header holds a menu (Edit / Delete, confirmed where it deletes); VoiceOver offers the
+  // same actions as custom actions. Sub-rows under a block have no hold and no swipe: notes are
+  // edited and deleted in the daily log (Activity spec, row interactions).
+  const headerMenu = (title: string, actions: SheetAction[]) =>
+    actions.length === 0
+      ? {}
+      : {
+          onLongPress: () => setMenu({ title, actions }),
+          a11yActions: actions.map((a) => ({ name: a.key, label: a.label })),
+          onA11yAction: (name: string) => actions.find((a) => a.key === name)?.onPress(),
+        };
   const [items, setItems] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsForDay>> | null>(null);
 
   // The day's recordings hang off their block: revision ones under Revised, reading ones under Read.
   const [recs, setRecs] = useState<RecordingMeta[]>([]);
   // Stable: useActivityReload runs `load` in a focus effect keyed on it, so a new function
-  // each render reloaded the day on every render, forever (see DayBlocksLoad.test.tsx).
+  // each render reloaded the day on every render, forever (ACT-9).
   const load = useCallback(() => {
     firestoreService
       .getActivityItemsForDay(day)
@@ -171,12 +160,58 @@ export function DayBlocks({
   );
   if (!view) return null;
 
-  const [revised, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
-  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0;
+  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
+  const revised = revisedRaw;
+  const doneAhead = items?.doneAhead ?? [];
+  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
 
+  const memorizedMenu = headerMenu(
+    'Memorized',
+    memorized.items.map((i) => ({
+      key: `delete-${i.id}`,
+      label: `Delete ${describePageRuns(pageRuns(i.pages))}`,
+      icon: 'trash-outline' as const,
+      destructive: true,
+      onPress: () =>
+        confirmDelete(
+          'Delete this memorization?',
+          `${describePageRuns(pageRuns(i.pages))} go back to not memorized.`,
+          () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
+        ),
+    })),
+  );
+  const readMenu = headerMenu(
+    'Read',
+    readItems.items.flatMap((i) => {
+      const session = readings.find((r) => r.id === i.id);
+      if (!session) return [];
+      const label = timeRange(i.occurredAt, i.minutes) || (i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'session');
+      return [
+        { key: `edit-${i.id}`, label: `Edit ${label}`, icon: 'create-outline' as const, onPress: () => onEditReading(session) },
+        { key: `delete-${i.id}`, label: `Delete ${label}`, icon: 'trash-outline' as const, destructive: true, onPress: () => onDeleteReading(session) },
+      ];
+    }),
+  );
+  // The block headers' menus: Revised (its session), Memorized (each entry), Read (each timed session).
+  const revisedMenu = revisedLog
+    ? headerMenu('Revised', [
+        {
+          key: 'delete',
+          label: 'Delete this session',
+          icon: 'trash-outline' as const,
+          destructive: true,
+          onPress: () =>
+            confirmDelete(
+              'Delete this session?',
+              `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
+              () => onDeleteRevised(revisedLog),
+            ),
+        },
+      ])
+    : {};
   return (
     <>
       {hasRevised && (
@@ -188,6 +223,7 @@ export function DayBlocks({
             />
           }
           name="Revised"
+          {...revisedMenu}
           figure={
             revised.assigned.length > 0 ? (
               <Text style={[typeV2.name, { color: palette.text }]}>{`${revised.revised.length} of ${revised.assigned.length}`}</Text>
@@ -212,34 +248,6 @@ export function DayBlocks({
               <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
             </>
           )}
-          {revised.assigned.length === 0 && revised.revised.length > 0 && (
-            <Tap
-              onLongPress={() =>
-                revisedLog &&
-                setMenu({
-                  title: 'Revised',
-                  actions: [
-                    {
-                      key: 'delete',
-                      label: 'Delete this session',
-                      icon: 'trash-outline',
-                      destructive: true,
-                      onPress: () =>
-                        confirmDelete(
-                          'Delete this session?',
-                          `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
-                          () => onDeleteRevised(revisedLog),
-                        ),
-                    },
-                  ],
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Revised. Hold for Delete"
-            >
-              <RowText secondary>{describePageRuns(pageRuns(revised.revised))}</RowText>
-            </Tap>
-          )}
           {revised.credits.map((c) => (
             <RowText key={c.countsFor} secondary>
               {`Ahead for ${c.countsFor}: ${describePageRuns(pageRuns(c.pages))}`}
@@ -249,6 +257,15 @@ export function DayBlocks({
             <ThreadBranch>
               {revisionNotes.map((n) => (
                 <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+              ))}
+            </ThreadBranch>
+          )}
+          {doneAhead.length > 0 && (
+            <ThreadBranch>
+              {doneAhead.map((a) => (
+                <Text key={`ahead-${a.fromDay}`} testID="activity-done-ahead" style={[typeV2.meta, { color: palette.secondary }]}>
+                  {`Done ahead, from ${a.fromDay}: ${describePageRuns(pageRuns(a.pages))}`}
+                </Text>
               ))}
             </ThreadBranch>
           )}
@@ -263,6 +280,7 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="bookmark-outline" />}
           name="Memorized"
+          {...memorizedMenu}
           figure={
             memorized.items.length > 0 ? (
               <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(memorized.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
@@ -275,32 +293,9 @@ export function DayBlocks({
           testID="activity-block-memorized"
         >
           {memorized.items.map((i) => (
-            <Tap
-              key={i.id}
-              onLongPress={() =>
-                setMenu({
-                  title: 'Memorized',
-                  actions: [
-                    {
-                      key: 'delete',
-                      label: 'Delete this entry',
-                      icon: 'trash-outline',
-                      destructive: true,
-                      onPress: () =>
-                        confirmDelete(
-                          'Delete this memorization?',
-                          `${describePageRuns(pageRuns(i.pages))} go back to not memorized.`,
-                          () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
-                        ),
-                    },
-                  ],
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Memorized. Hold for Delete"
-            >
+            <View key={i.id}>
               <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>
-            </Tap>
+            </View>
           ))}
           {memorizationNotes.length > 0 && (
             <ThreadBranch>
@@ -315,6 +310,7 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="stopwatch-outline" />}
           name="Read"
+          {...readMenu}
           figure={
             readItems.items.length > 0 ? (
               <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(readItems.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
@@ -332,10 +328,6 @@ export function DayBlocks({
               <Tap
                 key={i.id}
                 onPress={() => session && onEditReading(session)}
-                onLongPress={() => {
-                  const line = [i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'No pages yet', i.minutes != null ? formatMinutes(i.minutes) : null].filter(Boolean).join(' · ');
-                  if (session) menuFor('Read', line, () => onEditReading(session));
-                }}
                 accessibilityRole="button"
                 accessibilityLabel={`Timed session. Edit pages`}
               >
@@ -359,41 +351,28 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="create-outline" />}
           name="Notes"
-          figure={notes.some((n) => !gone.has(n.id)) ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.filter((n) => !gone.has(n.id)).length}</Text> : undefined}
+          figure={notes.length > 0 ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.length}</Text> : undefined}
           lineBelow
           separator={false}
           testID="activity-block-notes"
         >
-          <ThreadBranch>{notes.filter((n) => !gone.has(n.id)).map((n) => (
-            <SwipeRow
-              key={n.id}
-              onDelete={() => deleteNote(n.id)}
-              onHold={() => menuFor('Note', n.text.trim(), onOpenLog, () => deleteNote(n.id))}
-              deleteLabel="Delete"
-              testID={`activity-note-${n.id}`}
-            >
+          <ThreadBranch>
+            {notes.map((n) => (
+              // Editing happens in the log: a note here only opens it (no swipe, no menu).
               <Tap
+                key={n.id}
                 onPress={onOpenLog}
-                onLongPress={() => menuFor('Note', n.text.trim(), onOpenLog, () => deleteNote(n.id))}
                 accessibilityRole="button"
                 accessibilityLabel="Daily log. Open the log"
               >
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                 <RowText numberOfLines={4}>{n.text.trim()}</RowText>
               </Tap>
-            </SwipeRow>
-          ))}</ThreadBranch>
+            ))}
+          </ThreadBranch>
         </ThreadRow>
       )}
       <WindowFooter text={footerText} />
-      <UndoToast
-        visible={toast != null}
-        message="Note deleted"
-        actionLabel="Undo"
-        onUndo={() => toast && undoDelete(toast)}
-        onDismiss={() => setToast(null)}
-        duration={5000}
-      />
       <ActionSheet
         visible={menu != null}
         onClose={() => setMenu(null)}

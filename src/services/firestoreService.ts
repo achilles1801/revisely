@@ -779,12 +779,15 @@ export async function getActivityItemsForDay(
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
+  /** Pages revised in an earlier session, credited to this day ("done ahead"). */
+  doneAhead: { fromDay: string; pages: number[] }[];
 }> {
   const uid = userId || getCurrentUserId();
-  const [rev, mem, read] = await Promise.all([
+  const [rev, mem, read, ahead] = await Promise.all([
     getDocs(query(collection(db, 'users', uid, 'revisions'), where('day', '==', day))),
     getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '==', day))),
     getDocs(query(collection(db, 'users', uid, 'reads'), where('day', '==', day))),
+    getDocs(query(collection(db, 'users', uid, 'revisions'), where('countsFor', '==', day))),
   ]);
   return {
     revisions: rev.docs.map((d) => {
@@ -801,6 +804,9 @@ export async function getActivityItemsForDay(
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
+    doneAhead: ahead.docs
+      .filter((d) => d.data().day !== day)
+      .map((d) => ({ fromDay: d.data().day, pages: d.data().pages ?? [] })),
   };
 }
 
