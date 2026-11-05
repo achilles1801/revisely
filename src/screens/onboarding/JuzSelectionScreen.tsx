@@ -46,19 +46,24 @@ export default function JuzSelectionScreen() {
   >(new Map());
 
   // Seed the buffer once pages have loaded so the initial selection matches
-  // the chosen journey stage. Subsequent edits replace this baseline.
+  // the chosen journey stage. Subsequent edits replace this baseline. Anything
+  // marked before the pages arrived (a slow first load) stays on top of it:
+  // replacing the buffer threw it away, and Continue saved page 1 alone.
   const hasSeededRef = useRef(false);
   useEffect(() => {
     if (hasSeededRef.current) return;
     if (pages.length === 0) return;
     hasSeededRef.current = true;
-    setPendingChanges(buildInitialPendingForJourney(pages, journeyStage));
-    setPendingSurahChanges(
-      buildInitialPendingSurahsForJourney(
-        user?.memorizedSurahs ?? [],
-        journeyStage,
-      ),
-    );
+    setPendingChanges((marked) => {
+      const seeded = buildInitialPendingForJourney(pages, journeyStage);
+      marked.forEach((status, page) => seeded.set(page, status));
+      return seeded;
+    });
+    setPendingSurahChanges((marked) => {
+      const seeded = buildInitialPendingSurahsForJourney(user?.memorizedSurahs ?? [], journeyStage);
+      marked.forEach((status, surah) => seeded.set(surah, status));
+      return seeded;
+    });
   }, [pages, journeyStage, user]);
 
   // Effective memorized count = base memorized status with pendingChanges applied.
