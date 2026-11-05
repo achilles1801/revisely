@@ -64,6 +64,10 @@ How the tests are made: `tests/scenarios/README.md`.
   ahead in its sessions, and Review session opens exactly those (#199).
   A day done only by pages revised ahead (no session of its own) still opens its review with those
   pages checked; saving it makes that day's session.
+- **SESS-5.** On the juz plan, a session whose pages revised for its own day are whole juz (one, or
+  several in a row) is named by the juz, "Juz 29" or "Juz 28–29", wherever sessions are listed (Home,
+  Activity); pages credited ahead to another day don't count toward it. Any other session, a juz
+  with a page not revised, or whole juz with other pages besides, is named by its surahs.
 
 ## Revising ahead
 

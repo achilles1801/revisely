@@ -557,6 +557,7 @@ export default function DashboardScreen() {
               key={log.id}
               log={log}
               today={revisionDay}
+              juzPlan={user?.scheduleMode === 'juz'}
               onEdit={() => handleEditSession(log)}
               onDelete={() => deleteLog(log.id)}
               separator={i < recent.length - 1}
