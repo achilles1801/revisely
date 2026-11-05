@@ -885,6 +885,8 @@ export default function ActiveRevisionScreen() {
     />
   );
 
+  // Pages put in front by "Revise these first tomorrow" (Insights), labelled as such.
+  const fromInsights = user?.carryOver?.source === 'insights' && user.carryOver.day === sessionDay;
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame
@@ -903,6 +905,16 @@ export default function ActiveRevisionScreen() {
             >
               {hidden ? 'Hidden' : `Juz ${currentJuz}`} · {viewDone}/{totalPages}
             </Text>
+            {fromInsights ? (
+              <Text
+                style={[styles.quietText, { color: palette.textSecondary }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                testID="session-from-insights"
+              >
+                From Insights: the weak pages first
+              </Text>
+            ) : null}
             {hidden ? (
               <Text
                 style={[styles.quietText, { color: palette.textSecondary }]}
