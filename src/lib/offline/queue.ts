@@ -50,13 +50,18 @@ export function withPendingReadings(
   return out === list ? list : [...out].sort((a, b) => b.startedAt - a.startedAt);
 }
 
-/** One day's log with the notes still waiting laid over it; null when it has none. */
+/**
+ * One day's log with the notes still waiting laid over it; null when it has none.
+ * `sent` are changes already written that the server's copy (`base`) may not
+ * show yet: they go under the ones still waiting.
+ */
 export function withPendingJournalDay(
   date: string,
   base: JournalEntry | null,
   uid: string | null = account,
+  sent: OutboxEntry[] = [],
 ): JournalEntry | null {
-  return overlayJournal(base ? [base] : [], pendingEntries(uid), date)[0] ?? null;
+  return overlayJournal(base ? [base] : [], [...sent, ...pendingEntries(uid)], date)[0] ?? null;
 }
 
 /** Daily logs (one per day, newest first) with the notes still waiting laid over them. */

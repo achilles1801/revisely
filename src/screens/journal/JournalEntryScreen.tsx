@@ -30,6 +30,8 @@ import * as firestoreService from '../../services/firestoreService';
 import { autoId } from '../../lib/offline/apply';
 import { queueChange, withPendingJournalDay } from '../../lib/offline/queue';
 import { subscribeOutbox } from '../../lib/offline/outbox';
+import { onApplied } from '../../lib/offline/sync';
+import type { OutboxEntry, OutboxOp } from '../../lib/offline/ops';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
   JOURNAL_ENTRIES_PER_DAY,
@@ -85,6 +87,29 @@ const PLACEHOLDER: Record<JournalKind, string> = {
  * (edit, delete); the composer at the bottom writes a new note. Every change
  * is saved on the phone at once and reaches the server when it can.
  */
+// Re-reading the day while the server's copy is behind: after 1.5 s, 3 s, …
+const REREAD_MS = 1500;
+const MAX_REREADS = 6;
+
+/** The note a change of `date`'s log is about, or null for any other change. */
+export function journalNoteIdOf(op: OutboxOp, date: string): string | null {
+  if (op.kind === 'journal.entry.add' || op.kind === 'journal.entry.edit') return op.date === date ? op.entry.id : null;
+  if (op.kind === 'journal.entry.delete') return op.date === date ? op.id : null;
+  return null;
+}
+
+/** Whether the server's copy of the day already shows a written change. */
+export function journalChangeShown(e: OutboxEntry, day: JournalEntry | null): boolean {
+  const op = e.op;
+  const notes = day?.entries ?? [];
+  if (op.kind === 'journal.entry.add' || op.kind === 'journal.entry.edit') {
+    const n = notes.find((x) => x.id === op.entry.id);
+    return n != null && n.text === op.entry.text && n.minutes === op.entry.minutes && n.kind === op.entry.kind;
+  }
+  if (op.kind === 'journal.entry.delete') return !notes.some((x) => x.id === op.id);
+  return true;
+}
+
 export default function JournalEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
@@ -135,12 +160,54 @@ export default function JournalEntryScreen() {
   // sending). A newer read that fails (offline) leaves an older answer standing.
   const readSeq = useRef(0);
   const shownSeq = useRef(0);
+  // Changes to this day already written, until a read of the day shows them. A
+  // read started just after a change was written can still answer with the day
+  // as it was before (seen in E2E on iOS: a note added, or one deleted, came
+  // back as it was once the change was sent, and stayed so). These stay laid
+  // over the server's copy until it has caught up, and the day is read again.
+  const sentRef = useRef<OutboxEntry[]>([]);
+  const rereads = useRef(0);
+  const rereadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const withChanges = (entry: JournalEntry | null) =>
+    withPendingJournalDay(date, entry, undefined, sentRef.current);
   const showRead = (seq: number, entry: JournalEntry | null) => {
     if (seq < shownSeq.current) return;
     shownSeq.current = seq;
+    sentRef.current = sentRef.current.filter((e) => !journalChangeShown(e, entry));
+    // The last re-read still doesn't show a change: another phone changed that
+    // note since. The server's copy is the truth then.
+    if (sentRef.current.length > 0 && rereads.current >= MAX_REREADS && !rereadTimer.current) sentRef.current = [];
     setBase(entry);
-    setDay(withPendingJournalDay(date, entry));
+    setDay(withChanges(entry));
+    if (sentRef.current.length === 0) {
+      rereads.current = 0;
+    } else if (!rereadTimer.current && rereads.current < MAX_REREADS) {
+      // The server's copy is behind what this phone wrote: read it again soon.
+      rereads.current += 1;
+      rereadTimer.current = setTimeout(() => {
+        rereadTimer.current = null;
+        readDayRef.current();
+      }, REREAD_MS * rereads.current);
+    }
   };
+  const readDay = () => {
+    const seq = ++readSeq.current;
+    firestoreService
+      .getJournalEntry(date)
+      .then((entry) => showRead(seq, entry))
+      .catch(() => undefined); // offline: the changes still waiting stay laid over the last copy
+  };
+  const readDayRef = useRef(readDay);
+  readDayRef.current = readDay;
+  useEffect(
+    () => () => {
+      if (rereadTimer.current) clearTimeout(rereadTimer.current);
+      rereadTimer.current = null;
+      sentRef.current = [];
+      rereads.current = 0;
+    },
+    [date],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -153,7 +220,7 @@ export default function JournalEntryScreen() {
       })
       .catch((err) => {
         if (cancelled || seq < shownSeq.current) return;
-        const waiting = withPendingJournalDay(date, null);
+        const waiting = withChanges(null);
         if (waiting) return setDay(waiting);
         logger.warn('Failed to load journal day', err);
         setLoadFailed(true);
@@ -165,7 +232,7 @@ export default function JournalEntryScreen() {
   }, [date, attempt]);
 
   // After a change is queued: show the day again with it laid over.
-  const refreshDay = () => setDay(withPendingJournalDay(date, baseRef.current));
+  const refreshDay = () => setDay(withChanges(baseRef.current));
 
   // A change leaves the outbox once it is written, and then only the server's
   // copy of the day has it. So whenever the outbox changes, read the day again:
@@ -175,12 +242,20 @@ export default function JournalEntryScreen() {
   useEffect(() => {
     if (!uid) return;
     return subscribeOutbox((changed) => {
+      if (changed === uid) readDayRef.current();
+    });
+  }, [uid, date]);
+
+  // A change of this day is written (it leaves the outbox right after): keep it
+  // laid over until a read shows it. Only the newest change of a note is kept.
+  useEffect(() => {
+    if (!uid) return;
+    return onApplied((changed, e) => {
       if (changed !== uid) return;
-      const seq = ++readSeq.current;
-      firestoreService
-        .getJournalEntry(date)
-        .then((entry) => showRead(seq, entry))
-        .catch(() => undefined); // offline: the changes still waiting stay laid over the last copy
+      const id = journalNoteIdOf(e.op, date);
+      if (id == null) return;
+      sentRef.current = [...sentRef.current.filter((s) => journalNoteIdOf(s.op, date) !== id), e];
+      rereads.current = 0; // a new change gets its own re-reads
     });
   }, [uid, date]);
 
