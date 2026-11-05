@@ -12,22 +12,25 @@ import { reportError } from './sentry';
 type LogArgs = unknown[];
 
 export const logger = {
+  // E2E builds (EXPO_PUBLIC_E2E=1, a release build) keep these too: they go to
+  // the build's own log (lib/e2e/log), which a failed flow keeps. The bundler
+  // inlines the variable, so other release builds still drop them.
   log: (...args: LogArgs): void => {
-    if (__DEV__) {
+    if (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') {
       // eslint-disable-next-line no-console
       console.log(...args);
     }
   },
 
   warn: (...args: LogArgs): void => {
-    if (__DEV__) {
+    if (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') {
       // eslint-disable-next-line no-console
       console.warn(...args);
     }
   },
 
   error: (message: string, err?: unknown, context?: Record<string, unknown>): void => {
-    if (__DEV__) {
+    if (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') {
       // eslint-disable-next-line no-console
       console.error(message, err);
     }

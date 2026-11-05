@@ -40,12 +40,16 @@ appId: com.revisionbuddy.app
 # The backup notice comes about now; a tap on View under it would be lost.
 - runFlow: ../subflows/backup-notice.yaml
 # "Recording saved · View" opens it in Activity, while the toast is up (6 s);
-# otherwise the way a user finds it later: Home → Activity → the day.
+# otherwise the way a user finds it later: Home → Activity → the day. On a slow
+# simulator the toast can go between seeing it and the tap (CI): the tap is
+# then skipped and the way through Activity is taken.
 - runFlow:
     when:
       visible: "Recording saved"
     commands:
-      - tapOn: "View"
+      - tapOn:
+          text: "View"
+          optional: true
       - extendedWaitUntil:
           visible:
             text: "Revision recording, .*"

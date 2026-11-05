@@ -385,13 +385,17 @@ jobs:
             printf '\n### Commits\n\n```text\n%s\n```\n' "$(git log --format='%h %s%n%n%b' "$BASE..HEAD" | inert)"
           } > "$RUNNER_TEMP/body.md"
 
+          # A PR opened with the workflow token starts no workflows: CI and E2E (both
+          # required on develop) are started here, on the branch's head commit.
           if url=$(gh pr create --base develop --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/body.md" 2>"$RUNNER_TEMP/pr.err"); then
             gh workflow run ci.yml --ref "$branch" || echo "::warning::Couldn't start CI on $branch; push to the branch or re-run CI by hand."
+            gh workflow run e2e.yml --ref "$branch" || echo "::warning::Couldn't start E2E on $branch; run it by hand (Actions → E2E → Run workflow on $branch)."
             notes=""
             comment "Claude opened $url."
           else
             echo "::warning::$(head -c 300 "$RUNNER_TEMP/pr.err")"
             gh workflow run ci.yml --ref "$branch" || true
+            gh workflow run e2e.yml --ref "$branch" || true
             notes=""
             comment "Claude pushed \`$branch\`, but couldn't open the PR (allow it under Settings → Actions → General → \"Allow GitHub Actions to create and approve pull requests\"). Open it: ${{ github.server_url }}/${{ github.repository }}/compare/develop...$branch?expand=1"
           fi

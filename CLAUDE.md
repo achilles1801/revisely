@@ -206,8 +206,9 @@ file is the release mechanics and the traps behind them.
   `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
   hand.
 - `develop` requires CI green to merge (since Nov 4 2026): Secret scan, Typecheck, Unit +
-  component tests, Cloud Functions tests, Firestore rules tests and `Scenarios / Scenario tests`.
-  Admins can still bypass (`enforce_admins` off). `main` has no branch protection.
+  component tests, Cloud Functions tests, Firestore rules tests, `Scenarios / Scenario tests` and
+  `E2E` (`e2e.yml`'s last job). Admins can still bypass (`enforce_admins` off). `main` has no branch
+  protection.
 - No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
   `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
   entry written by one run can be restored by another. Only CI, which holds no secrets, caches.
@@ -507,9 +508,17 @@ hard-coded token was deleted from the console on 2026-10-27.
   and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
 - **E2E** (`e2e.yml`, `.maestro/README.md`): Maestro flows on the iOS Simulator and the Android
   emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
-  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On PRs into
-  `develop` that touch `src/`, `App.tsx`, `index.ts` or `.maestro/`, nightly (testing develop), and
-  by hand. The app is an E2E build: `EXPO_PUBLIC_E2E=1` at bundle time loads `src/lib/e2e/` (the
+  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On every PR into
+  `develop`, nightly (testing develop), and by hand.
+  - **A required check:** the job `E2E`. Its `changes` job reads the PR's files; when nothing that
+    goes into the app or the flows changed (only what `.github/scripts/app-hash.sh` leaves out, other
+    than `.maestro/`, `e2e.yml`, `firestore.rules` and `firebase.json`), the platform jobs are
+    skipped and `E2E` passes. It also runs after a failure or a cancellation, so it is never
+    missing. A run by hand on one platform or some flows reports as `E2E (partial run)`.
+    `claude-fix` starts it on its branch with CI.
+  - A flaky flow is fixed, not skipped (Nov 4 2026). A pass on a retry is a warning, and the job
+    keeps its results (screenshots, `app.log`: the E2E build's own log, `src/lib/e2e/log.ts`).
+  The app is an E2E build: `EXPO_PUBLIC_E2E=1` at bundle time loads `src/lib/e2e/` (the
   emulators, a hermetic network, the test clock `revisely://e2e/clock?at=…`); every other build
   drops it, since the bundler inlines the variable. Keep new E2E code behind that test, and check a
   release export has none of it. Its native build is cached per fingerprint: the workflow has no
