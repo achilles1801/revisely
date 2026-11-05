@@ -240,13 +240,15 @@ service cloud.firestore {
                         incomingData().carryOverMode in ['shift', 'add']) &&
                        (!hasField('carryOver') || incomingData().carryOver == null ||
                         (incomingData().carryOver is map &&
-                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip']) &&
+                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip', 'source']) &&
                          incomingData().carryOver.day is string &&
                          incomingData().carryOver.pages is list &&
                          incomingData().carryOver.pages.size() <= 604 &&
                          (!('skip' in incomingData().carryOver) ||
                           (incomingData().carryOver.skip is int &&
-                           isInRange(incomingData().carryOver.skip, 0, 604))))) &&
+                           isInRange(incomingData().carryOver.skip, 0, 604))) &&
+                         (!('source' in incomingData().carryOver) ||
+                          incomingData().carryOver.source == 'insights'))) &&
                        (!hasField('reciter') ||
                         (incomingData().reciter is string &&
                          incomingData().reciter.size() <= 60)) &&
