@@ -166,6 +166,14 @@ How the tests are made: `tests/scenarios/README.md`.
   ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
   under the Revised block. Shown to preview testers while the Activity blocks are built.
 
+- **ACT-3.** The calendar's day shows the share of the day's assigned pages revised (a ring), and a dot for a
+  memorized item, a read item and a note on that day. A month steps with ‹ ›. Shown to preview testers while
+  the Activity blocks are built.
+- **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within 7 or 30
+  days (a longer window never covers less); consistency is the days with a revision or a read; pace is shown
+  only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
+  oldest, or never.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an

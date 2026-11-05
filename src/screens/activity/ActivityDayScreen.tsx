@@ -244,7 +244,7 @@ export default function ActivityDayScreen() {
         a11y: `Revision session, ${n} pages revised${ahead ? `, ${ahead}` : ''}. Edit`,
       };
     })),
-    ...readings.map((r): Reply => ({
+    ...(blocks ? [] : readings.map((r): Reply => ({
       key: r.id,
       mark: <Mark size="reply" icon="stopwatch-outline" />,
       name: formatDuration(r.durationSeconds),
@@ -264,10 +264,10 @@ export default function ActivityDayScreen() {
       onPress: () => setEditingReading(r),
       onMenu: () => setTimedMenu(r),
       a11y: `Timed session, ${formatDuration(r.durationSeconds)}. Edit pages`,
-    })),
+    }))),
     // One row per note, in the order they were written.
     ...(journal
-      ? journal.entries.filter((n) => !(blocks && (n.kind === 'revision' || n.kind === 'memorization'))).map((n): Reply => {
+      ? journal.entries.filter((n) => !blocks).map((n): Reply => {
           const text = n.text.trim();
           const time = formatEntryTime(n.at, date, user);
           return {
@@ -338,6 +338,10 @@ export default function ActivityDayScreen() {
               day={date}
               revisionNotes={(journal?.entries ?? []).filter((n) => n.kind === 'revision')}
               memorizationNotes={(journal?.entries ?? []).filter((n) => n.kind === 'memorization')}
+              readings={readings}
+              notes={(journal?.entries ?? []).filter((n) => n.kind === 'note')}
+              onEditReading={setEditingReading}
+              onOpenLog={openJournal}
             />
           )}
           {replies.map((r, i) => {
