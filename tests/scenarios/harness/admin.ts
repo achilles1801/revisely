@@ -81,6 +81,29 @@ export function serveLoadTestScenario(): { calls: number; results: Record<string
   return served;
 }
 
+/**
+ * A new account as the server holds it part way through sign-up: the user
+ * document and pages 1–`lastPage` (harness/newAccountServer.js). `addPages`
+ * lands the rest; `memorizedOnServer` reads back what was saved.
+ */
+function newAccountServer(args: string[]): Record<string, unknown> {
+  const { execFileSync } = jest.requireActual<typeof import('child_process')>('child_process');
+  const out = execFileSync(process.execPath, [path.join(__dirname, 'newAccountServer.js'), ...args], {
+    env: emulatorEnv(),
+    encoding: 'utf8',
+  });
+  return JSON.parse(out.trim().split('\n').pop()!);
+}
+export function createAccountPartWay(email: string, password: string, lastPage: number): string {
+  return newAccountServer(['create', email, password, String(lastPage)]).uid as string;
+}
+export function addPages(email: string, from: number, to: number): void {
+  newAccountServer(['add-pages', email, String(from), String(to)]);
+}
+export function memorizedOnServer(email: string): number[] {
+  return newAccountServer(['memorized', email]).pages as number[];
+}
+
 /** functions/scripts/reset-account.js for this account (harness/adminReset.js). */
 export function resetAccount(email: string): Record<string, unknown> {
   const { execFileSync } = jest.requireActual<typeof import('child_process')>('child_process');

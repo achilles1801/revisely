@@ -44,6 +44,13 @@ How the tests are made: `tests/scenarios/README.md`.
   started. Pages revised ahead still count for the day they're scheduled on (AHEAD-2), on Home and in
   the schedule, but Activity lists them on the day they were revised.
 
+## Onboarding
+
+- **ONBOARD-1.** In "Select memorized portions", a page the user marks counts at once, loaded or not: a
+  new account's 604 pages arrive in two batches (1–450, 451–604), and a juz from the second can be
+  marked before it lands. Continue never saves a selection without a marked page: while a marked page
+  hasn't loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all.
+
 ## The schedule
 
 - **SCHED-1.** Pages plan: N pages a day in page order, from the plan's first day, wrapping round the

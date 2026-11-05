@@ -19,6 +19,8 @@ import {
   applyPendingSurahChanges,
   buildInitialPendingForJourney,
   buildInitialPendingSurahsForJourney,
+  countMemorizedWithPending,
+  markedPagesNotLoaded,
 } from '../../lib/memorizationChanges';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -66,19 +68,19 @@ export default function JuzSelectionScreen() {
     });
   }, [pages, journeyStage, user]);
 
-  // Effective memorized count = base memorized status with pendingChanges applied.
-  const effectiveMemorizedCount = useMemo(() => {
-    let n = 0;
-    for (const p of pages) {
-      const override = pendingChanges.get(p.pageNumber);
-      const effective =
-        override !== undefined ? override : p.status === 'memorized' ? 'memorized' : 'not_memorized';
-      if (effective === 'memorized') n++;
-    }
-    return n;
-  }, [pages, pendingChanges]);
+  // Effective memorized count = base memorized status with pendingChanges
+  // applied, over every page number: a marked page counts before it has loaded,
+  // as its juz's check already shows it (ONBOARD-1).
+  const effectiveMemorizedCount = useMemo(
+    () => countMemorizedWithPending(pages, pendingChanges),
+    [pages, pendingChanges],
+  );
+  // Marked pages the phone hasn't loaded yet (a new account's pages arrive in
+  // two batches): saving now would leave them out, so Continue waits for them.
+  const notLoaded = useMemo(() => markedPagesNotLoaded(pages, pendingChanges), [pages, pendingChanges]);
 
   const handleContinue = async () => {
+    if (notLoaded.length > 0) return;
     const { updatedPages, changedPageNumbers } = applyPendingChanges(
       pages,
       pendingChanges,
@@ -96,7 +98,7 @@ export default function JuzSelectionScreen() {
     navigation.navigate('Schedule', { journeyStage });
   };
 
-  const canContinue = effectiveMemorizedCount > 0;
+  const canContinue = effectiveMemorizedCount > 0 && notLoaded.length === 0;
 
   // The button shows it's saving, and a second tap waits.
   const [saving, setSaving] = useState(false);
@@ -159,7 +161,7 @@ export default function JuzSelectionScreen() {
           {' of 604 pages memorized'}
         </Text>
         <PillButton
-          title="Continue"
+          title={notLoaded.length > 0 ? 'Loading your pages…' : 'Continue'}
           size="lg"
           onPress={continueV2}
           disabled={!canContinue}
