@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
+import { DayBlocks, activityBlocksEnabled } from '../../components/activity/DayBlocks';
 import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -107,6 +108,8 @@ export default function ActivityDayScreen() {
   const { day: today } = useRevisionDay(user);
   // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
   const juzPlan = user?.scheduleMode === 'juz';
+  // The Revised and Memorized blocks from items replace the session rows and the log's copies (C2).
+  const blocks = activityBlocksEnabled(user);
   const quranData = useMemo(() => getQuranData(), []);
 
   const [readings, setReadings] = useState<ReadingSession[]>([]);
@@ -219,7 +222,7 @@ export default function ActivityDayScreen() {
     a11y: string;
   };
   const replies: Reply[] = [
-    ...revisions.map((log): Reply => {
+    ...(blocks ? [] : revisions.map((log): Reply => {
       const runs = pageRuns(log.pagesRevised);
       const n = log.pagesRevised.length;
       // Pages revised ahead (lib/aheadCredit) were revised here, in this
@@ -240,7 +243,7 @@ export default function ActivityDayScreen() {
         onPress: () => setEditingLog(log),
         a11y: `Revision session, ${n} pages revised${ahead ? `, ${ahead}` : ''}. Edit`,
       };
-    }),
+    })),
     ...readings.map((r): Reply => ({
       key: r.id,
       mark: <Mark size="reply" icon="stopwatch-outline" />,
@@ -264,7 +267,7 @@ export default function ActivityDayScreen() {
     })),
     // One row per note, in the order they were written.
     ...(journal
-      ? journal.entries.map((n): Reply => {
+      ? journal.entries.filter((n) => !(blocks && (n.kind === 'revision' || n.kind === 'memorization'))).map((n): Reply => {
           const text = n.text.trim();
           const time = formatEntryTime(n.at, date, user);
           return {
@@ -330,6 +333,13 @@ export default function ActivityDayScreen() {
           >
             <RowText secondary>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged yet'}</RowText>
           </ThreadRow>
+          {blocks && (
+            <DayBlocks
+              day={date}
+              revisionNotes={(journal?.entries ?? []).filter((n) => n.kind === 'revision')}
+              memorizationNotes={(journal?.entries ?? []).filter((n) => n.kind === 'memorization')}
+            />
+          )}
           {replies.map((r, i) => {
             const last = i === replies.length - 1;
             return (
