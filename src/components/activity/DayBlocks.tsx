@@ -4,8 +4,9 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Text } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
@@ -16,7 +17,7 @@ import { ProgressRing, PageStrip, StrengthCounts, WindowFooter } from './DayPart
 import { ThreadBranch } from './ThreadBranch';
 import { RecordingsList } from '../recordings/RecordingsList';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
-import { describePageRuns, pageRuns } from '../../lib/pageRanges';
+import { describePageRuns, describeSurahRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
 import { Tap } from '../v2/Tap';
@@ -53,6 +54,23 @@ interface Props {
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
 }
+
+/** "8:05 – 8:23 AM": from the start to the start plus the minutes; the start alone when not known. */
+const timeRange = (start: number | null | undefined, minutes: number | null) => {
+  if (start == null) return '';
+  const fmt = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return minutes != null && minutes > 0 ? `${fmt(start)} – ${fmt(start + minutes * 60_000)}` : fmt(start);
+};
+
+/** "1 page", "18 pages". */
+const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
+/** The surahs the pages fall in ("Al-Mulk 1–12"), or nothing. */
+const surahsOf = (pages: number[]) => (pages.length > 0 ? describeSurahRuns(pageRuns(pages)) : null);
+/** The sub-line of a block: its parts joined with " · ". */
+const subline = (parts: (string | null | undefined)[]) => {
+  const text = parts.filter((p): p is string => !!p).join(' · ');
+  return text || undefined;
+};
 
 /** Destructive actions confirm first, and name what goes (Activity spec section 3). */
 function confirmDelete(title: string, message: string, onConfirm: () => void) {
@@ -114,7 +132,9 @@ export function DayBlocks({
 
   // The day's recordings hang off their block: revision ones under Revised, reading ones under Read.
   const [recs, setRecs] = useState<RecordingMeta[]>([]);
-  const load = () => {
+  // Stable: useActivityReload runs `load` in a focus effect keyed on it, so a new function
+  // each render reloaded the day on every render, forever (see DayBlocksLoad.test.tsx).
+  const load = useCallback(() => {
     firestoreService
       .getActivityItemsForDay(day)
       .then(setItems)
@@ -122,7 +142,7 @@ export function DayBlocks({
     listRecordings()
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
-  };
+  }, [day]);
   const revRecs = recs.filter((r) => r.kind === 'revision');
   const readRecs = recs.filter((r) => r.kind === 'reading');
   useActivityReload(load);
@@ -146,7 +166,7 @@ export function DayBlocks({
       : `${weekday} runs midnight to midnight`;
   }, [day, dayWindow]);
   const view: DayView | null = useMemo(
-    () => (items ? buildDayView(day, { ...items, reads: [], notes: [] }, memorizedSet) : null),
+    () => (items ? buildDayView(day, { ...items, notes: [] }, memorizedSet) : null),
     [items, day, memorizedSet],
   );
   if (!view) return null;
@@ -154,7 +174,7 @@ export function DayBlocks({
   const [revised, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
   const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
-  const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null }[] };
+  const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
 
   return (
@@ -168,11 +188,13 @@ export function DayBlocks({
             />
           }
           name="Revised"
-          meta={
-            revised.assigned.length > 0
-              ? `${revised.revised.length} of ${revised.assigned.length}${revised.juzLabel ? ` · ${revised.juzLabel}` : ''}`
-              : undefined
+          figure={
+            revised.assigned.length > 0 ? (
+              <Text style={[typeV2.name, { color: palette.text }]}>{`${revised.revised.length} of ${revised.assigned.length}`}</Text>
+            ) : undefined
           }
+          meta={subline([revised.juzLabel, surahsOf(revised.revised), revised.minutes != null ? formatMinutes(revised.minutes) : null])}
+          metaBelow
           lineBelow
           separator={false}
           testID="activity-block-revised"
@@ -241,7 +263,13 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="bookmark-outline" />}
           name="Memorized"
-          meta={memorized.items.length > 0 ? `${memorized.items.reduce((n, i) => n + i.pages.length, 0)} pages` : undefined}
+          figure={
+            memorized.items.length > 0 ? (
+              <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(memorized.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
+            ) : undefined
+          }
+          meta={subline([surahsOf(memorized.items.flatMap((i) => i.pages))])}
+          metaBelow
           lineBelow
           separator={false}
           testID="activity-block-memorized"
@@ -287,7 +315,13 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="stopwatch-outline" />}
           name="Read"
-          meta={readMinutes > 0 ? formatMinutes(readMinutes) : undefined}
+          figure={
+            readItems.items.length > 0 ? (
+              <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(readItems.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
+            ) : undefined
+          }
+          meta={subline([surahsOf(readItems.items.flatMap((i) => i.pages)), readMinutes > 0 ? formatMinutes(readMinutes) : null])}
+          metaBelow
           lineBelow
           separator={false}
           testID="activity-block-read"
@@ -305,9 +339,12 @@ export function DayBlocks({
                 accessibilityRole="button"
                 accessibilityLabel={`Timed session. Edit pages`}
               >
-                <RowText secondary>
-                  {[i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'No pages yet', i.minutes != null ? formatMinutes(i.minutes) : null].filter(Boolean).join(' · ')}
-                </RowText>
+                <View style={styles.readHead}>
+                  <Ionicons name="stopwatch-outline" size={16} color={palette.secondary} />
+                  <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Timed in Read</Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]}>{timeRange(i.occurredAt, i.minutes)}</Text>
+                </View>
+                {i.pages.length > 0 && <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>}
               </Tap>
             );
           })}</ThreadBranch>
@@ -322,6 +359,7 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="create-outline" />}
           name="Notes"
+          figure={notes.some((n) => !gone.has(n.id)) ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.filter((n) => !gone.has(n.id)).length}</Text> : undefined}
           lineBelow
           separator={false}
           testID="activity-block-notes"
@@ -340,6 +378,7 @@ export function DayBlocks({
                 accessibilityRole="button"
                 accessibilityLabel="Daily log. Open the log"
               >
+                <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                 <RowText numberOfLines={4}>{n.text.trim()}</RowText>
               </Tap>
             </SwipeRow>
@@ -365,3 +404,7 @@ export function DayBlocks({
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  readHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+});

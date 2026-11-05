@@ -24,6 +24,8 @@ export interface ReadItemView {
   day: string;
   pages: number[];
   minutes: number | null;
+  /** When the timed session started (ms), when known. */
+  occurredAt?: number | null;
 }
 export interface NoteView {
   id: string;
@@ -41,6 +43,8 @@ export interface RevisedBlock {
   assigned: number[];
   /** Assigned pages the session skipped (the strip's hollow cells). */
   skipped: number[];
+  /** The session's minutes, when it recorded them. */
+  minutes: number | null;
   /** Pages revised ahead for a later day, one line each. */
   credits: { countsFor: string; pages: number[] }[];
   /** "Juz 12" when the session covered a whole juz, else null. */
@@ -85,6 +89,7 @@ export function buildDayView(
     revised,
     assigned,
     skipped,
+    minutes: own.reduce<number | null>((n, r) => (r.minutes == null ? n : (n ?? 0) + r.minutes), null),
     credits: credits.map((c) => ({ countsFor: c.countsFor, pages: c.pages })),
     juzLabel: assigned.length > 0 ? juzLabelFor(revised, assigned, memorized) : null,
   };

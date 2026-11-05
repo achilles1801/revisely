@@ -772,7 +772,7 @@ export async function getActivityItemsForDay(
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
-  reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
+  reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
   const [rev, mem, read] = await Promise.all([
@@ -794,7 +794,7 @@ export async function getActivityItemsForDay(
       };
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
-    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
   };
 }
 
