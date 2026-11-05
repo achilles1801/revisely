@@ -516,6 +516,12 @@ export async function deleteSession(sessionId: string, userId?: string): Promise
   await deleteDoc(getSessionRef(sessionId, userId));
 }
 
+/** Writes one Revised item added by hand (its id is new, so this never overwrites a session's). */
+export async function addRevisionItem(item: RevisionItem, userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  await setDoc(doc(collection(db, 'users', uid, 'revisions'), item.id), item);
+}
+
 /**
  * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
  * written, and any other item of that day is deleted (an edit that dropped an
@@ -579,7 +585,7 @@ function mergeNotes(legacy: JournalNote[], notes: JournalNote[]): JournalNote[] 
 }
 
 function noteFromFirestore(id: string, data: FirestoreJournalNote): JournalNote {
-  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null };
+  return { id, at: data.at, kind: data.kind, text: data.text ?? '', minutes: data.minutes ?? null, tag: data.tag ?? null };
 }
 
 function noteToFirestore(note: JournalNote, uid: string, date: string): FirestoreJournalNote {
@@ -591,6 +597,7 @@ function noteToFirestore(note: JournalNote, uid: string, date: string): Firestor
     kind: note.kind,
     text: note.text,
     minutes: note.minutes,
+    ...(note.tag ? { tag: note.tag } : {}),
   };
 }
 
@@ -771,13 +778,16 @@ export async function getActivityItemsForDay(
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
-  reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
+  reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
+  /** Pages revised in an earlier session, credited to this day ("done ahead"). */
+  doneAhead: { fromDay: string; pages: number[] }[];
 }> {
   const uid = userId || getCurrentUserId();
-  const [rev, mem, read] = await Promise.all([
+  const [rev, mem, read, ahead] = await Promise.all([
     getDocs(query(collection(db, 'users', uid, 'revisions'), where('day', '==', day))),
     getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '==', day))),
     getDocs(query(collection(db, 'users', uid, 'reads'), where('day', '==', day))),
+    getDocs(query(collection(db, 'users', uid, 'revisions'), where('countsFor', '==', day))),
   ]);
   return {
     revisions: rev.docs.map((d) => {
@@ -793,7 +803,10 @@ export async function getActivityItemsForDay(
       };
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
-    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
+    doneAhead: ahead.docs
+      .filter((d) => d.data().day !== day)
+      .map((d) => ({ fromDay: d.data().day, pages: d.data().pages ?? [] })),
   };
 }
 
@@ -1028,6 +1041,35 @@ export async function resetMyDataOnServer(): Promise<TesterResetResult> {
   if (!user) throw new Error('No signed-in user.');
   const out = (await callFunction(user, 'resetMyData', { confirm: 'RESET' })) as { result?: TesterResetResult } | null;
   if (!out?.result?.ok) throw new Error('The reset did not answer as expected.');
+  return out.result;
+}
+
+/** What loadTestScenario answers (functions/src/testScenarios.ts). */
+export interface TestScenarioResult extends TesterResetResult {
+  scenario: string;
+  /** The revision day the scenario was built around. */
+  today: string;
+  seeded: Record<string, number>;
+  /** The reset's mark (ms). */
+  resetAt: number;
+  /** Changes for this phone to queue and hold (the offline-queue scenario): outbox ops. */
+  outbox: Record<string, unknown>[];
+}
+
+/**
+ * Reset the signed-in account and load a test scenario into it (testers only;
+ * the function checks previewTester itself). lib/testScenarios does the phone's part.
+ */
+export async function loadTestScenarioOnServer(data: {
+  scenario: string;
+  context: Record<string, unknown>;
+}): Promise<TestScenarioResult> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No signed-in user.');
+  const out = (await callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data })) as {
+    result?: TestScenarioResult;
+  } | null;
+  if (!out?.result?.ok) throw new Error('The scenario did not answer as expected.');
   return out.result;
 }
 

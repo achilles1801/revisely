@@ -191,7 +191,8 @@ export interface FirestoreUser {
   /** The new design's accent; unset = Indigo. */
   accent?: 'indigo' | 'crimson' | 'jade';
   /** Pages carried into one revision day (see User.carryOver). */
-  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null } | null;
   /** Pages the schedule has been moved back by carry-overs. */
   scheduleShiftPages?: number;
   /** Translation shown when holding a verse. */
@@ -248,7 +249,8 @@ export interface UpdateUserInput {
   carryOverMode?: 'shift' | 'add';
   /** The new design's accent; unset = Indigo. */
   accent?: 'indigo' | 'crimson' | 'jade';
-  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null } | null;
   scheduleShiftPages?: number;
   translationId?: string;
   reciter?: string;
@@ -299,6 +301,8 @@ export interface FirestoreJournalNote {
   at: number;
   kind: 'memorization' | 'revision' | 'note';
   text: string;
+  /** The item this note is tagged to (see JournalNote.tag). */
+  tag?: string | null;
   minutes: number | null;
 }
 

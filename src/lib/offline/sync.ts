@@ -131,7 +131,7 @@ async function run(uid: string): Promise<void> {
     }
   }
   for (;;) {
-    if (!api || api.currentUid() !== uid || api.isDeleting(uid)) return;
+    if (!api || api.currentUid() !== uid || api.isDeleting(uid) || held.has(uid)) return;
     const head = pendingEntries(uid)[0];
     if (!head) return;
     try {
@@ -178,9 +178,31 @@ async function run(uid: string): Promise<void> {
   }
 }
 
+// Testers (Load test scenario → Offline queue, lib/testScenarios): the account's
+// changes wait on this phone until released, or until the app is next started
+// (this lives only in memory), so syncing a queue can be tried by hand.
+const held = new Set<string>();
+
+/** Holds the account's changes on this phone (testers). */
+export function holdSync(uid: string): void {
+  held.add(uid);
+  stateListeners.forEach((l) => l());
+}
+
+/** Lets held changes go, now. */
+export function releaseSync(uid: string): void {
+  if (!held.delete(uid)) return;
+  stateListeners.forEach((l) => l());
+  requestFlush(uid);
+}
+
+export function isSyncHeld(uid: string | null | undefined): boolean {
+  return !!uid && held.has(uid);
+}
+
 /** Starts a run for the account unless one is going (it picks up new changes itself). */
 export function requestFlush(uid: string | null | undefined): void {
-  if (!uid || running.has(uid)) return;
+  if (!uid || running.has(uid) || held.has(uid)) return;
   const timer = retryTimers.get(uid);
   if (timer) {
     clearTimeout(timer);
@@ -211,6 +233,7 @@ export function resetSyncForTests(): void {
   retryTimers.forEach(clearTimeout);
   retryTimers.clear();
   running.clear();
+  held.clear();
   transientStreak.clear();
   appliedListeners.clear();
   stateListeners.clear();

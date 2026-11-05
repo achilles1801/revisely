@@ -77,7 +77,8 @@ export interface User {
   // Pages carried into one revision day. They go first that day and replace its
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.
-  carryOver?: { day: string; pages: number[]; skip?: number } | null;
+  /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null } | null;
   // Pages the whole schedule has been moved back by carry-overs; every day reads
   // its pages this many earlier in the cycle. Reset when a plan is saved.
   scheduleShiftPages?: number;
@@ -162,6 +163,8 @@ export interface JournalNote {
   kind: JournalKind;
   text: string;
   minutes: number | null;
+  /** The item this note hangs off (Activity spec section 2): `revision:<day>`, `memorization:<day>`, `read:<id>`. */
+  tag?: string | null;
 }
 
 /**
