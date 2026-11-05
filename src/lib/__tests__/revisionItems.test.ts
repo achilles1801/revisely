@@ -41,6 +41,10 @@ describe('revisionItemsFor', () => {
     });
   });
 
+  it('writes no item for the day when nothing was revised', () => {
+    expect(revisionItemsFor(session({ pagesRevised: [] }), UID)).toEqual([]);
+  });
+
   it('rounds and caps minutes to a day', () => {
     expect(revisionItemsFor(session({ durationMinutes: 2000 }), UID)[0].minutes).toBe(1440);
     expect(revisionItemsFor(session({ durationMinutes: null }), UID)[0].minutes).toBeNull();

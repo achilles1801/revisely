@@ -84,5 +84,6 @@ export function revisionItemsFor(session: FirestoreSession, uid: string): Revisi
       recordings: [],
     }));
 
-  return [own, ...credited];
+  // A session that revised no page makes no item for its day.
+  return own.pages.length > 0 ? [own, ...credited] : credited;
 }
