@@ -794,6 +794,21 @@ export async function getActivityItemsForDay(
   };
 }
 
+/** Writes (or replaces) a session's Read item (C2 dual write). */
+export async function setReadItem(item: { id: string }, userId: string): Promise<void> {
+  await setDoc(doc(collection(db, 'users', userId, 'reads'), item.id), item);
+}
+
+/** A session's pages changed: its Read item follows (best effort: none if it was never written). */
+export async function patchReadItemPages(id: string, pages: number[], userId: string): Promise<void> {
+  await updateDoc(doc(collection(db, 'users', userId, 'reads'), id), { pages });
+}
+
+/** A session was deleted: its Read item goes with it. */
+export async function deleteReadItem(id: string, userId: string): Promise<void> {
+  await deleteDoc(doc(collection(db, 'users', userId, 'reads'), id));
+}
+
 /** Save a finished session. Returns the new document id. */
 export async function addReadingSession(
   session: Omit<ReadingSession, 'id'>,

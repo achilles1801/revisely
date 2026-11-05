@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import { revisionItemsFor } from '../revisionItems';
 import type { OutboxEntry } from './ops';
 import { applySessionEdit, mergeSessionAdd, pageUpdateData, sessionUpdateData } from './ops';
+import { readItemFor } from '../readItems';
 
 /** A document id like Firestore's own (20 letters and digits), made on the phone. */
 export function autoId(): string {
@@ -13,6 +14,15 @@ export function autoId(): string {
   let id = '';
   for (let i = 0; i < 20; i++) id += chars.charAt(Math.floor(Math.random() * chars.length));
   return id;
+}
+
+/** A Read item beside its session (C2 dual write): best effort, like the revision items. */
+async function mirrorReadItem(uid: string, write: () => Promise<void>): Promise<void> {
+  try {
+    await write();
+  } catch (err) {
+    logger.warn('Read item was not written for a session', err);
+  }
 }
 
 /**
@@ -66,11 +76,14 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
       await firestoreService.deleteSession(op.id, uid);
       return mirrorRevisionItems(uid, op.id, null);
     case 'reading.add':
-      return firestoreService.putReadingSession(op.id, op.session, entry.at, uid);
+      await firestoreService.putReadingSession(op.id, op.session, entry.at, uid);
+      return mirrorReadItem(uid, () => firestoreService.setReadItem(readItemFor(op.id, uid, op.session), uid));
     case 'reading.pages':
-      return firestoreService.updateReadingSessionPages(op.id, op.pages, uid);
+      await firestoreService.updateReadingSessionPages(op.id, op.pages, uid);
+      return mirrorReadItem(uid, () => firestoreService.patchReadItemPages(op.id, op.pages, uid));
     case 'reading.delete':
-      return firestoreService.deleteReadingSession(op.id, uid);
+      await firestoreService.deleteReadingSession(op.id, uid);
+      return mirrorReadItem(uid, () => firestoreService.deleteReadItem(op.id, uid));
     case 'journal.entry.add':
     case 'journal.entry.edit':
       return firestoreService.applyJournalNote(op.date, { kind: 'put', note: { ...op.entry } }, uid);
