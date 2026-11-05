@@ -364,6 +364,7 @@ export default function ActivityDayScreen() {
               }}
               onDeleteMemorized={onDeleteMemorized}
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
+              onDeleteReading={removeReading}
             />
           )}
           {replies.map((r, i) => {

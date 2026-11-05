@@ -183,10 +183,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. "From
   your session" offers only the pages the session missed: its skipped pages not revised, among the memorized
   ones. It never copies the session's own revised pages or minutes.
-- **ACT-6.** A note swiped away goes at once, with Undo; the delete is saved after the undo window (five
-  seconds), and leaving the screen saves any delete still waiting. A hold on a Read or Note row opens Edit and
-  Copy.
-
+- **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
+  window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
+  a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
+  header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
+  VoiceOver offers the same actions as custom actions on the header.
 - **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
   entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
   removal is kept and retried, never dropped.
