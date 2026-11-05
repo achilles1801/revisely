@@ -27,9 +27,10 @@ jest.mock('@react-navigation/native', () => ({
 
 const mockApp: any = {};
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
-const mockService = { getJournalEntry: jest.fn() };
+const mockService = { getJournalEntry: jest.fn(), readingsForDay: jest.fn(() => Promise.resolve([])) };
 jest.mock('../../../services/firestoreService', () => ({
   getJournalEntry: (...a: unknown[]) => mockService.getJournalEntry(...(a as [])),
+  getReadingSessionsForDay: (...a: unknown[]) => mockService.readingsForDay(...(a as [])),
 }));
 // Changes go into the outbox (lib/offline), which sends them when it can.
 const mockQueue = {
@@ -651,3 +652,24 @@ describe('the bottom of the log: one margin, not iOS’s inset on top of it', ()
     expect(screen.getByTestId('journal-v2').props.contentInsetAdjustmentBehavior).toBe('never');
   });
 });
+
+describe('the Memorized suggestion (C4)', () => {
+  it('offers the pages read today that are not memorized yet, and fills the draft', async () => {
+    mockApp.pages = [1, 2, 3].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+    mockService.readingsForDay.mockResolvedValue([{ id: 'r1', pages: [2, 7, 8] }]);
+    await renderScreen();
+    const chip = await screen.findByTestId('journal-memorize-suggestion');
+    fireEvent.press(chip);
+    expect(screen.getByTestId('journal-text-input').props.value).toMatch(/7/);
+    expect(screen.getByTestId('journal-text-input').props.value).not.toMatch(/\b2\b/);
+  });
+
+  it('no chip when everything read today is memorized already', async () => {
+    mockApp.pages = [1, 2].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+    mockService.readingsForDay.mockResolvedValue([{ id: 'r1', pages: [2] }]);
+    await renderScreen();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByTestId('journal-memorize-suggestion')).toBeNull();
+  });
+});
+
