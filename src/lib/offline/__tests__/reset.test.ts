@@ -1,5 +1,12 @@
 import { Timestamp } from 'firebase/firestore';
-import { resetMark, staleEntries, wasReset } from '../reset';
+import {
+  noteResetAdopted,
+  resetAdoptedForTests,
+  resetMark,
+  staleEntries,
+  wasReset,
+  whenResetAdopted,
+} from '../reset';
 import type { OutboxEntry } from '../ops';
 
 const entry = (id: string, at: number): OutboxEntry => ({ id, at, op: { kind: 'usage', seconds: 1 } });
@@ -39,5 +46,27 @@ describe('staleEntries', () => {
 
   it('with no copy (signed out since): the changes made before the reset go', () => {
     expect(staleEntries(entries, undefined, 200).map((e) => e.id)).toEqual(['a']);
+  });
+});
+
+describe('whenResetAdopted (lib/testScenarios queues changes only after it)', () => {
+  beforeEach(() => resetAdoptedForTests());
+
+  it('waits until the phone has taken in the reset, then resolves', async () => {
+    let done = false;
+    const wait = whenResetAdopted('u1', 200, 1000).then(() => {
+      done = true;
+    });
+    noteResetAdopted('u1', 100); // an older mark: not yet
+    noteResetAdopted('u2', 200); // another account: not this one
+    await Promise.resolve();
+    expect(done).toBe(false);
+    noteResetAdopted('u1', 200);
+    await wait;
+    expect(done).toBe(true);
+  });
+
+  it('gives up after its time, saying what to do', async () => {
+    await expect(whenResetAdopted('u1', 300, 10)).rejects.toThrow(/load the scenario again/);
   });
 });

@@ -993,6 +993,35 @@ export async function resetMyDataOnServer(): Promise<TesterResetResult> {
   return out.result;
 }
 
+/** What loadTestScenario answers (functions/src/testScenarios.ts). */
+export interface TestScenarioResult extends TesterResetResult {
+  scenario: string;
+  /** The revision day the scenario was built around. */
+  today: string;
+  seeded: Record<string, number>;
+  /** The reset's mark (ms). */
+  resetAt: number;
+  /** Changes for this phone to queue and hold (the offline-queue scenario): outbox ops. */
+  outbox: Record<string, unknown>[];
+}
+
+/**
+ * Reset the signed-in account and load a test scenario into it (testers only;
+ * the function checks previewTester itself). lib/testScenarios does the phone's part.
+ */
+export async function loadTestScenarioOnServer(data: {
+  scenario: string;
+  context: Record<string, unknown>;
+}): Promise<TestScenarioResult> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No signed-in user.');
+  const out = (await callFunction(user, 'loadTestScenario', { confirm: 'RESET', ...data })) as {
+    result?: TestScenarioResult;
+  } | null;
+  if (!out?.result?.ok) throw new Error('The scenario did not answer as expected.');
+  return out.result;
+}
+
 /** Call one of our callable Cloud Functions with the account's ID token and App Check. */
 async function callFunction(
   user: NonNullable<typeof auth.currentUser>,
