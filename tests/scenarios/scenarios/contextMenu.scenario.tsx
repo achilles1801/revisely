@@ -25,7 +25,7 @@ describe('The long-press menu (ACT-6)', () => {
       />,
     );
     expect(screen.getByText('548–549 keep slipping.')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('context-menu-edit'));
+    fireEvent.press(screen.getByTestId('sheet-action-edit'));
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(order).toEqual(['close', 'edit']);
   });

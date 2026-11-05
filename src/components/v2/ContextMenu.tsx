@@ -78,7 +78,7 @@ export function ContextMenu({
                 accessibilityRole="button"
                 accessibilityLabel={a.label}
                 style={styles.row}
-                testID={`context-menu-${a.key}`}
+                testID={`sheet-action-${a.key}`}
               >
                 <Text style={[typeV2.body, { color: a.destructive ? palette.red : palette.text, flex: 1 }]}>{a.label}</Text>
                 {a.icon ? <Ionicons name={a.icon} size={20} color={a.destructive ? palette.red : palette.text} /> : null}
