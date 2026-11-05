@@ -131,3 +131,15 @@ export function dayPreview(
   };
 }
 
+/** The window's days, oldest first, each with whether it had a revision or a read (the consistency picture). */
+export function dayPattern(items: { day: string }[], today: string, window: number): boolean[] {
+  const had = new Set(items.map((i) => i.day));
+  const out: boolean[] = [];
+  for (let k = window - 1; k >= 0; k--) {
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - k);
+    out.push(had.has(d.toISOString().slice(0, 10)));
+  }
+  return out;
+}
+

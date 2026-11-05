@@ -1,4 +1,4 @@
-import { PACE_MIN_ITEMS, consistency, coverage, dayMarks, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace } from '../activityInsights';
+import { PACE_MIN_ITEMS, consistency, coverage, dayMarks, dayPattern, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace } from '../activityInsights';
 
 const TODAY = '2026-11-10';
 
@@ -73,5 +73,10 @@ describe('Activity Insights (C3)', () => {
       noteDays: new Set(['2026-11-09']),
     });
     expect(p).toEqual({ revised: { done: 2, assigned: 3, minutes: 34 }, memorizedPages: 1, readPages: 2, readMinutes: 18, notes: true });
+  });
+
+  it('the consistency picture: one entry per day of the window, oldest first, true where there was an item', () => {
+    const p = dayPattern([{ day: '2026-11-10' }, { day: '2026-11-08' }], '2026-11-10', 3);
+    expect(p).toEqual([true, false, true]);
   });
 });
