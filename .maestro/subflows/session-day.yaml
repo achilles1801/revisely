@@ -3,13 +3,10 @@
 # ("Juz 1 · 0/10").
 appId: com.revisionbuddy.app
 ---
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: ${FIRST}
-    timeout: 15000
+- runFlow:
+    file: open-session.yaml
+    env:
+      QUIET: ${FIRST}
 - runFlow:
     file: swipe-pages.yaml
     env:

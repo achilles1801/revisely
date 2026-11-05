@@ -19,13 +19,10 @@ appId: com.revisionbuddy.app
     timeout: 30000
 
 # Three pages (1, 582, 583), offline.
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: "Juz 1 · 0/10"
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
 - runFlow:
     file: ../subflows/swipe-pages.yaml
     env:

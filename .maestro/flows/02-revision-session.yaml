@@ -11,13 +11,10 @@ appId: com.revisionbuddy.app
       BOUNDARY: midnight
 
 # SESS-3: leaving with nothing marked saves nothing.
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: "Juz 1 · 0/10"
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
@@ -33,13 +30,10 @@ appId: com.revisionbuddy.app
     text: "Starts at Al.Fatihah, p..1[^0-9]*"
 
 # SESS-1: swiping off a page marks it revised (1, 582, 583).
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: "Juz 1 · 0/10"
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
 - runFlow:
     file: ../subflows/swipe-pages.yaml
     env:
@@ -63,13 +57,10 @@ appId: com.revisionbuddy.app
     text: "Continue revision"
 
 # SESS-1: the check marks and unmarks the page on screen.
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: "Juz 30 · 3/10"
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 30 · 3/10"
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page

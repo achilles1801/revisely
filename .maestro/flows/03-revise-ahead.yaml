@@ -11,13 +11,10 @@ appId: com.revisionbuddy.app
       BOUNDARY: midnight
 
 # Tuesday, all ten pages, onto the end card.
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: "Juz 1 · 0/10"
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
 - runFlow:
     file: ../subflows/swipe-pages.yaml
     env:
@@ -71,13 +68,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-summary
     text: ".*3 of 10 pages done"
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-      text: "Juz 30 · 3/10"
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 30 · 3/10"
 - runFlow:
     file: ../subflows/swipe-pages.yaml
     env:
