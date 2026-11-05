@@ -108,3 +108,38 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-cta
     text: "Review session"
+
+# The Insights tab before Smart Tracking is set up: it is in the tab bar (a tap
+# opens the Smart Tracking preview) but not a page of the pager. A swipe past
+# Read opens the preview too; it used to spring back as if it were too short.
+- tapOn:
+    id: tab-Read
+- extendedWaitUntil:
+    visible:
+      id: read-index-v2
+    timeout: 10000
+# A swipe a slow simulator drops is made again (as in swipe-pages); before the
+# fix, no number of swipes opened it.
+- repeat:
+    while:
+      notVisible:
+        id: smart-preview
+    times: 3
+    commands:
+      - swipe:
+          start: 85%, 55%
+          end: 10%, 55%
+          duration: 300
+      - waitForAnimationToEnd:
+          timeout: 3000
+- assertVisible:
+    id: smart-preview
+# Closing it keeps the account as it was (the preview is not marked seen).
+- tapOn:
+    id: preview-close
+- extendedWaitUntil:
+    notVisible:
+      id: smart-preview
+    timeout: 5000
+- assertVisible:
+    id: read-index-v2
