@@ -123,3 +123,44 @@ export function reviewedOn(logs: readonly RevisionLog[], day: string): Set<numbe
 export function doneOnDay(logs: readonly RevisionLog[], day: string): Set<number> {
   return new Set([...creditedOnDay(logs, day), ...reviewedOn(logs, day)]);
 }
+
+/**
+ * The pages of a day's review in the order the review shows them (Majd, Nov 5
+ * 2026): the day's own pages first, in its assignment's order (then any other
+ * page credited to it), then the pages its sessions revised ahead, the earliest
+ * later day first, each in the order they were revised. The same set as
+ * doneOnDay, so Home's "Done · N" and the review still agree.
+ */
+export function reviewPagesInOrder(
+  logs: readonly RevisionLog[],
+  day: string,
+  assigned: readonly number[],
+): number[] {
+  const aheadByDay = new Map<string, number[]>();
+  for (const log of logs) {
+    if (log.date !== day) continue;
+    for (const [later, pages] of Object.entries(log.ahead ?? {})) {
+      aheadByDay.set(later, [...(aheadByDay.get(later) ?? []), ...pages]);
+    }
+  }
+  const aheadPages = new Set([...aheadByDay.values()].flat());
+  // A page revised ahead also sits in its session's pagesRevised: it belongs
+  // to the later day here, unless the day itself has it too.
+  const ownDay = new Set(assigned);
+  const own = [...creditedOnDay(logs, day)].filter((p) => ownDay.has(p) || !aheadPages.has(p));
+
+  const out: number[] = [];
+  const seen = new Set<number>();
+  const push = (p: number) => {
+    if (seen.has(p)) return;
+    seen.add(p);
+    out.push(p);
+  };
+  const ownSet = new Set(own);
+  for (const p of assigned) if (ownSet.has(p)) push(p);
+  for (const p of [...own].sort((a, b) => a - b)) push(p);
+  for (const later of [...aheadByDay.keys()].sort()) for (const p of aheadByDay.get(later)!) push(p);
+  // Anything else the day's sessions hold (nothing, unless a log is odd).
+  for (const p of [...doneOnDay(logs, day)].sort((a, b) => a - b)) push(p);
+  return out;
+}

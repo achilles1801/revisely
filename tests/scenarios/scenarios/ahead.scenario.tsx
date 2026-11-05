@@ -1,5 +1,7 @@
 // Revising ahead (BEHAVIOUR.md, AHEAD-*), with the reproduction scenarios of
 // PR #197 (S1: "Tomorrow starts at" before Fajr; the Tuesday/Thursday report).
+// A session that goes ahead holds that later day alone, and the day's review
+// lists its own pages and then the ones revised ahead (Majd, Nov 5 2026).
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange } from '../harness/account';
@@ -38,7 +40,7 @@ function credit(app: OpenApp) {
 }
 
 describe('done for the day', () => {
-  it('[AHEAD-1] [DAY-3] Home offers tomorrow; tapping it opens on its first page, after today’s', async () => {
+  it('[AHEAD-1] [DAY-3] Home offers tomorrow; tapping it opens tomorrow’s pages alone, on its first page', async () => {
     const { phone } = await account();
     const { app, home } = await openHome(phone, '2026-11-02 21:00');
     expect(home.ahead()).toBeNull();
@@ -48,8 +50,10 @@ describe('done for the day', () => {
     expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 6(?!\d)/);
 
     const ahead = await home.openAhead();
-    expect(ahead.pages()).toEqual([...MON, ...TUE]);
+    // As if it were Tuesday's session: Monday's pages, done, are not behind it.
+    expect(ahead.pages()).toEqual(TUE);
     expect(ahead.current()).toBe(6);
+    expect(ahead.canSwipeBack()).toBe(false);
     await app.close();
   });
 
@@ -65,7 +69,8 @@ describe('done for the day', () => {
     // Tomorrow is Tuesday (Monday + 1), not Wednesday (the calendar's tomorrow).
     expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 6(?!\d)/);
     const ahead = await home.openAhead();
-    expect(ahead.pages()).toEqual([...MON, ...TUE]);
+    expect(ahead.pages()).toEqual(TUE);
+    expect(ahead.canSwipeBack()).toBe(false);
     await app.close();
   });
 });
@@ -88,7 +93,7 @@ describe('revised ahead', () => {
     expect(home.title()).toMatch(/^Done · 7 pages/);
     expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 8(?!\d)/);
     const rest = await home.openAhead();
-    expect(rest.pages()).toEqual([...MON, 8, 9, 10]);
+    expect(rest.pages()).toEqual([8, 9, 10]);
     expect(rest.current()).toBe(8);
     await rest.back();
     await app.close();
@@ -129,10 +134,13 @@ describe('Keep going', () => {
     const session = await home.startSession();
     await session.swipeThrough(5);
     await session.keepGoing();
-    expect(session.pages()).toEqual([...MON, ...TUE]);
+    expect(session.pages()).toEqual(TUE);
+    expect(session.canSwipeBack()).toBe(false);
     await session.swipeThrough(5);
     await session.keepGoing();
-    expect(session.pages()).toEqual([...MON, ...TUE, ...WED]);
+    // Each later day alone: Tuesday's pages are not behind Wednesday's either.
+    expect(session.pages()).toEqual(WED);
+    expect(session.canSwipeBack()).toBe(false);
     await session.swipeThrough(5);
     await session.back();
     await app.untilSynced();
@@ -178,14 +186,14 @@ describe('Keep going', () => {
     expect(session.pages()).toEqual(TUE);
     await session.swipeThrough(5);
     await session.keepGoing();
-    expect(session.pages()).toEqual([...TUE, ...WED]);
+    expect(session.pages()).toEqual(WED);
     await session.swipeThrough(5);
     await session.back();
     await app.untilSynced();
     // Tomorrow (Wednesday) is done, so the line names Thursday.
     expect(home.ahead()).toMatch(/^Thu starts at .*p\. 16(?!\d)/);
     const opened = await home.openAhead();
-    expect(opened.pages()).toEqual([...TUE, ...THU]);
+    expect(opened.pages()).toEqual(THU);
     await app.close();
   });
 });
@@ -221,6 +229,50 @@ describe('a day done only ahead', () => {
     });
     await app.untilSynced();
     expect(credit(app).find((c) => c.day === '2026-11-03')?.revised).toEqual(TUE);
+    await app.close();
+  });
+});
+
+describe('the review of a day that went ahead', () => {
+  it('[SESS-4] [AHEAD-2] [DAY-2] the day’s own pages first, then the pages revised ahead (Fajr on, after midnight)', async () => {
+    const { phone } = await account({ fajrBoundaryEnabled: true, locationCoords: CITIES.chicago });
+    let { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const session = await home.startSession();
+    await session.swipeThrough(5);
+    await session.keepGoing();
+    await session.check();
+    await session.swipe();
+    await session.check();
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+
+    // Tuesday 00:30, before Fajr: still Monday's revision day.
+    ({ app, home } = await openHome(phone, '2026-11-03 00:30'));
+    expect(home.title()).toMatch(/^Done · 7 pages/);
+    const review = await home.openReview();
+    expect(review).toEqual([...MON, 6, 7]);
+    // It opens on the day's first page.
+    expect(flatText(app.screen.getByTestId('edit-session-page'))).toBe(String(MON[0]));
+    await app.close();
+  });
+
+  it('[SESS-4] [AHEAD-3] when the next day wraps to the start of the cycle, the ahead pages still come after the day’s own', async () => {
+    const { phone } = await account();
+    // Thursday is 16–20; Friday starts the cycle again on 1–5.
+    const { app, home } = await openHome(phone, '2026-11-05 21:00');
+    const session = await home.startSession();
+    expect(session.pages()).toEqual(THU);
+    await session.swipeThrough(5);
+    await session.keepGoing();
+    expect(session.pages()).toEqual(MON);
+    await session.check();
+    await session.swipe();
+    await session.check();
+    await session.back();
+    await app.untilSynced();
+    // Not in page order (1, 2, 16…): Thursday's, then Friday's two.
+    expect(await home.openReview()).toEqual([...THU, 1, 2]);
     await app.close();
   });
 });

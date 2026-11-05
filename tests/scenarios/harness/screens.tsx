@@ -122,6 +122,14 @@ export class Home {
     return this.open('today-ahead');
   }
 
+  /** Review session (the Today post's button once the day is done): the pages it holds, in order. */
+  async openReview(): Promise<number[]> {
+    resetPager();
+    await this.tap('today-cta');
+    await this.app.until(() => this.app.screen.queryByTestId('edit-session') != null, 'the review to open');
+    return [...(pagerState().props?.pages ?? [])];
+  }
+
   /**
    * Taps a button that opens the session, and waits for it. A snapshot that
    * lands between finding the button and pressing it (the server's copy of a
@@ -247,21 +255,27 @@ export class Session {
     for (let k = 0; k < n; k++) await this.swipe();
   }
 
-  /** The end card's Keep going: the next revision day's pages join the session. */
+  /** The end card's Keep going: the session goes on to the next revision day, which the pager then holds alone. */
   async keepGoing(): Promise<void> {
     const { fireEvent } = this.app.mods.rtl;
-    const before = this.pages().length;
+    const before = this.pages().join(',');
     const el = this.app.screen.getByTestId('session-end-keep-going');
     await this.app.act(async () => {
       fireEvent.press(el);
     });
-    await this.app.until(() => this.pages().length > before, 'Keep going to add the next day');
-    // The pager moves to the first page of the day added.
+    await this.app.until(() => this.pages().join(',') !== before, 'Keep going to open the next day');
+    // The pager opens on that day's first page.
     const state = pagerState();
-    state.current = state.props!.pages[before];
+    state.current = state.props!.initialPage ?? state.props!.pages[0];
     await this.app.act(async () => {
-      state.props?.onPageChange?.(state.current!, before);
+      state.props?.onPageChange?.(state.current!, state.props!.pages.indexOf(state.current!));
     });
+  }
+
+  /** Whether there is a page before the one on screen to swipe back to. */
+  canSwipeBack(): boolean {
+    const state = pagerState();
+    return state.props != null && state.current != null && state.props.pages.indexOf(state.current) > 0;
   }
 
   hasKeepGoing(): boolean {
