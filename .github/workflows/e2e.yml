@@ -64,9 +64,11 @@ on:
 permissions:
   contents: read
 
-# One run per PR (or branch): a push cancels the run of the commit before it.
+# One run per PR: a push cancels the run of the commit before it. Elsewhere one
+# per branch and event, so a push to develop (the native build) never cancels a
+# full run started by hand or on schedule there (a release's proof).
 concurrency:
-  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  group: e2e-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.event_name) }}
   cancel-in-progress: true
 
 env:
