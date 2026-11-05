@@ -185,6 +185,10 @@ How the tests are made: `tests/scenarios/README.md`.
   entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
   removal is kept and retried, never dropped.
 
+- **ACT-8.** A revised page's strength comes from its weakness rating (1–5): 1–2 is weak, 3 is moderate, 4–5
+  is strong. The counts on a day's Revised block are these classes, over the day's revised pages (a page with
+  no rating counts as 4, strong). Confirmed by Majd, Nov 2026.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
