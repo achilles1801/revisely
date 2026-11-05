@@ -26,6 +26,7 @@ import { journalFirstDay } from '../../lib/journal';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
+import { AddMemorizedSheet } from '../../components/activity/AddMemorizedSheet';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
 
@@ -69,9 +70,11 @@ export default function ActivityScreen() {
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
   // The + menu (C4, previewTester): one add per kind, each on its own composer tab.
   const [addOpen, setAddOpen] = useState(false);
+  // Memorized (d7): its own sheet, not the composer.
+  const [memorizedOpen, setMemorizedOpen] = useState(false);
   const addMenuActions = [
     { key: 'revision', label: 'Revised', icon: 'checkmark-circle-outline' as const, subtitle: 'Pages you revised, or missed', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'revision' }) },
-    { key: 'memorization', label: 'Memorized', icon: 'bookmark-outline' as const, subtitle: 'Pages you have memorized', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'memorization' }) },
+    { key: 'memorization', label: 'Memorized', icon: 'bookmark-outline' as const, subtitle: 'Pages you have memorized', onPress: () => setMemorizedOpen(true) },
     { key: 'read', label: 'Read', icon: 'stopwatch-outline' as const, subtitle: 'A timed reading session', onPress: () => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read') },
     { key: 'note', label: 'Note', icon: 'create-outline' as const, subtitle: 'Anything for the day', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'note' }) },
   ];
@@ -146,6 +149,7 @@ export default function ActivityScreen() {
         </ScrollView>
       )}
       <ActionSheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add" actions={addMenuActions} testID="activity-add-menu" />
+      <AddMemorizedSheet visible={memorizedOpen} onClose={() => setMemorizedOpen(false)} day={today} />
     </TopSafeAreaView>
   );
 }

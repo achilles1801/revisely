@@ -177,6 +177,9 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. "From
   your session" offers only the pages the session missed: its skipped pages not revised, among the memorized
   ones. It never copies the session's own revised pages or minutes.
+  Memorized opens its own sheet: From and To, or a surah. Add marks the pages memorized (the composer's two
+  writes) and records a Memorized item for today. "From your reading" offers the pages read today that are not
+  memorized yet. The sheet has no minutes: a Memorized item carries none yet.
 - **ACT-6.** A note swiped away goes at once, with Undo; the delete is saved after the undo window (five
   seconds), and leaving the screen saves any delete still waiting. A hold on a Read or Note row opens Edit and
   Copy.
