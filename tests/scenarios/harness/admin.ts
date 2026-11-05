@@ -103,6 +103,12 @@ export function addPages(email: string, from: number, to: number): void {
 export function memorizedOnServer(email: string): number[] {
   return newAccountServer(['memorized', email]).pages as number[];
 }
+export function markOnServer(email: string, page: number): void {
+  newAccountServer(['mark', email, String(page)]);
+}
+export function pageCountOnServer(email: string): number {
+  return newAccountServer(['count', email]).pages as number;
+}
 
 /** functions/scripts/reset-account.js for this account (harness/adminReset.js). */
 export function resetAccount(email: string): Record<string, unknown> {

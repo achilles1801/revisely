@@ -150,6 +150,29 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
   return userData;
 }
 
+/** A page as a new account starts it. */
+function newPageData(pageNumber: number, now: Timestamp): FirestorePage {
+  return {
+    pageNumber,
+    status: 'not_memorized',
+    dateMemorized: null,
+    lastRevisedAt: null,
+    weaknessRating: DEFAULT_WEAKNESS_RATING,
+    totalRevisionCount: 0,
+    skipCount: 0,
+    updatedAt: now,
+  };
+}
+
+// Accounts whose pages this app is writing now (initializeAllPages): their page
+// list is short on purpose until the last batch lands.
+const initializingPages = new Set<string>();
+
+/** Whether this app is creating `uid`'s pages right now. */
+export function isInitializingPages(uid: string | undefined | null): boolean {
+  return !!uid && initializingPages.has(uid);
+}
+
 /**
  * Initialize all 604 page documents with default values.
  * Uses multiple batches to stay under Firestore's 500-op limit.
@@ -157,27 +180,53 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
 export async function initializeAllPages(userId: string): Promise<void> {
   const BATCH_SIZE = 450;
   const now = Timestamp.now();
-
-  for (let batchStart = 1; batchStart <= TOTAL_QURAN_PAGES; batchStart += BATCH_SIZE) {
-    const batch = writeBatch(db);
-    const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, TOTAL_QURAN_PAGES);
-
-    for (let pageNumber = batchStart; pageNumber <= batchEnd; pageNumber++) {
-      const pageData: FirestorePage = {
-        pageNumber,
-        status: 'not_memorized',
-        dateMemorized: null,
-        lastRevisedAt: null,
-        weaknessRating: DEFAULT_WEAKNESS_RATING,
-        totalRevisionCount: 0,
-        skipCount: 0,
-        updatedAt: now,
-      };
-      batch.set(getPageRef(pageNumber, userId), pageData);
+  initializingPages.add(userId);
+  try {
+    for (let batchStart = 1; batchStart <= TOTAL_QURAN_PAGES; batchStart += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, TOTAL_QURAN_PAGES);
+      for (let pageNumber = batchStart; pageNumber <= batchEnd; pageNumber++) {
+        batch.set(getPageRef(pageNumber, userId), newPageData(pageNumber, now));
+      }
+      await batch.commit();
     }
-
-    await batch.commit();
+  } finally {
+    initializingPages.delete(userId);
   }
+}
+
+/**
+ * Creates the page documents an account lacks, and returns how many: a sign-up
+ * that stopped between initializeAllPages' two batches (the app closed, the
+ * second commit failed) leaves pages 1–450 alone, and nothing else creates the
+ * rest (AppContext creates pages only when there are none). Each missing page
+ * is created in a transaction that checks it still doesn't exist, so a page
+ * written meanwhile (by the other batch, or another phone) is never replaced.
+ */
+export async function createMissingPages(userId: string): Promise<number> {
+  const existing = await getDocsFromServer(getPagesCollectionRef(userId));
+  const have = new Set(existing.docs.map((d) => (d.data() as FirestorePage).pageNumber));
+  const missing: number[] = [];
+  for (let p = 1; p <= TOTAL_QURAN_PAGES; p++) if (!have.has(p)) missing.push(p);
+  if (missing.length === 0) return 0;
+  const now = Timestamp.now();
+  let created = 0;
+  const CHUNK = 200;
+  for (let i = 0; i < missing.length; i += CHUNK) {
+    const chunk = missing.slice(i, i + CHUNK);
+    created += await runTransaction(db, async (tx) => {
+      const refs = chunk.map((p) => getPageRef(p, userId));
+      const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+      let n = 0;
+      snaps.forEach((snap, k) => {
+        if (snap.exists()) return;
+        tx.set(refs[k], newPageData(chunk[k], now));
+        n++;
+      });
+      return n;
+    });
+  }
+  return created;
 }
 
 export async function getUser(userId?: string): Promise<FirestoreUser | null> {

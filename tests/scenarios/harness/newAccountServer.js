@@ -7,6 +7,8 @@
 //   node newAccountServer.js create <email> <password> <lastPage>   → {"uid": …}
 //   node newAccountServer.js add-pages <email> <from> <to>
 //   node newAccountServer.js memorized <email>                       → {"pages": [...]}
+//   node newAccountServer.js mark <email> <page>                     (marks a page memorized)
+//   node newAccountServer.js count <email>                           → {"pages": n}
 const path = require('path');
 
 const functions = path.resolve(__dirname, '../../../functions');
@@ -83,6 +85,14 @@ async function writePages(uid, from, to) {
     const user = await admin.auth().getUserByEmail(email);
     await writePages(user.uid, Number(a), Number(b));
     console.log(JSON.stringify({ ok: true }));
+  } else if (cmd === 'mark') {
+    const user = await admin.auth().getUserByEmail(email);
+    await db.doc(`users/${user.uid}/pages/${a}`).update({ status: 'memorized', dateMemorized: new Date().toISOString() });
+    console.log(JSON.stringify({ ok: true }));
+  } else if (cmd === 'count') {
+    const user = await admin.auth().getUserByEmail(email);
+    const snap = await db.collection(`users/${user.uid}/pages`).get();
+    console.log(JSON.stringify({ pages: snap.size }));
   } else if (cmd === 'memorized') {
     const user = await admin.auth().getUserByEmail(email);
     const snap = await db.collection(`users/${user.uid}/pages`).where('status', '==', 'memorized').get();

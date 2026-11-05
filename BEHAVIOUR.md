@@ -50,6 +50,10 @@ How the tests are made: `tests/scenarios/README.md`.
   new account's 604 pages arrive in two batches (1–450, 451–604), and a juz from the second can be
   marked before it lands. Continue never saves a selection without a marked page: while a marked page
   hasn't loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all.
+- **ONBOARD-2.** An account the server holds with some of its pages but not all 604 (a sign-up stopped
+  between its two batches: the app closed, the second commit failed) gets the missing ones created, as
+  new pages, once the app has the server's list and isn't writing them itself. A page it already has is
+  never replaced.
 
 ## The schedule
 
