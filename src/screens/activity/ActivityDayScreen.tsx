@@ -363,6 +363,7 @@ export default function ActivityDayScreen() {
                 void deleteLog(log.id);
               }}
               onDeleteMemorized={onDeleteMemorized}
+              onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
             />
           )}
           {replies.map((r, i) => {
@@ -389,6 +390,7 @@ export default function ActivityDayScreen() {
             );
           })}
           {/* The rows keep the gutter themselves (hairlines run edge to edge). */}
+          {!blocks && (
           <View onLayout={onRecordingsLayout}>
             <RecordingsList
               day={date}
@@ -402,6 +404,7 @@ export default function ActivityDayScreen() {
               }
             />
           </View>
+          )}
         </ScrollView>
       )}
       <ActionSheet
