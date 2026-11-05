@@ -3,7 +3,12 @@
 # would (a relaunch, coming back to the front). See .maestro/README.md.
 appId: com.revisionbuddy.app
 ---
-- openLink: revisely://e2e/clock?at=${AT}
+# Again if the link can't be sent (the iOS driver can drop for a moment as a
+# flow starts: 03 once failed here, Nov 5).
+- retry:
+    maxRetries: 2
+    commands:
+      - openLink: revisely://e2e/clock?at=${AT}
 # Until the status line (E2ERoot) shows the new time (the date and the hour are
 # enough). iOS asks "Open in “Revisely”?" the first time on a simulator, on a
 # slow one many seconds later: confirm it whenever it shows.
