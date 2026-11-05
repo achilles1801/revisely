@@ -125,6 +125,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **LOG-2.** Editing a note changes only that note; deleting one removes only it. Both reach every
   phone.
 - **LOG-3.** A note written between midnight and Fajr (boundary on) belongs to the revision day.
+- **LOG-4.** The log writes what is added at once: a note or a revised portion shows as soon as it is sent, stays
+  while the server catches up, and the first note of a day shows without leaving the log.
 
 ## Offline, devices and accounts
 
