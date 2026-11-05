@@ -161,6 +161,9 @@ How the tests are made: `tests/scenarios/README.md`.
   the one the user's revision sessions were written in (the offset under which each session's
   `createdAt` falls on its `date`). With no sessions, it is the saved location's zone, estimated from
   its longitude; with neither, UTC.
+- **ACT-2.** A day's Revised block is built from its revision items: one per day, with the pages revised
+  ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
+  under the Revised block. Shown to preview testers while the Activity blocks are built.
 
 ## Known bugs
 

@@ -760,6 +760,40 @@ export async function getReadingSessionsForDay(
   );
 }
 
+/**
+ * The Activity items of one revision day (C2): its Revised items (the day's own
+ * item and the credit to later days, which names its own day) and its Memorized
+ * items. Read items and notes come from their own stores for now.
+ */
+export async function getActivityItemsForDay(
+  day: string,
+  userId?: string,
+): Promise<{
+  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
+  memorized: { id: string; day: string; pages: number[] }[];
+}> {
+  const uid = userId || getCurrentUserId();
+  const [rev, mem] = await Promise.all([
+    getDocs(query(collection(db, 'users', uid, 'revisions'), where('day', '==', day))),
+    getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '==', day))),
+  ]);
+  return {
+    revisions: rev.docs.map((d) => {
+      const x = d.data();
+      return {
+        id: d.id,
+        day: x.day,
+        countsFor: x.countsFor,
+        pages: x.pages ?? [],
+        skipped: x.skipped ?? [],
+        assigned: x.assigned ?? [],
+        minutes: x.minutes ?? null,
+      };
+    }),
+    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+  };
+}
+
 /** Save a finished session. Returns the new document id. */
 export async function addReadingSession(
   session: Omit<ReadingSession, 'id'>,
