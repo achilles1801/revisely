@@ -29,15 +29,23 @@ appId: com.revisionbuddy.app
       id: juz-30-check
     direction: DOWN
     timeout: 30000
-# The check, and the count it changes (slow to show on a CI runner).
+# The check, once the screen has its starting count ("1 of 604": in progress
+# starts from page 1), which comes when the account's pages have loaded: a juz
+# marked before then was dropped when they arrived (fixed in #216). Tapped only
+# while the count still shows page 1 alone, since a tap toggles it.
+- extendedWaitUntil:
+    visible:
+      id: juz-selection-summary
+      text: "[1-9][0-9]* of 604 pages memorized"
+    timeout: 30000
 - retry:
     maxRetries: 2
     commands:
       - runFlow:
           when:
-            notVisible:
+            visible:
               id: juz-selection-summary
-              text: "24 of 604 pages memorized"
+              text: "1 of 604 pages memorized"
           commands:
             - tapOn:
                 id: juz-30-check
@@ -63,3 +71,8 @@ appId: com.revisionbuddy.app
     visible:
       id: today-post
     timeout: 30000
+# Juz 30 memorized (24 pages, 4.0%): what onboarding saved, on Home.
+- extendedWaitUntil:
+    visible:
+      text: ".*4.0% of the Quran memorized.*"
+    timeout: 15000

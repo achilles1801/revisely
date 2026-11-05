@@ -267,3 +267,29 @@ describe('Settings: the speech model (testers)', () => {
     expect(screen.getByText('30%')).toBeTruthy();
   });
 });
+
+describe('Settings: Reset my data (testers)', () => {
+  afterEach(() => {
+    delete mockUser.previewTester;
+  });
+
+  it('not a previewTester account: no Testing section, no row', async () => {
+    await renderV2();
+    expect(screen.queryByTestId('reset-data-row')).toBeNull();
+    expect(screen.queryByText('Reset my data')).toBeNull();
+  });
+
+  it('a previewTester account: the row, in red, says what it does and opens the RESET sheet', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    expect(screen.getByText('Testing')).toBeTruthy();
+    const label = screen.getByText('Reset my data');
+    expect(flat(label.props.style).color).toBe(palette.red);
+    expect(screen.getByText('Start again as a new account')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(label);
+    });
+    expect(screen.getByTestId('reset-data-input')).toBeTruthy();
+    expect(screen.getByTestId('reset-data-confirm').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});

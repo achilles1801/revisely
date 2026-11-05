@@ -88,3 +88,84 @@ describe('Jump to… with a carry-over into today', () => {
     await app.close();
   });
 });
+
+describe('Jump to… before the leftovers are taken', () => {
+  it('[JUMP-3] Juz 28 left over, then Jump to Juz 28 before adding it: nothing is offered any more, and the session starts at Juz 28 with no leftovers in front', async () => {
+    const phone = await account();
+    // Sun 1 Nov and Mon 2 Nov: Juz 26 and 27 are fully revised.
+    for (const at of ['2026-11-01 21:00', '2026-11-02 21:00']) {
+      const { app, home } = await openHome(phone, at);
+      const session = await home.startSession();
+      await session.swipeThrough(session.pages().length);
+      await session.back();
+      await app.untilSynced();
+      await app.close();
+    }
+    // Tue 3 Nov: Juz 28 from 542, only four pages done; 546–561 are left.
+    {
+      const { app, home } = await openHome(phone, '2026-11-03 21:00');
+      const session = await home.startSession();
+      await session.swipeThrough(4);
+      await session.back();
+      await app.untilSynced();
+      await app.close();
+    }
+    // Wed 4 Nov (Juz 29): the leftovers are offered, and the user jumps before taking them.
+    let { app, home } = await openHome(phone, '2026-11-04 09:00');
+    expect(home.carryOver()).toBe('Add to today');
+    await home.jumpTo('jump-juz-28');
+    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    expect(home.carryOver()).toBeNull();
+    let session = await home.startSession();
+    expect(session.pages()).toEqual(range(542, 561));
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+
+    // Reopened later: the offer is still gone, and today still starts at Juz 28.
+    ({ app, home } = await openHome(phone, '2026-11-04 15:00'));
+    expect(home.carryOver()).toBeNull();
+    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    session = await home.startSession();
+    expect(session.pages()).toEqual(range(542, 561));
+    await session.back();
+    await app.close();
+  });
+});
+
+describe('Jump to… with pages revised ahead for today', () => {
+  it('[JUMP-2] [JUMP-3] Juz 29’s first three pages were revised ahead on Tue; Jump to Juz 28 from Wed: the session holds Juz 28 from its start, and the ahead pages are not in front of it', async () => {
+    const phone = await account();
+    // Mon 2 Nov: Juz 27 fully revised.
+    {
+      const { app, home } = await openHome(phone, '2026-11-02 21:00');
+      const session = await home.startSession();
+      await session.swipeThrough(session.pages().length);
+      await session.back();
+      await app.untilSynced();
+      await app.close();
+    }
+    // Tue 3 Nov: Juz 28 fully revised, then Wed’s first three pages revised ahead (credited to Wed).
+    {
+      const { app, home } = await openHome(phone, '2026-11-03 21:00');
+      const session = await home.startSession();
+      await session.swipeThrough(session.pages().length);
+      await session.back();
+      const ahead = await home.openAhead();
+      // Wednesday's pages alone (Tuesday's are not behind them).
+      expect(ahead.pages()).toEqual(range(562, 581));
+      await ahead.swipeThrough(3);
+      await ahead.back();
+      await app.untilSynced();
+      await app.close();
+    }
+    // Wed 4 Nov (Juz 29, from 562): jump back to Juz 28.
+    const { app, home } = await openHome(phone, '2026-11-04 09:00');
+    await home.jumpTo('jump-juz-28');
+    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    const session = await home.startSession();
+    expect(session.pages()).toEqual(range(542, 561));
+    await session.back();
+    await app.close();
+  });
+});

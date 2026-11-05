@@ -3,8 +3,9 @@
 // variable as undefined, so `undefined === '1'` folds away with the require).
 // What it sets up, and how flows drive it: .maestro/README.md.
 
-import { Linking } from 'react-native';
+import { AppState, Linking } from 'react-native';
 import { handleClockLink, installClock } from './clock';
+import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
 
 let installed = false;
@@ -19,9 +20,19 @@ function handle(url: string | null | undefined): void {
 export function installE2E(): void {
   if (installed) return;
   installed = true;
+  installLog();
   installClock();
   installNetwork();
-  Linking.addEventListener('url', ({ url }) => handle(url));
+  Linking.addEventListener('url', ({ url }) => {
+    // eslint-disable-next-line no-console
+    console.log(`[e2e] link ${url}`);
+    handle(url);
+  });
+  AppState.addEventListener('change', (state) => {
+    // eslint-disable-next-line no-console
+    console.log(`[e2e] app ${state}`);
+    if (state !== 'active') flushE2ELog();
+  });
   // A cold start from a link (openLink with the app closed): the app waits for
   // it (E2ERoot), so the first screen already runs at the flow's time.
   ready = Linking.getInitialURL()

@@ -4,8 +4,8 @@
 // and the E2E network state. Flows read it (id e2e-status) to check the clock
 // took, and a failed flow's screenshots say what time the app thought it was.
 
-import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import { e2eReady } from './install';
 import { clockLabel, onClockChange } from './clock';
 import { isOffline, onNetworkChange } from './network';
@@ -70,8 +70,23 @@ export function withE2E<P extends object>(App: React.ComponentType<P>): React.Co
         live = false;
       };
     }, []);
+    // Where the app's root sits in its window, in the app's log each time it
+    // changes: Android once laid the window out a status bar's height too low
+    // after a quick relaunch. A flow failing on that then says so.
+    const root = useRef<View>(null);
+    const onLayout = useCallback(() => {
+      root.current?.measureInWindow((x, y, width, height) => {
+        const w = Dimensions.get('window');
+        const s = Dimensions.get('screen');
+        // eslint-disable-next-line no-console
+        console.log(
+          `[e2e] layout: root at ${Math.round(x)},${Math.round(y)} ${Math.round(width)}×${Math.round(height)}; ` +
+            `window ${Math.round(w.width)}×${Math.round(w.height)}, screen ${Math.round(s.width)}×${Math.round(s.height)}`,
+        );
+      });
+    }, []);
     return (
-      <View style={styles.root}>
+      <View ref={root} style={styles.root} onLayout={onLayout}>
         {ready ? <App {...props} /> : null}
         <Status />
       </View>

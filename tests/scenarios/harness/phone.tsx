@@ -256,8 +256,16 @@ export class OpenApp {
       renders: this.renders.n,
       signedIn: !!u.firebaseUser,
       authLoading: u.isLoading,
-      user: a.user ? { anchor: a.user.scheduleAnchorDate, perDay: a.user.dailyPageCapacity } : a.user,
+      user: a.user
+        ? {
+            anchor: a.user.scheduleAnchorDate,
+            perDay: a.user.dailyPageCapacity,
+            plan: a.user.customPlan?.days.length ?? 0,
+            carry: a.user.carryOver ?? null,
+          }
+        : a.user,
       pages: a.pages.length,
+      memorized: a.pages.filter((p: { status: string }) => p.status === 'memorized').length,
       logs: a.logs.length,
       loading: a.loading,
       onboardingComplete: a.onboardingComplete,
@@ -327,11 +335,32 @@ export class OpenApp {
   }
 
   /** Quits the app. What it saved on the phone stays for the next launch. */
-  async close({ settleMs = 600 }: { settleMs?: number } = {}): Promise<void> {
+  /** Waits until the app hasn't rendered for `quietMs` (at most `maxMs`). */
+  async settle(quietMs: number, maxMs = 15_000): Promise<void> {
+    const started = performance.now();
+    let last = this.renders.n;
+    let since = performance.now();
+    while (performance.now() - started < maxMs) {
+      await this.idle(50);
+      if (this.renders.n !== last) {
+        last = this.renders.n;
+        since = performance.now();
+      } else if (performance.now() - since >= quietMs) {
+        return;
+      }
+    }
+  }
+
+  async close({ settleMs = 900 }: { settleMs?: number } = {}): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    // The copy of the account is written a moment after a change (AppContext).
-    if (settleMs > 0) await this.idle(settleMs).catch(() => undefined);
+    // The copy of the account is written 400 ms after the last change
+    // (AppContext's CACHE_WRITE_DELAY_MS), and every snapshot that changes it
+    // starts that wait again. Closing after a fixed pause could leave an older
+    // copy on a busy machine, and the next launch then began from it (Home
+    // briefly with no memorized pages). So: until nothing has changed for
+    // `settleMs`, at most 15 s.
+    if (settleMs > 0) await this.settle(settleMs).catch(() => undefined);
     const AsyncStorage = storageOf(this.mods.require);
     await this.mods.rtl.act(async () => {
       this.view?.unmount();

@@ -1,7 +1,6 @@
 # Offline: a session revised with no connection is kept on the phone, survives a
 # cold start offline, and reaches the server once the phone is back online.
 # Rules (BEHAVIOUR.md): SYNC-1, SYNC-2, SESS-3
-# e2e-ci-skip: ios — on CI's macOS runner the app stayed "Offline" for minutes after the E2E switch came back on (seconds on a Mac); Android covers it with airplane mode. See .maestro/README.md.
 appId: com.revisionbuddy.app
 ---
 - runFlow:

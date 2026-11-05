@@ -1,15 +1,25 @@
-# Types TEXT into the log's field, replacing what is there. On Android the field
-# shows its text, so the typing is checked, and done again if the keyboard
-# wasn't ready for it (a slow emulator).
+# Types TEXT into the log's field, replacing what is there, and checks the field
+# holds it: on a slow device the first keys can go before the keyboard is ready
+# (Android), or the field can take focus after the typing started (seen on the
+# iOS Simulator in CI: the note was added empty). Done again if so.
+# On iOS the multiline field is found by its label (log-input.yaml); its text is
+# its value, which `text:` matches.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
     when:
       platform: iOS
     commands:
-      - runFlow: log-input.yaml
-      - eraseText: 80
-      - inputText: ${TEXT}
+      - retry:
+          maxRetries: 3
+          commands:
+            - runFlow: log-input.yaml
+            - eraseText: 80
+            - inputText: ${TEXT}
+            - extendedWaitUntil:
+                visible:
+                  text: ${TEXT}
+                timeout: 5000
 - runFlow:
     when:
       platform: Android

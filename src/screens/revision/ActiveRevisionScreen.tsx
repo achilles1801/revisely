@@ -119,9 +119,9 @@ export default function ActiveRevisionScreen() {
     return generateDailyAssignment(pages, quranData, user, new Date(y, m - 1, d));
   }, [user, pages, sessionDay]);
 
-  // Home's "Tomorrow starts at …" (#168) opens on that day's pages, after
-  // today's. Planned here, at mount, when the user is already loaded: the pager
-  // then starts on the day's first page with no jump (and no flash of today's).
+  // Home's "Tomorrow starts at …" (#168) opens on that day's pages alone.
+  // Planned here, at mount, when the user is already loaded: the pager then
+  // starts on the day's first page with no jump (and no flash of today's).
   // Otherwise the effect below adds the day as soon as the user is there.
   const openAheadDay = route.params?.aheadDay;
   const [openedAhead] = useState<RevisionDayPlan | null>(() => {
@@ -146,6 +146,12 @@ export default function ActiveRevisionScreen() {
   }, [sections]);
   const lastSectionDay = sections[sections.length - 1].day;
   const lastSectionPages = sections[sections.length - 1].pages;
+  // The pager holds one revision day: today's, or once the session has gone
+  // ahead (Home's "Tomorrow starts at", Keep going), only that later day's, as
+  // if it were that day's own session. Today's pages, done, don't sit behind it
+  // (Majd, Nov 5 2026). The session still spans every day it covered: marks,
+  // credit and saves go by page, each page's day in pageDays.
+  const shownPages = lastSectionPages.length > 0 ? lastSectionPages : NO_PAGES;
   const keepGoingPlan = useMemo(
     () =>
       user && lastSectionDay
@@ -272,7 +278,7 @@ export default function ActiveRevisionScreen() {
   // Each hide is a new round: what was followed before is covered again.
   const [hideRound, setHideRound] = useState(0);
   const markRevisedRef = useRef<(page: number) => void>(() => undefined);
-  const followPages = sessionPages.length > 0 ? sessionPages : NO_PAGES;
+  const followPages = shownPages;
   const follow = useReciteFollow({
     active: wordMode && listenOn && isScreenFocused && !recorder.recording,
     round: hideRound,
@@ -331,7 +337,7 @@ export default function ActiveRevisionScreen() {
   );
 
   const verseActions = useVerseActions({
-    pages: sessionPages,
+    pages: shownPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
     focused: isScreenFocused,
@@ -500,15 +506,15 @@ export default function ActiveRevisionScreen() {
   const assignedPages = sessionPages.length > 0 ? sessionPages : NO_PAGES;
 
   const scopeLabel = useMemo(() => {
-    // Prefer juz scope when the assignment fits one juz; otherwise show count.
+    // Prefer juz scope when the day's pages fit one juz; otherwise show count.
     const juzes = new Set(
-      assignedPages
+      shownPages
         .map((p) => quranData.find((q) => q.pageNumber === p)?.juzNumber)
         .filter((j): j is number => typeof j === 'number'),
     );
     if (juzes.size === 1) return `Juz ${[...juzes][0]}`;
-    return `${assignedPages.length} pages`;
-  }, [assignedPages, quranData]);
+    return `${shownPages.length} pages`;
+  }, [shownPages, quranData]);
 
   // ===== Mark / unmark =====
 
@@ -615,16 +621,14 @@ export default function ActiveRevisionScreen() {
 
 
   // ===== Keep going (#168) =====
-  // Appends the next revision day's pages after the last section; the end card
-  // moves past them, and the pager turns to the first new page.
-  const scrollToPageRef = useRef<number | null>(null);
+  // Adds the next revision day after the last section. The pager then holds
+  // that day alone (it is keyed by day), opening on its first page.
   const addSection = useCallback(
     (plan: RevisionDayPlan) => {
       if (plan.pages.length === 0) return;
       const credited = creditedOnDay(logs, plan.day);
       const already = plan.pages.filter((p) => credited.has(p));
-      scrollToPageRef.current = plan.pages[0];
-      // The header names the page the pager turns to, the day's first.
+      // The header names the page the pager opens on, the day's first.
       setCurrentPageNumber(plan.pages[0]);
       // Pages already credited to that day are done, as on the day itself.
       setCompletedPages((prev) => new Set([...prev, ...already]));
@@ -638,12 +642,6 @@ export default function ActiveRevisionScreen() {
     addSection(keepGoingPlan);
     haptics.selection();
   }, [keepGoingPlan, addSection, haptics]);
-  useEffect(() => {
-    const page = scrollToPageRef.current;
-    if (page == null) return;
-    scrollToPageRef.current = null;
-    pagerRef.current?.scrollToPage(page);
-  }, [aheadDays]);
 
   // Home's "Tomorrow starts at …" (#168) when the user wasn't loaded at mount:
   // the day is added once they are (planned at mount otherwise, above).
@@ -746,10 +744,7 @@ export default function ActiveRevisionScreen() {
     haptics,
   ]);
 
-  const viewerPages = useMemo(
-    () => assignedPages,
-    [assignedPages],
-  );
+  const viewerPages = shownPages;
 
   // Force re-render of the pager's extraData when revision state of any page
   // changes (so any overlay can update). We don't actually render an overlay
@@ -782,15 +777,15 @@ export default function ActiveRevisionScreen() {
     );
   }
 
-  const completedCount = sessionPages.filter((p) => completedPages.has(p)).length;
   const todaysPages = assignment.pages;
 
-  // Opened from "Tomorrow starts at …": that day's first page. Otherwise the
+  // A later day (Home's "Tomorrow starts at …", Keep going): its first page,
+  // the first not yet done (its plan leaves out the ones done). Today: the
   // first of today's not yet revised.
   const resumePage =
-    openedAhead?.pages[0] ??
-    assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
-    assignment.pages[0];
+    lastSectionDay !== sessionDay
+      ? lastSectionPages[0]
+      : (assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ?? assignment.pages[0]);
   const displayPageNumber = currentPageNumber || resumePage;
   // The day of the page on screen: its own pages and count (the header says
   // "Revising ahead" for a day revised ahead).
@@ -833,10 +828,12 @@ export default function ActiveRevisionScreen() {
 
   // ===== Bulk-action handlers (used inside BulkActionsModal) =====
 
-  const handleMarkAllComplete = () => setCompletedPages(new Set(assignment.pages));
-  const handleMarkAllIncomplete = () => setCompletedPages(new Set());
+  // In bulk: the day on screen (today's, or the later day the session is on).
+  const handleMarkAllComplete = () => setCompletedPages((prev) => new Set([...prev, ...viewerPages]));
+  const handleMarkAllIncomplete = () =>
+    setCompletedPages((prev) => new Set([...prev].filter((p) => !viewerPages.includes(p))));
   const handleMarkJuzComplete = (juzNumber: number) => {
-    const juzPages = assignment.pages.filter((pageNum) => {
+    const juzPages = viewerPages.filter((pageNum) => {
       const quranPage = quranData.find((q) => q.pageNumber === pageNum);
       return quranPage?.juzNumber === juzNumber;
     });
@@ -1046,6 +1043,8 @@ export default function ActiveRevisionScreen() {
         }
       >
         <MushafPager
+          // One pager per revision day: a later day opens fresh on its first page.
+          key={lastSectionDay}
           ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}

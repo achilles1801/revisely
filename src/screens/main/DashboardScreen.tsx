@@ -58,7 +58,7 @@ import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
-import { creditedOnDay, doneOnDay } from '../../lib/aheadCredit';
+import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
 import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -353,8 +353,9 @@ export default function DashboardScreen() {
 
   const handleCtaPress = () => {
     if (todayStatus.status === 'completed') {
-      // The review is the day's done pages: the same set Home counts as Done.
-      const done = [...doneOnDay(logs, revisionDay)].sort((a, b) => a - b);
+      // The review is the day's done pages, the same set Home counts as Done:
+      // today's first, then the pages revised ahead today (reviewPagesInOrder).
+      const done = reviewPagesInOrder(logs, revisionDay, assignment.pages);
       const todayLog = logs.find((log) => log.date === revisionDay);
       // Done only by pages revised ahead from an earlier session: no session of
       // today yet, so the review opens as a new one, with those pages checked.
@@ -557,6 +558,7 @@ export default function DashboardScreen() {
               key={log.id}
               log={log}
               today={revisionDay}
+              juzPlan={user?.scheduleMode === 'juz'}
               onEdit={() => handleEditSession(log)}
               onDelete={() => deleteLog(log.id)}
               separator={i < recent.length - 1}

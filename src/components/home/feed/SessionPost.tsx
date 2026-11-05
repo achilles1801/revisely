@@ -16,8 +16,11 @@ export function SessionPost({
   onEdit,
   onDelete,
   separator = true,
+  juzPlan = false,
 }: {
   log: RevisionLog;
+  /** The account plans by juz: a session of whole juz reads "Juz 1" (lib/pageRanges describeRevised). */
+  juzPlan?: boolean;
   /** Today's revision day, for "2d". */
   today: string;
   onEdit: () => void;
@@ -25,7 +28,7 @@ export function SessionPost({
   separator?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const item = useMemo(() => revisionItem(log), [log]);
+  const item = useMemo(() => revisionItem(log, { juzPlan }), [log, juzPlan]);
   const confirmDelete = () =>
     Alert.alert('Delete this session?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },

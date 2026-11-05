@@ -61,19 +61,26 @@ How the tests are made: `tests/scenarios/README.md`.
   counts the day.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
-  ahead in its sessions, and Review session opens exactly those (#199).
+  ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,
+  in the day's order, then the pages revised ahead, the earliest later day first (Nov 5 2026).
   A day done only by pages revised ahead (no session of its own) still opens its review with those
   pages checked; saving it makes that day's session.
+- **SESS-5.** On the juz plan, a session whose pages revised for its own day are whole juz (one, or
+  several in a row) is named by the juz, "Juz 29" or "Juz 28–29", wherever sessions are listed (Home,
+  Activity); pages credited ahead to another day don't count toward it. Any other session, a juz
+  with a page not revised, or whole juz with other pages besides, is named by its surahs.
 
 ## Revising ahead
 
 - **AHEAD-1.** Once today is done, Home offers the next revision day ("Tomorrow starts at …"), from its
-  first page not done yet. Tapping it opens the session there, after today's pages; the next day's
-  pages already done are left out (#198).
+  first page not done yet. Tapping it opens that day's pages alone, as if it were that day's session:
+  today's pages are not behind them (Nov 5 2026). The next day's pages already done are left out
+  (#198).
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
   That day then needs only the pages left, and is done when none are.
-- **AHEAD-3.** The end card's Keep going adds the next revision day's pages not done yet to the
-  session. Done again, it adds the day after. It stops at the end of a cycle.
+- **AHEAD-3.** The end card's Keep going goes on to the next revision day's pages not done yet,
+  which the session then holds alone (the day before is not behind them). Done again, it goes on
+  to the day after. It stops at the end of a cycle. Mark in bulk works on the day on screen.
 - **AHEAD-4.** A day already done ahead is passed over: Keep going and Home's next line go to the day
   after it (the owner's rule, #198).
 - **AHEAD-5.** A page is credited ahead only when it was revised in that session (checked or swiped).
@@ -100,8 +107,11 @@ How the tests are made: `tests/scenarios/README.md`.
   start, and the days after carry on from it. The start moves at once.
 - **JUMP-2.** The session holds today's pages from that start. Pages behind it are not in the session.
 - **JUMP-3.** A jump drops pages carried into today that are not yet revised: they were the old start's.
-  Pages revised today stay counted and go first. (Changed Nov 2026: a carry kept the old start in place,
-  so Jump to an earlier juz did nothing.)
+  Pages revised in today's own session stay counted and go first. Pages revised ahead for today from an
+  earlier day are dropped too, and a jump leaves no carry-over offered for today. (Changed Nov 2026: a
+  carry kept the old start in place, so Jump to an earlier juz did nothing. Changed Nov 5 2026: pages
+  revised ahead for today came back in front of the new start, and a leftover offer made after the jump
+  was added in front of it: Jump to p. 1 showed pages 236–240 first.)
 
 ## The daily log
 
@@ -121,6 +131,10 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SYNC-4.** A new account loads right after sign-up, with no relaunch.
 - **RESET-1.** After the owner resets an account (`functions/scripts/reset-account.js`), every phone
   shows it as new. A change a phone made offline before the reset never reaches the server.
+- **RESET-2.** A tester (`previewTester`) can reset their own data from Settings (Reset my data, typed
+  RESET): a backup only the owner can read is taken first, then the account is as new, onboarding
+  next, still signed in, with nothing of before on the phone. No other account can, and not again
+  within 10 minutes.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 

@@ -52,6 +52,21 @@ async function emitOutbox(uid: string) {
     mockOutboxListeners.forEach((l) => l(uid));
   });
 }
+// The sync loop tells the screen a change was written, before it leaves the outbox.
+let mockAppliedListeners: ((uid: string, e: unknown) => void)[] = [];
+jest.mock('../../../lib/offline/sync', () => ({
+  onApplied: (fn: (uid: string, e: unknown) => void) => {
+    mockAppliedListeners.push(fn);
+    return () => {
+      mockAppliedListeners = mockAppliedListeners.filter((l) => l !== fn);
+    };
+  },
+}));
+async function emitApplied(uid: string, e: unknown) {
+  await act(async () => {
+    mockAppliedListeners.forEach((l) => l(uid, e));
+  });
+}
 jest.mock('../../../lib/offline/queue', () => ({
   queueChange: (...a: unknown[]) => mockQueue.queueChange(...(a as [])),
   withPendingJournalDay: (...a: unknown[]) => mockQueue.withPendingJournalDay(...(a as [string, unknown])),
@@ -110,6 +125,7 @@ beforeEach(async () => {
   await AsyncStorage.clear();
   await AsyncStorage.setItem('@revisely_theme_v2', 'light');
   mockOutboxListeners = [];
+  mockAppliedListeners = [];
   mockApp.user = { id: 'u1', createdAt: '2026-01-01T12:00:00.000Z', fajrBoundaryEnabled: false };
   mockApp.logs = [];
   mockService.getJournalEntry.mockResolvedValue(null);
@@ -486,6 +502,123 @@ describe('adding notes one after another: each one stays', () => {
     await waitFor(() => expect(screen.getAllByTestId(/^journal-note-[A-Za-z0-9]+$/)).toHaveLength(2));
     expect(screen.getByText('first')).toBeTruthy();
     await waitFor(() => expect(screen.getByText('second')).toBeTruthy());
+  });
+});
+
+describe('reads of the day that answer out of order', () => {
+  it('[LOG-1] a note just sent stays when an older read of the day answers last', async () => {
+    // The outbox changes twice for one note: queued, then sent. The read that
+    // started when it was queued is slow and answers last, with the day as it
+    // was before (no note); the read after it was sent has it.
+    const later: ((v: unknown) => void)[] = [];
+    let reads = 0;
+    mockService.getJournalEntry.mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) return Promise.resolve(null); // the first load
+      if (reads === 2) return new Promise((resolve) => later.push(resolve)); // slow, stale
+      return Promise.resolve(journalDayFromEntries('2026-10-20', [memo]));
+    });
+    await renderScreen();
+    await emitOutbox('u1'); // queued
+    await emitOutbox('u1'); // sent
+    await waitFor(() => expect(screen.getByTestId('journal-note-n1')).toBeTruthy());
+    await act(async () => {
+      later.forEach((resolve) => resolve(null));
+    });
+    expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+  });
+
+  it('[LOG-1] an older read still shows when the newer one fails (offline)', async () => {
+    // The first load is slow; a read started after it (the outbox changed)
+    // fails. The first load's answer is still the newest there is, so it shows.
+    const later: ((v: unknown) => void)[] = [];
+    let reads = 0;
+    mockService.getJournalEntry.mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) return new Promise((resolve) => later.push(resolve)); // the first load, slow
+      return Promise.reject(new Error('offline'));
+    });
+    await renderScreen();
+    await emitOutbox('u1');
+    await act(async () => {
+      later.forEach((resolve) => resolve(journalDayFromEntries('2026-10-20', [memo])));
+    });
+    await waitFor(() => expect(screen.getByTestId('journal-note-n1')).toBeTruthy());
+  });
+});
+
+describe('[LOG-1, LOG-2] a change already written stays until the server shows it', () => {
+  // The real overlay, so changes laid over the server's copy show.
+  const { overlayJournal } = jest.requireActual('../../../lib/offline/ops');
+  beforeEach(() => {
+    mockQueue.withPendingJournalDay.mockImplementation(
+      (date: string, base: unknown, _uid?: unknown, sent?: unknown[]) =>
+        overlayJournal(base ? [base] : [], sent ?? [], date)[0] ?? null,
+    );
+  });
+  const added = { id: 'o1', at: AT, op: { kind: 'journal.entry.add', date: '2026-10-20', entry: memo } };
+  const deleted = { id: 'o2', at: AT, op: { kind: 'journal.entry.delete', date: '2026-10-20', id: 'n1' } };
+
+  it('[LOG-1] a note written stays when the read after it answers with the day as it was', async () => {
+    let fresh = false;
+    mockService.getJournalEntry.mockImplementation(() =>
+      Promise.resolve(fresh ? journalDayFromEntries('2026-10-20', [memo]) : null),
+    );
+    await renderScreen();
+    await emitApplied('u1', added); // written
+    await emitOutbox('u1'); // it leaves the outbox; this read answers without it
+    expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+    // The day is read again until the server's copy has it.
+    fresh = true;
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1600));
+    });
+    await waitFor(() => expect(mockService.getJournalEntry.mock.calls.length).toBeGreaterThanOrEqual(3));
+    expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+  });
+
+  it('[LOG-2] a note deleted stays gone when the read after it still has it', async () => {
+    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+    await renderScreen();
+    expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+    await emitApplied('u1', deleted);
+    await emitOutbox('u1'); // this read still has the note
+    expect(screen.queryByTestId('journal-note-n1')).toBeNull();
+  });
+
+  it('a change the server never shows (another phone changed that note) gives way after the re-reads', async () => {
+    jest.useFakeTimers();
+    try {
+      mockService.getJournalEntry.mockResolvedValue(null); // another phone deleted it right after
+      await renderScreen();
+      await emitApplied('u1', added);
+      await emitOutbox('u1');
+      expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+      for (let i = 0; i < 8; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(10_000);
+        });
+      }
+      expect(screen.queryByTestId('journal-note-n1')).toBeNull();
+      // A later change still gets re-read: its own count starts again.
+      const calls = mockService.getJournalEntry.mock.calls.length;
+      await emitApplied('u1', { ...added, id: 'o3', op: { ...added.op, entry: { ...memo, id: 'n9' } } });
+      await emitOutbox('u1');
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+      expect(mockService.getJournalEntry.mock.calls.length).toBeGreaterThan(calls + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('another day\'s change, or another account\'s, is not laid over this day', async () => {
+    await renderScreen();
+    await emitApplied('u2', added);
+    await emitApplied('u1', { ...added, op: { ...added.op, date: '2026-10-21' } });
+    await emitOutbox('u1');
+    expect(screen.queryByTestId('journal-note-n1')).toBeNull();
   });
 });
 

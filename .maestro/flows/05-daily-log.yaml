@@ -19,9 +19,13 @@ appId: com.revisionbuddy.app
     file: ../subflows/add-note.yaml
     env:
       TEXT: Repeat Al-Mutaffifin twice
-- assertVisible:
-    id: journal-note-.*
-    text: "Note, Juz 30 felt steady today, .*"
+# The first note is checked with a wait: the second note's send can still be
+# landing, and a note that truly vanished still fails after the timeout.
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Note, Juz 30 felt steady today, .*"
+    timeout: 15000
 
 # Kept: a cold start, then back to the log.
 - runFlow: ../subflows/relaunch.yaml
@@ -51,6 +55,11 @@ appId: com.revisionbuddy.app
       id: journal-note-.*
       text: "Note, An-Naba needs another look, .*"
     timeout: 10000
+# Still so once the edit has been sent and the day read again.
+- runFlow: ../subflows/wait-sync.yaml
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, An-Naba needs another look, .*"
 - assertNotVisible:
     text: "Note, Juz 30 felt steady today, .*"
 - assertVisible:
@@ -76,6 +85,10 @@ appId: com.revisionbuddy.app
     notVisible:
       text: "Note, Repeat Al-Mutaffifin twice, .*"
     timeout: 10000
+# Still gone once the delete has been sent and the day read again.
+- runFlow: ../subflows/wait-sync.yaml
+- assertNotVisible:
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
 - assertVisible:
     id: journal-note-.*
     text: "Note, An-Naba needs another look, .*"

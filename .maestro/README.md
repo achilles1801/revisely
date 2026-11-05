@@ -1,8 +1,50 @@
 # E2E flows
 
 The real app on the iOS Simulator and the Android emulator, driven by Maestro, against the Firebase
-emulators, at a time and in a time zone each flow sets. CI runs them (`.github/workflows/e2e.yml`)
-on PRs into `develop` that touch the app's JavaScript, every night, and by hand.
+emulators, at a time and in a time zone each flow sets. CI runs them (`.github/workflows/e2e.yml`):
+
+| When | Flows | Jobs |
+| --- | --- | --- |
+| A PR into `develop` | the smoke set: 02, 04, 05, 06 | one iOS, one Android |
+| A PR into `main`, every night (testing develop), by hand | all eight | two iOS, two Android |
+| A push to `develop` | none: the native builds are kept for PRs | one each |
+
+**The smoke set:**
+- **02 (today's session):** the revision session, the core of the app. Like every flow it starts
+  with sign-up and onboarding (`subflows/new-account.yaml`), checking what onboarding saved on Home,
+  so 01 adds only its own details.
+- **04 (Fajr boundary):** the day and time logic, where the bug that started this suite was
+  (revise ahead before Fajr).
+- **05 (daily log):** adding, editing and deleting notes. It found two app bugs on Nov 4.
+- **06 (offline):** the phone's copy, the outbox and syncing back, where a bug would lose data.
+
+03, 07 and 08 run before a release (the PR into `main`) and every night.
+
+**Why not every flow on every PR:** a macOS runner is the scarce part, five at a time on this plan,
+and each iOS job takes 21–39 minutes of flows.
+- Nov 4–5: eight macOS jobs were wanted at once, and some waited 36 minutes for a runner.
+- The smoke set is one iOS job instead of two, and about half the flows.
+
+**`E2E` is a required check for merges into `develop`.** It is the workflow's last job:
+- **Skipped flows:** its `changes` job reads the PR's files. When nothing in them goes into the app
+  or the flows, the iOS and Android jobs are skipped and `E2E` passes. "Goes into" means anything
+  outside `.github/scripts/app-hash.sh`'s ignore list, plus `.maestro/`, `e2e.yml`,
+  `firestore.rules` and `firebase.json`.
+- **Never missing:** it runs after a failure or a cancellation too, so a PR never waits for a check
+  that won't come.
+- **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`), reports
+  as `E2E (partial run)` and can't stand in for the check. `debug` there adds Firestore's own log to
+  the app's log.
+- **Claude's PRs:** `claude-fix` starts it on its branch, with CI, since a PR opened by the workflow
+  token starts no workflow.
+
+A flaky flow is fixed, not skipped. Each failed flow is run once more (`E2E_RETRIES`). A pass on that
+retry is a warning on the run, and the job keeps its results as for a failure.
+- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes and the warm-up after 6
+  (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its iOS driver answered
+  500, its JVM never exited, and a job waited 55 minutes for it.
+- **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
+  Firestore emulator's jar, as it keeps the native builds.
 
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,
@@ -142,10 +184,21 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 - **iOS:** the Simulator shares the computer's network and has no airplane mode, so the E2E build's
   switch makes the emulators unreachable from the app (`subflows/network.yaml`); NetInfo's
   reachability check fails with them, and the app sees what a phone without a connection sees.
-- In CI, `06-offline` runs on Android only (`# e2e-ci-skip: ios`): on the macOS runner's simulator
-  the app stayed "Offline" for minutes after the switch came back on, also after coming back to the
-  front, while on a Mac it takes seconds. Whether that is the runner or the app on a slow device is
-  open; the status line now says whether NetInfo or Firestore is the side still down.
+- **Firestore's back channels go to `127.0.0.1` on iOS** (`rewrite` in `src/lib/e2e/network.ts`);
+  everything else goes to `localhost`. Until Nov 4 2026, `06-offline` was skipped on iOS in CI
+  because the app stayed "Offline" for minutes after coming back online. The cause was in the
+  connection to the emulator:
+  1. On the slow CI Simulator, iOS sent a stream's back-channel GET on the handshake's kept-alive
+     connection just as the emulator closed it.
+  2. CFNetwork retried the GET on a new connection.
+  3. The emulator had already written the first messages into the dead connection, and it doesn't
+     send them again (reproduced against a local emulator).
+  4. The stream lost the user document's messages and never came online.
+
+  This happens only over plain HTTP/1.1 to the emulator. The real Firestore is HTTP/2, where a
+  retried request is safe. With different hosts the two never share a connection. Debug a stream
+  with a run by hand with `debug`: the app's log then has Firestore's log and every back-channel
+  chunk.
 - `06-offline` checks the server itself (`scripts/server-session.js`): Maestro reads the session
   from the Firestore emulator's REST API with its admin token, "Bearer owner", which only the
   emulators accept.
@@ -181,6 +234,12 @@ Things that bit:
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
 
-A failed flow keeps Maestro's log and screenshots, a screenshot of the device and the app's log
-(logcat on Android, the unified log on iOS) in `.maestro/build/results/<platform>/<flow>/`; CI
-uploads the folder.
+A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
+in `.maestro/build/results/<platform>/<flow>/`:
+- `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
+  JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
+  An iOS release build passes only `console.error` to the unified log.
+- `device.log` (iOS): the unified log.
+- `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
+
+CI uploads the folder for a job with any failed attempt.

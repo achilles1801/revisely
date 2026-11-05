@@ -4,6 +4,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import ActiveRevisionScreen from '../ActiveRevisionScreen';
+import { BulkActionsModal } from '../../../components/BulkActionsModal';
 import { getCurrentRevisionDay } from '../../../lib/algorithm';
 import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
@@ -634,7 +635,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     mockRouteParams = undefined;
   });
 
-  it('after the last page, Keep going adds the next day’s pages; leaving saves them as credit for that day', async () => {
+  it('after the last page, Keep going opens the next day alone; leaving saves its pages as credit for that day', async () => {
     setupTwoDays([331, 332, 333, 334, 335, 336, 337, 338, 339]);
     const { unmount } = render(<ActiveRevisionScreen />);
     await act(async () => {
@@ -643,7 +644,9 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(screen.getByText('Revision complete')).toBeTruthy();
     expect(screen.getByText(/Next: .* · 3 pages/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-end-keep-going'));
-    expect(mockPager.pages).toEqual([...DAY_PAGES, ...NEXT]);
+    // Only that day's pages: today's, done, are not behind them (Majd, Nov 5 2026).
+    expect(mockPager.pages).toEqual(NEXT);
+    expect(mockPager.initialPage).toBe(NEXT[0]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
 
     // One page of the next day, checked, then leave.
@@ -710,16 +713,36 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     );
   });
 
-  it('Home’s “starts at” line opens on that day’s first page, with today’s pages behind it', () => {
+  it('Home’s “starts at” line opens on that day’s pages alone, on its first page', () => {
     setupTwoDays(DAY_PAGES);
     mockRouteParams = { aheadDay: tomorrow() };
     render(<ActiveRevisionScreen />);
-    expect(mockPager.pages).toEqual([...DAY_PAGES, ...NEXT]);
+    // As if it were that day's session: today's pages are not behind it.
+    expect(mockPager.pages).toEqual(NEXT);
     // The pager starts there (not on today's first page), and the page on
     // screen is tomorrow's: its check reflects tomorrow, not today.
     expect(mockPager.initialPage).toBe(NEXT[0]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
     expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+  });
+
+  it('in a later day’s session, mark in bulk works on that day’s pages and leaves today’s as they were', async () => {
+    setupTwoDays(DAY_PAGES);
+    mockRouteParams = { aheadDay: tomorrow() };
+    const { unmount } = render(<ActiveRevisionScreen />);
+    const bulk = () => screen.UNSAFE_getByType(BulkActionsModal);
+    expect(bulk().props.pages.map((p: { pageNumber: number }) => p.pageNumber)).toEqual(NEXT);
+    act(() => {
+      bulk().props.onMarkAllComplete();
+    });
+    await act(async () => {
+      unmount();
+    });
+    // That day's pages saved as its credit; today's, done before, untouched.
+    expect(mockApp.addLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pagesRevised: NEXT, ahead: { [tomorrow()]: NEXT } }),
+    );
+    expect(mockApp.updateLog).not.toHaveBeenCalled();
   });
 
   it('a day partly revised ahead earlier opens on its first page not yet done', () => {
