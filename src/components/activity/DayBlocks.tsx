@@ -364,7 +364,6 @@ export function DayBlocks({
                 onPress={onOpenLog}
                 accessibilityRole="button"
                 accessibilityLabel="Daily log. Open the log"
-                testID={`activity-note-${n.id}`}
               >
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                 <RowText numberOfLines={4}>{n.text.trim()}</RowText>
