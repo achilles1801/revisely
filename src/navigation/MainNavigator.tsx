@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
@@ -27,7 +27,7 @@ import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
 import { getRecitation } from '../lib/recitation';
 import { openReaderAt } from './openReader';
 import { createPagerTabNavigator } from './PagerTabs';
-import { swipeableTabCount } from './tabPages';
+import { insightsTab, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 
@@ -152,10 +152,10 @@ export function MainNavigator() {
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const hasSeenPreview = user?.hasSeenSmartTrackingPreview ?? false;
 
-  const showInsightsTab = smartTrackingEnabled || !hasSeenPreview;
-  const glowInsightsTab = !smartTrackingEnabled && !hasSeenPreview;
+  const { shown: showInsightsTab, opensPreview: glowInsightsTab } = insightsTab(smartTrackingEnabled, hasSeenPreview);
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  const openPreview = useCallback(() => setPreviewOpen(true), []);
   useAppUsageTracking();
   // Signing out leaves the app's screens: the recitation stops with them.
   useEffect(() => () => getRecitation().stop(), []);
@@ -178,12 +178,15 @@ export function MainNavigator() {
                 <TabBar
                   {...props}
                   showInsightsTab={showInsightsTab}
-                  onInsightsTabPress={glowInsightsTab ? () => setPreviewOpen(true) : undefined}
+                  onInsightsTabPress={glowInsightsTab ? openPreview : undefined}
                 />
               </>
             );
           }}
           swipeableCount={swipeableTabCount(smartTrackingEnabled)}
+          // Before Smart Tracking is set up, Insights is in the bar but not a
+          // page: a swipe past Read opens its preview, as a tap on it does.
+          onSwipePastEnd={glowInsightsTab ? openPreview : undefined}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />

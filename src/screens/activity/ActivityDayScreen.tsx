@@ -46,7 +46,8 @@ import { RowText, ThreadRow } from '../../components/v2/ThreadRow';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { Tap } from '../../components/v2/Tap';
 import { dayOfMonth } from '../../lib/dayAgo';
-import { describePageRuns, describeSurahRuns, pageRuns } from '../../lib/pageRanges';
+import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
+import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
@@ -104,6 +105,8 @@ export default function ActivityDayScreen() {
   const { theme, palette } = useTheme();
   const tabFootprint = useTabBarFootprint();
   const { day: today } = useRevisionDay(user);
+  // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
+  const juzPlan = user?.scheduleMode === 'juz';
   const quranData = useMemo(() => getQuranData(), []);
 
   const [readings, setReadings] = useState<ReadingSession[]>([]);
@@ -229,7 +232,7 @@ export default function ActivityDayScreen() {
         meta: log.durationMinutes != null ? formatMinutes(log.durationMinutes) : undefined,
         body: (
           <RowText secondary numberOfLines={2}>
-            {`${describePageRuns(runs)} · ${describeSurahRuns(runs)}${
+            {`${describePageRuns(runs)} · ${describeRevised(ownRevised(log), { juzPlan })}${
               log.pagesSkipped.length > 0 ? ` · ${log.pagesSkipped.length} skipped` : ''
             }${ahead ? ` · ${ahead}` : ''}`}
           </RowText>

@@ -122,6 +122,13 @@ type PagerTabsProps = DefaultNavigatorOptions<
     tabBar: (props: PagerTabBarProps) => ReactNode;
     /** Tabs a swipe can reach, from the first; later tabs only by tapping. */
     swipeableCount: number;
+    /**
+     * A tab shown in the bar past the last page whose tap does something other
+     * than open a page (Insights before Smart Tracking is set up opens its
+     * preview): a swipe past the last page that would have reached it does the
+     * same. Without it, that swipe is only the rubber band.
+     */
+    onSwipePastEnd?: () => void;
   };
 
 function PagerTabs({
@@ -133,6 +140,7 @@ function PagerTabs({
   screenOptions,
   tabBar,
   swipeableCount,
+  onSwipePastEnd,
 }: PagerTabsProps) {
   const { state, descriptors, navigation, NavigationContent } = useNavigationBuilder<
     TabNavigationState<ParamListBase>,
@@ -176,12 +184,14 @@ function PagerTabs({
   const lo = useSharedValue(min);
   const hi = useSharedValue(max);
   const swipeOn = useSharedValue(canSwipe);
+  const pastEndOn = useSharedValue(onSwipePastEnd != null);
   useEffect(() => {
     pageWidth.value = width;
     lo.value = min;
     hi.value = max;
     swipeOn.value = canSwipe;
-  }, [width, min, max, canSwipe, pageWidth, lo, hi, swipeOn]);
+    pastEndOn.value = onSwipePastEnd != null;
+  }, [width, min, max, canSwipe, onSwipePastEnd, pageWidth, lo, hi, swipeOn, pastEndOn]);
 
   // A tab press (or navigate() from anywhere) slides to that tab, from
   // wherever the pager is, even mid-animation.
@@ -206,6 +216,9 @@ function PagerTabs({
   const hapticsRef = useRef(haptics);
   hapticsRef.current = haptics;
   const tick = useCallback(() => hapticsRef.current.selection(), []);
+  const pastEndRef = useRef(onSwipePastEnd);
+  pastEndRef.current = onSwipePastEnd;
+  const swipedPastEnd = useCallback(() => pastEndRef.current?.(), []);
 
   const pan = useMemo(
     () =>
@@ -238,10 +251,20 @@ function PagerTabs({
           if (page !== Math.round(start.value)) {
             runOnJS(tick)();
             runOnJS(go)(page);
+          } else if (pastEndOn.value && Math.round(start.value) === hi.value) {
+            // Past the last page toward a tab that isn't one (yet): judged as a
+            // swipe to a next page would be, on the distance before the rubber
+            // band shortened it. The pager springs back; the tab's tap runs.
+            const raw = start.value - e.translationX / pageWidth.value;
+            const beyond = snapPage(start.value, raw, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value + 1);
+            if (beyond === hi.value + 1) {
+              runOnJS(tick)();
+              runOnJS(swipedPastEnd)();
+            }
           }
         })
         .withTestId('tab-pager'),
-    [go, tick, position, start, target, pageWidth, lo, hi, swipeOn],
+    [go, tick, swipedPastEnd, position, start, target, pageWidth, lo, hi, swipeOn, pastEndOn],
   );
 
   const row = useAnimatedStyle(() => ({ transform: [{ translateX: -position.value * pageWidth.value }] }));
