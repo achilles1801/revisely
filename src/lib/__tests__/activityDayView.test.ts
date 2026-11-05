@@ -67,3 +67,4 @@ describe('the Activity day view (C2)', () => {
     expect(v.blocks[3]).toEqual({ kind: 'notes', items: [{ id: 'n', day: DAY, text: 'felt steady', kind: 'note' }] });
   });
 });
+

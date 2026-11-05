@@ -90,6 +90,8 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
     case 'reading.delete':
       await firestoreService.deleteReadingSession(op.id, uid);
       return mirrorReadItem(uid, () => firestoreService.deleteReadItem(op.id, uid));
+    case 'revision.add':
+      return firestoreService.addRevisionItem(op.item, uid);
     case 'journal.entry.add':
     case 'journal.entry.edit':
       return firestoreService.applyJournalNote(op.date, { kind: 'put', note: { ...op.entry } }, uid);

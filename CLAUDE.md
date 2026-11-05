@@ -505,6 +505,15 @@ hard-coded token was deleted from the console on 2026-10-27.
   `--self-test` checks every pattern still catches a sample. Coverage reports aren't committed
   (`coverage/` is ignored; CI uploads them as an artifact).
 
+- **Emulators: always through `scripts/emulators.sh`** (`exec <only> <project> '<command>'`, or
+  `start` for local E2E). It takes a lock per set of ports (a folder in `/tmp`; it waits for the
+  owner, takes over one whose owner has exited, and waits while the ports are held by something
+  started by hand, naming it). Several sessions and worktrees ran `firebase emulators:*` on the same
+  ports (8080, 9099, 4400) at once and broke each other's runs (Nov 5 2026). `npm test` in
+  `tests/scenarios` and `tests/firestore-rules`, `scenarios.yml`, and `.maestro/scripts/emulators.sh`
+  all use it. A worktree of its own: `REVISELY_EMU_PORT_BASE=auto` (ports from the worktree's path,
+  the same each time) or a number (Firestore at it, Auth +1, Storage +2, hub +3, logging +4). The
+  scenario harness and the rules suite read the ports from the environment the script sets.
 - The app typecheck excludes `functions/` and `tests/firestore-rules/`. Each has its own
   dependencies and its own job.
 - The rules tests need Java 21 (firebase-tools). When `firestore.rules` changes, update the tests in

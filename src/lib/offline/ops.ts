@@ -51,6 +51,8 @@ export type OutboxOp =
   | { kind: 'memorization.mark'; day: string; pages: number[]; at: number }
   /** Pages un-memorized: removed from the items that hold them. */
   | { kind: 'memorization.unmark'; pages: number[] }
+  /** A Revised item added by hand (Activity's add sheet): one write, never merged. */
+  | { kind: 'revision.add'; item: import('../revisionItems').RevisionItem }
   | {
       kind: 'session.add';
       date: string;

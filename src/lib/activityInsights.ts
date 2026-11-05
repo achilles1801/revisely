@@ -1,7 +1,7 @@
 // Activity's Insights and calendar marks, from items (Activity spec section 5, C3).
 // Pure: the screens pass in items and get the figures. Days are YYYY-MM-DD revision days.
 
-export interface Revised { day: string; pages: number[]; minutes: number | null; countsFor: string; }
+export interface Revised { day: string; pages: number[]; assigned?: number[]; minutes: number | null; countsFor: string; }
 export interface Memorized { day: string; pages: number[]; }
 export interface Read { day: string; pages: number[]; minutes: number | null; }
 
@@ -101,7 +101,7 @@ export function dayMarks(
   input: { revised: Revised[]; memorized: Memorized[]; read: Read[]; noteDays: Set<string> },
 ): { ring: number | null; memorized: boolean; read: boolean; note: boolean } {
   const own = input.revised.filter((r) => r.day === day && r.countsFor === day);
-  const assigned = own.reduce((n, r) => n + (r.pages.length > 0 ? r.pages.length : 0), 0);
+  const assigned = own.reduce((n, r) => n + (r.assigned?.length ?? 0), 0);
   const revised = own.reduce((n, r) => n + r.pages.length, 0);
   return {
     ring: assigned > 0 ? Math.min(1, revised / assigned) : null,
@@ -110,3 +110,36 @@ export function dayMarks(
     note: input.noteDays.has(day),
   };
 }
+
+/** What a calendar day previews under the grid: the blocks it holds, with their figures. */
+export function dayPreview(
+  day: string,
+  input: { revised: Revised[]; memorized: Memorized[]; read: Read[]; noteDays: Set<string> },
+): { revised: { done: number; assigned: number; minutes: number | null } | null; memorizedPages: number; readPages: number; readMinutes: number | null; notes: boolean } {
+  const own = input.revised.filter((r) => r.day === day && r.countsFor === day);
+  const assigned = own.reduce((n, r) => n + (r.assigned?.length ?? 0), 0);
+  const done = own.reduce((n, r) => n + r.pages.length, 0);
+  const minutes = own.reduce<number | null>((n, r) => (r.minutes == null ? n : (n ?? 0) + r.minutes), null);
+  const reads = input.read.filter((r) => r.day === day);
+  const readMinutes = reads.reduce<number | null>((n, r) => (r.minutes == null ? n : (n ?? 0) + r.minutes), null);
+  return {
+    revised: own.length > 0 ? { done, assigned, minutes } : null,
+    memorizedPages: input.memorized.filter((m) => m.day === day).reduce((n, m) => n + m.pages.length, 0),
+    readPages: reads.reduce((n, r) => n + r.pages.length, 0),
+    readMinutes,
+    notes: input.noteDays.has(day),
+  };
+}
+
+/** The window's days, oldest first, each with whether it had a revision or a read (the consistency picture). */
+export function dayPattern(items: { day: string }[], today: string, window: number): boolean[] {
+  const had = new Set(items.map((i) => i.day));
+  const out: boolean[] = [];
+  for (let k = window - 1; k >= 0; k--) {
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - k);
+    out.push(had.has(d.toISOString().slice(0, 10)));
+  }
+  return out;
+}
+

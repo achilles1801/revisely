@@ -18,6 +18,8 @@ import {
 } from './playAvailable';
 import { RESET_CALL_OPTIONS, ResetError, ResetResult, handleResetMyData } from './testerReset';
 import { adminResetStore } from './testerResetAdmin';
+import { ScenarioResult, handleLoadTestScenario } from './testScenarios';
+import { adminScenarioWriter } from './testScenariosAdmin';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -122,6 +124,31 @@ export const resetMyData = onCall(RESET_CALL_OPTIONS, async (request): Promise<R
     if (err instanceof ResetError) throw new HttpsError(err.code, err.message);
     logger.error('resetMyData failed', err);
     throw new HttpsError('internal', 'The reset did not finish. Try again; anything already reset stays reset.');
+  }
+});
+
+/**
+ * Settings → Testing → Load test scenario (testers only): the caller's account is
+ * reset as resetMyData does it (the same backup first), then filled with the
+ * chosen scenario. Who may and the order: testScenarios.ts. App Check is required.
+ */
+export const loadTestScenario = onCall(RESET_CALL_OPTIONS, async (request): Promise<ScenarioResult> => {
+  try {
+    const bucket = getStorage().bucket();
+    const result = await handleLoadTestScenario(request, {
+      store: adminResetStore(adminDb, bucket),
+      writer: adminScenarioWriter(adminDb, bucket),
+      authUser: async (uid) => {
+        const u = await getAuth().getUser(uid);
+        return { uid: u.uid, email: u.email ?? null, displayName: u.displayName ?? null, photoURL: u.photoURL ?? null };
+      },
+    });
+    logger.info('Test scenario loaded', { scenario: result.scenario, backup: result.backup, seeded: result.seeded });
+    return result;
+  } catch (err) {
+    if (err instanceof ResetError) throw new HttpsError(err.code, err.message);
+    logger.error('loadTestScenario failed', err);
+    throw new HttpsError('internal', 'The scenario did not finish loading. Try again (the account was backed up first).');
   }
 });
 

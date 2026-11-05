@@ -142,6 +142,12 @@ How the tests are made: `tests/scenarios/README.md`.
   RESET): a backup only the owner can read is taken first, then the account is as new, onboarding
   next, still signed in, with nothing of before on the phone. No other account can, and not again
   within 10 minutes.
+- **RESET-3.** A tester can load a test scenario from Settings (Load test scenario, typed RESET): the
+  account is reset as in RESET-2 (the same backup first) and filled with the scenario, on the revision
+  days this phone shows (its zone, clock and Fajr). Every rule above that can be read off an account
+  holds for each scenario, and the phone shows it with no relaunch. No other account can, and not
+  again within 2 minutes (30 a day). The Offline queue scenario holds its changes on the phone until
+  "Send held changes" (or the next start of the app), then sends them in order.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 
@@ -174,15 +180,22 @@ How the tests are made: `tests/scenarios/README.md`.
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
   oldest, or never.
 
-- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. "From
-  your session" offers only the pages the session missed: its skipped pages not revised, among the memorized
-  ones. It never copies the session's own revised pages or minutes.
+- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
+  opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates
+  those pages 2, 3 or 4 (ACT-8's bins), written as each page's weakness rating. Adding it queues one manual
+  Revised item for today; it counts toward today's Revised block and carries no plan assignment. "From your
+  session" offers only the pages the session missed: its skipped pages not revised, among the memorized ones.
+  It never copies the session's own revised pages or minutes.
+  Note opens its own sheet: its text, and an optional "Show under" choice of the day's Revised, Memorized or
+  Read item (the note's tag). Add is a new note with its own id and time; an empty note cannot be added.
   Memorized opens its own sheet: From and To, or a surah. Add marks the pages memorized (the composer's two
   writes) and records a Memorized item for today. "From your reading" offers the pages read today that are not
   memorized yet. The sheet has no minutes: a Memorized item carries none yet.
-- **ACT-6.** A note swiped away goes at once, with Undo; the delete is saved after the undo window (five
-  seconds), and leaving the screen saves any delete still waiting. A hold on a Read or Note row opens Edit and
-  Copy.
+- **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
+  window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
+  a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
+  header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
+  VoiceOver offers the same actions as custom actions on the header.
 
 - **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
   entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
@@ -192,6 +205,8 @@ How the tests are made: `tests/scenarios/README.md`.
   is strong. The counts on a day's Revised block are these classes, over the day's revised pages (a page with
   no rating counts as 4, strong). Confirmed by Majd, Nov 2026.
 
+- **ACT-9.** A day's Activity items load when the day opens and again when its screen regains focus, not
+  on their own: a render never starts another load (it looped and froze the app, Nov 2026).
 - **ACT-10.** Pages marked memorized in the memorization manager, or in the Memorized composer, are logged as a
   memorization item for the day the user chooses: Today writes them into that day's item (merged, idempotent);
   Before (don't log) writes nothing. The manager asks "When did you memorize these?" (default Before above five
