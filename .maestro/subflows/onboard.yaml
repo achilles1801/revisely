@@ -29,56 +29,31 @@ appId: com.revisionbuddy.app
       id: juz-30-check
     direction: DOWN
     timeout: 30000
-# The check. iOS decides by the check's own state ("checkbox, checked"): a tap
-# toggles it, and tapping again because the count below was slow to show (or,
-# on iOS, missing from the accessibility tree while on screen; CI, Nov 4)
-# unchecked it. Android reads the count, as before.
-- runFlow:
-    when:
-      platform: iOS
+# The check, once the screen has its starting count ("1 of 604": in progress
+# starts from page 1), which comes when the account's pages have loaded: a juz
+# marked before then was dropped when they arrived (fixed in #216). Tapped only
+# while the count still shows page 1 alone, since a tap toggles it.
+- extendedWaitUntil:
+    visible:
+      id: juz-selection-summary
+      text: "[1-9][0-9]* of 604 pages memorized"
+    timeout: 30000
+- retry:
+    maxRetries: 2
     commands:
-      - retry:
-          maxRetries: 2
+      - runFlow:
+          when:
+            visible:
+              id: juz-selection-summary
+              text: "1 of 604 pages memorized"
           commands:
-            - runFlow:
-                when:
-                  visible:
-                    id: juz-30-check
-                    text: ".*unchecked"
-                commands:
-                  - tapOn:
-                      id: juz-30-check
-            - extendedWaitUntil:
-                visible:
-                  id: juz-30-check
-                  text: "checkbox, checked"
-                timeout: 10000
+            - tapOn:
+                id: juz-30-check
       - extendedWaitUntil:
           visible:
             id: juz-selection-summary
             text: "24 of 604 pages memorized"
-          timeout: 15000
-          optional: true
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - retry:
-          maxRetries: 2
-          commands:
-            - runFlow:
-                when:
-                  notVisible:
-                    id: juz-selection-summary
-                    text: "24 of 604 pages memorized"
-                commands:
-                  - tapOn:
-                      id: juz-30-check
-            - extendedWaitUntil:
-                visible:
-                  id: juz-selection-summary
-                  text: "24 of 604 pages memorized"
-                timeout: 10000
+          timeout: 10000
 - tapOn:
     id: juz-continue
 - extendedWaitUntil:
