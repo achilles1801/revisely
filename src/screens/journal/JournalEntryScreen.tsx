@@ -29,6 +29,7 @@ import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { autoId } from '../../lib/offline/apply';
 import { queueChange, withPendingJournalDay } from '../../lib/offline/queue';
+import { pendingEntries } from '../../lib/offline/outbox';
 import { subscribeOutbox } from '../../lib/offline/outbox';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
@@ -136,6 +137,7 @@ export default function JournalEntryScreen() {
   const readSeq = useRef(0);
   const shownSeq = useRef(0);
   const showRead = (seq: number, entry: JournalEntry | null) => {
+    console.log('[diag] answer', seq, 'shown', shownSeq.current, 'notes', JSON.stringify((entry?.entries ?? []).map((n) => n.text)), 'pending', JSON.stringify(pendingEntries(uid ?? '').map((e) => (e.op.kind === 'journal.entry.add' ? e.op.entry.text : e.op.kind))));
     if (seq < shownSeq.current) return;
     shownSeq.current = seq;
     setBase(entry);
@@ -177,6 +179,7 @@ export default function JournalEntryScreen() {
     return subscribeOutbox((changed) => {
       if (changed !== uid) return;
       const seq = ++readSeq.current;
+      console.log('[diag] outbox read', seq, changed);
       firestoreService
         .getJournalEntry(date)
         .then((entry) => showRead(seq, entry))
