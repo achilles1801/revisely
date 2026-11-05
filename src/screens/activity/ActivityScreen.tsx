@@ -23,7 +23,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
 import { journalFirstDay, shiftDay } from '../../lib/journal';
-import { carryForTomorrow, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
+import { carryForTomorrow, planItAction, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
@@ -50,6 +50,11 @@ export default function ActivityScreen() {
 
   // The day picked in the calendar (today until one is tapped).
   const [pickedDay, setPickedDay] = useState<string | null>(null);
+  // "Revise these first tomorrow" (Insights): the weak pages lead tomorrow's session, labelled From Insights.
+  const reviseTomorrow = (weak: number[]) => {
+    if (!user) return;
+    void saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(today, 1), weak, user.carryOver) });
+  };
 
   const { day: today } = useRevisionDay(user);
   const { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh } = useActivitySources();
@@ -118,12 +123,12 @@ export default function ActivityScreen() {
               today={today}
               noteDays={noteDays}
               onOpenDay={openDay}
-              onReviseTomorrow={(weak) => {
-                if (!user) return;
-                const tomorrow = shiftDay(today, 1);
-                void saveUser({ ...user, carryOver: carryForTomorrow(tomorrow, weak, user.carryOver) });
-              }}
-              onPlanIt={(weak) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })}
+              onReviseTomorrow={reviseTomorrow}
+              onPlanIt={(weak) =>
+                planItAction(!!user?.customPlan) === 'plan-day'
+                  ? navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })
+                  : reviseTomorrow(weak)
+              }
             />
           ) : (
             <View style={v2.graph}>

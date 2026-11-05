@@ -14,7 +14,16 @@ export function carryForTomorrow(
   existing: { day: string; pages: number[] } | null | undefined,
 ): CarryOver {
   const kept = existing && existing.day === tomorrow ? existing.pages : [];
-  return { day: tomorrow, pages: [...new Set([...weak, ...kept])], skip: 0 };
+  return { day: tomorrow, pages: [...new Set([...weak, ...kept])], skip: 0, source: 'insights' };
+}
+
+/**
+ * "Plan it" for every plan type (decision, documented in the PR): a custom plan opens its
+ * day for tomorrow pre-filled; a pages or juz plan has no day editor, so the pages go to
+ * the front of tomorrow's session, as "Revise these first tomorrow" does.
+ */
+export function planItAction(hasCustomPlan: boolean): 'plan-day' | 'carry' {
+  return hasCustomPlan ? 'plan-day' : 'carry';
 }
 
 /** The plan day "Plan it" opens: tomorrow's position in the plan, with the weak pages. */
