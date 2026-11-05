@@ -511,6 +511,24 @@ describe('reads of the day that answer out of order', () => {
     });
     expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
   });
+
+  it('[LOG-1] an older read still shows when the newer one fails (offline)', async () => {
+    // The first load is slow; a read started after it (the outbox changed)
+    // fails. The first load's answer is still the newest there is, so it shows.
+    const later: ((v: unknown) => void)[] = [];
+    let reads = 0;
+    mockService.getJournalEntry.mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) return new Promise((resolve) => later.push(resolve)); // the first load, slow
+      return Promise.reject(new Error('offline'));
+    });
+    await renderScreen();
+    await emitOutbox('u1');
+    await act(async () => {
+      later.forEach((resolve) => resolve(journalDayFromEntries('2026-10-20', [memo])));
+    });
+    await waitFor(() => expect(screen.getByTestId('journal-note-n1')).toBeTruthy());
+  });
 });
 
 describe('the keyboard: a Done key puts it away', () => {

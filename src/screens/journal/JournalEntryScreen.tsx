@@ -129,10 +129,18 @@ export default function JournalEntryScreen() {
 
   // Reads of the day can overlap (the first load, and one after each outbox
   // change) and answer out of order: a read started before a note reached the
-  // server can answer after one started once it had. Only the latest read is
-  // kept, or the note just sent would drop out of view (seen in E2E on a slow
-  // Android emulator: the second note of a day vanished after sending).
+  // server can answer after one started once it had. An answer older than the
+  // one shown is dropped, or the note just sent would drop out of view (seen in
+  // E2E on a slow Android emulator: the second note of a day vanished after
+  // sending). A newer read that fails (offline) leaves an older answer standing.
   const readSeq = useRef(0);
+  const shownSeq = useRef(0);
+  const showRead = (seq: number, entry: JournalEntry | null) => {
+    if (seq < shownSeq.current) return;
+    shownSeq.current = seq;
+    setBase(entry);
+    setDay(withPendingJournalDay(date, entry));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -141,12 +149,10 @@ export default function JournalEntryScreen() {
     firestoreService
       .getJournalEntry(date)
       .then((entry) => {
-        if (cancelled || seq !== readSeq.current) return;
-        setBase(entry);
-        setDay(withPendingJournalDay(date, entry));
+        if (!cancelled) showRead(seq, entry);
       })
       .catch((err) => {
-        if (cancelled || seq !== readSeq.current) return;
+        if (cancelled || seq < shownSeq.current) return;
         const waiting = withPendingJournalDay(date, null);
         if (waiting) return setDay(waiting);
         logger.warn('Failed to load journal day', err);
@@ -173,11 +179,7 @@ export default function JournalEntryScreen() {
       const seq = ++readSeq.current;
       firestoreService
         .getJournalEntry(date)
-        .then((entry) => {
-          if (seq !== readSeq.current) return;
-          setBase(entry);
-          setDay(withPendingJournalDay(date, entry));
-        })
+        .then((entry) => showRead(seq, entry))
         .catch(() => undefined); // offline: the changes still waiting stay laid over the last copy
     });
   }, [uid, date]);
