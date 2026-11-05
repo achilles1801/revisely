@@ -79,15 +79,23 @@ it('[RESET-2] an account that is not a tester is refused, and keeps everything',
   const phone = new Phone('phone');
   const app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
   const server = serveResetMyData();
+  const memorizedCount = () => app.app.pages.filter((p) => p.status === 'memorized').length;
   try {
+    // The memorized pages reach the phone after the account itself: wait for them first.
+    await app.until(() => memorizedCount() === 20, 'the 20 memorized pages');
     const { resetMyData } = app.mods.require<TesterReset>('src/lib/testerReset');
     await app.act(async () => {
       await expect(resetMyData()).rejects.toThrow(/testers only/);
     });
     expect(server.calls).toBe(1);
     expect(app.app.onboardingComplete).toBe(true);
-    expect(app.app.pages.filter((p) => p.status === 'memorized')).toHaveLength(20);
+    expect(memorizedCount()).toBe(20);
+    // Still there on the server too: a relaunch reads them back.
     await app.close();
+    const again = await phone.open();
+    await again.until(() => again.app.pages.filter((p) => p.status === 'memorized').length === 20, 'the 20 memorized pages after a relaunch');
+    expect(again.app.onboardingComplete).toBe(true);
+    await again.close();
   } finally {
     server.restore();
   }
