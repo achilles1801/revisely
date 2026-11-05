@@ -160,8 +160,10 @@ export function DayBlocks({
   );
   if (!view) return null;
 
-  const [revised, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
-  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0;
+  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
+  const revised = revisedRaw;
+  const doneAhead = items?.doneAhead ?? [];
+  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
@@ -258,6 +260,15 @@ export function DayBlocks({
               ))}
             </ThreadBranch>
           )}
+          {doneAhead.length > 0 && (
+            <ThreadBranch>
+              {doneAhead.map((a) => (
+                <Text key={`ahead-${a.fromDay}`} testID="activity-done-ahead" style={[typeV2.meta, { color: palette.secondary }]}>
+                  {`Done ahead, from ${a.fromDay}: ${describePageRuns(pageRuns(a.pages))}`}
+                </Text>
+              ))}
+            </ThreadBranch>
+          )}
           {revRecs.length > 0 && (
             <ThreadBranch>
               <RecordingsList day={day} kind="revision" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />
@@ -340,22 +351,26 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="create-outline" />}
           name="Notes"
-          figure={<Text style={[typeV2.name, { color: palette.text }]}>{notes.length}</Text>}
+          figure={notes.length > 0 ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.length}</Text> : undefined}
           lineBelow
           separator={false}
           testID="activity-block-notes"
         >
-          <ThreadBranch>{notes.map((n) => (
-            <Tap
-              key={n.id}
-              onPress={onOpenLog}
-              accessibilityRole="button"
-              accessibilityLabel="Daily log. Open the log"
-              testID={`activity-note-${n.id}`}
-            >
-              <RowText numberOfLines={4}>{n.text.trim()}</RowText>
-            </Tap>
-          ))}</ThreadBranch>
+          <ThreadBranch>
+            {notes.map((n) => (
+              // Editing happens in the log: a note here only opens it (no swipe, no menu).
+              <Tap
+                key={n.id}
+                onPress={onOpenLog}
+                accessibilityRole="button"
+                accessibilityLabel="Daily log. Open the log"
+                testID={`activity-note-${n.id}`}
+              >
+                <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+                <RowText numberOfLines={4}>{n.text.trim()}</RowText>
+              </Tap>
+            ))}
+          </ThreadBranch>
         </ThreadRow>
       )}
       <WindowFooter text={footerText} />

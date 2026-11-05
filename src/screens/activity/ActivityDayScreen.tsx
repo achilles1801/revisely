@@ -339,16 +339,18 @@ export default function ActivityDayScreen() {
               <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of this day. Tap to retry.</Text>
             </Tap>
           )}
-          <ThreadRow
-            mark={<Mark label={dayOfMonth(date)} />}
-            name={label}
-            meta={formatLongDay(date)}
-            lineBelow
-            separator={false}
-            testID="day-post"
-          >
-            <RowText secondary>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged yet'}</RowText>
-          </ThreadRow>
+          {!blocks && (
+            <ThreadRow
+              mark={<Mark label={dayOfMonth(date)} />}
+              name={label}
+              meta={formatLongDay(date)}
+              lineBelow
+              separator={false}
+              testID="day-post"
+            >
+              <RowText secondary>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged yet'}</RowText>
+            </ThreadRow>
+          )}
           {blocks && (
             <DayBlocks
               day={date}

@@ -12,6 +12,7 @@ import { getQuranData } from '../../lib/quranData';
 import { monthGrid, monthTitle, shiftMonth } from '../../lib/activityHeatmap';
 import { coverage, consistency, dayMarks, dayPattern, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace, PACE_MIN_ITEMS, type Memorized, type Read, type Revised } from '../../lib/activityInsights';
 import { ProgressRing } from './DayParts';
+import { PillButton } from '../v2/PillButton';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -31,12 +32,15 @@ type ViewKind = 'calendar' | 'insights';
 
 interface Props {
   today: string;
+  /** Weak spots' actions (Insights): the weak pages to tomorrow's front, or to tomorrow's plan day. */
+  onReviseTomorrow: (weak: number[]) => void;
+  onPlanIt: (weak: number[]) => void;
   /** Days with a note in the log (the calendar's note dot). */
   noteDays: Set<string>;
   onOpenDay: (day: string) => void;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt }: Props) {
   const { pages } = useApp();
   const { palette } = useTheme();
   const [view, setView] = useState<ViewKind>('calendar');
@@ -147,6 +151,8 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
           read={read}
           itemDays={[...revised.map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), ...read]}
           weakPages={weakPages}
+          onReviseTomorrow={onReviseTomorrow}
+          onPlanIt={onPlanIt}
         />
       )}
     </RNView>
@@ -187,6 +193,8 @@ function Insights(props: {
   itemDays: { day: string; pages: number[]; minutes: number | null }[];
   /** Memorized pages rated weak (1–2), for the weak-spots card. */
   weakPages: number[];
+  onReviseTomorrow: (weak: number[]) => void;
+  onPlanIt: (weak: number[]) => void;
 }) {
   const { palette } = useTheme();
   const last = useMemo(() => lastRevisedByPage(props.revised, props.today), [props.revised, props.today]);
@@ -248,6 +256,16 @@ function Insights(props: {
                   <Text style={[typeV2.body, { color: palette.text }]}>p. {p}</Text>
                 </RNView>
               ))}
+              <RNView style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                <PillButton
+                  title="Revise these first tomorrow"
+                  size="sm"
+                  variant="outline"
+                  onPress={() => props.onReviseTomorrow(props.weakPages)}
+                  testID="insights-revise-tomorrow"
+                />
+                <PillButton title="Plan it" size="sm" variant="outline" onPress={() => props.onPlanIt(props.weakPages)} testID="insights-plan-it" />
+              </RNView>
             </RNView>
           ) : undefined
         }
