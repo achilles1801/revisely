@@ -22,7 +22,7 @@ describe('Activity Insights (C3)', () => {
     // Juz 2 has page 12, never revised: it is untouched for as long as that page is.
     expect(juzUntouchedLongest(juzOf, memorized, last, TODAY)).toEqual({ juz: 2, daysSince: null });
     expect(juzUntouchedLongest(juzOf, new Set([1, 11]), new Map([[1, '2026-11-09'], [11, '2026-10-01']]), TODAY)).toEqual({ juz: 2, daysSince: 40 });
-    expect(juzUntouchedLongest(juzOf, new Set([1, 2]), new Map([[1, '2026-11-09'], [2, '2026-11-01']]), TODAY)).toEqual({ juz: 1, daysSince: 1 });
+    expect(juzUntouchedLongest(juzOf, new Set([1, 2]), new Map([[1, '2026-11-09'], [2, '2026-11-01']]), TODAY)).toEqual({ juz: 1, daysSince: 9 });
   });
 
   it('consistency: days with an item in the window, and per weekday', () => {
