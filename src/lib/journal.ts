@@ -1,6 +1,6 @@
 import { JournalEntry, JournalKind, JournalNote, User } from '../types';
 import { getSurahsForPage } from './quranData';
-import { getRevisionDayForUser } from './fajrBoundary';
+import { getRevisionDayForUser, revisionDayOf } from './fajrBoundary';
 
 // Limits mirrored in firestore.rules — keep them in sync.
 export const JOURNAL_TEXT_MAX = 200;
@@ -133,14 +133,17 @@ export function journalTotalMinutes(entry: JournalEntry): number | null {
 }
 
 /**
- * The clock time a note was written: "7:12 am". A note written after midnight
- * but before the day's fajr belongs to the day before, so its weekday follows
- * the time: "12:40 am Tue".
+ * The clock time a note was written: "7:12 am". A note written on the log's own
+ * revision day shows only its time, 12:40 am before Fajr included: it belongs
+ * to that day (LOG-3, DAY-9), so no other weekday is named. One written on
+ * another day (added later to an older day's log) gets that day's weekday:
+ * "9:05 am Wed". Without the account, the calendar day decides.
  */
-export function formatEntryTime(at: number, day: string): string {
+export function formatEntryTime(at: number, day: string, user?: User | null): string {
   const d = new Date(at);
   const clock = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
-  if (toDay(d) === day) return clock;
+  const writtenOn = user !== undefined ? revisionDayOf(at, user) : toDay(d);
+  if (writtenOn === day) return clock;
   return `${clock} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
 }
 

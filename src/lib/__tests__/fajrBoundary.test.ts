@@ -3,6 +3,7 @@ import {
   getNextRevisionDayStart,
   getRevisionDateForUser,
   getRevisionDayForUser,
+  revisionDayOf,
 } from '../fajrBoundary';
 import { calendarDaysBetween, generateDailyAssignment } from '../algorithm';
 import type { User, UserPage } from '../../types';
@@ -104,6 +105,30 @@ describe('revision day with the fajr boundary', () => {
     );
     expect(assignment.date).toBe('2026-10-16');
     expect(assignment.pages).toEqual([1, 2]);
+  });
+});
+
+describe('[DAY-9] revisionDayOf: the day something done at a time belongs to', () => {
+  it('a time before that day\'s Fajr is the day before; after Fajr, its own day', () => {
+    const before = new Date(fajr.getTime() - 5 * MIN);
+    if (day(before) !== day(noon)) return; // fajr this close to midnight: nothing to test
+    expect(revisionDayOf(before.getTime(), user)).toBe(day(new Date(2026, 9, 16)));
+    expect(revisionDayOf(new Date(fajr.getTime() + 5 * MIN), user)).toBe(day(noon));
+  });
+
+  it('takes a number or a Date, and is the calendar day with the boundary off or no account', () => {
+    const half = new Date(2026, 9, 17, 0, 30);
+    expect(revisionDayOf(half, user)).toBe(revisionDayOf(half.getTime(), user));
+    expect(revisionDayOf(half, { ...user, fajrBoundaryEnabled: false })).toBe('2026-10-17');
+    expect(revisionDayOf(half, null)).toBe('2026-10-17');
+  });
+
+  it('uses the Fajr of the day the time falls on, not today\'s', () => {
+    // A week earlier at 00:30: decided by Oct 10's Fajr, whatever the clock says now.
+    const then = new Date(2026, 9, 10, 0, 30);
+    const fajrThen = getFajrTimeFor(then, user) as Date;
+    const expected = then.getTime() < fajrThen.getTime() ? '2026-10-09' : '2026-10-10';
+    expect(revisionDayOf(then.getTime(), user)).toBe(expected);
   });
 });
 

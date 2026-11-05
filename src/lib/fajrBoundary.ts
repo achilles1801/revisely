@@ -51,6 +51,16 @@ export function getRevisionDayForUser(
   return revisionDayAt(now, (d) => getFajrTimeFor(d, user));
 }
 
+/**
+ * The revision day something done at `at` belongs to: with the Fajr boundary
+ * on, that day's own Fajr decides (00:30 is still the day before); off, the
+ * calendar day. The one day key for anything that carries only a time (a
+ * note, a timed reading, a recording): Activity and the daily log group by it.
+ */
+export function revisionDayOf(at: number | Date, user: User | null | undefined): string {
+  return getRevisionDayForUser(user, typeof at === 'number' ? new Date(at) : at);
+}
+
 /** The revision day at `now`, given each local day's Fajr: the day before until that day's Fajr. */
 function revisionDayAt(now: Date, fajrOf: (day: Date) => Date | null): string {
   const todaysFajr = fajrOf(now);

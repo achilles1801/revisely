@@ -93,22 +93,23 @@ describe('Insights: missed revisions', () => {
   });
 });
 
-describe('Activity', () => {
-  const sessions = [log('2026-01-05', [1, 2], { ahead: { '2026-01-06': [3, 4] } })];
+describe('[DAY-9] Activity: pages revised ahead show on the day they were revised', () => {
+  // Monday's session revised pages 1–2 for Monday and 3–4 ahead for Tuesday
+  // (pagesRevised holds all four, as the app saves it).
+  const sessions = [log('2026-01-05', [1, 2, 3, 4], { ahead: { '2026-01-06': [3, 4] } })];
 
-  it('shows the session as revised ahead, and the day it counts for as done ahead', () => {
-    const titles = buildActivityItems({ logs: sessions }).map((i) => `${i.day} ${i.title}`);
-    expect(titles).toContain('2026-01-05 Revised ahead for Tue · 2 pages');
-    expect(titles).toContain('2026-01-06 Done ahead on Mon');
+  it('one item, on Monday: nothing is put on Tuesday, which may not have started', () => {
+    const items = buildActivityItems({ logs: sessions });
+    expect(items.map((i) => `${i.day} ${i.title}`)).toContain('2026-01-05 Revised ahead for Tue · 2 pages');
+    expect(items.filter((i) => i.day === '2026-01-06')).toEqual([]);
   });
 
-  it('a day done ahead has its pages, with no session of its own', () => {
+  it('Monday holds them, counted once among its revised pages; Tuesday has no activity', () => {
     const days = buildActivityDays({ logs: sessions, readings: [], journal: [] });
-    const target = days.find((d) => d.date === '2026-01-06');
-    expect(target?.revisions).toEqual([]);
-    expect(target && summarizeActivityDay(target).aheadPages).toBe(2);
-    // Those pages are not counted as revised on the day that did not revise them.
-    expect(target && summarizeActivityDay(target).revisedPages).toBe(0);
+    expect(days.map((d) => d.date)).toEqual(['2026-01-05']);
+    const monday = summarizeActivityDay(days[0]);
+    expect(monday.revisedPages).toBe(4);
+    expect(monday.aheadPages).toBe(2);
   });
 });
 
