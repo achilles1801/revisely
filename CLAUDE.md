@@ -24,7 +24,15 @@ file is the release mechanics and the traps behind them.
      sign-in and `previewTester`), `node scripts/reset-account.js <email>` from `functions/` (a dry
      run; `--yes` backs up to `~/secrets/backups/<uid>-<date>/`, checks the backup, then resets;
      `--check` says whether it still looks new). `restore-account.js <backup dir>` puts it back.
-     It refuses the App Review account.
+     It refuses the App Review account. Testers can also do it themselves: Settings → Testing →
+     Reset my data (shown only when `previewTester` is true; type RESET) calls the callable
+     `resetMyData` (`functions/src/testerReset.ts`). It works on the caller's own uid only, needs
+     App Check and `previewTester` read on the server, refuses the App Review account, allows one
+     reset per 10 minutes and 10 tries a day (`adminResets/<uid>`, closed to clients), and backs up
+     to Storage `backups/tester-resets/<uid>/<time>/` (closed to clients) before changing anything.
+     Unlike the script, it also deletes that phone's local recordings (the user asked for it on that
+     phone). Deployed Nov 5 2026; deploy it again (`firebase deploy --only functions:resetMyData`)
+     when `testerReset.ts` changes, and keep its `freshUser` in step with `reset-account.js`.
   3. Try it in TestFlight, then merge `develop` into `main` (a PR, CI green). Changes made on `main`
      directly that go into the app block promotion until they come back through `develop`.
   4. `Promote to production` (`.github/workflows/promote.yml`) finds the preview update with main's
@@ -508,8 +516,18 @@ hard-coded token was deleted from the console on 2026-10-27.
   and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
 - **E2E** (`e2e.yml`, `.maestro/README.md`): Maestro flows on the iOS Simulator and the Android
   emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
-  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On every PR into
-  `develop`, nightly (testing develop), and by hand.
+  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On PRs into
+  `develop`, a smoke set (02 session, 04 Fajr boundary, 05 daily log, 06 offline; one iOS job and one
+  Android job). On PRs into `main`, nightly (testing develop) and by hand, every flow (two iOS and two
+  Android jobs). One run per PR (a push cancels the older one); on develop, runs are grouped by
+  branch and event, so a push can't cancel a full run started by hand. iOS runners are the slow part
+  (5 macOS jobs at once on this plan): don't start full runs you don't need.
+  - **Hangs and system alerts:** `run.sh` stops a flow attempt after 15 minutes and the warm-up
+    after 6 (a Maestro driver that answered 500 once hung a shard for 55 minutes). Flows confirm
+    iOS permission alerts (the simulator's microphone grant sometimes doesn't take), and the clock
+    and network links are re-sent until they take.
+  - **The daily log** (05) checks again 8 s after each change is sent: a note that drops out once
+    sent, or a deleted one that comes back, fails it (#220 fixed exactly that, Nov 5 2026).
   - **A required check:** the job `E2E`. Its `changes` job reads the PR's files; when nothing that
     goes into the app or the flows changed (only what `.github/scripts/app-hash.sh` leaves out, other
     than `.maestro/`, `e2e.yml`, `firestore.rules` and `firebase.json`), the platform jobs are
