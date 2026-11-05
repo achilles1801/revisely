@@ -22,7 +22,8 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
-import { journalFirstDay } from '../../lib/journal';
+import { journalFirstDay, shiftDay } from '../../lib/journal';
+import { carryForTomorrow, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
@@ -43,7 +44,7 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logs } = useApp();
+  const { user, logs, saveUser } = useApp();
   const { palette } = useTheme();
   const tabFootprint = useTabBarFootprint();
 
@@ -113,7 +114,17 @@ export default function ActivityScreen() {
             </Tap>
           )}
           {blocks ? (
-            <ActivityBlocksViews today={today} noteDays={noteDays} onOpenDay={openDay} />
+            <ActivityBlocksViews
+              today={today}
+              noteDays={noteDays}
+              onOpenDay={openDay}
+              onReviseTomorrow={(weak) => {
+                if (!user) return;
+                const tomorrow = shiftDay(today, 1);
+                void saveUser({ ...user, carryOver: carryForTomorrow(tomorrow, weak, user.carryOver) });
+              }}
+              onPlanIt={(weak) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })}
+            />
           ) : (
             <View style={v2.graph}>
               <ActivityCalendar
