@@ -47,7 +47,8 @@ import {
   summarizeRevisedPages,
 } from '../../lib/journal';
 import { logger } from '../../lib/logger';
-import { missedFromSession } from '../../lib/activityAdd';
+import { memorizeSuggestion, missedFromSession } from '../../lib/activityAdd';
+import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
@@ -309,6 +310,24 @@ export default function JournalEntryScreen() {
       cancelled = true;
     };
   }, [date]);
+  // The Memorized suggestion (C4): pages read today that aren't memorized yet.
+  const [readToday, setReadToday] = useState<number[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    firestoreService
+      .getReadingSessionsForDay(date)
+      .then((list) => !cancelled && setReadToday(list.flatMap((r) => r.pages)))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
+  const memorizeSugg = useMemo(() => {
+    const memorized = new Set((allPages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+    return memorizeSuggestion(readToday, memorized);
+  }, [readToday, allPages]);
+  const showMemorizeSuggestion =
+    composingKind === 'memorization' && memorizeSugg.length > 0 && text.trim() === '' && !editing;
   const showSuggestion =
     composingKind === 'revision' &&
     sessionSuggestion != null &&
@@ -562,6 +581,19 @@ export default function JournalEntryScreen() {
                   <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
                     From your session: {sessionSuggestion.text}
                     {sessionSuggestion.minutes != null ? ` · ${formatMinutes(sessionSuggestion.minutes)}` : ''}
+                  </Text>
+                </Tap>
+              ) : showMemorizeSuggestion ? (
+                <Tap
+                  onPress={() => setDraft({ text: describePageRuns(pageRuns(memorizeSugg)) })}
+                  style={[v2.suggestion, { borderColor: palette.outline }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fill with the pages you read today"
+                  testID="journal-memorize-suggestion"
+                >
+                  <Ionicons name="sparkles-outline" size={14} color={palette.text} />
+                  <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
+                    Read today, not memorized: {describePageRuns(pageRuns(memorizeSugg))}
                   </Text>
                 </Tap>
               ) : composingKind === 'note' && tagOptions.length > 0 && !editing ? (
