@@ -4,7 +4,7 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Text } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -114,7 +114,9 @@ export function DayBlocks({
 
   // The day's recordings hang off their block: revision ones under Revised, reading ones under Read.
   const [recs, setRecs] = useState<RecordingMeta[]>([]);
-  const load = () => {
+  // Stable: useActivityReload runs `load` in a focus effect keyed on it, so a new function
+  // each render reloaded the day on every render, forever (ACT-9).
+  const load = useCallback(() => {
     firestoreService
       .getActivityItemsForDay(day)
       .then(setItems)
@@ -122,7 +124,7 @@ export function DayBlocks({
     listRecordings()
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
-  };
+  }, [day]);
   const revRecs = recs.filter((r) => r.kind === 'revision');
   const readRecs = recs.filter((r) => r.kind === 'reading');
   useActivityReload(load);
