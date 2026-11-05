@@ -22,6 +22,8 @@ export function ThreadRow({
   name,
   nameAfter,
   meta,
+  metaBelow = false,
+  figure,
   headerMaxScale,
   onMenu,
   menuLabel = 'More',
@@ -40,6 +42,10 @@ export function ThreadRow({
   /** Beside the name, before the metadata (e.g. the Arabic name). */
   nameAfter?: React.ReactNode;
   meta?: string;
+  /** The metadata on its own line under the name (the Activity blocks). */
+  metaBelow?: boolean;
+  /** A figure on the right of the header ("18 of 20"). */
+  figure?: React.ReactNode;
   /** Caps how far the name and metadata grow with Dynamic Type. */
   headerMaxScale?: number;
   onMenu?: () => void;
@@ -77,7 +83,7 @@ export function ThreadRow({
             {name}
           </Text>
           {nameAfter}
-          {meta ? (
+          {meta && !metaBelow ? (
             <Text
               style={[typeV2.meta, styles.meta, { color: palette.secondary }]}
               numberOfLines={1}
@@ -87,6 +93,7 @@ export function ThreadRow({
             </Text>
           ) : null}
           <View style={styles.spacer} />
+          {figure ? <View style={styles.figure}>{figure}</View> : null}
           {onMenu ? (
             <Tap
               onPress={onMenu}
@@ -100,6 +107,11 @@ export function ThreadRow({
             </Tap>
           ) : null}
         </View>
+        {meta && metaBelow ? (
+          <Text style={[typeV2.meta, styles.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={headerMaxScale}>
+            {meta}
+          </Text>
+        ) : null}
         {children}
         {footer ? <View style={styles.footer}>{footer}</View> : null}
       </View>
@@ -155,6 +167,7 @@ export function RowText({
 }
 
 const styles = StyleSheet.create({
+  figure: { marginLeft: 8 },
   row: { flexDirection: 'row', paddingHorizontal: layoutV2.gutter },
   markCol: { width: markV2.top, alignItems: 'center' },
   lineAbove: { flex: 1, marginBottom: 4 },
