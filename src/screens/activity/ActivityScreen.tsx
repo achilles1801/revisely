@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
+import { ActivityBlocksViews } from '../../components/activity/ActivityBlocksViews';
+import { activityBlocksEnabled } from '../../components/activity/DayBlocks';
 import { ActivityItemRow, RecentSection } from '../../components/activity/ActivityItemRow';
 import { ActivityItem, buildActivityItems } from '../../lib/activityItems';
 import { useApp } from '../../context/AppContext';
@@ -65,6 +67,13 @@ export default function ActivityScreen() {
   const openDay = (date: string) => navigation.navigate('ActivityDay', { date });
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
 
+  // Days with a note in the log (the flagged calendar's note dot).
+  const noteDays = useMemo(
+    () => new Set((journal ?? []).filter((d) => d.entries.some((n) => n.kind === 'note' && n.text.trim() !== '')).map((d) => d.date)),
+    [journal],
+  );
+  const blocks = activityBlocksEnabled(user);
+
   const recentItems = items.slice(0, RECENT_ITEMS);
   const openItem = (it: ActivityItem) =>
     navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
@@ -94,16 +103,20 @@ export default function ActivityScreen() {
               <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of your activity. Tap to retry.</Text>
             </Tap>
           )}
-          <View style={v2.graph}>
-            <ActivityCalendar
-              days={days}
-              today={today}
-              firstDay={firstDay}
-              selected={pickedDay ?? today}
-              onSelect={setPickedDay}
-              onOpenDay={openDay}
-            />
-          </View>
+          {blocks ? (
+            <ActivityBlocksViews today={today} noteDays={noteDays} onOpenDay={openDay} />
+          ) : (
+            <View style={v2.graph}>
+              <ActivityCalendar
+                days={days}
+                today={today}
+                firstDay={firstDay}
+                selected={pickedDay ?? today}
+                onSelect={setPickedDay}
+                onOpenDay={openDay}
+              />
+            </View>
+          )}
           <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
           <RecentSection
             count={recentItems.length}

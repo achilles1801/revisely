@@ -771,11 +771,13 @@ export async function getActivityItemsForDay(
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
+  reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
-  const [rev, mem] = await Promise.all([
+  const [rev, mem, read] = await Promise.all([
     getDocs(query(collection(db, 'users', uid, 'revisions'), where('day', '==', day))),
     getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '==', day))),
+    getDocs(query(collection(db, 'users', uid, 'reads'), where('day', '==', day))),
   ]);
   return {
     revisions: rev.docs.map((d) => {
@@ -791,6 +793,7 @@ export async function getActivityItemsForDay(
       };
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
   };
 }
 
@@ -807,6 +810,33 @@ export async function patchReadItemPages(id: string, pages: number[], userId: st
 /** A session was deleted: its Read item goes with it. */
 export async function deleteReadItem(id: string, userId: string): Promise<void> {
   await deleteDoc(doc(collection(db, 'users', userId, 'reads'), id));
+}
+
+/**
+ * The Activity items between two revision days, inclusive (C3: the calendar's month
+ * and Insights' window). Revised and memorization items by their day; reads too.
+ */
+export async function getActivityItemsBetween(
+  from: string,
+  to: string,
+  userId?: string,
+): Promise<{
+  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
+  memorized: { id: string; day: string; pages: number[] }[];
+  reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
+}> {
+  const uid = userId || getCurrentUserId();
+  const range = (c: string) =>
+    getDocs(query(collection(db, 'users', uid, c), where('day', '>=', from), where('day', '<=', to)));
+  const [rev, mem, read] = await Promise.all([range('revisions'), range('memorizations'), range('reads')]);
+  return {
+    revisions: rev.docs.map((d) => {
+      const x = d.data();
+      return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null };
+    }),
+    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+  };
 }
 
 /** Save a finished session. Returns the new document id. */

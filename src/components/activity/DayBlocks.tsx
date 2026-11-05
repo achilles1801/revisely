@@ -12,7 +12,9 @@ import * as firestoreService from '../../services/firestoreService';
 import { buildDayView, type DayView, type RevisedBlock } from '../../lib/activityDayView';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
-import type { JournalNote } from '../../types';
+import type { JournalNote, ReadingSession } from '../../types';
+import { Tap } from '../v2/Tap';
+import { formatMinutes } from '../../lib/journal';
 import { Mark } from '../v2/Mark';
 import { RowText, ThreadRow } from '../v2/ThreadRow';
 import { typeV2 } from '../../theme/v2';
@@ -26,9 +28,14 @@ interface Props {
   /** The day's log notes of each kind this block shows. */
   revisionNotes: JournalNote[];
   memorizationNotes: JournalNote[];
+  /** The day's timed sessions (their edit flow), and the log notes (its own kind). */
+  readings: ReadingSession[];
+  notes: JournalNote[];
+  onEditReading: (session: ReadingSession) => void;
+  onOpenLog: () => void;
 }
 
-export function DayBlocks({ day, revisionNotes, memorizationNotes }: Props) {
+export function DayBlocks({ day, revisionNotes, memorizationNotes, readings, notes, onEditReading, onOpenLog }: Props) {
   const { pages } = useApp();
   const { palette } = useTheme();
   const [items, setItems] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsForDay>> | null>(null);
@@ -51,6 +58,8 @@ export function DayBlocks({ day, revisionNotes, memorizationNotes }: Props) {
   const [revised, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
   const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
+  const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null }[] };
+  const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
 
   return (
     <>
@@ -94,6 +103,42 @@ export function DayBlocks({ day, revisionNotes, memorizationNotes }: Props) {
           ))}
           {memorizationNotes.map((n) => (
             <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+          ))}
+        </ThreadRow>
+      )}
+      {readItems.items.length > 0 && (
+        <ThreadRow
+          mark={<Mark size="reply" icon="stopwatch-outline" />}
+          name="Read"
+          meta={readMinutes > 0 ? formatMinutes(readMinutes) : undefined}
+          lineBelow
+          separator={false}
+          testID="activity-block-read"
+        >
+          {readItems.items.map((i) => {
+            const session = readings.find((r) => r.id === i.id);
+            return (
+              <Tap key={i.id} onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`Timed session. Edit pages`}>
+                <RowText secondary>
+                  {[i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'No pages yet', i.minutes != null ? formatMinutes(i.minutes) : null].filter(Boolean).join(' · ')}
+                </RowText>
+              </Tap>
+            );
+          })}
+        </ThreadRow>
+      )}
+      {notes.length > 0 && (
+        <ThreadRow
+          mark={<Mark size="reply" icon="create-outline" />}
+          name="Notes"
+          lineBelow
+          separator={false}
+          testID="activity-block-notes"
+        >
+          {notes.map((n) => (
+            <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel="Daily log. Open the log">
+              <RowText numberOfLines={4}>{n.text.trim()}</RowText>
+            </Tap>
           ))}
         </ThreadRow>
       )}
