@@ -226,6 +226,9 @@ Things that bit:
 - The mushaf runs right to left: the next page comes in from the left. Swipe until a count or the
   end card (`subflows/swipe-pages.yaml`), not a fixed number of times: on a slow emulator a swipe
   can be lost.
+- A tap can be lost too: on a slow iOS Simulator, Home's "Start revision" once showed pressed and
+  never fired (06-offline, run 41990309194). Open today's session with `subflows/open-session.yaml`,
+  which waits for the session's header and taps again while Home's button is still on screen.
 - Android waits for the screen to settle after each command. A screen that never settles (a
   recording's timer) needs `waitToSettleTimeoutMs` on the tap, or each tap takes a minute.
 - On Android, text typed into a field as it gains focus can be lost; `subflows/type-in-log.yaml`

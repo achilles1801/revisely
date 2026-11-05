@@ -9,12 +9,10 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T12:00
       BOUNDARY: midnight
-- tapOn:
-    id: today-cta
-- extendedWaitUntil:
-    visible:
-      id: session-quiet-count
-    timeout: 15000
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: ".*"
 - runFlow: ../subflows/show-controls.yaml
 # While recording, the screen never settles (a live timer and waveform): don't
 # wait for it after these taps.
