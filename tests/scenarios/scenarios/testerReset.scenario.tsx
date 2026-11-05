@@ -17,12 +17,14 @@ it('[RESET-2] a tester resets their own data: onboarding again, signed in, nothi
   const phone = new Phone('phone');
   let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
   const uid = app.uid;
-  markPreviewTester(uid);
-  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  await app.untilSynced();
   await app.close();
+  // The owner marks the account a tester (set-preview-tester.js) while the app is closed.
+  markPreviewTester(uid);
 
   // A day revised.
   app = await phone.open(homeStack);
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
   const home = new Home(app);
   await home.ready();
   const session = await home.startSession();
