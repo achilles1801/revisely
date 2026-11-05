@@ -13,6 +13,7 @@ import { buildDayView, type DayView, type RevisedBlock } from '../../lib/activit
 import { stripCells, strengthCounts } from '../../lib/activityDayParts';
 import { getFajrTimeFor } from '../../lib/fajrBoundary';
 import { ProgressRing, PageStrip, StrengthCounts, WindowFooter } from './DayParts';
+import { ThreadBranch } from './ThreadBranch';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
@@ -210,9 +211,13 @@ export function DayBlocks({
               {`Ahead for ${c.countsFor}: ${describePageRuns(pageRuns(c.pages))}`}
             </RowText>
           ))}
-          {revisionNotes.map((n) => (
-            <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-          ))}
+          {revisionNotes.length > 0 && (
+            <ThreadBranch>
+              {revisionNotes.map((n) => (
+                <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+              ))}
+            </ThreadBranch>
+          )}
         </ThreadRow>
       )}
       {hasMemorized && (
@@ -252,9 +257,13 @@ export function DayBlocks({
               <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>
             </Tap>
           ))}
-          {memorizationNotes.map((n) => (
-            <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-          ))}
+          {memorizationNotes.length > 0 && (
+            <ThreadBranch>
+              {memorizationNotes.map((n) => (
+                <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+              ))}
+            </ThreadBranch>
+          )}
         </ThreadRow>
       )}
       {readItems.items.length > 0 && (
@@ -266,7 +275,7 @@ export function DayBlocks({
           separator={false}
           testID="activity-block-read"
         >
-          {readItems.items.map((i) => {
+          <ThreadBranch>{readItems.items.map((i) => {
             const session = readings.find((r) => r.id === i.id);
             return (
               <Tap
@@ -284,7 +293,7 @@ export function DayBlocks({
                 </RowText>
               </Tap>
             );
-          })}
+          })}</ThreadBranch>
         </ThreadRow>
       )}
       {notes.length > 0 && (
@@ -295,7 +304,7 @@ export function DayBlocks({
           separator={false}
           testID="activity-block-notes"
         >
-          {notes.filter((n) => !gone.has(n.id)).map((n) => (
+          <ThreadBranch>{notes.filter((n) => !gone.has(n.id)).map((n) => (
             <SwipeRow
               key={n.id}
               onDelete={() => deleteNote(n.id)}
@@ -312,7 +321,7 @@ export function DayBlocks({
                 <RowText numberOfLines={4}>{n.text.trim()}</RowText>
               </Tap>
             </SwipeRow>
-          ))}
+          ))}</ThreadBranch>
         </ThreadRow>
       )}
       <WindowFooter text={footerText} />
