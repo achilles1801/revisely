@@ -4,7 +4,7 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
