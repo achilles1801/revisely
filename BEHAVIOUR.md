@@ -180,9 +180,12 @@ How the tests are made: `tests/scenarios/README.md`.
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
   oldest, or never.
 
-- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. "From
-  your session" offers only the pages the session missed: its skipped pages not revised, among the memorized
-  ones. It never copies the session's own revised pages or minutes.
+- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note). Revised opens its own sheet:
+  pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates those pages 2, 3 or 4
+  (ACT-8's bins), written as each page's weakness rating. Adding it queues one manual Revised item for today;
+  it counts toward today's Revised block and carries no plan assignment. "From your session" offers only the
+  pages the session missed: its skipped pages not revised, among the memorized ones. It never copies the
+  session's own revised pages or minutes.
 - **ACT-6.** A note swiped away goes at once, with Undo; the delete is saved after the undo window (five
   seconds), and leaving the screen saves any delete still waiting. A hold on a Read or Note row opens Edit and
   Copy.
