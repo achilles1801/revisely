@@ -797,6 +797,44 @@ export async function getActivityItemsForDay(
   };
 }
 
+/**
+ * Pages memorized on `day` (the memorization manager, Today): merged into that day's item, so
+ * saving the same pages again changes nothing (ids come from the day).
+ */
+export async function addMemorizationPages(day: string, pages: number[], at: number, userId: string): Promise<void> {
+  const ref = doc(collection(db, 'users', userId, 'memorizations'), day);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = snap.exists() ? (snap.data() as { pages?: number[]; occurredAt?: number }) : null;
+    const merged = [...new Set([...(prev?.pages ?? []), ...pages])].sort((a, b) => a - b);
+    tx.set(ref, {
+      id: day,
+      uid: userId,
+      day,
+      occurredAt: prev?.occurredAt && prev.occurredAt > 0 ? Math.min(prev.occurredAt, at) : at,
+      source: 'manual',
+      pages: merged,
+      minutes: null,
+      recordings: [],
+    });
+  });
+}
+
+/** Pages un-memorized: removed from every item that holds them; an item left empty is removed. */
+export async function removeMemorizationPages(pages: number[], userId: string): Promise<void> {
+  const drop = new Set(pages);
+  const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
+  await Promise.all(
+    snap.docs.map(async (d) => {
+      const current: number[] = d.data().pages ?? [];
+      const rest = current.filter((p) => !drop.has(p));
+      if (rest.length === current.length) return;
+      if (rest.length === 0) await deleteDoc(d.ref);
+      else await updateDoc(d.ref, { pages: rest });
+    }),
+  );
+}
+
 /** Removes a memorization item (C4): its pages are un-marked by their own change. */
 export async function deleteMemorizationItem(id: string, userId: string): Promise<void> {
   await deleteDoc(doc(collection(db, 'users', userId, 'memorizations'), id));

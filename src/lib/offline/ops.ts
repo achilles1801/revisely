@@ -47,6 +47,10 @@ export type OutboxOp =
   | { kind: 'pages'; pages: PageFields[] }
   /** A memorization item is removed (its pages are un-marked by the pages change beside it). */
   | { kind: 'memorization.delete'; day: string; id: string }
+  /** Pages memorized today (the manager's "Today"): merged into the day's memorization item. */
+  | { kind: 'memorization.mark'; day: string; pages: number[]; at: number }
+  /** Pages un-memorized: removed from the items that hold them. */
+  | { kind: 'memorization.unmark'; pages: number[] }
   | {
       kind: 'session.add';
       date: string;
