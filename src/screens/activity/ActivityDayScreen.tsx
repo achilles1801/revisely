@@ -22,6 +22,7 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { queueChange, withPendingJournalDay, withPendingReadings } from '../../lib/offline/queue';
+import { pagesToUnmark } from '../../lib/activityAdd';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
 import {
@@ -102,7 +103,7 @@ export default function ActivityDayScreen() {
   const focusRecordingId = route.params.focusRecordingId;
   const scrollRef = useRef<ScrollView>(null);
   const scrolledToRecordingRef = useRef(false);
-  const { user, logs, updateLog, deleteLog } = useApp();
+  const { user, logs, updateLog, deleteLog, pages, updatePages } = useApp();
   const { theme, palette } = useTheme();
   const tabFootprint = useTabBarFootprint();
   const { day: today } = useRevisionDay(user);
@@ -297,6 +298,21 @@ export default function ActivityDayScreen() {
     readings.length > 0 ? `${readings.length} timed` : null,
     journal ? 'daily log' : null,
   ].filter(Boolean);
+  // Deleting a memorization (C4): its pages go back to not memorized (one change to the
+  // pages, which also updates this phone), then the item is removed.
+  const onDeleteMemorized = async (item: { id: string; day: string; pages: number[] }) => {
+    const memorized = new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+    const unmark = pagesToUnmark(item.pages, memorized);
+    if (unmark.length > 0) {
+      const set = new Set(unmark);
+      await updatePages(
+        pages.map((p) => (set.has(p.pageNumber) ? { ...p, status: 'not_memorized' as const, dateMemorized: null } : p)),
+        unmark,
+      );
+    }
+    await queueChange({ kind: 'memorization.delete', day: item.day, id: item.id });
+  };
+
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar title={label} onBack={() => navigation.goBack()} separator />
@@ -344,6 +360,12 @@ export default function ActivityDayScreen() {
               notes={(journal?.entries ?? []).filter((n) => n.kind === 'note')}
               onEditReading={setEditingReading}
               onOpenLog={openJournal}
+              revisedLog={logs.find((l) => l.date === date) ?? null}
+              onDeleteRevised={(log) => {
+                void deleteLog(log.id);
+              }}
+              onDeleteMemorized={onDeleteMemorized}
+              onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
             />
           )}
           {replies.map((r, i) => {
@@ -370,6 +392,7 @@ export default function ActivityDayScreen() {
             );
           })}
           {/* The rows keep the gutter themselves (hairlines run edge to edge). */}
+          {!blocks && (
           <View onLayout={onRecordingsLayout}>
             <RecordingsList
               day={date}
@@ -383,6 +406,7 @@ export default function ActivityDayScreen() {
               }
             />
           </View>
+          )}
         </ScrollView>
       )}
       <ActionSheet
