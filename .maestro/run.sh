@@ -17,6 +17,8 @@
 #   E2E_OUTPUT         where reports, logs and screenshots go (.maestro/build/results)
 #   E2E_RETRIES        reruns of a failed flow (default 0); a pass on a rerun is reported
 #   E2E_ZONE           the zone for flows that name none (America/Chicago)
+#   E2E_FLOW_LIMIT     seconds an attempt may take before it is stopped (900)
+#   E2E_WARMUP_LIMIT   seconds the warm-up may take (360)
 set -uo pipefail
 
 PLATFORM=${1:?usage: run.sh ios|android [flow.yaml ...]}
@@ -46,6 +48,36 @@ if [ -z "$DEVICE" ]; then
     [ -n "$DEVICE" ] || { echo "no Android device: set E2E_DEVICE" >&2; exit 1; }
   fi
 fi
+
+# Runs "$@" for at most $1 seconds, then stops it (and its children). Maestro
+# can hang for good: once its iOS driver answered 500, the CLI printed
+# 'Exception in thread "main"' and its JVM never exited, holding a CI job for
+# 55 minutes (Nov 5). A stopped run counts as a failed attempt.
+with_limit() {
+  local secs=$1 pid watcher status
+  shift
+  "$@" &
+  pid=$!
+  (
+    sleep "$secs"
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "  stopped after ${secs}s: $*" >&2
+      pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
+      sleep 10
+      pkill -KILL -P "$pid" 2>/dev/null; kill -KILL "$pid" 2>/dev/null
+    fi
+  ) &
+  watcher=$!
+  wait "$pid"
+  status=$?
+  kill "$watcher" 2>/dev/null
+  wait "$watcher" 2>/dev/null
+  return "$status"
+}
+
+# A flow's attempt (a flow takes 2–10 minutes on CI) and the warm-up.
+FLOW_LIMIT=${E2E_FLOW_LIMIT:-900}
+WARMUP_LIMIT=${E2E_WARMUP_LIMIT:-360}
 
 # `# e2e-ci-skip: ios — why` in a flow: not run on that platform in CI (CI set).
 ci_skips() {
@@ -97,13 +129,13 @@ run_flow() {
     adb -s "$DEVICE" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
   fi
   if [ "$PLATFORM" = ios ]; then
-    SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
+    with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       "$flow" > "$out/maestro.log" 2>&1
   else
     set_android_zone "$zone" || return 1
-    "$MAESTRO" --device "$DEVICE" test \
+    with_limit "$FLOW_LIMIT" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       "$flow" > "$out/maestro.log" 2>&1
@@ -113,7 +145,7 @@ run_flow() {
 # The app's first launch, and iOS's one-time link prompt, before any flow.
 echo "▶ warm-up ($PLATFORM)"
 mkdir -p "$OUT/$PLATFORM"
-"$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1 ||
+with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/subflows/warm-up.yaml" > "$OUT/$PLATFORM/warm-up.log" 2>&1 ||
   echo "  warm-up failed (see $OUT/$PLATFORM/warm-up.log); going on"
 
 failed=0

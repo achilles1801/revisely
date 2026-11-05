@@ -51,6 +51,11 @@ appId: com.revisionbuddy.app
       id: journal-note-.*
       text: "Note, An-Naba needs another look, .*"
     timeout: 10000
+# Still so once the edit has been sent and the day read again.
+- runFlow: ../subflows/wait-sync.yaml
+- assertVisible:
+    id: journal-note-.*
+    text: "Note, An-Naba needs another look, .*"
 - assertNotVisible:
     text: "Note, Juz 30 felt steady today, .*"
 - assertVisible:
@@ -76,6 +81,10 @@ appId: com.revisionbuddy.app
     notVisible:
       text: "Note, Repeat Al-Mutaffifin twice, .*"
     timeout: 10000
+# Still gone once the delete has been sent and the day read again.
+- runFlow: ../subflows/wait-sync.yaml
+- assertNotVisible:
+    text: "Note, Repeat Al-Mutaffifin twice, .*"
 - assertVisible:
     id: journal-note-.*
     text: "Note, An-Naba needs another look, .*"

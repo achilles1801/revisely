@@ -21,6 +21,28 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: record-start
     waitToSettleTimeoutMs: 500
+# If the microphone's alert comes up (its grant didn't take: CI), Allow, as a
+# user would, and record if that didn't start it.
+- extendedWaitUntil:
+    visible:
+      id: record-stop
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: record-stop
+    commands:
+      - runFlow: ../subflows/system-alert.yaml
+      - extendedWaitUntil:
+          visible:
+            id: record-stop
+          timeout: 3000
+          optional: true
+      - tapOn:
+          id: record-start
+          optional: true
+          waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: record-stop

@@ -1,8 +1,29 @@
 # E2E flows
 
 The real app on the iOS Simulator and the Android emulator, driven by Maestro, against the Firebase
-emulators, at a time and in a time zone each flow sets. CI runs them (`.github/workflows/e2e.yml`)
-on every PR into `develop`, every night, and by hand.
+emulators, at a time and in a time zone each flow sets. CI runs them (`.github/workflows/e2e.yml`):
+
+| When | Flows | Jobs |
+| --- | --- | --- |
+| A PR into `develop` | the smoke set: 02, 04, 05, 06 | one iOS, one Android |
+| A PR into `main`, every night (testing develop), by hand | all eight | two iOS, two Android |
+| A push to `develop` | none: the native builds are kept for PRs | one each |
+
+**The smoke set:**
+- **02 (today's session):** the revision session, the core of the app. Like every flow it starts
+  with sign-up and onboarding (`subflows/new-account.yaml`), checking what onboarding saved on Home,
+  so 01 adds only its own details.
+- **04 (Fajr boundary):** the day and time logic, where the bug that started this suite was
+  (revise ahead before Fajr).
+- **05 (daily log):** adding, editing and deleting notes. It found two app bugs on Nov 4.
+- **06 (offline):** the phone's copy, the outbox and syncing back, where a bug would lose data.
+
+03, 07 and 08 run before a release (the PR into `main`) and every night.
+
+**Why not every flow on every PR:** a macOS runner is the scarce part, five at a time on this plan,
+and each iOS job takes 21–39 minutes of flows.
+- Nov 4–5: eight macOS jobs were wanted at once, and some waited 36 minutes for a runner.
+- The smoke set is one iOS job instead of two, and about half the flows.
 
 **`E2E` is a required check for merges into `develop`.** It is the workflow's last job:
 - **Skipped flows:** its `changes` job reads the PR's files. When nothing in them goes into the app
@@ -19,6 +40,11 @@ on every PR into `develop`, every night, and by hand.
 
 A flaky flow is fixed, not skipped. Each failed flow is run once more (`E2E_RETRIES`). A pass on that
 retry is a warning on the run, and the job keeps its results as for a failure.
+- **Time limits:** `run.sh` stops a flow's attempt after 15 minutes and the warm-up after 6
+  (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its iOS driver answered
+  500, its JVM never exited, and a job waited 55 minutes for it.
+- **Caches:** this workflow holds no release secrets, so it keeps `node_modules`, Maestro and the
+  Firestore emulator's jar, as it keeps the native builds.
 
 They sit on top of the scenario tests (`tests/scenarios`, `BEHAVIOUR.md`): those run the app's
 providers and screens in Jest; these run the built app, with its native modules, its navigation,
