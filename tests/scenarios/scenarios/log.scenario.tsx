@@ -88,3 +88,35 @@ it('[LOG-3] [DAY-2] after midnight, before Fajr, a note goes to the revision day
   expect(tuesday.entries()).toEqual([]);
   await app.close();
 });
+
+// Three times: the flicker is a race, and a single pass can miss it.
+for (let rep = 0; rep < 3; rep++) it(`[LOG-1] two notes sent back to back, the second before the first has shown: both stay (${rep + 1})`, async () => {
+  setZone(ZONES.london);
+  setNow('2026-11-02 20:00');
+  const phone = new Phone();
+  const app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  await app.close();
+
+  setNow('2026-11-03 21:00');
+  const opened = await phone.open(homeStack);
+  await new Home(opened).ready();
+  const log = new DailyLog(opened);
+  await log.open();
+  const { fireEvent, within } = opened.mods.rtl;
+  const send = async (text: string) => {
+    fireEvent.press(within(opened.screen.getByTestId('journal-kind')).getByText('Note'));
+    await opened.act(async () => {
+      fireEvent.changeText(opened.screen.getByTestId('journal-text-input'), text);
+    });
+    fireEvent.press(opened.screen.getByTestId('journal-send'));
+    await opened.act(async () => {});
+  };
+  await send('first');
+  await send('second');
+  await opened.until(() => log.entries().length === 2, 'both notes in the log');
+  await opened.untilSynced();
+  // The clock stands still, so both notes share a time: the order is by id, not checked here.
+  expect(log.entries().map((e) => e.text).sort()).toEqual(['first', 'second']);
+  await log.back();
+  await opened.close();
+});
