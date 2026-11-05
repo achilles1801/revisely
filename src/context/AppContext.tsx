@@ -422,7 +422,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     configureSync({
       currentUid: () => getAuth().currentUser?.uid ?? null,
-      isDeleting: (u) => firestoreService.isDeletingAccount(u),
+      // Deleted, or reset by a tester (lib/testerReset): nothing is sent meanwhile.
+      isDeleting: (u) => firestoreService.isDeletingAccount(u) || firestoreService.isResettingAccount(u),
       apply: applyEntry,
       // A server read works: Auth and App Check are fine, so a permission
       // error on a change is the rules refusing it.
@@ -601,7 +602,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ensuring[what] = true;
       ensureOnServer({
         fromCache,
-        skip: () => !active || firestoreService.isDeletingAccount(fbUser.uid),
+        skip: () =>
+          !active || firestoreService.isDeletingAccount(fbUser.uid) || firestoreService.isResettingAccount(fbUser.uid),
         existsOnServer: () =>
           what === 'user'
             ? firestoreService.userDocExistsOnServer(fbUser.uid)

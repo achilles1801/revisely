@@ -669,6 +669,13 @@ service cloud.firestore {
       allow read: if isOwner(resource.data.uid);
     }
 
+    // Tester resets (functions resetMyData): how often each account reset.
+    // Written by the function only; no client reads or writes it, its own
+    // account included.
+    match /adminResets/{userId} {
+      allow read, write: if false;
+    }
+
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;

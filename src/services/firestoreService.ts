@@ -853,6 +853,47 @@ export async function deleteAccount(): Promise<void> {
 }
 
 async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>): Promise<void> {
+  await callFunction(user, 'deleteUserAccount', {});
+}
+
+// The account whose data is being reset (Settings → Reset my data, testers):
+// nothing is sent from the outbox meanwhile, and nothing missing is recreated.
+let resettingUid: string | null = null;
+export function isResettingAccount(uid: string | undefined | null): boolean {
+  return uid != null && uid === resettingUid;
+}
+export function setResettingAccount(uid: string | null): void {
+  resettingUid = uid;
+}
+
+/** What the server's tester reset did (functions resetMyData). */
+export interface TesterResetResult {
+  ok: true;
+  backup: { location: string; docs: number; files: number };
+  pages: number;
+  deleted: Record<string, number>;
+  recordings: number;
+  files: number;
+}
+
+/**
+ * Reset the signed-in account's data on the server (testers only; the function
+ * checks previewTester itself). lib/testerReset does the phone's part.
+ */
+export async function resetMyDataOnServer(): Promise<TesterResetResult> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No signed-in user.');
+  const out = (await callFunction(user, 'resetMyData', { confirm: 'RESET' })) as { result?: TesterResetResult } | null;
+  if (!out?.result?.ok) throw new Error('The reset did not answer as expected.');
+  return out.result;
+}
+
+/** Call one of our callable Cloud Functions with the account's ID token and App Check. */
+async function callFunction(
+  user: NonNullable<typeof auth.currentUser>,
+  name: string,
+  data: Record<string, unknown>,
+): Promise<unknown> {
   const idToken = await user.getIdToken(/* forceRefresh */ true);
 
   let appCheckToken: string | null = null;
@@ -863,8 +904,8 @@ async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>)
     // App Check is best-effort — function enforces it server-side.
   }
 
-  const projectId =
-    (await import('expo-constants')).default.expoConfig?.extra?.firebase?.projectId;
+  // The project the app is configured with (lib/firebase, from expo config).
+  const projectId = db.app.options.projectId;
   if (!projectId) throw new Error('Firebase projectId is not configured.');
 
   const headers: Record<string, string> = {
@@ -873,11 +914,11 @@ async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>)
   };
   if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
 
-  const url = `https://us-central1-${projectId}.cloudfunctions.net/deleteUserAccount`;
+  const url = `https://us-central1-${projectId}.cloudfunctions.net/${name}`;
   const resp = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ data: {} }),
+    body: JSON.stringify({ data }),
   });
 
   if (!resp.ok) {
@@ -890,6 +931,11 @@ async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>)
       // keep raw
     }
     throw new Error(message);
+  }
+  try {
+    return await resp.json();
+  } catch {
+    return null;
   }
 }
 

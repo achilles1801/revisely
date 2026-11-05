@@ -67,6 +67,8 @@ import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/m
 import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
+import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
+import { showsResetMyData } from '../../lib/testerReset';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
@@ -207,6 +209,7 @@ export default function SettingsScreen() {
   }, [user]);
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [resetSheet, setResetSheet] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [tempName, setTempName] = useState(user?.name ?? '');
@@ -822,6 +825,20 @@ export default function SettingsScreen() {
           <AppInfo tools={showsUpdateTools(user)} />
         </Section>
 
+        {firebaseUser && showsResetMyData(user) && (
+          <Section title="Testing">
+            <View testID="reset-data-row">
+              <Row
+                icon="refresh-outline"
+                label="Reset my data"
+                subtitle="Start again as a new account"
+                destructive
+                onPress={() => setResetSheet(true)}
+              />
+            </View>
+          </Section>
+        )}
+
         {firebaseUser && (
           <Section>
             <Row
@@ -862,6 +879,7 @@ export default function SettingsScreen() {
         testID="speech-model-delete-menu"
       />
       <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
+      {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
       <ActionSheet
         visible={mushafMenu}
         onClose={() => setMushafMenu(false)}
