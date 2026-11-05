@@ -22,7 +22,7 @@ export interface BucketLike {
 export interface FileLike {
   name: string;
   metadata: { md5Hash?: string; size?: string | number; contentType?: string; metadata?: unknown; updated?: string };
-  save(data: string, options?: { contentType?: string; resumable?: boolean }): Promise<unknown>;
+  save(data: string | Buffer, options?: { contentType?: string; resumable?: boolean }): Promise<unknown>;
   download(): Promise<[Buffer, ...unknown[]]>;
   copy(destination: string): Promise<unknown>;
   getMetadata(): Promise<[FileLike['metadata'], ...unknown[]]>;
@@ -70,13 +70,16 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
       return snap.exists ? (snap.data() as Record<string, unknown>) : null;
     },
 
-    async claim(uid, nowMs) {
+    async claim(uid, nowMs, kind = 'reset') {
       await db.runTransaction(async (tx) => {
         const ref = logRef(uid);
-        const log = ((await tx.get(ref)).data() as ResetLog | undefined) ?? null;
-        const result = claimReset(log, nowMs);
+        const doc = ((await tx.get(ref)).data() as (ResetLog & { scenario?: ResetLog }) | undefined) ?? null;
+        // A scenario load keeps its own counts, in `scenario`.
+        const log = kind === 'scenario' ? doc?.scenario ?? null : doc;
+        const result = claimReset(log, nowMs, kind);
         if (!result.ok) throw new ResetError('resource-exhausted', result.reason);
-        tx.set(ref, { ...result.next, updatedAt: Timestamp.fromMillis(nowMs) }, { merge: true });
+        const write = kind === 'scenario' ? { scenario: result.next } : result.next;
+        tx.set(ref, { ...write, updatedAt: Timestamp.fromMillis(nowMs) }, { merge: true });
       });
     },
 
@@ -87,7 +90,7 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
       const userSnap = await ref.get();
       if (userSnap.exists) docs.push({ path: ref.path, data: encode(userSnap.data()) });
       await walk(ref, docs);
-      const body = JSON.stringify({ uid, exportedAt: stampIso, reason: 'tester reset (resetMyData)', docs });
+      const body = JSON.stringify({ uid, exportedAt: stampIso, reason: 'tester reset (resetMyData or loadTestScenario)', docs });
       await bucket.file(`${dir}/firestore.json`).save(body, { contentType: 'application/json', resumable: false });
 
       const [files] = await bucket.getFiles({ prefix: recordingPrefix(uid) });
@@ -179,8 +182,9 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
       return files.length;
     },
 
-    async finish(uid, nowMs) {
-      await logRef(uid).set({ lastDoneAt: nowMs, updatedAt: Timestamp.fromMillis(nowMs) }, { merge: true });
+    async finish(uid, nowMs, kind = 'reset') {
+      const done = kind === 'scenario' ? { scenario: { lastDoneAt: nowMs } } : { lastDoneAt: nowMs };
+      await logRef(uid).set({ ...done, updatedAt: Timestamp.fromMillis(nowMs) }, { merge: true });
     },
   };
 }
