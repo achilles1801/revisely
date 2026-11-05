@@ -39,7 +39,6 @@ describe('DayBlocks loads its items once', () => {
         onDeleteRevised={jest.fn()}
         onDeleteMemorized={jest.fn()}
         onOpenRecording={jest.fn()}
-        onDeleteReading={jest.fn()}
       /> as never,
     );
     for (let i = 0; i < 20; i++) {

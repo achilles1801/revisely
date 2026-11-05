@@ -48,6 +48,8 @@ import {
 } from '../../lib/journal';
 import { logger } from '../../lib/logger';
 import { memorizeSuggestion, missedFromSession } from '../../lib/activityAdd';
+import { parsePageRange } from '../../lib/memorizationLog';
+import { RangePickerSheet } from '../../components/memorization/RangePickerSheet';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
@@ -72,7 +74,7 @@ const KIND_OPTIONS: { value: JournalKind; label: string }[] = [
   { value: 'note', label: 'Note' },
 ];
 
-type Draft = { text: string; minutes: string; tag?: string | null };
+type Draft = { text: string; minutes: string; tag?: string | null; from?: string; to?: string };
 const EMPTY_DRAFT: Draft = { text: '', minutes: '' };
 const EMPTY_DRAFTS: Record<JournalKind, Draft> = {
   memorization: EMPTY_DRAFT,
@@ -98,7 +100,7 @@ const MAX_REREADS = 6;
 export default function JournalEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ScreenRoute>();
-  const { user, logs, pages: allPages } = useApp();
+  const { user, logs, pages: allPages, updatePages } = useApp();
   const { palette } = useTheme();
   const haptics = useHaptics();
   // This screen hides the tab bar, so the bottom is the home indicator's room
@@ -312,6 +314,7 @@ export default function JournalEntryScreen() {
   }, [date]);
   // The Memorized suggestion (C4): pages read today that aren't memorized yet.
   const [readToday, setReadToday] = useState<number[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     firestoreService
@@ -350,6 +353,13 @@ export default function JournalEntryScreen() {
     const trimmed = text.trim().slice(0, journalTextMax(sendKind));
     // The minutes are for memorization and revision; a note has none.
     const minutes = sendKind === 'note' ? null : parseMinutesInput(minutesText);
+    // A Memorized entry names pages (From and To): those pages are marked memorized today.
+    const range = sendKind === 'memorization' && !editing ? parsePageRange(draft.from, draft.to) : null;
+    if (sendKind === 'memorization' && !editing && (draft.from || draft.to) && !range) {
+      Alert.alert('Check the pages', 'Type the first and last page, as numbers from 1 to 604.');
+      return;
+    }
+    const rangeLabel = range ? (range.length === 1 ? `p. ${range[0]}` : `p. ${range[0]}–${range[range.length - 1]}`) : '';
     setSaving(true);
     try {
       if (editing) {
@@ -368,18 +378,34 @@ export default function JournalEntryScreen() {
         }
         setEditing(null);
       } else {
-        if (trimmed === '' && minutes == null) return;
+        if (trimmed === '' && minutes == null && !range) return;
         if ((day?.entries.length ?? 0) >= JOURNAL_ENTRIES_PER_DAY) {
           Alert.alert('This day is full', `A day holds up to ${JOURNAL_ENTRIES_PER_DAY} entries.`);
           setSaving(false);
           return;
         }
         // Always a new note with its own id and time: Add never replaces one.
+        if (range && user) {
+          const memorizedNow = new Set((allPages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+          const changed = range.filter((p) => !memorizedNow.has(p));
+          if (changed.length > 0) {
+            const inRange = new Set(range);
+            await updatePages(
+              (allPages ?? []).map((p) =>
+                inRange.has(p.pageNumber) && p.status !== 'memorized'
+                  ? { ...p, status: 'memorized' as const, dateMemorized: new Date().toISOString() }
+                  : p,
+              ),
+              changed,
+            );
+          }
+          await queueChange({ kind: 'memorization.mark', day: getRevisionDayForUser(user), pages: range, at: Date.now() });
+        }
         const entry: JournalNote = {
           id: autoId(),
           at: Date.now(),
           kind: sendKind,
-          text: trimmed,
+          text: range ? trimmed || rangeLabel : trimmed,
           minutes,
           ...(sendKind === 'note' && noteTag ? { tag: noteTag } : {}),
         };
@@ -452,7 +478,7 @@ export default function JournalEntryScreen() {
   };
 
   // Saving an edited note with nothing left in it deletes it.
-  const canSend = (editing != null || text.trim() !== '' || minutesText !== '') && !saving && !loading && !loadFailed;
+  const canSend = (editing != null || text.trim() !== '' || minutesText !== '' || parsePageRange(draft.from, draft.to) != null) && !saving && !loading && !loadFailed;
   const field = [typeV2.body, v2.field, { color: palette.text }];
   // A hold on a note (or its VoiceOver action) opens this menu. Delete is the
   // swipe: it confirms before it removes the note.
@@ -525,7 +551,7 @@ export default function JournalEntryScreen() {
         </View>
       ) : (
         // iOS would add the home indicator's inset again: the padding below is the only one.
-        <ScrollView
+      <ScrollView
           style={styles.scroll}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           contentInsetAdjustmentBehavior="never"
@@ -617,6 +643,7 @@ export default function JournalEntryScreen() {
               ) : undefined
             }
           >
+            <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
             <PillTabs
               options={KIND_OPTIONS}
               value={composingKind}
@@ -624,6 +651,37 @@ export default function JournalEntryScreen() {
               disabled={editing != null}
               testID="journal-kind"
             />
+            {composingKind === 'memorization' && !editing && (
+              <View style={v2.fieldRow}>
+                <PillButton
+                  size="sm"
+                  variant="outline"
+                  title="Surah or juz"
+                  onPress={() => setPickerOpen(true)}
+                  testID="memorize-pick"
+                />
+                <TextInput
+                  value={draft.from ?? ''}
+                  onChangeText={(v) => setDraft({ from: v.replace(/[^0-9]/g, '') })}
+                  placeholder="From page"
+                  placeholderTextColor={palette.secondary}
+                  keyboardType="number-pad"
+                  style={[field, { flex: 1 }]}
+                  accessibilityLabel="From page"
+                  testID="memorize-from"
+                />
+                <TextInput
+                  value={draft.to ?? ''}
+                  onChangeText={(v) => setDraft({ to: v.replace(/[^0-9]/g, '') })}
+                  placeholder="To page"
+                  placeholderTextColor={palette.secondary}
+                  keyboardType="number-pad"
+                  style={[field, { flex: 1 }]}
+                  accessibilityLabel="To page"
+                  testID="memorize-to"
+                />
+              </View>
+            )}
             <View style={v2.fieldRow}>
               <TextInput
                 value={text}
@@ -717,6 +775,7 @@ export default function JournalEntryScreen() {
         actions={menuActions}
         testID="journal-note-menu"
       />
+    <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
     </TopSafeAreaView>
   );
 }
