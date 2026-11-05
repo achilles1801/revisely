@@ -181,6 +181,10 @@ How the tests are made: `tests/scenarios/README.md`.
   seconds), and leaving the screen saves any delete still waiting. A hold on a Read or Note row opens Edit and
   Copy.
 
+- **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
+  entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
+  removal is kept and retried, never dropped.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
