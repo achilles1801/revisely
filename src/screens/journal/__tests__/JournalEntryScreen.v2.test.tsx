@@ -586,6 +586,33 @@ describe('[LOG-1, LOG-2] a change already written stays until the server shows i
     expect(screen.queryByTestId('journal-note-n1')).toBeNull();
   });
 
+  it('a change the server never shows (another phone changed that note) gives way after the re-reads', async () => {
+    jest.useFakeTimers();
+    try {
+      mockService.getJournalEntry.mockResolvedValue(null); // another phone deleted it right after
+      await renderScreen();
+      await emitApplied('u1', added);
+      await emitOutbox('u1');
+      expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+      for (let i = 0; i < 8; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(10_000);
+        });
+      }
+      expect(screen.queryByTestId('journal-note-n1')).toBeNull();
+      // A later change still gets re-read: its own count starts again.
+      const calls = mockService.getJournalEntry.mock.calls.length;
+      await emitApplied('u1', { ...added, id: 'o3', op: { ...added.op, entry: { ...memo, id: 'n9' } } });
+      await emitOutbox('u1');
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+      expect(mockService.getJournalEntry.mock.calls.length).toBeGreaterThan(calls + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('another day\'s change, or another account\'s, is not laid over this day', async () => {
     await renderScreen();
     await emitApplied('u2', added);

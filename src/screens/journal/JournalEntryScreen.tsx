@@ -174,6 +174,9 @@ export default function JournalEntryScreen() {
     if (seq < shownSeq.current) return;
     shownSeq.current = seq;
     sentRef.current = sentRef.current.filter((e) => !journalChangeShown(e, entry));
+    // The last re-read still doesn't show a change: another phone changed that
+    // note since. The server's copy is the truth then.
+    if (sentRef.current.length > 0 && rereads.current >= MAX_REREADS && !rereadTimer.current) sentRef.current = [];
     setBase(entry);
     setDay(withChanges(entry));
     if (sentRef.current.length === 0) {
@@ -200,6 +203,8 @@ export default function JournalEntryScreen() {
     () => () => {
       if (rereadTimer.current) clearTimeout(rereadTimer.current);
       rereadTimer.current = null;
+      sentRef.current = [];
+      rereads.current = 0;
     },
     [date],
   );
@@ -250,6 +255,7 @@ export default function JournalEntryScreen() {
       const id = journalNoteIdOf(e.op, date);
       if (id == null) return;
       sentRef.current = [...sentRef.current.filter((s) => journalNoteIdOf(s.op, date) !== id), e];
+      rereads.current = 0; // a new change gets its own re-reads
     });
   }, [uid, date]);
 
