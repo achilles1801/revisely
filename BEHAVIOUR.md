@@ -189,6 +189,12 @@ How the tests are made: `tests/scenarios/README.md`.
   is strong. The counts on a day's Revised block are these classes, over the day's revised pages (a page with
   no rating counts as 4, strong). Confirmed by Majd, Nov 2026.
 
+- **ACT-10.** Pages marked memorized in the memorization manager, or in the Memorized composer, are logged as a
+  memorization item for the day the user chooses: Today writes them into that day's item (merged, idempotent);
+  Before (don't log) writes nothing. The manager asks "When did you memorize these?" (default Before above five
+  pages). Pages unmarked are removed from the items that hold them. The Memorized composer takes a page range
+  (From and To) and marks it in the same save.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an

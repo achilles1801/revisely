@@ -21,3 +21,19 @@ describe('the memorization manager’s change (what gets logged)', () => {
     expect(defaultWhen([1, 2, 3, 4, 5, 6])).toBe('before');
   });
 });
+
+import { parsePageRange } from '../memorizationLog';
+
+describe('the Memorized composer’s page range', () => {
+  it('a range is its pages, inclusive', () => {
+    expect(parsePageRange('5', '7')).toEqual([5, 6, 7]);
+    expect(parsePageRange('604', '604')).toEqual([604]);
+  });
+  it('a missing, backwards or out-of-book range is refused', () => {
+    expect(parsePageRange('', '7')).toBeNull();
+    expect(parsePageRange('8', '7')).toBeNull();
+    expect(parsePageRange('0', '3')).toBeNull();
+    expect(parsePageRange('600', '605')).toBeNull();
+    expect(parsePageRange('2.5', '3')).toBeNull();
+  });
+});

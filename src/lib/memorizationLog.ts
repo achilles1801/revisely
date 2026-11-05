@@ -28,3 +28,12 @@ export type WhenMemorized = 'today' | 'before';
 export function defaultWhen(marked: number[]): WhenMemorized {
   return marked.length > BEFORE_DEFAULT_ABOVE ? 'before' : 'today';
 }
+
+/** A page range typed in the Memorized composer: "From" and "To" (both pages, inclusive), or null when not valid. */
+export function parsePageRange(from: string | undefined, to: string | undefined): number[] | null {
+  const a = Number((from ?? '').trim());
+  const b = Number((to ?? '').trim());
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
+  if (a < 1 || b > 604 || a > b) return null;
+  return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+}
