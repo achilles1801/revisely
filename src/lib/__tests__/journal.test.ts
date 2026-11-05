@@ -384,4 +384,25 @@ describe('formatEntryTime', () => {
     expect(formatEntryTime(new Date(2026, 9, 20, 7, 12).getTime(), '2026-10-20')).toBe('7:12 am');
     expect(formatEntryTime(late, '2026-10-20')).toBe('12:40 am Wed');
   });
+
+  it('[LOG-3] [DAY-9] with the account, a note before Fajr is on its revision day: no other weekday named', () => {
+    // Fajr boundary on, with Fajr long after 00:40 (a place where solar time is
+    // this machine's: Fajr in the early morning, as in fajrBoundary.test).
+    const fajrUser = {
+      fajrBoundaryEnabled: true,
+      fajrCalculationMethod: 'MuslimWorldLeague',
+      locationCoords: {
+        latitude: 30,
+        longitude: Math.max(-165, Math.min(165, -new Date(2026, 9, 20, 12).getTimezoneOffset() / 4)),
+      },
+    } as never;
+    const late = new Date(2026, 9, 21, 0, 40).getTime();
+    expect(formatEntryTime(late, '2026-10-20', fajrUser)).toBe('12:40 am');
+    // The boundary off: past midnight is the next day, so it is named.
+    expect(formatEntryTime(late, '2026-10-20', { ...(fajrUser as object), fajrBoundaryEnabled: false } as never)).toBe(
+      '12:40 am Wed',
+    );
+    // A note added later to an older day's log still says when.
+    expect(formatEntryTime(new Date(2026, 9, 22, 9, 5).getTime(), '2026-10-20', fajrUser)).toBe('9:05 am Thu');
+  });
 });

@@ -38,6 +38,11 @@ How the tests are made: `tests/scenarios/README.md`.
   day the user is in, not the calendar day.
 - **DAY-8.** Wherever the phone is, and whatever location is saved, the revision day moves on one day at
   a time. It turns at the Fajr of that morning (or at midnight), and no day is skipped or repeated.
+- **DAY-9.** Activity shows everything on the revision day it was done: sessions, pages revised ahead,
+  daily-log notes, timed readings and recordings. Something done between midnight and Fajr (boundary
+  on) shows on the day before, with no other weekday named, and nothing shows on a day that hasn't
+  started. Pages revised ahead still count for the day they're scheduled on (AHEAD-2), on Home and in
+  the schedule, but Activity lists them on the day they were revised.
 
 ## The schedule
 

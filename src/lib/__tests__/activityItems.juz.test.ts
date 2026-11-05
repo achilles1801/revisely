@@ -48,7 +48,8 @@ describe('Activity names a juz-plan session of whole juz by the juz', () => {
     const items = buildActivityItems({ logs: [l] }, juzUser);
     expect(items.find((i) => i.key === 'revision-l1')?.detail).toContain('· Juz 1');
     expect(items.find((i) => i.key === 'ahead-from-l1-2026-11-05')?.detail).toBe('Pages 22–41 · Juz 2');
-    expect(items.find((i) => i.key === 'ahead-to-l1-2026-11-05')?.detail).toBe('Pages 22–41 · Juz 2');
+    // DAY-9: nothing on the later day itself (it hasn't started when they were revised).
+    expect(items.find((i) => i.key === 'ahead-to-l1-2026-11-05')).toBeUndefined();
   });
 
   it('a day whose juz was partly credited ahead earlier: this session revised only the rest, so the surahs', () => {
