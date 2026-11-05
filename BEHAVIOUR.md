@@ -201,6 +201,9 @@ How the tests are made: `tests/scenarios/README.md`.
 
 - **ACT-9.** A day's Activity items load when the day opens and again when its screen regains focus, not
   on their own: a render never starts another load (it looped and froze the app, Nov 2026).
+- **ACT-11.** A log note tagged to one of the day's items shows under that item in Activity: a Revised,
+  Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
+  While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
 
 ## Known bugs
 
