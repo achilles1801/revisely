@@ -10,7 +10,7 @@ import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { getQuranData } from '../../lib/quranData';
 import { monthGrid, monthTitle, shiftMonth } from '../../lib/activityHeatmap';
-import { coverage, consistency, dayMarks, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace, PACE_MIN_ITEMS, type Memorized, type Read, type Revised } from '../../lib/activityInsights';
+import { coverage, consistency, dayMarks, dayPattern, dayPreview, growthByMonth, juzUntouchedLongest, lastRevisedByPage, pace, PACE_MIN_ITEMS, type Memorized, type Read, type Revised } from '../../lib/activityInsights';
 import { ProgressRing } from './DayParts';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
@@ -54,6 +54,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
   useActivityReload(load);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
+  const weakPages = useMemo(() => pages.filter((p) => p.status === 'memorized' && p.weaknessRating <= 2).map((p) => p.pageNumber).sort((a, b) => a - b), [pages]);
   const juzByPage = useMemo(() => new Map(getQuranData().map((q) => [q.pageNumber, q.juzNumber])), []);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
@@ -145,6 +146,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay }: Props) {
           memorizedItems={memorized}
           read={read}
           itemDays={[...revised.map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), ...read]}
+          weakPages={weakPages}
         />
       )}
     </RNView>
@@ -183,41 +185,131 @@ function Insights(props: {
   memorizedItems: Memorized[];
   read: Read[];
   itemDays: { day: string; pages: number[]; minutes: number | null }[];
+  /** Memorized pages rated weak (1–2), for the weak-spots card. */
+  weakPages: number[];
 }) {
   const { palette } = useTheme();
   const last = useMemo(() => lastRevisedByPage(props.revised, props.today), [props.revised, props.today]);
   const cov7 = coverage(props.memorized, last, props.today, 7);
   const cov30 = coverage(props.memorized, last, props.today, 30);
   const cons = consistency([...props.revised, ...props.read], props.today, 30);
-  const growth = useMemo(() => [...growthByMonth(props.memorizedItems)].sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 3), [props.memorizedItems]);
+  const pattern = useMemo(() => dayPattern([...props.revised, ...props.read], props.today, 30), [props.revised, props.read, props.today]);
+  const growth = useMemo(() => [...growthByMonth(props.memorizedItems)].sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 6).reverse(), [props.memorizedItems]);
   const paceValue = pace(props.itemDays, props.today, 30);
   const timedCount = props.itemDays.filter((i) => i.minutes != null && i.minutes > 0).length;
   const juz = juzUntouchedLongest(props.juzOf, props.memorized, last, props.today);
   const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const maxGrowth = Math.max(1, ...growth.map(([, n]) => n));
 
   return (
     <RNView style={styles.pad} testID="activity-insights">
-      <Figure label="Coverage, last 7 days" value={pct(cov7)} note="Memorized pages revised in the last 7 days, as a share of all memorized pages." palette={palette} />
-      <Figure label="Coverage, last 30 days" value={pct(cov30)} note="The same over 30 days." palette={palette} />
-      <Figure label="Consistency" value={`${cons.days} of ${cons.of} days`} note={`Days with a revision or a read. ${cons.perWeekday.map((n, i) => `${WEEKDAYS[i]} ${n}`).join(' · ')}`} palette={palette} />
-      <Figure
-        label="Memorized per month"
-        value={growth.length ? growth.map(([m, n]) => `${m.slice(5)}: ${n}`).join('  ') : 'None yet'}
-        note="Pages memorized each month, from the memorization items."
+      <Card
+        label="Coverage"
+        value={`${pct(cov7)} this week`}
+        note="Memorized pages revised in the last 7 days, as a share of all memorized pages."
+        picture={
+          <RNView style={{ gap: 8 }}>
+            {[{ label: '7 days', v: cov7 }, { label: '30 days', v: cov30 }].map((b) => (
+              <RNView key={b.label} style={styles.barRow}>
+                <Text style={[typeV2.meta, { color: palette.secondary, width: 56 }]}>{b.label}</Text>
+                <RNView style={[styles.barTrack, { backgroundColor: palette.track }]}>
+                  <RNView style={[styles.barFill, { width: `${Math.round(b.v * 100)}%`, backgroundColor: palette.primary }]} />
+                </RNView>
+                <Text style={[typeV2.meta, { color: palette.secondary, width: 40, textAlign: 'right' }]}>{pct(b.v)}</Text>
+              </RNView>
+            ))}
+          </RNView>
+        }
         palette={palette}
       />
-      <Figure
+      <Card
+        label="Consistency"
+        value={`${cons.days} of ${cons.of} days`}
+        note="Days with a revision or a read, over the last 30."
+        picture={
+          <RNView style={styles.squares} testID="activity-consistency-picture">
+            {pattern.map((had, i) => (
+              <RNView key={i} style={[styles.square, { backgroundColor: had ? palette.primary : palette.track, opacity: had ? 1 : 0.5 }]} />
+            ))}
+          </RNView>
+        }
+        palette={palette}
+      />
+      <Card
+        label="Weak spots"
+        value={`${props.weakPages.length} ${props.weakPages.length === 1 ? 'page' : 'pages'}`}
+        note="Memorized pages rated weak (1–2)."
+        picture={
+          props.weakPages.length > 0 ? (
+            <RNView style={{ gap: 6 }}>
+              {props.weakPages.slice(0, 6).map((p) => (
+                <RNView key={p} style={styles.weakRow}>
+                  <RNView style={[styles.weakDot, { backgroundColor: palette.red }]} />
+                  <Text style={[typeV2.body, { color: palette.text }]}>p. {p}</Text>
+                </RNView>
+              ))}
+            </RNView>
+          ) : undefined
+        }
+        palette={palette}
+      />
+      <Card
+        label="Memorized per month"
+        value={growth.length ? `${growth[growth.length - 1][1]} this month` : 'None yet'}
+        note="Pages memorized each month, from the memorization items."
+        picture={
+          growth.length > 0 ? (
+            <RNView style={styles.bars}>
+              {growth.map(([m, n]) => (
+                <RNView key={m} style={styles.barCol}>
+                  <RNView style={[styles.bar, { height: Math.max(4, Math.round((n / maxGrowth) * 56)), backgroundColor: palette.primary }]} />
+                  <Text style={[typeV2.meta, { color: palette.secondary }]}>{m.slice(5)}</Text>
+                </RNView>
+              ))}
+            </RNView>
+          ) : undefined
+        }
+        palette={palette}
+      />
+      <Card
         label="Pace"
         value={paceValue != null ? `${paceValue.toFixed(1)} min per page` : `Needs ${PACE_MIN_ITEMS} timed items (${timedCount} so far)`}
         note="Minutes per page over 30 days, from items with minutes."
         palette={palette}
       />
-      <Figure
+      <Card
         label="Juz untouched longest"
         value={juz ? (juz.daysSince == null ? `Juz ${juz.juz}, never revised` : `Juz ${juz.juz}, ${juz.daysSince} days`) : 'None'}
         note="The juz whose least recently revised page is oldest."
+        outline={juz != null && (juz.daysSince == null || juz.daysSince > 30) ? palette.red : undefined}
         palette={palette}
       />
+    </RNView>
+  );
+}
+
+/** One Insights card: a label, one figure, one picture, a note. */
+function Card({
+  label,
+  value,
+  note,
+  picture,
+  outline,
+  palette,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  picture?: React.ReactNode;
+  outline?: string;
+  palette: { text: string; secondary: string; separator: string };
+}) {
+  return (
+    <RNView style={[styles.card, { borderBottomColor: palette.separator }, outline ? { borderWidth: 1.5, borderColor: outline, borderRadius: 12 } : null]}>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{label}</Text>
+      <Text style={[typeV2.title, { color: palette.text }]}>{value}</Text>
+      {picture ? <RNView style={styles.picture}>{picture}</RNView> : null}
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{note}</Text>
     </RNView>
   );
 }
@@ -233,6 +325,18 @@ function Figure({ label, value, note, palette }: { label: string; value: string;
 }
 
 const styles = StyleSheet.create({
+  card: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 4 },
+  picture: { marginTop: 8, marginBottom: 6 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barTrack: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: 8, borderRadius: 4 },
+  squares: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
+  square: { width: 12, height: 12, borderRadius: 3 },
+  weakRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  weakDot: { width: 7, height: 7, borderRadius: 4 },
+  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, height: 80 },
+  barCol: { alignItems: 'center', gap: 4 },
+  bar: { width: 14, borderRadius: 4 },
   ringWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', top: 0, left: 0 },
   preview: { marginTop: 12, gap: 10 },
