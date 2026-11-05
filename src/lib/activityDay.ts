@@ -1,8 +1,9 @@
-// The day Activity files a memorized page under (BEHAVIOUR ACT-1): the calendar
-// date in the user's own time zone, with no Fajr shift. Memorized timestamps are
-// coarse, so the boundary is not worth more than the date.
+// The day Activity files a moment under (BEHAVIOUR ACT-1): the same revision day as
+// everything else in Activity. With the Fajr boundary on and a location, the day
+// turns at Fajr; otherwise it is the calendar date in the user's own time zone.
 
 const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
 
 /** Offsets from UTC are tried in quarter hours, from UTC−12 to UTC+14. */
 const OFFSET_STEP = 15;
@@ -39,4 +40,22 @@ export function sessionOffsetMinutes(sessions: { date: string; createdAt: number
     }
   }
   return bestOffsets[Math.floor((bestOffsets.length - 1) / 2)];
+}
+
+/**
+ * The Activity day of a moment (ACT-1). `fajrOf(day)` gives the Fajr of that calendar
+ * day as epoch ms, or null when the user has no Fajr boundary (or no location, or no
+ * Fajr that day). Before that day's Fajr, the moment belongs to the day before.
+ * The zone is a fixed offset, so this is exact for zones without a clock change.
+ */
+export function activityDayAt(
+  ms: number,
+  offsetMinutes: number,
+  fajrOf: ((day: string) => number | null) | null,
+): string {
+  const day = localDayAt(ms, offsetMinutes);
+  if (!fajrOf) return day;
+  const fajr = fajrOf(day);
+  if (fajr != null && ms < fajr) return localDayAt(ms - DAY_MS, offsetMinutes);
+  return day;
 }

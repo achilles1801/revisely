@@ -149,11 +149,12 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## Activity
 
-- **ACT-1.** A memorized page is filed under the calendar date, in the user's own time zone, on
-  which it was marked memorized. There is no Fajr shift: memorized timestamps are coarse. The zone is
-  the one the user's revision sessions were written in (the offset under which each session's
-  `createdAt` falls on its `date`). With no sessions, it is the saved location's zone, estimated from
-  its longitude; with neither, UTC.
+- **ACT-1.** A memorized page is filed under the same revision day as everything else in Activity: the
+  day it is in, turning at Fajr when the user has the Fajr boundary on and a location (the moment before
+  that day's Fajr belongs to the day before). Otherwise it is the calendar day in the user's own time
+  zone, which is the zone their revision sessions were written in (the offset under which each session's
+  `createdAt` falls on its `date`); with no sessions, the saved location's zone, then UTC. (Changed Nov 5
+  2026: memorized items used to have no Fajr shift; Majd chose one day rule for all of Activity.)
 
 ## Known bugs
 
