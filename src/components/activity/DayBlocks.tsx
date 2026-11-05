@@ -24,9 +24,6 @@ import { Tap } from '../v2/Tap';
 import { ActionSheet, type SheetAction } from '../v2/ActionSheet';
 import { copyText } from '../../lib/clipboard';
 import { queueChange } from '../../lib/offline/queue';
-import { UndoQueue } from '../../lib/activityAdd';
-import { SwipeRow } from '../v2/SwipeRow';
-import { UndoToast } from '../revision/UndoToast';
 import { formatMinutes } from '../../lib/journal';
 import { Mark } from '../v2/Mark';
 import { RowText, ThreadRow } from '../v2/ThreadRow';
@@ -95,28 +92,6 @@ export function DayBlocks({
 }: Props) {
   const { pages, user } = useApp();
   const { palette } = useTheme();
-  // A note swiped away goes at once, with Undo; the delete is saved after the undo
-  // window (C4). Leaving the screen saves any delete still waiting.
-  const undoQueue = useRef(new UndoQueue());
-  const [gone, setGone] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
-  useEffect(() => () => undoQueue.current.flush(), []);
-  const deleteNote = (id: string) => {
-    setGone((g) => new Set(g).add(id));
-    setToast(id);
-    undoQueue.current.schedule(`note-${id}`, () => {
-      void queueChange({ kind: 'journal.entry.delete', date: day, id });
-    });
-  };
-  const undoDelete = (id: string) => {
-    undoQueue.current.undo(`note-${id}`);
-    setGone((g) => {
-      const next = new Set(g);
-      next.delete(id);
-      return next;
-    });
-    setToast(null);
-  };
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
   const menuFor = (title: string, text: string, edit?: () => void, del?: () => void) =>
@@ -171,8 +146,10 @@ export function DayBlocks({
   );
   if (!view) return null;
 
-  const [revised, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
-  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0;
+  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
+  const revised = revisedRaw;
+  const doneAhead = items?.doneAhead ?? [];
+  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
@@ -249,6 +226,15 @@ export function DayBlocks({
             <ThreadBranch>
               {revisionNotes.map((n) => (
                 <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+              ))}
+            </ThreadBranch>
+          )}
+          {doneAhead.length > 0 && (
+            <ThreadBranch>
+              {doneAhead.map((a) => (
+                <Text key={`ahead-${a.fromDay}`} testID="activity-done-ahead" style={[typeV2.meta, { color: palette.secondary }]}>
+                  {`Done ahead, from ${a.fromDay}: ${describePageRuns(pageRuns(a.pages))}`}
+                </Text>
               ))}
             </ThreadBranch>
           )}
@@ -359,41 +345,24 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="create-outline" />}
           name="Notes"
-          figure={notes.some((n) => !gone.has(n.id)) ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.filter((n) => !gone.has(n.id)).length}</Text> : undefined}
+          figure={notes.length > 0 ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.length}</Text> : undefined}
           lineBelow
           separator={false}
           testID="activity-block-notes"
         >
-          <ThreadBranch>{notes.filter((n) => !gone.has(n.id)).map((n) => (
-            <SwipeRow
-              key={n.id}
-              onDelete={() => deleteNote(n.id)}
-              onHold={() => menuFor('Note', n.text.trim(), onOpenLog, () => deleteNote(n.id))}
-              deleteLabel="Delete"
-              testID={`activity-note-${n.id}`}
-            >
-              <Tap
-                onPress={onOpenLog}
-                onLongPress={() => menuFor('Note', n.text.trim(), onOpenLog, () => deleteNote(n.id))}
-                accessibilityRole="button"
-                accessibilityLabel="Daily log. Open the log"
-              >
+          <ThreadBranch>
+            {notes.map((n) => (
+              // Editing happens in the log: a note here only opens it (no swipe, no menu).
+              <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel="Daily log. Open the log">
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                 <RowText numberOfLines={4}>{n.text.trim()}</RowText>
               </Tap>
-            </SwipeRow>
-          ))}</ThreadBranch>
+            ))}
+          </ThreadBranch>
         </ThreadRow>
       )}
       <WindowFooter text={footerText} />
-      <UndoToast
-        visible={toast != null}
-        message="Note deleted"
-        actionLabel="Undo"
-        onUndo={() => toast && undoDelete(toast)}
-        onDismiss={() => setToast(null)}
-        duration={5000}
-      />
+
       <ActionSheet
         visible={menu != null}
         onClose={() => setMenu(null)}
