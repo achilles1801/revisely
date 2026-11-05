@@ -14,6 +14,7 @@ appId: com.revisionbuddy.app
     times: 36
     commands:
       - runFlow: open-link-prompt.yaml
+      - runFlow: system-alert.yaml
       - extendedWaitUntil:
           visible:
             id: auth

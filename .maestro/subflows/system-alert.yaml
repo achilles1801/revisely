@@ -1,0 +1,12 @@
+# A system permission alert (iOS), confirmed with "Allow". Maestro grants the
+# app's permissions as it installs it, but on a CI Simulator the microphone's
+# grant once didn't take (Nov 5): its alert stopped the recording, and, left
+# up, it covered the next attempt's sign-in screen.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+      visible: ".*would like to access.*"
+    commands:
+      - tapOn: "Allow"
