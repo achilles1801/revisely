@@ -48,6 +48,7 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { Tap } from '../../components/v2/Tap';
 import { dayOfMonth } from '../../lib/dayAgo';
 import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
+import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
@@ -59,6 +60,18 @@ function formatTimeOfDay(ms: number): string {
 
 // 'YYYY-MM-DD' as a local date; new Date('YYYY-MM-DD') is UTC midnight,
 // which shows the previous day west of Greenwich.
+/** "3 ahead for Tue": a session's pages revised ahead, by the day they count for. */
+function aheadSummary(log: RevisionLog): string | null {
+  const parts = Object.entries(log.ahead ?? {})
+    .filter(([day, pages]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && pages.length > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, pages]) => {
+      const [y, m, d] = day.split('-').map(Number);
+      return `${pages.length} ahead for ${new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' })}`;
+    });
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
 function formatLongDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', {
@@ -143,11 +156,6 @@ export default function ActivityDayScreen() {
     () => logs.filter((l) => l.date === date && isRevisionActivity(l)),
     [logs, date],
   );
-  const aheadPages = useMemo(() => {
-    const pages = new Set<number>();
-    for (const l of logs) for (const p of l.ahead?.[date] ?? []) pages.add(p);
-    return [...pages];
-  }, [logs, date]);
 
   const savePages = async (session: ReadingSession, pages: number[]) => {
     setReadings((prev) => prev.map((s) => (s.id === session.id ? { ...s, pages } : s)));
@@ -217,6 +225,9 @@ export default function ActivityDayScreen() {
     ...(blocks ? [] : revisions.map((log): Reply => {
       const runs = pageRuns(log.pagesRevised);
       const n = log.pagesRevised.length;
+      // Pages revised ahead (lib/aheadCredit) were revised here, in this
+      // session: they show on this day, never on the day they count for (DAY-9).
+      const ahead = aheadSummary(log);
       return {
         key: log.id,
         mark: <Mark size="reply" done />,
@@ -224,36 +235,15 @@ export default function ActivityDayScreen() {
         meta: log.durationMinutes != null ? formatMinutes(log.durationMinutes) : undefined,
         body: (
           <RowText secondary numberOfLines={2}>
-            {`${describePageRuns(runs)} · ${describeRevised(log.pagesRevised, { juzPlan })}${
+            {`${describePageRuns(runs)} · ${describeRevised(ownRevised(log), { juzPlan })}${
               log.pagesSkipped.length > 0 ? ` · ${log.pagesSkipped.length} skipped` : ''
-            }`}
+            }${ahead ? ` · ${ahead}` : ''}`}
           </RowText>
         ),
         onPress: () => setEditingLog(log),
-        a11y: `Revision session, ${n} pages revised. Edit`,
+        a11y: `Revision session, ${n} pages revised${ahead ? `, ${ahead}` : ''}. Edit`,
       };
     })),
-    // Pages of this day revised ahead, in an earlier session (lib/aheadCredit).
-    ...(aheadPages.length > 0
-      ? [
-          (() => {
-            const runs = pageRuns(aheadPages);
-            const n = aheadPages.length;
-            return {
-              key: `ahead-${date}`,
-              mark: <Mark size="reply" done />,
-              name: `${n} ${n === 1 ? 'page' : 'pages'} done ahead`,
-              body: (
-                <RowText secondary numberOfLines={2}>
-                  {`${describePageRuns(runs)} · ${describeRevised(aheadPages, { juzPlan })}`}
-                </RowText>
-              ),
-              onPress: () => undefined,
-              a11y: `${n} ${n === 1 ? 'page' : 'pages'} done ahead, revised in an earlier session`,
-            } as Reply;
-          })(),
-        ]
-      : []),
     ...readings.map((r): Reply => ({
       key: r.id,
       mark: <Mark size="reply" icon="stopwatch-outline" />,
@@ -279,7 +269,7 @@ export default function ActivityDayScreen() {
     ...(journal
       ? journal.entries.filter((n) => !(blocks && (n.kind === 'revision' || n.kind === 'memorization'))).map((n): Reply => {
           const text = n.text.trim();
-          const time = formatEntryTime(n.at, date);
+          const time = formatEntryTime(n.at, date, user);
           return {
             key: `journal-${n.id}`,
             mark: <Mark size="reply" icon={JOURNAL_KIND_ICONS[n.kind]} />,
