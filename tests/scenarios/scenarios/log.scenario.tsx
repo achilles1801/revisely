@@ -89,7 +89,8 @@ it('[LOG-3] [DAY-2] after midnight, before Fajr, a note goes to the revision day
   await app.close();
 });
 
-it('[LOG-1] two notes sent back to back, the second before the first has shown: both stay', async () => {
+// Three times: the flicker is a race, and a single pass can miss it.
+for (let rep = 0; rep < 3; rep++) it(`[LOG-1] two notes sent back to back, the second before the first has shown: both stay (${rep + 1})`, async () => {
   setZone(ZONES.london);
   setNow('2026-11-02 20:00');
   const phone = new Phone();

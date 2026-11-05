@@ -135,11 +135,34 @@ export default function JournalEntryScreen() {
   // sending). A newer read that fails (offline) leaves an older answer standing.
   const readSeq = useRef(0);
   const shownSeq = useRef(0);
-  const showRead = (seq: number, entry: JournalEntry | null) => {
-    if (seq < shownSeq.current) return;
+  // An older read that answers while a newer one is still out is held, not shown:
+  // it can predate a note just sent, and showing it would drop that note from view
+  // until the newer read lands (seen in CI: the second of two back-to-back notes
+  // flickered out). The newest read shows it; if that one fails, the held answer does.
+  const held = useRef<{ seq: number; entry: JournalEntry | null } | null>(null);
+  const settle = (seq: number, entry: JournalEntry | null) => {
+    held.current = null;
     shownSeq.current = seq;
     setBase(entry);
     setDay(withPendingJournalDay(date, entry));
+  };
+  // The newest read, once it has failed: an older answer then stands (offline).
+  const failedSeq = useRef(0);
+  const showRead = (seq: number, entry: JournalEntry | null) => {
+    if (seq < shownSeq.current) return;
+    if (seq < readSeq.current && failedSeq.current !== readSeq.current) {
+      held.current = { seq, entry };
+      return;
+    }
+    settle(seq, entry);
+  };
+  // A read that failed: the newest one shows the held answer, if there is one.
+  const failedRead = (seq: number): boolean => {
+    if (seq === readSeq.current) failedSeq.current = seq;
+    const h = held.current;
+    if (seq !== readSeq.current || !h || h.seq <= shownSeq.current) return false;
+    settle(h.seq, h.entry);
+    return true;
   };
 
   useEffect(() => {
@@ -152,7 +175,7 @@ export default function JournalEntryScreen() {
         if (!cancelled) showRead(seq, entry);
       })
       .catch((err) => {
-        if (cancelled || seq < shownSeq.current) return;
+        if (cancelled || seq < shownSeq.current || failedRead(seq)) return;
         const waiting = withPendingJournalDay(date, null);
         if (waiting) return setDay(waiting);
         logger.warn('Failed to load journal day', err);
@@ -180,7 +203,7 @@ export default function JournalEntryScreen() {
       firestoreService
         .getJournalEntry(date)
         .then((entry) => showRead(seq, entry))
-        .catch(() => undefined); // offline: the changes still waiting stay laid over the last copy
+        .catch(() => failedRead(seq)); // offline: the changes still waiting stay laid over the last copy
     });
   }, [uid, date]);
 
