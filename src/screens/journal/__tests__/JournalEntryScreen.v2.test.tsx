@@ -271,21 +271,33 @@ describe('adding, editing and deleting notes', () => {
     alert.mockRestore();
   });
 
-  it("offers the day's session for a revision, filling its text and minutes", async () => {
-    mockApp.logs = [{ id: 'l1', date: '2026-10-20', pagesRevised: [3, 4], pagesSkipped: [], weaknessUpdates: [], durationMinutes: 25 }];
+  it("offers what the day's session missed for a revision (its skipped pages), filling its text", async () => {
+    mockApp.pages = [3, 4, 5, 6].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+    mockApp.logs = [{ id: 'l1', date: '2026-10-20', pagesRevised: [3, 4], pagesSkipped: [5, 6], weaknessUpdates: [], durationMinutes: 25 }];
     await renderScreen();
     fireEvent.press(screen.getByText('Revised'));
     const chip = screen.getByTestId('journal-suggestion');
     fireEvent.press(chip);
-    // In words, not the old "2p" shorthand.
+    // In words, not the old "2p" shorthand. The session's own pages and minutes are not copied.
     expect(screen.getByTestId('journal-text-input').props.value).toMatch(/^2 pages\b/);
-    expect(screen.getByLabelText('Minutes').props.value).toBe('25');
+    expect(screen.getByLabelText('Minutes').props.value).toBe('');
+  });
+
+  it('a session that missed nothing offers no chip', async () => {
+    mockApp.pages = [3, 4].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+    mockApp.logs = [{ id: 'l1', date: '2026-10-20', pagesRevised: [3, 4], pagesSkipped: [], weaknessUpdates: [], durationMinutes: 25 }];
+    await renderScreen();
+    fireEvent.press(screen.getByText('Revised'));
+    expect(screen.queryByTestId('journal-suggestion')).toBeNull();
   });
 });
 
 describe('the session suggestion is added once', () => {
-  const SESSION = { id: 'l1', date: '2026-10-20', pagesRevised: [3, 4], pagesSkipped: [], weaknessUpdates: [], durationMinutes: 25 };
-  const SUMMARY = summarizeRevisedPages([3, 4]);
+  const SESSION = { id: 'l1', date: '2026-10-20', pagesRevised: [3, 4], pagesSkipped: [5, 6], weaknessUpdates: [], durationMinutes: 25 };
+  const SUMMARY = summarizeRevisedPages([5, 6]);
+  beforeEach(() => {
+    mockApp.pages = [3, 4, 5, 6].map((pageNumber) => ({ pageNumber, status: 'memorized' }));
+  });
 
   it('Add from the chip hides it: the same revision is not offered twice', async () => {
     mockApp.logs = [SESSION];
@@ -307,7 +319,7 @@ describe('the session suggestion is added once', () => {
     expect(queuedOps()).toEqual([
       expect.objectContaining({
         kind: 'journal.entry.add',
-        entry: expect.objectContaining({ kind: 'revision', text: SUMMARY, minutes: 25 }),
+        entry: expect.objectContaining({ kind: 'revision', text: SUMMARY, minutes: null }),
       }),
     ]);
     // The log now holds that revision: the chip is gone.

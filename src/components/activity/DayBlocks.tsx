@@ -14,6 +14,13 @@ import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import type { JournalNote, ReadingSession } from '../../types';
 import { Tap } from '../v2/Tap';
+import { ActionSheet } from '../v2/ActionSheet';
+import { copyText } from '../../lib/clipboard';
+import { queueChange } from '../../lib/offline/queue';
+import { UndoQueue } from '../../lib/activityAdd';
+import { SwipeRow } from '../v2/SwipeRow';
+import { UndoToast } from '../revision/UndoToast';
+import { useEffect, useRef } from 'react';
 import { formatMinutes } from '../../lib/journal';
 import { Mark } from '../v2/Mark';
 import { RowText, ThreadRow } from '../v2/ThreadRow';
@@ -38,6 +45,30 @@ interface Props {
 export function DayBlocks({ day, revisionNotes, memorizationNotes, readings, notes, onEditReading, onOpenLog }: Props) {
   const { pages } = useApp();
   const { palette } = useTheme();
+  // A note swiped away goes at once, with Undo; the delete is saved after the undo
+  // window (C4). Leaving the screen saves any delete still waiting.
+  const undoQueue = useRef(new UndoQueue());
+  const [gone, setGone] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => () => undoQueue.current.flush(), []);
+  const deleteNote = (id: string) => {
+    setGone((g) => new Set(g).add(id));
+    setToast(id);
+    undoQueue.current.schedule(`note-${id}`, () => {
+      void queueChange({ kind: 'journal.entry.delete', date: day, id });
+    });
+  };
+  const undoDelete = (id: string) => {
+    undoQueue.current.undo(`note-${id}`);
+    setGone((g) => {
+      const next = new Set(g);
+      next.delete(id);
+      return next;
+    });
+    setToast(null);
+  };
+  // A hold on a Read or Notes row opens its menu (C4): Edit, and Copy of the row's text.
+  const [menu, setMenu] = useState<{ title: string; text: string; edit: () => void } | null>(null);
   const [items, setItems] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsForDay>> | null>(null);
 
   const load = () => {
@@ -118,7 +149,16 @@ export function DayBlocks({ day, revisionNotes, memorizationNotes, readings, not
           {readItems.items.map((i) => {
             const session = readings.find((r) => r.id === i.id);
             return (
-              <Tap key={i.id} onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`Timed session. Edit pages`}>
+              <Tap
+                key={i.id}
+                onPress={() => session && onEditReading(session)}
+                onLongPress={() => {
+                  const line = [i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'No pages yet', i.minutes != null ? formatMinutes(i.minutes) : null].filter(Boolean).join(' · ');
+                  if (session) setMenu({ title: 'Read', text: line, edit: () => onEditReading(session) });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Timed session. Edit pages`}
+              >
                 <RowText secondary>
                   {[i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'No pages yet', i.minutes != null ? formatMinutes(i.minutes) : null].filter(Boolean).join(' · ')}
                 </RowText>
@@ -135,13 +175,48 @@ export function DayBlocks({ day, revisionNotes, memorizationNotes, readings, not
           separator={false}
           testID="activity-block-notes"
         >
-          {notes.map((n) => (
-            <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel="Daily log. Open the log">
-              <RowText numberOfLines={4}>{n.text.trim()}</RowText>
-            </Tap>
+          {notes.filter((n) => !gone.has(n.id)).map((n) => (
+            <SwipeRow
+              key={n.id}
+              onDelete={() => deleteNote(n.id)}
+              onHold={() => setMenu({ title: 'Note', text: n.text.trim(), edit: onOpenLog })}
+              deleteLabel="Delete"
+              testID={`activity-note-${n.id}`}
+            >
+              <Tap
+                onPress={onOpenLog}
+                onLongPress={() => setMenu({ title: 'Note', text: n.text.trim(), edit: onOpenLog })}
+                accessibilityRole="button"
+                accessibilityLabel="Daily log. Open the log"
+              >
+                <RowText numberOfLines={4}>{n.text.trim()}</RowText>
+              </Tap>
+            </SwipeRow>
           ))}
         </ThreadRow>
       )}
+      <UndoToast
+        visible={toast != null}
+        message="Note deleted"
+        actionLabel="Undo"
+        onUndo={() => toast && undoDelete(toast)}
+        onDismiss={() => setToast(null)}
+        duration={5000}
+      />
+      <ActionSheet
+        visible={menu != null}
+        onClose={() => setMenu(null)}
+        title={menu?.title}
+        actions={
+          menu
+            ? [
+                { key: 'edit', label: 'Edit', icon: 'create-outline', onPress: menu.edit },
+                { key: 'copy', label: 'Copy', icon: 'copy-outline', onPress: () => copyText(menu.text) },
+              ]
+            : []
+        }
+        testID="activity-row-menu"
+      />
     </>
   );
 }

@@ -30,6 +30,7 @@ import { createPagerTabNavigator } from './PagerTabs';
 import { insightsTab, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
+import type { JournalKind } from '../types';
 
 export type MainTabParamList = {
   // Non-screen code (the timer) opens a day of Activity on the Home stack.
@@ -63,7 +64,7 @@ export type HomeStackParamList = {
   ActivityAll: { kind?: ActivityKind } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
-  JournalEntry: { date?: string } | undefined;
+  JournalEntry: { date?: string; kind?: JournalKind } | undefined;
   // Settings → Prayer (testers).
   PrayerCalculation: undefined;
   PrayerNotifications: undefined;
