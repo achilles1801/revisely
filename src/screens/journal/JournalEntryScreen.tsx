@@ -32,6 +32,7 @@ import { queueChange, withPendingJournalDay } from '../../lib/offline/queue';
 import { subscribeOutbox } from '../../lib/offline/outbox';
 import { onApplied } from '../../lib/offline/sync';
 import type { OutboxEntry, OutboxOp } from '../../lib/offline/ops';
+import { journalChangeShown, journalNoteIdOf, unshownChanges } from '../../lib/journalLocal';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
   JOURNAL_ENTRIES_PER_DAY,
@@ -90,25 +91,6 @@ const PLACEHOLDER: Record<JournalKind, string> = {
 // Re-reading the day while the server's copy is behind: after 1.5 s, 3 s, …
 const REREAD_MS = 1500;
 const MAX_REREADS = 6;
-
-/** The note a change of `date`'s log is about, or null for any other change. */
-export function journalNoteIdOf(op: OutboxOp, date: string): string | null {
-  if (op.kind === 'journal.entry.add' || op.kind === 'journal.entry.edit') return op.date === date ? op.entry.id : null;
-  if (op.kind === 'journal.entry.delete') return op.date === date ? op.id : null;
-  return null;
-}
-
-/** Whether the server's copy of the day already shows a written change. */
-export function journalChangeShown(e: OutboxEntry, day: JournalEntry | null): boolean {
-  const op = e.op;
-  const notes = day?.entries ?? [];
-  if (op.kind === 'journal.entry.add' || op.kind === 'journal.entry.edit') {
-    const n = notes.find((x) => x.id === op.entry.id);
-    return n != null && n.text === op.entry.text && n.minutes === op.entry.minutes && n.kind === op.entry.kind;
-  }
-  if (op.kind === 'journal.entry.delete') return !notes.some((x) => x.id === op.id);
-  return true;
-}
 
 export default function JournalEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -173,7 +155,7 @@ export default function JournalEntryScreen() {
   const showRead = (seq: number, entry: JournalEntry | null) => {
     if (seq < shownSeq.current) return;
     shownSeq.current = seq;
-    sentRef.current = sentRef.current.filter((e) => !journalChangeShown(e, entry));
+    sentRef.current = unshownChanges(entry, sentRef.current);
     // The last re-read still doesn't show a change: another phone changed that
     // note since. The server's copy is the truth then.
     if (sentRef.current.length > 0 && rereads.current >= MAX_REREADS && !rereadTimer.current) sentRef.current = [];
