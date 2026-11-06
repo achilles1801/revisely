@@ -50,6 +50,8 @@ interface Props {
   onDeleteMemorized: (item: { id: string; day: string; pages: number[] }) => void;
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
+  /** Deletes a timed session (the screen confirms first). */
+  onDeleteReading: (session: ReadingSession) => void;
 }
 
 /** "8:05 – 8:23 AM": from the start to the start plus the minutes; the start alone when not known. */
@@ -89,6 +91,7 @@ export function DayBlocks({
   onDeleteRevised,
   onDeleteMemorized,
   onOpenRecording,
+  onDeleteReading,
 }: Props) {
   const { pages, user } = useApp();
   const { palette } = useTheme();
@@ -103,12 +106,23 @@ export function DayBlocks({
         ...(del ? [{ key: 'delete', label: 'Delete', icon: 'trash-outline' as const, destructive: true, onPress: del }] : []),
       ],
     });
+  // A block header holds a menu (Edit / Delete, confirmed where it deletes); VoiceOver offers the
+  // same actions as custom actions. Sub-rows under a block have no hold and no swipe: notes are
+  // edited and deleted in the daily log (Activity spec, row interactions).
+  const headerMenu = (title: string, actions: SheetAction[]) =>
+    actions.length === 0
+      ? {}
+      : {
+          onLongPress: () => setMenu({ title, actions }),
+          a11yActions: actions.map((a) => ({ name: a.key, label: a.label })),
+          onA11yAction: (name: string) => actions.find((a) => a.key === name)?.onPress(),
+        };
   const [items, setItems] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsForDay>> | null>(null);
 
   // The day's recordings hang off their block: revision ones under Revised, reading ones under Read.
   const [recs, setRecs] = useState<RecordingMeta[]>([]);
   // Stable: useActivityReload runs `load` in a focus effect keyed on it, so a new function
-  // each render reloaded the day on every render, forever (see DayBlocksLoad.test.tsx).
+  // each render reloaded the day on every render, forever (ACT-9).
   const load = useCallback(() => {
     firestoreService
       .getActivityItemsForDay(day)
@@ -154,6 +168,50 @@ export function DayBlocks({
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
 
+  const memorizedMenu = headerMenu(
+    'Memorized',
+    memorized.items.map((i) => ({
+      key: `delete-${i.id}`,
+      label: `Delete ${describePageRuns(pageRuns(i.pages))}`,
+      icon: 'trash-outline' as const,
+      destructive: true,
+      onPress: () =>
+        confirmDelete(
+          'Delete this memorization?',
+          `${describePageRuns(pageRuns(i.pages))} go back to not memorized.`,
+          () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
+        ),
+    })),
+  );
+  const readMenu = headerMenu(
+    'Read',
+    readItems.items.flatMap((i) => {
+      const session = readings.find((r) => r.id === i.id);
+      if (!session) return [];
+      const label = timeRange(i.occurredAt, i.minutes) || (i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'session');
+      return [
+        { key: `edit-${i.id}`, label: `Edit ${label}`, icon: 'create-outline' as const, onPress: () => onEditReading(session) },
+        { key: `delete-${i.id}`, label: `Delete ${label}`, icon: 'trash-outline' as const, destructive: true, onPress: () => onDeleteReading(session) },
+      ];
+    }),
+  );
+  // The block headers' menus: Revised (its session), Memorized (each entry), Read (each timed session).
+  const revisedMenu = revisedLog
+    ? headerMenu('Revised', [
+        {
+          key: 'delete',
+          label: 'Delete this session',
+          icon: 'trash-outline' as const,
+          destructive: true,
+          onPress: () =>
+            confirmDelete(
+              'Delete this session?',
+              `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
+              () => onDeleteRevised(revisedLog),
+            ),
+        },
+      ])
+    : {};
   return (
     <>
       {hasRevised && (
@@ -165,6 +223,7 @@ export function DayBlocks({
             />
           }
           name="Revised"
+          {...revisedMenu}
           figure={
             revised.assigned.length > 0 ? (
               <Text style={[typeV2.name, { color: palette.text }]}>{`${revised.revised.length} of ${revised.assigned.length}`}</Text>
@@ -188,34 +247,6 @@ export function DayBlocks({
               />
               <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
             </>
-          )}
-          {revised.assigned.length === 0 && revised.revised.length > 0 && (
-            <Tap
-              onLongPress={() =>
-                revisedLog &&
-                setMenu({
-                  title: 'Revised',
-                  actions: [
-                    {
-                      key: 'delete',
-                      label: 'Delete this session',
-                      icon: 'trash-outline',
-                      destructive: true,
-                      onPress: () =>
-                        confirmDelete(
-                          'Delete this session?',
-                          `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
-                          () => onDeleteRevised(revisedLog),
-                        ),
-                    },
-                  ],
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Revised. Hold for Delete"
-            >
-              <RowText secondary>{describePageRuns(pageRuns(revised.revised))}</RowText>
-            </Tap>
           )}
           {revised.credits.map((c) => (
             <RowText key={c.countsFor} secondary>
@@ -249,6 +280,7 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="bookmark-outline" />}
           name="Memorized"
+          {...memorizedMenu}
           figure={
             memorized.items.length > 0 ? (
               <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(memorized.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
@@ -261,32 +293,9 @@ export function DayBlocks({
           testID="activity-block-memorized"
         >
           {memorized.items.map((i) => (
-            <Tap
-              key={i.id}
-              onLongPress={() =>
-                setMenu({
-                  title: 'Memorized',
-                  actions: [
-                    {
-                      key: 'delete',
-                      label: 'Delete this entry',
-                      icon: 'trash-outline',
-                      destructive: true,
-                      onPress: () =>
-                        confirmDelete(
-                          'Delete this memorization?',
-                          `${describePageRuns(pageRuns(i.pages))} go back to not memorized.`,
-                          () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
-                        ),
-                    },
-                  ],
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Memorized. Hold for Delete"
-            >
+            <View key={i.id}>
               <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>
-            </Tap>
+            </View>
           ))}
           {memorizationNotes.length > 0 && (
             <ThreadBranch>
@@ -301,6 +310,7 @@ export function DayBlocks({
         <ThreadRow
           mark={<Mark size="reply" icon="stopwatch-outline" />}
           name="Read"
+          {...readMenu}
           figure={
             readItems.items.length > 0 ? (
               <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(readItems.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
@@ -318,10 +328,6 @@ export function DayBlocks({
               <Tap
                 key={i.id}
                 onPress={() => session && onEditReading(session)}
-                onLongPress={() => {
-                  const line = [i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'No pages yet', i.minutes != null ? formatMinutes(i.minutes) : null].filter(Boolean).join(' · ');
-                  if (session) menuFor('Read', line, () => onEditReading(session));
-                }}
                 accessibilityRole="button"
                 accessibilityLabel={`Timed session. Edit pages`}
               >
@@ -353,7 +359,12 @@ export function DayBlocks({
           <ThreadBranch>
             {notes.map((n) => (
               // Editing happens in the log: a note here only opens it (no swipe, no menu).
-              <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel="Daily log. Open the log">
+              <Tap
+                key={n.id}
+                onPress={onOpenLog}
+                accessibilityRole="button"
+                accessibilityLabel="Daily log. Open the log"
+              >
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                 <RowText numberOfLines={4}>{n.text.trim()}</RowText>
               </Tap>
@@ -362,7 +373,6 @@ export function DayBlocks({
         </ThreadRow>
       )}
       <WindowFooter text={footerText} />
-
       <ActionSheet
         visible={menu != null}
         onClose={() => setMenu(null)}
