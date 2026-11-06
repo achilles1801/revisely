@@ -6,9 +6,9 @@
 // The widget shows the day whose span holds "now", so it rolls over at fajr (or
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
-import { generateDailyAssignment } from '../algorithm';
-import { creditedOnDay } from '../aheadCredit';
-import { daysDoneAhead } from '../aheadPlan';
+import { generateDailyAssignment, getPagesForDay } from '../algorithm';
+import { creditedOnDay, creditIndex } from '../aheadCredit';
+import { aliveStreak, completedDays } from '../streak';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
@@ -164,20 +164,7 @@ function previousDay(s: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/**
- * Days in a row with a session, ending at `day` if it has one, or else at the day
- * before: a streak stays alive until the day is over. (Home counts the same days,
- * from the first session of the day.)
- */
-export function aliveStreak(logDays: ReadonlySet<string>, day: string): number {
-  let cursor = logDays.has(day) ? day : previousDay(day);
-  let streak = 0;
-  while (logDays.has(cursor)) {
-    streak++;
-    cursor = previousDay(cursor);
-  }
-  return streak;
-}
+export { aliveStreak };
 
 export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   const base = {
@@ -191,11 +178,13 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   };
   if (!input.signedIn || !input.user) return { ...base, state: 'signedOut', days: [] };
   const user = input.user;
-  const memorizedCount = input.pages.filter((p) => p.status === 'memorized').length;
+  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const memorizedCount = memorized.length;
   if (!input.onboardingComplete || memorizedCount === 0) return { ...base, state: 'noPlan', days: [] };
 
   // A day with a session, or whose pages were all revised ahead, is a day done.
-  const logDays = new Set([...input.logs.map((l) => l.date), ...daysDoneAhead(user, input.pages, input.logs)]);
+  const logOf = new Map(input.logs.map((l) => [l.date, l]));
+  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? getPagesForDay(user, localDay(d), memorized));
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -220,7 +209,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       total,
       done: completed ? total : doneHere,
       completed,
-      streak: aliveStreak(logDays, day),
+      streak: aliveStreak(done, day),
     });
     // Never stall: a boundary that isn't later (an odd clock) moves on a day.
     startsAt = endsAt.getTime() > startsAt.getTime() ? endsAt : new Date(startsAt.getTime() + 86_400_000);

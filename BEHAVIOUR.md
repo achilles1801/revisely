@@ -63,7 +63,9 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SESS-1.** Swiping off a page marks it revised, the last page by swiping onto the end card. The
   check marks or unmarks the page on screen.
 - **SESS-2.** A day is done when all its pages are credited to it. Home then says Done, and the streak
-  counts the day.
+  counts the day. The streak counts back from
+  today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
+  widget and the reminders share this rule (lib/streak).
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,

@@ -59,7 +59,9 @@ import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
 import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
-import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
+import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
+import { streakFromLogs } from '../../lib/streak';
+import { dateToLocalISODay } from '../../lib/schedulePlans';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
@@ -203,31 +205,11 @@ export default function DashboardScreen() {
     registerForPushNotificationsAsync();
   }, []);
 
-  const calculatedStreak = useMemo(() => {
-    if (logs.length === 0) return 0;
-    // Log dates are revision days ('YYYY-MM-DD'), so count back from the
-    // revision day, parsing them as local dates: `new Date('YYYY-MM-DD')` is
-    // UTC midnight, the previous evening west of Greenwich.
-    const localDay = (s: string) => {
-      const [y, m, d] = s.split('-').map(Number);
-      return new Date(y, m - 1, d).getTime();
-    };
-    // A day whose pages were all revised ahead is a day done, so it keeps the streak.
-    const days = new Set<string>(logs.map((l) => l.date));
-    if (user) for (const day of daysDoneAhead(user, pages, logs)) days.add(day);
-    const sortedDays = [...days].map(localDay).sort((a, b) => b - a);
-    let streak = 0;
-    for (const logDay of sortedDays) {
-      const expectedDate = new Date(revisionDate);
-      expectedDate.setDate(revisionDate.getDate() - streak);
-      if (logDay === expectedDate.getTime()) {
-        streak++;
-      } else if (logDay < expectedDate.getTime()) {
-        break;
-      }
-    }
-    return streak;
-  }, [logs, revisionDate, user, pages]);
+  // The streak (lib/streak): the same rule and the same answer as the widget.
+  const calculatedStreak = useMemo(
+    () => (user ? streakFromLogs({ user, pages, logs, today: dateToLocalISODay(revisionDate) }) : 0),
+    [logs, revisionDate, user, pages],
+  );
 
   // Sessions
   const sessionLogs = useMemo(
