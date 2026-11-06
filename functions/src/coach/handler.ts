@@ -36,7 +36,7 @@ export interface CoachStore {
   /** Adds `amount` to the month's spend if it stays within `cap`. False when it would not. */
   reserveSpend(month: string, amount: number, cap: number): Promise<boolean>;
   /** Replaces a reservation with the real cost and adds the call's tokens to the ledger. */
-  settleSpend(month: string, reserved: number, actual: number, usage: CallLedger): Promise<void>;
+  settleSpend(month: string, reserved: number, actual: number, usage: CallLedger, day: string): Promise<void>;
 }
 
 /** What the usage ledger keeps: token counts and calls, never content. */
@@ -127,7 +127,7 @@ export async function handleAskCoach(
   try {
     reply = await deps.call(request);
   } catch (err) {
-    await deps.store.settleSpend(month, reserved, 0, { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+    await deps.store.settleSpend(month, reserved, 0, { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, today);
     await deps.store.releaseQuestion(uid, today);
     const code = err instanceof CoachCallError ? err.status : null;
     deps.log({ event: 'failed', insight, code: code == null ? 'network' : String(code) });
@@ -136,7 +136,7 @@ export async function handleAskCoach(
 
   const actual = costUsd(reply.usage);
   const ledger = ledgerOf(reply.usage);
-  await deps.store.settleSpend(month, reserved, actual, ledger);
+  await deps.store.settleSpend(month, reserved, actual, ledger, today);
   await deps.store.setAnswer(uid, insight, day, reply.text);
   deps.log({
     event: 'answer',

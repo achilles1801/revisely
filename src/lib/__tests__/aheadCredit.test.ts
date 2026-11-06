@@ -167,6 +167,16 @@ describe('recomputePagesFromLogs', () => {
 
 describe('credit is only for pages the session has revised', () => {
   const at = Date.UTC(2026, 10, 3, 10);
+  it('[SESS-7] a catch-up page the session checked keeps its credit, though it is not in pagesRevised', () => {
+    // Page 236 is a catch-up (credited to 11-04, not revised today): checked, so its credit stays.
+    const kept = mergeSessionAdd(null, { ...add, pagesRevised: [6], ahead: { '2026-11-04': [236] }, checked: [6, 236] }, at);
+    expect(kept.ahead).toEqual({ '2026-11-04': [236] });
+    expect(kept.pagesRevised).toEqual([6]);
+    // Unchecked (not in the checked set any more): its credit goes.
+    const dropped = mergeSessionAdd(null, { ...add, pagesRevised: [6], ahead: { '2026-11-04': [236] }, checked: [6] }, at);
+    expect(dropped.ahead).toBeUndefined();
+  });
+
   const add = {
     kind: 'session.add' as const,
     date: '2026-11-03',

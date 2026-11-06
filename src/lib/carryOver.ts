@@ -37,6 +37,8 @@ function addDays(isoDay: string, delta: number): string {
 /** The pages to catch up on, and the days they were scheduled for. */
 export interface Leftovers {
   pages: number[];
+  /** Each leftover page's day (page → 'YYYY-MM-DD'): the day it was scheduled for. Its credit goes there. */
+  from: Record<string, string>;
   /** The days that gave pages, oldest first. `missed`: nothing at all was revised that day. */
   days: { day: string; ago: number; missed: boolean }[];
 }
@@ -69,7 +71,7 @@ export function findLeftovers(
 
   const exclude = new Set(todaysPages);
   const credit = creditIndex(logs);
-  const out: Leftovers = { pages: [], days: [] };
+  const out: Leftovers = { pages: [], from: {}, days: [] };
   for (let back = lookbackDays; back >= 1; back--) {
     const day = addDays(today, -back);
     const dayLogs = logs.filter((l) => l.date === day);
@@ -85,6 +87,7 @@ export function findLeftovers(
       if (exclude.has(p) || !memorized.has(p)) continue;
       exclude.add(p);
       out.pages.push(p);
+      out.from[String(p)] = day;
     }
     if (out.pages.length > before) {
       out.days.push({ day, ago: back, missed: !dayLogs.some((l) => l.pagesRevised.length > 0) });
@@ -106,7 +109,7 @@ export function leftoversFor(
   todaysPages: number[],
   memorizedPages: UserPage[],
 ): Leftovers {
-  const none: Leftovers = { pages: [], days: [] };
+  const none: Leftovers = { pages: [], from: {}, days: [] };
   if (hasCarriedOver(user, today)) return none;
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
   const carriedDay = user.carryOver?.day;
@@ -149,19 +152,20 @@ export function applyCarryOver(
   memorizedPages: UserPage[],
   leftovers: number[],
   revisionDate: Date,
+  from?: Record<string, string>,
 ): User {
   const today = dateToLocalISODay(revisionDate);
   if (leftovers.length === 0 || hasCarriedOver(user, today)) return user;
   const mode = user.carryOverMode ?? DEFAULT_CARRY_OVER_MODE;
   if (mode === 'add') {
-    return { ...user, carryOver: { day: today, pages: [...leftovers], skip: 0 } };
+    return { ...user, carryOver: { day: today, pages: [...leftovers], skip: 0, ...(from ? { from: pick(from, leftovers) } : {}) } };
   }
   const scheduled = getPagesScheduledForDate(user, revisionDate, memorizedPages);
   const skip = Math.min(leftovers.length, scheduled.length);
   return {
     ...user,
     scheduleShiftPages: (user.scheduleShiftPages ?? 0) + skip,
-    carryOver: { day: today, pages: [...leftovers], skip },
+    carryOver: { day: today, pages: [...leftovers], skip, ...(from ? { from: pick(from, leftovers) } : {}) },
   };
 }
 
@@ -175,4 +179,32 @@ export function applyCarryOver(
  */
 export function settleCarryOverForNewPlan(user: User): User {
   return user.scheduleShiftPages ? { ...user, scheduleShiftPages: 0 } : user;
+}
+
+/** The source days of the carried pages only (a map keyed by page number as a string). */
+function pick(from: Record<string, string>, pages: number[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const p of pages) if (from[String(p)]) out[String(p)] = from[String(p)];
+  return out;
+}
+
+/** The pages carried into `day` (none unless the carry is for that day). */
+export function carriedPagesFor(user: User, day: string): Set<number> {
+  return user.carryOver?.day === day ? new Set(user.carryOver.pages) : new Set<number>();
+}
+
+/**
+ * Today's OWN pages: the day's pages without the ones carried in from earlier days. Today is done
+ * when these are credited to today; a catch-up page is credited to the day it was missed (SESS-7).
+ */
+export function ownPagesOf(pages: readonly number[], user: User, day: string): number[] {
+  const carried = carriedPagesFor(user, day);
+  return pages.filter((p) => !carried.has(p));
+}
+
+/** The day a carried page is credited to, when it came from an earlier day; null otherwise. */
+export function catchUpDayOf(user: User, day: string, page: number): string | null {
+  if (user.carryOver?.day !== day) return null;
+  const from = user.carryOver.from?.[String(page)];
+  return from && from < day ? from : null;
 }

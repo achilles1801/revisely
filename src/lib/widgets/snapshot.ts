@@ -8,7 +8,9 @@
 
 import { generateDailyAssignment, getPagesForDay } from '../algorithm';
 import { creditedOnDay, creditIndex } from '../aheadCredit';
+import { ownPagesOf } from '../carryOver';
 import { aliveStreak, completedDays } from '../streak';
+import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
@@ -123,6 +125,8 @@ export interface WidgetInputs {
   cities?: readonly City[];
   /** Prayer times to include (testers with a place); none otherwise. */
   prayer?: { from: Coords; settings: CalcSettings; place: string | null } | null;
+  /** The Activity items' history (C5): the streak is read from it once loaded; the logs until then. */
+  history?: HistoryItem[] | null;
 }
 
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
@@ -184,7 +188,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
   // A day with a session, or whose pages were all revised ahead, is a day done.
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
-  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? getPagesForDay(user, localDay(d), memorized));
+  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? ownPagesOf(getPagesForDay(user, localDay(d), memorized), user, d));
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -195,8 +199,10 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
     // As Home: done once every page of the day is revised, today or ahead.
     const credited = creditedOnDay(input.logs, day);
-    const total = assignment.totalPages;
-    const doneHere = assignment.pages.filter((p) => credited.has(p)).length;
+    // Today's own pages (SESS-7): catch-up pages are credited to the days they were missed.
+    const own = ownPagesOf(assignment.pages, user, day);
+    const total = own.length;
+    const doneHere = own.filter((p) => credited.has(p)).length;
     const completed = total > 0 && doneHere >= total;
 
     days.push({
@@ -209,7 +215,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       total,
       done: completed ? total : doneHere,
       completed,
-      streak: aliveStreak(done, day),
+      streak: input.history ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak : aliveStreak(done, day),
     });
     // Never stall: a boundary that isn't later (an odd clock) moves on a day.
     startsAt = endsAt.getTime() > startsAt.getTime() ? endsAt : new Date(startsAt.getTime() + 86_400_000);

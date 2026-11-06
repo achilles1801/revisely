@@ -23,6 +23,8 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
 import { useActivityReload } from './useActivityReload';
+import { AskCoachSheet } from '../coach/AskCoachSheet';
+import { streakReadingFromLogs } from '../../lib/streak';
 
 const WINDOW_DAYS = 90;
 const shiftDays = (day: string, n: number) => {
@@ -310,6 +312,38 @@ function Insights(props: {
   const pattern = useMemo(() => dayPattern([...props.revised, ...props.read], props.today, 30), [props.revised, props.read, props.today]);
   const growth = useMemo(() => [...growthByMonth(props.memorizedItems)].sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 6).reverse(), [props.memorizedItems]);
   const paceValue = pace(props.itemDays, props.today, 30);
+  // The Ask coach (C6, d9): the totals for each insight, computed here, sent only when asked.
+  const { user, logs, pages: allPages } = useApp();
+  const [askOpen, setAskOpen] = useState(false);
+  const coachTotals = useMemo(() => {
+    const weak = props.weakPages.length ? new Set(props.weakPages) : new Set<number>();
+    const last7 = shiftDays(props.today, -6);
+    const last30 = shiftDays(props.today, -29);
+    const within = <T extends { day: string }>(items: T[], from: string): T[] => items.filter((i) => i.day >= from && i.day <= props.today);
+    const r7 = within(props.revised, last7);
+    const r30 = within(props.revised, last30);
+    const memorizedCount = props.memorized.size;
+    const cov7n = Math.round(coverage(props.memorized, lastRevisedByPage(props.revised, props.today), props.today, 7) * memorizedCount);
+    const cov30n = Math.round(coverage(props.memorized, lastRevisedByPage(props.revised, props.today), props.today, 30) * memorizedCount);
+    const ratings = (allPages ?? []).filter((p) => p.status === 'memorized');
+    const streakDays = user ? streakReadingFromLogs({ user, pages: allPages ?? [], logs, today: props.today }).streak : 0;
+    return {
+      memorizedPages: memorizedCount,
+      revisedWithin7Days: cov7n,
+      revisedWithin30Days: cov30n,
+      daysWithSession30: consistency(props.revised, props.today, 30).days,
+      streakDays,
+      sessions30: r30.length,
+      weakPages: props.weakPages.length,
+      moderatePages: ratings.filter((p) => p.weaknessRating === 3).length,
+      strongPages: ratings.filter((p) => p.weaknessRating >= 4).length,
+      weakRevisedLast7Days: r7.reduce((n, r) => n + r.pages.filter((p) => weak.has(p)).length, 0),
+      pagesPerDay7: r7.reduce((n, r) => n + r.pages.length, 0) / 7,
+      pagesPerDay30: r30.reduce((n, r) => n + r.pages.length, 0) / 30,
+      plannedPerDay: user?.dailyPageCapacity ?? 0,
+    } as Record<string, number>;
+  }, [props.revised, props.memorized, props.weakPages, props.today, allPages, logs, user]);
+  const coachOn = user?.previewTester === true;
   const timedCount = props.itemDays.filter((i) => i.minutes != null && i.minutes > 0).length;
   const juz = juzUntouchedLongest(props.juzOf, props.memorized, last, props.today);
   const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -408,6 +442,14 @@ function Insights(props: {
         outline={juz != null && (juz.daysSince == null || juz.daysSince > 30) ? palette.red : undefined}
         palette={palette}
       />
+      {coachOn ? (
+        <>
+          <Tap onPress={() => setAskOpen(true)} accessibilityRole="button" accessibilityLabel="Ask the coach" testID="insights-ask-coach" style={styles.askRow}>
+            <Text style={[typeV2.body, { color: palette.primary, fontWeight: '600' }]}>Ask the coach</Text>
+          </Tap>
+          <AskCoachSheet visible={askOpen} onClose={() => setAskOpen(false)} day={props.today} totals={coachTotals} />
+        </>
+      ) : null}
     </RNView>
   );
 }
@@ -449,6 +491,7 @@ function Figure({ label, value, note, palette }: { label: string; value: string;
 }
 
 const styles = StyleSheet.create({
+  askRow: { paddingVertical: 14, paddingHorizontal: 16 },
   spanRow: { paddingBottom: 8 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   card: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 4 },

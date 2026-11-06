@@ -178,3 +178,29 @@ function renderDigest({ weekDays, launch, appStore, play, mention }) {
 }
 
 module.exports = { EMPTY, add, daysOfMonth, kindOf, monthsSince, parseSummary, renderDigest, tally, weeks, change, ymd };
+/**
+ * The Ask coach's line for the week (C6): the coachLedgerDay documents of the week, summed. Only
+ * counts, tokens and dollars: no user, no question, no answer. `days` may be empty or absent.
+ */
+function coachLine(days) {
+  const t = (days || []).reduce(
+    (a, d) => ({
+      calls: a.calls + (Number(d.calls) || 0),
+      input: a.input + (Number(d.inputTokens) || 0),
+      output: a.output + (Number(d.outputTokens) || 0),
+      cacheRead: a.cacheRead + (Number(d.cacheReadTokens) || 0),
+      cacheWrite: a.cacheWrite + (Number(d.cacheWriteTokens) || 0),
+      spend: a.spend + (Number(d.spendUsd) || 0),
+    }),
+    { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, spend: 0 },
+  );
+  if (t.calls === 0) return 'Ask coach: no answers this week.';
+  const cached = t.cacheRead + t.cacheWrite;
+  const share = cached > 0 ? Math.round((100 * t.cacheRead) / cached) : null;
+  const answers = t.calls + (t.calls === 1 ? ' answer' : ' answers');
+  const cache = share == null ? '' : ', ' + share + '% of cached input read from cache';
+  const tokens = t.input + t.cacheRead + t.cacheWrite + ' input tokens, ' + t.output + ' output' + cache;
+  return 'Ask coach: ' + answers + ', $' + t.spend.toFixed(2) + ' (' + tokens + ').';
+}
+
+module.exports.coachLine = coachLine;

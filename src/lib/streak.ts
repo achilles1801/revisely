@@ -6,6 +6,7 @@
 import { RevisionLog, User, UserPage } from '../types';
 import { getPagesForDay } from './algorithm';
 import { creditIndex } from './aheadCredit';
+import { ownPagesOf } from './carryOver';
 
 /** The day before an ISO day ('YYYY-MM-DD'). UTC calendar arithmetic: no daylight-saving shift. */
 export function previousIsoDay(s: string): string {
@@ -127,7 +128,7 @@ export function streakReadingFromLogs(input: { user: User; pages: readonly UserP
     const assigned = logOf.get(day)?.assignedPages;
     if (assigned) return assigned;
     const [y, m, d] = day.split('-').map(Number);
-    return getPagesForDay(input.user, new Date(y, m - 1, d), memorized);
+    return ownPagesOf(getPagesForDay(input.user, new Date(y, m - 1, d), memorized), input.user, day);
   };
   const credited = creditIndex(input.logs);
   const done = completedDays(credited, scheduled);

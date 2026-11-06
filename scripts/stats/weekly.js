@@ -79,8 +79,16 @@ async function main() {
     play: await play(),
     mention: process.env.MENTION || '',
   });
+  // The Ask coach line (C6), when the workflow gives the week's coachLedgerDay totals as JSON.
+  let coach = '';
+  try {
+    if (process.env.COACH_LEDGER_WEEK_JSON) coach = '\n\n' + D.coachLine(JSON.parse(process.env.COACH_LEDGER_WEEK_JSON));
+  } catch (err) {
+    console.error('::warning title=Ask coach ledger::' + err.message);
+  }
+  const full = body + coach;
   if (dryRun) {
-    console.log(body);
+    console.log(full);
   } else {
     const { githubApi } = require('../sentry/api');
     const open = await githubApi.issuesWithLabel(LABEL, 'open');
@@ -93,7 +101,7 @@ async function main() {
         [LABEL],
       );
     }
-    await githubApi.comment(issue.number, body);
+    await githubApi.comment(issue.number, full);
     console.log(`Posted the digest on #${issue.number}`);
   }
   if (!store) process.exit(1);

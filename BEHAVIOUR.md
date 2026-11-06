@@ -76,13 +76,19 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SESS-2.** A day is done when all its pages are credited to it. Home then says Done, and the streak
   counts the day. The streak counts back from
   today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
-  widget and the reminders share this rule (lib/streak).
+  widget and the reminders share this rule (lib/streak). The Dashboard and the widget read it from the Activity items
+  (the last 400 days) once they load (lib/streakFromItems); the logs answer until then.
 - **SESS-6.** A missed day keeps a grace window. When yesterday is missed (not all its scheduled pages credited to it)
   but the run before it is intact, the streak reads as broken and the widget and Home show the streak dimmed, with a
   ring for the missed pages. Revising yesterday's missed pages, credited to yesterday, restores the streak at once,
   and only pages of the missed day count (today's own pages don't). The grace is recoverable until today's revision
   day ends, and repeats any day a day is missed. Two missed days in a row break the streak; a day done late does not
   restore a missed day, and older days can still be revised, credited to their own days.
+- **SESS-7.** A catch-up page (one carried in from a missed or unfinished day) is credited to the day it was
+  scheduled for, not to today. It never counts toward today's completion: today is done when today's own pages are
+  credited to today (in shift mode, the own pages are the day's usual size; the carried pages stand in for the
+  pages the shift moved). Each carried page keeps its source day in the carry (`carryOver.from`). A session saves a
+  catch-up page under the ahead credit of its own day, and out of its own pagesRevised.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,
@@ -252,6 +258,9 @@ How the tests are made: `tests/scenarios/README.md`.
   secret and never reaches the app. The system prompt is stable and cached (above the 512-token minimum); each call
   is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
   when short), with a timeout per attempt, and its log keeps the usage and never the content.
+
+- **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
+  what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
 
 ## Known bugs
 

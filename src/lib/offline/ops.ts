@@ -68,8 +68,10 @@ export type OutboxOp =
        * `durationAtLeast`: then this change is in already (sent twice).
        */
       durationAdd?: number;
-      /** Pages of this change credited to a later day (lib/aheadCredit): day → pages. */
+      /** Pages of this change credited to another day (lib/aheadCredit): day → pages. */
       ahead?: Record<string, number[]>;
+      /** Every page this session holds as revised, catch-up pages included (SESS-7). Absent: pagesRevised and the ahead pages. */
+      checked?: number[];
     }
   | {
       kind: 'session.edit';
@@ -81,6 +83,8 @@ export type OutboxOp =
       weaknessUpdates: WeaknessChange[];
       /** The session's whole `ahead` map after the edit (absent: unchanged). */
       ahead?: Record<string, number[]>;
+      /** Every page the session holds as revised after the edit, catch-up pages included (SESS-7). */
+      checked?: number[];
     }
   | { kind: 'session.delete'; id: string }
   | {
@@ -188,6 +192,13 @@ export function safePercent(revised: number, total: number): number {
 
 const union = (a: number[], b: number[]) => [...a, ...b.filter((p) => !a.includes(p))];
 
+/**
+ * The pages a session change checks, for keeping its ahead credit: the checked pages it names (every
+ * page held as revised, catch-up pages included), else its pagesRevised. Credit for an unchecked page
+ * is dropped (aheadWithin).
+ */
+const checkedOf = (op: { checked?: number[] }, pagesRevised: number[]): number[] => union(op.checked ?? [], pagesRevised);
+
 const weaknessKey = (w: { pageNumber: number; newRating: number; changedAt: unknown }) =>
   `${w.pageNumber}:${w.newRating}:${
     typeof w.changedAt === 'number' ? w.changedAt : (w.changedAt as { toMillis?: () => number })?.toMillis?.()
@@ -250,7 +261,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
       pagesSkipped,
       weaknessUpdates,
       // Credit only for pages this session has revised (see aheadWithin).
-      ...sessionAheadField(existing.ahead, aheadWithin(mergeAhead(existing.ahead, op.ahead), pagesRevised)),
+      ...sessionAheadField(existing.ahead, aheadWithin(mergeAhead(existing.ahead, op.ahead), checkedOf(op, pagesRevised))),
       durationMinutes: Math.max(1, addedMinutes(existing.durationMinutes ?? 0, op)),
       // The rules forbid going back from completed.
       state: completed ? 'COMPLETED' : 'IN_PROGRESS',
@@ -286,7 +297,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     ...base,
     pagesRevised: [...new Set(op.pagesRevised)],
     pagesSkipped: op.pagesSkipped,
-    ...aheadField(aheadWithin(mergeAhead(undefined, op.ahead), op.pagesRevised)),
+    ...aheadField(aheadWithin(mergeAhead(undefined, op.ahead), checkedOf(op, op.pagesRevised))),
     durationMinutes: Math.max(1, op.durationAtLeast || 1),
     state: revisedHere >= total ? 'COMPLETED' : 'IN_PROGRESS',
     completionPercentage: safePercent(revisedHere, total),
@@ -303,7 +314,7 @@ export function applySessionEdit(existing: FirestoreSession | null, op: SessionE
     ...existing,
     pagesRevised,
     pagesSkipped: op.pagesSkipped,
-    ...(op.ahead !== undefined ? { ahead: aheadWithin(op.ahead, pagesRevised) } : {}),
+    ...(op.ahead !== undefined ? { ahead: aheadWithin(op.ahead, checkedOf(op, pagesRevised)) } : {}),
     // The rules take minutes above 0, or none.
     durationMinutes: op.durationMinutes != null && op.durationMinutes > 0 ? op.durationMinutes : null,
     weaknessUpdates: weaknessDocs(op.weaknessUpdates),

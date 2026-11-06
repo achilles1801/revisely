@@ -168,7 +168,7 @@ describe('a day revised ahead is done, not missed', () => {
 
   it('offers nothing from a day whose pages were all revised ahead', () => {
     const got = leftoversFor(baseUser, logs, today, pagesFor(baseUser, today), memorizedPages);
-    expect(got).toEqual({ pages: [], days: [] });
+    expect(got).toEqual({ pages: [], from: {}, days: [] });
   });
 });
 
@@ -224,7 +224,7 @@ describe('before the plan started', () => {
   it('a day before the plan’s start is not missed', () => {
     const late: User = { ...baseUser, scheduleAnchorDate: '2026-11-04T12:00:00' };
     const got = leftoversFor(late, [], '2026-11-04', pagesFor(late, '2026-11-04'), memorizedPages);
-    expect(got).toEqual({ pages: [], days: [] });
+    expect(got).toEqual({ pages: [], from: {}, days: [] });
     expect(catchUpLine(got)).toBeNull();
   });
 });

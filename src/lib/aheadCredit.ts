@@ -164,3 +164,20 @@ export function reviewPagesInOrder(
   for (const p of [...doneOnDay(logs, day)].sort((a, b) => a - b)) push(p);
   return out;
 }
+
+/**
+ * How a session's pages are credited when saved (SESS-7). A page whose day is before the session's
+ * (a catch-up page, credited to the day it was missed) is kept out of this session's pagesRevised,
+ * so it never counts toward today; it goes to `ahead` under its own day. Other pages are as before.
+ */
+export function sessionCredit(
+  pages: readonly number[],
+  pageDays: ReadonlyMap<number, string>,
+  sessionDay: string,
+): { pagesRevised: number[]; ahead: Record<string, number[]> } {
+  const pagesRevised = pages.filter((p) => {
+    const d = pageDays.get(p);
+    return !(d && d < sessionDay);
+  });
+  return { pagesRevised, ahead: aheadCreditFor(pageDays, pages, sessionDay) };
+}

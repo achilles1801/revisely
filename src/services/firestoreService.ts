@@ -932,7 +932,7 @@ export async function getActivityItemsBetween(
   to: string,
   userId?: string,
 ): Promise<{
-  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
+  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null; occurredAt: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
 }> {
@@ -943,7 +943,8 @@ export async function getActivityItemsBetween(
   return {
     revisions: rev.docs.map((d) => {
       const x = d.data();
-      return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null };
+      const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;
+      return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
