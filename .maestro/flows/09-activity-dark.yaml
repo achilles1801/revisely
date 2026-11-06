@@ -1,0 +1,21 @@
+# Activity's screens in dark (the same screens as 09-activity-light.yaml), set through Settings.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/seed-activity.yaml
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- tapOn:
+    id: open-settings
+- tapOn:
+    id: pill-dark
+- tapOn:
+    id: back
+- runFlow:
+    file: ../subflows/activity-screens.yaml
+    env:
+      THEME: dark
