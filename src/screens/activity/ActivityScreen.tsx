@@ -27,6 +27,7 @@ import { carryForTomorrow, planItAction, PLAN_IT_DAY_INDEX } from '../../lib/wea
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
+import { AddRevisedSheet } from '../../components/activity/AddRevisedSheet';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { missedFromSession } from '../../lib/activityAdd';
@@ -76,6 +77,8 @@ export default function ActivityScreen() {
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
   // The + menu (C4, previewTester): one add per kind, each on its own composer tab.
   const [addOpen, setAddOpen] = useState(false);
+  // Revised (d6): its own sheet, not the composer.
+  const [revisedOpen, setRevisedOpen] = useState(false);
   // "From your session" (d5): on top when today's session missed pages it can add.
   const todaysLog = logs.find((l) => l.date === today);
   const missed = todaysLog
@@ -85,7 +88,7 @@ export default function ActivityScreen() {
     ...(missed.length > 0
       ? [{ key: 'session', label: 'From your session', icon: 'sparkles-outline' as const, subtitle: `${missed.length} ${missed.length === 1 ? 'page' : 'pages'} it missed`, onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'revision' }) }]
       : []),
-    { key: 'revision', label: 'Revised', icon: 'checkmark-circle-outline' as const, subtitle: 'Pages you revised, or missed', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'revision' }) },
+    { key: 'revision', label: 'Revised', icon: 'checkmark-circle-outline' as const, subtitle: 'Pages you revised, or missed', onPress: () => setRevisedOpen(true) },
     { key: 'memorization', label: 'Memorized', icon: 'bookmark-outline' as const, subtitle: 'Pages you have memorized', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'memorization' }) },
     { key: 'read', label: 'Read', icon: 'stopwatch-outline' as const, subtitle: 'A timed reading session', onPress: () => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read') },
     { key: 'note', label: 'Note', icon: 'create-outline' as const, subtitle: 'Anything for the day', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'note' }) },
@@ -171,6 +174,7 @@ export default function ActivityScreen() {
         </ScrollView>
       )}
       <ActionSheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add" actions={addMenuActions} testID="activity-add-menu" />
+      <AddRevisedSheet visible={revisedOpen} onClose={() => setRevisedOpen(false)} day={today} logs={logs} />
     </TopSafeAreaView>
   );
 }

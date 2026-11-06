@@ -15,7 +15,7 @@ export interface RevisionItem {
   day: string;
   occurredAt: number;
   countsFor: string;
-  source: 'session';
+  source: 'session' | 'manual';
   pages: number[];
   skipped: number[];
   ratings?: Record<string, number>;

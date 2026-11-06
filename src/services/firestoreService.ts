@@ -571,6 +571,12 @@ export async function deleteSession(sessionId: string, userId?: string): Promise
   await deleteDoc(getSessionRef(sessionId, userId));
 }
 
+/** Writes one Revised item added by hand (its id is new, so this never overwrites a session's). */
+export async function addRevisionItem(item: RevisionItem, userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  await setDoc(doc(collection(db, 'users', uid, 'revisions'), item.id), item);
+}
+
 /**
  * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
  * written, and any other item of that day is deleted (an edit that dropped an
