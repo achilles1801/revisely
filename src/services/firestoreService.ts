@@ -571,6 +571,12 @@ export async function deleteSession(sessionId: string, userId?: string): Promise
   await deleteDoc(getSessionRef(sessionId, userId));
 }
 
+/** Writes one Revised item added by hand (its id is new, so this never overwrites a session's). */
+export async function addRevisionItem(item: RevisionItem, userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  await setDoc(doc(collection(db, 'users', uid, 'revisions'), item.id), item);
+}
+
 /**
  * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
  * written, and any other item of that day is deleted (an edit that dropped an
@@ -857,6 +863,44 @@ export async function getActivityItemsForDay(
       .filter((d) => d.data().day !== day)
       .map((d) => ({ fromDay: d.data().day, pages: d.data().pages ?? [] })),
   };
+}
+
+/**
+ * Pages memorized on `day` (the memorization manager, Today): merged into that day's item, so
+ * saving the same pages again changes nothing (ids come from the day).
+ */
+export async function addMemorizationPages(day: string, pages: number[], at: number, userId: string): Promise<void> {
+  const ref = doc(collection(db, 'users', userId, 'memorizations'), day);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = snap.exists() ? (snap.data() as { pages?: number[]; occurredAt?: number }) : null;
+    const merged = [...new Set([...(prev?.pages ?? []), ...pages])].sort((a, b) => a - b);
+    tx.set(ref, {
+      id: day,
+      uid: userId,
+      day,
+      occurredAt: prev?.occurredAt && prev.occurredAt > 0 ? Math.min(prev.occurredAt, at) : at,
+      source: 'manual',
+      pages: merged,
+      minutes: null,
+      recordings: [],
+    });
+  });
+}
+
+/** Pages un-memorized: removed from every item that holds them; an item left empty is removed. */
+export async function removeMemorizationPages(pages: number[], userId: string): Promise<void> {
+  const drop = new Set(pages);
+  const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
+  await Promise.all(
+    snap.docs.map(async (d) => {
+      const current: number[] = d.data().pages ?? [];
+      const rest = current.filter((p) => !drop.has(p));
+      if (rest.length === current.length) return;
+      if (rest.length === 0) await deleteDoc(d.ref);
+      else await updateDoc(d.ref, { pages: rest });
+    }),
+  );
 }
 
 /** Removes a memorization item (C4): its pages are un-marked by their own change. */

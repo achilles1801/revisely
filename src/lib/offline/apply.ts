@@ -77,6 +77,10 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
       return mirrorRevisionItems(uid, op.id, null);
     case 'memorization.delete':
       return firestoreService.deleteMemorizationItem(op.id, uid);
+    case 'memorization.mark':
+      return firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid);
+    case 'memorization.unmark':
+      return firestoreService.removeMemorizationPages(op.pages, uid);
     case 'reading.add':
       await firestoreService.putReadingSession(op.id, op.session, entry.at, uid);
       return mirrorReadItem(uid, () => firestoreService.setReadItem(readItemFor(op.id, uid, op.session), uid));
@@ -86,6 +90,8 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
     case 'reading.delete':
       await firestoreService.deleteReadingSession(op.id, uid);
       return mirrorReadItem(uid, () => firestoreService.deleteReadItem(op.id, uid));
+    case 'revision.add':
+      return firestoreService.addRevisionItem(op.item, uid);
     case 'journal.entry.add':
     case 'journal.entry.edit':
       return firestoreService.applyJournalNote(op.date, { kind: 'put', note: { ...op.entry } }, uid);
