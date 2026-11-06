@@ -3,6 +3,7 @@
 // against the emulators (harness/testerReset.js; App Check is checked by the
 // callable and in functions' unit tests).
 
+import { withAuthRetry } from '../harness/authRetry';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, onboard, pagesRange } from '../harness/account';
 import { markPreviewTester, serveResetMyData } from '../harness/admin';
@@ -39,7 +40,7 @@ it('[RESET-2] a tester resets their own data: onboarding again, signed in, nothi
     const { resetMyData } = app.mods.require<TesterReset>('src/lib/testerReset');
     let result: Awaited<ReturnType<TesterReset['resetMyData']>> | undefined;
     await app.act(async () => {
-      result = await resetMyData();
+      result = await withAuthRetry(() => resetMyData());
     });
     expect(server.calls).toBe(1);
     expect(result).toMatchObject({ ok: true, pages: 604, deleted: { sessions: 1 } });
@@ -54,7 +55,7 @@ it('[RESET-2] a tester resets their own data: onboarding again, signed in, nothi
 
     // A second reset straight away is refused, and changes nothing.
     await app.act(async () => {
-      await expect(resetMyData()).rejects.toThrow(/less than 10 minutes/);
+      await expect(withAuthRetry(() => resetMyData())).rejects.toThrow(/less than 10 minutes/);
     });
     expect(server.calls).toBe(2);
 
@@ -85,7 +86,7 @@ it('[RESET-2] an account that is not a tester is refused, and keeps everything',
     await app.until(() => memorizedCount() === 20, 'the 20 memorized pages');
     const { resetMyData } = app.mods.require<TesterReset>('src/lib/testerReset');
     await app.act(async () => {
-      await expect(resetMyData()).rejects.toThrow(/testers only/);
+      await expect(withAuthRetry(() => resetMyData())).rejects.toThrow(/testers only/);
     });
     expect(server.calls).toBe(1);
     expect(app.app.onboardingComplete).toBe(true);
