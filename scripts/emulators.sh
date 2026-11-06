@@ -39,6 +39,11 @@ if [ "$MODE" != exec ] && [ "$MODE" != start ] || [ -z "$ONLY" ] || [ -z "$PROJE
 fi
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+# The Firebase CLI pinned in tests/scenarios (its emulators are the ones the suites
+# are tested against; firebase-tools 15.15's Firestore emulator garbles Listen
+# streams and broke SYNC-1/3, #275), when installed; otherwise the one on PATH.
+FIREBASE="$ROOT/tests/scenarios/node_modules/.bin/firebase"
+[ -x "$FIREBASE" ] || FIREBASE=firebase
 CALLER=$(pwd)
 
 # ---- ports ---------------------------------------------------------------
@@ -149,10 +154,10 @@ echo "emulators: $ONLY on firestore $FIRESTORE, auth $AUTH, storage $STORAGE (hu
 
 cd "$WORK"
 if [ "$MODE" = exec ]; then
-  firebase emulators:exec --config "$CONFIG" --only "$ONLY" --project "$PROJECT" \
+  "$FIREBASE" emulators:exec --config "$CONFIG" --only "$ONLY" --project "$PROJECT" \
     "cd $(printf '%q' "$CALLER") && $COMMAND" &
 else
-  firebase emulators:start --config "$CONFIG" --only "$ONLY" --project "$PROJECT" &
+  "$FIREBASE" emulators:start --config "$CONFIG" --only "$ONLY" --project "$PROJECT" &
 fi
 CHILD=$!
 set +e
