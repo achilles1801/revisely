@@ -1,0 +1,17 @@
+# Activity's screens in light, for the visual check against the mocks (gap audit). Its screenshots are
+# the run's artifacts; scripts/verify/activity-boards.py puts them beside the mocks.
+# Rules (BEHAVIOUR.md): none; this flow looks, it doesn't test the rules.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/seed-activity.yaml
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- runFlow:
+    file: ../subflows/activity-screens.yaml
+    env:
+      THEME: light
