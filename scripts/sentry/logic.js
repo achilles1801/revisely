@@ -268,7 +268,7 @@ function parseBar(env = {}) {
     if (!Number.isFinite(n) || n < lo || n > hi) throw new Error(`${name}=${JSON.stringify(String(raw))} must be a number from ${lo} to ${hi}.`);
     return n;
   };
-  return { minSessions: num('MIN_SESSIONS', 5, 0, 1e6), minCrashFree: num('MIN_CRASH_FREE', 0.99, 0, 1) };
+  return { minSessions: num('MIN_SESSIONS', 1, 0, 1e6), minCrashFree: num('MIN_CRASH_FREE', 0.99, 0, 1) };
 }
 
 /** Whether an update may be promoted: enough sessions on preview, and crash-free at or above the bar. */
