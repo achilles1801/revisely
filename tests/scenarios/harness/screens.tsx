@@ -47,6 +47,64 @@ export function homeStack(mods: Booted): ReactElement {
   );
 }
 
+/** Pass to Phone.open: the app opens on onboarding's "Select memorized portions" (in progress). */
+export function onboardingStack(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
+  const JuzSelection = req<any>('src/screens/onboarding/JuzSelectionScreen').default;
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const Stack = createNativeStackNavigator();
+  const h = React.createElement;
+  const Schedule = () => null;
+  return h(
+    NavigationContainer,
+    { ref: nav.navigation },
+    h(
+      Stack.Navigator,
+      { screenOptions: { headerShown: false, animation: 'none' } },
+      h(Stack.Screen, { name: 'JuzSelection', component: JuzSelection, initialParams: { journeyStage: 'in_progress' } }),
+      h(Stack.Screen, { name: 'Schedule', component: Schedule }),
+    ),
+  );
+}
+
+/** Onboarding's "Select memorized portions", read and driven through its own elements. */
+export class Onboarding {
+  constructor(private readonly app: OpenApp) {}
+
+  /** The count at the foot: "24 of 604 pages memorized". */
+  summary(): string {
+    const el = this.app.screen.queryByTestId('juz-selection-summary');
+    return el ? flatText(el) : '';
+  }
+
+  continueEnabled(): boolean {
+    const el = this.app.screen.queryByTestId('juz-continue');
+    return !!el && el.props.accessibilityState?.disabled !== true;
+  }
+
+  /**
+   * Marks a juz as its row's check does (MemorizationBrowser.applyBulk: every
+   * page of the juz by number, loaded or not). Its row isn't drawn here, the
+   * list being virtualized, so the browser's change goes in directly.
+   */
+  async markJuz(pages: number[]): Promise<void> {
+    const { MemorizationBrowser } = this.app.mods.require<any>('src/components/MemorizationBrowser');
+    const browser = this.app.screen.UNSAFE_getByType(MemorizationBrowser);
+    const next = new Map(browser.props.pendingChanges as Map<number, string>);
+    for (const p of pages) next.set(p, 'memorized');
+    await this.app.act(async () => browser.props.onChange(next));
+  }
+
+  async continue(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('juz-continue'));
+    });
+  }
+}
+
 /** What Home shows, read from its own elements (testIDs in components/home/feed/TodayPost). */
 export class Home {
   constructor(private readonly app: OpenApp) {}
