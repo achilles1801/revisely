@@ -176,4 +176,24 @@ describe('the streak from items (C5)', () => {
     expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-04' }).streak).toBe(1);
   });
 
+  it('[SESS-6] a session at 00:30 before Fajr is still the day before (Fajr on)', () => {
+    // Revision day 2026-11-03 ends at Fajr on 11-04, not at midnight: 00:30 on 11-04 is on time for it.
+    const fajrUser = {
+      ...user,
+      fajrBoundaryEnabled: true,
+      // Chicago: its Fajr on 11-04 is well after 00:30 local, in any time zone the tests run in.
+      locationCoords: { latitude: 41.8781, longitude: -87.6298 },
+      fajrCalculationMethod: 'NorthAmerica',
+    } as unknown as User;
+    const at0030 = new Date(2026, 10, 4, 0, 30).getTime();
+    const items = [
+      item('2026-11-02', [1, 2], new Date(2026, 10, 2, 12).getTime()),
+      item('2026-11-03', [3, 4], at0030),
+      item('2026-11-04', [5, 6], new Date(2026, 10, 4, 12).getTime()),
+    ];
+    // With Fajr: 11-03 is on time, so the run is 11-04, 11-03, 11-02.
+    expect(streakReadingFromItems({ user: fajrUser, pages: [], items, today: '2026-11-05' }).streak).toBe(3);
+    // Without the boundary (midnight), 11-03 is late and carries nothing: the streak is just 11-04.
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-05' }).streak).toBe(1);
+  });
 });

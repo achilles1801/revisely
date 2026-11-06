@@ -10,6 +10,26 @@
 const { salesSummary, token } = require('./appStore');
 const D = require('./digest');
 
+/**
+ * The Ask coach's ledger days for the week (C6), from the coachDigestDays function. The workflow
+ * proves who it is with its GitHub Actions OIDC token (id-token: write), audience revisely-coach-digest.
+ * Returns null when the workflow has no token (a laptop run); throws on a failed call (the digest
+ * still posts without the line).
+ */
+const COACH_DIGEST_URL = process.env.COACH_DIGEST_URL || 'https://us-central1-revision-buddy-3a398.cloudfunctions.net/coachDigestDays';
+async function coachDays(start, end) {
+  const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+  const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  if (!requestUrl || !requestToken) return null;
+  const idRes = await fetch(requestUrl + '&audience=revisely-coach-digest', { headers: { Authorization: 'Bearer ' + requestToken } });
+  if (!idRes.ok) throw new Error('GitHub did not issue the token (HTTP ' + idRes.status + ')');
+  const { value } = await idRes.json();
+  const res = await fetch(COACH_DIGEST_URL + '?start=' + start + '&end=' + end, { headers: { Authorization: 'Bearer ' + value } });
+  if (!res.ok) throw new Error('the coach ledger did not answer (HTTP ' + res.status + ')');
+  const body = await res.json();
+  return Array.isArray(body.days) ? body.days : [];
+}
+
 const TITLE = 'App stats (weekly digest)';
 const LABEL = 'stats-digest';
 /** 1.0's release (submitted Oct 4 2026, released on approval); earlier days hold nothing. */
@@ -82,7 +102,10 @@ async function main() {
   // The Ask coach line (C6), when the workflow gives the week's coachLedgerDay totals as JSON.
   let coach = '';
   try {
-    if (process.env.COACH_LEDGER_WEEK_JSON) coach = '\n\n' + D.coachLine(JSON.parse(process.env.COACH_LEDGER_WEEK_JSON));
+    const days = process.env.COACH_LEDGER_WEEK_JSON
+      ? JSON.parse(process.env.COACH_LEDGER_WEEK_JSON)
+      : await coachDays(weekDays[0], weekDays[weekDays.length - 1]);
+    if (days) coach = '\n\n' + D.coachLine(days);
   } catch (err) {
     console.error('::warning title=Ask coach ledger::' + err.message);
   }

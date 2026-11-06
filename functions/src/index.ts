@@ -21,6 +21,7 @@ import { adminResetStore } from './testerResetAdmin';
 import { ScenarioResult, handleLoadTestScenario } from './testScenarios';
 import { adminScenarioWriter } from './testScenariosAdmin';
 import { defineSecret } from 'firebase-functions/params';
+import { checkDigestCaller, DIGEST_AUDIENCE, ledgerDayCounts, parseWeek } from './coachDigest';
 import { adminCoachStore } from './coach/admin';
 import { CoachError, handleAskCoach, handleSetOptIn } from './coach/handler';
 import { callCoach } from './coach/call';
@@ -269,5 +270,40 @@ export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, 
     if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
     logger.error('setCoachOptIn failed', err);
     throw new HttpsError('internal', 'The setting did not save. Try again.');
+  }
+});
+
+/**
+ * The Ask coach's ledger for one week, for the weekly digest (stats-digest.yml, via its GitHub OIDC
+ * token): the coachLedgerDay counts, no user and no content. See coachDigest.ts for who may read.
+ */
+export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'GET only' });
+    return;
+  }
+  const header = req.get('authorization') ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  try {
+    let claims;
+    try {
+      claims = verifyGithubToken(token, await githubJwks(), DIGEST_AUDIENCE);
+    } catch (err) {
+      if (!(err instanceof UnknownKeyError)) throw err;
+      claims = verifyGithubToken(token, await githubJwks(true), DIGEST_AUDIENCE);
+    }
+    checkDigestCaller(claims);
+    const { start, end } = parseWeek(req.query as Record<string, unknown>);
+    const snap = await adminDb.collection('coachLedgerDay').where('day', '>=', start).where('day', '<=', end).get();
+    const days = snap.docs.map((d) => ledgerDayCounts(d.data() as Record<string, unknown>)).sort((a, b) => String(a.day).localeCompare(String(b.day)));
+    logger.info('Coach digest read', { start, end, days: days.length, run: claims.run_id });
+    res.json({ days });
+  } catch (err) {
+    if (err instanceof CallerError) {
+      res.status(err.message.startsWith('start') || err.message.startsWith('end') || err.message.startsWith('at most') ? 400 : 403).json({ error: err.message });
+    } else {
+      logger.error('coachDigestDays failed', err);
+      res.status(500).json({ error: 'internal' });
+    }
   }
 });

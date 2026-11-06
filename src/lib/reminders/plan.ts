@@ -17,6 +17,7 @@ import { getFajrTimeFor, getNextRevisionDayStart, getRevisionDateForUser, getRev
 import type { Place } from '../prayer/prefs';
 import { dayTimes, type CalcSettings } from '../prayer/times';
 import { streakFromLogs } from '../streak';
+import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { reminderCopy, type ReminderKind } from './copy';
 
@@ -60,6 +61,8 @@ export interface PlanReminderInput {
   name: string;
   pages: UserPage[];
   logs: RevisionLog[];
+  /** The Activity items' history (C5): the streak is read from it once loaded; the logs until then. */
+  history?: HistoryItem[] | null;
   quranData: QuranPage[];
   /** Where Asr is worked out (the prayer place), if the phone has one. */
   place: Place | null;
@@ -136,7 +139,9 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   // As Home and the widget: done once as many pages were revised as are assigned.
   const doneToday = todayRevised.size > 0 && todayRevised.size >= todayPages.length;
   // The streak as Home and the widget count it (lib/streak).
-  const streak = streakFromLogs({ user, pages: input.pages, logs: input.logs, today: today.day });
+  const streak = input.history
+    ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: today.day }).streak
+    : streakFromLogs({ user, pages: input.pages, logs: input.logs, today: today.day });
   const beforeNoon = morningTime(user).hour < 12;
   const juzPlan = user.scheduleMode === 'juz';
 

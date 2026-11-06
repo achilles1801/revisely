@@ -5,6 +5,7 @@
 
 import { User, UserPage } from '../types';
 import { getPagesForDay } from './algorithm';
+import { getFajrTimeFor } from './fajrBoundary';
 import { ownPagesOf } from './carryOver';
 import { completedDays, streakReading, type StreakReading } from './streak';
 
@@ -16,10 +17,17 @@ export interface HistoryItem {
   occurredAt: number | null;
 }
 
-/** The local midnight that ends `day` (the revision day's end, ignoring the Fajr boundary). */
-export function dayEndMs(day: string): number {
+/**
+ * When revision day `day` ends: the Fajr that starts the next day when the Fajr boundary is on (DAY-2:
+ * from midnight until Fajr it is still the day before); the next local midnight otherwise.
+ */
+export function dayEndMs(day: string, user?: User | null): number {
   const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d + 1).getTime();
+  const nextDay = new Date(y, m - 1, d + 1);
+  const midnight = nextDay.getTime();
+  if (!user || !user.fajrBoundaryEnabled || !user.locationCoords) return midnight;
+  const fajr = getFajrTimeFor(nextDay, user);
+  return fajr ? fajr.getTime() : midnight;
 }
 
 export function streakReadingFromItems(input: {
@@ -38,7 +46,7 @@ export function streakReadingFromItems(input: {
     const set = credited.get(day) ?? new Set<number>();
     for (const p of item.pages) set.add(p);
     credited.set(day, set);
-    if (item.occurredAt != null && item.occurredAt < dayEndMs(day)) {
+    if (item.occurredAt != null && item.occurredAt < dayEndMs(day, input.user)) {
       const early = onTime.get(day) ?? new Set<number>();
       for (const p of item.pages) early.add(p);
       onTime.set(day, early);

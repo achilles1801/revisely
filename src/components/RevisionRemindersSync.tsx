@@ -8,6 +8,7 @@ import { greetingName } from '../lib/displayName';
 import { getQuranData } from '../lib/quranData';
 import { logger } from '../lib/logger';
 import { planRevisionReminders } from '../lib/reminders/plan';
+import { useActivityHistory } from '../lib/activityHistory';
 import { clearRevisionReminders, syncRevisionReminders } from '../lib/reminders/sync';
 import { usePrayerPrefs } from '../lib/prayer/prefs';
 import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
@@ -43,6 +44,8 @@ export function RevisionRemindersSync() {
   // The place and settings by value.
   const placeKey = JSON.stringify([place, settings]);
   const name = greetingName(ownUser?.name, firebaseUser?.displayName);
+  // The history for the streak (C5), so a reminder's streak is the one Home shows.
+  const history = useActivityHistory(day, !signedOut && !!ownUser, logs.length);
 
   useEffect(() => {
     if (authLoading) return;
@@ -66,6 +69,7 @@ export function RevisionRemindersSync() {
           name,
           pages,
           logs,
+          history,
           quranData: getQuranData(),
           place,
           settings,
@@ -78,7 +82,7 @@ export function RevisionRemindersSync() {
     return () => clearTimeout(timer);
     // The place and settings by value (placeKey); the rest as listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, signedOut, ownUser, enabled, pages, logs, day, foreground, placeKey, name]);
+  }, [authLoading, signedOut, ownUser, enabled, pages, logs, history, day, foreground, placeKey, name]);
 
   return null;
 }
