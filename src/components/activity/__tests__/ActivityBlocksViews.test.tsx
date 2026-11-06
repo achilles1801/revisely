@@ -29,13 +29,20 @@ beforeEach(() => {
 });
 
 describe('the Activity calendar (gap audit §3)', () => {
-  it('shows the Calendar and Insights tabs, and no Week or Month row', async () => {
+  it('shows the Overview and Insights tabs, and the Week | Month toggle (Majd, Nov 2026)', async () => {
     render(<ActivityBlocksViews {...props} />);
     expect(await screen.findByTestId('calendar-month')).toBeTruthy();
     expect(screen.getByText('Overview')).toBeTruthy();
     expect(screen.getByText('Insights')).toBeTruthy();
-    expect(screen.queryByText('Week')).toBeNull();
-    expect(screen.queryByText('Month')).toBeNull();
+    expect(screen.getByText('Week')).toBeTruthy();
+    expect(screen.getByText('Month')).toBeTruthy();
+  });
+
+  it('Week shows the seven days of the week, each with its summary', async () => {
+    render(<ActivityBlocksViews {...props} />);
+    fireEvent.press(await screen.findByText('Week'));
+    expect(await screen.findByTestId('calendar-week')).toBeTruthy();
+    expect(screen.getAllByText('Nothing logged')).toHaveLength(7);
   });
 
   it('shows the month’s title and its four totals', async () => {

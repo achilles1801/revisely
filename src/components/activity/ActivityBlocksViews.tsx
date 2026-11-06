@@ -4,7 +4,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder } from 'react-native';
-import { CALENDAR_SCREEN_LABEL } from '../../lib/activityCalendar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, shiftWeek, weekDays, type CalendarSpan } from '../../lib/activityCalendar';
+import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
 import { StyleSheet, Text, View as RNView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -50,11 +52,26 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const { palette } = useTheme();
   const [view, setView] = useState<ViewKind>('calendar');
   const [month, setMonth] = useState(today.slice(0, 7));
+  const [span, setSpanState] = useState<CalendarSpan>('month');
+  const [week, setWeek] = useState(weekStartOf(today));
   const [picked, setPicked] = useState<string | null>(null);
+  // The last Week | Month choice is kept on the phone (a per-device convenience, not synced).
+  useEffect(() => {
+    AsyncStorage.getItem(CALENDAR_SPAN_KEY)
+      .then((v) => setSpanState(parseSpan(v)))
+      .catch(() => undefined);
+  }, []);
+  const setSpan = (next: CalendarSpan) => {
+    setSpanState(next);
+    AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
+  };
   const [data, setData] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsBetween>> | null>(null);
 
   // The days on screen (the month grid) and the 90 days the insights read.
-  const shown = useMemo(() => monthGrid(month).flat().filter((d): d is string => d != null), [month]);
+  const shown = useMemo(
+    () => (span === 'week' ? weekDays(week) : monthGrid(month).flat().filter((d): d is string => d != null)),
+    [span, week, month],
+  );
   const rangeFrom = [shiftDays(today, -WINDOW_DAYS), ...shown].sort()[0];
   const rangeTo = [today, ...shown].sort().reverse()[0];
   const load = useCallback(() => {
@@ -70,7 +87,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 
   // Swipe between weeks or months (a horizontal drag on the calendar).
   const stepRef = useRef<(delta: number) => void>(() => undefined);
-  stepRef.current = (delta: number) => setMonth(shiftMonth(month, delta));
+  stepRef.current = (delta: number) => (span === 'week' ? setWeek(shiftWeek(week, delta)) : setMonth(shiftMonth(month, delta)));
   const swipe = useMemo(
     () =>
       PanResponder.create({
@@ -117,10 +134,13 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
         <RNView style={styles.pad} {...swipe.panHandlers} testID="activity-calendar">
           <CalendarMonth
             month={month}
+            week={week}
+            span={span}
+            onSpan={setSpan}
             today={today}
             picked={picked}
             data={{ revised, memorized, read, noteDays }}
-            onStep={(delta) => setMonth(shiftMonth(month, delta))}
+            onStep={(delta) => stepRef.current(delta)}
             onPick={setPicked}
             onOpen={onOpenDay}
           />
