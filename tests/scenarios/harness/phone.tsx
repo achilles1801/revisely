@@ -12,6 +12,7 @@
 // the server is shared. One app is open at a time; a scenario opens one, closes
 // it, then opens the other.
 
+import { withAuthRetry } from './authRetry';
 import type * as RTL from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import type { RevisionLog, User, UserPage } from '../../../src/types';
@@ -288,13 +289,15 @@ export class OpenApp {
 
   /** Signs up through the app (AuthContext.signUp) and waits for the account to load. */
   async signUp(email = newEmail(), name = 'Scenario'): Promise<string> {
-    await this.act(() => this.auth.signUp(email, PASSWORD, name));
+    await this.act(() =>
+      withAuthRetry(() => this.auth.signUp(email, PASSWORD, name), { ifCreated: () => this.auth.signIn(email, PASSWORD) }),
+    );
     await this.until(() => !!this.ctx.app?.user && this.ctx.app.pages.length > 0, 'the new account to load');
     return email;
   }
 
   async signIn(email: string): Promise<void> {
-    await this.act(() => this.auth.signIn(email, PASSWORD));
+    await this.act(() => withAuthRetry(() => this.auth.signIn(email, PASSWORD)));
     await this.untilLoaded();
   }
 
