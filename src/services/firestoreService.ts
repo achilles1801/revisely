@@ -174,22 +174,28 @@ export function isInitializingPages(uid: string | undefined | null): boolean {
 }
 
 /**
- * Initialize all 604 page documents with default values.
- * Uses multiple batches to stay under Firestore's 500-op limit.
+ * Initialize all 604 page documents with default values, in batches under
+ * Firestore's 500-op limit. The batches are committed together, not one after
+ * the other's acknowledgement: each commit puts its pages in the phone's view at
+ * once, and a slow server ack (about 100 s on a CI simulator) kept pages
+ * 451–604 off the phone that long, so onboarding couldn't count or save a juz
+ * from them (ONBOARD-1). Firestore applies the batches in the order they were made.
  */
 export async function initializeAllPages(userId: string): Promise<void> {
   const BATCH_SIZE = 450;
   const now = Timestamp.now();
   initializingPages.add(userId);
   try {
+    const commits: Promise<void>[] = [];
     for (let batchStart = 1; batchStart <= TOTAL_QURAN_PAGES; batchStart += BATCH_SIZE) {
       const batch = writeBatch(db);
       const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, TOTAL_QURAN_PAGES);
       for (let pageNumber = batchStart; pageNumber <= batchEnd; pageNumber++) {
         batch.set(getPageRef(pageNumber, userId), newPageData(pageNumber, now));
       }
-      await batch.commit();
+      commits.push(batch.commit());
     }
+    await Promise.all(commits);
   } finally {
     initializingPages.delete(userId);
   }
