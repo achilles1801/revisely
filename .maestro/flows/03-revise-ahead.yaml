@@ -25,6 +25,10 @@ appId: com.revisionbuddy.app
       TEXT: Revision complete
 # AHEAD-3, DAY-3: Keep going offers the next revision day, Wednesday.
 - assertVisible: "Next: Wed · 10 pages"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-end-card
 - tapOn:
     id: session-end-keep-going
 - runFlow: ../subflows/show-controls.yaml
@@ -54,6 +58,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-ahead
     text: "Tomorrow starts at Al.Fajr, page 594"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-home-tomorrow
 
 # AHEAD-2: on Wednesday, the three pages revised ahead count for it.
 - runFlow:

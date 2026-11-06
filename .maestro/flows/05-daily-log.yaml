@@ -38,6 +38,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: journal-note-.*
     text: "Note, Repeat Al-Mutaffifin twice, .*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 05-daily-log-notes
 
 # LOG-2: editing one changes only it. Hold the note, Edit, change the text, Save.
 - longPressOn:

@@ -213,18 +213,41 @@ file is the release mechanics and the traps behind them.
   Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" lets
   `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
   hand.
-- `develop` requires CI green to merge (since Nov 4 2026): Secret scan, Typecheck, Unit +
-  component tests, Cloud Functions tests, Firestore rules tests, `Scenarios / Scenario tests` and
-  `E2E` (`e2e.yml`'s last job). Admins can still bypass (`enforce_admins` off). `main` has no branch
-  protection.
-- **Merging into develop: auto-merge, not babysitting** (Nov 6 2026). Open the PR and run
-  `gh pr merge <n> --auto --merge`: GitHub merges it the moment the required checks pass (the repo
-  allows auto-merge). Don't poll or loop over PRs to merge them. A stack of PRs lands as one batch by
-  auto-merging its tip (it holds the others; GitHub marks them merged). A PR whose checks fail stays
-  open: fix it, push, and auto-merge takes it from there. GitHub's merge queue would batch
-  unrelated PRs too, but it needs an organization-owned repository (this one is a user's: the API
-  refuses the rule); `ci.yml` and `e2e.yml` already run on `merge_group`, so moving the repo to an
-  organization and adding the ruleset is all it would take.
+- `develop` requires one check to merge: **`Required`** (ci.yml's last job, since Nov 6 2026). It
+  runs after a failure too and fails unless every job the change needs passed: Secret scan,
+  Typecheck, Unit + component tests, Cloud Functions tests, Firestore rules tests, Scenarios (four
+  shards; `Scenarios / Scenario tests` passes only if all four did) and E2E when `plan` asks for it.
+  A job skipped because another failed is not a pass; E2E is the one job that may be skipped, when
+  the plan leaves it out. Branches needn't be up to date with develop (`strict` off: the Preview
+  workflow's scenario gate still stops a broken develop from publishing). Admins can still bypass
+  (`enforce_admins` off). `main` has no branch protection. "Bug fixes add a scenario" (`spec.yml`)
+  runs on every PR on its own, so a label or a title edit re-runs it alone.
+- **Where the slow checks run** (`plan` in ci.yml; E2E is `e2e.yml`, called from CI):
+  - a lower layer of a GitHub stack: the fast checks only (the top layer tests the whole stack);
+  - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
+  - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
+  - what lands on develop (each push): every Android flow, and the iOS native build alone (kept
+    where every PR can restore it); a newer push cancels the run of the one before;
+  - nightly (develop) and by hand: every flow on both, from e2e.yml itself.
+
+  So iOS flows run only for the top of a stack, PRs into `main`, nightly and by hand.
+- **Stacks** (GitHub's stacked PRs, GA Oct 6 2026; `gh extension install github/gh-stack`, which
+  needs gh 2.90 or later): a large change is a stack, one layer per PR, each based on the one below.
+  - **Linear history.** Rebase a branch onto develop (or onto the layer below) and force-push with
+    `--force-with-lease`; never merge develop into a stack branch. GitHub requires it for stacks,
+    and it ends the "merge commit cannot be cleanly created" refusals (several merge bases).
+  - **Merging.** Every layer's `Required` must pass. Merging the top merges the whole stack, one
+    merge commit per layer. Merge from the top, not a lower layer alone: a lower layer has passed
+    only the fast checks.
+  - **Retargeting.** When a lower layer lands, GitHub rebases the rest onto develop.
+- **Merging into develop: auto-merge, no polling** (Nov 6 2026). A single PR: `gh pr merge <n>
+  --auto --merge`, and GitHub merges it once `Required` passes. A stack: the same on its top PR, or
+  `gh stack merge` (auto-merge for stacks is still rolling out). To follow a PR, run
+  `gh pr checks <n> --watch --fail-fast` in the background (one command that returns when the checks
+  finish or the first one fails), never a loop. A PR whose checks fail stays open: fix it and push.
+  GitHub's merge queue needs an organization-owned repository (this one is a user's: the API refuses
+  the rule); `ci.yml` already runs on `merge_group`, so moving the repo to an organization and adding
+  the ruleset is all it would take.
 - No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
   `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
   entry written by one run can be restored by another. Only CI, which holds no secrets, caches.
@@ -533,27 +556,34 @@ hard-coded token was deleted from the console on 2026-10-27.
   and Sentry source maps upload only if a `SENTRY_AUTH_TOKEN` repository secret exists.
 - **E2E** (`e2e.yml`, `.maestro/README.md`): Maestro flows on the iOS Simulator and the Android
   emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
-  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On PRs into
-  `develop`, a smoke set (02 session, 04 Fajr boundary, 05 daily log, 06 offline; one iOS job and one
-  Android job). On what lands on develop (each push: the batch just merged), on a merge group (if
-  ever enabled), on PRs into `main`, nightly (testing develop) and by hand, every flow (two iOS and
-  two Android jobs). One run per PR (a push cancels the older one); a push to develop cancels the
-  full run of the push before it (a burst of merges is tested once, at its end) and never a full run
-  started by hand. A red full run on develop doesn't stop the preview (the scenario gate does that):
-  fix it like any failure. iOS runners are the slow part (5 macOS jobs at once on this plan): don't
-  start full runs you don't need.
+  session, revise ahead, the Fajr boundary, the daily log, offline, recordings). CI calls it with
+  the sets `plan` picks (see "Where the slow checks run" above): the smoke set is 02 session, 04 Fajr
+  boundary, 05 daily log, 06 offline; every flow is two jobs a platform. The top of a stack tests the
+  stack's whole change. One run per PR (a push cancels the older one); a push to develop cancels the
+  run of the push before it, and never a full run started by hand. A red run on develop doesn't stop
+  the preview (the scenario gate does that): fix it like any failure. iOS runners are the slow part
+  (5 macOS jobs at once on this plan): don't start iOS runs you don't need.
+  - **Screenshots:** the flows take one on key screens (`subflows/shot.yaml`: Home's states, a
+    session page, the end card, the daily log, offline, a recording, Kathmandu). Every run that ran
+    flows keeps them as the artifact `e2e-<platform>-screens-<job>-<run>` (14 days):
+    `gh run download <run> -p 'e2e-*-screens-*'`. Check a visual change there, not on Majd's
+    simulator.
+  - **Cached builds:** the native build is kept per fingerprint, so a JavaScript-only change only
+    re-bundles. A PR restores develop's (pushes keep it there) and the nightly run's (kept on
+    `main`); a stack's upper layers see only `main`'s, so after a native change they build once,
+    until the next nightly run.
   - **Hangs and system alerts:** `run.sh` stops a flow attempt after 15 minutes and the warm-up
     after 6 (a Maestro driver that answered 500 once hung a shard for 55 minutes). Flows confirm
     iOS permission alerts (the simulator's microphone grant sometimes doesn't take), and the clock
     and network links are re-sent until they take.
   - **The daily log** (05) checks again 8 s after each change is sent: a note that drops out once
     sent, or a deleted one that comes back, fails it (#220 fixed exactly that, Nov 5 2026).
-  - **A required check:** the job `E2E`. Its `changes` job reads the PR's files; when nothing that
+  - **Its check:** the job `E2E` (CI's `Required` waits for it). Its `changes` job reads the change's files; when nothing that
     goes into the app or the flows changed (only what `.github/scripts/app-hash.sh` leaves out, other
     than `.maestro/`, `e2e.yml`, `firestore.rules` and `firebase.json`), the platform jobs are
     skipped and `E2E` passes. It also runs after a failure or a cancellation, so it is never
     missing. A run by hand on one platform or some flows reports as `E2E (partial run)`.
-    `claude-fix` starts it on its branch with CI.
+    `claude-fix` starts CI on its branch, which runs it.
   - A flaky flow is fixed, not skipped (Nov 4 2026). A pass on a retry is a warning, and the job
     keeps its results (screenshots, `app.log`: the E2E build's own log, `src/lib/e2e/log.ts`).
   The app is an E2E build: `EXPO_PUBLIC_E2E=1` at bundle time loads `src/lib/e2e/` (the

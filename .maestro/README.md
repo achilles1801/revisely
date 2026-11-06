@@ -1,13 +1,20 @@
 # E2E flows
 
 The real app on the iOS Simulator and the Android emulator, driven by Maestro, against the Firebase
-emulators, at a time and in a time zone each flow sets. CI runs them (`.github/workflows/e2e.yml`):
+emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them through
+`.github/workflows/e2e.yml`, with the sets its `plan` job picks:
 
 | When | Flows | Jobs |
 | --- | --- | --- |
-| A PR into `develop` | the smoke set: 02, 04, 05, 06 | one iOS, one Android |
-| A PR into `main`, every night (testing develop), by hand | all eight | two iOS, two Android |
-| A push to `develop` | none: the native builds are kept for PRs | one each |
+| A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | one Android |
+| A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
+| The top of a stack into `develop`, a PR into `main`, a merge group | all eight | two iOS, two Android |
+| A push to `develop` (what just landed) | all eight on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
+| Every night (testing develop), by hand | all eight | two iOS, two Android |
+
+Every run that ran flows keeps their screenshots of key screens (`subflows/shot.yaml`;
+`<flow>/run/takeScreenshot/<name>.png` under the results) as the artifact
+`e2e-<platform>-screens-<job>-<run>`.
 
 **The smoke set:**
 - **02 (today's session):** the revision session, the core of the app. Like every flow it starts
@@ -23,10 +30,12 @@ emulators, at a time and in a time zone each flow sets. CI runs them (`.github/w
 **Why not every flow on every PR:** a macOS runner is the scarce part, five at a time on this plan,
 and each iOS job takes 21–39 minutes of flows.
 - Nov 4–5: eight macOS jobs were wanted at once, and some waited 36 minutes for a runner.
-- The smoke set is one iOS job instead of two, and about half the flows.
+- So iOS runs only where a whole change is tested (the top of a stack, a release, nightly), and a
+  single PR gets the smoke set on Android, which runs on Linux.
 
-**`E2E` is a required check for merges into `develop`.** It is the workflow's last job:
-- **Skipped flows:** its `changes` job reads the PR's files. When nothing in them goes into the app
+**`E2E` is the workflow's last job; CI's required check, `Required`, waits for it:**
+- **Skipped flows:** its `changes` job reads the change's files (a stack's top: the whole stack's;
+  a push: what it added). When nothing in them goes into the app
   or the flows, the iOS and Android jobs are skipped and `E2E` passes. "Goes into" means anything
   outside `.github/scripts/app-hash.sh`'s ignore list, plus `.maestro/`, `e2e.yml`,
   `firestore.rules` and `firebase.json`.
@@ -35,8 +44,8 @@ and each iOS job takes 21–39 minutes of flows.
 - **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`), reports
   as `E2E (partial run)` and can't stand in for the check. `debug` there adds Firestore's own log to
   the app's log.
-- **Claude's PRs:** `claude-fix` starts it on its branch, with CI, since a PR opened by the workflow
-  token starts no workflow.
+- **Claude's PRs:** `claude-fix` starts CI on its branch (which runs it), since a PR opened by the
+  workflow token starts no workflow.
 
 A flaky flow is fixed, not skipped. Each failed flow is run once more (`E2E_RETRIES`). A pass on that
 retry is a warning on the run, and the job keeps its results as for a failure.

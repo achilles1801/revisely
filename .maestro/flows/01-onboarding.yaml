@@ -26,6 +26,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-cta
     text: "Start revision"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 01-home-day-one
 # The account is on the server: a cold start shows the same day.
 - runFlow: ../subflows/relaunch.yaml
 - extendedWaitUntil:

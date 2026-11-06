@@ -4,6 +4,11 @@ name: Scenarios
 # code against the Firebase emulators, with a test clock and time zone. Called by
 # ci.yml (every push and PR) and by preview.yml, which publishes nothing unless
 # they pass. No caches: preview.yml holds release secrets (CLAUDE.md).
+#
+# Four jobs side by side, each with a quarter of the files (Jest's --shard) and
+# its own emulators on its own runner: as one job it took 18 minutes. The check
+# ci.yml and preview.yml wait for is `Scenario tests`, which passes only when
+# every shard passed.
 
 on:
   workflow_call:
@@ -12,10 +17,14 @@ permissions:
   contents: read
 
 jobs:
-  scenarios:
-    name: Scenario tests
+  shard:
+    name: Scenario tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,8 +41,25 @@ jobs:
       - run: npm ci
         working-directory: functions
       - name: BEHAVIOUR.md and its tests
+        if: matrix.shard == 1
         run: node tests/scenarios/check-spec.js
-      - name: Scenarios and properties (Firebase emulators)
+      - name: Scenarios and properties (Firebase emulators), shard ${{ matrix.shard }} of 4
         run: >-
           scripts/emulators.sh exec auth,firestore demo-revisely
-          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit'
+          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4'
+
+  # The one check: every shard passed. It runs after a failure too, so it is
+  # never missing, and a shard that didn't run (cancelled, skipped) fails it.
+  scenarios:
+    name: Scenario tests
+    needs: shard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          RESULT: ${{ needs.shard.result }}
+        run: |
+          echo "Shards: $RESULT"
+          [ "$RESULT" = success ] || { echo "::error::A scenario shard didn't pass ($RESULT)."; exit 1; }

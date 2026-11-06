@@ -39,6 +39,10 @@ appId: com.revisionbuddy.app
     id: offline-note
     text: ".*changes are saved on this phone.*"
 - runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 06-home-offline
+- runFlow:
     file: ../subflows/server-session-is.yaml
     env:
       DAY: 2026-11-03

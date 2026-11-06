@@ -19,6 +19,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: session-page
     text: "Page 1 · .*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-session-page
 - tapOn: "Back"
 - extendedWaitUntil:
     visible:
@@ -55,6 +59,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-cta
     text: "Continue revision"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-home-continue
 
 # SESS-1: the check marks and unmarks the page on screen.
 - runFlow:
@@ -99,6 +107,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-cta
     text: "Review session"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-home-done
 
 # The Insights tab before Smart Tracking is set up: it is in the tab bar (a tap
 # opens the Smart Tracking preview) but not a page of the pager. A swipe past
@@ -125,6 +137,10 @@ appId: com.revisionbuddy.app
           timeout: 3000
 - assertVisible:
     id: smart-preview
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-smart-preview
 # Closing it keeps the account as it was (the preview is not marked seen).
 - tapOn:
     id: preview-close
