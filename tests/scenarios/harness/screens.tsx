@@ -451,16 +451,27 @@ export class ActivityDayView {
     return this.app.screen.queryByTestId('activity-block-memorized') != null;
   }
 
-  /** Holds the Memorized row, chooses Delete this entry, and confirms. */
+  /**
+   * Deletes the day's Memorized entry from the Memorized block's header (#260):
+   * the header holds the menu, and VoiceOver gets the same actions, one
+   * "delete-<id>" per entry, run here directly. The deletion is confirmed.
+   */
   async deleteMemorized(): Promise<void> {
     const { fireEvent } = this.app.mods.rtl;
     const { Alert } = this.app.mods.require<typeof import('react-native')>('react-native');
     (Alert as { alert: unknown }).alert = (_t: string, _m?: string, buttons?: { style?: string; onPress?: () => void }[]) =>
       buttons?.find((b) => b.style === 'destructive')?.onPress?.();
-    await this.app.until(() => this.app.screen.queryByLabelText('Memorized. Hold for Delete') != null, 'the Memorized row');
-    fireEvent(this.app.screen.getByLabelText('Memorized. Hold for Delete'), 'longPress');
-    await this.app.until(() => this.app.screen.queryByText('Delete this entry') != null, 'the Delete this entry action');
-    fireEvent.press(this.app.screen.getByText('Delete this entry'));
+    type A11y = { name: string };
+    const deleteAction = (el: { props: { accessibilityActions?: A11y[] } }) =>
+      (el.props.accessibilityActions ?? []).find((a) => String(a.name).startsWith('delete-'));
+    const header = () => this.app.screen.queryAllByLabelText('Memorized').find((el) => deleteAction(el) != null);
+    await this.app.until(() => header() != null, 'the Memorized block header');
+    const el = header()!;
+    const action = deleteAction(el)!.name;
+    await this.app.act(async () => {
+      fireEvent(el, 'accessibilityAction', { nativeEvent: { actionName: action } });
+    });
+    await this.app.idle(50);
   }
 }
 
