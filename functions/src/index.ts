@@ -20,6 +20,10 @@ import { RESET_CALL_OPTIONS, ResetError, ResetResult, handleResetMyData } from '
 import { adminResetStore } from './testerResetAdmin';
 import { ScenarioResult, handleLoadTestScenario } from './testScenarios';
 import { adminScenarioWriter } from './testScenariosAdmin';
+import { defineSecret } from 'firebase-functions/params';
+import { adminCoachStore } from './coach/admin';
+import { CoachError, handleAskCoach, handleSetOptIn } from './coach/handler';
+import { callCoach } from './coach/call';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -216,3 +220,42 @@ export const playBuildAvailable = onRequest(
     }
   },
 );
+
+/**
+ * The Ask coach (C6, previewTester accounts that opted in): one answer per insight and revision
+ * day, at most 5 new answers a user a day, and a monthly cap in dollars. The key is the
+ * ANTHROPIC_COACH_KEY secret; it never reaches the app. See functions/src/coach/.
+ */
+const ANTHROPIC_COACH_KEY = defineSecret('ANTHROPIC_COACH_KEY');
+
+function coachDeps() {
+  return {
+    store: adminCoachStore(adminDb),
+    call: (request: Parameters<typeof callCoach>[0]) => callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value() }),
+    now: () => new Date(),
+    log: (entry: Record<string, unknown>) => logger.info('coach', entry),
+  };
+}
+
+export const askCoach = onCall(
+  { enforceAppCheck: true, secrets: [ANTHROPIC_COACH_KEY], timeoutSeconds: 90, memory: '256MiB', maxInstances: 2 },
+  async (request) => {
+    try {
+      return await handleAskCoach(request.auth, request.data, coachDeps());
+    } catch (err) {
+      if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
+      logger.error('askCoach failed', err);
+      throw new HttpsError('internal', 'The coach is unavailable. Try again.');
+    }
+  },
+);
+
+export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, async (request) => {
+  try {
+    return await handleSetOptIn(request.auth, request.data, coachDeps());
+  } catch (err) {
+    if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
+    logger.error('setCoachOptIn failed', err);
+    throw new HttpsError('internal', 'The setting did not save. Try again.');
+  }
+});

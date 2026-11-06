@@ -1030,7 +1030,7 @@ export async function loadTestScenarioOnServer(data: {
 }
 
 /** Call one of our callable Cloud Functions with the account's ID token and App Check. */
-async function callFunction(
+export async function callFunction(
   user: NonNullable<typeof auth.currentUser>,
   name: string,
   data: Record<string, unknown>,
