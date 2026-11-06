@@ -72,6 +72,11 @@ How the tests are made: `tests/scenarios/README.md`.
   and only pages of the missed day count (today's own pages don't). The grace is recoverable until today's revision
   day ends, and repeats any day a day is missed. Two missed days in a row break the streak; a day done late does not
   restore a missed day, and older days can still be revised, credited to their own days.
+- **SESS-7.** A catch-up page (one carried in from a missed or unfinished day) is credited to the day it was
+  scheduled for, not to today. It never counts toward today's completion: today is done when today's own pages are
+  credited to today (in shift mode, the own pages are the day's usual size; the carried pages stand in for the
+  pages the shift moved). Each carried page keeps its source day in the carry (`carryOver.from`). A session saves a
+  catch-up page under the ahead credit of its own day, and out of its own pagesRevised.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,

@@ -57,7 +57,7 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
-import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
+import { applyCarryOver, leftoversFor, ownPagesOf, type Leftovers } from '../../lib/carryOver';
 import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { streakReadingFromLogs } from '../../lib/streak';
@@ -163,8 +163,10 @@ export default function DashboardScreen() {
     // Today's pages credited to today: revised today, or ahead from an earlier
     // session (a day done ahead is done).
     const credited = creditedOnDay(logs, revisionDay);
-    const totalAssigned = assignment?.totalPages || 0;
-    const completed = (assignment?.pages ?? []).filter((p) => credited.has(p)).length;
+    // Today is done when its OWN pages are (SESS-7): catch-up pages are credited to the days they were missed.
+    const own = user && assignment ? ownPagesOf(assignment.pages, user, revisionDay) : (assignment?.pages ?? []);
+    const totalAssigned = own.length;
+    const completed = own.filter((p) => credited.has(p)).length;
     // If the user revised pages today and the assignment later shrank
     // (custom-plan edit, un-memorized surah), treat that as completed
     // rather than letting `remaining` go negative downstream.
@@ -174,7 +176,7 @@ export default function DashboardScreen() {
     if (completed > 0)
       return { status: 'partial' as const, pagesCompleted: completed };
     return { status: 'not_started' as const, pagesCompleted: 0 };
-  }, [logs, assignment, revisionDay]);
+  }, [logs, assignment, revisionDay, user]);
 
   // Done today: the next revision day, which Home's quiet line opens (#168).
   const aheadNext = useMemo(() => {
@@ -189,7 +191,7 @@ export default function DashboardScreen() {
   // no session at all counts as missed), offered as "Add to today". Empty once
   // they are in today's assignment.
   const leftovers = useMemo<Leftovers>(() => {
-    if (!user || !assignment) return { pages: [], days: [] };
+    if (!user || !assignment) return { pages: [], from: {}, days: [] };
     return leftoversFor(user, logs, revisionDay, assignment.pages, pages.filter((p) => p.status === 'memorized'));
   }, [logs, revisionDay, assignment, pages, user]);
 
@@ -395,7 +397,7 @@ export default function DashboardScreen() {
     setCarrying(true);
     try {
       const memorized = pages.filter((p) => p.status === 'memorized');
-      await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate));
+      await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate, leftovers.from));
     } catch {
       Alert.alert("Couldn't update today's session", 'Please try again.');
     } finally {

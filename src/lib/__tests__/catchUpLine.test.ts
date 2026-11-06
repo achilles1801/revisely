@@ -4,12 +4,13 @@ import { catchUpLine } from '../todayLines';
 const N = ' ';
 const one = (pages: number[], ago: number, missed = true) => ({
   pages,
+  from: {},
   days: [{ day: `d${ago}`, ago, missed }],
 });
 
 describe('catchUpLine', () => {
   it('nothing left over: no line', () => {
-    expect(catchUpLine({ pages: [], days: [] })).toBeNull();
+    expect(catchUpLine({ pages: [], from: {}, days: [] })).toBeNull();
   });
 
   it('a missed yesterday: "Missed yesterday · Revise p. 559–563"', () => {
@@ -29,6 +30,7 @@ describe('catchUpLine', () => {
   it('several missed days say how many, and show their pages as one range', () => {
     const got = catchUpLine({
       pages: Array.from({ length: 15 }, (_, i) => 6 + i),
+      from: {},
       days: [
         { day: 'd3', ago: 3, missed: true },
         { day: 'd2', ago: 2, missed: true },

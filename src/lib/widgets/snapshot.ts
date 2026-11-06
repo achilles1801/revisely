@@ -8,6 +8,7 @@
 
 import { generateDailyAssignment, getPagesForDay } from '../algorithm';
 import { creditedOnDay, creditIndex } from '../aheadCredit';
+import { ownPagesOf } from '../carryOver';
 import { aliveStreak, completedDays } from '../streak';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
@@ -184,7 +185,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
   // A day with a session, or whose pages were all revised ahead, is a day done.
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
-  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? getPagesForDay(user, localDay(d), memorized));
+  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? ownPagesOf(getPagesForDay(user, localDay(d), memorized), user, d));
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -195,8 +196,10 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
     // As Home: done once every page of the day is revised, today or ahead.
     const credited = creditedOnDay(input.logs, day);
-    const total = assignment.totalPages;
-    const doneHere = assignment.pages.filter((p) => credited.has(p)).length;
+    // Today's own pages (SESS-7): catch-up pages are credited to the days they were missed.
+    const own = ownPagesOf(assignment.pages, user, day);
+    const total = own.length;
+    const doneHere = own.filter((p) => credited.has(p)).length;
     const completed = total > 0 && doneHere >= total;
 
     days.push({

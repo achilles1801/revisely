@@ -63,7 +63,8 @@ import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
-import { aheadCreditFor, creditedOnDay } from '../../lib/aheadCredit';
+import { catchUpDayOf, ownPagesOf } from '../../lib/carryOver';
+import { aheadCreditFor, creditedOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
 import {
   getHizbForPage,
@@ -142,8 +143,15 @@ export default function ActiveRevisionScreen() {
   const pageDays = useMemo(() => {
     const days = new Map<number, string>();
     for (const s of sections) for (const p of s.pages) days.set(p, s.day);
+    // A catch-up page is credited to the day it was missed, not to today (SESS-7).
+    if (user && sessionDay) {
+      for (const p of sessionPages) {
+        const d = catchUpDayOf(user, sessionDay, p);
+        if (d) days.set(p, d);
+      }
+    }
     return days;
-  }, [sections]);
+  }, [sections, sessionPages, user, sessionDay]);
   const lastSectionDay = sections[sections.length - 1].day;
   const lastSectionPages = sections[sections.length - 1].pages;
   // The pager holds one revision day: today's, or once the session has gone
@@ -398,7 +406,8 @@ export default function ActiveRevisionScreen() {
   const commitPendingPages = useCallback(async (): Promise<void> => {
     if (!user || !assignment || !sessionDay) return;
     const revisionDay = sessionDay;
-    const assignedPages = assignment.pages;
+    // Today's own pages: the catch-up pages are credited to the days they were missed (SESS-7).
+    const assignedPages = ownPagesOf(assignment.pages, user, revisionDay);
     while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
       (p) => !silentlySavedRef.current.has(p),
@@ -438,14 +447,15 @@ export default function ActiveRevisionScreen() {
       const weaknessUpdates = Array.from(localRatings.entries())
         .filter(([page]) => pending.includes(page))
         .map(([page, rating]) => ({ page, rating }));
+      const credit = sessionCredit(pending, pageDays, revisionDay);
       await addLog({
         date: revisionDay,
         assignedPages,
-        pagesRevised: pending,
+        pagesRevised: credit.pagesRevised,
         pagesSkipped: [],
         weaknessUpdates,
         durationMinutes,
-        ahead: aheadCreditFor(pageDays, pending, revisionDay),
+        ahead: credit.ahead,
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
       lastSaveTimeRef.current = Date.now();
@@ -711,12 +721,12 @@ export default function ActiveRevisionScreen() {
         const revisionDay = sessionDay ?? getCurrentRevisionDay(user!);
         await addLog({
           date: revisionDay,
-          assignedPages: assignment?.pages ?? [],
-          pagesRevised,
+          assignedPages: ownPagesOf(assignment?.pages ?? [], user!, revisionDay),
+          pagesRevised: sessionCredit(pagesRevised, pageDays, revisionDay).pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,
           durationMinutes: durationDelta,
-          ahead: aheadCreditFor(pageDays, pagesRevised, revisionDay),
+          ahead: sessionCredit(pagesRevised, pageDays, revisionDay).ahead,
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
