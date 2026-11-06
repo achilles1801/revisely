@@ -76,8 +76,10 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SESS-2.** A day is done when all its pages are credited to it. Home then says Done, and the streak
   counts the day. The streak counts back from
   today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
-  widget and the reminders share this rule (lib/streak). The Dashboard and the widget read it from the Activity items
-  (the last 400 days) once they load (lib/streakFromItems); the logs answer until then.
+  widget and the reminders share this rule (lib/streak). The Dashboard, the widget and the reminders read it from the Activity items
+  (the last 400 days) once they load (lib/streakFromItems); the logs answer until then. An item counts as on time
+  when it was written before its revision day ended: the Fajr that starts the next day with the boundary on (so
+  00:30 before that Fajr is still the day before), midnight otherwise.
 - **SESS-6.** A missed day keeps a grace window. When yesterday is missed (not all its scheduled pages credited to it)
   but the run before it is intact, the streak reads as broken and the widget and Home show the streak dimmed, with a
   ring for the missed pages. Revising yesterday's missed pages, credited to yesterday, restores the streak at once,
