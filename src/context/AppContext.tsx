@@ -145,8 +145,9 @@ interface AppContextType extends AppState {
   savePages: (pages: UserPage[], changedPageNumbers?: number[]) => Promise<void>;
   updatePage: (page: UserPage) => Promise<void>;
   updatePages: (pages: UserPage[], changedPageNumbers?: number[]) => Promise<void>;
-  addLog: (log: Omit<RevisionLog, 'id'>) => Promise<void>;
-  updateLog: (log: RevisionLog) => Promise<void>;
+  /** `checked`: every page the session holds as revised, catch-up pages included (SESS-7). */
+  addLog: (log: Omit<RevisionLog, 'id'> & { checked?: number[] }) => Promise<void>;
+  updateLog: (log: RevisionLog & { checked?: number[] }) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
   deleteLogs: (logIds: string[]) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -990,7 +991,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // LOG/SESSION OPERATIONS
   // ============================================================================
 
-  const addLog = useCallback(async (log: Omit<RevisionLog, 'id'>) => {
+  /**
+   * The pages a session holds as revised, catch-up pages included (SESS-7): the caller's own list, else
+   * its pagesRevised and the pages it credits ahead (a catch-up page is credited, not revised).
+   */
+  const checkedOf = (log: { pagesRevised: number[]; ahead?: Record<string, number[]>; checked?: number[] }): number[] =>
+    log.checked ?? [...new Set([...log.pagesRevised, ...Object.values(log.ahead ?? {}).flat()])];
+
+  const addLog = useCallback(async (log: Omit<RevisionLog, 'id'> & { checked?: number[] }) => {
     setError(null);
     const at = Date.now();
     const existing = viewRef.current?.sessions.find((s) => s.id === log.date);
@@ -1006,12 +1014,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
         durationAdd: log.durationMinutes ?? 0,
         ...(log.ahead ? { ahead: log.ahead } : {}),
+        ...(log.ahead || log.checked ? { checked: checkedOf(log) } : {}),
       },
       at,
     );
   }, [enqueueOp]);
 
-  const updateLog = useCallback(async (log: RevisionLog) => {
+  const updateLog = useCallback(async (log: RevisionLog & { checked?: number[] }) => {
     setError(null);
     const at = Date.now();
     const before = viewRef.current?.sessions.find((s) => s.id === log.id);
@@ -1027,6 +1036,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
       // Pages no longer revised here are no longer credited ahead either.
       ...(log.ahead ? { ahead: removeAheadPages(log.ahead, [...old].filter((p) => !next.has(p))) } : {}),
+      checked: checkedOf(log),
     };
     const forUid = uidRef.current;
     const freshLogs = logsWith([op], at);
