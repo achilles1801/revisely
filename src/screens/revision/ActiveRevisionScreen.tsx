@@ -456,6 +456,8 @@ export default function ActiveRevisionScreen() {
         weaknessUpdates,
         durationMinutes,
         ahead: credit.ahead,
+        // Every page checked, catch-up pages too: their credit stays while they are checked (SESS-7).
+        checked: pending,
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
       lastSaveTimeRef.current = Date.now();
@@ -727,6 +729,7 @@ export default function ActiveRevisionScreen() {
           weaknessUpdates: weaknessUpdatesArray,
           durationMinutes: durationDelta,
           ahead: sessionCredit(pagesRevised, pageDays, revisionDay).ahead,
+          checked: pagesRevised,
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
