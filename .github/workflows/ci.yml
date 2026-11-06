@@ -4,6 +4,9 @@ on:
   push:
     branches: [develop, main]
   pull_request:
+  # A merge queue's group (needs an organization-owned repo; ready if it moves).
+  merge_group:
+    types: [checks_requested]
   # Claude's fix PRs (claude-fix.yml) are opened with the workflow token, which starts no workflows;
   # that workflow starts CI on the branch this way.
   workflow_dispatch:
@@ -15,7 +18,71 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# The one required check on develop is `Required` (the last job): it passes only
+# when every job this change needs passed. What runs where:
+#   - every PR, push and merge group: the fast checks (secret scan, typecheck,
+#     unit, functions, rules, the scenario suite in four shards);
+#   - E2E (e2e.yml, called below), decided by `plan`:
+#       a lower layer of a GitHub stack: none (the top layer tests the whole stack);
+#       the top of a stack into develop, a PR into main, a merge group: every flow, iOS and Android;
+#       a single PR into develop (or claude-fix's run by hand): the Android smoke set;
+#       a push to develop (what just landed): every Android flow, and the iOS native
+#       build kept for PRs (no iOS flows);
+#     nightly and by hand: e2e.yml's own schedule and Run workflow.
+# "Bug fixes add a scenario" is its own workflow (spec.yml), so a label or title
+# edit re-runs it alone.
+
 jobs:
+  plan:
+    name: CI plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      e2e: ${{ steps.plan.outputs.e2e }}
+      ios: ${{ steps.plan.outputs.ios }}
+      android: ${{ steps.plan.outputs.android }}
+    steps:
+      # A stacked PR carries `stack` (position 1 is the bottom; the top has
+      # position == size; base.ref is the branch the whole stack targets).
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref_name }}
+          BASE: ${{ github.base_ref }}
+          STACK_SIZE: ${{ github.event.pull_request.stack.size }}
+          STACK_POSITION: ${{ github.event.pull_request.stack.position }}
+          STACK_BASE: ${{ github.event.pull_request.stack.base.ref }}
+        run: |
+          ios=none; android=none
+          case "$EVENT" in
+            pull_request)
+              target=${STACK_BASE:-$BASE}
+              if [ -n "$STACK_SIZE" ] && [ "$STACK_POSITION" != "$STACK_SIZE" ]; then
+                what="layer $STACK_POSITION of $STACK_SIZE of a stack into $target: fast checks (the top layer runs E2E for the whole stack)"
+              elif [ "$target" = main ]; then
+                ios=full; android=full; what="a PR into main: every flow"
+              elif [ "$target" = develop ] && [ -n "$STACK_SIZE" ]; then
+                ios=full; android=full; what="the top of a stack of $STACK_SIZE into develop: every flow"
+              elif [ "$target" = develop ]; then
+                android=smoke; what="a PR into develop: the Android smoke set"
+              else
+                what="a PR into $target: fast checks (E2E runs once it targets develop)"
+              fi ;;
+            merge_group) ios=full; android=full; what="a merge group: every flow" ;;
+            push)
+              if [ "$REF" = develop ]; then
+                ios=build; android=full; what="what landed on develop: every Android flow, and the iOS native build kept for PRs"
+              else
+                what="a push to $REF: no E2E (its PR ran it)"
+              fi ;;
+            workflow_dispatch) android=smoke; what="a run by hand: the Android smoke set" ;;
+            *) what="$EVENT: no E2E" ;;
+          esac
+          e2e=true; [ "$ios$android" = nonenone ] && e2e=false
+          echo "$what (iOS: $ios, Android: $android)"
+          { echo "ios=$ios"; echo "android=$android"; echo "e2e=$e2e"; } >> "$GITHUB_OUTPUT"
+
   # -----------------------------------------------------------------------
   # The repository is public: fail if a tracked file holds something that
   # looks like a secret (scripts/check-secrets.sh; no dependencies).
@@ -123,3 +190,42 @@ jobs:
         run: npm install -g firebase-tools
       - run: npm ci
       - run: npm test
+
+  # -----------------------------------------------------------------------
+  # The real app on the simulator and the emulator (e2e.yml), as `plan` says.
+  # -----------------------------------------------------------------------
+  e2e:
+    name: E2E
+    needs: plan
+    if: ${{ needs.plan.outputs.e2e == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/e2e.yml
+    with:
+      ios: ${{ needs.plan.outputs.ios }}
+      android: ${{ needs.plan.outputs.android }}
+
+  # -----------------------------------------------------------------------
+  # The required check. It runs after a failure too (never missing), and fails
+  # unless every job passed: a job skipped because another failed is not a
+  # pass. The one job that may be skipped is E2E, when `plan` didn't ask for it.
+  # -----------------------------------------------------------------------
+  required:
+    name: Required
+    needs: [plan, secrets, typecheck, unit, functions, scenarios, firestore-rules, e2e]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+          E2E_PLANNED: ${{ needs.plan.outputs.e2e }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq -r --arg e2e "$E2E_PLANNED" '
+            to_entries[] | select(.value.result != "success")
+            | select(.key != "e2e" or $e2e == "true" or .value.result != "skipped") | .key')
+          if [ -n "$bad" ]; then echo "::error::Not passed: $(echo $bad)"; exit 1; fi
+          echo "Every job this change needs passed."

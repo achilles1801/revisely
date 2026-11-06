@@ -30,6 +30,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-title
     text: "Done · 10.pages"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 04-home-done
 
 # DAY-2, DAY-5: 03:00 on Wednesday is before Fajr: still Tuesday, done.
 - runFlow:
@@ -62,6 +66,10 @@ appId: com.revisionbuddy.app
 # LOG-3: a note written at 03:00 belongs to Tuesday, the revision day.
 - runFlow: ../subflows/open-log.yaml
 - assertVisible: "Tue 11/3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 04-daily-log
 - runFlow:
     file: ../subflows/add-note.yaml
     env:

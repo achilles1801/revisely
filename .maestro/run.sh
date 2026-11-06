@@ -102,6 +102,9 @@ set_android_zone() {
   fi
 }
 
+# A flow's own screenshots of key screens (takeScreenshot: a name) go to
+# $out/run/takeScreenshot/<name>.png; the workflow keeps them from every run.
+
 # What the device saw, for a failed flow: a screenshot and the app's logs.
 # app.log is the E2E build's own log (src/lib/e2e/log.ts): everything the app's
 # JavaScript said, which an iOS release build doesn't pass to the system log
@@ -132,12 +135,14 @@ run_flow() {
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
+      --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1
   else
     set_android_zone "$zone" || return 1
     with_limit "$FLOW_LIMIT" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
+      --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1
   fi
 }

@@ -16,6 +16,10 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: today-title
     text: "Starts at Al.Fatihah, p..1[^0-9]*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 08-home-kathmandu
 # 00:20 in Kathmandu is still 18:35 UTC on Tuesday.
 - runFlow:
     file: ../subflows/set-clock-and-relaunch.yaml
