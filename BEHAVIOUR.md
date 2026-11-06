@@ -215,6 +215,11 @@ How the tests are made: `tests/scenarios/README.md`.
 
 - **ACT-9.** A day's Activity items load when the day opens and again when its screen regains focus, not
   on their own: a render never starts another load (it looped and froze the app, Nov 2026).
+- **ACT-10.** Pages marked memorized in the memorization manager, or in the Memorized composer, are logged as a
+  memorization item for the day the user chooses: Today writes them into that day's item (merged, idempotent);
+  Before (don't log) writes nothing. The manager asks "When did you memorize these?" (default Before above five
+  pages). Pages unmarked are removed from the items that hold them. The Memorized composer takes a page range
+  (From and To) and marks it in the same save.
 
 ## Known bugs
 
