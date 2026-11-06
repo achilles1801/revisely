@@ -3,6 +3,7 @@
 // screens make (JuzSelectionScreen → updatePages, ScheduleScreen →
 // createDefaultUser + saveUser + completeOnboarding).
 
+import { withAuthRetry } from './authRetry';
 import type { User, UserPage } from '../../../src/types';
 import { newEmail, OpenApp, Phone } from './phone';
 
@@ -37,7 +38,11 @@ export function pagesRange(from: number, to: number): number[] {
  */
 export async function signUpAndRelaunch(phone: Phone, email = newEmail()): Promise<OpenApp> {
   let app = phone.current ?? (await phone.open());
-  await app.act(() => app.auth.signUp(email, 'scenario-password', 'Scenario'));
+  await app.act(() =>
+    withAuthRetry(() => app.auth.signUp(email, 'scenario-password', 'Scenario'), {
+      ifCreated: () => app.auth.signIn(email, 'scenario-password'),
+    }),
+  );
   phone.email = email;
   await app.untilLoaded();
   const svc = app.mods.require<typeof import('../../../src/services/firestoreService')>('src/services/firestoreService');
