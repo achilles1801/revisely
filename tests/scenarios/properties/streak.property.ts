@@ -1,6 +1,7 @@
 // The streak rule (C5, owner-approved Nov 2026): a day counts when every page scheduled for it is
 // credited to it, ahead credits included; alive through yesterday until today's revision day ends.
-import { aliveStreak, completedDays, previousIsoDay, streakFromLogs, streakReading } from '../../../src/lib/streak';
+import { aliveStreak, completedDays, previousIsoDay, streakFromLogs, streakReading, streakReadingFromLogs } from '../../../src/lib/streak';
+import { streakReadingFromItems } from '../../../src/lib/streakFromItems';
 import type { RevisionLog, User, UserPage } from '../../../src/types';
 
 const log = (date: string, assignedPages: number[], pagesRevised: number[], ahead?: Record<string, number[]>): RevisionLog => ({
@@ -129,4 +130,50 @@ describe('the grace window (SESS-6)', () => {
     const sameRevisionDay = reading({ ...full('2026-11-01', '2026-11-02') }, '2026-11-04');
     expect(sameRevisionDay).toEqual(before);
   });
+});
+
+// C5: the streak from the Activity items, not the logs (lib/streakFromItems). Same answers on the same
+// history; a day done late doesn't carry a run behind it.
+describe('the streak from items (C5)', () => {
+  const user = { id: 'u1', dailyPageCapacity: 2, scheduleMode: 'pages' } as unknown as User;
+  const dayMs = (d: string) => {
+    const [y, m, dd] = d.split('-').map(Number);
+    return new Date(y, m - 1, dd, 20, 0).getTime();
+  };
+  const item = (day: string, pages: number[], occurredAt: number | null) => ({
+    day,
+    countsFor: day,
+    pages,
+    assigned: pages,
+    occurredAt,
+  });
+
+  it('[SESS-2] the items give the same streak as the logs on the same history', () => {
+    const logs = [
+      { id: 'a', date: '2026-11-01', assignedPages: [1, 2], pagesRevised: [1, 2], pagesSkipped: [], weaknessUpdates: [], durationMinutes: null },
+      { id: 'b', date: '2026-11-02', assignedPages: [3, 4], pagesRevised: [3, 4], pagesSkipped: [], weaknessUpdates: [], durationMinutes: null },
+    ] as unknown as RevisionLog[];
+    const items = [item('2026-11-01', [1, 2], dayMs('2026-11-01')), item('2026-11-02', [3, 4], dayMs('2026-11-02'))];
+    const fromLogs = streakReadingFromLogs({ user, pages: [], logs, today: '2026-11-03' });
+    const fromItems = streakReadingFromItems({ user, pages: [], items, today: '2026-11-03' });
+    expect(fromItems).toEqual(fromLogs);
+    expect(fromItems.streak).toBe(2);
+  });
+
+  it('[SESS-6] a missed day restored late brings back the run before it (items only)', () => {
+    // Day 1 on time; day 2 missed on its own day, restored the next day. Restoring it brings back day 1.
+    const items = [item('2026-11-01', [1, 2], dayMs('2026-11-01')), item('2026-11-02', [3, 4], dayMs('2026-11-03'))];
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-03' }).streak).toBe(2);
+  });
+
+  it('[SESS-6] two days done late do not carry each other (items only)', () => {
+    // Day 1 on time; days 2 and 3 both restored late. Only the first restoration brings back day 1.
+    const items = [
+      item('2026-11-01', [1, 2], dayMs('2026-11-01')),
+      item('2026-11-02', [3, 4], dayMs('2026-11-03')),
+      item('2026-11-03', [5, 6], dayMs('2026-11-04')),
+    ];
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-04' }).streak).toBe(1);
+  });
+
 });

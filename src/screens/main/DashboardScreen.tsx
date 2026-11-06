@@ -61,6 +61,7 @@ import { applyCarryOver, leftoversFor, ownPagesOf, type Leftovers } from '../../
 import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { streakReadingFromLogs } from '../../lib/streak';
+import { streakReadingFromItems, type HistoryItem } from '../../lib/streakFromItems';
 import { dateToLocalISODay } from '../../lib/schedulePlans';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -208,10 +209,31 @@ export default function DashboardScreen() {
   }, []);
 
   // The streak (lib/streak): the same rule and the same answer as the widget.
-  const streakNow = useMemo(
-    () => (user ? streakReadingFromLogs({ user, pages, logs, today: dateToLocalISODay(revisionDate) }) : null),
-    [logs, revisionDate, user, pages],
-  );
+  // From the Activity items (C5) once the history has loaded (400 days back); the logs until then.
+  const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const to = revisionDay;
+    const [y, m, d] = to.split('-').map(Number);
+    const from = dateToLocalISODay(new Date(y, m - 1, d - 400));
+    firestoreService
+      .getActivityItemsBetween(from, to)
+      .then((r) => {
+        if (!cancelled) setHistory(r.revisions.map((x) => ({ day: x.day, countsFor: x.countsFor, pages: x.pages, assigned: x.assigned, occurredAt: x.occurredAt })));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, revisionDay, logs.length]);
+  const streakNow = useMemo(() => {
+    if (!user) return null;
+    const today = dateToLocalISODay(revisionDate);
+    return history
+      ? streakReadingFromItems({ user, pages, items: history, today })
+      : streakReadingFromLogs({ user, pages, logs, today });
+  }, [history, logs, revisionDate, user, pages]);
   const calculatedStreak = streakNow?.streak ?? 0;
 
   // Sessions

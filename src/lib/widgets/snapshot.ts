@@ -10,6 +10,7 @@ import { generateDailyAssignment, getPagesForDay } from '../algorithm';
 import { creditedOnDay, creditIndex } from '../aheadCredit';
 import { ownPagesOf } from '../carryOver';
 import { aliveStreak, completedDays } from '../streak';
+import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
@@ -124,6 +125,8 @@ export interface WidgetInputs {
   cities?: readonly City[];
   /** Prayer times to include (testers with a place); none otherwise. */
   prayer?: { from: Coords; settings: CalcSettings; place: string | null } | null;
+  /** The Activity items' history (C5): the streak is read from it once loaded; the logs until then. */
+  history?: HistoryItem[] | null;
 }
 
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
@@ -212,7 +215,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       total,
       done: completed ? total : doneHere,
       completed,
-      streak: aliveStreak(done, day),
+      streak: input.history ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak : aliveStreak(done, day),
     });
     // Never stall: a boundary that isn't later (an odd clock) moves on a day.
     startsAt = endsAt.getTime() > startsAt.getTime() ? endsAt : new Date(startsAt.getTime() + 86_400_000);

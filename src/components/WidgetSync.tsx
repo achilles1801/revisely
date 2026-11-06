@@ -6,6 +6,8 @@ import { useDesign } from '../design/DesignContext';
 import { useRevisionDay } from '../hooks/useRevisionDay';
 import { getQuranData } from '../lib/quranData';
 import { buildWidgetSnapshot } from '../lib/widgets/snapshot';
+import type { HistoryItem } from '../lib/streakFromItems';
+import * as firestoreService from '../services/firestoreService';
 import { writeWidgetSnapshot } from '../lib/widgets/storage';
 import { lastKnownPosition } from '../lib/widgets/position';
 import type { Coords } from '../lib/widgets/qibla';
@@ -63,6 +65,25 @@ export function WidgetSync() {
   const prayerFrom = prayerTimesEnabled(ownUser) ? prayerPlace(ownUser, prayerPrefs) : null;
   const prayerKey = prayerFrom ? JSON.stringify([prayerFrom, prayerSettings(ownUser, prayerPrefs)]) : '';
 
+  // The Activity items' history for the streak (C5), 400 days back; the logs until it loads.
+  const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  useEffect(() => {
+    if (!signedIn || !ownUser || !day) return;
+    let cancelled = false;
+    const [y, m, d] = day.split('-').map(Number);
+    const from = new Date(y, m - 1, d - 400);
+    const iso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
+    firestoreService
+      .getActivityItemsBetween(iso, day)
+      .then((r) => {
+        if (!cancelled) setHistory(r.revisions.map((x) => ({ day: x.day, countsFor: x.countsFor, pages: x.pages, assigned: x.assigned, occurredAt: x.occurredAt })));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, ownUser, day, logs.length]);
+
   useEffect(() => {
     if (authLoading || (signedIn && (loading || !ownUser))) return;
     writeWidgetSnapshot(
@@ -72,6 +93,7 @@ export function WidgetSync() {
         onboardingComplete,
         pages,
         logs,
+        history,
         quranData: getQuranData(),
         accent,
         now: new Date(),
@@ -88,7 +110,7 @@ export function WidgetSync() {
     );
     // prayerKey stands for the prayer place and settings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, accent, day, foreground, qiblaFrom, prayerKey]);
+  }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, history, accent, day, foreground, qiblaFrom, prayerKey]);
 
   useWidgetLinks(signedIn && !loading && !!ownUser && onboardingComplete);
   return null;
