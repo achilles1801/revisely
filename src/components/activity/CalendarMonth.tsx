@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 import { monthGrid, monthTitle } from '../../lib/activityHeatmap';
+import { weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalendar';
+import { PillTabs } from '../v2/PillTabs';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { formatMinutesLong } from '../../lib/activityFormat';
 import { typeV2 } from '../../theme/v2';
@@ -26,6 +28,9 @@ export interface CalendarData {
 
 export function CalendarMonth({
   month,
+  week,
+  span,
+  onSpan,
   today,
   picked,
   data,
@@ -33,8 +38,12 @@ export function CalendarMonth({
   onPick,
   onOpen,
 }: {
-  /** 'YYYY-MM' */
+  /** 'YYYY-MM' (the month shown, and the grid's days). */
   month: string;
+  /** The Sunday that starts the week shown (the week span). */
+  week: string;
+  span: CalendarSpan;
+  onSpan: (span: CalendarSpan) => void;
   today: string;
   picked: string | null;
   data: CalendarData;
@@ -46,6 +55,7 @@ export function CalendarMonth({
   const grid = monthGrid(month);
   const days = grid.flat().filter((d): d is string => d != null);
   const inMonth = (d: string) => d.startsWith(`${month}-`);
+  const weekShown = weekDays(week);
 
   // The month's totals: days revised, pages memorized, time read, days with a note.
   const revisedDays = days.filter((d) => dayMarks(d, data).ring != null).length;
@@ -69,9 +79,24 @@ export function CalendarMonth({
 
   return (
     <View testID="calendar-month">
-      {/* Month header: the title on the left, the chevrons on the right (22, gap 22). */}
+      {/* Week | Month: ink pills that hug their labels (the choice is kept on the phone). */}
+      <View style={styles.spanRow}>
+        <PillTabs<CalendarSpan>
+          options={[
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+          ]}
+          value={span}
+          onChange={onSpan}
+          tone="ink"
+          hug
+          testID="calendar-span"
+        />
+      </View>
+
+      {/* Header: the title on the left, the chevrons on the right (22, gap 22). */}
       <View style={styles.monthHead}>
-        <Text style={[styles.monthTitle, { color: palette.text }]}>{monthTitle(month)}</Text>
+        <Text style={[styles.monthTitle, { color: palette.text }]}>{span === 'week' ? weekTitle(week) : monthTitle(month)}</Text>
         <View style={styles.chevrons}>
           <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel="Previous month" hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={palette.text} />
@@ -82,15 +107,27 @@ export function CalendarMonth({
         </View>
       </View>
 
-      {/* Totals: four equal columns (icon and label, then the value). */}
-      <View style={styles.totals}>
+      {/* Totals (the month): four equal columns (icon and label, then the value). */}
+      {span === 'month' ? <View style={styles.totals}>
         <Total icon="repeat" label="Revised" value={`${revisedDays} ${revisedDays === 1 ? 'day' : 'days'}`} />
         <Total icon="leaf-outline" label="Memorized" value={`+${memorizedPages} pages`} />
         <Total icon="book-outline" label="Read" value={readMinutes > 0 ? formatMinutesLong(readMinutes) : '0 min'} />
         <Total icon="document-text-outline" label="Notes" value={String(noteDays)} />
-      </View>
+      </View> : null}
 
-      {/* Grid: letters (18 tall), then the weeks, each day 50 tall. */}
+      {span === 'week' ? (
+        <View style={styles.grid} testID="calendar-week">
+          <View style={styles.weekRow}>
+            {weekShown.map((d) => (
+              <DayCell key={d} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} />
+            ))}
+          </View>
+          {weekShown.map((d) => (
+            <WeekSummary key={`sum-${d}`} day={d} data={data} onOpen={onOpen} />
+          ))}
+        </View>
+      ) : (
+      /* Grid: letters (18 tall), then the weeks, each day 50 tall. */
       <View style={styles.grid}>
         <View style={styles.weekRow}>
           {WEEKDAYS.map((w, i) => (
@@ -101,35 +138,11 @@ export function CalendarMonth({
         </View>
         {grid.map((row, r) => (
           <View key={r} style={styles.weekRow}>
-            {row.map((d, c) => {
-              if (!d) return <View key={c} style={styles.cell} />;
-              const m = dayMarks(d, data);
-              const isFuture = d > today;
-              const isPicked = picked === d;
-              return (
-                <Tap
-                  key={c}
-                  onPress={() => {
-                    onPick(d);
-                    onOpen(d);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${d}${m.ring != null ? `, revised ${Math.round(m.ring * 100)} percent` : ''}${m.memorized ? ', memorized' : ''}${m.read ? ', read' : ''}${m.note ? ', note' : ''}`}
-                  style={[styles.cell, isPicked && { backgroundColor: palette.bubble, borderRadius: 12 }]}
-                  testID={`calendar-day-${d}`}
-                >
-                  <DayDisc ring={m.ring} isToday={d === today} isFuture={isFuture} number={Number(d.slice(8))} />
-                  <View style={styles.dots}>
-                    <View style={[styles.slot, m.memorized && { backgroundColor: palette.primary, borderRadius: 2.5 }]} />
-                    <View style={[styles.slot, m.read && { backgroundColor: palette.text, borderRadius: 2.5 }]} />
-                    <View style={[styles.slot, m.note && styles.noteRing, m.note && { borderColor: palette.secondary }]} />
-                  </View>
-                </Tap>
-              );
-            })}
+            {row.map((d, c) => (d ? <DayCell key={c} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} /> : <View key={c} style={styles.cell} />))}
           </View>
         ))}
       </View>
+      )}
 
       {/* Legend. */}
       <View style={styles.legend}>
@@ -168,6 +181,66 @@ export function CalendarMonth({
         ))}
       </View>
     </View>
+  );
+}
+
+/** One day's cell: the disc, its number, and the dots (the grid and the week share it). */
+function DayCell({
+  day,
+  today,
+  picked,
+  data,
+  onPick,
+  onOpen,
+}: {
+  day: string;
+  today: string;
+  picked: string | null;
+  data: CalendarData;
+  onPick: (day: string) => void;
+  onOpen: (day: string) => void;
+}) {
+  const { palette } = useTheme();
+  const m = dayMarks(day, data);
+  const isPicked = picked === day;
+  return (
+    <Tap
+      onPress={() => {
+        onPick(day);
+        onOpen(day);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${day}${m.ring != null ? `, revised ${Math.round(m.ring * 100)} percent` : ''}${m.memorized ? ', memorized' : ''}${m.read ? ', read' : ''}${m.note ? ', note' : ''}`}
+      style={[styles.cell, isPicked && { backgroundColor: palette.bubble, borderRadius: 12 }]}
+      testID={`calendar-day-${day}`}
+    >
+      <DayDisc ring={m.ring} isToday={day === today} isFuture={day > today} number={Number(day.slice(8))} />
+      <View style={styles.dots}>
+        <View style={[styles.slot, m.memorized && { backgroundColor: palette.primary, borderRadius: 2.5 }]} />
+        <View style={[styles.slot, m.read && { backgroundColor: palette.text, borderRadius: 2.5 }]} />
+        <View style={[styles.slot, m.note && styles.noteRing, m.note && { borderColor: palette.secondary }]} />
+      </View>
+    </Tap>
+  );
+}
+
+/** A week's day, in a row under the cells: its date and what it holds, one line. */
+function WeekSummary({ day, data, onOpen }: { day: string; data: CalendarData; onOpen: (day: string) => void }) {
+  const { palette } = useTheme();
+  const p = dayPreview(day, data);
+  const parts = [
+    p.revised ? `Revised ${p.revised.done} of ${p.revised.assigned}` : null,
+    p.memorizedPages > 0 ? `Memorized ${p.memorizedPages}` : null,
+    p.readPages > 0 ? `Read ${p.readPages} ${p.readPages === 1 ? 'page' : 'pages'}` : null,
+    p.notes ? 'Note' : null,
+  ].filter(Boolean);
+  return (
+    <Tap onPress={() => onOpen(day)} accessibilityRole="button" style={styles.summary}>
+      <Text style={[typeV2.name, { color: palette.text, width: 84 }]}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}</Text>
+      <Text style={[typeV2.body, { color: palette.secondary, flex: 1 }]} numberOfLines={1}>
+        {parts.length > 0 ? parts.join(' · ') : 'Nothing logged'}
+      </Text>
+    </Tap>
   );
 }
 
@@ -232,6 +305,8 @@ function formatDay(day: string): string {
 }
 
 const styles = StyleSheet.create({
+  spanRow: { paddingTop: 12, paddingHorizontal: 16 },
+  summary: { height: 40, flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#00000000' },
   monthHead: { height: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthTitle: { fontSize: 20, lineHeight: 24, fontWeight: '700' },
   chevrons: { flexDirection: 'row', gap: 22 },
