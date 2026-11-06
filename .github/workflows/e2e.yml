@@ -162,7 +162,8 @@ jobs:
           echo "iOS: $ios"; echo "Android: $android"
 
       # What the change holds. A PR: its files; the top of a stack: the whole
-      # stack's (from the stack's base); a push: what it added. Anything else
+      # stack's (from the stack's base); a push: everything since the last push
+      # whose CI passed. Anything else
       # (nightly, by hand, a merge group): every flow runs.
       - id: diff
         env:
@@ -171,7 +172,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
-          BEFORE: ${{ github.event.before }}
+          BRANCH: ${{ github.ref_name }}
           AFTER: ${{ github.sha }}
           REPO: ${{ github.repository }}
         run: |
@@ -189,10 +190,15 @@ jobs:
                 limit=3000
               fi ;;
             push)
-              if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
-                echo "app=true" >> "$GITHUB_OUTPUT"; echo "A new branch: every flow runs."; exit 0
+              # Since the last push whose CI passed, not since the push before: a
+              # newer push cancels an older run, and the older one's change must
+              # still be tested. (Pushes reach this workflow through ci.yml.)
+              since=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$BRANCH&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty')
+              if [ -z "$since" ]; then
+                echo "app=true" >> "$GITHUB_OUTPUT"; echo "No push here has passed CI yet: every flow runs."; exit 0
               fi
-              gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq '.files[] | .filename, (.previous_filename // empty)' > "$files"
+              echo "What changed since $since, the last push whose CI passed."
+              gh api "repos/$REPO/compare/$since...$AFTER" --jq '.files[] | .filename, (.previous_filename // empty)' > "$files"
               limit=300 ;;
             *)
               echo "app=true" >> "$GITHUB_OUTPUT"
