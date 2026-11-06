@@ -54,7 +54,7 @@ import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
-import { ActionSheet } from '../../components/v2/ActionSheet';
+import { ContextMenu } from '../../components/v2/ContextMenu';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
@@ -761,10 +761,17 @@ export default function JournalEntryScreen() {
         </InputAccessoryView>
       )}
 
-      <ActionSheet
+      <ContextMenu
         visible={menuNote != null}
         onClose={() => setMenuNote(null)}
-        title={menuNote ? JOURNAL_KIND_LABELS[menuNote.kind] : undefined}
+        preview={
+          menuNote
+            ? {
+                label: `${JOURNAL_KIND_LABELS[menuNote.kind]} · ${new Date(menuNote.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
+                text: menuNote.text.trim() || undefined,
+              }
+            : undefined
+        }
         actions={menuActions}
         testID="journal-note-menu"
       />

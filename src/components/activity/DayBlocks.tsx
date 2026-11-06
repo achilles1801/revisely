@@ -21,7 +21,8 @@ import { describePageRuns, describeSurahRuns, pageRuns } from '../../lib/pageRan
 import { logger } from '../../lib/logger';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
 import { Tap } from '../v2/Tap';
-import { ActionSheet, type SheetAction } from '../v2/ActionSheet';
+import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
+type SheetAction = ContextMenuAction;
 import { copyText } from '../../lib/clipboard';
 import { queueChange } from '../../lib/offline/queue';
 import { formatMinutes } from '../../lib/journal';
@@ -373,10 +374,10 @@ export function DayBlocks({
         </ThreadRow>
       )}
       <WindowFooter text={footerText} />
-      <ActionSheet
+      <ContextMenu
         visible={menu != null}
         onClose={() => setMenu(null)}
-        title={menu?.title}
+        preview={menu ? { label: menu.title } : undefined}
         actions={menu?.actions ?? []}
         testID="activity-row-menu"
       />

@@ -207,6 +207,9 @@ How the tests are made: `tests/scenarios/README.md`.
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
   header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
   VoiceOver offers the same actions as custom actions on the header.
+  The menu is the iOS-style long-press menu: a preview of the held item (its label and text) with its actions
+  beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
+  The daily log's note menu is the same menu (Edit, and Copy when the note has text).
 
 - **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
   entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
