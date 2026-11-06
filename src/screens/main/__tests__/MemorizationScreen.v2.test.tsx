@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -26,6 +27,17 @@ import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 import type { User, UserPage } from '../../../types';
+
+// Saving newly memorized pages asks "When did you memorize these?": the tests answer Before (no log).
+beforeEach(() => {
+  jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    const before = buttons?.find((b) => b.text === "Before (don't log)");
+    before?.onPress?.();
+  });
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 const palette = paletteV2(false, DEFAULT_ACCENT);
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));

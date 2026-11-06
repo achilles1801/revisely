@@ -5,6 +5,7 @@
 // account must hold every rule that can be read off it (harness/invariants)
 // and keep its own promise (TESTING-CHECKLIST.md).
 
+import { withAuthRetry } from '../harness/authRetry';
 import { advance, MINUTE, setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester, serveLoadTestScenario } from '../harness/admin';
@@ -37,7 +38,7 @@ async function load(app: OpenApp, scenario: ScenarioId): Promise<SeedPlan> {
   // The plan the server builds, from what the phone sends (the clock doesn't move meanwhile).
   const sent = lib.buildSeedContext(scenario, user, new Date());
   const plan = buildScenario(scenario, parseContext(sent, Date.now(), scenario), app.uid);
-  await app.act(() => lib.loadTestScenario(scenario, user));
+  await app.act(() => withAuthRetry(() => lib.loadTestScenario(scenario, user)));
   const dates = plan.sessions.map((s) => s.date).join();
   await app.until(
     () =>
@@ -94,7 +95,7 @@ it('[RESET-3] an account that is not a tester is refused, and keeps everything',
   try {
     const lib = app.mods.require<Lib>('src/lib/testScenarios');
     await app.act(async () => {
-      await expect(lib.loadTestScenario('hafiz', app.app.user)).rejects.toThrow(/testers only/);
+      await expect(withAuthRetry(() => lib.loadTestScenario('hafiz', app.app.user))).rejects.toThrow(/testers only/);
     });
     expect(server.calls).toBe(1);
     expect(app.app.pages.filter((p) => p.status === 'memorized')).toHaveLength(9);

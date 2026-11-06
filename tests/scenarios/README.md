@@ -5,18 +5,26 @@ every push and PR (`ci.yml` → `scenarios.yml`), and `preview.yml` publishes no
 
 ## Running them
 
-You need Java 21 and the Firebase CLI, as for the rules tests.
+You need Java 21. The Firebase CLI comes with this folder's packages (`firebase-tools`, pinned), so
+the emulator is the one CI runs:
 
 ```bash
 cd tests/scenarios && npm ci
 ```
 
 ```bash
-scripts/emulators.sh exec auth,firestore demo-revisely 'cd tests/scenarios && npx jest --config jest.config.js --maxWorkers=4 --forceExit'
+PATH="$PWD/tests/scenarios/node_modules/.bin:$PATH" scripts/emulators.sh exec auth,firestore demo-revisely 'cd tests/scenarios && npx jest --config jest.config.js --maxWorkers=4 --forceExit'
 ```
 
-Run it from the repository root. To run one file, add its name after `--forceExit` (for example
-`ahead`). Always start the emulators through `scripts/emulators.sh`, never `firebase emulators:*`
+Run it from the repository root (`npm test` in this folder does the same, one file at a time). To run
+one file, add its name after `--forceExit` (for example `ahead`).
+
+**Use the pinned CLI, not an older global one.** firebase-tools 15.15 starts Firestore emulator
+v1.20.4, which now and then sends a gRPC Listen stream bytes it can't frame ("Received message larger
+than max" with a length made of text, about 60 times a full run). The SDK then waits up to a minute
+before listening again, and a scenario waiting on server snapshots times out: `[SYNC-1] [SYNC-3]`
+failed about 1 run in 3 that way (Nov 2026). Emulator v1.22.0 (firebase-tools 15.34.1, and what CI
+installs) doesn't. Always start the emulators through `scripts/emulators.sh`, never `firebase emulators:*`
 directly: it takes the shared lock, so two sessions never run on one set of ports. To run beside
 another worktree, give this one its own ports with `REVISELY_EMU_PORT_BASE=auto` (stable per
 worktree path); the harness reads them from the environment the script sets. The property tests alone need no emulators:
