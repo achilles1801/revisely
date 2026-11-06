@@ -1,8 +1,10 @@
 /**
  * The Auth emulator, under a busy CI runner, sometimes drops a request: the
  * client then fails with auth/network-request-failed though nothing is wrong
- * with the account or the app (seen in RESET-3, Nov 2026). Sign-up and sign-in
- * are tried again, a few times, after a short wait. A sign-up whose answer was
+ * with the account or the app (seen in RESET-3, Nov 2026). Sign-up, sign-in and
+ * the calls that fetch a fresh ID token first (callFunction's getIdToken(true):
+ * Reset my data, Load test scenario) are tried again, a few times, after a
+ * short wait; a token that failed to come means nothing reached the server. A sign-up whose answer was
  * lost may have made the account: trying it again then fails with
  * auth/email-already-in-use, and the account is signed in to instead.
  */
