@@ -66,6 +66,12 @@ How the tests are made: `tests/scenarios/README.md`.
   counts the day. The streak counts back from
   today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
   widget and the reminders share this rule (lib/streak).
+- **SESS-6.** A missed day keeps a grace window. When yesterday is missed (not all its scheduled pages credited to it)
+  but the run before it is intact, the streak reads as broken and the widget and Home show the streak dimmed, with a
+  ring for the missed pages. Revising yesterday's missed pages, credited to yesterday, restores the streak at once,
+  and only pages of the missed day count (today's own pages don't). The grace is recoverable until today's revision
+  day ends, and repeats any day a day is missed. Two missed days in a row break the streak; a day done late does not
+  restore a missed day, and older days can still be revised, credited to their own days.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,

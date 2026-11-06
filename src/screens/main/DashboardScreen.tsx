@@ -60,7 +60,7 @@ import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
 import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
-import { streakFromLogs } from '../../lib/streak';
+import { streakReadingFromLogs } from '../../lib/streak';
 import { dateToLocalISODay } from '../../lib/schedulePlans';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -206,10 +206,11 @@ export default function DashboardScreen() {
   }, []);
 
   // The streak (lib/streak): the same rule and the same answer as the widget.
-  const calculatedStreak = useMemo(
-    () => (user ? streakFromLogs({ user, pages, logs, today: dateToLocalISODay(revisionDate) }) : 0),
+  const streakNow = useMemo(
+    () => (user ? streakReadingFromLogs({ user, pages, logs, today: dateToLocalISODay(revisionDate) }) : null),
     [logs, revisionDate, user, pages],
   );
+  const calculatedStreak = streakNow?.streak ?? 0;
 
   // Sessions
   const sessionLogs = useMemo(
@@ -506,6 +507,7 @@ export default function DashboardScreen() {
           done={donePagesToday}
           carried={carriedToday}
           streak={calculatedStreak}
+          streakGrace={streakNow?.grace ?? null}
           memorized={memorized}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}

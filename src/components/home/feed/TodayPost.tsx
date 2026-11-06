@@ -6,6 +6,7 @@ import { computeMemorizationStats } from '../../../lib/memorizationStats';
 import { aheadLine, NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
+import { ProgressRing } from '../../activity/DayParts';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
 import { JuzDots } from '../../v2/JuzDots';
@@ -69,6 +70,7 @@ export function TodayPost({
   done,
   carried = 0,
   streak,
+  streakGrace,
   memorized,
   onPrimary,
   onEditSchedule,
@@ -89,6 +91,8 @@ export function TodayPost({
   /** How many of today's pages were carried in from yesterday (they come first). */
   carried?: number;
   streak: number;
+  /** Yesterday missed but restorable (SESS-6): the streak reads dimmed, with a ring for the missed pages. */
+  streakGrace?: { previous: number; progress: { scheduled: number; credited: number } } | null;
   /** How much is memorized (memorizedText): the line and the juz dots. */
   memorized: { body: string; fraction: number; juz: number[] };
   onPrimary: () => void;
@@ -108,7 +112,13 @@ export function TodayPost({
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const lines = todayLines(status, pages, done, carried);
-  const meta = streak > 0 ? `Today · ${streak}-day streak` : 'Today';
+  const grace = streakGrace ?? null;
+  // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
+  const meta = grace
+    ? `Today · ${grace.previous}-day streak`
+    : streak > 0
+      ? `Today · ${streak}-day streak`
+      : 'Today';
 
   const actions: SheetAction[] = [
     {
@@ -168,6 +178,15 @@ export function TodayPost({
         mark={<Mark label={initial} />}
         name={name || 'Today'}
         meta={name ? meta : undefined}
+        figure={
+          grace ? (
+            <ProgressRing
+              fraction={grace.progress.scheduled > 0 ? grace.progress.credited / grace.progress.scheduled : 0}
+              done={false}
+              size={18}
+            />
+          ) : undefined
+        }
         headerMaxScale={HEADER_MAX_SCALE}
         testID="today-post"
         footer={

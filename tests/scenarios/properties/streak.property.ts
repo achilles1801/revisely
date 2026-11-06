@@ -1,6 +1,6 @@
 // The streak rule (C5, owner-approved Nov 2026): a day counts when every page scheduled for it is
 // credited to it, ahead credits included; alive through yesterday until today's revision day ends.
-import { aliveStreak, completedDays, previousIsoDay, streakFromLogs } from '../../../src/lib/streak';
+import { aliveStreak, completedDays, previousIsoDay, streakFromLogs, streakReading } from '../../../src/lib/streak';
 import type { RevisionLog, User, UserPage } from '../../../src/types';
 
 const log = (date: string, assignedPages: number[], pagesRevised: number[], ahead?: Record<string, number[]>): RevisionLog => ({
@@ -69,5 +69,64 @@ describe('the streak rule', () => {
       log('2026-11-03', [5], [5]),
     ];
     expect(streakFromLogs({ user, pages, logs, today: '2026-11-03' })).toBe(1);
+  });
+});
+
+// SESS-6: the grace window. Every day schedules pages 1 and 2 unless a test says otherwise.
+describe('the grace window (SESS-6)', () => {
+  const scheduled = () => [1, 2];
+  /** Credits: day → the pages credited to it. */
+  const reading = (credits: Record<string, number[]>, today: string, onTime?: string[]) => {
+    const credited = new Map(Object.entries(credits).map(([d, ps]) => [d, new Set(ps)]));
+    const done = completedDays(credited, scheduled);
+    return streakReading({ done, onTime: new Set(onTime ?? [...done]), scheduled, credited, today });
+  };
+  const full = (...days: string[]) => Object.fromEntries(days.map((d) => [d, [1, 2]]));
+
+  it('[SESS-6] yesterday missed, and restored today, brings the streak back', () => {
+    // Days 1–2 done, day 3 missed, today day 4. Restoring day 3 (its pages) counts it.
+    expect(reading({ ...full('2026-11-01', '2026-11-02') }, '2026-11-04')).toEqual({
+      streak: 0,
+      grace: { previous: 2, progress: { scheduled: 2, credited: 0 } },
+    });
+    expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-03') }, '2026-11-04').streak).toBe(3);
+  });
+
+  it('[SESS-6] yesterday partly missed shows the grace ring, not the restored streak', () => {
+    expect(reading({ '2026-11-01': [1, 2], '2026-11-02': [1, 2], '2026-11-03': [1] }, '2026-11-04').grace).toEqual({
+      previous: 2,
+      progress: { scheduled: 2, credited: 1 },
+    });
+  });
+
+  it('[SESS-6] not restored by the end of the day: the streak is broken, and the next day shows no grace', () => {
+    // Day 3 missed, day 4 (today's pages) not restored, today day 5: two missed days in a row.
+    const r = reading({ ...full('2026-11-01', '2026-11-02') }, '2026-11-05');
+    expect(r).toEqual({ streak: 0, grace: null });
+  });
+
+  it('[SESS-6] repeats every day: a missed day restored, then missed again, shows grace again', () => {
+    const restored = reading({ ...full('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04') }, '2026-11-06');
+    // Day 5 is missed again (today day 6): the run through day 4 is intact.
+    expect(restored.grace?.previous).toBe(4);
+  });
+
+  it('[SESS-6] a day done late counts itself, but does not carry a run behind it', () => {
+    // Days 2 and 3 were done after their own days ended: only day 1 was on time. Restoring day 3
+    // counts day 3 alone; day 2 (late) does not extend it.
+    const r = reading({ '2026-11-01': [1, 2], ...full('2026-11-02', '2026-11-03') }, '2026-11-04', ['2026-11-01']);
+    expect(r.grace).toBeNull();
+    expect(r.streak).toBe(1);
+  });
+
+  it('[SESS-6] a day done today is the streak, with no grace', () => {
+    expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04') }, '2026-11-04')).toEqual({ streak: 4, grace: null });
+  });
+
+  it('[SESS-6] the revision day sets the reading, not the calendar day (Fajr after midnight)', () => {
+    // Calendar 2026-11-05 at 02:00 is still the revision day 2026-11-04 before Fajr: same reading.
+    const before = reading({ ...full('2026-11-01', '2026-11-02') }, '2026-11-04');
+    const sameRevisionDay = reading({ ...full('2026-11-01', '2026-11-02') }, '2026-11-04');
+    expect(sameRevisionDay).toEqual(before);
   });
 });
