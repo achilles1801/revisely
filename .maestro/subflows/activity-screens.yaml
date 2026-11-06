@@ -40,8 +40,9 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-menu-revised-${THEME}
-- tapOn: "Close menu"
-  optional: true
+- tapOn:
+    text: "Close menu"
+    optional: true
 - tapOn:
     id: back
 - extendedWaitUntil:
