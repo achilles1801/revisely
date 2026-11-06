@@ -7,6 +7,9 @@ import type { ReactElement } from 'react';
 import type { Booted, OpenApp } from './phone';
 import { pagerState } from './pager';
 
+/** The pages every scenario account holds (TOTAL_QURAN_PAGES). */
+const TOTAL_PAGES = 604;
+
 function resetPager() {
   const s = pagerState();
   s.props = null;
@@ -21,6 +24,8 @@ export function homeStack(mods: Booted): ReactElement {
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
   const Journal = req<any>('src/screens/journal/JournalEntryScreen').default;
+  const Manager = req<any>('src/screens/main/MemorizationScreen').default;
+  const ActivityDayScreen = req<any>('src/screens/activity/ActivityDayScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const Stack = createNativeStackNavigator();
@@ -39,12 +44,72 @@ export function homeStack(mods: Booted): ReactElement {
       h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
       h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
       h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
-      ...['Settings', 'Memorization', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityDay', 'ActivityAll', 'Insights'].map(
+      h(Stack.Screen, { name: 'Memorization', component: Manager }),
+      h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
+      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights'].map(
         (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
       ),
     ),
     ),
   );
+}
+
+/** Pass to Phone.open: the app opens on onboarding's "Select memorized portions" (in progress). */
+export function onboardingStack(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
+  const JuzSelection = req<any>('src/screens/onboarding/JuzSelectionScreen').default;
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const Stack = createNativeStackNavigator();
+  const h = React.createElement;
+  const Schedule = () => null;
+  return h(
+    NavigationContainer,
+    { ref: nav.navigation },
+    h(
+      Stack.Navigator,
+      { screenOptions: { headerShown: false, animation: 'none' } },
+      h(Stack.Screen, { name: 'JuzSelection', component: JuzSelection, initialParams: { journeyStage: 'in_progress' } }),
+      h(Stack.Screen, { name: 'Schedule', component: Schedule }),
+    ),
+  );
+}
+
+/** Onboarding's "Select memorized portions", read and driven through its own elements. */
+export class Onboarding {
+  constructor(private readonly app: OpenApp) {}
+
+  /** The count at the foot: "24 of 604 pages memorized". */
+  summary(): string {
+    const el = this.app.screen.queryByTestId('juz-selection-summary');
+    return el ? flatText(el) : '';
+  }
+
+  continueEnabled(): boolean {
+    const el = this.app.screen.queryByTestId('juz-continue');
+    return !!el && el.props.accessibilityState?.disabled !== true;
+  }
+
+  /**
+   * Marks a juz as its row's check does (MemorizationBrowser.applyBulk: every
+   * page of the juz by number, loaded or not). Its row isn't drawn here, the
+   * list being virtualized, so the browser's change goes in directly.
+   */
+  async markJuz(pages: number[]): Promise<void> {
+    const { MemorizationBrowser } = this.app.mods.require<any>('src/components/MemorizationBrowser');
+    const browser = this.app.screen.UNSAFE_getByType(MemorizationBrowser);
+    const next = new Map(browser.props.pendingChanges as Map<number, string>);
+    for (const p of pages) next.set(p, 'memorized');
+    await this.app.act(async () => browser.props.onChange(next));
+  }
+
+  async continue(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('juz-continue'));
+    });
+  }
 }
 
 /** What Home shows, read from its own elements (testIDs in components/home/feed/TodayPost). */
@@ -140,6 +205,11 @@ export class Home {
    */
   private async open(testID: string): Promise<Session> {
     resetPager();
+    // A listener can briefly hold part of the pages while a batch of them is
+    // written (the emulator, under load: 584 of 604, the memorized ones
+    // missing). Home then offers Memorization, not the session. Tap once the
+    // phone holds all of them, as it does a moment later.
+    await this.app.until(() => this.app.app.pages.length === TOTAL_PAGES, 'every page on the phone', 20_000);
     const session = new Session(this.app);
     const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
     const onHome = () => nav.current?.getCurrentRoute?.()?.name === 'Dashboard';
@@ -395,3 +465,79 @@ export function flatText(node: unknown): string {
   walk(node);
   return out.join(' ').replace(/\s+/g, ' ').trim();
 }
+
+/** The memorization manager (Memorization): mark a juz in mark mode and save it. */
+export class Manager {
+  constructor(private readonly app: OpenApp) {}
+
+  async open(): Promise<void> {
+    const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+    await this.app.act(async () => {
+      nav.current.navigate('Memorization');
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('memorization-v2') != null, 'the memorization manager to open');
+  }
+
+  /** Marks a whole juz (mark mode, its check) and saves; "Today" answers the When question. */
+  async markJuzToday(juz: number): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    const { Alert } = this.app.mods.require<typeof import('react-native')>('react-native');
+    (Alert as { alert: unknown }).alert = (_t: string, _m?: string, buttons?: { text?: string; onPress?: () => void }[]) =>
+      buttons?.find((b) => b.text === 'Today')?.onPress?.();
+    await this.app.until(() => this.app.screen.queryByTestId('memorization-edit') != null, 'the edit control');
+    fireEvent.press(this.app.screen.getByTestId('memorization-edit'));
+    // The browser opens on Surahs: the Juz tab shows the juz checks.
+    fireEvent.press(this.app.screen.getByText('Juz'));
+    await this.app.until(() => this.app.screen.queryByTestId(`juz-${juz}-check`) != null, 'the juz check');
+    fireEvent.press(this.app.screen.getByTestId(`juz-${juz}-check`));
+    fireEvent.press(this.app.screen.getByTestId('memorization-save'));
+    await this.app.until(() => this.app.screen.queryByTestId('confirm-save') != null, 'the save sheet');
+    fireEvent.press(this.app.screen.getByTestId('confirm-save'));
+  }
+}
+
+/** The day's Activity (ActivityDay): its blocks and their menus. */
+export class ActivityDayView {
+  constructor(private readonly app: OpenApp) {}
+
+  async open(date: string): Promise<void> {
+    const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+    await this.app.act(async () => {
+      nav.current.navigate('ActivityDay', { date });
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('activity-day-v2') != null, 'the day to open');
+  }
+
+  /** Waits for the Memorized block: the day's items load after the screen opens. */
+  async waitMemorized(): Promise<void> {
+    await this.app.until(() => this.memorizedBlockShown(), 'the Memorized block');
+  }
+
+  memorizedBlockShown(): boolean {
+    return this.app.screen.queryByTestId('activity-block-memorized') != null;
+  }
+
+  /**
+   * Deletes the day's Memorized entry from the Memorized block's header (#260):
+   * the header holds the menu, and VoiceOver gets the same actions, one
+   * "delete-<id>" per entry, run here directly. The deletion is confirmed.
+   */
+  async deleteMemorized(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    const { Alert } = this.app.mods.require<typeof import('react-native')>('react-native');
+    (Alert as { alert: unknown }).alert = (_t: string, _m?: string, buttons?: { style?: string; onPress?: () => void }[]) =>
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    type A11y = { name: string };
+    const deleteAction = (el: { props: { accessibilityActions?: A11y[] } }) =>
+      (el.props.accessibilityActions ?? []).find((a) => String(a.name).startsWith('delete-'));
+    const header = () => this.app.screen.queryAllByLabelText('Memorized').find((el) => deleteAction(el) != null);
+    await this.app.until(() => header() != null, 'the Memorized block header');
+    const el = header()!;
+    const action = deleteAction(el)!.name;
+    await this.app.act(async () => {
+      fireEvent(el, 'accessibilityAction', { nativeEvent: { actionName: action } });
+    });
+    await this.app.idle(50);
+  }
+}
+

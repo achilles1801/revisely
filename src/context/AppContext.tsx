@@ -6,6 +6,7 @@ import {
   FirestorePage,
   FirestoreSession,
   DEFAULT_WEAKNESS_RATING,
+  TOTAL_QURAN_PAGES,
   WeaknessRating,
 } from '../types/firestore';
 import * as firestoreService from '../services/firestoreService';
@@ -665,6 +666,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       onListenError,
     );
 
+    // Some pages but not all 604, as the server has them: a sign-up stopped
+    // between its two batches leaves 1–450 alone for good (ONBOARD-1). Create
+    // the rest, unless this app is still writing them (then look again soon).
+    const completing = { running: false, attempt: 0 };
+    const completePages = () => {
+      const fbUser = getAuth().currentUser;
+      if (!active || !fbUser || fbUser.uid !== uid || completing.running) return;
+      if (firestoreService.isDeletingAccount(uid) || firestoreService.isResettingAccount(uid)) return;
+      const have = baseRef.current?.uid === uid ? (baseRef.current.pages?.length ?? 0) : 0;
+      if (have === 0 || have >= TOTAL_QURAN_PAGES) return;
+      if (firestoreService.isInitializingPages(uid)) {
+        timers.push(setTimeout(completePages, 2000));
+        return;
+      }
+      completing.running = true;
+      firestoreService
+        .createMissingPages(uid)
+        .then((n) => {
+          completing.attempt = 0;
+          if (n > 0) logger.warn(`Created ${n} missing pages (a sign-up had stopped part way)`);
+        })
+        .catch((err) => {
+          logger.warn('Could not create the missing pages', err);
+          timers.push(setTimeout(completePages, retryDelayMs(completing.attempt++)));
+        })
+        .finally(() => {
+          completing.running = false;
+        });
+    };
+
     const unsubscribePages = firestoreService.subscribeToPages(
       (fsPages, { fromCache }) => {
         if (!active || fromCache) return;
@@ -676,6 +707,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         update((b) => ({ ...b, pages: fsPages, pagesFresh: true }));
         saveCopy(uid, 'pages', fsPages);
+        if (fsPages.length < TOTAL_QURAN_PAGES) completePages();
       },
       uid,
       onListenError,

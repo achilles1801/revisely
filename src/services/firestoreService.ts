@@ -150,34 +150,89 @@ export async function createUser(input: CreateUserInput): Promise<FirestoreUser>
   return userData;
 }
 
+/** A page as a new account starts it. */
+function newPageData(pageNumber: number, now: Timestamp): FirestorePage {
+  return {
+    pageNumber,
+    status: 'not_memorized',
+    dateMemorized: null,
+    lastRevisedAt: null,
+    weaknessRating: DEFAULT_WEAKNESS_RATING,
+    totalRevisionCount: 0,
+    skipCount: 0,
+    updatedAt: now,
+  };
+}
+
+// Accounts whose pages this app is writing now (initializeAllPages): their page
+// list is short on purpose until the last batch lands.
+const initializingPages = new Set<string>();
+
+/** Whether this app is creating `uid`'s pages right now. */
+export function isInitializingPages(uid: string | undefined | null): boolean {
+  return !!uid && initializingPages.has(uid);
+}
+
 /**
- * Initialize all 604 page documents with default values.
- * Uses multiple batches to stay under Firestore's 500-op limit.
+ * Initialize all 604 page documents with default values, in batches under
+ * Firestore's 500-op limit. The batches are committed together, not one after
+ * the other's acknowledgement: each commit puts its pages in the phone's view at
+ * once, and a slow server ack (about 100 s on a CI simulator) kept pages
+ * 451–604 off the phone that long, so onboarding couldn't count or save a juz
+ * from them (ONBOARD-1). Firestore applies the batches in the order they were made.
  */
 export async function initializeAllPages(userId: string): Promise<void> {
   const BATCH_SIZE = 450;
   const now = Timestamp.now();
-
-  for (let batchStart = 1; batchStart <= TOTAL_QURAN_PAGES; batchStart += BATCH_SIZE) {
-    const batch = writeBatch(db);
-    const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, TOTAL_QURAN_PAGES);
-
-    for (let pageNumber = batchStart; pageNumber <= batchEnd; pageNumber++) {
-      const pageData: FirestorePage = {
-        pageNumber,
-        status: 'not_memorized',
-        dateMemorized: null,
-        lastRevisedAt: null,
-        weaknessRating: DEFAULT_WEAKNESS_RATING,
-        totalRevisionCount: 0,
-        skipCount: 0,
-        updatedAt: now,
-      };
-      batch.set(getPageRef(pageNumber, userId), pageData);
+  initializingPages.add(userId);
+  try {
+    const commits: Promise<void>[] = [];
+    for (let batchStart = 1; batchStart <= TOTAL_QURAN_PAGES; batchStart += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, TOTAL_QURAN_PAGES);
+      for (let pageNumber = batchStart; pageNumber <= batchEnd; pageNumber++) {
+        batch.set(getPageRef(pageNumber, userId), newPageData(pageNumber, now));
+      }
+      commits.push(batch.commit());
     }
-
-    await batch.commit();
+    await Promise.all(commits);
+  } finally {
+    initializingPages.delete(userId);
   }
+}
+
+/**
+ * Creates the page documents an account lacks, and returns how many: a sign-up
+ * that stopped between initializeAllPages' two batches (the app closed, the
+ * second commit failed) leaves pages 1–450 alone, and nothing else creates the
+ * rest (AppContext creates pages only when there are none). Each missing page
+ * is created in a transaction that checks it still doesn't exist, so a page
+ * written meanwhile (by the other batch, or another phone) is never replaced.
+ */
+export async function createMissingPages(userId: string): Promise<number> {
+  const existing = await getDocsFromServer(getPagesCollectionRef(userId));
+  const have = new Set(existing.docs.map((d) => (d.data() as FirestorePage).pageNumber));
+  const missing: number[] = [];
+  for (let p = 1; p <= TOTAL_QURAN_PAGES; p++) if (!have.has(p)) missing.push(p);
+  if (missing.length === 0) return 0;
+  const now = Timestamp.now();
+  let created = 0;
+  const CHUNK = 200;
+  for (let i = 0; i < missing.length; i += CHUNK) {
+    const chunk = missing.slice(i, i + CHUNK);
+    created += await runTransaction(db, async (tx) => {
+      const refs = chunk.map((p) => getPageRef(p, userId));
+      const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+      let n = 0;
+      snaps.forEach((snap, k) => {
+        if (snap.exists()) return;
+        tx.set(refs[k], newPageData(chunk[k], now));
+        n++;
+      });
+      return n;
+    });
+  }
+  return created;
 }
 
 export async function getUser(userId?: string): Promise<FirestoreUser | null> {
@@ -516,6 +571,12 @@ export async function deleteSession(sessionId: string, userId?: string): Promise
   await deleteDoc(getSessionRef(sessionId, userId));
 }
 
+/** Writes one Revised item added by hand (its id is new, so this never overwrites a session's). */
+export async function addRevisionItem(item: RevisionItem, userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  await setDoc(doc(collection(db, 'users', uid, 'revisions'), item.id), item);
+}
+
 /**
  * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
  * written, and any other item of that day is deleted (an edit that dropped an
@@ -804,6 +865,44 @@ export async function getActivityItemsForDay(
   };
 }
 
+/**
+ * Pages memorized on `day` (the memorization manager, Today): merged into that day's item, so
+ * saving the same pages again changes nothing (ids come from the day).
+ */
+export async function addMemorizationPages(day: string, pages: number[], at: number, userId: string): Promise<void> {
+  const ref = doc(collection(db, 'users', userId, 'memorizations'), day);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = snap.exists() ? (snap.data() as { pages?: number[]; occurredAt?: number }) : null;
+    const merged = [...new Set([...(prev?.pages ?? []), ...pages])].sort((a, b) => a - b);
+    tx.set(ref, {
+      id: day,
+      uid: userId,
+      day,
+      occurredAt: prev?.occurredAt && prev.occurredAt > 0 ? Math.min(prev.occurredAt, at) : at,
+      source: 'manual',
+      pages: merged,
+      minutes: null,
+      recordings: [],
+    });
+  });
+}
+
+/** Pages un-memorized: removed from every item that holds them; an item left empty is removed. */
+export async function removeMemorizationPages(pages: number[], userId: string): Promise<void> {
+  const drop = new Set(pages);
+  const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
+  await Promise.all(
+    snap.docs.map(async (d) => {
+      const current: number[] = d.data().pages ?? [];
+      const rest = current.filter((p) => !drop.has(p));
+      if (rest.length === current.length) return;
+      if (rest.length === 0) await deleteDoc(d.ref);
+      else await updateDoc(d.ref, { pages: rest });
+    }),
+  );
+}
+
 /** Removes a memorization item (C4): its pages are un-marked by their own change. */
 export async function deleteMemorizationItem(id: string, userId: string): Promise<void> {
   await deleteDoc(doc(collection(db, 'users', userId, 'memorizations'), id));
@@ -1030,7 +1129,7 @@ export async function loadTestScenarioOnServer(data: {
 }
 
 /** Call one of our callable Cloud Functions with the account's ID token and App Check. */
-async function callFunction(
+export async function callFunction(
   user: NonNullable<typeof auth.currentUser>,
   name: string,
   data: Record<string, unknown>,

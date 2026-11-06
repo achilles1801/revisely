@@ -44,6 +44,17 @@ How the tests are made: `tests/scenarios/README.md`.
   started. Pages revised ahead still count for the day they're scheduled on (AHEAD-2), on Home and in
   the schedule, but Activity lists them on the day they were revised.
 
+## Onboarding
+
+- **ONBOARD-1.** In "Select memorized portions", a page the user marks counts at once, loaded or not: a
+  new account's 604 pages arrive in two batches (1–450, 451–604), and a juz from the second can be
+  marked before it lands. Continue never saves a selection without a marked page: while a marked page
+  hasn't loaded, it waits ("Loading your pages…"), and once the pages are there it saves them all.
+- **ONBOARD-2.** An account the server holds with some of its pages but not all 604 (a sign-up stopped
+  between its two batches: the app closed, the second commit failed) gets the missing ones created, as
+  new pages, once the app has the server's list and isn't writing them itself. A page it already has is
+  never replaced.
+
 ## The schedule
 
 - **SCHED-1.** Pages plan: N pages a day in page order, from the plan's first day, wrapping round the
@@ -193,12 +204,25 @@ How the tests are made: `tests/scenarios/README.md`.
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
   oldest, or never.
 
-- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. "From
-  your session" offers only the pages the session missed: its skipped pages not revised, among the memorized
-  ones. It never copies the session's own revised pages or minutes.
-- **ACT-6.** A note swiped away goes at once, with Undo; the delete is saved after the undo window (five
-  seconds), and leaving the screen saves any delete still waiting. A hold on a Read or Note row opens Edit and
-  Copy.
+- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
+  opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates
+  those pages 2, 3 or 4 (ACT-8's bins), written as each page's weakness rating. Adding it queues one manual
+  Revised item for today; it counts toward today's Revised block and carries no plan assignment. "From your
+  session" offers only the pages the session missed: its skipped pages not revised, among the memorized ones.
+  It never copies the session's own revised pages or minutes.
+  Note opens its own sheet: its text, and an optional "Show under" choice of the day's Revised, Memorized or
+  Read item (the note's tag). Add is a new note with its own id and time; an empty note cannot be added.
+  Memorized opens its own sheet: From and To, or a surah. Add marks the pages memorized (the composer's two
+  writes) and records a Memorized item for today. "From your reading" offers the pages read today that are not
+  memorized yet. The sheet has no minutes: a Memorized item carries none yet.
+- **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
+  window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
+  a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
+  header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
+  VoiceOver offers the same actions as custom actions on the header.
+  The menu is the iOS-style long-press menu: a preview of the held item (its label and text) with its actions
+  beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
+  The daily log's note menu is the same menu (Edit, and Copy when the note has text).
 
 - **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A memorized
   entry's pages go back to not memorized (only those still memorized) and its item is removed. A failed
@@ -210,6 +234,29 @@ How the tests are made: `tests/scenarios/README.md`.
 
 - **ACT-9.** A day's Activity items load when the day opens and again when its screen regains focus, not
   on their own: a render never starts another load (it looped and froze the app, Nov 2026).
+- **ACT-10.** Pages marked memorized in the memorization manager, or in the Memorized composer, are logged as a
+  memorization item for the day the user chooses: Today writes them into that day's item (merged, idempotent);
+  Before (don't log) writes nothing. The manager asks "When did you memorize these?" (default Before above five
+  pages). Pages unmarked are removed from the items that hold them. The Memorized composer takes a page range
+  (From and To) and marks it in the same save.
+- **ACT-11.** A log note tagged to one of the day's items shows under that item in Activity: a Revised,
+  Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
+  While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
+
+## Ask coach
+
+- **COACH-1.** The coach answers only a previewTester account that has opted in. One answer is kept per insight and
+  revision day, so a repeat ask is free and counts nothing. An account may ask 5 new questions a day (UTC). A monthly
+  hard cap in dollars (`MONTHLY_CAP_USD`) stops every call once the month's reserved spend would pass it. A failed
+  call gives back the question and its reserve.
+
+- **COACH-2.** The coach is sent only the totals for the asked insight, as whole numbers (pages per day to a tenth).
+  No notes, recordings, names or page lists. The server refuses any field the insight does not name.
+
+- **COACH-3.** The model is claude-haiku-5-5, called from a Cloud Function only: the key is the ANTHROPIC_COACH_KEY
+  secret and never reaches the app. The system prompt is stable and cached (above the 512-token minimum); each call
+  is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
+  when short), with a timeout per attempt, and its log keeps the usage and never the content.
 
 ## Known bugs
 
