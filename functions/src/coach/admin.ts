@@ -6,6 +6,7 @@
  *   coachAnswers/{uid__insight__day} the cached answer
  *   coachUsage/{uid__day}            questions asked that UTC day
  *   coachLedger/{YYYY-MM}            spend (dollars) and token totals for the month; no content
+ *   coachLedgerDay/{YYYY-MM-DD}      the same totals for one day (the weekly digest reads them)
  */
 import { FieldValue, Firestore } from 'firebase-admin/firestore';
 import { CallLedger, CoachStore } from './handler';
@@ -65,9 +66,10 @@ export function adminCoachStore(db: Firestore): CoachStore {
         return true;
       });
     },
-    async settleSpend(month, reserved, actual, usage: CallLedger) {
+    async settleSpend(month, reserved, actual, usage: CallLedger, day) {
       await db.runTransaction(async (tx) => {
         const snap = await tx.get(ledgerRef(month));
+        // The same totals per day, for the weekly digest (no user, no content).
         const spent = (snap.get('spendUsd') as number | undefined) ?? 0;
         tx.set(
           ledgerRef(month),
@@ -79,6 +81,19 @@ export function adminCoachStore(db: Firestore): CoachStore {
             outputTokens: FieldValue.increment(usage.output),
             cacheReadTokens: FieldValue.increment(usage.cacheRead),
             cacheWriteTokens: FieldValue.increment(usage.cacheWrite),
+          },
+          { merge: true },
+        );
+        tx.set(
+          db.doc(`coachLedgerDay/${day}`),
+          {
+            day,
+            calls: FieldValue.increment(usage.calls),
+            inputTokens: FieldValue.increment(usage.input),
+            outputTokens: FieldValue.increment(usage.output),
+            cacheReadTokens: FieldValue.increment(usage.cacheRead),
+            cacheWriteTokens: FieldValue.increment(usage.cacheWrite),
+            spendUsd: FieldValue.increment(actual),
           },
           { merge: true },
         );

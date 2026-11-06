@@ -159,3 +159,18 @@ describe('appStore (the whole collection)', () => {
     expect(r.appStore.total.first).toBe(31 + 1);
   });
 });
+
+describe('the Ask coach line (C6)', () => {
+  it('says there were no answers when the week has none', () => {
+    expect(D.coachLine([])).toBe('Ask coach: no answers this week.');
+  });
+
+  it('sums the week and shows the cached share, with no user or content', () => {
+    const line = D.coachLine([
+      { calls: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 5000, cacheWriteTokens: 2000, spendUsd: 0.01 },
+      { calls: 1, inputTokens: 500, outputTokens: 50, cacheReadTokens: 0, cacheWriteTokens: 0, spendUsd: 0.02 },
+    ]);
+    expect(line).toBe('Ask coach: 2 answers, $0.03 (8500 input tokens, 150 output, 71% of cached input read from cache).');
+    expect(line).not.toMatch(/@|user|question|answer text/i);
+  });
+});
