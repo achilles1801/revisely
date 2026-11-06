@@ -238,6 +238,21 @@ How the tests are made: `tests/scenarios/README.md`.
   Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
   While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
 
+## Ask coach
+
+- **COACH-1.** The coach answers only a previewTester account that has opted in. One answer is kept per insight and
+  revision day, so a repeat ask is free and counts nothing. An account may ask 5 new questions a day (UTC). A monthly
+  hard cap in dollars (`MONTHLY_CAP_USD`) stops every call once the month's reserved spend would pass it. A failed
+  call gives back the question and its reserve.
+
+- **COACH-2.** The coach is sent only the totals for the asked insight, as whole numbers (pages per day to a tenth).
+  No notes, recordings, names or page lists. The server refuses any field the insight does not name.
+
+- **COACH-3.** The model is claude-haiku-5-5, called from a Cloud Function only: the key is the ANTHROPIC_COACH_KEY
+  secret and never reaches the app. The system prompt is stable and cached (above the 512-token minimum); each call
+  is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
+  when short), with a timeout per attempt, and its log keeps the usage and never the content.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
