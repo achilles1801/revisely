@@ -116,7 +116,13 @@ export default function ActivityScreen() {
       <TopBar
         title="Activity"
         onBack={() => navigation.goBack()}
-        right={<IconButton icon="add" label={blocks ? 'Add' : 'Log today'} onPress={blocks ? () => setAddOpen(true) : logToday} size={28} />}
+        right={
+          blocks ? (
+            <IconButton icon="search" label="Search" onPress={() => navigation.navigate('ActivityAll')} size={22} />
+          ) : (
+            <IconButton icon="add" label="Log today" onPress={logToday} size={28} />
+          )
+        }
         separator
       />
       {loading ? (
@@ -160,6 +166,8 @@ export default function ActivityScreen() {
               />
             </View>
           )}
+          {!blocks ? (
+          <>
           <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
           <RecentSection
             count={recentItems.length}
@@ -177,6 +185,8 @@ export default function ActivityScreen() {
               />
             ))}
           </RecentSection>
+          </>
+          ) : null}
         </ScrollView>
       )}
       <ActionSheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add" actions={addMenuActions} testID="activity-add-menu" />

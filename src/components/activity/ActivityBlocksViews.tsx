@@ -3,10 +3,8 @@
 // Insights are the spec's figures, each with its own definition (activityInsights).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PanResponder } from 'react-native';
-import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, shiftWeek, weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalendar';
-import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
+import { CALENDAR_SCREEN_LABEL } from '../../lib/activityCalendar';
 import { StyleSheet, Text, View as RNView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -21,6 +19,7 @@ import { describePageRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
+import { CalendarMonth } from './CalendarMonth';
 import { Tap } from '../v2/Tap';
 import { useActivityReload } from './useActivityReload';
 import { AskCoachSheet } from '../coach/AskCoachSheet';
@@ -51,27 +50,11 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const { palette } = useTheme();
   const [view, setView] = useState<ViewKind>('calendar');
   const [month, setMonth] = useState(today.slice(0, 7));
-  const [span, setSpanState] = useState<CalendarSpan>('month');
-  const [week, setWeek] = useState(weekStartOf(today));
   const [picked, setPicked] = useState<string | null>(null);
   const [data, setData] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsBetween>> | null>(null);
 
-  // The last choice is kept on the phone (a per-device convenience, not synced).
-  useEffect(() => {
-    AsyncStorage.getItem(CALENDAR_SPAN_KEY)
-      .then((v) => setSpanState(parseSpan(v)))
-      .catch(() => undefined);
-  }, []);
-  const setSpan = (next: CalendarSpan) => {
-    setSpanState(next);
-    AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
-  };
-
-  // The days on screen (the week, or the month grid) and the 90 days the insights read.
-  const shown = useMemo(
-    () => (span === 'week' ? weekDays(week) : monthGrid(month).flat().filter((d): d is string => d != null)),
-    [span, week, month],
-  );
+  // The days on screen (the month grid) and the 90 days the insights read.
+  const shown = useMemo(() => monthGrid(month).flat().filter((d): d is string => d != null), [month]);
   const rangeFrom = [shiftDays(today, -WINDOW_DAYS), ...shown].sort()[0];
   const rangeTo = [today, ...shown].sort().reverse()[0];
   const load = useCallback(() => {
@@ -87,7 +70,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 
   // Swipe between weeks or months (a horizontal drag on the calendar).
   const stepRef = useRef<(delta: number) => void>(() => undefined);
-  stepRef.current = (delta: number) => (span === 'week' ? setWeek(shiftWeek(week, delta)) : setMonth(shiftMonth(month, delta)));
+  stepRef.current = (delta: number) => setMonth(shiftMonth(month, delta));
   const swipe = useMemo(
     () =>
       PanResponder.create({
@@ -126,128 +109,21 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           value={view}
           onChange={setView}
           testID="activity-views"
+          tone="ink"
+          hug
         />
       </RNView>
       {view === 'calendar' ? (
         <RNView style={styles.pad} {...swipe.panHandlers} testID="activity-calendar">
-          <RNView style={styles.spanRow}>
-            <PillTabs
-              options={[
-                { value: 'week', label: 'Week' },
-                { value: 'month', label: 'Month' },
-              ]}
-              value={span}
-              onChange={setSpan}
-              testID="calendar-span"
-            />
-          </RNView>
-          <RNView style={styles.header}>
-            <Tap onPress={() => stepRef.current(-1)} accessibilityRole="button" accessibilityLabel={span === 'week' ? 'Previous week' : 'Previous month'}>
-              <Ionicons name="chevron-back" size={22} color={palette.secondary} />
-            </Tap>
-            <Text style={[typeV2.title, { color: palette.text }]}>{span === 'week' ? weekTitle(week) : monthTitle(month)}</Text>
-            <Tap onPress={() => stepRef.current(1)} accessibilityRole="button" accessibilityLabel={span === 'week' ? 'Next week' : 'Next month'}>
-              <Ionicons name="chevron-forward" size={22} color={palette.secondary} />
-            </Tap>
-          </RNView>
-          {span === 'week' ? (
-            <RNView testID="calendar-week">
-              <RNView style={styles.weekRow}>
-                {weekDays(week).map((d) => {
-                  const m = marksByDay.get(d);
-                  return (
-                    <Tap
-                      key={d}
-                      onPress={() => {
-                        setPicked(d);
-                        onOpenDay(d);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${d}${m?.memorized ? ', memorized' : ''}${m?.read ? ', read' : ''}${m?.note ? ', note' : ''}`}
-                      style={[styles.cell, styles.dayCell, { borderColor: picked === d || d === today ? palette.secondary : 'transparent' }]}
-                    >
-                      <RNView style={styles.ringWrap}>
-                        {m?.ring != null && (
-                          <RNView style={styles.ring}>
-                            <ProgressRing fraction={m.ring} done={m.ring >= 1} size={32} />
-                          </RNView>
-                        )}
-                        <Text style={[typeV2.meta, { color: palette.text }]}>{Number(d.slice(8))}</Text>
-                      </RNView>
-                      <RNView style={styles.dots}>
-                        {m?.memorized && <RNView style={[styles.dot, { backgroundColor: palette.primary }]} />}
-                        {m?.read && <RNView style={[styles.dot, { backgroundColor: palette.text }]} />}
-                        {m?.note && <RNView style={[styles.dot, styles.hollow, { borderColor: palette.text }]} />}
-                      </RNView>
-                    </Tap>
-                  );
-                })}
-              </RNView>
-              {weekDays(week).map((d) => {
-                const p = dayPreview(d, { revised, memorized, read, noteDays });
-                const parts = [
-                  p.revised ? `Revised ${p.revised.done} of ${p.revised.assigned}` : null,
-                  p.memorizedPages > 0 ? `Memorized ${p.memorizedPages}` : null,
-                  p.readPages > 0 ? `Read ${p.readPages} ${p.readPages === 1 ? 'page' : 'pages'}` : null,
-                  p.notes ? 'Note' : null,
-                ].filter(Boolean);
-                return (
-                  <Tap key={`sum-${d}`} onPress={() => onOpenDay(d)} accessibilityRole="button" style={styles.summaryRow}>
-                    <Text style={[typeV2.meta, { color: palette.secondary, width: 64 }]}>{new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}</Text>
-                    <Text style={[typeV2.body, { color: palette.text, flex: 1 }]} numberOfLines={1}>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged'}</Text>
-                  </Tap>
-                );
-              })}
-            </RNView>
-          ) : null}
-          {span === 'month' ? (
-            <>
-          <RNView style={styles.weekRow}>
-            {WEEKDAYS.map((w, i) => (
-              <Text key={i} style={[typeV2.meta, styles.cell, { color: palette.secondary }]}>{w}</Text>
-            ))}
-          </RNView>
-          {monthGrid(month).map((row, r) => (
-            <RNView key={r} style={styles.weekRow}>
-              {row.map((d, c) => {
-                if (!d) return <RNView key={c} style={styles.cell} />;
-                const m = marksByDay.get(d);
-                const isPicked = picked === d;
-                return (
-                  <Tap
-                    key={c}
-                    onPress={() => {
-                      setPicked(d);
-                      onOpenDay(d);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${d}${m?.memorized ? ', memorized' : ''}${m?.read ? ', read' : ''}${m?.note ? ', note' : ''}`}
-                    style={[styles.cell, styles.dayCell, { borderColor: isPicked || d === today ? palette.secondary : 'transparent' }]}
-                  >
-                    <RNView style={styles.ringWrap}>
-                      {m?.ring != null && (
-                        <RNView style={styles.ring}>
-                          <ProgressRing fraction={m.ring} done={m.ring >= 1} size={32} />
-                        </RNView>
-                      )}
-                      <Text style={[typeV2.meta, { color: palette.text }]}>{Number(d.slice(8))}</Text>
-                    </RNView>
-                    <RNView style={styles.dots}>
-                      {m?.memorized && <RNView style={[styles.dot, { backgroundColor: palette.primary }]} />}
-                      {m?.read && <RNView style={[styles.dot, { backgroundColor: palette.text }]} />}
-                      {m?.note && <RNView style={[styles.dot, styles.hollow, { borderColor: palette.text }]} />}
-                    </RNView>
-                  </Tap>
-                );
-              })}
-            </RNView>
-          ))}
-          <DayPreview
-            day={picked ?? today}
+          <CalendarMonth
+            month={month}
+            today={today}
+            picked={picked}
             data={{ revised, memorized, read, noteDays }}
+            onStep={(delta) => setMonth(shiftMonth(month, delta))}
+            onPick={setPicked}
+            onOpen={onOpenDay}
           />
-            </>
-          ) : null}
         </RNView>
       ) : (
         <Insights
@@ -492,7 +368,6 @@ function Figure({ label, value, note, palette }: { label: string; value: string;
 
 const styles = StyleSheet.create({
   askRow: { paddingVertical: 14, paddingHorizontal: 16 },
-  spanRow: { paddingBottom: 8 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   card: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 4 },
   picture: { marginTop: 8, marginBottom: 6 },
