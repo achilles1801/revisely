@@ -227,7 +227,9 @@ file is the release mechanics and the traps behind them.
   - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
   - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
   - what lands on develop (each push): every Android flow, and the iOS native build alone (kept
-    where every PR can restore it); a newer push cancels the run of the one before;
+    where every PR can restore it); a newer push cancels the run of the one before, so a push's
+    E2E covers everything since the last push whose CI passed (a docs-only push after a cancelled
+    run still tests that run's change);
   - nightly (develop) and by hand: every flow on both, from e2e.yml itself.
 
   So iOS flows run only for the top of a stack, PRs into `main`, nightly and by hand.
