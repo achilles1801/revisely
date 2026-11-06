@@ -1,0 +1,137 @@
+// The streak, one rule for Home, the widget and the reminders (C5, Nov 2026, owner-approved):
+// a day counts when every page scheduled for it is credited to it, ahead credits included (a
+// page revised on another day counts for the day it is scheduled on). The streak stays alive
+// through yesterday until today's revision day ends. Pure: the callers pass the logs and pages.
+
+import { RevisionLog, User, UserPage } from '../types';
+import { getPagesForDay } from './algorithm';
+import { creditIndex } from './aheadCredit';
+
+/** The day before an ISO day ('YYYY-MM-DD'). UTC calendar arithmetic: no daylight-saving shift. */
+export function previousIsoDay(s: string): string {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+
+/**
+ * The days whose scheduled pages are all credited to them. `credited` maps each day to the
+ * pages credited to it (creditIndex); `scheduled` gives a day's pages. A day with nothing
+ * scheduled never counts.
+ */
+export function completedDays(
+  credited: ReadonlyMap<string, ReadonlySet<number>>,
+  scheduled: (day: string) => readonly number[],
+): Set<string> {
+  const done = new Set<string>();
+  for (const [day, pages] of credited) {
+    const need = scheduled(day);
+    if (need.length > 0 && need.every((p) => pages.has(p))) done.add(day);
+  }
+  return done;
+}
+
+/**
+ * Days in a row, counting back from `today` if it is done, else from yesterday: the streak is
+ * alive until today's revision day ends.
+ */
+export function aliveStreak(done: ReadonlySet<string>, today: string): number {
+  let cursor = done.has(today) ? today : previousIsoDay(today);
+  let streak = 0;
+  while (done.has(cursor)) {
+    streak++;
+    cursor = previousIsoDay(cursor);
+  }
+  return streak;
+}
+
+/**
+ * The streak from the revision logs. A logged day's scheduled pages are its own assignment
+ * snapshot (assignedPages); a day without a log is scheduled by the plan.
+ */
+export function streakFromLogs(input: {
+  user: User;
+  pages: readonly UserPage[];
+  logs: readonly RevisionLog[];
+  today: string;
+}): number {
+  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const logOf = new Map(input.logs.map((l) => [l.date, l]));
+  const scheduled = (day: string): readonly number[] => {
+    const assigned = logOf.get(day)?.assignedPages;
+    if (assigned) return assigned;
+    const [y, m, d] = day.split('-').map(Number);
+    return getPagesForDay(input.user, new Date(y, m - 1, d), memorized);
+  };
+  return aliveStreak(completedDays(creditIndex(input.logs), scheduled), input.today);
+}
+
+/** A day's progress: its scheduled pages and how many are credited to it. */
+export interface DayProgress {
+  scheduled: number;
+  credited: number;
+}
+
+/**
+ * The streak as Home and the widget show it (SESS-6). `done` is every day all its pages are
+ * credited to, at any time. `onTime` is the days that were done by the end of their own revision
+ * day: only those keep a streak alive behind a missed day (a day done late doesn't restore it).
+ * `grace` is set when yesterday is missed but the run before it is intact: the streak reads 0
+ * until yesterday is done, and `previous` is the streak that comes back if it is.
+ */
+export interface StreakReading {
+  streak: number;
+  grace: null | { previous: number; progress: DayProgress };
+}
+
+export function streakReading(input: {
+  done: ReadonlySet<string>;
+  onTime: ReadonlySet<string>;
+  scheduled: (day: string) => readonly number[];
+  credited: ReadonlyMap<string, ReadonlySet<number>>;
+  today: string;
+}): StreakReading {
+  const { done, onTime, today } = input;
+  // A day that is done counts itself (even late, once restored); the run behind it counts only the days done on time.
+  if (done.has(today)) return { streak: 1 + runFrom(onTime, previousIsoDay(today)), grace: null };
+  const yesterday = previousIsoDay(today);
+  if (done.has(yesterday)) return { streak: 1 + runFrom(onTime, previousIsoDay(yesterday)), grace: null };
+  // Nothing was scheduled yesterday: no missed day, so the run before it carries on.
+  if (input.scheduled(yesterday).length === 0) return { streak: runFrom(onTime, previousIsoDay(yesterday)), grace: null };
+  // Yesterday missed. The run before it must have been intact on time, or the streak is broken.
+  const previous = runFrom(onTime, previousIsoDay(yesterday));
+  if (previous === 0) return { streak: 0, grace: null };
+  const need = input.scheduled(yesterday);
+  const got = input.credited.get(yesterday) ?? new Set<number>();
+  return {
+    streak: 0,
+    grace: { previous, progress: { scheduled: need.length, credited: need.filter((p) => got.has(p)).length } },
+  };
+}
+
+/** Days in a row in `set`, counting back from `day` (no alive rule: the caller picks the start). */
+function runFrom(set: ReadonlySet<string>, day: string): number {
+  let cursor = day;
+  let n = 0;
+  while (set.has(cursor)) {
+    n++;
+    cursor = previousIsoDay(cursor);
+  }
+  return n;
+}
+
+/** The streak reading from the revision logs: the logs' pages, ahead credits and each day's assignment. */
+export function streakReadingFromLogs(input: { user: User; pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string }): StreakReading {
+  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const logOf = new Map(input.logs.map((l) => [l.date, l]));
+  const scheduled = (day: string): readonly number[] => {
+    const assigned = logOf.get(day)?.assignedPages;
+    if (assigned) return assigned;
+    const [y, m, d] = day.split('-').map(Number);
+    return getPagesForDay(input.user, new Date(y, m - 1, d), memorized);
+  };
+  const credited = creditIndex(input.logs);
+  const done = completedDays(credited, scheduled);
+  // The logs alone cannot say when a page was revised. Until the items carry a time, a day counts
+  // as on time when it is done (the grace rule then matches the done-day rule).
+  return streakReading({ done, onTime: done, scheduled, credited, today: input.today });
+}
