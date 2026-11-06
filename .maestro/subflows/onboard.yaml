@@ -31,29 +31,65 @@ appId: com.revisionbuddy.app
     timeout: 30000
 # The check, once the screen has its starting count ("1 of 604": in progress
 # starts from page 1), which comes when the account's pages have loaded: a juz
-# marked before then was dropped when they arrived (fixed in #216). Tapped only
-# while the count still shows page 1 alone, since a tap toggles it.
+# marked before then was dropped when they arrived (fixed in #216).
 - extendedWaitUntil:
     visible:
       id: juz-selection-summary
       text: "[1-9][0-9]* of 604 pages memorized"
     timeout: 30000
+# Tapped while the check itself reads unchecked, and again only if a tap was
+# lost: a tap toggles it. The count is no guide here: it counts only the pages
+# the account has loaded, and once lagged behind a check that had taken, so
+# re-tapping on it turned Juz 30 off again (E2E, Nov 5 2026).
+# Its state reads as the value on iOS ("checkbox, checked") and as `checked` on
+# Android.
 - retry:
     maxRetries: 2
     commands:
       - runFlow:
           when:
+            platform: iOS
             visible:
-              id: juz-selection-summary
-              text: "1 of 604 pages memorized"
+              id: juz-30-check
+              text: "checkbox, unchecked"
           commands:
             - tapOn:
                 id: juz-30-check
-      - extendedWaitUntil:
-          visible:
-            id: juz-selection-summary
-            text: "24 of 604 pages memorized"
-          timeout: 10000
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            platform: Android
+            visible:
+              id: juz-30-check
+              checked: false
+          commands:
+            - tapOn:
+                id: juz-30-check
+                retryTapIfNoChange: false
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: juz-30-check
+                  text: "checkbox, checked"
+                timeout: 5000
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: juz-30-check
+                  checked: true
+                timeout: 5000
+# Then the count: Juz 30's 23 pages and page 1.
+- extendedWaitUntil:
+    visible:
+      id: juz-selection-summary
+      text: "24 of 604 pages memorized"
+    timeout: 30000
 - tapOn:
     id: juz-continue
 - extendedWaitUntil:
@@ -63,8 +99,19 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: schedule-amount
     text: "10"
-- tapOn:
-    id: pill-${BOUNDARY}
+# When the day resets. "At fajr" is the default, so a lost tap here left the
+# account on fajr and 04's first switch in Settings then turned it off (E2E,
+# Nov 5 2026): tapped until the pill reads selected (a selected pill ignores a tap).
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: pill-${BOUNDARY}
+      - extendedWaitUntil:
+          visible:
+            id: pill-${BOUNDARY}
+            text: ".*, selected"
+          timeout: 3000
 - tapOn:
     id: schedule-start
 - extendedWaitUntil:
