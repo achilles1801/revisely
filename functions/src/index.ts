@@ -93,6 +93,18 @@ export const deleteUserAccount = onCall(
     await deleteSubcollection('_quota');
     await deleteSubcollection('recordings');
 
+    // The Ask coach's documents: top-level, keyed by uid (functions/src/coach/admin.ts).
+    for (const col of ['coachAnswers', 'coachUsage'] as const) {
+      while (true) {
+        const snap = await adminDb.collection(col).where('uid', '==', uid).limit(400).get();
+        if (snap.empty) break;
+        const batch = adminDb.batch();
+        for (const doc of snap.docs) batch.delete(doc.ref);
+        await batch.commit();
+      }
+    }
+    await adminDb.doc(`coachSettings/${uid}`).delete();
+
     await userRef.delete();
 
     try {

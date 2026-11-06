@@ -39,8 +39,9 @@ describe('the payload (COACH-2)', () => {
 });
 
 describe('the prompt (COACH-3)', () => {
-  it('[COACH-3] is cached: a stable system prompt above the 512-token minimum (about four characters a token)', () => {
-    expect(COACH_SYSTEM_PROMPT.length / 4).toBeGreaterThan(512);
+  it('[COACH-3] is cached: a stable system prompt above the 512-token minimum, with a safe margin', () => {
+    // The safe margin (docs say 512 tokens; at most 6 characters a token): 512 × 6 = 3,072 characters.
+    expect(COACH_SYSTEM_PROMPT.length).toBeGreaterThanOrEqual(512 * 6);
     const req = buildCoachRequest('coverage', { memorizedPages: 10, revisedWithin7Days: 4, revisedWithin30Days: 9 });
     expect(req.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(req.system[0].text).toBe(COACH_SYSTEM_PROMPT);
