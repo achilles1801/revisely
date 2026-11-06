@@ -144,7 +144,7 @@ describe('findLeftovers: a day missed entirely', () => {
 
   it('a day with nothing scheduled (an off day) gives no days', () => {
     const got = findLeftovers([], TODAY, [], memorizedSet, 1, () => []);
-    expect(got).toEqual({ pages: [], days: [] });
+    expect(got).toEqual({ pages: [], from: {}, days: [] });
   });
 });
 

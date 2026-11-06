@@ -57,9 +57,11 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
-import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
+import { applyCarryOver, leftoversFor, ownPagesOf, type Leftovers } from '../../lib/carryOver';
 import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
-import { daysDoneAhead, nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
+import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
+import { streakReadingFromLogs } from '../../lib/streak';
+import { dateToLocalISODay } from '../../lib/schedulePlans';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
@@ -161,8 +163,10 @@ export default function DashboardScreen() {
     // Today's pages credited to today: revised today, or ahead from an earlier
     // session (a day done ahead is done).
     const credited = creditedOnDay(logs, revisionDay);
-    const totalAssigned = assignment?.totalPages || 0;
-    const completed = (assignment?.pages ?? []).filter((p) => credited.has(p)).length;
+    // Today is done when its OWN pages are (SESS-7): catch-up pages are credited to the days they were missed.
+    const own = user && assignment ? ownPagesOf(assignment.pages, user, revisionDay) : (assignment?.pages ?? []);
+    const totalAssigned = own.length;
+    const completed = own.filter((p) => credited.has(p)).length;
     // If the user revised pages today and the assignment later shrank
     // (custom-plan edit, un-memorized surah), treat that as completed
     // rather than letting `remaining` go negative downstream.
@@ -172,7 +176,7 @@ export default function DashboardScreen() {
     if (completed > 0)
       return { status: 'partial' as const, pagesCompleted: completed };
     return { status: 'not_started' as const, pagesCompleted: 0 };
-  }, [logs, assignment, revisionDay]);
+  }, [logs, assignment, revisionDay, user]);
 
   // Done today: the next revision day, which Home's quiet line opens (#168).
   const aheadNext = useMemo(() => {
@@ -187,7 +191,7 @@ export default function DashboardScreen() {
   // no session at all counts as missed), offered as "Add to today". Empty once
   // they are in today's assignment.
   const leftovers = useMemo<Leftovers>(() => {
-    if (!user || !assignment) return { pages: [], days: [] };
+    if (!user || !assignment) return { pages: [], from: {}, days: [] };
     return leftoversFor(user, logs, revisionDay, assignment.pages, pages.filter((p) => p.status === 'memorized'));
   }, [logs, revisionDay, assignment, pages, user]);
 
@@ -203,31 +207,12 @@ export default function DashboardScreen() {
     registerForPushNotificationsAsync();
   }, []);
 
-  const calculatedStreak = useMemo(() => {
-    if (logs.length === 0) return 0;
-    // Log dates are revision days ('YYYY-MM-DD'), so count back from the
-    // revision day, parsing them as local dates: `new Date('YYYY-MM-DD')` is
-    // UTC midnight, the previous evening west of Greenwich.
-    const localDay = (s: string) => {
-      const [y, m, d] = s.split('-').map(Number);
-      return new Date(y, m - 1, d).getTime();
-    };
-    // A day whose pages were all revised ahead is a day done, so it keeps the streak.
-    const days = new Set<string>(logs.map((l) => l.date));
-    if (user) for (const day of daysDoneAhead(user, pages, logs)) days.add(day);
-    const sortedDays = [...days].map(localDay).sort((a, b) => b - a);
-    let streak = 0;
-    for (const logDay of sortedDays) {
-      const expectedDate = new Date(revisionDate);
-      expectedDate.setDate(revisionDate.getDate() - streak);
-      if (logDay === expectedDate.getTime()) {
-        streak++;
-      } else if (logDay < expectedDate.getTime()) {
-        break;
-      }
-    }
-    return streak;
-  }, [logs, revisionDate, user, pages]);
+  // The streak (lib/streak): the same rule and the same answer as the widget.
+  const streakNow = useMemo(
+    () => (user ? streakReadingFromLogs({ user, pages, logs, today: dateToLocalISODay(revisionDate) }) : null),
+    [logs, revisionDate, user, pages],
+  );
+  const calculatedStreak = streakNow?.streak ?? 0;
 
   // Sessions
   const sessionLogs = useMemo(
@@ -412,7 +397,7 @@ export default function DashboardScreen() {
     setCarrying(true);
     try {
       const memorized = pages.filter((p) => p.status === 'memorized');
-      await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate));
+      await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate, leftovers.from));
     } catch {
       Alert.alert("Couldn't update today's session", 'Please try again.');
     } finally {
@@ -524,6 +509,7 @@ export default function DashboardScreen() {
           done={donePagesToday}
           carried={carriedToday}
           streak={calculatedStreak}
+          streakGrace={streakNow?.grace ?? null}
           memorized={memorized}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}

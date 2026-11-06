@@ -16,7 +16,7 @@ import { generateDailyAssignment } from '../algorithm';
 import { getFajrTimeFor, getNextRevisionDayStart, getRevisionDateForUser, getRevisionDayForUser } from '../fajrBoundary';
 import type { Place } from '../prayer/prefs';
 import { dayTimes, type CalcSettings } from '../prayer/times';
-import { aliveStreak } from '../widgets/snapshot';
+import { streakFromLogs } from '../streak';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { reminderCopy, type ReminderKind } from './copy';
 
@@ -135,7 +135,8 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   const todayRevised = new Set(input.logs.filter((l) => l.date === today.day).flatMap((l) => l.pagesRevised));
   // As Home and the widget: done once as many pages were revised as are assigned.
   const doneToday = todayRevised.size > 0 && todayRevised.size >= todayPages.length;
-  const streak = aliveStreak(new Set(input.logs.map((l) => l.date)), today.day);
+  // The streak as Home and the widget count it (lib/streak).
+  const streak = streakFromLogs({ user, pages: input.pages, logs: input.logs, today: today.day });
   const beforeNoon = morningTime(user).hour < 12;
   const juzPlan = user.scheduleMode === 'juz';
 

@@ -78,7 +78,7 @@ export interface User {
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
-  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null } | null;
+  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string> } | null;
   // Pages the whole schedule has been moved back by carry-overs; every day reads
   // its pages this many earlier in the cycle. Reset when a plan is saved.
   scheduleShiftPages?: number;

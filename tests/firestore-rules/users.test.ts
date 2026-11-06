@@ -170,6 +170,20 @@ describe('users/{userId}', () => {
       );
     });
 
+    it('owner can carry a catch-up with each page’s source day (SESS-7)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}`), { carryOver: { day: '2026-10-17', pages: [548], skip: 0, from: { '548': '2026-10-16' } } }),
+      );
+    });
+
+    it('a carry-over source map that is not a map is refused', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(
+        updateDoc(doc(alice, `users/${ALICE}`), { carryOver: { day: '2026-10-17', pages: [548], skip: 0, from: 'nope' } }),
+      );
+    });
+
     it('owner can choose a reciter', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { reciter: 'minshawi:mujawwad' }));
