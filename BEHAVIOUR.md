@@ -199,6 +199,9 @@ How the tests are made: `tests/scenarios/README.md`.
   It never copies the session's own revised pages or minutes.
   Note opens its own sheet: its text, and an optional "Show under" choice of the day's Revised, Memorized or
   Read item (the note's tag). Add is a new note with its own id and time; an empty note cannot be added.
+  Memorized opens its own sheet: From and To, or a surah. Add marks the pages memorized (the composer's two
+  writes) and records a Memorized item for today. "From your reading" offers the pages read today that are not
+  memorized yet. The sheet has no minutes: a Memorized item carries none yet.
 - **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
   window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
