@@ -7,6 +7,9 @@ import type { ReactElement } from 'react';
 import type { Booted, OpenApp } from './phone';
 import { pagerState } from './pager';
 
+/** The pages every scenario account holds (TOTAL_QURAN_PAGES). */
+const TOTAL_PAGES = 604;
+
 function resetPager() {
   const s = pagerState();
   s.props = null;
@@ -198,6 +201,11 @@ export class Home {
    */
   private async open(testID: string): Promise<Session> {
     resetPager();
+    // A listener can briefly hold part of the pages while a batch of them is
+    // written (the emulator, under load: 584 of 604, the memorized ones
+    // missing). Home then offers Memorization, not the session. Tap once the
+    // phone holds all of them, as it does a moment later.
+    await this.app.until(() => this.app.app.pages.length === TOTAL_PAGES, 'every page on the phone', 20_000);
     const session = new Session(this.app);
     const nav = this.app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
     const onHome = () => nav.current?.getCurrentRoute?.()?.name === 'Dashboard';
