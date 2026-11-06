@@ -226,6 +226,9 @@ How the tests are made: `tests/scenarios/README.md`.
   Before (don't log) writes nothing. The manager asks "When did you memorize these?" (default Before above five
   pages). Pages unmarked are removed from the items that hold them. The Memorized composer takes a page range
   (From and To) and marks it in the same save.
+- **ACT-11.** A log note tagged to one of the day's items shows under that item in Activity: a Revised,
+  Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
+  While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
 
 ## Known bugs
 

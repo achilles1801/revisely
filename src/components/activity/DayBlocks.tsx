@@ -19,6 +19,7 @@ import { RecordingsList } from '../recordings/RecordingsList';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { describePageRuns, describeSurahRuns, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
+import { parseTag } from '../../lib/noteTags';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
 import { Tap } from '../v2/Tap';
 import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
@@ -164,8 +165,6 @@ export function DayBlocks({
   const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
   const revised = revisedRaw;
   const doneAhead = items?.doneAhead ?? [];
-  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0;
-  const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0;
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
 
@@ -196,6 +195,31 @@ export function DayBlocks({
       ];
     }),
   );
+  // Tagged notes (#248): a note tagged to one of the day's items shows under that item. A note
+  // whose item is gone, or an untagged note, stays in the Notes block. While the items load, a
+  // tagged note shows nowhere, so it never flickers into Notes.
+  const targetExists = (n: JournalNote): boolean => {
+    const t = parseTag(n.tag);
+    if (!t || !items) return false;
+    if (t.kind === 'revision') return t.id === day && items.revisions.some((r) => r.countsFor === day);
+    if (t.kind === 'memorization') return items.memorized.some((m) => m.id === t.id);
+    return items.reads.some((r) => r.id === t.id);
+  };
+  const taggedTo = (kind: 'revision' | 'memorization' | 'read', id?: string) =>
+    notes.filter((n) => {
+      const t = parseTag(n.tag);
+      return t != null && t.kind === kind && (id === undefined || t.id === id) && targetExists(n);
+    });
+  const notesBlock = items == null ? notes.filter((n) => !parseTag(n.tag)) : notes.filter((n) => !targetExists(n));
+  const taggedRow = (n: JournalNote) => (
+    <View key={n.id}>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+      <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+    </View>
+  );
+
+  const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0 || taggedTo('revision').length > 0;
+  const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0 || taggedTo('memorization').length > 0;
   // The block headers' menus: Revised (its session), Memorized (each entry), Read (each timed session).
   const revisedMenu = revisedLog
     ? headerMenu('Revised', [
@@ -261,6 +285,7 @@ export function DayBlocks({
               ))}
             </ThreadBranch>
           )}
+          {taggedTo('revision').length > 0 && <ThreadBranch>{taggedTo('revision').map(taggedRow)}</ThreadBranch>}
           {doneAhead.length > 0 && (
             <ThreadBranch>
               {doneAhead.map((a) => (
@@ -296,6 +321,7 @@ export function DayBlocks({
           {memorized.items.map((i) => (
             <View key={i.id}>
               <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>
+              {taggedTo('memorization', i.id).length > 0 && <ThreadBranch>{taggedTo('memorization', i.id).map(taggedRow)}</ThreadBranch>}
             </View>
           ))}
           {memorizationNotes.length > 0 && (
@@ -326,8 +352,8 @@ export function DayBlocks({
           <ThreadBranch>{readItems.items.map((i) => {
             const session = readings.find((r) => r.id === i.id);
             return (
+              <React.Fragment key={i.id}>
               <Tap
-                key={i.id}
                 onPress={() => session && onEditReading(session)}
                 accessibilityRole="button"
                 accessibilityLabel={`Timed session. Edit pages`}
@@ -339,6 +365,8 @@ export function DayBlocks({
                 </View>
                 {i.pages.length > 0 && <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>}
               </Tap>
+              {taggedTo('read', i.id).length > 0 && <ThreadBranch>{taggedTo('read', i.id).map(taggedRow)}</ThreadBranch>}
+              </React.Fragment>
             );
           })}</ThreadBranch>
           {readRecs.length > 0 && (
@@ -348,17 +376,17 @@ export function DayBlocks({
           )}
         </ThreadRow>
       )}
-      {notes.length > 0 && (
+      {notesBlock.length > 0 && (
         <ThreadRow
           mark={<Mark size="reply" icon="create-outline" />}
           name="Notes"
-          figure={notes.length > 0 ? <Text style={[typeV2.name, { color: palette.text }]}>{notes.length}</Text> : undefined}
+          figure={notesBlock.length > 0 ? <Text style={[typeV2.name, { color: palette.text }]}>{notesBlock.length}</Text> : undefined}
           lineBelow
           separator={false}
           testID="activity-block-notes"
         >
           <ThreadBranch>
-            {notes.map((n) => (
+            {notesBlock.map((n) => (
               // Editing happens in the log: a note here only opens it (no swipe, no menu).
               <Tap
                 key={n.id}
