@@ -237,6 +237,9 @@ How the tests are made: `tests/scenarios/README.md`.
   is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
   when short), with a timeout per attempt, and its log keeps the usage and never the content.
 
+- **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
+  what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
