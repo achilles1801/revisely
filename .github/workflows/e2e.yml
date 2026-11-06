@@ -19,8 +19,11 @@ name: E2E
 # part: five at a time on this plan):
 #   - a PR into develop: the smoke set, 02 04 05 06, one iOS job and one Android
 #     job (.maestro/README.md says why these four);
-#   - a PR into main, the nightly run (develop) and a run by hand: every flow,
-#     two iOS jobs and two Android jobs.
+#   - what lands on develop (a push: the batch auto-merge just merged) and, if a
+#     merge queue is ever enabled (an organization-owned repo), its merge group:
+#     every flow, two iOS jobs and two Android jobs. A newer push cancels the run
+#     of the one before, so a burst of merges is tested once, as it ends;
+#   - a PR into main, the nightly run (develop) and a run by hand: every flow.
 #
 # A required check for merges into develop: the job named `E2E` at the end. It
 # runs on every pull request into develop, so it can never wait for a run that
@@ -33,11 +36,14 @@ on:
   # Into develop: the smoke set (below). Into main (a release): every flow.
   pull_request:
     branches: [develop, main]
-  # Keeps the native builds where pull requests can restore them: a cache saved
-  # by one PR is that PR's alone, but one saved on develop is open to every PR
-  # into it. A push only builds what isn't kept yet; it runs no flows.
+  # What lands on develop: every flow (the batch just merged). It also keeps the
+  # native builds where pull requests can restore them: a cache saved by one PR
+  # is that PR's alone, but one saved on develop is open to every PR into it.
   push:
     branches: [develop]
+  # A merge queue's group (needs an organization-owned repo; ready if it moves).
+  merge_group:
+    types: [checks_requested]
   schedule:
     # 07:30 UTC: the small hours in Chicago.
     - cron: '30 7 * * *'
@@ -65,8 +71,9 @@ permissions:
   contents: read
 
 # One run per PR: a push cancels the run of the commit before it. Elsewhere one
-# per branch and event, so a push to develop (the native build) never cancels a
-# full run started by hand or on schedule there (a release's proof).
+# per branch and event: a push to develop cancels the full run of the push before
+# it (a burst of merges is tested once, at its end), and never a full run started
+# by hand or on schedule there (a release's proof).
 concurrency:
   group: e2e-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.event_name) }}
   cancel-in-progress: true
@@ -106,7 +113,8 @@ jobs:
       # The jobs and their flows. Every flow: two iOS and two Android jobs of
       # about the same length (03 and 04, the long ones, apart). A PR into
       # develop: the smoke set in one job each. A run by hand with `flows`: one
-      # job each with those. A push to develop: the native builds alone.
+      # job each with those. Everything else (a push to develop, a merge group,
+      # a PR into main, the nightly run): every flow.
       - id: shards
         env:
           ONLY: ${{ inputs.flows }}
@@ -116,9 +124,7 @@ jobs:
         run: |
           full='[{"name":"01 02 03 08","flows":".maestro/flows/0[1238]-*.yaml"},{"name":"04 05 06 07","flows":".maestro/flows/0[4567]-*.yaml"}]'
           smoke='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
-          if [ "$EVENT" = push ]; then
-            ios='[{"name":"native build","flows":""}]'; android="$ios"
-          elif [ -n "$ONLY" ]; then
+          if [ -n "$ONLY" ]; then
             case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
             ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]'); android="$ios"
           elif { [ "$EVENT" = pull_request ] && [ "$BASE" = develop ]; } || [ "$SMOKE" = true ]; then
@@ -201,7 +207,6 @@ jobs:
       # Started now, finished later: a new simulator's first boot takes minutes,
       # which the install and the build hide.
       - name: Boot a simulator
-        if: github.event_name != 'push'
         id: sim
         run: |
           RUNTIME=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | sort_by(.version) | last | .identifier')
@@ -263,13 +268,12 @@ jobs:
 
       # A kept build: this commit's JavaScript into it.
       - name: Bundle this commit's JavaScript
-        if: github.event_name != 'push' && steps.cache.outputs.cache-hit == 'true'
+        if: steps.cache.outputs.cache-hit == 'true'
         run: bash .maestro/scripts/embed-js.sh ios .maestro/build/Revisely.app
 
       # Maestro and the Firestore emulator's jar, kept per version (the CLI
       # downloads the jar each run otherwise).
       - name: Restore Maestro and the emulators
-        if: github.event_name != 'push'
         uses: actions/cache@v4
         with:
           path: |
@@ -278,14 +282,12 @@ jobs:
           key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}
 
       - name: Firebase CLI and Maestro
-        if: github.event_name != 'push'
         run: |
           npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
           [ -x "$HOME/.maestro/bin/maestro" ] || curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Start the Firebase emulators
-        if: github.event_name != 'push'
         # Twice if need be: on a busy runner the Firestore emulator can miss the
         # CLI's own one-minute start limit.
         run: |
@@ -305,7 +307,6 @@ jobs:
 
       # Booted (above) while the app was built: the first boot of a new simulator takes minutes.
       - name: Install the app on the simulator
-        if: github.event_name != 'push'
         env:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
@@ -313,7 +314,6 @@ jobs:
           xcrun simctl install "$UDID" .maestro/build/Revisely.app
 
       - name: Run the flows
-        if: github.event_name != 'push'
         env:
           E2E_DEVICE: ${{ steps.sim.outputs.udid }}
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
@@ -426,13 +426,12 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: Bundle this commit's JavaScript
-        if: github.event_name != 'push' && steps.cache.outputs.cache-hit == 'true'
+        if: steps.cache.outputs.cache-hit == 'true'
         run: bash .maestro/scripts/embed-js.sh android .maestro/build/revisely-e2e.apk
 
       # Maestro and the Firestore emulator's jar, kept per version (the CLI
       # downloads the jar each run otherwise).
       - name: Restore Maestro and the emulators
-        if: github.event_name != 'push'
         uses: actions/cache@v4
         with:
           path: |
@@ -441,7 +440,6 @@ jobs:
           key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}
 
       - name: Firebase CLI and Maestro
-        if: github.event_name != 'push'
         run: |
           npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
           [ -x "$HOME/.maestro/bin/maestro" ] || curl -fsSL "https://get.maestro.mobile.dev" | bash
@@ -449,7 +447,6 @@ jobs:
 
       # The emulator sees this computer's 127.0.0.1 as 10.0.2.2.
       - name: Start the Firebase emulators
-        if: github.event_name != 'push'
         # Twice if need be: on a busy runner the Firestore emulator can miss the
         # CLI's own one-minute start limit.
         run: |
@@ -468,7 +465,6 @@ jobs:
           exit 1
 
       - name: Enable KVM
-        if: github.event_name != 'push'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -477,7 +473,6 @@ jobs:
       # The action runs each line of `script` on its own: one line. $E2E_FLOWS
       # (the job's flows) is a glob, expanded there.
       - name: Run the flows
-        if: github.event_name != 'push'
         uses: reactivecircus/android-emulator-runner@v2
         env:
           E2E_FLOWS: ${{ matrix.shard.flows }}

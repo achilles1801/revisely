@@ -4,6 +4,9 @@ on:
   push:
     branches: [develop, main]
   pull_request:
+  # A merge queue's group (needs an organization-owned repo; ready if it moves).
+  merge_group:
+    types: [checks_requested]
   # Claude's fix PRs (claude-fix.yml) are opened with the workflow token, which starts no workflows;
   # that workflow starts CI on the branch this way.
   workflow_dispatch:

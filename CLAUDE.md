@@ -217,6 +217,14 @@ file is the release mechanics and the traps behind them.
   component tests, Cloud Functions tests, Firestore rules tests, `Scenarios / Scenario tests` and
   `E2E` (`e2e.yml`'s last job). Admins can still bypass (`enforce_admins` off). `main` has no branch
   protection.
+- **Merging into develop: auto-merge, not babysitting** (Nov 6 2026). Open the PR and run
+  `gh pr merge <n> --auto --merge`: GitHub merges it the moment the required checks pass (the repo
+  allows auto-merge). Don't poll or loop over PRs to merge them. A stack of PRs lands as one batch by
+  auto-merging its tip (it holds the others; GitHub marks them merged). A PR whose checks fail stays
+  open: fix it, push, and auto-merge takes it from there. GitHub's merge queue would batch
+  unrelated PRs too, but it needs an organization-owned repository (this one is a user's: the API
+  refuses the rule); `ci.yml` and `e2e.yml` already run on `merge_group`, so moving the repo to an
+  organization and adding the ruleset is all it would take.
 - No caches in jobs that hold release secrets (`preview.yml`, `promote.yml`, `ios-build.yml`: no
   `cache: npm`, `eas-cache: false`). The fix job runs code Claude writes on these runners, and a cache
   entry written by one run can be restored by another. Only CI, which holds no secrets, caches.
@@ -527,10 +535,13 @@ hard-coded token was deleted from the console on 2026-10-27.
   emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
   session, revise ahead, the Fajr boundary, the daily log, offline, recordings). On PRs into
   `develop`, a smoke set (02 session, 04 Fajr boundary, 05 daily log, 06 offline; one iOS job and one
-  Android job). On PRs into `main`, nightly (testing develop) and by hand, every flow (two iOS and two
-  Android jobs). One run per PR (a push cancels the older one); on develop, runs are grouped by
-  branch and event, so a push can't cancel a full run started by hand. iOS runners are the slow part
-  (5 macOS jobs at once on this plan): don't start full runs you don't need.
+  Android job). On what lands on develop (each push: the batch just merged), on a merge group (if
+  ever enabled), on PRs into `main`, nightly (testing develop) and by hand, every flow (two iOS and
+  two Android jobs). One run per PR (a push cancels the older one); a push to develop cancels the
+  full run of the push before it (a burst of merges is tested once, at its end) and never a full run
+  started by hand. A red full run on develop doesn't stop the preview (the scenario gate does that):
+  fix it like any failure. iOS runners are the slow part (5 macOS jobs at once on this plan): don't
+  start full runs you don't need.
   - **Hangs and system alerts:** `run.sh` stops a flow attempt after 15 minutes and the warm-up
     after 6 (a Maestro driver that answered 500 once hung a shard for 55 minutes). Flows confirm
     iOS permission alerts (the simulator's microphone grant sometimes doesn't take), and the clock
