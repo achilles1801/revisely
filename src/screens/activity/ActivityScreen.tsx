@@ -28,6 +28,7 @@ import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AddRevisedSheet } from '../../components/activity/AddRevisedSheet';
+import { AddNoteSheet } from '../../components/activity/AddNoteSheet';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { missedFromSession } from '../../lib/activityAdd';
@@ -79,6 +80,8 @@ export default function ActivityScreen() {
   const [addOpen, setAddOpen] = useState(false);
   // Revised (d6): its own sheet, not the composer.
   const [revisedOpen, setRevisedOpen] = useState(false);
+  // Note (d8): its own sheet, not the composer.
+  const [noteOpen, setNoteOpen] = useState(false);
   // "From your session" (d5): on top when today's session missed pages it can add.
   const todaysLog = logs.find((l) => l.date === today);
   const missed = todaysLog
@@ -91,7 +94,7 @@ export default function ActivityScreen() {
     { key: 'revision', label: 'Revised', icon: 'checkmark-circle-outline' as const, subtitle: 'Pages you revised, or missed', onPress: () => setRevisedOpen(true) },
     { key: 'memorization', label: 'Memorized', icon: 'bookmark-outline' as const, subtitle: 'Pages you have memorized', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'memorization' }) },
     { key: 'read', label: 'Read', icon: 'stopwatch-outline' as const, subtitle: 'A timed reading session', onPress: () => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read') },
-    { key: 'note', label: 'Note', icon: 'create-outline' as const, subtitle: 'Anything for the day', onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'note' }) },
+    { key: 'note', label: 'Note', icon: 'create-outline' as const, subtitle: 'Anything for the day', onPress: () => setNoteOpen(true) },
   ];
 
   // Days with a note in the log (the flagged calendar's note dot).
@@ -175,6 +178,7 @@ export default function ActivityScreen() {
       )}
       <ActionSheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add" actions={addMenuActions} testID="activity-add-menu" />
       <AddRevisedSheet visible={revisedOpen} onClose={() => setRevisedOpen(false)} day={today} logs={logs} />
+      <AddNoteSheet visible={noteOpen} onClose={() => setNoteOpen(false)} day={today} />
     </TopSafeAreaView>
   );
 }
