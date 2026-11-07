@@ -257,7 +257,7 @@ const SAMPLES = [
     ctx: steady,
     facts: [
       F('no pause', /no pause|can’t pause|isn’t a pause|there’s no|not possible|no way to pause|doesn’t have a pause/i),
-      F('the plan doesn’t move by itself; missed days don’t pile up', /doesn’t move|won’t move|don’t pile up|pick up|where you left|carries on/i, true),
+      F('missed days don’t pile up (the plan follows the calendar)', /doesn’t move|won’t move|don’t pile up|follows the calendar/i, true),
       F('closest: Jump to… when back', /jump to/i, true),
       NOT('doesn’t offer rest days as a pause', /(?:^|[.!?]\s)(?![^.!?]*pause)[^.!?]*rest days?[^.!?]*(?:[.!?]|$)/i),
       UNSURE,
@@ -388,13 +388,16 @@ function show(s, r) {
   lines.push('');
   for (const { f, ok } of results) lines.push(`- ${ok ? '✅' : '❌'} ${f.label}`);
   if (s.screen) {
+    // Counted (REVO-31): the card for the screen the answer names, from the model or added by the server.
     const a = r.reply?.action;
     const offered = a?.kind === 'openScreen' ? a.screen : null;
-    lines.push(`- ${offered === s.screen ? '✅' : '◻️'} offers to open ${s.screen}${offered && offered !== s.screen ? ` (offered ${offered})` : offered ? '' : ' (no screen offered)'} *(not counted)*`);
+    const ok = offered === s.screen;
+    results.push({ f: { label: `offers to open ${s.screen}` }, ok });
+    lines.push(`- ${ok ? '✅' : '❌'} offers to open ${s.screen}${offered && !ok ? ` (offered ${offered})` : offered ? '' : ` (${a ? `suggested ${a.kind}` : 'no card'})`}`);
   }
   const cached = r.usage.cache_read_input_tokens ?? 0;
   lines.push('', `<sub>${words(r.reply?.text)} words · ${r.usage.output_tokens ?? '?'} output tokens · ${cached} cached input tokens · stop: ${r.stop}</sub>`);
-  return { text: lines.join('\n'), passed: results.every((x) => x.ok), failed: results.filter((x) => !x.ok).length };
+  return { text: lines.join('\n'), passed: results.every((x) => x.ok), failed: results.filter((x) => !x.ok).length, counted: results.length };
 }
 
 (async () => {
@@ -427,7 +430,7 @@ function show(s, r) {
     const r = await ask(s);
     const out = show(s, r);
     if (out.passed) passed++;
-    facts += s.facts.length + (s.aboutToday ? 0 : 1);
+    facts += out.counted;
     failedFacts += out.failed;
     if (s.screen) {
       wanted++;
@@ -441,7 +444,7 @@ function show(s, r) {
     '',
     `Real replies from claude-sonnet-5-5 with the guide in its prompt (functions/src/revo/guide.ts), ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. Made-up tester accounts, not anyone’s data. A fact passes when the answer (its text, and the card’s title and detail) says it; the patterns are in functions/scripts/revo-guide-samples.js.`,
     '',
-    `**${passed} of ${samples.length} answers have every fact** (${facts - failedFacts} of ${facts} facts). Revo offered the right screen ${offered} of ${wanted} times (not counted).`,
+    `**${passed} of ${samples.length} answers have every fact** (${facts - failedFacts} of ${facts} facts, the right screen’s card included). The right screen offered ${offered} of ${wanted} times.`,
     '',
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

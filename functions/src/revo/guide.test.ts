@@ -3,7 +3,8 @@
  * screens the app has and labels the app shows, and the screens Revo may open are the same list
  * on both sides. When one of these fails, change the guide in the same PR as the feature.
  */
-import { readdirSync, readFileSync } from 'fs';
+import { execFileSync } from 'child_process';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { GUIDE_INTERNAL, GUIDE_SECTIONS, REVO_GUIDE } from './guide';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS } from './types';
@@ -86,5 +87,16 @@ describe('the screens Revo may open (REVO-31)', () => {
   it('are the same list in the app and on the server', () => {
     expect(appList('REVO_SCREENS')).toEqual([...REVO_SCREENS]);
     expect(appList('REVO_SETTINGS_SECTIONS')).toEqual([...REVO_SETTINGS_SECTIONS]);
+  });
+});
+
+describe('the scripts that ask the real model still build their requests', () => {
+  // They run on the built functions (lib/); CI builds before testing (npm run build && npm test).
+  // A change to the request (Nov 7: `attach` became `attached`) broke all three without a test failing.
+  const lib = join(__dirname, '..', '..', 'lib', 'revo', 'prompt.js');
+  // The tone script compares with an older prompt from git; CI's checkout is shallow, so it compares with HEAD here.
+  it.each([['revo-guide-samples.js'], ['record-anthropic.js'], ['revo-tone-samples.js', '--before', 'HEAD']])('%s --dry', (script, ...args) => {
+    if (!existsSync(lib)) throw new Error('Build the functions first: npm run build');
+    execFileSync(process.execPath, [join(__dirname, '..', '..', 'scripts', script), '--dry', ...args], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, ANTHROPIC_API_KEY: '' } });
   });
 });

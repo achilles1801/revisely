@@ -155,7 +155,7 @@ const SAMPLES = [
 ];
 
 async function ask(build, ctx) {
-  const body = build({ day: DAY, question: this.q, context: ctx, attach: null, memory: [], history: [] });
+  const body = build({ day: DAY, question: this.q, context: ctx, attach: null, attached: [], memory: [], history: [] });
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION },
@@ -197,10 +197,10 @@ function show(r) {
     for (const s of SAMPLES) {
       validateContext(s.ctx);
       validateContext(older(s.ctx));
-      before.buildAskRequest({ day: DAY, question: s.q, context: older(s.ctx), attach: null, memory: [], history: [] });
-      after.buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attach: null, memory: [], history: [] });
+      before.buildAskRequest({ day: DAY, question: s.q, context: older(s.ctx), attach: null, attached: [], memory: [], history: [] });
+      after.buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attach: null, attached: [], memory: [], history: [] });
     }
-    const r = after.buildAskRequest({ day: DAY, question: SAMPLES[2].q, context: SAMPLES[2].ctx, attach: null, memory: [], history: [] });
+    const r = after.buildAskRequest({ day: DAY, question: SAMPLES[2].q, context: SAMPLES[2].ctx, attach: null, attached: [], memory: [], history: [] });
     console.log(`${SAMPLES.length} samples build. What the model reads with sample 3 (after):\n\n${r.messages[r.messages.length - 1].content}`);
     return;
   }

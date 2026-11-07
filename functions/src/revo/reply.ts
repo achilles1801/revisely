@@ -4,6 +4,7 @@
  * action that names a page the model wasn't given is dropped whole. A reply that isn't JSON is
  * its own text, and nothing else (a reply cut off mid-object keeps its text when it arrived whole).
  */
+import { screenFromText } from './screenText';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoAction, RevoChart, RevoReplyParts } from './types';
 
 export const MAX_TEXT = 1500;
@@ -167,6 +168,11 @@ export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { fi
       out.action = action;
       break;
     }
+  }
+  // An answer that names a screen but suggests nothing gets that screen's card (REVO-31).
+  if (!out.action) {
+    const found = screenFromText([out.text, out.textAfter].filter(Boolean).join('\n'));
+    if (found) out.action = found;
   }
   const chips = strings(o.chips, MAX_CHIPS, MAX_CHIP);
   if (chips.length > 0) out.chips = chips;
