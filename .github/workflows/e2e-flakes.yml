@@ -28,6 +28,7 @@ on:
   pull_request:
     paths:
       - scripts/e2e/**
+      - scripts/ci/**
       - .github/workflows/e2e-flakes.yml
 
 permissions:
@@ -59,3 +60,14 @@ jobs:
           DAYS: ${{ inputs.days || '7' }}
           DRY: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && '--dry-run' || '' }}
         run: node scripts/e2e/flakes.js $DRY
+
+      # CI congestion over the same days, in its own comment on the same issue
+      # (scripts/ci/wait-times.js): waiting against running per workflow, and the
+      # most jobs running at once (Linux, macOS).
+      - name: CI wait times
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DAYS: ${{ inputs.days || '7' }}
+          COMMENT: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && '' || '--comment' }}
+        run: node scripts/ci/wait-times.js --days "$DAYS" $COMMENT
