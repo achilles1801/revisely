@@ -16,7 +16,15 @@ export function debugTokenFor(dev: boolean, value: string | undefined): string |
 // and EAS has no such variable.
 const DEBUG_TOKEN: string | undefined = __DEV__
   ? debugTokenFor(true, process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN)
-  : undefined;
+  : process.env.EXPO_PUBLIC_TESTLAB === '1'
+    ? debugTokenFor(true, process.env.EXPO_PUBLIC_TESTLAB_APPCHECK_TOKEN)
+    : undefined;
+
+// The Test Lab build (EXPO_PUBLIC_TESTLAB=1, testlab.yml, TESTING.md "Real devices"): a release
+// build installed on Test Lab's phones outside Play, so Play Integrity can't vouch for it; it uses
+// the debug provider with a token registered for it. Every other build has no such variable (EAS
+// has none), so this is false and the bundler drops it.
+const TESTLAB = process.env.EXPO_PUBLIC_TESTLAB === '1';
 
 export async function setupAppCheck(): Promise<void> {
   if (initialized) return;
@@ -31,11 +39,11 @@ export async function setupAppCheck(): Promise<void> {
       // 'debug' in development (a token registered in the Console; without
       // one, the SDK logs a new token to register). App Attest is only
       // available on physical iOS 14+ devices.
-      provider: __DEV__ ? 'debug' : 'appAttestWithDeviceCheckFallback',
+      provider: __DEV__ || TESTLAB ? 'debug' : 'appAttestWithDeviceCheckFallback',
       debugToken: DEBUG_TOKEN,
     },
     android: {
-      provider: __DEV__ ? 'debug' : 'playIntegrity',
+      provider: __DEV__ || TESTLAB ? 'debug' : 'playIntegrity',
       debugToken: DEBUG_TOKEN,
     },
   });

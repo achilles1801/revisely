@@ -118,6 +118,7 @@ function Row({
   onPress,
   destructive,
   accessibilityState,
+  testID,
 }: {
   icon?: IconName;
   label: string;
@@ -128,6 +129,7 @@ function Row({
   onPress?: () => void;
   destructive?: boolean;
   accessibilityState?: AccessibilityState;
+  testID?: string;
 }) {
   const { palette } = useTheme();
   const row = (
@@ -161,6 +163,7 @@ function Row({
       accessibilityRole="button"
       accessibilityLabel={value ? `${label}, ${value}` : label}
       accessibilityState={accessibilityState}
+      testID={testID}
     >
       {row}
     </Tap>
@@ -928,12 +931,14 @@ export default function SettingsScreen() {
               icon="log-out-outline"
               label="Sign out"
               onPress={handleSignOut}
+              testID="settings-sign-out"
             />
             <Row
               icon="trash-outline"
               label="Delete account"
               destructive
               onPress={handleDeleteAccount}
+              testID="settings-delete-account"
             />
           </Section>
         )}
