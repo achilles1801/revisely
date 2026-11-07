@@ -6,6 +6,9 @@
 //   revisely://e2e/clock?at=2026-11-03T06:30Z    an instant (Z or ±hh:mm)
 //   revisely://e2e/clock?at=now                  back to the real clock
 //
+// On iOS a launch can carry the time instead (Maestro's launchApp `arguments:
+// {e2eClock: 2026-11-03T12:00}`, read at launch: see launchClock below).
+//
 // Time keeps running from there, as on a phone. The offset is kept in a file in
 // the app's Documents, so a relaunch (a cold start) keeps the time the flow set,
 // and clearState (a fresh install) clears it. The zone is the phone's own: the
@@ -16,6 +19,7 @@
 // the app does what it does on a phone: a timer firing, the app coming back to
 // the front, or a relaunch. Flows change the clock, then relaunch.
 
+import { Platform, Settings } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 
 const RealDate = Date;
@@ -91,23 +95,47 @@ export function onClockChange(listener: () => void): () => void {
   };
 }
 
-/** Handles revisely://e2e/clock?at=…; true if the URL was one. */
-export function handleClockLink(url: string): boolean {
-  const m = /^revisely:\/\/e2e\/clock\?(?:.*&)?at=([^&]+)/i.exec(url);
-  if (!m) return false;
-  const at = decodeURIComponent(m[1]);
+/** Sets the clock from a flow's `at` ('now', a wall time or an instant). */
+function applyClock(at: string): void {
   if (at === 'now') {
     setClock(null);
-    return true;
+    return;
   }
   const t = parseClock(at);
   if (t == null) {
     // eslint-disable-next-line no-console
     console.warn(`[e2e] bad clock time ${at}`);
-    return true;
+    return;
   }
   setClock(t);
+}
+
+/** Handles revisely://e2e/clock?at=…; true if the URL was one. */
+export function handleClockLink(url: string): boolean {
+  const m = /^revisely:\/\/e2e\/clock\?(?:.*&)?at=([^&]+)/i.exec(url);
+  if (!m) return false;
+  applyClock(decodeURIComponent(m[1]));
   return true;
+}
+
+/**
+ * iOS: the time the app was launched with, if any. Maestro passes launchApp's
+ * `arguments` to `simctl launch` as `-e2eClock <at>`, which iOS puts in the
+ * app's defaults for that launch only (React Native's Settings reads them).
+ * A fresh install gets its clock this way (.maestro/subflows/launch.yaml), so
+ * the first screen already runs at it. The link needed `simctl openurl`, which
+ * on a busy CI Simulator gave up after 10 s while SpringBoard took 15 s to open
+ * the app; Maestro can't treat that error as optional, so the flow ended there
+ * (E2E, Nov 6 2026). Android has no such argument: its flows send the link.
+ */
+function launchClock(): string | null {
+  if (Platform.OS !== 'ios') return null;
+  try {
+    const at: unknown = Settings.get('e2eClock');
+    return typeof at === 'string' && at.length > 0 ? at : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -132,6 +160,8 @@ export function installClock(): void {
   Object.defineProperty(shim, 'parse', { value: RealDate.parse, writable: true, configurable: true });
   Object.defineProperty(shim, 'UTC', { value: RealDate.UTC, writable: true, configurable: true });
   (globalThis as { Date: DateConstructor }).Date = shim;
+  const launchedAt = launchClock();
+  if (launchedAt != null) applyClock(launchedAt);
 }
 
 /** 'YYYY-MM-DD HH:mm' of the app's now, in the phone's zone (the status line). */

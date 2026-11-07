@@ -24,6 +24,17 @@ jest.mock('expo-file-system', () => {
   return { File, Paths: { document: { uri: 'documents' } } };
 });
 
+// The launch's arguments as iOS hands them to the app's defaults (Settings).
+const mockLaunch: { os: string; args: Record<string, unknown> } = { os: 'ios', args: {} };
+jest.mock('react-native', () => ({
+  Platform: {
+    get OS() {
+      return mockLaunch.os;
+    },
+  },
+  Settings: { get: (key: string) => mockLaunch.args[key] },
+}));
+
 const RealDate = Date;
 
 function freshClock(): typeof import('../clock') {
@@ -42,6 +53,8 @@ afterEach(() => {
   jest.restoreAllMocks();
   (globalThis as { Date: DateConstructor }).Date = RealDate;
   mockFiles.clear();
+  mockLaunch.os = 'ios';
+  mockLaunch.args = {};
 });
 
 describe('parseClock', () => {
@@ -114,5 +127,38 @@ describe('the clock', () => {
     expect(next.handleClockLink('revisely://e2e/clock?at=now')).toBe(true);
     expect(Math.abs(Date.now() - RealDate.now())).toBeLessThan(1000);
     expect(next.handleClockLink('revisely://today')).toBe(false);
+  });
+
+  it('on iOS, starts at the time the launch carries, and a relaunch without it keeps it', () => {
+    mockLaunch.args = { e2eClock: '2026-11-03T12:00' };
+    const launched = freshClock();
+    launched.installClock();
+    const at = new RealDate(2026, 10, 3, 12, 0).getTime();
+    expect(Math.abs(Date.now() - at)).toBeLessThan(1000);
+    (globalThis as { Date: DateConstructor }).Date = RealDate;
+
+    mockLaunch.args = {};
+    const relaunched = freshClock();
+    relaunched.installClock();
+    expect(Math.abs(Date.now() - at)).toBeLessThan(1000);
+  });
+
+  it('ignores a launch without the argument, a bad time, and Android', () => {
+    const at = RealDate.UTC(2026, 10, 4, 9);
+    const first = freshClock();
+    first.installClock();
+    first.setClock(at);
+    (globalThis as { Date: DateConstructor }).Date = RealDate;
+
+    mockLaunch.args = { e2eClock: 'tomorrow' };
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    freshClock().installClock();
+    expect(Math.abs(Date.now() - at)).toBeLessThan(1000);
+    (globalThis as { Date: DateConstructor }).Date = RealDate;
+
+    mockLaunch.os = 'android';
+    mockLaunch.args = { e2eClock: '2030-01-01T00:00' };
+    freshClock().installClock();
+    expect(Math.abs(Date.now() - at)).toBeLessThan(1000);
   });
 });
