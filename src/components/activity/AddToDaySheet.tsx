@@ -11,7 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { missedFromSession } from '../../lib/activityAdd';
 import { manualRevisionItem } from '../../lib/manualRevision';
-import { formatPagesShort } from '../../lib/activityFormat';
+import { describePassage } from '../../lib/passages';
 import { queueChange } from '../../lib/offline/queue';
 import { logger } from '../../lib/logger';
 import { typeV2 } from '../../theme/v2';
@@ -23,7 +23,8 @@ import { Suggestion } from './AddSheetParts';
 
 type Log = { date: string; pagesRevised: number[]; pagesSkipped: number[]; assignedPages?: number[] };
 
-const shortPages = formatPagesShort;
+/** The skipped pages by surah (Majd, Nov 7 2026): "At-Taghabun", "Al-Baqarah, ayahs 142–176". */
+const passage = (pages: number[]) => describePassage(pages);
 
 export function AddToDaySheet({
   visible,
@@ -109,11 +110,11 @@ export function AddToDaySheet({
             <View style={styles.session}>
               <Suggestion
                 label="From your session"
-                text={`${shortPages(missed)} ${missed.length === 1 ? 'was' : 'were'} skipped. Revised ${missed.length === 1 ? 'it' : 'them'} another way?`}
+                text={`You skipped ${passage(missed)}. Revised it another way?`}
                 action="Add"
                 onAction={addMissed}
                 disabled={adding}
-                accessibilityLabel={`Add ${shortPages(missed)} as revised`}
+                accessibilityLabel={`Add ${passage(missed)} as revised`}
                 testID="add-from-session"
               />
             </View>

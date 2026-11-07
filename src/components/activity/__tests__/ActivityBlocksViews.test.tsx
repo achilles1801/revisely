@@ -3,6 +3,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { ActivityBlocksViews } from '../ActivityBlocksViews';
+import { plainText } from '../../../lib/passages';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -82,6 +83,22 @@ describe('the Activity calendar (gap audit §3)', () => {
     }
   });
 
+  it('the preview names what was memorized and read by surah, not pages (Majd, Nov 7 2026)', async () => {
+    const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+    service.getActivityItemsBetween.mockResolvedValue({
+      revisions: [],
+      memorized: [{ id: TODAY, day: TODAY, pages: [562] }],
+      reads: [{ id: 'r', day: TODAY, pages: [562, 563, 564], minutes: 22, occurredAt: null }],
+    });
+    try {
+      render(<ActivityBlocksViews {...props} />);
+      expect(await screen.findByText('Start of Al-Mulk', { normalizer: plainText })).toBeTruthy();
+      expect(screen.getByText('Al-Mulk to Al-Qalam · 22 min', { normalizer: plainText })).toBeTruthy();
+    } finally {
+      service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [] });
+    }
+  });
+
   it('steps to the next month and shows its title', async () => {
     render(<ActivityBlocksViews {...props} />);
     await screen.findByText('November 2026');
@@ -115,9 +132,10 @@ describe('Insights (gap audit §5)', () => {
     ];
     render(<ActivityBlocksViews {...props} />);
     fireEvent.press(await screen.findByText('Insights'));
-    expect(await screen.findByText('Al-Hashr')).toBeTruthy();
+    // By surah and ayahs, the pages a quiet detail after (Majd, Nov 7 2026).
+    expect(await screen.findByText('Al-Hashr, ayahs 4–16  pp. 546–547', { normalizer: plainText })).toBeTruthy();
     expect(screen.getByText('Weak now')).toBeTruthy();
-    fireEvent.press(screen.getByText('Revise these 2 pages first tomorrow'));
+    fireEvent.press(screen.getByText('Revise Al-Hashr 4–16 first tomorrow', { normalizer: plainText }));
     expect(props.onReviseTomorrow).toHaveBeenCalledWith([546, 547]);
     fireEvent.press(screen.getByTestId('weak-spot-546'));
     expect(props.onOpenPage).toHaveBeenCalledWith(546);
