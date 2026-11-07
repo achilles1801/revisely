@@ -379,7 +379,8 @@ export function passagePreview(f: RevoPassageFacts): string {
   const t = f.revised.last30;
   if (t.days === 0) parts.push('Not revised in 30 days');
   else if (f.memorized === 1) parts.push(`Revised ${t.maxEach}× in 30 days`);
-  else parts.push(t.minEach > 0 ? `Revised in full ${t.minEach}× in 30 days` : `Revised on ${plural(t.days, 'day')} in 30`);
+  // Revised in full (every memorized page) that many times; else only some of it was.
+  else parts.push(t.minEach > 0 ? `Revised ${t.minEach}× in 30 days` : 'Partly revised in 30 days');
   if (f.weakSpots.length > 0) parts.push(plural(f.weakSpots.length, 'weak spot'));
   if (f.memorized < f.pages) parts.push(`${f.memorized} of ${f.pages} pages memorized`);
   return parts.join(' · ');

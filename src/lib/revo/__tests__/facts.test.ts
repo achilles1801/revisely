@@ -169,7 +169,7 @@ describe('attachments', () => {
     expect(a.label).toBe('Today · Sat 7 Nov · 1 note');
   });
   it('previews: a line of the data for a picker row', () => {
-    expect(passagePreview(passageFacts([582, 583], p))).toBe('Revised in full 2× in 30 days · 1 weak spot');
+    expect(passagePreview(passageFacts([582, 583], p))).toBe('Revised 2× in 30 days · 1 weak spot');
     expect(passagePreview(passageFacts([1], p))).toBe('Not memorized');
   });
 });
