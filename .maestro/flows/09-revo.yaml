@@ -97,10 +97,16 @@ appId: com.revisionbuddy.app
     id: revo-input
 - inputText: "Why do these two keep slipping?"
 # REVO-24: with the keyboard up the header and the greeting stay on screen; the composer rides up.
-- assertVisible:
-    id: revo-history
-- assertVisible:
-    id: revo-greeting
+# Waited for: on iOS the check ran while the sheet was still settling with the keyboard (#328's run,
+# Nov 7 2026; the greeting was there a moment later).
+- extendedWaitUntil:
+    visible:
+      id: revo-history
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 5000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -272,10 +278,14 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-input
 - inputText: "Why do these two keep slipping?"
-- assertVisible:
-    id: revo-history
-- assertVisible:
-    id: revo-greeting
+- extendedWaitUntil:
+    visible:
+      id: revo-history
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 5000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
