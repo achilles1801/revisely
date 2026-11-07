@@ -70,6 +70,10 @@ import { shareIcon } from '../../lib/platformUi';
 import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
 import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
 import { showsResetMyData } from '../../lib/testerReset';
+import { revoAvailable } from '../../lib/revo/availability';
+import { revoBackend } from '../../lib/revo/backend';
+import { openRevo } from '../../lib/revo/open';
+import { useRevoSettings } from '../../lib/revo/useRevoSettings';
 import { showsTestScenarios } from '../../lib/testScenarios';
 import { releaseSync } from '../../lib/offline/sync';
 
@@ -222,6 +226,34 @@ export default function SettingsScreen() {
   const homePrefs = useHomePrefs();
   // The speech model (hidden pages, word by word; testers): its size, its
   // download, Delete.
+  // Revo (previewTester accounts): on and off here; off deletes its history and memory.
+  const revoSettings = useRevoSettings(revoAvailable(user));
+  const confirmRevoOff = () =>
+    Alert.alert('Turn off Revo?', 'Your conversations with Revo and what it remembers are deleted.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Turn off',
+        style: 'destructive',
+        onPress: () => {
+          revoBackend()
+            .setOptions({ optIn: false })
+            .catch((err) => Alert.alert('Couldn’t turn off Revo', (err as Error)?.message ?? 'Try again.'));
+        },
+      },
+    ]);
+  const confirmRevoHistoryDelete = () =>
+    Alert.alert('Delete your conversations?', 'Every conversation with Revo is deleted. What Revo remembers stays.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          revoBackend()
+            .clear('history')
+            .catch((err) => Alert.alert('Couldn’t delete them', (err as Error)?.message ?? 'Try again.'));
+        },
+      },
+    ]);
   const speechModel = useSpeechModelState();
   const [speechSheet, setSpeechSheet] = useState(false);
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
@@ -706,6 +738,31 @@ export default function SettingsScreen() {
           ) : null}
 
         </Section>
+
+        {revoAvailable(user) && (
+          <Section title="Revo AI" footer="Revo AI can make mistakes. It answers from your own revision data.">
+            <View style={v2.iconRow} testID="revo-settings-row">
+              <SettingIcon name="sparkles-outline" />
+              <View style={v2.iconRowText}>
+                <Text style={[typeV2.body, { color: palette.text }]}>Revo</Text>
+                <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                  {revoSettings?.optIn ? 'Your revision coach, from the button on Home' : 'Off. Turn on to ask about your revision'}
+                </Text>
+              </View>
+              <SettingSwitch
+                value={revoSettings?.optIn === true}
+                onValueChange={(v) => (v ? openRevo({ view: 'optin' }) : confirmRevoOff())}
+                accessibilityLabel="Revo"
+              />
+            </View>
+            {revoSettings?.optIn ? (
+              <>
+                <Row icon="bulb-outline" label="Memory" value={revoSettings.memoryOn ? 'On' : 'Off'} onPress={() => openRevo({ view: 'memory' })} />
+                <Row icon="trash-outline" label="Delete conversations" destructive onPress={confirmRevoHistoryDelete} />
+              </>
+            ) : null}
+          </Section>
+        )}
 
         <Section title="Mushaf">
           <View testID="mushaf-edition-row">

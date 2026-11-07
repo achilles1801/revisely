@@ -1,0 +1,221 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useHaptics } from '../../design/haptics';
+import { copyText } from '../../lib/clipboard';
+import { shiftDay } from '../../lib/journal';
+import { logger } from '../../lib/logger';
+import { revoBackAt } from '../../lib/revo/availability';
+import { RevoError, revoBackend } from '../../lib/revo/backend';
+import { revoChips, revoGreeting } from '../../lib/revo/greeting';
+import { useRevoContext } from '../../lib/revo/useRevoContext';
+import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal } from '../../lib/revo/types';
+import { carryForTomorrow } from '../../lib/weakSpotActions';
+import { greetingName } from '../../lib/displayName';
+import { auth } from '../../lib/firebase';
+import { ChartCard, PlanCard } from './RevoCards';
+import { RevoComposer, type PickKind } from './RevoComposer';
+import { Chips, FeedbackRow, LimitCard, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
+
+/**
+ * A conversation with Revo. A new one opens on a line written from today's data (no call),
+ * copy and thumbs, suggestions, and the composer. A question shows at once with Revo thinking;
+ * the answer comes with at most one small chart and one suggested action, which waits for a
+ * tap. When the day's questions are used, the composer greys out and says when Revo is back.
+ */
+export function RevoChat({
+  uid,
+  chatId,
+  onChatId,
+  usage,
+  attach,
+  onAttach,
+  onPick,
+  onHistory,
+  onMemory,
+  onExpand,
+  onAction,
+}: {
+  uid: string;
+  chatId: string | null;
+  onChatId: (id: string) => void;
+  usage: { day: string; count: number };
+  attach: RevoAttachment | null;
+  onAttach: (a: RevoAttachment | null) => void;
+  onPick: (kind: PickKind) => void;
+  onHistory: () => void;
+  onMemory: () => void;
+  onExpand: () => void;
+  /** Open a page or today's session (the sheet closes first). */
+  onAction: (action: RevoAction) => void;
+}) {
+  const { palette } = useTheme();
+  const haptics = useHaptics();
+  const { user, saveUser } = useApp();
+  const { day, context, build } = useRevoContext();
+  const backend = revoBackend();
+  const [messages, setMessages] = useState<RevoMessage[]>([]);
+  // A question sent and not answered yet (shown with Revo thinking).
+  const [pending, setPending] = useState<{ text: string; attach?: { kind: string; label: string } } | null>(null);
+  const [refusal, setRefusal] = useState<{ kind: RevoRefusal; message: string; retry?: string } | null>(null);
+  const scroll = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    setMessages([]);
+    if (!chatId) return;
+    return backend.watchMessages(uid, chatId, setMessages);
+  }, [backend, uid, chatId]);
+
+  const usedToday = usage.day === day ? usage.count : 0;
+  const left = Math.max(0, REVO_DAILY_QUESTIONS - usedToday);
+  const capped = refusal?.kind === 'monthly';
+  const outOfQuestions = left === 0 || refusal?.kind === 'daily';
+  const back = revoBackAt(user, new Date());
+  const name = greetingName(user?.name, auth.currentUser?.displayName ?? null) || null;
+  const greeting = useMemo(() => (context ? revoGreeting(name, context) : null), [context, name]);
+  const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
+  const chips = chatId ? (lastRevo?.chips ?? []) : context ? revoChips(context) : [];
+
+  const ask = async (question: string) => {
+    const ctx = build();
+    if (!ctx) return;
+    const sentAttach = attach;
+    setRefusal(null);
+    setPending({ text: question, ...(sentAttach ? { attach: { kind: sentAttach.kind, label: sentAttach.label } } : {}) });
+    onAttach(null);
+    onExpand();
+    try {
+      const result = await backend.ask({ chatId, day, question, context: ctx, attach: sentAttach });
+      if (!chatId) onChatId(result.chatId);
+      else setMessages((list) => (list.some((m) => m.id === result.reply.id) ? list : [...list, result.question, result.reply]));
+    } catch (err) {
+      const e = err instanceof RevoError ? err : new RevoError('unavailable', 'Revo couldn’t answer. Try again.');
+      logger.warn('Revo ask failed', { refusal: e.refusal });
+      setRefusal({ kind: e.refusal, message: e.message, retry: e.refusal === 'unavailable' ? question : undefined });
+      if (sentAttach) onAttach(sentAttach);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  // Once the stored question arrives, the pending one is gone (no flicker of both).
+  useEffect(() => {
+    scroll.current?.scrollToEnd({ animated: true });
+  }, [messages.length, pending, refusal]);
+
+  const copy = (text: string) => {
+    copyText(text);
+    haptics.light();
+  };
+
+  const act = async (m: RevoMessage) => {
+    if (!m.action || !chatId) return;
+    const a = m.action;
+    if (a.kind === 'reviseFirst') {
+      if (!user) return;
+      try {
+        await saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(day, 1), a.pages, user.carryOver) });
+        await backend.setActionState(uid, chatId, m.id, 'added');
+        haptics.success();
+      } catch (err) {
+        logger.warn('Revo plan not added', err);
+      }
+      return;
+    }
+    await backend.setActionState(uid, chatId, m.id, 'added').catch(() => undefined);
+    onAction(a);
+  };
+
+  return (
+    <View style={styles.fill}>
+      <View style={styles.gutter}>
+        <RevoHeader onHistory={onHistory} onMemory={onMemory} />
+      </View>
+      <ScrollView
+        ref={scroll}
+        style={styles.fill}
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        testID="revo-messages"
+      >
+        {!chatId && greeting ? (
+          <View style={styles.revo}>
+            <RevoText text={greeting} greeting testID="revo-greeting" />
+            <FeedbackRow onCopy={() => copy(greeting)} testID="revo-greeting" />
+          </View>
+        ) : null}
+        {messages.map((m) =>
+          m.role === 'user' ? (
+            <UserBubble key={m.id} text={m.text} attach={m.attach} testID="revo-question" />
+          ) : (
+            <View key={m.id} style={styles.revo} testID="revo-answer">
+              <RevoText text={m.text} />
+              {m.chart ? <ChartCard chart={m.chart} day={day} /> : null}
+              {m.textAfter ? <RevoText text={m.textAfter} /> : null}
+              {m.action ? (
+                <PlanCard
+                  action={m.action}
+                  state={m.actionState}
+                  onDo={() => void act(m)}
+                  onDismiss={() => chatId && void backend.setActionState(uid, chatId, m.id, 'dismissed')}
+                />
+              ) : null}
+              <FeedbackRow
+                feedback={m.feedback}
+                onCopy={() => copy([m.text, m.textAfter].filter(Boolean).join('\n\n'))}
+                onFeedback={(f) => chatId && void backend.setFeedback(uid, chatId, m.id, f)}
+                testID="revo-answer"
+              />
+            </View>
+          ),
+        )}
+        {pending ? (
+          <>
+            <UserBubble text={pending.text} attach={pending.attach} testID="revo-question" />
+            <Typing />
+          </>
+        ) : null}
+        {refusal && refusal.kind !== 'daily' && refusal.kind !== 'monthly' ? (
+          <Text style={[styles.error, { color: palette.secondary }]} testID="revo-error" accessibilityLiveRegion="polite">
+            {refusal.kind === 'off' ? 'Turn Revo on first.' : refusal.kind === 'clock' ? refusal.message : 'Revo couldn’t answer. Try again.'}
+            {refusal.retry ? (
+              <Text style={{ color: palette.link }} onPress={() => void ask(refusal.retry!)} suppressHighlighting>
+                {'  '}Try again
+              </Text>
+            ) : null}
+          </Text>
+        ) : null}
+      </ScrollView>
+      <View style={[styles.gutter, styles.foot]}>
+        {capped ? (
+          <LimitCard title="Revo is resting" body="Revo has reached this month’s limit for everyone. It’s back next month. Your conversations stay in History." />
+        ) : outOfQuestions ? (
+          <LimitCard title={`That’s today’s ${REVO_DAILY_QUESTIONS} questions`} body={`${back.long} Your conversations stay in History.`} />
+        ) : (
+          <Chips chips={chips} onPick={(c) => void ask(c)} disabled={pending != null} />
+        )}
+        <RevoComposer
+          onSend={(t) => void ask(t)}
+          onPick={onPick}
+          attach={attach}
+          onRemoveAttach={() => onAttach(null)}
+          disabled={outOfQuestions || capped}
+          disabledText={capped ? 'Back next month' : back.short}
+          busy={pending != null}
+          onFocus={onExpand}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  gutter: { paddingHorizontal: 16 },
+  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 20 },
+  revo: { gap: 14 },
+  foot: { gap: 12, paddingTop: 8 },
+  error: { fontSize: 15, lineHeight: 21 },
+});
