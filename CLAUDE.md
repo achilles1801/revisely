@@ -1147,18 +1147,20 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   phone (`lib/revo/greeting`), no call. Charts are named by the model and drawn from the phone's own data
   (`lib/revo/charts`); an action ("Add to my plan": tomorrow's carry, `carryForTomorrow`) waits for a tap.
 - **Server** (`functions/src/revo/`): `revoAsk`, `revoDayInReview`, `revoSetOptions`, `revoClear`, with the
-  coach's key (`ANTHROPIC_COACH_KEY`), model (`claude-haiku-5-5`), cached system prompt, retries and ledger.
-  10 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
+  coach's key (`ANTHROPIC_COACH_KEY`), cached system prompt, retries and ledger, on `claude-sonnet-5-5`
+  (`REVO_MODEL`; the Ask coach stays on Haiku 5.5; prices per model in `coach/pricing.ts`, Sonnet 5.5's
+  caching minimum is 512 tokens). 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
   question without an attachment kept for the day (free), the last 10 messages sent with a follow-up, up to
   30 memory items (`users/{uid}/revoMemory`), conversations in `users/{uid}/revoChats/{id}/messages`. The
   owner reads them and may only rate a reply, mark an action, mark a chat "plan added" and delete a memory
   item (firestore.rules, tests in `tests/firestore-rules/revo.test.ts`). Off deletes conversations, memory and
   kept answers; account deletion and Reset my data delete them too.
-- **The monthly cap** (shared with the Ask coach, one ledger) is `config/coach.monthlyCapUsd`, $10 when unset,
+- **The monthly cap** (shared with the Ask coach, one ledger) is `config/coach.monthlyCapUsd`: **$150** since
+  Nov 7 2026 (the plan's $200 a month of API credit, used only by Revisely, less a buffer); $10 when unset,
   at most $1,000, read again within a minute: `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-coach-cap.js 200`
   (`--show` prints it and the month's spend). No code change or deploy.
 - **Day in review:** from 19:00 local on a day with something done, the app asks once (`revoDayInReview`,
-  idempotent per day, `review-{day}`); it never counts toward the 10 and is skipped when capped. The
+  idempotent per day, `review-{day}`); it never counts toward the 20 and is skipped when capped. The
   button's dot shows until it is opened (AsyncStorage, per account).
 - **Deploy order:** `firestore.rules` and the functions (`revoAsk,revoDayInReview,revoSetOptions,revoClear`,
   and `askCoach,deleteUserAccount,resetMyData`, which changed with it) must be live before the app reaches

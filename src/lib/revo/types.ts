@@ -1,7 +1,7 @@
 // Revo, the in-app assistant: what the app and the server exchange (the server's side is
 // functions/src/revo/; both follow the same contract) and what is stored per account.
 
-export const REVO_DAILY_QUESTIONS = 10;
+export const REVO_DAILY_QUESTIONS = 20;
 
 export const REVO_TOTALS = [
   'memorizedPages',

@@ -8,7 +8,7 @@
 import { createHash } from 'crypto';
 import { CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
 import { CallLedger, MONTHLY_CAP_USD, ledgerOf } from '../coach/handler';
-import { costUsd, worstCaseCostUsd } from '../coach/pricing';
+import { REVO_MODEL, costUsd, worstCaseCostUsd } from '../coach/pricing';
 import { REVO_HISTORY, REVO_MAX_TOKENS, buildAskRequest, buildReviewRequest } from './prompt';
 import { parseReply } from './reply';
 import {
@@ -34,7 +34,7 @@ import {
   validateQuestion,
 } from './validate';
 
-export const REVO_DAILY_QUESTIONS = 10;
+export const REVO_DAILY_QUESTIONS = 20;
 export const REVO_MEMORY_CAP = 30;
 export const REVIEW_TITLE = 'Day in review';
 /** The review chat's one reply. */
@@ -230,7 +230,7 @@ async function metered(
 ): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number } | 'capped'> {
   const today = utcDay(deps.now());
   const month = today.slice(0, 7);
-  const reserved = worstCaseCostUsd(JSON.stringify(request).length, REVO_MAX_TOKENS);
+  const reserved = worstCaseCostUsd(JSON.stringify(request).length, REVO_MAX_TOKENS, REVO_MODEL);
   const cap = (await deps.store.monthlyCapUsd?.()) ?? MONTHLY_CAP_USD;
   if (!(await deps.store.reserveSpend(month, reserved, cap))) {
     deps.log({ event: 'capped' });
@@ -245,7 +245,7 @@ async function metered(
     deps.log({ event: 'failed', code: code == null ? 'network' : String(code) });
     throw callFailure(err);
   }
-  const cost = costUsd(reply.usage);
+  const cost = costUsd(reply.usage, REVO_MODEL);
   const ledger = ledgerOf(reply.usage);
   await deps.store.settleSpend(month, reserved, cost, ledger, today);
   deps.log({

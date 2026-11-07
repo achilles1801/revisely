@@ -146,15 +146,15 @@ describe('Revo’s conversation', () => {
   });
 
   it('the day’s questions used: the limit card, the composer off with when Revo is back', async () => {
-    render(<Chat usage={{ day: DAY, count: 10 }} />);
+    render(<Chat usage={{ day: DAY, count: 20 }} />);
     await flush();
-    expect(screen.getByText('That’s today’s 10 questions')).toBeTruthy();
+    expect(screen.getByText('That’s today’s 20 questions')).toBeTruthy();
     expect(screen.getByText('Revo is back at midnight. Your conversations stay in History.')).toBeTruthy();
     const input = screen.getByTestId('revo-input');
     expect(input.props.editable).toBe(false);
     expect(input.props.placeholder).toBe('Back at midnight');
     // A count from another day doesn't hold.
-    render(<Chat usage={{ day: '2026-11-02', count: 10 }} />);
+    render(<Chat usage={{ day: '2026-11-02', count: 20 }} />);
     await flush();
     expect(screen.getByTestId('revo-input').props.editable).toBe(true);
   });
