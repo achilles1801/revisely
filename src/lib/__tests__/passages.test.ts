@@ -306,6 +306,13 @@ describe('placeOfPage: where reading begins', () => {
     expect(plainText(placeOfPage(586, { edition: 'madani1441' }))).toBe("'Abasa, ayah 41");
     expect(placeOfPage(0)).toBe('');
   });
+
+  it('names every page differently, in both prints (where a day starts can be read back from the words)', () => {
+    for (const edition of ['madani1405', 'madani1441'] as const) {
+      const places = range(1, 604).map((p) => placeOfPage(p, { edition }));
+      expect(new Set(places).size).toBe(604);
+    }
+  });
 });
 
 describe('ayahsInSurah: the part of a surah, for a row named by it', () => {

@@ -24,3 +24,14 @@ export const startsAt = (page: number): RegExp => new RegExp(`^(Starts|Continue)
 
 /** The line that opens the next day (plain): "Tomorrow starts at At-Tariq", "Thu starts at …". */
 export const aheadAt = (lead: string, page: number): RegExp => new RegExp(`^${lead} starts at ${escaped(place(page))}$`);
+
+/**
+ * The page Today's title starts (or goes on) at, read back from its words: every page begins with a
+ * verse no other page begins with, so one page fits. NaN when none does (no title, "Done · 5 pages").
+ */
+export function pageOfTitle(title: string | null): number {
+  const text = plain(title);
+  if (!text) return NaN;
+  for (let p = 1; p <= 604; p++) if (startsAt(p).test(text)) return p;
+  return NaN;
+}
