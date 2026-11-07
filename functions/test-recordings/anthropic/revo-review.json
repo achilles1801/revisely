@@ -3,8 +3,10 @@
   "how": "Hand-written in the Messages API response shape, not recorded yet: replace it with a real reply by running functions/scripts/record-anthropic.js with an Anthropic key (TESTING.md).",
   "request": {
     "model": "claude-sonnet-5-5",
-    "max_tokens": 700,
-    "thinking": null,
+    "max_tokens": 1200,
+    "thinking": {
+      "type": "between_tools"
+    },
     "systemSha256": "4607e97eae7a5d16d30cdfee34ed4468c80e4447d8b2233ab3e79681af913a3c"
   },
   "status": 200,
