@@ -19,6 +19,13 @@ export function juzKeyForPage(pageNumber: number): number {
 const DEFAULT_WEAKNESS_RATING = 4;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
+/** A Revised item added by hand, as the self-heal reads it: its day, pages and strengths (page → rating). */
+export interface HandAddedRevision {
+  day: string;
+  pages: number[];
+  ratings?: Record<string, number>;
+}
+
 /**
  * Re-derive per-page revision state from the canonical list of session logs.
  *
@@ -29,13 +36,29 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
  *
  * Use this whenever logs change (add / edit / delete) so insights and the
  * scheduling algorithm stay consistent with what the user has actually logged.
+ *
+ * `handAdds`: Revised pages added by hand (Activity's +, lib/manualRevision) are revisions too, with
+ * the strength chosen for them (ACT-16). Left out, every launch reset that strength and their
+ * "last revised" (Nov 2026). On their day they come after the day's session.
  */
 export function recomputePagesFromLogs(
   pages: UserPage[],
   logs: RevisionLog[],
+  handAdds: readonly HandAddedRevision[] = [],
 ): UserPage[] {
-  // Sort chronologically so the *last* matching log wins for rating / date.
-  const sortedLogs = [...logs].sort(
+  const asLogs: RevisionLog[] = handAdds.map((h, i) => ({
+    id: `hand-${i}`,
+    date: h.day,
+    pagesRevised: [...h.pages],
+    pagesSkipped: [],
+    weaknessUpdates: Object.entries(h.ratings ?? {})
+      .map(([page, rating]) => ({ page: Number(page), rating }))
+      .filter((w) => Number.isInteger(w.page) && Number.isFinite(w.rating)),
+    durationMinutes: null,
+  }));
+  // Sort chronologically so the *last* matching log wins for rating / date (a stable sort: the
+  // hand adds, listed last, stay after their day's session).
+  const sortedLogs = [...logs, ...asLogs].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 

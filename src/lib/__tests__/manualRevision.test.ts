@@ -29,6 +29,12 @@ describe('manual Revised items', () => {
     });
   });
 
+  it('[ACT-16] carries the strength chosen as each page’s rating, for the self-heal', () => {
+    const item = manualRevisionItem({ uid: 'u1', day: '2026-11-03', now: 1000, pages: [557, 556], minutes: null, rating: STRENGTH_RATING.weak });
+    expect(item.ratings).toEqual({ '556': 2, '557': 2 });
+    expect('ratings' in manualRevisionItem({ uid: 'u1', day: '2026-11-03', now: 1000, pages: [1], minutes: null })).toBe(false);
+  });
+
   it('maps strength to the weakness rating bins (ACT-8)', () => {
     expect(STRENGTH_RATING).toEqual({ weak: 2, moderate: 3, strong: 4 });
   });

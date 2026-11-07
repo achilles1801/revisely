@@ -12,7 +12,7 @@ import {
 import * as firestoreService from '../services/firestoreService';
 import { updateAuthDisplayName } from '../lib/firebase';
 import { generateId } from '../lib/utils';
-import { recomputePagesFromLogs } from '../lib/algorithm';
+import { recomputePagesFromLogs, type HandAddedRevision } from '../lib/algorithm';
 import {
   customPlanFromFirestore,
   customPlanToFirestore,
@@ -750,6 +750,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const viewUser = view?.user ?? null;
   const user = useMemo(() => (viewUser ? firestoreUserToLocal(viewUser) : null), [viewUser]);
+  // Testers can add Revised pages by hand (Activity's +); the self-heal counts them (ACT-16).
+  const testerRef = useRef(false);
+  testerRef.current = user?.previewTester === true;
   const viewPages = view?.pages;
   const pages = useMemo(() => (viewPages ?? []).map(firestorePageToLocal), [viewPages]);
   const viewSessions = view?.sessions;
@@ -867,10 +870,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const syncPagesFromLogs = useCallback(
     async (currentPages: UserPage[], freshLogs: RevisionLog[]) => {
       if (currentPages.length === 0) return;
-      const next = recomputePagesFromLogs(currentPages, freshLogs);
+      // A tester's Revised pages added by hand are revisions too, with the strength chosen for them
+      // (ACT-16): read from the server, with any still waiting here. Without them every launch reset
+      // that strength (Nov 2026); if they can't be read (offline), nothing is re-derived this time.
+      let hand: HandAddedRevision[] = [];
+      let base = currentPages;
+      const forUid = uidRef.current;
+      if (testerRef.current && forUid) {
+        try {
+          const server = await firestoreService.getManualRevisionItems(forUid);
+          const seen = new Set(server.map((h) => h.id));
+          const waiting = pendingEntries(forUid).flatMap((e) =>
+            e.op.kind === 'revision.add' && !seen.has(e.op.item.id) ? [{ day: e.op.item.day, pages: e.op.item.pages, ratings: e.op.item.ratings }] : [],
+          );
+          hand = [...server, ...waiting];
+        } catch (err) {
+          logger.warn('Self-heal skipped: pages added by hand could not be read', err);
+          return;
+        }
+        if (uidRef.current !== forUid) return;
+        if (pagesRef.current.length > 0) base = pagesRef.current;
+      }
+      const next = recomputePagesFromLogs(base, freshLogs, hand);
       const changed = next
         .filter((p) => {
-          const old = currentPages.find((c) => c.pageNumber === p.pageNumber);
+          const old = base.find((c) => c.pageNumber === p.pageNumber);
           if (!old) return false;
           return (
             // The logs give a day ("2026-10-27"); the page holds a time (that

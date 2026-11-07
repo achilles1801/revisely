@@ -275,6 +275,11 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
+- **ACT-16.** Revised pages added by hand are revisions of those pages on that day: the strength chosen
+  for them (Weak, Moderate, Strong; ACT-8's ratings) stays, and they count in each page's last revised day
+  and number of revisions, as a session's pages do, from the next launch on too. On their day they come
+  after the day's session. (Nov 7 2026: the next launch re-derived pages from sessions alone and reset
+  them.)
 
 ## Ask coach
 

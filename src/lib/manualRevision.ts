@@ -33,7 +33,10 @@ export function manualRevisionItem(input: {
   now: number;
   pages: number[];
   minutes: number | null;
+  /** The strength chosen ("How did it go?") as each page's rating; the self-heal reads it (ACT-16). */
+  rating?: number | null;
 }): RevisionItem {
+  const pages = [...input.pages].sort((a, b) => a - b);
   return {
     id: manualRevisionId(input.day, input.now),
     uid: input.uid,
@@ -41,10 +44,11 @@ export function manualRevisionItem(input: {
     occurredAt: input.now,
     countsFor: input.day,
     source: 'manual',
-    pages: [...input.pages].sort((a, b) => a - b),
+    pages,
     skipped: [],
     assigned: [],
     minutes: input.minutes,
     recordings: [],
+    ...(input.rating != null ? { ratings: Object.fromEntries(pages.map((p) => [String(p), input.rating as number])) } : {}),
   };
 }

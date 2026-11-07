@@ -579,6 +579,18 @@ export async function addRevisionItem(item: RevisionItem, userId?: string): Prom
 }
 
 /**
+ * The Revised items added by hand (Activity's +), from the server: the self-heal counts them with the
+ * sessions (ACT-16). From the server only: a partial copy from the phone's memory would lose some.
+ */
+export async function getManualRevisionItems(userId: string): Promise<{ id: string; day: string; pages: number[]; ratings?: Record<string, number> }[]> {
+  const snap = await getDocsFromServer(query(collection(db, 'users', userId, 'revisions'), where('source', '==', 'manual')));
+  return snap.docs.map((d) => {
+    const x = d.data();
+    return { id: d.id, day: x.day, pages: x.pages ?? [], ...(x.ratings && typeof x.ratings === 'object' ? { ratings: x.ratings as Record<string, number> } : {}) };
+  });
+}
+
+/**
  * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
  * written, and any other item of that day is deleted (an edit that dropped an
  * ahead credit, or a deleted session). Items of other days are not touched.

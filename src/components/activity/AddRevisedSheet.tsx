@@ -91,7 +91,14 @@ export function AddRevisedSheet({
     if (!range || !user) return;
     setSaving(true);
     try {
-      const item = manualRevisionItem({ uid: user.id, day, now: Date.now(), pages: pageNumbers, minutes: minutesValue });
+      const item = manualRevisionItem({
+        uid: user.id,
+        day,
+        now: Date.now(),
+        pages: pageNumbers,
+        minutes: minutesValue,
+        rating: strength ? STRENGTH_RATING[strength] : null,
+      });
       await queueChange({ kind: 'revision.add', item });
       if (strength) {
         const rating = STRENGTH_RATING[strength] as WeaknessRating;
