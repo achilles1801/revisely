@@ -1,13 +1,13 @@
 {
   "recordedAt": "2026-11-07T09:35:30.530Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "how": "functions/scripts/record-anthropic.js, on the live prompt (d31285c). The request hash was then moved to the next prompt (the guide's line about + naming Add to chat, PR #345) without recording again: record it again to match exactly.",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "ae5e816c4dfeb4b3e233a877ff11dbd0f8bc63be2282dcae131a8357e9e45f8b"
+    "systemSha256": "9ad055ffaa7f8c54de9ffe2b6bcc9359492a94154ab02c0ba43255c2ae3364c0"
   },
   "status": 200,
   "body": {
