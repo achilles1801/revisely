@@ -19,10 +19,10 @@ appId: com.revisionbuddy.app
 # SCHED-1: day one is the first 10 memorized pages in page order: 1, 582–590.
 - assertVisible:
     id: today-title
-    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+    text: "Starts at Al.Fatihah[^,0-9]*"
 - assertVisible:
     id: today-detail
-    text: "10.pages · then An.Naba, p..582"
+    text: "10.pages · then An.Naba"
 - assertVisible:
     id: today-cta
     text: "Start revision"
@@ -35,7 +35,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Starts at Al.Fatihah, p..1[^0-9]*"
+      text: "Starts at Al.Fatihah[^,0-9]*"
     timeout: 20000
 # DAY-1: past midnight it is the next calendar day, and the plan moves on one day.
 - runFlow:
@@ -45,5 +45,5 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Starts at At.Tariq, p..591.*"
+      text: "Starts at At.Tariq[^,0-9]*"
     timeout: 20000

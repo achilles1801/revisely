@@ -18,7 +18,8 @@
 // were the old start's. Today's carry-over is written by the jump, so yesterday's
 // leftovers are not offered again today.
 
-import { getPagesForJuz, getPagesForSurah, getSurah, getSurahDisplay } from './quranData';
+import { getPagesForJuz, getPagesForSurah } from './quranData';
+import { placeOfPage, surahName } from './passages';
 import {
   calendarDaysBetween,
   getPagesScheduledForDate,
@@ -197,12 +198,16 @@ export function undoJump(current: User, before: User): User {
   };
 }
 
-/** "Juz 12 · p. 222", "Al-Kahf · p. 293", for the toast. */
+/**
+ * Where today now starts, for the toast, surahs and juz first, never the page
+ * (lib/passages): "Juz 12" at its start, else "Juz 12 · Hud, ayah 29"; the surah
+ * chosen when today starts at its first page ("Al-Kahf", though that page opens
+ * with the end of Al-Isra), else where the page begins ("Al-Kahf, ayah 75").
+ */
 export function describeStart(target: JumpTarget, startPage: number): string {
-  if (target.kind === 'juz') return `Juz ${target.juz} · p. ${startPage}`;
-  if (target.kind === 'surah') {
-    const name = getSurahDisplay(target.surah)?.nameDisplay ?? getSurah(target.surah)?.name ?? `Surah ${target.surah}`;
-    return `${name} · p. ${startPage}`;
+  if (target.kind === 'juz') {
+    return startPage === getPagesForJuz(target.juz)[0] ? `Juz ${target.juz}` : `Juz ${target.juz} · ${placeOfPage(startPage)}`;
   }
-  return `p. ${startPage}`;
+  if (target.kind === 'surah' && startPage === getPagesForSurah(target.surah)[0]) return surahName(target.surah);
+  return placeOfPage(startPage);
 }

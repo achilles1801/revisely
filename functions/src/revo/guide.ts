@@ -256,6 +256,9 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  // Not yet in the guide's text: its examples still show "p. 542" and change with the next
+  // recording of the Anthropic replies (a new prompt needs a new recording, TESTING.md).
+  'NAME-1': 'how the app words parts of the Qur’an (by surah and juz); the guide’s examples follow with the next recording',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',

@@ -3,6 +3,7 @@
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange, saveCustomPlan, saveEditedPlan } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
+import { catchUpWhat, plain } from '../harness/words';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
 
@@ -54,7 +55,7 @@ describe.each([
     await partMonday(phone, 2);
 
     let { app, home } = await openHome(phone, '2026-11-03 09:00');
-    expect(home.catchUp()).toBe('Left yesterday · Revise p. 3–5');
+    expect(plain(home.catchUp())).toBe(`Left yesterday · Revise ${catchUpWhat([3, 4, 5])}`);
     expect(home.carryOver()).toBe('Add to today');
     await home.tap('today-carry-over');
     await app.untilSynced();
@@ -91,7 +92,7 @@ it('[CARRY-1] [DAY-2] before Fajr, the leftovers are still "today’s", not yest
   await app.close();
   // After Fajr: Tuesday, with Monday's three to add.
   ({ app, home } = await openHome(phone, '2026-11-03 07:00'));
-  expect(home.catchUp()).toBe('Left yesterday · Revise p. 3–5');
+  expect(plain(home.catchUp())).toBe(`Left yesterday · Revise ${catchUpWhat([3, 4, 5])}`);
   expect(home.carryOver()).toBe('Add to today');
   await app.close();
 });
@@ -100,12 +101,12 @@ describe('missed days', () => {
   // Nothing was started on Monday (1–5), so it is missed. Tuesday offers it; the
   // schedule does not move until the user taps.
   it.each([
-    { mode: 'shift' as const, rule: 'CARRY-2', tuesday: [1, 2, 3, 4, 5], wednesday: [6, 7, 8, 9, 10], again: 'Missed yesterday · Revise p. 1–5' },
-    { mode: 'add' as const, rule: 'CARRY-3', tuesday: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], wednesday: [11, 12, 13, 14, 15], again: 'Missed yesterday · Revise p. 1–10' },
+    { mode: 'shift' as const, rule: 'CARRY-2', tuesday: [1, 2, 3, 4, 5], wednesday: [6, 7, 8, 9, 10], again: [1, 5] as const },
+    { mode: 'add' as const, rule: 'CARRY-3', tuesday: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], wednesday: [11, 12, 13, 14, 15], again: [1, 10] as const },
   ])('[CARRY-4] [SCHED-5] [$rule] [CARRY-1] a missed day is offered, not added: nothing moves until the user adds it ($mode)', async ({ mode, tuesday, wednesday, again }) => {
     const phone = await account({ carryOverMode: mode });
     let { app, home } = await openHome(phone, '2026-11-03 09:00');
-    expect(home.catchUp()).toBe('Missed yesterday · Revise p. 1–5');
+    expect(plain(home.catchUp())).toBe(`Missed yesterday · Revise ${catchUpWhat(pagesRange(1, 5))}`);
     expect(home.carryOver()).toBe('Add to today');
     // Before the tap, Tuesday is still its own pages.
     expect(await todaysSession(home)).toEqual([6, 7, 8, 9, 10]);
@@ -118,7 +119,7 @@ describe('missed days', () => {
     // Once a day: the next launch doesn't offer it again today. Wednesday is its own pages, and
     // Tuesday's pages are still undone, so they are offered again (CARRY-4), not added.
     ({ app, home } = await openHome(phone, '2026-11-04 09:00'));
-    expect(home.catchUp()).toBe(again);
+    expect(plain(home.catchUp())).toBe(`Missed yesterday · Revise ${catchUpWhat(pagesRange(again[0], again[1]))}`);
     expect(home.carryOver()).toBe('Add to today');
     expect(await todaysSession(home)).toEqual(wednesday);
     await app.close();
@@ -128,7 +129,7 @@ describe('missed days', () => {
     const phone = await account({});
     // Monday, Tuesday and Wednesday all missed; Thursday’s own pages are 16–20.
     const { app, home } = await openHome(phone, '2026-11-05 09:00');
-    expect(home.catchUp()).toBe('Missed 3 days · Revise p. 1–15');
+    expect(plain(home.catchUp())).toBe(`Missed 3 days · Revise ${catchUpWhat(pagesRange(1, 15))}`);
     expect(await todaysSession(home)).toEqual([16, 17, 18, 19, 20]);
     await home.tap('today-carry-over');
     await app.untilSynced();
@@ -143,7 +144,7 @@ describe('missed days', () => {
     // Thursday Nov 12 is day 10 of the plan: pages 11–15 (10 × 5 = 50, and 50 mod 20 = 10).
     // Nov 9–11 had no session, so they are the last three days: 16–20, 1–5 and 6–10.
     const { app, home } = await openHome(phone, '2026-11-12 09:00');
-    expect(home.catchUp()).toBe('Missed 3 days · Revise pp. 1–10, 16–20');
+    expect(plain(home.catchUp())).toBe(`Missed 3 days · Revise ${catchUpWhat([...pagesRange(1, 10), ...pagesRange(16, 20)])}`);
     expect(await todaysSession(home)).toEqual([11, 12, 13, 14, 15]);
     await app.close();
   });

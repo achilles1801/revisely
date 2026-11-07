@@ -1,3 +1,4 @@
+import { plainText } from '../passages';
 import { aliveStreak, buildWidgetSnapshot, juzLabel, WIDGET_DAYS_AHEAD, type WidgetInputs } from '../widgets/snapshot';
 import { getQuranData } from '../quranData';
 import { generateDailyAssignment } from '../algorithm';
@@ -74,9 +75,11 @@ describe('buildWidgetSnapshot', () => {
     const today = snap.days[0];
     expect(today).toMatchObject({ day: '2026-10-27', startsAt: now.getTime(), total: 5, done: 0, completed: false, streak: 0 });
     expect(todaysPages).toHaveLength(5);
-    expect(today.title).toMatch(/^Pages \d+–\d+$/);
-    expect(today.short).toMatch(/^p\. \d+–\d+$/);
-    expect(today.where).toMatch(/^Juz 30 · /);
+    // By surah and juz, never page numbers (CLAUDE.md, lib/passages).
+    expect(plainText(today.title)).toBe('At-Tin to Al-Fil');
+    expect(plainText(today.short)).toBe('At-Tin to Al-Fil');
+    expect(today.where).toBe('Juz 30');
+    for (const t of [today.title, today.short, today.where]) expect(t).not.toMatch(/\bp{1,2}\.\s|\bPages? \d/);
   });
 
   it('a week ahead, each day starting at the last one’s end (midnight here)', () => {
@@ -143,14 +146,14 @@ describe('buildWidgetSnapshot', () => {
     expect(buildWidgetSnapshot(inputs({ signedIn: false, user: null, accent: 'crimson' })).colors.light.done).toBe('#DC1433');
   });
 
-  it('several ranges: the Lock Screen says how many pages', () => {
+  it('several ranges: the title names the first two and how many more; the Lock Screen, where the day starts', () => {
     const scattered: UserPage[] = pages.map((p) => ({
       ...p,
       status: [10, 11, 50, 90].includes(p.pageNumber) ? 'memorized' : 'not_memorized',
     })) as UserPage[];
     const snap = buildWidgetSnapshot(inputs({ pages: scattered, user: { ...user, dailyPageCapacity: 4 } }));
-    expect(snap.days[0].short).toBe('4 pages');
-    expect(snap.days[0].title).toBe('Pages 10–11, 50 and 90');
+    expect(plainText(snap.days[0].title)).toBe('Al-Baqarah 62–76, then 2 more');
+    expect(plainText(snap.days[0].short)).toBe('Al-Baqarah 62');
   });
 });
 

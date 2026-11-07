@@ -10,15 +10,20 @@ import { WheelPicker } from '../v2/WheelPicker';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { getAllSurahs, getJuzForPage, getPagesForJuz, getSurahDisplay, getSurahForPage } from '../../lib/quranData';
 import { isJuzMode, jumpablePages, type JumpTarget, todayStartPage } from '../../lib/jump';
+import { describePageRange, describePassage, NBSP, spokenText } from '../../lib/passages';
 import type { User, UserPage } from '../../types';
 
 type Tab = 'juz' | 'surah' | 'page';
 
 const surahName = (n: number, fallback: string) => getSurahDisplay(n)?.nameDisplay ?? fallback;
-const pagesText = (pages: number[]) =>
-  pages.length === 1 ? `p. ${pages[0]}` : `p. ${pages[0]}–${pages[pages.length - 1]}`;
+const juzOf = (pages: number[]) => {
+  const a = getJuzForPage(pages[0]);
+  const b = getJuzForPage(pages[pages.length - 1]);
+  return a === b ? `Juz${NBSP}${a}` : `Juz${NBSP}${a}–${b}`;
+};
+const partOf = (have: number, size: number) => (have === size ? '' : ` · ${have} of ${size} pages`);
 
-/** "Juz 12", "Al-Kahf", "p. 222": what the button and the toast call a target. */
+/** "Juz 12", "Al-Kahf", "p. 222" (the Page tab chooses by page): what the button calls a target. */
 export function targetLabel(target: JumpTarget): string {
   if (target.kind === 'juz') return `Juz ${target.juz}`;
   if (target.kind === 'surah') return surahName(target.surah, `Surah ${target.surah}`);
@@ -65,8 +70,9 @@ export function JumpSheet({
       .map((s) => ({
         surah: s.number,
         name: surahName(s.number, s.name),
-        pages: Array.from({ length: s.endPage - s.startPage + 1 }, (_, i) => s.startPage + i).filter((p) => has.has(p)),
+        all: Array.from({ length: s.endPage - s.startPage + 1 }, (_, i) => s.startPage + i),
       }))
+      .map((r) => ({ ...r, pages: r.all.filter((p) => has.has(p)) }))
       .filter((r) => r.pages.length > 0);
   }, [pages]);
 
@@ -105,7 +111,7 @@ export function JumpSheet({
         style={[styles.row, { borderBottomColor: palette.separator }]}
         accessibilityRole="radio"
         accessibilityState={{ checked: selected }}
-        accessibilityLabel={`${label}. ${meta}${today ? '. Today starts here' : ''}`}
+        accessibilityLabel={`${label}. ${spokenText(meta)}${today ? '. Today starts here' : ''}`}
         testID={testID}
       >
         <View style={styles.rowText}>
@@ -169,7 +175,7 @@ export function JumpSheet({
             </View>
             {pageChosen != null ? (
               <Text style={[typeV2.meta, styles.centred, { color: palette.secondary }]} testID="jump-page-where">
-                {`Juz ${getJuzForPage(pageChosen)} · ${surahName(getSurahForPage(pageChosen).number, getSurahForPage(pageChosen).name)}${pageChosen === current ? ' · today starts here' : ''}`}
+                {`${describePageRange(pageChosen, pageChosen, { juz: true })}${pageChosen === current ? ' · today starts here' : ''}`}
               </Text>
             ) : null}
           </View>
@@ -180,13 +186,20 @@ export function JumpSheet({
                   row(
                     { kind: 'juz', juz: r.juz },
                     `Juz ${r.juz}`,
-                    r.pages.length === r.size ? pagesText(r.pages) : `${pagesText(r.pages)} · ${r.pages.length} of ${r.size} pages`,
+                    // What of it is in the schedule, by surah (surahs and juz first, CLAUDE.md).
+                    `${describePassage(r.pages, { form: 'short', wholeJuz: false, max: 2 })}${partOf(r.pages.length, r.size)}`,
                     r.juz === currentJuz,
                     `jump-juz-${r.juz}`,
                   ),
                 )
               : surahRows.map((r) =>
-                  row({ kind: 'surah', surah: r.surah }, r.name, pagesText(r.pages), r.surah === currentSurah, `jump-surah-${r.surah}`),
+                  row(
+                    { kind: 'surah', surah: r.surah },
+                    r.name,
+                    `${juzOf(r.all)}${partOf(r.pages.length, r.all.length)}`,
+                    r.surah === currentSurah,
+                    `jump-surah-${r.surah}`,
+                  ),
                 )}
           </ScrollView>
         )}

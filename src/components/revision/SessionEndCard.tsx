@@ -23,6 +23,7 @@ export function SessionEndCard({
   done,
   celebrate,
   dayLabel = 'today',
+  what,
   next,
   onKeepGoing,
   onListenBack,
@@ -33,8 +34,10 @@ export function SessionEndCard({
   celebrate: number;
   /** What this card closes: "today", or the weekday of a day revised ahead. */
   dayLabel?: string;
-  /** The next revision day's pages (Keep going), or none at the end of the cycle. */
-  next?: { label: string; pages: number } | null;
+  /** What was revised, by surah or juz (lib/passages): "Al-Mujadila to At-Tahrim", "Juz 28". */
+  what?: string;
+  /** The next revision day (Keep going): its weekday, its surahs and how many pages; none at the end of the cycle. */
+  next?: { label: string; what?: string; pages: number } | null;
   onKeepGoing?: () => void;
   /** The session was recorded: play it back over its pages. */
   onListenBack?: () => void;
@@ -72,6 +75,11 @@ export function SessionEndCard({
         <Text style={[typeV2.title, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
           {complete ? 'Revision complete' : `${done} of ${total} revised`}
         </Text>
+        {complete && what ? (
+          <Text style={[typeV2.body, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="session-end-what">
+            {what}
+          </Text>
+        ) : null}
         <Text style={[typeV2.body, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {complete
             ? `${total} ${total === 1 ? 'page' : 'pages'} revised ${dayLabel}`
@@ -81,7 +89,7 @@ export function SessionEndCard({
       {complete && next && onKeepGoing ? (
         <View style={styles.keep}>
           <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {`Next: ${next.label} · ${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`}
+            {[`Next: ${next.label}`, next.what, `${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`].filter(Boolean).join(' · ')}
           </Text>
           <PillButton title="Keep going" onPress={onKeepGoing} testID="session-end-keep-going" />
         </View>
