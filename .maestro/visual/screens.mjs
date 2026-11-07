@@ -40,7 +40,8 @@ const sessionMinutes = (ios, android) => ({
 // Revo's button (bottom right, over Home): Revo is being rebuilt. Unmask it when Revo's
 // baselines are approved.
 const revoButton = {
-  ios: [{ x: 940, y: 2110, w: 266, h: 256, why: "Revo's button" }],
+  // With its shadow, which reaches over the tab bar's top line on iOS.
+  ios: [{ x: 940, y: 2110, w: 266, h: 280, why: "Revo's button" }],
   android: [{ x: 872, y: 1990, w: 208, h: 240, why: "Revo's button" }],
 };
 
@@ -70,7 +71,10 @@ export const SCREEN_MASKS = {
       { x: 276, y: 497, w: 184, h: 44, why: 'note time' },
     ],
   },
-  '06-home-offline': merge(revoButton, sessionMinutes(1272, 1186)),
+  '06-home-offline': merge(revoButton, sessionMinutes(1272, 1186), {
+    // The next prayer's countdown, under the offline note (Android shows the prayer line here).
+    android: [{ x: 800, y: 348, w: 205, h: 53, why: 'prayer countdown' }],
+  }),
   '08-home-kathmandu': merge(revoButton),
 };
 
