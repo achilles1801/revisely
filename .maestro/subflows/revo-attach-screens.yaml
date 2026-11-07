@@ -153,8 +153,9 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-input
 - inputText: "Should I revise Al-Hashr now or later?"
-# The keyboard away: hideKeyboard on Android; on iOS a tap on the greeting, which is no control
-# (the composer's return key would send the question).
+# The keyboard away: hideKeyboard on Android; on iOS a tap on Revo's message, which is no control
+# (the composer's return key would send the question): the greeting, or in the evening the Day in
+# review that took its place (the dark pass).
 - runFlow:
     when:
       platform: Android
@@ -165,7 +166,8 @@ appId: com.revisionbuddy.app
       platform: iOS
     commands:
       - tapOn:
-          id: revo-greeting
+          id: "revo-greeting|revo-answer"
+          index: 0
 - runFlow:
     file: shot.yaml
     env:
@@ -175,8 +177,9 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-input
 - eraseText: 60
-# The keyboard away: hideKeyboard on Android; on iOS a tap on the greeting, which is no control
-# (the composer's return key would send the question).
+# The keyboard away: hideKeyboard on Android; on iOS a tap on Revo's message, which is no control
+# (the composer's return key would send the question): the greeting, or in the evening the Day in
+# review that took its place (the dark pass).
 - runFlow:
     when:
       platform: Android
@@ -187,7 +190,8 @@ appId: com.revisionbuddy.app
       platform: iOS
     commands:
       - tapOn:
-          id: revo-greeting
+          id: "revo-greeting|revo-answer"
+          index: 0
 - repeat:
     while:
       visible:
