@@ -132,9 +132,10 @@ describe('Insights (gap audit §5)', () => {
     ];
     render(<ActivityBlocksViews {...props} />);
     fireEvent.press(await screen.findByText('Insights'));
-    expect(await screen.findByText('Al-Hashr')).toBeTruthy();
+    // By surah and ayahs, the pages a quiet detail after (Majd, Nov 7 2026).
+    expect(await screen.findByText('Al-Hashr, ayahs 4–16  pp. 546–547', { normalizer: plainText })).toBeTruthy();
     expect(screen.getByText('Weak now')).toBeTruthy();
-    fireEvent.press(screen.getByText('Revise these 2 pages first tomorrow'));
+    fireEvent.press(screen.getByText('Revise Al-Hashr 4–16 first tomorrow', { normalizer: plainText }));
     expect(props.onReviseTomorrow).toHaveBeenCalledWith([546, 547]);
     fireEvent.press(screen.getByTestId('weak-spot-546'));
     expect(props.onOpenPage).toHaveBeenCalledWith(546);
