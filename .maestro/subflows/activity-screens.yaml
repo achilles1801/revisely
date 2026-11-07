@@ -92,18 +92,7 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: add-revised-minutes
 - inputText: "8"
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          id: activity-keyboard-done
-          optional: true
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
+# Choosing a strength puts the number pad away (iOS's has no return key).
 - tapOn:
     id: add-revised-strength-moderate
 - extendedWaitUntil:
