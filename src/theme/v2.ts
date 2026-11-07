@@ -120,6 +120,8 @@ export interface PaletteV2 extends AccentTokens {
   sheet: string;
   /** A sheet's grab handle. */
   handle: string;
+  /** The chosen segment of a segmented control, raised on its `bubble` track (Activity's add sheets). */
+  raised: string;
   /**
    * What hasn't been reached yet on a progress track or a recording's waveform
    * (the played part is `accentText`): ≥ 3:1 against every accent's
@@ -151,6 +153,7 @@ const BASE_LIGHT: Base = {
   bubble: '#F0F0F2',
   sheet: '#FFFFFF',
   handle: '#D1D5DB',
+  raised: '#FFFFFF',
   track: '#D1D5DB',
   overlay: 'rgba(0,0,0,0.4)',
   shadow: '#000000',
@@ -172,6 +175,7 @@ const BASE_DARK: Base = {
   bubble: '#1C1C1E',
   sheet: '#101010',
   handle: '#3A3A3C',
+  raised: '#2C2C2E',
   track: '#333333',
   overlay: 'rgba(0,0,0,0.6)',
   shadow: '#000000',

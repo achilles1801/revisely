@@ -1,39 +1,64 @@
-// The Memorized add sheet (Activity d7): pages the user has memorized, for today. Adding marks
+// The Memorized add sheet (Activity d7): pages the user has memorized, for the day. Adding marks
 // the pages memorized (the same two writes the composer makes) and records a Memorized item for
-// the day. "From your reading" offers the pages read today that are not memorized yet.
+// the day, with its minutes when given (ACT-5). "From your reading" offers the pages read that day
+// that are not memorized yet.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Sheet } from '../v2/Sheet';
-import { Tap } from '../v2/Tap';
 import { RangePickerSheet } from '../memorization/RangePickerSheet';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { memorizeSuggestion } from '../../lib/activityAdd';
 import { parsePageRange } from '../../lib/memorizationLog';
-import { describePageRuns, pageRuns } from '../../lib/pageRanges';
+import { formatPagesShort } from '../../lib/activityFormat';
+import { ayahSpan } from '../../lib/ayahSpan';
+import { describeSurahs } from '../../lib/pageRanges';
 import * as firestoreService from '../../services/firestoreService';
 import { typeV2 } from '../../theme/v2';
 import type { UserPage } from '../../types';
+import { BlockMark } from './BlockMark';
+import { FormLabel, InfoLine, MinutesField, PageRangeFields, Segmented, Suggestion } from './AddSheetParts';
 
-export function AddMemorizedSheet({ visible, onClose, day }: { visible: boolean; onClose: () => void; day: string }) {
+type What = 'pages' | 'surah';
+
+/** "this morning" (before noon), "this afternoon", "this evening"; "that morning" on another day. */
+export function partOfDay(at: number, today: boolean): string {
+  const h = new Date(at).getHours();
+  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  return `${today ? 'this' : 'that'} ${part}`;
+}
+
+export function AddMemorizedSheet({
+  visible,
+  onClose,
+  day,
+  dayName = 'today',
+}: {
+  visible: boolean;
+  onClose: () => void;
+  day: string;
+  /** How the sheet names the day: "today", "yesterday", "Sunday". */
+  dayName?: string;
+}) {
   const { user, pages, updatePages } = useApp();
   const { palette } = useTheme();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [tab, setTab] = useState<'pages' | 'surah'>('pages');
+  const [minutes, setMinutes] = useState('');
+  const [what, setWhat] = useState<What>('pages');
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [readToday, setReadToday] = useState<number[]>([]);
+  const [readings, setReadings] = useState<{ pages: number[]; startedAt: number }[]>([]);
   const [usedReading, setUsedReading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // The pages read today (timed sessions), offered when they are not memorized yet.
+  // The pages read that day (timed sessions), offered when they are not memorized yet.
   useEffect(() => {
     let cancelled = false;
     firestoreService
       .getReadingSessionsForDay(day)
-      .then((list) => !cancelled && setReadToday(list.flatMap((r) => r.pages)))
+      .then((list) => !cancelled && setReadings(list.map((r) => ({ pages: r.pages, startedAt: new Date(r.startedAt).getTime() }))))
       .catch(() => undefined);
     return () => {
       cancelled = true;
@@ -41,10 +66,22 @@ export function AddMemorizedSheet({ visible, onClose, day }: { visible: boolean;
   }, [day]);
 
   const memorized = useMemo(() => new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
-  const suggestion = memorizeSuggestion(readToday, memorized);
+  const suggestion = memorizeSuggestion(
+    readings.flatMap((r) => r.pages),
+    memorized,
+  );
+  // When the suggested pages were read: the first session that held one of them.
+  const readAt = readings.find((r) => r.pages.some((p) => suggestion.includes(p)))?.startedAt;
+  const suggestionText = [
+    [formatPagesShort(suggestion), ayahSpan(suggestion)].filter(Boolean).join(', '),
+    readAt != null && Number.isFinite(readAt) ? `read ${partOfDay(readAt, dayName === 'today')}` : `read ${dayName}`,
+  ].join(' · ');
+
   const pageNumbers = parsePageRange(from, to) ?? [];
   const range = parsePageRange(from, to);
-  const canAdd = range != null && !saving && !!user;
+  const minutesValue = minutes.trim() === '' ? null : Number(minutes);
+  const minutesOk = minutesValue === null || (Number.isInteger(minutesValue) && minutesValue >= 0);
+  const canAdd = range != null && minutesOk && !saving && !!user;
 
   const useReading = () => {
     if (suggestion.length === 0) return;
@@ -54,6 +91,7 @@ export function AddMemorizedSheet({ visible, onClose, day }: { visible: boolean;
       setUsedReading(false);
       return;
     }
+    setWhat('pages');
     setFrom(String(suggestion[0]));
     setTo(String(suggestion[suggestion.length - 1]));
     setUsedReading(true);
@@ -75,112 +113,96 @@ export function AddMemorizedSheet({ visible, onClose, day }: { visible: boolean;
           changed,
         );
       }
-      await queueChange({ kind: 'memorization.mark', day, pages: pageNumbers, at: Date.now() });
+      await queueChange({
+        kind: 'memorization.mark',
+        day,
+        pages: pageNumbers,
+        at: Date.now(),
+        ...(minutesValue != null && minutesValue > 0 ? { minutes: minutesValue } : {}),
+      });
       setFrom('');
       setTo('');
+      setMinutes('');
       setUsedReading(false);
+      setWhat('pages');
       onClose();
     } finally {
       setSaving(false);
     }
   };
 
-  const fieldStyle = [styles.field, { backgroundColor: palette.fill }];
-
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
       title="Memorized"
+      titleMark={<BlockMark kind="memorized" size={24} />}
+      headerRule="full"
       left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, disabled: !canAdd }}
+      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-memorized-add' }}
       keyboard
       testID="add-memorized-sheet"
     >
       <View style={styles.body}>
         {suggestion.length > 0 && (
-          <View style={[styles.banner, { backgroundColor: palette.fill }]}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[typeV2.meta, { color: palette.primary, fontWeight: '700' }]}>From your reading</Text>
-              <Text style={[typeV2.body, { color: palette.text }]}>{describePageRuns(pageRuns(suggestion))} · read today</Text>
-            </View>
-            <Tap onPress={useReading} accessibilityRole="button" accessibilityLabel={usedReading ? 'Undo the reading pages' : 'Use the reading pages'} style={[styles.useBtn, { backgroundColor: palette.primary }]}>
-              <Text style={[typeV2.body, { color: palette.onPrimary, fontWeight: '700' }]}>{usedReading ? 'Undo' : 'Use'}</Text>
-            </Tap>
+          <View style={styles.top}>
+            <Suggestion
+              label="From your reading"
+              text={suggestionText}
+              action={usedReading ? 'Undo' : 'Use'}
+              onAction={useReading}
+              accessibilityLabel={usedReading ? 'Undo the reading pages' : 'Use the reading pages'}
+              testID="add-memorized-from-reading"
+            />
           </View>
         )}
 
-        <Text style={[styles.label, { color: palette.secondary }]}>WHAT</Text>
-        <View style={[styles.segment, { backgroundColor: palette.fill }]}>
-          {(['pages', 'surah'] as const).map((t) => {
-            const on = tab === t;
-            return (
-              <Tap
-                key={t}
-                testID={`add-memorized-tab-${t}`}
-                onPress={() => {
-                  setTab(t);
-                  if (t === 'surah') setPickerOpen(true);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                style={[styles.segBtn, on && { backgroundColor: palette.bg ?? palette.text, shadowOpacity: 0 }]}
-              >
-                <Text style={[typeV2.body, { color: on ? palette.text : palette.secondary, fontWeight: '600' }]}>{t === 'pages' ? 'Pages' : 'Surah'}</Text>
-              </Tap>
-            );
-          })}
+        <FormLabel text="WHAT" />
+        <Segmented<What>
+          options={[
+            { value: 'pages', label: 'Pages' },
+            { value: 'surah', label: 'Surah' },
+          ]}
+          value={what}
+          onChange={(w) => {
+            setWhat(w);
+            if (w === 'surah') setPickerOpen(true);
+          }}
+          testID="add-memorized-tab"
+        />
+        <View style={styles.fields}>
+          <PageRangeFields
+            from={from}
+            to={to}
+            onFrom={(v) => {
+              setUsedReading(false);
+              setFrom(v);
+            }}
+            onTo={(v) => {
+              setUsedReading(false);
+              setTo(v);
+            }}
+            placeholders
+            testIDs={{ from: 'add-memorized-from', to: 'add-memorized-to' }}
+          />
         </View>
+        {range ? (
+          <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]}>
+            {`${describeSurahs({ first: pageNumbers[0], last: pageNumbers[pageNumbers.length - 1] })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
+          </Text>
+        ) : null}
 
-        <View style={styles.pair}>
-          <View style={[...fieldStyle, styles.pageField]}>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>p.</Text>
-            <TextInput
-              testID="add-memorized-from"
-              value={from}
-              placeholder="From"
-              placeholderTextColor={palette.secondary}
-              onChangeText={(v) => {
-                setUsedReading(false);
-                setFrom(v.replace(/[^0-9]/g, ''));
-              }}
-              keyboardType="number-pad"
-              accessibilityLabel="From page"
-              style={[typeV2.body, styles.input, { color: palette.text }]}
-            />
-          </View>
-          <Text style={[typeV2.body, { color: palette.secondary }]}>to</Text>
-          <View style={[...fieldStyle, styles.pageField]}>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>p.</Text>
-            <TextInput
-              testID="add-memorized-to"
-              value={to}
-              placeholder="To"
-              placeholderTextColor={palette.secondary}
-              onChangeText={(v) => {
-                setUsedReading(false);
-                setTo(v.replace(/[^0-9]/g, ''));
-              }}
-              keyboardType="number-pad"
-              accessibilityLabel="To page"
-              style={[typeV2.body, styles.input, { color: palette.text }]}
-            />
-          </View>
-        </View>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>
-          {range ? `${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}` : 'Enter the first and last page you memorized'}
-        </Text>
+        <FormLabel text="MINUTES" />
+        <MinutesField value={minutes} onChange={setMinutes} testID="add-memorized-minutes" />
 
-        <Text style={[typeV2.meta, { color: palette.secondary, marginTop: 8 }]}>
-          Adding marks these pages memorized, so they join your revision plan. For anything else, add a note.
-        </Text>
+        <InfoLine text="Adding marks these pages memorized, so they join your revision plan. For anything else, add a note." />
       </View>
 
       <RangePickerSheet
         visible={pickerOpen}
         onClose={() => {
           setPickerOpen(false);
-          setTab('pages');
+          setWhat('pages');
         }}
         onUse={(r) => {
           setFrom(String(r.from));
@@ -193,14 +215,8 @@ export function AddMemorizedSheet({ visible, onClose, day }: { visible: boolean;
 }
 
 const styles = StyleSheet.create({
-  body: { gap: 10, paddingVertical: 8 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  useBtn: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
-  label: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, marginTop: 6 },
-  segment: { flexDirection: 'row', borderRadius: 999, padding: 3 },
-  segBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999, minHeight: 38 },
-  pair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  field: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingHorizontal: 14, minHeight: 48 },
-  pageField: { flex: 1 },
-  input: { flex: 1, padding: 0 },
+  body: { paddingBottom: 8 },
+  top: { marginTop: 8 },
+  fields: { marginTop: 10 },
+  under: { marginTop: 8, marginHorizontal: 2 },
 });

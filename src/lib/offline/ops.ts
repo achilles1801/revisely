@@ -47,8 +47,9 @@ export type OutboxOp =
   | { kind: 'pages'; pages: PageFields[] }
   /** A memorization item is removed (its pages are un-marked by the pages change beside it). */
   | { kind: 'memorization.delete'; day: string; id: string }
-  /** Pages memorized today (the manager's "Today"): merged into the day's memorization item. */
-  | { kind: 'memorization.mark'; day: string; pages: number[]; at: number }
+  /** Pages memorized today (the manager's "Today"): merged into the day's memorization item, with
+   *  the minutes the Memorized add sheet was given, if any (they add to the day's). */
+  | { kind: 'memorization.mark'; day: string; pages: number[]; at: number; minutes?: number | null }
   /** Pages un-memorized: removed from the items that hold them. */
   | { kind: 'memorization.unmark'; pages: number[] }
   /** A Revised item added by hand (Activity's add sheet): one write, never merged. */
