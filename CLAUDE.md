@@ -523,10 +523,15 @@ hard-coded token was deleted from the console on 2026-10-27.
 
 ## CI
 
+- **How we test: `TESTING.md`.** The layers and what each proves, what is real and what is stood in
+  (only outside services, at their outermost edge: everything of ours runs for real), adding a test,
+  flakes (fix the cause, never a retry or a skip), the `develop-red` issue, the daily live smoke check
+  against production and real devices (Test Lab).
 - **Behaviour first.** `BEHAVIOUR.md` lists every rule the app keeps for its users, each with an id.
   The scenario and property tests in `tests/scenarios/` check them (how to run and write them:
   `tests/scenarios/README.md`). Scenarios run the real providers, Home and the session screen against
-  the Auth and Firestore emulators (real rules), with a test clock and time zone. Property tests
+  the Auth, Firestore, Storage and Functions emulators (real rules, our real functions; only Anthropic
+  answers from a recording, `functions/src/emulator.ts`), with a test clock and time zone. Property tests
   (fast-check) cover the schedule and day functions. `Scenarios` in CI (`scenarios.yml`) runs both,
   and `preview.yml` builds and publishes nothing unless it passes.
   - **Every bug fix adds a scenario** that fails without the fix and names the rule it keeps
@@ -567,7 +572,8 @@ hard-coded token was deleted from the console on 2026-10-27.
   emulator against the Firebase emulators, at a time and in a zone each flow sets (sign-up, a
   session, revise ahead, the Fajr boundary, the daily log, offline, recordings). CI calls it with
   the sets `plan` picks (see "Where the slow checks run" above): the smoke set is 02 session, 04 Fajr
-  boundary, 05 daily log, 06 offline; every flow is two jobs a platform. The top of a stack tests the
+  boundary, 05 daily log, 06 offline (two Android jobs side by side: 02 + 05, 04 + 06); every flow is
+  two jobs a platform. The top of a stack tests the
   stack's whole change. One run per PR (a push cancels the older one); a push to develop cancels the
   run of the push before it, and never a full run started by hand. A red run on develop doesn't stop
   the preview (the scenario gate does that): fix it like any failure. iOS runners are the slow part
