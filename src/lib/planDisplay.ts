@@ -6,9 +6,10 @@ import {
   getAllSurahs,
   getJuzForPage,
   getJuzName,
-  getSurahForPage,
   getSurahsForPage,
 } from './quranData';
+import { describePassage, placeOfPage } from './passages';
+import { pageRuns } from './pageRanges';
 
 export interface MemorizedSurahGroup {
   number: number;
@@ -119,13 +120,20 @@ export interface DaySummary {
   isRest: boolean;
 }
 
-/** Row copy for one cycle day. */
+/**
+ * Row copy for one cycle day: the juz, then the surahs ("Al-Mujadila to
+ * At-Tahrim", short: lib/passages) and how many pages. A day of scattered pages
+ * (weakest first) lists its surahs' names instead.
+ */
 export function summarizeDay(pages: number[]): DaySummary {
   if (pages.length === 0) {
     return { title: 'Rest Day', subtitle: 'Nothing scheduled', isRest: true };
   }
   const juzList = Array.from(new Set(pages.map(getJuzForPage))).sort((a, b) => a - b);
-  const surahs = surahNamesLabel(pages);
+  const surahs =
+    pageRuns(pages).length <= 2
+      ? describePassage(pages, { form: 'short', wholeJuz: false, order: 'given' })
+      : surahNamesLabel(pages);
   return {
     title: juzTitle(juzList),
     subtitle: [surahs, pageCountLabel(pages.length)].filter(Boolean).join(' · '),
@@ -133,12 +141,11 @@ export function summarizeDay(pages: number[]): DaySummary {
   };
 }
 
-/** "Al-Baqarah" / "Page 22 · Juz 2" for a start-point row. */
+/** "Al-Baqarah, ayah 142" / "Juz 2 · p. 22" for a start-point row: where the page begins, the page a quiet detail. */
 export function describeStartPage(page: number | null): { title: string; subtitle: string } {
   if (page == null) return { title: 'Beginning', subtitle: '' };
-  const surah = getSurahForPage(page);
   return {
-    title: surah.name,
-    subtitle: `Page ${page} · Juz ${getJuzForPage(page)}`,
+    title: placeOfPage(page),
+    subtitle: `Juz ${getJuzForPage(page)} · p. ${page}`,
   };
 }

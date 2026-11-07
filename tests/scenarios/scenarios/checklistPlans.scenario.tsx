@@ -9,6 +9,7 @@
 import { pagesRange, saveEditedPlan } from '../harness/account';
 import { setNow } from '../harness/clock';
 import { DailyLog, Home, Manager, homeStack } from '../harness/screens';
+import { place, plain, startsAt } from '../harness/words';
 import { addDays, scenarioPhone } from '../harness/testScenario';
 import type { OpenApp } from '../harness/phone';
 
@@ -24,12 +25,16 @@ async function memorizedItems(app: OpenApp, from: string, to: string) {
 
 // New account: Juz 30 (pp. 582–604), five a day from today, nothing revised.
 describe('1. New account', () => {
-  it('[SCHED-1] [SESS-1] [SESS-2] today is pp. 582–586; the session opens on 582, and five swipes end on the card with Home Done', async () => {
+  it('[SCHED-1] [SESS-1] [SESS-2] [NAME-1] today is pp. 582–586, named by its surahs; the session opens on 582, and five swipes end on the card with Home Done', async () => {
     const { app } = await scenarioPhone('new');
     const home = new Home(app);
     await home.ready();
-    expect(home.title()).toMatch(/^Starts at An.Naba, p\.\s582(?!\d)/);
+    expect(plain(home.title())).toBe(`Starts at ${place(582)}`);
+    expect(plain(home.title())).toBe('Starts at An-Naba');
     expect(home.detail()).toMatch(/^5\spages · /);
+    // NAME-1: surahs and juz, never page numbers (amounts are fine).
+    const noPageNumbers = /\bpp?\.\s?\d|\bPages?\s\d/;
+    expect(home.today()).not.toMatch(noPageNumbers);
     expect(home.catchUp()).toBeNull();
     expect(home.cta()).toBe('Start revision');
     await home.untilStreak(0);
@@ -38,12 +43,16 @@ describe('1. New account', () => {
     expect(session.pages()).toEqual(pagesRange(582, 586));
     expect(session.current()).toBe(582);
     await session.swipeThrough(5);
-    expect(session.endCard()).toContain('Revision complete 5 pages revised today');
+    expect(plain(session.endCard())).toBe("Revision complete An-Naba to At-Takwir 5 pages revised today");
     await session.back();
     await app.untilSynced();
     expect(home.title()).toBe('Done · 5 pages');
     expect(home.cta()).toBe('Review session');
     await home.untilStreak(1);
+    // The session just saved, in the recent list: by its surahs.
+    await app.until(() => home.recent().length === 1, 'the session in the recent list');
+    expect(plain(home.recent()[0])).toMatch(/^Revised 5 pages .*An-Naba to At-Takwir/);
+    expect(home.recent()[0]).not.toMatch(noPageNumbers);
     await app.close();
   });
 
@@ -101,7 +110,7 @@ describe('3. Hafiz', () => {
     const { app } = await scenarioPhone('hafiz');
     const home = new Home(app);
     await home.ready();
-    expect(home.title()).toMatch(/^Starts at Al.Fatihah, p\.\s1(?!\d)/);
+    expect(plain(home.title())).toBe('Starts at Al-Fatihah');
     expect(home.detail()).toMatch(/^21\spages · .*Juz\s1$/);
     // D−1, D−2, D−3: Juz 30, 29, 28, named by the juz, not their surahs.
     const rows = home.recent();
@@ -127,12 +136,12 @@ describe('3. Hafiz', () => {
 // Revised ahead: Juz 30, three a day from D−3. Today 591–593 done, and 594–595 of tomorrow's
 // 594–596 revised ahead. The day after is 597–599.
 describe('6. Revised ahead', () => {
-  it('[SESS-4] [AHEAD-1] Done · 5 pages; the review holds today’s three then the two ahead; Tomorrow starts at p. 596', async () => {
+  it('[SESS-4] [AHEAD-1] Done · 5 pages; the review holds today’s three then the two ahead; Tomorrow starts at page 596', async () => {
     const { app } = await scenarioPhone('revise-ahead');
     const home = new Home(app);
     await home.ready();
     expect(home.title()).toBe('Done · 5 pages');
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s596(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(596)}`);
     expect(await home.openReview()).toEqual([591, 592, 593, 594, 595]);
     await app.close();
   });
@@ -146,7 +155,7 @@ describe('6. Revised ahead', () => {
     expect(ahead.current()).toBe(596);
     expect(ahead.canSwipeBack()).toBe(false);
     await ahead.swipe();
-    expect(ahead.endCard()).toMatch(/Revision complete 1 page revised /);
+    expect(ahead.endCard()).toMatch(/Revision complete .+ 1 page revised /);
     await ahead.keepGoing();
     expect(ahead.pages()).toEqual([597, 598, 599]);
     expect(ahead.canSwipeBack()).toBe(false);
@@ -154,7 +163,7 @@ describe('6. Revised ahead', () => {
     await app.untilSynced();
     // Tomorrow is done ahead: the line goes on to Saturday.
     expect(home.title()).toBe('Done · 6 pages');
-    expect(home.ahead()).toMatch(/^Sat starts at .+, p\.\s597(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Sat starts at ${place(597)}`);
     await app.close();
   });
 });
@@ -210,7 +219,7 @@ describe('8. Custom reverse plan', () => {
     const { phone, app } = await scenarioPhone('custom-reverse');
     const home = new Home(app);
     await home.ready();
-    expect(home.title()).toMatch(/^Starts at .+, p\.\s598(?!\d)/);
+    expect(plain(home.title())).toBe(`Starts at ${place(598)}`);
     expect(home.detail()).toMatch(/^4\spages/);
     const session = await home.startSession();
     expect(session.pages()).toEqual([598, 597, 596, 595]);
@@ -236,7 +245,7 @@ describe('8. Custom reverse plan', () => {
     const next = await phone.open(homeStack);
     const tomorrow = new Home(next);
     await tomorrow.ready();
-    expect(tomorrow.title()).toMatch(/^Starts at .+, p\.\s595(?!\d)/);
+    expect(plain(tomorrow.title())).toBe(`Starts at ${place(595)}`);
     const s2 = await tomorrow.startSession();
     expect(s2.pages()).toEqual([595, 594, 593, 592]);
     await s2.back();
@@ -252,7 +261,7 @@ describe('8. Custom reverse plan', () => {
       shown[2] = [592, 591, 590];
       return shown;
     });
-    await app.until(() => /p\.\s598(?!\d)/.test(home.title() ?? ''), 'Home to show today');
+    await app.until(() => startsAt(598).test(plain(home.title()) ?? ''), 'Home to show today');
     const session = await home.startSession();
     expect(session.pages()).toEqual([598, 597, 596, 595]);
     await session.back();

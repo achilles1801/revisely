@@ -120,9 +120,10 @@ How the tests are made: `tests/scenarios/README.md`.
 ## Carrying pages over
 
 - **CARRY-1.** Pages left over from the last three revision days are offered on Home, once a day, as
-  one line above today's action with "Add to today" beneath it: "Left yesterday · Revise p. 3–5" for a
-  day started and not finished, "Missed yesterday · Revise p. 1–5" for a day with no session, and
-  "Missed 3 days · Revise pp. …" when several days come to more than one. Earlier days are not offered.
+  one line above today's action with "Add to today" beneath it: "Left yesterday · Revise Al-Baqarah
+  6–29" for a day started and not finished, "Missed yesterday · Revise Al-Fatihah to Al-Baqarah" for a
+  day with no session, and "Missed 3 days · Revise …" when several days come to more than one (the
+  pages named by their surahs, NAME-1). Earlier days are not offered.
   A page revised at any point in those days is never offered, whichever day the schedule had it on.
 - **CARRY-2.** Keep daily amount (`shift`, the default): today keeps its size. The leftovers come
   first, and the rest of the plan slides back by as many pages.
@@ -413,6 +414,17 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   revision minutes, timed reading, pages marked memorized, ratings given, this phone's recordings, and its daily-log
   notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
   question's day, or whose place ("2 days ago") or figures don't match it.
+
+## Naming the Qur'an
+
+- **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers
+  (the owner, Nov 7 2026; `lib/passages`): Home's Today post ("Starts at An-Naba", "Continue at
+  Al-Hashr, ayah 17", "Tomorrow starts at …"), its catch-up line, the recent sessions and See all
+  ("Juz 28 · 41 min", "Al-Baqarah 142–176"), the session's end card ("Revision complete", "An-Naba to
+  At-Takwir", "5 pages revised today") and Keep going. Amounts are fine ("20 pages"). Page numbers
+  stay only as a quiet detail after the words (the › sheet's "… · pp. 542–561"), inside the reader
+  and the session (the printed page), and where the user chooses by page (Jump to's Page tab, From
+  and To).
 
 ## Known bugs
 
