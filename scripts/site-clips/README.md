@@ -23,9 +23,20 @@ signed in to the demo account `screenshots@revisely.app`. No real user's data ap
    `- pause: N` in the flows is shorthand: expand it to an optional `extendedWaitUntil` with a
    timeout of N ms before running (Maestro has no plain wait). Order: `carry` (once a day: carrying
    over can't be repeated without undoing `carryOver` on the user doc), `plan` (from Home),
-   `reader` (inside the session on page 518), `activity` (from Home).
+   `reader` (inside the session on page 518), `activity` (from Home). Only `reader` and
+   `activity` are on the page now (see Stills).
 5. `python3 encode.py <raw dir> ../../docs/assets/clips` cuts out the pauses and writes MP4, WebM and
    a poster for each. Keep the total under about 5 MB.
+
+## Stills
+
+The Home and revision screens on the page are the approved App Store screenshots
+(`store/screenshots/01-home.png`, `03-revision.png`), not clips: the Home clips (`plan`, `carry`)
+showed Home from before 1.0.3 and were taken off the page on 2026-11-07. `python3
+scripts/site-clips/stills.py` writes them to `docs/assets/img/screens/` (half size, WebP and JPEG,
+with the Dynamic Island drawn in like the clips have it) and puts the Home screenshot into the
+phone in `docs/assets/img/og.png`, the link preview. Run it again whenever those screenshots are
+retaken.
 
 The Arabic verse on the page (`docs/assets/img/verse-54-17.webp`) is the Uthmani text of 54:17 set in
 Amiri (`assets/fonts/Amiri-Regular.ttf`) by headless Chrome and used as a CSS mask, so the page

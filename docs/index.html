@@ -18,14 +18,14 @@
   <meta property="og:image" content="https://revisely.app/assets/img/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Revisely on an iPhone, showing today’s revision plan.">
+  <meta property="og:image:alt" content="Revisely on an iPhone, showing where today’s revision starts.">
   <meta name="twitter:card" content="summary_large_image">
 
   <link rel="icon" href="/favicon.ico" sizes="48x48">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="preload" as="image" href="/assets/clips/plan.jpg" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/img/screens/home.webp" type="image/webp" fetchpriority="high">
   <link rel="stylesheet" href="/assets/site.css">
   <script>document.documentElement.classList.remove('no-js')</script>
   <script type="application/ld+json">
@@ -83,19 +83,14 @@
           </ul>
         </div>
 
-        <div class="phone" data-clip-frame>
+        <div class="phone">
           <div class="screen">
-            <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
-              poster="/assets/clips/plan.jpg"
-              aria-label="Revisely’s Home shows today’s pages, 517 to 536. Start revision opens page 517 of the mushaf; it is checked off and the next page swipes in.">
-              <source src="/assets/clips/plan.webm" type="video/webm; codecs=vp9">
-              <source src="/assets/clips/plan.mp4" type="video/mp4">
-            </video>
+            <picture>
+              <source srcset="/assets/img/screens/home.webp" type="image/webp">
+              <img src="/assets/img/screens/home.jpg" width="660" height="1434" fetchpriority="high"
+                alt="Revisely’s Home: today’s revision starts at Al-Hadid, 20 pages to At-Tahrim, with a Start revision button and how much of the Qur’an is memorized. The next prayer, Fajr, is above it.">
+            </picture>
           </div>
-          <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
-            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
-            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
-          </button>
         </div>
       </div>
     </section>
@@ -149,11 +144,12 @@
           <div class="copy">
             <span class="label">The mushaf</span>
             <h2 id="f-reader" class="title">Revise on real pages, and hear them recited.</h2>
-            <p>Every page of the Madani mushaf, laid out as it is in print. Press and hold a verse to read its translation or to play the recitation from there.</p>
+            <p>Every page of the Madani mushaf, laid out as it is in print. Press and hold a verse to read its translation, play the recitation from there, or copy it to share.</p>
             <ul class="points">
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Saheeh International translation, verse by verse</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Al-Husary, Al-Minshawi, Abdul Basit, Alafasy and more</span></li>
-              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>A teaching recitation that pauses after each verse for you to repeat</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Saheeh International, or <a href="https://theclearquran.org">The Clear Quran® by Dr. Mustafa Khattab</a>, verse by verse</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Al-Husary, Al-Minshawi, Abdul Basit, Alafasy and more, including a teaching recitation</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Change the speed, repeat each verse, or pause after it to recite it back</span></li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg><span>Keeps playing with the phone locked, with controls on the Lock Screen</span></li>
             </ul>
           </div>
           <div class="phone" data-clip-frame>
@@ -174,28 +170,22 @@
         </div>
       </section>
 
-      <section class="feature flip" aria-labelledby="f-carry">
+      <section class="feature flip" aria-labelledby="f-revision">
         <div class="wrap">
           <div class="copy">
-            <span class="label">Carry-over</span>
-            <h2 id="f-carry" class="title">Didn’t finish yesterday? Pick up where you left off.</h2>
-            <p>If you stopped partway through yesterday’s pages, Home offers to add the ones you missed to today. Today keeps its usual size, and the rest of your plan moves back to make room.</p>
-            <p>Been away? Jump to any juz, surah or page and carry on from there. The schedule never piles up.</p>
+            <span class="label">Revision</span>
+            <h2 id="f-revision" class="title">One page at a time. Pick up where you left off.</h2>
+            <p>Today’s pages open in the mushaf, one after another. Swipe past a page to check it off. With Smart Tracking on, you can also rate how well you know it.</p>
+            <p>Stopped partway yesterday? Home offers to add the pages you missed to today. Today keeps its usual size, and the rest of your plan moves back to make room. Been away? Jump to any surah or juz and carry on from there. The schedule never piles up.</p>
           </div>
-          <div class="phone" data-clip-frame>
+          <div class="phone">
             <div class="screen">
-              <video data-clip muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
-                data-poster="/assets/clips/carry.jpg"
-                aria-label="Home shows today’s pages, 523 to 542, and a button: Add 6 from yesterday. After tapping it, today becomes pages 517 to 536.">
-                <source src="/assets/clips/carry.webm" type="video/webm; codecs=vp9">
-                <source src="/assets/clips/carry.mp4" type="video/mp4">
-              </video>
-              <noscript><img src="/assets/clips/carry.jpg" alt="" loading="lazy"></noscript>
+              <picture>
+                <source srcset="/assets/img/screens/revision.webp" type="image/webp">
+                <img src="/assets/img/screens/revision.jpg" width="660" height="1434" loading="lazy"
+                  alt="A revision session: a page of Surah Al-Hadid fills the screen, with 0 of 20 pages done at the top, and play, the reciter, audio options, record and the timer at the bottom.">
+              </picture>
             </div>
-            <button class="clip-toggle" type="button" aria-pressed="true" aria-label="Pause clip">
-              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
-              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
-            </button>
           </div>
         </div>
       </section>
@@ -205,7 +195,7 @@
           <div class="copy">
             <span class="label">Activity</span>
             <h2 id="f-activity" class="title">See your month at a glance.</h2>
-            <p>Each day you revise fills in on the calendar, darker the more you did. Tap a day to see what you covered and for how long, or switch to a week for the detail.</p>
+            <p>Each day you revise fills in on the calendar, darker the more you did. Tap a day to see what you covered and for how long, or switch to a week for the detail. Your recordings and daily log are kept there too.</p>
           </div>
           <div class="phone" data-clip-frame>
             <div class="screen">
@@ -233,7 +223,15 @@
         <ul class="rows">
           <li>
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-            <div><h3>Record your recitation</h3><p>Record yourself reciting a page, then listen back for what slipped.</p></div>
+            <div><h3>Record your recitation</h3><p>Record yourself reciting a page, then listen back for what slipped. Recordings are backed up to your account.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2l-1.6 4-4 1.6 1.6-4z"/></svg>
+            <div><h3>Prayer times and the Qibla</h3><p>Today’s prayer times and the next one on Home, a notification for the prayers you choose, and a Qibla compass, all worked out on your phone.</p></div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="17" height="7" rx="2"/></svg>
+            <div><h3>Widgets</h3><p>Today’s revision, a verse of the day, prayer times and the Qibla, on your Home Screen and Lock Screen.</p></div>
           </li>
           <li>
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 6.5V4M6.3 10.3 4.6 8.6M17.7 10.3l1.7-1.7"/></svg>
@@ -285,6 +283,10 @@
           <details>
             <summary>Do I need an account?</summary>
             <p>Yes. Sign in with Apple, Google or email so your progress is saved and syncs between devices. You can delete your account and all of its data at any time in Settings.</p>
+          </details>
+          <details>
+            <summary>Does Revisely use my location?</summary>
+            <p>Only if you use prayer times, the Qibla compass or Start day at fajr. Prayer times and the Qibla are worked out on your phone, and your location isn’t sent to us. Start day at fajr saves it to your account, to work out fajr where you are. The <a href="/privacy/">Privacy Policy</a> has the details.</p>
           </details>
         </div>
       </div>
