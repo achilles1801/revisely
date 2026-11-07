@@ -27,13 +27,14 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: [],
+    covers: ['NAME-1'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
       '- The tab bar has Home and Read (swipe sideways between them). Testers have no Insights tab: Insights is in Activity.',
       '- Home’s top bar, on the right: a compass (the Prayer sheet: prayer times and the Qibla), a pulse icon (Activity) and a gear (Settings). A running timer shows on the left.',
-      '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila, p. 542 ›") and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
+      '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
+      '- The app names parts of the Qur’an by surah and juz, never by page numbers: "Starts at Al-Hadid, ayah 4", "Al-Baqarah 84–101", "Juz 28". Page numbers show only as a quiet detail after the words (the header of today’s › menu), inside the reader and the session (the printed page), and where pages are chosen by number (the Page tab of “Jump to…”).',
       '- Revo (testers): the round button at the bottom right of Home, Activity and Read’s list. Never in the reader or a session.',
     ),
   },
@@ -99,7 +100,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['CARRY-1', 'CARRY-2', 'CARRY-3', 'CARRY-4'],
     routes: ['Dashboard', 'Settings'],
     text: lines(
-      '- Pages not revised in the last three revision days are offered on Home once a day, above today’s button: "Left yesterday · Revise p. 3–5" (a day started and not finished), "Missed yesterday · …" (no session that day) or "Missed 3 days · …". Older days aren’t offered, and a page revised at any point in those days isn’t either.',
+      '- Pages not revised in the last three revision days are offered on Home once a day, above today’s button: "Left yesterday · Revise Al-Baqarah 84–101" (a day started and not finished), "Missed yesterday · …" (no session that day) or "Missed 3 days · Revise Al-Baqarah 30–134". Older days aren’t offered, and a page revised at any point in those days isn’t either.',
       '- Nothing moves until “Add to today” is tapped; then they come first in today’s session. Still unrevised the next day, they are offered again.',
       '- “Keep daily amount” (Settings → Revision) decides the rest. On (the default): today keeps its usual size; the missed pages come first and the rest of the plan moves back by as many pages. Off: the missed pages go on top of today’s and nothing else moves.',
       '- Added pages count for the day they came from (that is what can bring a streak back), never for today.',
@@ -110,7 +111,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['AHEAD-1', 'AHEAD-2', 'AHEAD-3', 'AHEAD-4', 'AHEAD-5'],
     routes: ['ActiveRevision'],
     text: lines(
-      '- Once today is done, Home shows a line like "Tomorrow starts at Al-Mulk, p. 562"; tapping it opens the next day’s pages alone.',
+      '- Once today is done, Home shows a line like "Tomorrow starts at Al-Mulk"; tapping it opens the next day’s pages alone.',
       '- On the end card, “Keep going” goes on to the next revision day’s pages not done yet, then the day after, up to the end of the cycle. A day already done ahead is passed over.',
       '- A page revised ahead counts for the day it is planned on: that day then needs only the pages left, and is done when none are. Only pages actually revised (swiped or checked) count.',
     ),
@@ -256,9 +257,6 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
-  // Not yet in the guide's text: its examples still show "p. 542" and change with the next
-  // recording of the Anthropic replies (a new prompt needs a new recording, TESTING.md).
-  'NAME-1': 'how the app words parts of the Qur’an (by surah and juz); the guide’s examples follow with the next recording',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
