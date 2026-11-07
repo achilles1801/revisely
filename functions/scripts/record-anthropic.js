@@ -28,38 +28,58 @@ const { ANTHROPIC_URL, ANTHROPIC_VERSION } = require(path.join(lib, 'coach/call.
 const { buildAskRequest, buildReviewRequest } = require(path.join(lib, 'revo/prompt.js'));
 const { buildCoachRequest } = require(path.join(lib, 'coach/prompt.js'));
 const { shortRequest, kindOf } = require(path.join(lib, 'emulator.js'));
+const { validateContext } = require(path.join(lib, 'revo/validate.js'));
 
 const OUT = path.join(__dirname, '..', 'test-recordings', 'anthropic');
 const DAY = '2026-11-03';
 
-// A made-up account: 120 pages memorized, 10 a day, part of today done.
+// A made-up account: 120 pages memorized, 10 a day, part of today done (Juz 30's end), as the app
+// sends it today (src/lib/revo/context.ts): Home's numbers, the week with its plan, the streak, and
+// the parts of the Qur'an worded surah and juz first. The words are the app's own contextWords()
+// (src/lib/revo/words.ts) for these pages: today 583–592, next 587–592, weak next 589, weak 589, 12,
+// 595 and 3. Change the pages, change the words with them (Nov 7 2026: a fixture with page numbers
+// alone got replies saying "page 587", which no tester's app would get).
 const context = {
   totals: {
     memorizedPages: 120,
     revisedWithin7Days: 64,
     revisedWithin30Days: 118,
     daysWithSession30: 24,
-    streakDays: 5,
+    streakDays: 2,
     sessions30: 27,
     weakPages: 4,
     moderatePages: 18,
     strongPages: 98,
     weakRevisedLast7Days: 2,
-    pagesPerDay7: 9.1,
+    pagesPerDay7: 9,
     pagesPerDay30: 8.4,
     plannedPerDay: 10,
   },
-  today: { plannedPages: 10, revisedPages: 4, minutes: 22, memorizedPages: 0, nextPages: [587, 588, 589, 590, 591, 592], weakNext: [589], done: false },
+  today: {
+    plannedPages: 10,
+    revisedPages: 4,
+    carriedPages: 0,
+    doneEarlier: 0,
+    otherPages: 0,
+    minutes: 22,
+    memorizedPages: 0,
+    nextPages: [587, 588, 589, 590, 591, 592],
+    weakNext: [589],
+    done: false,
+  },
   weakPages: [589, 12, 595, 3],
   week: [
-    { day: '2026-10-28', pages: 10 },
-    { day: '2026-10-29', pages: 9 },
-    { day: '2026-10-30', pages: 10 },
-    { day: '2026-10-31', pages: 0 },
-    { day: '2026-11-01', pages: 10 },
-    { day: '2026-11-02', pages: 10 },
-    { day: DAY, pages: 4 },
+    { day: '2026-10-28', pages: 10, planned: 10, done: true },
+    { day: '2026-10-29', pages: 9, planned: 10, done: false },
+    { day: '2026-10-30', pages: 10, planned: 10, done: true },
+    { day: '2026-10-31', pages: 0, planned: 10, done: false },
+    { day: '2026-11-01', pages: 10, planned: 10, done: true },
+    { day: '2026-11-02', pages: 10, planned: 10, done: true },
+    { day: DAY, pages: 4, planned: 10, done: false },
   ],
+  streak: { days: 2, atRisk: null },
+  passages: {"today": "An-Naba 31 to Al-Ghashiyah · Juz 30", "startsAt": "An-Naba, ayah 31", "next": "Al-Infitar to Al-Ghashiyah · Juz 30", "nextAt": "Al-Infitar", "weakNext": "Al-Mutaffifin 35 to Al-Inshiqaq · Juz 30", "weak": "Al-Baqarah 6–16, Al-Baqarah 77–83 and 2 more"},
+  pageNames: {"3": "Al-Baqarah, ayahs 6–16 · Juz 1", "12": "Al-Baqarah, ayahs 77–83 · Juz 1", "587": "Al-Infitar to Al-Mutaffifin 6 · Juz 30", "588": "Al-Mutaffifin, ayahs 7–34 · Juz 30", "589": "Al-Mutaffifin 35 to Al-Inshiqaq · Juz 30", "590": "Al-Buruj · Juz 30", "591": "At-Tariq to Al-A'la 15 · Juz 30", "592": "Al-A'la 16 to Al-Ghashiyah · Juz 30", "595": "Ash-Shams to Al-Layl 14 · Juz 30"},
   localTime: '19:40',
 };
 
@@ -89,6 +109,7 @@ function write(name, rec) {
 (async () => {
   // --dry: build every request and check the emulator reads it as its kind; no call, no key.
   if (process.argv.includes('--dry')) {
+    validateContext(context);
     for (const [name, build] of Object.entries(REQUESTS)) {
       const request = build();
       if (kindOf(request) !== name) throw new Error(`${name}: the emulator would read this request as ${kindOf(request)}`);

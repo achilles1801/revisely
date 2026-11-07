@@ -41,6 +41,7 @@ const { buildAskRequest, REVO_SYSTEM_PROMPT } = require(path.join(lib, 'revo/pro
 const { REVO_GUIDE } = require(path.join(lib, 'revo/guide.js'));
 const { parseReply } = require(path.join(lib, 'revo/reply.js'));
 const { contextPages, validateContext } = require(path.join(lib, 'revo/validate.js'));
+const { barePageNumbers, replyWords } = require(path.join(lib, 'revo/pageWords.js'));
 
 // ---------------------------------------------------------------------------------------------
 // Made-up accounts, as the app sends them (src/lib/revo/context.ts).
@@ -387,6 +388,10 @@ function show(s, r) {
   const results = facts.map((f) => ({ f, ok: f.not ? !f.re.test(all) && !(f.re === FILLER && r.reply?.action?.kind === 'startRevision') : f.re.test(all) }));
   lines.push('');
   for (const { f, ok } of results) lines.push(`- ${ok ? '✅' : '❌'} ${f.label}`);
+  // Counted on every answer (NAME-1): a page number only after the surah's name, never on its own.
+  const bare = r.reply ? barePageNumbers(replyWords(r.reply)) : [];
+  results.push({ f: { label: 'no page number on its own (NAME-1)' }, ok: bare.length === 0 });
+  lines.push(`- ${bare.length === 0 ? '✅' : '❌'} no page number on its own (NAME-1)${bare.length ? `: “${bare.join('”, “')}”` : ''}`);
   if (s.screen) {
     // Counted (REVO-31): the card for the screen the answer names, from the model or added by the server.
     const a = r.reply?.action;

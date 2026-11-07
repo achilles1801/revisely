@@ -7,6 +7,8 @@ import { execFileSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { GUIDE_INTERNAL, GUIDE_SECTIONS, REVO_GUIDE } from './guide';
+import { barePageNumbers, replyWords } from './pageWords';
+import { parseReply } from './reply';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS } from './types';
 
 const ROOT = join(__dirname, '..', '..', '..');
@@ -98,5 +100,24 @@ describe('the scripts that ask the real model still build their requests', () =>
   it.each([['revo-guide-samples.js'], ['record-anthropic.js'], ['revo-tone-samples.js', '--before', 'HEAD']])('%s --dry', (script, ...args) => {
     if (!existsSync(lib)) throw new Error('Build the functions first: npm run build');
     execFileSync(process.execPath, [join(__dirname, '..', '..', 'scripts', script), '--dry', ...args], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, ANTHROPIC_API_KEY: '' } });
+  });
+});
+
+describe('page numbers where Revo should name the surah (NAME-1)', () => {
+  it('finds a page number on its own, and lets one after a surah’s name through', () => {
+    expect(barePageNumbers('Next up starts at page 587, with one weak page among them')).toEqual(['page 587']);
+    expect(barePageNumbers('Put page 589 first. Then pages 590–592, and p. 12.')).toEqual(['page 589', 'pages 590', 'p. 12']);
+    expect(barePageNumbers('Al-Baqarah, p. 288 is the one. Al-Mujadila · p. 542 too, and Al-Hashr, ayahs 17–24, p. 548.')).toEqual([]);
+    expect(barePageNumbers('20 pages a day, page by page, about 9 pages this week.')).toEqual([]);
+  });
+
+  it.each(['revo-ask', 'revo-review'])('the recorded %s reply names the Qur’an by surah and juz, never by page number', (name) => {
+    // A recording made from a context with page numbers alone got "page 587" (Nov 7 2026): the
+    // fixture in scripts/record-anthropic.js sends the app's own words for every page.
+    const recording = JSON.parse(readFileSync(join(__dirname, '..', '..', 'test-recordings', 'anthropic', `${name}.json`), 'utf8'));
+    const text = (recording.body.content as { type: string; text?: string }[]).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('');
+    const reply = parseReply(text, new Set(Array.from({ length: 604 }, (_, i) => i + 1)), { firstTurn: true });
+    expect(reply).not.toBeNull();
+    expect(barePageNumbers(replyWords(reply!))).toEqual([]);
   });
 });
