@@ -3,7 +3,7 @@
 // tag chip and the closing info line. Each sheet (Revised, Memorized, Note) puts its own together.
 
 import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { InputAccessoryView, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
@@ -11,6 +11,25 @@ import { typeV2 } from '../../theme/v2';
 import { BLOCK_ICON, REVISED_ICON, type BlockKind } from './BlockMark';
 
 const MAX_SCALE = 1.4;
+
+/** The number pad has no return key: on iOS a Done bar above it puts it away (as the daily log's). */
+export const KEYBOARD_DONE_ID = 'activity-keyboard-done';
+const doneBar = Platform.OS === 'ios' ? KEYBOARD_DONE_ID : undefined;
+
+/** The Done bar itself: render it once in a sheet with number fields. */
+export function KeyboardDone() {
+  const { palette } = useTheme();
+  if (Platform.OS !== 'ios') return null;
+  return (
+    <InputAccessoryView nativeID={KEYBOARD_DONE_ID}>
+      <View style={[styles.doneBar, { backgroundColor: palette.sheet, borderTopColor: palette.separator }]}>
+        <Pressable onPress={() => Keyboard.dismiss()} accessibilityRole="button" accessibilityLabel="Done" testID="activity-keyboard-done" hitSlop={8}>
+          <Text style={[typeV2.name, { color: palette.accentText }]}>Done</Text>
+        </Pressable>
+      </View>
+    </InputAccessoryView>
+  );
+}
 
 /** "WHAT", "MINUTES", "HOW DID IT GO?" with "Optional" on the right. */
 export function FormLabel({ text, right }: { text: string; right?: string }) {
@@ -96,6 +115,7 @@ export function PageRangeFields({
         placeholder={placeholders ? placeholder : undefined}
         placeholderTextColor={palette.secondary}
         keyboardType="number-pad"
+        inputAccessoryViewID={doneBar}
         accessibilityLabel={label}
         maxFontSizeMultiplier={MAX_SCALE}
         style={[styles.input, { color: palette.text }]}
@@ -123,6 +143,7 @@ export function MinutesField({ value, onChange, testID }: { value: string; onCha
         placeholder="0"
         placeholderTextColor={palette.secondary}
         keyboardType="number-pad"
+        inputAccessoryViewID={doneBar}
         accessibilityLabel="Minutes"
         maxFontSizeMultiplier={MAX_SCALE}
         style={[styles.input, { color: palette.text }]}
@@ -322,5 +343,6 @@ const styles = StyleSheet.create({
   choiceDot: { width: 7, height: 7, borderRadius: 3.5 },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: 14 },
   info: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 18 },
+  doneBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   infoIcon: { marginTop: 1 },
 });
