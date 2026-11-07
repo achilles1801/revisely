@@ -66,6 +66,11 @@ appId: com.revisionbuddy.app
 - tapOn: "Back"
 - tapOn:
     id: open-activity
+# Until the calendar has loaded: a new account's first reads can wait behind its first writes.
+- extendedWaitUntil:
+    visible:
+      id: heat-2026-11-03
+    timeout: 20000
 - tapOn:
     id: heat-2026-11-03
 - runFlow:
