@@ -51,7 +51,18 @@ appId: com.revisionbuddy.app
       NAME: a3-search-day${SUFFIX}
 - tapOn:
     id: revo-add-search-clear
-- hideKeyboard
+# The keyboard away: hideKeyboard on Android; on iOS the keyboard's Search key (Maestro's
+# hideKeyboard there taps the list and ticked a surah).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter
 
 # a4: Days, October: Tue 20 added, Tue 27 previewed.
 - tapOn:
@@ -86,7 +97,18 @@ appId: com.revisionbuddy.app
     id: revo-add-surah-59
 - tapOn:
     id: revo-add-search-clear
-- hideKeyboard
+# The keyboard away: hideKeyboard on Android; on iOS the keyboard's Search key (Maestro's
+# hideKeyboard there taps the list and ticked a surah).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter
 # Juz opens on the account's own juz (28), a few rows above it in view.
 - tapOn:
     id: pill-juz
@@ -131,7 +153,19 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-input
 - inputText: "Should I revise Al-Hashr now or later?"
-- hideKeyboard
+# The keyboard away: hideKeyboard on Android; on iOS a tap on the greeting, which is no control
+# (the composer's return key would send the question).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: revo-greeting
 - runFlow:
     file: shot.yaml
     env:
@@ -141,7 +175,19 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-input
 - eraseText: 60
-- hideKeyboard
+# The keyboard away: hideKeyboard on Android; on iOS a tap on the greeting, which is no control
+# (the composer's return key would send the question).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: revo-greeting
 - repeat:
     while:
       visible:

@@ -238,7 +238,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
       ) : null}
 
       {q.trim() ? (
-        <ScrollView style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" testID="revo-add-results">
+        <ScrollView style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="revo-add-results">
           {results.length === 0 ? (
             <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="revo-add-empty">
               Nothing found. Try a surah, “Juz 14”, “Tuesday” or “p. 288”.
@@ -280,6 +280,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
               renderItem={({ item, index }) => surahRow(item, index === SURAHS.length - 1)}
               initialNumToRender={10}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               testID="revo-add-surahs"
             />
           ) : tab === 'juz' ? (
@@ -289,6 +290,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
               style={styles.fill}
               contentContainerStyle={styles.list}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               onLayout={scrollToJuz}
               onContentSizeChange={scrollToJuz}
               onScrollBeginDrag={() => {
@@ -313,7 +315,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
               ))}
             </ScrollView>
           ) : prepared ? (
-            <ScrollView style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+            <ScrollView style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
               {tab === 'days' ? (
                 <RevoMonth prepared={prepared} extras={extras} today={today} chosen={days} canAdd={canAdd} onToggle={(d) => toggle({ kind: 'day', day: d })} />
               ) : (
