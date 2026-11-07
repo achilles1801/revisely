@@ -38,11 +38,12 @@ if (!from && !/^\d+$/.test(runId ?? '')) {
   process.exit(2);
 }
 
-const gh = (...a) => execFileSync('gh', [...a, ...(repo ? ['-R', repo] : [])], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+const gh = (a, quiet = false) =>
+  execFileSync('gh', [...a, ...(repo ? ['-R', repo] : [])], { encoding: 'utf8', stdio: ['ignore', 'pipe', quiet ? 'pipe' : 'inherit'] });
 
 let dir = from ? path.resolve(from) : null;
 if (runId) {
-  const run = JSON.parse(gh('run', 'view', runId, '--json', 'headBranch,headSha,status,conclusion,workflowName,url'));
+  const run = JSON.parse(gh(['run', 'view', runId, '--json', 'headBranch,headSha,status,conclusion,workflowName,url']));
   console.log(`Run ${runId} (${run.workflowName}) on ${run.headBranch} ${run.headSha.slice(0, 7)}: ${run.status} ${run.conclusion ?? ''}`);
   console.log(`  ${run.url}`);
   let branch = '';
@@ -55,7 +56,7 @@ if (runId) {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), `revisely-screens-${runId}-`));
   for (const p of platforms) {
     try {
-      gh('run', 'download', runId, '-p', `e2e-${p}-screens-*`, '-D', path.join(dir, p));
+      gh(['run', 'download', runId, '-p', `e2e-${p}-screens-*`, '-D', path.join(dir, p)], true);
     } catch {
       console.log(`  No ${p} screenshots in this run.`);
     }
