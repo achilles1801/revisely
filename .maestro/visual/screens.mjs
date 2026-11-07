@@ -78,20 +78,12 @@ export const SCREEN_MASKS = {
   }),
   '08-home-kathmandu': merge(revoButton),
   // 11-surah-names: Home done after a session, alone and under today's menu and Jump to, in light
-  // and dark. iOS has no prayer line here (02-home-done's layout); Android shows one (04's).
+  // and dark: 02-home-done's layout. It runs in the first job, where no flow before it has given the
+  // Android emulator a location (04 does, in the second), so Home has no prayer line.
   ...Object.fromEntries(
     ['11-home', '11-today-menu', '11-jump-juz', '11-jump-surah']
       .flatMap((n) => [n, `${n}-dark`])
-      .map((n) => [
-        n,
-        merge(revoButton, {
-          ios: sessionMinutes(1272, 0).ios,
-          android: [
-            ...sessionMinutes(0, 1186).android,
-            { x: 800, y: 279, w: 205, h: 53, why: 'prayer countdown' },
-          ],
-        }),
-      ]),
+      .map((n) => [n, merge(revoButton, sessionMinutes(1272, 1081))]),
   ),
   // All activity: the session's row, its minutes (Android; iOS once its run is in).
   ...Object.fromEntries(
