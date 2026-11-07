@@ -7,7 +7,8 @@
 // "activity"): a flow can't put files on the phone.
 //
 // What it writes:
-//   - the account: previewTester, 20 pages a day, the Fajr boundary on at Chicago, recording backup off;
+//   - the account: previewTester, 20 pages a day, the Fajr boundary on at Chicago, recording backup off,
+//     Smart Tracking on (Weak spots and its "See all pages by strength" need the ratings, ACT-12);
 //   - 305 memorized pages, half the Quran: Juz 1–6, 21–28 and 30, and p. 562 (memorized on 3 November:
 //     Juz 29 is being learned). Rated weak: 548–549 and 40–41; moderate: 544, 551, 553, 559 (d1);
 //   - a revision item and its session for every day revised since 9 September: Juz 4 last on 23
@@ -94,6 +95,8 @@ function pad(n) {
 // ── The account ─────────────────────────────────────────────────────────────
 merge('users/' + uid, {
   previewTester: true,
+  smartTrackingEnabled: true,
+  hasSeenSmartTrackingPreview: true,
   dailyPageCapacity: 20,
   fajrBoundaryEnabled: true,
   locationCoords: { latitude: 41.8781, longitude: -87.6298 },

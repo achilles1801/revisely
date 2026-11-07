@@ -9,7 +9,7 @@ export function revoAvailable(user: Pick<User, 'previewTester'> | null | undefin
 }
 
 /** The main screens the button shows on (never the reader, a session or an editor). */
-export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'ReadIndex', 'Insights']);
+export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength', 'ReadIndex']);
 
 /**
  * When Revo is back after the day's questions: the next revision day's start. "after Fajr, at

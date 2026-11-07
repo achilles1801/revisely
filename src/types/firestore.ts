@@ -129,7 +129,7 @@ export interface FirestoreUser {
   scheduleMode?: 'pages' | 'juz';
   /** How many juz to revise per day (only used when scheduleMode === 'juz') */
   dailyJuzCount?: number;
-  /** Whether Smart Tracking (page ratings + Insights tab) is enabled */
+  /** Whether Smart Tracking (page ratings, and Insights: the tab, or Activity's Weak spots) is enabled */
   smartTrackingEnabled: boolean;
   /** Whether the user has finished (or dismissed) the Smart Tracking preview tour */
   hasSeenSmartTrackingPreview: boolean;
