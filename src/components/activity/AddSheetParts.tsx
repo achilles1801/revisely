@@ -98,7 +98,7 @@ export function PageRangeFields({
   placeholders?: boolean;
   testIDs: { from: string; to: string };
 }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const box = (value: string, set: (v: string) => void, placeholder: string, label: string, testID: string) => (
     <View style={[styles.field, styles.flex, { backgroundColor: palette.bubble }]}>
       <Text style={[styles.prefix, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
@@ -111,6 +111,7 @@ export function PageRangeFields({
         placeholder={placeholders ? placeholder : undefined}
         placeholderTextColor={palette.secondary}
         keyboardType="number-pad"
+        keyboardAppearance={isDark ? 'dark' : 'light'}
         accessibilityLabel={label}
         maxFontSizeMultiplier={MAX_SCALE}
         style={[styles.input, { color: palette.text }]}
@@ -128,7 +129,7 @@ export function PageRangeFields({
 
 /** The minutes, with "min" on the right. */
 export function MinutesField({ value, onChange, testID }: { value: string; onChange: (v: string) => void; testID: string }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   return (
     <View style={[styles.field, { backgroundColor: palette.bubble }]}>
       <TextInput
@@ -138,6 +139,7 @@ export function MinutesField({ value, onChange, testID }: { value: string; onCha
         placeholder="0"
         placeholderTextColor={palette.secondary}
         keyboardType="number-pad"
+        keyboardAppearance={isDark ? 'dark' : 'light'}
         accessibilityLabel="Minutes"
         maxFontSizeMultiplier={MAX_SCALE}
         style={[styles.input, { color: palette.text }]}
