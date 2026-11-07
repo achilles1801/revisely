@@ -28,9 +28,9 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
     covers: [],
-    routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings', 'Insights'],
+    routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
-      '- The tab bar has Home and Read (swipe sideways between them). With Smart Tracking on there is a third tab, Insights.',
+      '- The tab bar has Home and Read (swipe sideways between them). Testers have no Insights tab: Insights is in Activity.',
       '- Home’s top bar, on the right: a compass (the Prayer sheet: prayer times and the Qibla), a pulse icon (Activity) and a gear (Settings). A running timer shows on the left.',
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila, p. 542 ›") and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
@@ -150,12 +150,13 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Insights and page strength',
-    covers: ['ACT-4', 'ACT-8'],
-    routes: ['Activity', 'Insights'],
+    covers: ['ACT-4', 'ACT-8', 'ACT-12'],
+    routes: ['Activity', 'PagesByStrength'],
     text: lines(
       '- Testers: Activity → “Insights”. “Coverage”: a tile per juz revised in the last “7 days” or “30 days”, the share of memorized pages, and the juz “untouched the longest” with “Plan it”. “Consistency”: days with a revision or a read, of the last 7 and in the month, and the minutes by hour. “Weak spots”: pages weak now or skipped twice in 30 days, with “Revise … first tomorrow” and “Ask” (Revo). “Memorization”: pages memorized each month. “Pace”: minutes per page, shown from ten timed items.',
       '- Strength comes from ratings: 1–2 weak, 3 moderate, 4–5 strong (an unrated revised page counts as strong). Rating needs “Smart Tracking” (Settings → Revision), then ⋯ → “Rate page strength” in a session.',
-      '- With Smart Tracking on, the Insights tab in the tab bar shows Strength, “Focus” (the weakest and most overdue pages to revise first) and “Browse” (weakest first, filtered by juz or strength).',
+      '- Testers: the separate Insights tab (Strength, Focus, Browse) is gone. At the foot of Weak spots, “See all pages by strength” opens “Pages by strength”: every revised page, weakest first, by “Pages”, “Surahs” or “Juz”, filtered by juz or strength.',
+      '- Smart Tracking off (testers): Weak spots and that link are hidden, and a line in their place under Insights, “Turn on Smart Tracking to see your weak spots”, turns it on (Settings → Revision, at its switch).',
     ),
   },
   {

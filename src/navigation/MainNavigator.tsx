@@ -19,6 +19,8 @@ import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
+import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
+import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
@@ -28,7 +30,7 @@ import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
 import { getRecitation } from '../lib/recitation';
 import { openReaderAt } from './openReader';
 import { createPagerTabNavigator } from './PagerTabs';
-import { insightsTab, swipeableTabCount } from './tabPages';
+import { insightsTab, mainTabRoutes, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 import type { JournalKind } from '../types';
@@ -39,6 +41,7 @@ export type MainTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList> | undefined;
   // Home opens the reader directly for the Friday Al-Kahf card.
   Read: NavigatorScreenParams<ReadStackParamList> | undefined;
+  // Only for accounts whose Insights aren't in Activity (navigation/tabPages).
   Insights: undefined;
 };
 
@@ -65,6 +68,8 @@ export type HomeStackParamList = {
   ListenBack: { recordingId: string; fromMs?: number };
   // Everything done, searchable (new design's "See all"); kind preselects a filter.
   ActivityAll: { kind?: ActivityKind } | undefined;
+  // Every revised page by strength (the Insights tab's Browse), from Activity's Weak spots.
+  PagesByStrength: undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
   JournalEntry: { date?: string; kind?: JournalKind } | undefined;
@@ -117,6 +122,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
+      <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
     </HomeStack.Navigator>
   );
@@ -155,8 +161,14 @@ export function MainNavigator() {
   const { user } = useApp();
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const hasSeenPreview = user?.hasSeenSmartTrackingPreview ?? false;
+  // Accounts on the new Activity have Insights there: the tab bar is Home and Read (ACT-12).
+  const insightsInActivity = activityBlocksEnabled(user);
 
-  const { shown: showInsightsTab, opensPreview: glowInsightsTab } = insightsTab(smartTrackingEnabled, hasSeenPreview);
+  const { shown: showInsightsTab, opensPreview: glowInsightsTab } = insightsTab(
+    smartTrackingEnabled,
+    hasSeenPreview,
+    insightsInActivity,
+  );
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const openPreview = useCallback(() => setPreviewOpen(true), []);
@@ -187,14 +199,16 @@ export function MainNavigator() {
               </>
             );
           }}
-          swipeableCount={swipeableTabCount(smartTrackingEnabled)}
+          swipeableCount={swipeableTabCount(smartTrackingEnabled, insightsInActivity)}
           // Before Smart Tracking is set up, Insights is in the bar but not a
           // page: a swipe past Read opens its preview, as a tap on it does.
           onSwipePastEnd={glowInsightsTab ? openPreview : undefined}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />
-          <Tab.Screen name="Insights" component={AlgorithmScreen} />
+          {mainTabRoutes(insightsInActivity).includes('Insights') ? (
+            <Tab.Screen name="Insights" component={AlgorithmScreen} />
+          ) : null}
         </Tab.Navigator>
       </View>
       <SmartTrackingPreviewScreen

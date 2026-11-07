@@ -1,0 +1,143 @@
+# Insights moved into Activity (ACT-12): a tester's tab bar is Home and Read, and Weak spots' "See all
+# pages by strength" opens every revised page by strength (the old tab's Browse). With Smart Tracking
+# off, one line in Weak spots' place opens Settings at its switch. Screenshots named
+# tabs-merge-<screen>-${THEME}. Run by 09-activity-light.yaml and 09-activity-dark.yaml after
+# activity-screens.yaml, which leaves Activity on Insights (seed-activity.js turns Smart Tracking on).
+appId: com.revisionbuddy.app
+---
+- scrollUntilVisible:
+    element:
+      id: insights-see-all-pages
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-weak-spots-${THEME}
+- tapOn:
+    id: insights-see-all-pages
+- extendedWaitUntil:
+    visible:
+      id: browse-pages
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-browse-${THEME}
+# Surahs, as the old tab's Browse had them.
+- tapOn:
+    id: pill-surahs
+- extendedWaitUntil:
+    visible:
+      id: browse-surahs
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-browse-surahs-${THEME}
+# Juz, at the end of the list: the last row clears Revo's button (useRevoFootprint).
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible:
+      id: browse-juz
+    timeout: 10000
+- repeat:
+    times: 4
+    commands:
+      - swipe:
+          start: 50%, 75%
+          end: 50%, 25%
+          duration: 400
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-browse-juz-end-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 10000
+- tapOn:
+    id: back
+# Home: the tab bar is Home and Read; no Insights tab.
+- extendedWaitUntil:
+    visible:
+      id: tab-Read
+    timeout: 10000
+- assertVisible:
+    id: tab-Home
+- assertNotVisible:
+    id: tab-Insights
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-tabs-${THEME}
+# Smart Tracking off (Settings → Revision): Insights shows the line that turns it on, in Weak spots' place.
+- tapOn:
+    id: open-settings
+# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap.
+- scrollUntilVisible:
+    element:
+      id: smart-tracking-switch
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: smart-tracking-switch
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 10000
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 15000
+- tapOn:
+    id: pill-insights
+- scrollUntilVisible:
+    element:
+      id: insights-smart-tracking
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertNotVisible:
+    id: insights-see-all-pages
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-invite-${THEME}
+# The line opens Settings scrolled to Revision, its switch in view.
+- tapOn:
+    id: insights-smart-tracking
+- extendedWaitUntil:
+    visible:
+      id: smart-tracking-switch
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-invite-settings-${THEME}
+# On again: back in Insights (where the line was), Weak spots and, at its foot, its "See all" are there.
+- tapOn:
+    id: smart-tracking-switch
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: insights-see-all-pages
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertNotVisible:
+    id: insights-smart-tracking
