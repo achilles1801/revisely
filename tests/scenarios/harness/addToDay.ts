@@ -68,11 +68,6 @@ export class AddToDay {
     await this.type('add-note-text', text);
     await this.add('note');
   }
-
-  /** The day's text, flattened (blocks, figures, notes). */
-  text(): string {
-    return JSON.stringify(this.app.screen.toJSON());
-  }
 }
 
 /** Back from the pushed screen (the day) to the one under it. */

@@ -20,6 +20,7 @@ import { AddRevisedSheet } from './AddRevisedSheet';
 import { AddMemorizedSheet } from './AddMemorizedSheet';
 import { AddNoteSheet } from './AddNoteSheet';
 import { Suggestion } from './AddSheetParts';
+import { revisedOnDay, useDayItems } from './useDayItems';
 
 type Log = { date: string; pagesRevised: number[]; pagesSkipped: number[]; assignedPages?: number[] };
 
@@ -50,9 +51,15 @@ export function AddToDaySheet({
 
   const memorized = useMemo(() => new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
   const log = logs.find((l) => l.date === day);
-  const missed = log ? missedFromSession(log, memorized) : [];
-  const assigned = log ? (log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages.length : log.pagesRevised.length + log.pagesSkipped.length) : 0;
-  const fraction = log && assigned > 0 ? log.pagesRevised.length / assigned : 0;
+  // The day's items while the menu is open: pages already added by hand are revised already, so the
+  // session's suggestion leaves them out (offered again, a second Add counted them twice).
+  const alreadyRevised = revisedOnDay(useDayItems(day, visible), day);
+  const missed = log ? missedFromSession(log, memorized, alreadyRevised) : [];
+  const assignedPages = log ? (log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages : [...log.pagesRevised, ...log.pagesSkipped]) : [];
+  const assigned = new Set(assignedPages).size;
+  const doneSet = new Set([...(log?.pagesRevised ?? []), ...alreadyRevised]);
+  const doneCount = new Set(assignedPages.filter((p) => doneSet.has(p))).size;
+  const fraction = assigned > 0 ? doneCount / assigned : 0;
 
   // The sheets open once this one has gone (one modal at a time).
   const then = (next: 'revised' | 'memorized' | 'note') => {
@@ -77,7 +84,7 @@ export function AddToDaySheet({
   const rows: { key: string; mark: React.ReactNode; label: string; subtitle: string; onPress: () => void }[] = [
     {
       key: 'revised',
-      mark: <RevisedMark fraction={fraction} done={log != null && assigned > 0 && log.pagesRevised.length >= assigned} />,
+      mark: <RevisedMark fraction={fraction} done={assigned > 0 && doneCount >= assigned} />,
       label: 'Revised',
       subtitle: 'Pages you revised outside a session',
       onPress: () => then('revised'),

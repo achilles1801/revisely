@@ -16,6 +16,7 @@ import { describePassage } from '../../lib/passages';
 import { typeV2 } from '../../theme/v2';
 import type { WeaknessRating } from '../../types/firestore';
 import { RevisedMark } from './BlockMark';
+import { revisedOnDay, useDayItems } from './useDayItems';
 import { FormLabel, InfoLine, DismissArea, MinutesField, PageRangeFields, Segmented, StrengthChoice, SuggestionLine } from './AddSheetParts';
 
 type Log = { date: string; pagesRevised: number[]; pagesSkipped: number[]; assignedPages?: number[] };
@@ -51,13 +52,19 @@ export function AddRevisedSheet({
   // suggestion). Using it fills From and To with its first and last page; Undo clears them.
   const memorized = useMemo(() => new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
   const log = logs.find((l) => l.date === day);
-  const missed = log ? missedFromSession(log, memorized) : [];
-  const assigned = log ? (log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages : [...log.pagesRevised, ...log.pagesSkipped]) : [];
-  const done = new Set(log?.pagesRevised ?? []);
-  const [usedSession, setUsedSession] = useState(false);
+  // Pages already added to the day by hand are revised already: not offered again, and counted in
+  // what the day has.
+  const alreadyRevised = revisedOnDay(useDayItems(day, visible), day);
+  const missed = log ? missedFromSession(log, memorized, alreadyRevised) : [];
+  const assigned = log ? [...new Set(log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages : [...log.pagesRevised, ...log.pagesSkipped])] : [];
+  const assignedHere = new Set(assigned);
+  const done = new Set([...(log?.pagesRevised ?? []), ...alreadyRevised].filter((p) => assignedHere.has(p)));
+  // The session's pages, as used: exactly those, not every page from the first to the last (which
+  // added the pages between that it had revised, Nov 2026). Typing a page goes back to the range.
+  const [usedSession, setUsedSession] = useState<number[] | null>(null);
 
   const range = parsePageRange(from, to);
-  const pageNumbers = range ? pagesInRange(range) : [];
+  const pageNumbers = usedSession ?? (range ? pagesInRange(range) : []);
   const minutesValue = minutes.trim() === '' ? null : Number(minutes);
   const minutesOk = minutesValue === null || (Number.isInteger(minutesValue) && minutesValue >= 0);
   const canAdd = range != null && minutesOk && !saving && !!user;
@@ -72,19 +79,19 @@ export function AddRevisedSheet({
       ? `Adding ${pageNumbers.length === 1 ? 'it' : 'these'} makes ${dayName} ${after} of ${assigned.length}.`
       : `Adds ${pagesWord(pageNumbers.length)} to ${dayName === 'today' ? 'today’s' : `${dayName}’s`} Revised block.`;
 
-  const clearSession = () => setUsedSession(false);
+  const clearSession = () => setUsedSession(null);
   const useSession = () => {
-    if (missed.length === 0) return;
     if (usedSession) {
       setFrom('');
       setTo('');
-      setUsedSession(false);
+      setUsedSession(null);
       return;
     }
+    if (missed.length === 0) return;
     setWhat('pages');
     setFrom(String(missed[0]));
     setTo(String(missed[missed.length - 1]));
-    setUsedSession(true);
+    setUsedSession(missed);
   };
 
   const handleAdd = async () => {
@@ -103,7 +110,7 @@ export function AddRevisedSheet({
       setTo('');
       setMinutes('');
       setStrength(null);
-      setUsedSession(false);
+      setUsedSession(null);
       setWhat('pages');
       onClose();
     } finally {
@@ -131,11 +138,11 @@ export function AddRevisedSheet({
     >
       <DismissArea>
       <View style={styles.body}>
-        {missed.length > 0 && (
+        {(missed.length > 0 || usedSession) && (
           <View style={styles.top}>
             <SuggestionLine
               label="From your session:"
-              text={`${describePassage(missed, { form: 'short' })}, which it skipped`}
+              text={`${describePassage(usedSession ?? missed, { form: 'short' })}, which it skipped`}
               action={usedSession ? 'Undo' : 'Use'}
               onPress={useSession}
               accessibilityLabel={usedSession ? 'Undo the session pages' : 'Use the pages the session skipped'}

@@ -3,10 +3,16 @@
 
 /**
  * "From your session" (default): what the session missed, i.e. its skipped pages not
- * revised, among the memorized ones. The session's revised pages are already there.
+ * revised, among the memorized ones. The session's revised pages are already there, and so are
+ * pages already added to the day by hand (`alreadyRevised`): offered again, a second tap added them
+ * twice ("22 of 20", Nov 2026).
  */
-export function missedFromSession(log: { pagesRevised: number[]; pagesSkipped: number[] }, memorized: Set<number>): number[] {
-  const revised = new Set(log.pagesRevised);
+export function missedFromSession(
+  log: { pagesRevised: number[]; pagesSkipped: number[] },
+  memorized: Set<number>,
+  alreadyRevised: Iterable<number> = [],
+): number[] {
+  const revised = new Set([...log.pagesRevised, ...alreadyRevised]);
   return [...new Set(log.pagesSkipped)].filter((p) => !revised.has(p) && memorized.has(p)).sort((a, b) => a - b);
 }
 
