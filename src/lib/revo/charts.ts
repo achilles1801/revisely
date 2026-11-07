@@ -2,6 +2,7 @@
 // draws it from the account's own data, so no figure in a chart is ever made up.
 
 import type { RevisionLog } from '../../types';
+import { reviewedOn } from '../aheadCredit';
 import { shiftDay } from '../journal';
 
 export type RatingBand = 'weak' | 'moderate' | 'strong';
@@ -31,11 +32,11 @@ export function pageRatingsData(
   };
 }
 
-/** Pages revised on each of the `days` up to `end`, oldest first. */
+/** Pages revised on each of the `days` up to `end`, oldest first: counted as Revo's week counts them. */
 export function dailyPagesData(logs: readonly RevisionLog[], end: string, days: 7 | 30): { day: string; pages: number }[] {
   return Array.from({ length: days }, (_, i) => {
     const day = shiftDay(end, i - (days - 1));
-    return { day, pages: logs.filter((l) => l.date === day).reduce((n, l) => n + l.pagesRevised.length, 0) };
+    return { day, pages: reviewedOn(logs, day).size };
   });
 }
 

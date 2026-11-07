@@ -5,7 +5,7 @@
  * length) and are rounded; page numbers, ratings and counts must be whole.
  * Messages here never say "date": the app reads that word as a clock problem.
  */
-import { REVO_INSIGHTS, REVO_TOTALS, RevoAttachment, RevoContext, RevoInsight, RevoTotals } from './types';
+import { REVO_INSIGHTS, REVO_PASSAGE_KEYS, REVO_TOTALS, RevoAttachment, RevoContext, RevoInsight, RevoTotals } from './types';
 
 export class RevoInvalid extends Error {}
 
@@ -58,6 +58,20 @@ function list<T>(v: unknown, max: number, path: string, item: (x: unknown, p: st
   return v.map((x, i) => item(x, `${path}[${i}]`));
 }
 
+const MAX_PASSAGE = 160;
+const MAX_PAGE_NAME = 100;
+const MAX_PAGE_NAMES = 70;
+/** Surah names, ayah and juz numbers and joining words: letters (Latin, with transliteration marks), digits, spaces and a little punctuation. */
+const PASSAGE_RE = /^[\p{L}\p{M}0-9 '’ʿʾ.,·–—\-‑\u00A0]+$/u;
+
+/** A part of the Qur'an in words ("Al-Hashr, ayahs 1–10 · Juz 28"): one short line of plain text. */
+function passageText(v: unknown, max: number, path: string): string {
+  if (typeof v !== 'string') fail(path);
+  const t = v.trim();
+  if (t.length === 0 || t.length > max || !PASSAGE_RE.test(t)) fail(path);
+  return t;
+}
+
 function pages(v: unknown, max: number, path: string): number[] {
   return list(v, max, path, (x, p) => int(x, 1, MAX_PAGE, p));
 }
@@ -100,7 +114,9 @@ export function validateChatId(v: unknown): string | null {
 
 export function validateContext(v: unknown): RevoContext {
   const c = obj(v, 'context');
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `streak`, `today.carriedPages`, `today.doneEarlier`, `today.otherPages`, `week[].planned` and
+  // `week[].done` come from apps after Nov 7 2026 (lib/todaySnapshot); older apps send without them.
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'passages', 'pageNames', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -108,11 +124,16 @@ export function validateContext(v: unknown): RevoContext {
   for (const k of REVO_TOTALS) totals[k] = num(t[k], 0, MAX_COUNT, `context.totals.${k}`);
 
   const d = obj(c.today, 'context.today');
-  keys(d, ['plannedPages', 'revisedPages', 'minutes', 'memorizedPages', 'nextPages', 'weakNext', 'done'], 'context.today');
+  const TODAY_REQUIRED = ['plannedPages', 'revisedPages', 'minutes', 'memorizedPages', 'nextPages', 'weakNext', 'done'];
+  keys(d, [...TODAY_REQUIRED, 'carriedPages', 'doneEarlier', 'otherPages'], 'context.today', TODAY_REQUIRED);
   if (typeof d.done !== 'boolean') fail('context.today.done');
+  const optionalCount = (v: unknown, path: string) => (v === undefined ? {} : { [path.split('.').pop()!]: int(v, 0, MAX_COUNT, path) });
   const today = {
     plannedPages: int(d.plannedPages, 0, MAX_COUNT, 'context.today.plannedPages'),
     revisedPages: int(d.revisedPages, 0, MAX_COUNT, 'context.today.revisedPages'),
+    ...optionalCount(d.carriedPages, 'context.today.carriedPages'),
+    ...optionalCount(d.doneEarlier, 'context.today.doneEarlier'),
+    ...optionalCount(d.otherPages, 'context.today.otherPages'),
     minutes: rounded(d.minutes, MAX_COUNT, 'context.today.minutes'),
     memorizedPages: int(d.memorizedPages, 0, MAX_COUNT, 'context.today.memorizedPages'),
     nextPages: pages(d.nextPages, 20, 'context.today.nextPages'),
@@ -122,14 +143,68 @@ export function validateContext(v: unknown): RevoContext {
 
   const week = list(c.week, 7, 'context.week', (x, p) => {
     const w = obj(x, p);
-    keys(w, ['day', 'pages'], p);
-    return { day: day(w.day, `${p}.day`), pages: int(w.pages, 0, MAX_COUNT, `${p}.pages`) };
+    keys(w, ['day', 'pages', 'planned', 'done'], p, ['day', 'pages']);
+    if (w.done !== undefined && typeof w.done !== 'boolean') fail(`${p}.done`);
+    return {
+      day: day(w.day, `${p}.day`),
+      pages: int(w.pages, 0, MAX_COUNT, `${p}.pages`),
+      ...(w.planned === undefined ? {} : { planned: int(w.planned, 0, MAX_COUNT, `${p}.planned`) }),
+      ...(w.done === undefined ? {} : { done: w.done as boolean }),
+    };
   });
+
+  let streak: RevoContext['streak'];
+  if (c.streak !== undefined) {
+    const s = obj(c.streak, 'context.streak');
+    keys(s, ['days', 'atRisk'], 'context.streak');
+    let atRisk: NonNullable<RevoContext['streak']>['atRisk'] = null;
+    if (s.atRisk !== null) {
+      const r = obj(s.atRisk, 'context.streak.atRisk');
+      keys(r, ['previous', 'yesterdayPlanned', 'yesterdayDone'], 'context.streak.atRisk');
+      atRisk = {
+        previous: int(r.previous, 0, MAX_COUNT, 'context.streak.atRisk.previous'),
+        yesterdayPlanned: int(r.yesterdayPlanned, 0, MAX_COUNT, 'context.streak.atRisk.yesterdayPlanned'),
+        yesterdayDone: int(r.yesterdayDone, 0, MAX_COUNT, 'context.streak.atRisk.yesterdayDone'),
+      };
+    }
+    streak = { days: int(s.days, 0, MAX_COUNT, 'context.streak.days'), atRisk };
+  }
 
   const lt = c.localTime ?? null;
   if (lt !== null && (typeof lt !== 'string' || !TIME_RE.test(lt))) fail('context.localTime');
 
-  return { totals, today, weakPages: pages(c.weakPages, 30, 'context.weakPages'), week, localTime: lt };
+  const weakPages = pages(c.weakPages, 30, 'context.weakPages');
+
+  // Names of parts of the Qur'an, as the app words them: short plain text, never instructions.
+  let passages: RevoContext['passages'];
+  if (c.passages !== undefined) {
+    const o = obj(c.passages, 'context.passages');
+    keys(o, REVO_PASSAGE_KEYS, 'context.passages', []);
+    passages = {};
+    for (const k of REVO_PASSAGE_KEYS) if (o[k] !== undefined) passages[k] = passageText(o[k], MAX_PASSAGE, `context.passages.${k}`);
+  }
+  let pageNames: RevoContext['pageNames'];
+  if (c.pageNames !== undefined) {
+    const o = obj(c.pageNames, 'context.pageNames');
+    const named = new Set([...today.nextPages, ...today.weakNext, ...weakPages].map(String));
+    if (Object.keys(o).length > MAX_PAGE_NAMES) fail('context.pageNames');
+    pageNames = {};
+    for (const [k, v] of Object.entries(o)) {
+      if (!named.has(k)) fail(`context.pageNames.${k}`);
+      pageNames[k] = passageText(v, MAX_PAGE_NAME, `context.pageNames.${k}`);
+    }
+  }
+
+  return {
+    totals,
+    today,
+    weakPages,
+    week,
+    ...(streak ? { streak } : {}),
+    ...(passages ? { passages } : {}),
+    ...(pageNames ? { pageNames } : {}),
+    localTime: lt,
+  };
 }
 
 const ATTACH_KEYS: Record<RevoAttachment['kind'], readonly string[]> = {

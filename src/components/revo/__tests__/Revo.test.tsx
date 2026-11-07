@@ -34,9 +34,10 @@ const ctx: RevoContext = {
     pagesPerDay30: 17.2,
     plannedPerDay: 20,
   },
-  today: { plannedPages: 20, revisedPages: 6, minutes: 31, memorizedPages: 0, nextPages: [548, 549, 550], weakNext: [548, 549], done: false },
+  today: { plannedPages: 20, revisedPages: 6, carriedPages: 0, doneEarlier: 0, otherPages: 0, minutes: 31, memorizedPages: 0, nextPages: [548, 549, 550], weakNext: [548, 549], done: false },
   weakPages: [548, 549],
-  week: [{ day: DAY, pages: 6 }],
+  week: [{ day: DAY, pages: 6, planned: 20, done: false }],
+  streak: { days: 12, atRisk: null },
   localTime: '21:41',
 };
 const mockSaveUser = jest.fn(async () => undefined);

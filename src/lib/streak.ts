@@ -127,8 +127,23 @@ function runFrom(set: ReadonlySet<string>, day: string): number {
   return n;
 }
 
+/**
+ * A streak reading with the days behind it: which days are done (every scheduled page credited)
+ * and what each day had scheduled. Revo's week reads these, so it says what the streak counts.
+ */
+export interface StreakDetail {
+  reading: StreakReading;
+  done: ReadonlySet<string>;
+  scheduled: (day: string) => readonly number[];
+}
+
 /** The streak reading from the revision logs: the logs' pages, ahead credits and each day's assignment. */
 export function streakReadingFromLogs(input: { user: User; pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string }): StreakReading {
+  return streakDetailFromLogs(input).reading;
+}
+
+/** streakReadingFromLogs, with the days behind it. */
+export function streakDetailFromLogs(input: { user: User; pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string }): StreakDetail {
   const memorized = input.pages.filter((p) => p.status === 'memorized');
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
   const scheduled = (day: string): readonly number[] => {
@@ -141,5 +156,5 @@ export function streakReadingFromLogs(input: { user: User; pages: readonly UserP
   const done = completedDays(credited, scheduled);
   // The logs alone cannot say when a page was revised. Until the items carry a time, a day counts
   // as on time when it is done (the grace rule then matches the done-day rule).
-  return streakReading({ done, onTime: done, scheduled, credited, today: input.today });
+  return { reading: streakReading({ done, onTime: done, scheduled, credited, today: input.today }), done, scheduled };
 }

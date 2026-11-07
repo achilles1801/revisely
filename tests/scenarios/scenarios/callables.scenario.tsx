@@ -322,9 +322,10 @@ function revoContext(day: string) {
       pagesPerDay30: 3.6,
       plannedPerDay: 5,
     },
-    today: { plannedPages: 5, revisedPages: 2, minutes: 12, memorizedPages: 0, nextPages: [584, 585, 586], weakNext: [585], done: false },
+    today: { plannedPages: 5, revisedPages: 2, carriedPages: 0, doneEarlier: 0, otherPages: 0, minutes: 12, memorizedPages: 0, nextPages: [584, 585, 586], weakNext: [585], done: false },
     weakPages: [585],
-    week: [{ day, pages: 2 }],
+    week: [{ day, pages: 2, planned: 5, done: false }],
+    streak: { days: 2, atRisk: null },
     localTime: '20:10',
   };
 }
@@ -449,7 +450,7 @@ it('[REVO-9] [REVO-10] [REVO-8] the Day in review once a day, skipped when cappe
   // Not counted among the day's questions.
   expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
   // Nothing done that day: no review.
-  const idle = { ...revoContext('2031-09-10'), today: { plannedPages: 5, revisedPages: 0, minutes: 0, memorizedPages: 0, nextPages: [582], weakNext: [], done: false } };
+  const idle = { ...revoContext('2031-09-10'), today: { plannedPages: 5, revisedPages: 0, carriedPages: 0, doneEarlier: 0, otherPages: 0, minutes: 0, memorizedPages: 0, nextPages: [582], weakNext: [], done: false } };
   setNow('2031-09-10 20:30');
   await app.act(async () => {
     review = await withAuthRetry(() => revo().dayInReview({ day: '2031-09-10', context: idle } as Parameters<ReturnType<typeof revo>['dayInReview']>[0]));

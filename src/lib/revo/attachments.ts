@@ -2,7 +2,9 @@
 // with the question it was added to. A note's text goes only when the user picks that note;
 // a recording goes as its length and pages, never the audio.
 
-import type { JournalNote, ReadingSession, RevisionLog, UserPage } from '../../types';
+import type { JournalNote, ReadingSession, RevisionLog, User, UserPage } from '../../types';
+import { reviewedOn } from '../aheadCredit';
+import { revisionDayOf } from '../fajrBoundary';
 import { getAllSurahs, getSurahForPage } from '../quranData';
 import type { RecordingMeta } from '../recordings';
 import { pagesLabel } from './greeting';
@@ -29,9 +31,12 @@ export function dayAttachment(input: {
   logs: readonly RevisionLog[];
   pages: readonly UserPage[];
   readings?: readonly ReadingSession[];
+  /** For the revision day each page was marked memorized on (DAY-2). */
+  user?: User | null;
 }): RevoAttachment {
   const logs = input.logs.filter((l) => l.date === input.day);
-  const revised = [...new Set(logs.flatMap((l) => l.pagesRevised))].slice(0, MAX_PAGES);
+  // Every page revised in the day's sessions, catch-up pages included, as Revo's week counts them.
+  const revised = [...reviewedOn(input.logs, input.day)].slice(0, MAX_PAGES);
   const ratings = new Map<number, number>();
   for (const l of logs) for (const w of l.weaknessUpdates) ratings.set(w.page, w.rating);
   return {
@@ -39,7 +44,10 @@ export function dayAttachment(input: {
     label: input.label,
     day: input.day,
     revisedPages: revised,
-    memorizedPages: input.pages.filter((p) => dayOf(p.dateMemorized) === input.day).map((p) => p.pageNumber).slice(0, MAX_PAGES),
+    memorizedPages: input.pages
+      .filter((p) => p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), input.user) === input.day)
+      .map((p) => p.pageNumber)
+      .slice(0, MAX_PAGES),
     readMinutes: Math.min(1440, Math.round((input.readings ?? []).filter((r) => r.date === input.day).reduce((n, r) => n + r.durationSeconds, 0) / 60)),
     minutes: Math.min(1440, logs.reduce((n, l) => n + (l.durationMinutes ?? 0), 0)),
     ratings: [...ratings].slice(0, MAX_PAGES).map(([page, rating]) => ({ page, rating: Math.max(1, Math.min(5, Math.round(rating))) })),

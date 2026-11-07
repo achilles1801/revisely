@@ -7,7 +7,7 @@ import { User, UserPage } from '../types';
 import { getPagesForDay } from './algorithm';
 import { getFajrTimeFor } from './fajrBoundary';
 import { ownPagesOf } from './carryOver';
-import { completedDays, streakReading, type StreakReading } from './streak';
+import { completedDays, streakReading, type StreakDetail, type StreakReading } from './streak';
 
 export interface HistoryItem {
   /** The item's id: a session's own day (`day`) or `day-ahead-<countsFor>`; a manual add's `manual-…`. */
@@ -38,6 +38,16 @@ export function streakReadingFromItems(input: {
   items: readonly HistoryItem[];
   today: string;
 }): StreakReading {
+  return streakDetailFromItems(input).reading;
+}
+
+/** streakReadingFromItems, with the days behind it (lib/streak's StreakDetail). */
+export function streakDetailFromItems(input: {
+  user: User;
+  pages: readonly UserPage[];
+  items: readonly HistoryItem[];
+  today: string;
+}): StreakDetail {
   const memorized = input.pages.filter((p) => p.status === 'memorized');
   const own = new Map<string, HistoryItem>();
   const credited = new Map<string, Set<number>>();
@@ -62,5 +72,5 @@ export function streakReadingFromItems(input: {
   };
   const done = completedDays(credited, scheduled);
   const early = completedDays(onTime, scheduled);
-  return streakReading({ done, onTime: early, scheduled, credited, today: input.today });
+  return { reading: streakReading({ done, onTime: early, scheduled, credited, today: input.today }), done, scheduled };
 }

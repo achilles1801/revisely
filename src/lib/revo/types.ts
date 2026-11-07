@@ -20,24 +20,47 @@ export const REVO_TOTALS = [
 ] as const;
 export type RevoTotals = Record<(typeof REVO_TOTALS)[number], number>;
 
-/** Sent with every question: totals and today's blocks, as numbers and page numbers. */
+/**
+ * Sent with every question: totals and today's blocks, as numbers and page numbers. Built from
+ * lib/todaySnapshot, the function Home's Today post is built from, so its numbers are Home's:
+ * week[today].pages = today.revisedPages - today.doneEarlier + today.otherPages, always.
+ */
 export interface RevoContext {
   totals: RevoTotals;
   today: {
+    /** Today's pages, carried pages included: Home's "20 pages". */
     plannedPages: number;
+    /** Of them, done: Home's "6 of 20" (pages done ahead on an earlier day included). */
     revisedPages: number;
+    /** Of today's pages, the ones carried in from earlier days ("4 from yesterday first"). */
+    carriedPages: number;
+    /** Of the done ones, those revised ahead on an earlier day (not today). */
+    doneEarlier: number;
+    /** Pages revised today that aren't today's: ahead for a later day, or no longer in today's plan. */
+    otherPages: number;
+    /** Minutes of today's revision sessions. */
     minutes: number;
+    /** Pages marked memorized on this revision day. */
     memorizedPages: number;
     /** Today's pages not revised yet, in order. */
     nextPages: number[];
     /** Of those, the ones rated weak (1–2). */
     weakNext: number[];
+    /** Home says Done: today's own pages are all done (carried ones count for their own days). */
     done: boolean;
   };
   /** Pages rated weak (1–2), the longest unrevised first. */
   weakPages: number[];
-  /** Pages revised on each of the last 7 revision days, oldest first. */
-  week: { day: string; pages: number }[];
+  /**
+   * The last 7 revision days, oldest first: the pages revised that day (in its sessions), the pages
+   * its plan had, and whether the day was done, as the streak counts it.
+   */
+  week: { day: string; pages: number; planned: number; done: boolean }[];
+  /**
+   * The streak as Home shows it. `atRisk`: yesterday was missed but the run before it can still be
+   * kept today by finishing yesterday's pages (SESS-6); Home shows `previous` dimmed.
+   */
+  streak: { days: number; atRisk: { previous: number; yesterdayPlanned: number; yesterdayDone: number } | null };
   localTime: string | null;
 }
 
