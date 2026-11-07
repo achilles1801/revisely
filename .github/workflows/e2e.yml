@@ -372,6 +372,7 @@ jobs:
           xcrun simctl install "$UDID" .maestro/build/Revisely.app
 
       - name: Run the flows
+        id: flows
         if: matrix.shard.flows != ''
         env:
           E2E_DEVICE: ${{ steps.sim.outputs.udid }}
@@ -379,6 +380,16 @@ jobs:
           FLOWS: ${{ matrix.shard.flows }}
         # $FLOWS is a glob, expanded here.
         run: bash .maestro/run.sh ios $FLOWS
+
+      # Each flow's attempts (run.sh's attempts.json: passed on the first attempt or
+      # not, and why not), from every run, for the weekly flake report (e2e-flakes.yml).
+      - name: Keep the attempts
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') && hashFiles('.maestro/build/results/ios/attempts.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-attempts-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .maestro/build/results/ios/attempts.json
+          retention-days: 14
 
       - name: Keep the results
         if: failure() || cancelled() || hashFiles('.maestro/build/results/**/attempt-failed') != ''
@@ -546,6 +557,7 @@ jobs:
       # The action runs each line of `script` on its own: one line. $E2E_FLOWS
       # (the job's flows) is a glob, expanded there.
       - name: Run the flows
+        id: flows
         if: matrix.shard.flows != ''
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -558,6 +570,16 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
           script: adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android $E2E_FLOWS
+
+      # Each flow's attempts (run.sh's attempts.json: passed on the first attempt or
+      # not, and why not), from every run, for the weekly flake report (e2e-flakes.yml).
+      - name: Keep the attempts
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') && hashFiles('.maestro/build/results/android/attempts.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-attempts-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .maestro/build/results/android/attempts.json
+          retention-days: 14
 
       - name: Keep the results
         if: failure() || cancelled() || hashFiles('.maestro/build/results/**/attempt-failed') != ''

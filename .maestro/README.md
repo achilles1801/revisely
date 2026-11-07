@@ -49,6 +49,24 @@ and each iOS job takes 21–39 minutes of flows.
 
 A flaky flow is fixed, not skipped. Each failed flow is run once more (`E2E_RETRIES`). A pass on that
 retry is a warning on the run, and the job keeps its results as for a failure.
+- **Flakes are counted.** A retry hides a flake (flow 02 needed its retry 13 times in 3 days before
+  PR #286 fixed it), so every job keeps each flow's attempts:
+  - `run.sh` writes a line per attempt to `attempts.tsv`, and at the end
+    `scripts/attempts.js` turns them, with Maestro's own report of each attempt (`report.xml`: why it
+    failed), into `results/<platform>/attempts.json`.
+  - The job keeps it as the artifact `e2e-<platform>-attempts-<job>-<run>-<attempt>` (14 days),
+    from every run, passing or not.
+  - **The weekly report** (`.github/workflows/e2e-flakes.yml`, `scripts/e2e/flakes.js`), Mondays
+    14:00 UTC and by hand: the last 7 days of those, as a comment on the issue
+    **"E2E flakes (weekly report)"** (label `e2e-flakes`). Per flow and platform: runs, passed first
+    time, passed on retry, failed both, and the first-attempt pass rate, worst first, with the
+    reasons of the first attempts that needed a retry.
+  - The rate is passed first time ÷ runs that passed: a run where both attempts failed is counted
+    apart, since most are a branch's own bug. The owner is mentioned (GitHub emails it) only when a
+    flow with at least 5 passing runs is under 95%.
+  - Runs of a fork's pull request are left out. A PR that changes the report prints it in its job
+    summary instead of commenting; so does a run by hand with `dry_run`. Like every scheduled
+    workflow it runs from `main`.
 - **Time limits:** `run.sh` stops a flow's attempt after 15 minutes and the warm-up after 6
   (`E2E_FLOW_LIMIT`, `E2E_WARMUP_LIMIT`). Maestro can hang for good: once its iOS driver answered
   500, its JVM never exited, and a job waited 55 minutes for it.
