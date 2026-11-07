@@ -31,8 +31,9 @@ MOCKS = os.path.expanduser("~/Documents/revisely-today-mocks/activity-redesign/p
 VERIFY = os.path.expanduser("~/Documents/revisely-today-mocks/activity-redesign/verify")
 
 # Capture name (without theme) → the mock it is compared with (gap audit: 1-overview, 2-day, 3-insights),
-# and which part of it: a mock taller than the screen (d1) is cut to the screen's height, its top for
-# the first capture and its bottom for the one scrolled to the end.
+# and which part of it: a mock taller than the screen (d1, d4) is cut to the screen's height, its top
+# for the first capture, its bottom for the one scrolled to the end, or a screen centred on a point
+# (pt down the mock) for one scrolled to an element in the middle.
 MOCK_FOR = {
     "09-overview-month": ("d3-calendar", None),
     "09-overview-week": (None, None),  # the mocks show the month only
@@ -41,7 +42,13 @@ MOCK_FOR = {
     "09-day-sunday": ("d2-day-light", None),
     "09-menu-revised": ("d10a-long-press", None),
     "09-add-menu": ("d5-add-menu", None),
-    "09-insights": ("d4-insights", None),
+    "09-add-revised": ("d6-add-revised", None),
+    "09-add-memorized": ("d7-add-memorized", None),
+    "09-add-note": ("d8-add-note", None),
+    "09-insights": ("d4-insights", "top"),
+    # The flow scrolls Revo's Ask (Weak spots' title row) to about 371pt down the screen; d4 has it 871pt down, so the crop is centred on 937.
+    "09-insights-weak": ("d4-insights", ("center", 937)),
+    "09-insights-end": ("d4-insights", "bottom"),
 }
 MARGIN = 24
 TITLE_H = 44
@@ -70,7 +77,15 @@ def board(capture_path, mock_path, title, out_path, part=None):
         # A tall mock, cut to the capture's shape (same width, so the same scale).
         tall = round(mock.width * cap.height / cap.width)
         if part and mock.height > tall:
-            mock = mock.crop((0, 0, mock.width, tall) if part == "top" else (0, mock.height - tall, mock.width, mock.height))
+            if part == "top":
+                box = (0, 0, mock.width, tall)
+            elif part == "bottom":
+                box = (0, mock.height - tall, mock.width, mock.height)
+            else:  # ("center", pt): the mocks are 402pt wide
+                centre = round(part[1] * mock.width / 402)
+                top = max(0, min(mock.height - tall, centre - tall // 2))
+                box = (0, top, mock.width, top + tall)
+            mock = mock.crop(box)
         right = fit(mock, height)
     else:
         right = Image.new("RGB", (left.width, height), (240, 240, 240))
