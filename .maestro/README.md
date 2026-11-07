@@ -259,7 +259,11 @@ Things that bit:
   end card (`subflows/swipe-pages.yaml`), one page at a time: each swipe waits until the app has
   counted it (`subflows/swipe-page.yaml`). E2E builds draw no page images, so the screen stands
   still before the app has caught up, and a count read straight after a swipe can be the one from
-  before it; swiping again on that went past the count to the end card.
+  before it; swiping again on that went past the count to the end card. A swipe can also be lost
+  (the Android emulator, offline): a count still unchanged after 10 s means the page didn't turn,
+  and it is swiped once more.
+- Airplane mode belongs to the emulator: `run.sh` turns it off before every Android attempt, so a
+  flow that failed offline doesn't leave the next one without a network.
 - Wait for a button to be enabled before tapping it when the app may still be loading (Continue in
   onboarding waits for the new account's pages): a tap on a disabled button does nothing.
 - A tap can be lost too: on a slow iOS Simulator, Home's "Start revision" once showed pressed and

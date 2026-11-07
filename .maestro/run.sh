@@ -130,6 +130,10 @@ run_flow() {
     adb -s "$DEVICE" logcat -c >/dev/null 2>&1
     # A system dialog left up (a slow emulator's "isn't responding") would cover the app.
     adb -s "$DEVICE" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
+    # Airplane mode is the emulator's, not the app's: an attempt that failed
+    # offline (06) left it on, and the retry and the next flow then couldn't
+    # sign up ("welcome" never showed). Every attempt starts online.
+    adb -s "$DEVICE" shell cmd connectivity airplane-mode disable >/dev/null 2>&1
   fi
   if [ "$PLATFORM" = ios ]; then
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
