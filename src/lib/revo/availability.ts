@@ -1,11 +1,10 @@
-// Who sees Revo: previewTester accounts (the server checks the same), and E2E builds, whose
-// accounts can't be testers (the field is admin-only) and whose Revo is the in-memory stand-in.
+// Who sees Revo: previewTester accounts (the server checks the same). E2E flows mark their account a
+// tester through the emulator, as the owner's script does (.maestro/scripts/server-revo.js).
 
 import type { User } from '../../types';
 import { getNextRevisionDayStart } from '../fajrBoundary';
 
 export function revoAvailable(user: Pick<User, 'previewTester'> | null | undefined): boolean {
-  if (process.env.EXPO_PUBLIC_E2E === '1') return !!user;
   return user?.previewTester === true;
 }
 

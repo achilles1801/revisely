@@ -1132,8 +1132,9 @@ To rotate one (or after a leak: revoke the old key in the portal first):
 Revo is the in-app AI assistant (Nov 6 2026; mocks and notes `~/Documents/revisely-today-mocks/revo/`,
 privacy draft `~/Documents/revisely-stats/coach-privacy-draft.md` § R). It supersedes the Ask coach in the
 app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. Rules: BEHAVIOUR.md REVO-*.
-- **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. E2E builds show it to every
-  account, with an in-memory server (`lib/e2e/revoFake`, links `revisely://e2e/revo?optin=1&left=0&review=1&memory=1&day=…`).
+- **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. E2E builds run the real
+  `revo*` functions in the functions emulator (only the model answers from a recording); `09-revo` marks
+  its account a tester and sets the model's text through the emulators (`.maestro/scripts/server-revo.js`).
 - **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (bottom-right, 14 above
   the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the reader, a session or an
   editor; hidden with the keyboard and while the sheet is up), and the sheet (`RevoSheetFrame`: about 55%,

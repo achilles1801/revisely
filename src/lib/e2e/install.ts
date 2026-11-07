@@ -7,7 +7,6 @@ import { AppState, Linking } from 'react-native';
 import { handleClockLink, installClock } from './clock';
 import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
-import { handleRevoLink } from './revoFake';
 
 let installed = false;
 let ready: Promise<void> = Promise.resolve();
@@ -15,7 +14,6 @@ let ready: Promise<void> = Promise.resolve();
 function handle(url: string | null | undefined): void {
   if (!url) return;
   if (handleClockLink(url)) return;
-  if (handleRevoLink(url)) return;
   handleNetworkLink(url);
 }
 
