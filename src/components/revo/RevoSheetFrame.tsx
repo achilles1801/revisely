@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Keyboard, type KeyboardEvent, Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,17 +9,37 @@ import { useReduceMotion } from '../../design/motion';
 import { layoutV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
 import { shouldDismiss } from '../v2/Sheet';
+import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, revoSheetFit } from '../../lib/revo/sheetFit';
 
 /** Revo opens at about half the screen; a conversation, or a drag up, takes it to full height. */
 export const REVO_MEDIUM = 0.55;
 export const REVO_RADIUS = 22;
 const SPRING = { damping: 24, stiffness: 300, mass: 0.8 };
 
+/** How much of the sheet's frame the keyboard covers (keyboardCover), live, with the keyboard's own duration. */
+function useKeyboardCover(frameHeight: number): { cover: number; duration: number } {
+  const [keyboard, setKeyboard] = useState({ height: 0, duration: 0 });
+  const base = useRef(frameHeight);
+  if (keyboard.height === 0 && frameHeight > 0) base.current = frameHeight;
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const shown = (e: KeyboardEvent) => setKeyboard({ height: e.endCoordinates?.height ?? 0, duration: e.duration ?? 0 });
+    const hidden = (e: KeyboardEvent) => setKeyboard({ height: 0, duration: e?.duration ?? 0 });
+    const subs = [
+      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', shown),
+      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', hidden),
+    ];
+    return () => subs.forEach((s) => s.remove());
+  }, []);
+  return { cover: keyboardCover(keyboard.height, base.current, frameHeight), duration: keyboard.duration };
+}
+
 /**
  * Revo's sheet: the `sheet` ground, radius 22, a 40 × 4 handle, and one soft Indigo glow at
  * the top-left. Two heights: medium (55%) and full. Dragging the handle up expands it; down
  * shrinks a full sheet, or closes a medium one (as every sheet closes: past the distance or a
- * fling). A tap on the backdrop closes it; VoiceOver's escape too. The keyboard lifts it.
+ * fling). A tap on the backdrop closes it; VoiceOver's escape too. With the keyboard up it sits on
+ * the keyboard and gets shorter (revoSheetFit): the header stays, the composer rides up.
  */
 export function RevoSheetFrame({
   visible,
@@ -40,7 +60,9 @@ export function RevoSheetFrame({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
-  const fullHeight = height - insets.top - 8;
+  // The frame the sheet sits in (the modal's root), measured; the window's height until then.
+  const [frameHeight, setFrameHeight] = useState(height);
+  const fullHeight = height - insets.top - REVO_TOP_GAP;
   const mediumHeight = Math.round(height * REVO_MEDIUM);
   const [shown, setShown] = useState(visible);
 
@@ -48,6 +70,16 @@ export function RevoSheetFrame({
   const offset = useSharedValue(height);
   const sheetH = useSharedValue(full ? fullHeight : mediumHeight);
   const drag = useSharedValue(0);
+  const { cover, duration } = useKeyboardCover(frameHeight);
+  // The keyboard's cover and the room above it, for the sheet's style on the UI thread.
+  const lift = useSharedValue(0);
+  const room = useSharedValue(frameHeight - insets.top - REVO_TOP_GAP);
+  useEffect(() => {
+    const fit = revoSheetFit({ frameHeight, top: insets.top, keyboard: cover, target: fullHeight });
+    const ms = Math.max(120, duration || 250);
+    lift.value = withTiming(fit.lift, { duration: ms });
+    room.value = withTiming(fit.height, { duration: ms });
+  }, [cover, duration, frameHeight, fullHeight, insets.top, lift, room]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const fullRef = useRef(onFullChange);
@@ -100,8 +132,9 @@ export function RevoSheetFrame({
   );
 
   const sheetStyle = useAnimatedStyle(() => ({
-    height: sheetH.value,
-    transform: [{ translateY: offset.value + Math.max(0, drag.value) + Math.min(0, drag.value) * 0.25 }],
+    // With the keyboard up: no taller than the room above it, and lifted onto it.
+    height: Math.min(sheetH.value, room.value),
+    transform: [{ translateY: offset.value - lift.value + Math.max(0, drag.value) + Math.min(0, drag.value) * 0.25 }],
   }));
   const dim = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, offset.value / Math.max(1, sheetH.value)) }));
 
@@ -111,11 +144,11 @@ export function RevoSheetFrame({
         <Reanimated.View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }, dim]}>
           <Backdrop onPress={onClose} label="Close Revo" />
         </Reanimated.View>
-        <KeyboardAvoidingView style={styles.bottom} behavior="padding" pointerEvents="box-none">
+        <View style={styles.bottom} pointerEvents="box-none" onLayout={(e) => setFrameHeight(e.nativeEvent.layout.height)} testID={`${testID}-frame`}>
           <Reanimated.View
             accessibilityViewIsModal
             onAccessibilityEscape={onClose}
-            style={[styles.sheet, { backgroundColor: palette.sheet, paddingBottom: Math.max(insets.bottom, 12) }, sheetStyle]}
+            style={[styles.sheet, { backgroundColor: palette.sheet, paddingBottom: cover > 0 ? REVO_KEYBOARD_PAD : Math.max(insets.bottom, 12) }, sheetStyle]}
             testID={testID}
           >
             {/* One soft glow, top-left: the primary at 10% (30% in dark). */}
@@ -147,7 +180,7 @@ export function RevoSheetFrame({
             </GestureDetector>
             <View style={styles.fill}>{children}</View>
           </Reanimated.View>
-        </KeyboardAvoidingView>
+        </View>
       </GestureHandlerRootView>
     </Modal>
   );
