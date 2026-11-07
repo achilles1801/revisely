@@ -40,7 +40,7 @@ export function demoLevels(seed: number, count = 96): number[] {
   const out: number[] = [];
   let x = seed;
   // Phrase lengths and the pauses after them, as a share of the recording.
-  const shape = [[0.12, 0.06], [0.26, 0.04], [0.22, 0.03], [0.17, 0.05], [0.05, 0]];
+  const shape = [[0.1, 0.1], [0.24, 0.04], [0.16, 0.08], [0.2, 0.03], [0.05, 0]];
   for (const [phrase, pause] of shape) {
     for (let i = 0; i < Math.round(phrase * count); i++) {
       x = (x * 9301 + 49297) % 233280;
