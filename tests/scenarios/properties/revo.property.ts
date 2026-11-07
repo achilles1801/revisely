@@ -691,6 +691,9 @@ describe('opening a screen (REVO-31)', () => {
     expect(r.reply.action).toEqual(action);
     expect(f.messages('u', r.chatId)[1].action).toEqual(action);
     expect(historyTurn(f.messages('u', r.chatId)[1]).content).toContain('[suggested: open jumpTo]');
+  });
+});
+
 describe('what + attaches, on the server (REVO-32, REVO-33)', () => {
   const tally = { days: 1, pages: 2, onDay: 1, late: 0, ahead: 0, skipped: 1, skippedDays: 1 };
   const facts = {
