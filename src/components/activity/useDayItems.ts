@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as firestoreService from '../../services/firestoreService';
 import { logger } from '../../lib/logger';
-import { dayChangesKey, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { dayChangesKey, joinedSince, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
 import { pendingEntries, subscribeOutbox } from '../../lib/offline/outbox';
 import { currentAccount } from '../../lib/offline/queue';
 
@@ -21,10 +21,14 @@ export function useDayItems(day: string, active: boolean): DayItems | null {
     if (!active) return;
     let cancelled = false;
     let served: DayItems | null = null;
+    let waiting = new Set<string>();
     let n = 0;
     const load = () => {
       const mine = ++n;
-      if (served) setItems(withPending(served, day));
+      // At once only when a change has joined; one that left is in what's shown already.
+      const since = joinedSince(waiting, pendingEntries(currentAccount()), day);
+      waiting = since.ids;
+      if (since.joined && served) setItems(withPending(served, day));
       firestoreService
         .getActivityItemsForDay(day)
         .then((got) => {
