@@ -286,9 +286,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   Revo's own switch turned off stops it.
 
 - **REVO-2.** Every question sends the totals behind Insights (coverage, consistency, weak spots, pace) and today's
-  blocks, as numbers and page numbers. A day, a page or surah, a note or a recording goes only with the question it was
-  picked for with +: a note's text only when that note is picked, a recording only as its length and pages, never
-  the audio. Names are never sent. The server refuses any field the contract doesn't name, a page outside 1–604 and a
+  blocks, as numbers and page numbers. A surah, a juz, pages, a day or a recording goes only with the question it was
+  picked for with + (REVO-32, REVO-33): a day's notes only with that day, and the picker says so before it is added
+  ("includes 2 notes"; there is no separate Notes option), a recording only as its length and pages, never the
+  audio. Names are never sent. The server refuses any field the contract doesn't name, a page outside 1–604 and a
   question over 600 characters.
 
 - **REVO-3.** An account may ask 20 new questions a revision day (it starts at Fajr or midnight, the user's setting). A
@@ -389,6 +390,25 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   times, the Qibla, or the reader at a surah or a juz. The server drops any other screen, section, surah or juz (the
   answer kept, as with a page Revo wasn't given). Nothing opens until the user taps the card's button, and an app that
   doesn't know an action shows no card for it.
+
+- **REVO-32.** A surah, a juz or pages attached with + go with what the app shows for them, worked out on the phone
+  from the sources Insights, Activity and the streak read, the way they read them: how many of its pages are
+  memorized; its strength as Insights counts it (memorized pages revised at least once: weak, moderate, strong, the
+  average to one decimal; the rest not rated yet) and its weak spots; when it was last revised and its page left
+  longest; how many times it was revised in the last 7 and 30 days and on record (a page counts once a day; "in full"
+  is the fewest times any of its memorized pages was); its pages on the plan over the 7 and 30 days before today,
+  each revised on its day, carried over and revised later, revised ahead, or never revised, as the streak credits
+  them; its pages in today's revision; and when the plan next has it. Parts are named by surah and juz. The figures
+  add up (never more missed than planned) and the server refuses any that don't, an unknown field, or a surah or juz
+  whose pages aren't its own. Revo answers about it from those figures alone, and says when the one asked about
+  isn't there. Several things (at most six) can go with one question; the conversation keeps them for follow-ups.
+
+- **REVO-33.** A day attached with + goes with what Activity shows for it, and for today what Home shows: its pages
+  (today's carried ones too), each revised on the day, ahead on an earlier day, caught up later or not, and whether
+  it counts as done for the streak; every page its sessions revised, with those for later and earlier days; its
+  revision minutes, timed reading, pages marked memorized, ratings given, this phone's recordings, and its daily-log
+  notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
+  question's day, or whose place ("2 days ago") or figures don't match it.
 
 ## Known bugs
 

@@ -130,6 +130,11 @@ export function UserBubble({ text, attach, testID }: { text: string; attach?: { 
 }
 
 export const ATTACH_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  revisionDay: 'calendar-outline',
+  surah: 'book-outline',
+  juz: 'albums-outline',
+  pages: 'document-outline',
+  // Kinds older apps sent, still shown in their conversations.
   day: 'calendar-outline',
   page: 'book-outline',
   note: 'document-text-outline',

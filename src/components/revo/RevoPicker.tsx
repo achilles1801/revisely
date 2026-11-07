@@ -1,30 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { shiftDay } from '../../lib/journal';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { logger } from '../../lib/logger';
 import * as firestoreService from '../../services/firestoreService';
-import { withPendingJournal } from '../../lib/offline/queue';
-import {
-  dayAttachment,
-  dayLabel,
-  findPagesOrSurahs,
-  noteAttachment,
-  pageAttachment,
-  recordingAttachment,
-} from '../../lib/revo/attachments';
+import { withPendingJournal, withPendingReadings } from '../../lib/offline/queue';
+import { attachmentFor, dayAttachment, dayLabel, findPassages, pagesAttachment, recordingAttachment, type Found } from '../../lib/revo/attachments';
+import { dayPreview, passagePreview, prepare, type DayExtras } from '../../lib/revo/facts';
 import { passageShort } from '../../lib/revo/words';
 import type { RevoAttachment } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
-import { reviewedOn } from '../../lib/aheadCredit';
+import type { JournalEntry, ReadingSession } from '../../types';
 import { Tap } from '../v2/Tap';
 import type { PickKind } from './RevoComposer';
 import { RevoSubHeader } from './RevoParts';
 
-const TITLES: Record<PickKind, string> = { day: 'A day', page: 'A page or surah', note: 'A note', recording: 'A recording' };
+const TITLES: Record<PickKind, string> = { day: 'A day', page: 'A surah, juz or page', recording: 'A recording' };
 const DAYS_BACK = 14;
 
 interface Choice {
@@ -34,34 +27,48 @@ interface Choice {
   make: () => RevoAttachment;
 }
 
-/** Picking what to add to a question: a list, with search for pages and surahs. */
+/** What a day's facts read beyond the logs: loaded when the day list opens; null until then, or when one fails. */
+function useDayExtras(enabled: boolean): DayExtras | null {
+  const [extras, setExtras] = useState<DayExtras | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    Promise.allSettled([
+      firestoreService.getJournalEntries(60).then((list) => withPendingJournal(list)),
+      firestoreService.getReadingSessions().then((list) => withPendingReadings(list)),
+      listRecordings(),
+    ]).then(([j, r, rec]) => {
+      if (!live) return;
+      if (j.status === 'rejected') logger.warn('Revo: daily log not loaded', j.reason);
+      if (r.status === 'rejected') logger.warn('Revo: readings not loaded', r.reason);
+      setExtras({
+        journal: j.status === 'fulfilled' ? (j.value as JournalEntry[]) : null,
+        readings: r.status === 'fulfilled' ? (r.value as ReadingSession[]) : null,
+        recordings: rec.status === 'fulfilled' ? (rec.value as RecordingMeta[]) : null,
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [enabled]);
+  return extras;
+}
+
+/** Picking what to add to a question: a list, with search for surahs, juz and pages. */
 export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: () => void; onPick: (a: RevoAttachment) => void }) {
   const { palette } = useTheme();
-  const { logs, pages, user } = useApp();
-  const { day: today, context } = useRevoContext();
+  const { day: today, context, sources } = useRevoContext();
   const yesterday = shiftDay(today, -1);
   const [q, setQ] = useState('');
-  const [notes, setNotes] = useState<{ day: string; at: number; text: string }[] | null>(null);
   const [recordings, setRecordings] = useState<RecordingMeta[] | null>(null);
+  const extras = useDayExtras(kind === 'day');
+  // The account's data read once for every row (the credits indexed, the plan's days cached).
+  const prepared = useMemo(() => {
+    const src = sources();
+    return src ? prepare(src) : null;
+  }, [sources]);
 
   useEffect(() => {
-    if (kind === 'note') {
-      firestoreService
-        .getJournalEntries(60)
-        .then((list) => withPendingJournal(list))
-        .then((entries) =>
-          setNotes(
-            entries
-              .flatMap((e) => e.entries.filter((n) => n.text.trim().length > 0).map((n) => ({ day: e.date, at: n.at, text: n.text })))
-              .sort((a, b) => b.at - a.at)
-              .slice(0, 40),
-          ),
-        )
-        .catch((err) => {
-          logger.warn('Revo: notes not loaded', err);
-          setNotes([]);
-        });
-    }
     if (kind === 'recording') {
       listRecordings()
         .then((list) => setRecordings([...list].sort((a, b) => b.createdAt - a.createdAt).slice(0, 40)))
@@ -70,37 +77,30 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
   }, [kind]);
 
   const choices = useMemo((): Choice[] | null => {
+    if (!prepared) return null;
     if (kind === 'day') {
+      if (!extras) return null;
       return Array.from({ length: DAYS_BACK }, (_, i) => {
         const d = shiftDay(today, -i);
         const label = dayLabel(d, today, yesterday);
-        const n = reviewedOn(logs, d).size;
-        return { key: d, title: label, line: n > 0 ? `${n} ${n === 1 ? 'page' : 'pages'} revised` : 'Nothing revised', make: () => dayAttachment({ day: d, label, logs, pages, user }) };
+        const a = dayAttachment(d, label, prepared, extras);
+        return { key: d, title: label, line: a.kind === 'revisionDay' ? dayPreview(a.facts) : '', make: () => a };
       });
     }
     if (kind === 'page') {
-      const found = findPagesOrSurahs(q);
-      const suggested = q.trim()
-        ? []
+      const found: Found[] = q.trim()
+        ? findPassages(q)
         : [
-            ...(context && context.today.nextPages.length ? [{ label: passageShort(context.today.nextPages.slice(0, 2)), pages: context.today.nextPages.slice(0, 2), detail: 'Coming up today' }] : []),
-            ...(context && context.weakPages.length ? [{ label: passageShort(context.weakPages.slice(0, 4)), pages: context.weakPages.slice(0, 4), detail: 'Rated weak' }] : []),
+            ...(context && context.today.nextPages.length ? [{ kind: 'pages' as const, pages: context.today.nextPages.slice(0, 2), label: passageShort(context.today.nextPages.slice(0, 2)) }] : []),
+            ...(context && context.weakPages.length ? [{ kind: 'pages' as const, pages: context.weakPages.slice(0, 4), label: passageShort(context.weakPages.slice(0, 4)) }] : []),
           ];
-      return [...suggested, ...found].map((f) => ({
-        key: `${f.label}-${f.pages[0]}`,
-        title: f.label,
-        line: f.detail,
-        make: () => pageAttachment({ pages: f.pages, label: f.label, logs, userPages: pages }),
-      }));
-    }
-    if (kind === 'note') {
-      if (!notes) return null;
-      return notes.map((n) => ({
-        key: `${n.day}-${n.at}`,
-        title: n.text.split('\n')[0].slice(0, 80),
-        line: dayLabel(n.day, today, yesterday),
-        make: () => noteAttachment(n),
-      }));
+      return found.map((f, i) => {
+        const a = f.kind === 'pages' ? pagesAttachment(f.pages, prepared, f.label) : attachmentFor(f, prepared);
+        const facts = a.kind === 'surah' || a.kind === 'juz' || a.kind === 'pages' ? a.facts : null;
+        const lead = !q.trim() ? (i === 0 && context?.today.nextPages.length ? 'Coming up today' : 'Rated weak') : null;
+        const line = [lead, facts ? passagePreview(facts) : null].filter(Boolean).join(' · ');
+        return { key: `${f.kind}-${f.label}`, title: a.label, line, make: () => a };
+      });
     }
     if (!recordings) return null;
     return recordings.map((r) => {
@@ -109,7 +109,7 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
       const pagesOf = a.kind === 'recording' ? a.pages : [];
       return { key: r.id, title: a.label, line: `${minutes} min${pagesOf.length ? ` · ${passageShort(pagesOf)}` : ''}`, make: () => a };
     });
-  }, [kind, today, yesterday, logs, pages, q, context, notes, recordings]);
+  }, [kind, today, yesterday, prepared, extras, q, context, recordings]);
 
   return (
     <View style={styles.fill} testID={`revo-pick-${kind}`}>
@@ -121,19 +121,19 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder="A page number or a surah"
+              placeholder="A surah, a juz or a page"
               placeholderTextColor={palette.secondary}
               style={[styles.searchInput, { color: palette.text }]}
               autoFocus
               returnKeyType="search"
-              accessibilityLabel="A page number or a surah"
+              accessibilityLabel="A surah, a juz or a page"
               testID="revo-pick-search"
             />
           </View>
         ) : null}
-        {kind === 'note' || kind === 'recording' ? (
+        {kind === 'day' || kind === 'recording' ? (
           <Text style={[styles.hint, { color: palette.secondary }]}>
-            {kind === 'note' ? 'Only the note you pick is sent, with this question.' : 'Only its length and pages are sent, never the audio.'}
+            {kind === 'day' ? 'A day goes with its notes, when it has any.' : 'Only its length and pages are sent, never the audio.'}
           </Text>
         ) : null}
       </View>
@@ -141,7 +141,7 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
         {choices == null ? <ActivityIndicator style={styles.loading} color={palette.secondary} /> : null}
         {choices != null && choices.length === 0 ? (
           <Text style={[styles.hint, { color: palette.secondary }]} testID="revo-pick-empty">
-            {kind === 'note' ? 'No notes yet.' : kind === 'recording' ? 'No recordings on this phone.' : 'Nothing found.'}
+            {kind === 'recording' ? 'No recordings on this phone.' : 'Nothing found.'}
           </Text>
         ) : null}
         {(choices ?? []).map((c, i) => (

@@ -6,12 +6,11 @@ import type { RevoAttachment } from '../../lib/revo/types';
 import { Tap } from '../v2/Tap';
 import { ContextChip } from './RevoParts';
 
-export type PickKind = 'day' | 'page' | 'note' | 'recording';
+export type PickKind = 'day' | 'page' | 'recording';
 
 const ROWS: { kind: PickKind; title: string; line: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { kind: 'day', title: 'A day', line: 'Today, or another day’s blocks', icon: 'calendar-outline' },
-  { kind: 'page', title: 'A page or surah', line: 'Its ratings and revisions', icon: 'book-outline' },
-  { kind: 'note', title: 'A note', line: 'Only the one you pick', icon: 'document-text-outline' },
+  { kind: 'day', title: 'A day', line: 'What was planned and done, with its notes', icon: 'calendar-outline' },
+  { kind: 'page', title: 'A surah, juz or page', line: 'How often it was revised, its weak spots', icon: 'book-outline' },
   { kind: 'recording', title: 'A recording', line: 'Length and pages, never the audio', icon: 'mic-outline' },
 ];
 
