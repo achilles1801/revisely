@@ -76,7 +76,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: journal-note-.*
-      text: "Memorized.*Al.Mulk to Al.Qalam.15.*"
+      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
     timeout: 15000
 - runFlow:
     file: ../subflows/shot.yaml
@@ -103,7 +103,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: journal-note-.*
-      text: "Memorized.*Al.Mulk to Al.Qalam.15.*"
+      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
     timeout: 15000
 - runFlow:
     file: ../subflows/shot.yaml
