@@ -35,6 +35,19 @@ describe('the flake report', () => {
     expect(rows[1].rate).toBe(1);
   });
 
+  it('counts and lists the passes that needed a stand-in (a second swipe, a relaunch)', () => {
+    const helped = { ...ok(), standIns: ['WARNING swipe-page: the page did not turn 10 s after the swipe; swiping again'] };
+    const recs = [job('android', { '06-offline': [helped] }), job('android', { '06-offline': [ok()] })];
+    const rows = aggregate(recs);
+    expect(rows[0]).toMatchObject({ flow: '06-offline', runs: 2, first: 2, standIn: 1 });
+    // The rate counts first attempts; the stand-in is shown beside it.
+    expect(rows[0].rate).toBe(1);
+    const text = render({ rows, since: new Date('2026-11-01'), until: new Date('2026-11-08'), jobs: 2 });
+    expect(text).toContain('| 06-offline | Android | 2 | 2 | 0 | 0 | 1 | 100% |');
+    expect(text).toContain('### Passes that needed a stand-in');
+    expect(text).toContain('`WARNING swipe-page: the page did not turn 10 s after the swipe; swiping again`');
+  });
+
   it('counts a job once, however often its artifact is read', () => {
     const one = job('android', { '06-offline': [miss('x'), retryOk] });
     expect(aggregate([one, one])[0].runs).toBe(1);
@@ -48,7 +61,7 @@ describe('the flake report', () => {
     flaky.push(job('ios', { '02-revision-session': [miss('Element not found: `x`\nmore'), retryOk] }, '2026-11-05T10:20:00Z', 'feature/x'));
     const body = render({ rows: aggregate(flaky), since, until, jobs: 7, mention: '@owner' });
     expect(body).toContain('@owner one flow passed on the first attempt less than 95% of the time: 02-revision-session (iOS).');
-    expect(body).toContain('| 02-revision-session | iOS | 7 | 6 | 1 | 0 | **85.7%** |');
+    expect(body).toContain('| 02-revision-session | iOS | 7 | 6 | 1 | 0 | 0 | **85.7%** |');
     expect(body).toContain('Nov 5, 10:20 UTC');
     expect(body).toContain('`Element not found: x more`');
 
@@ -56,7 +69,7 @@ describe('the flake report', () => {
     const few = [job('android', { '04-fajr-boundary': [miss('y'), retryOk] }), job('android', { '04-fajr-boundary': [ok()] })];
     const quiet = render({ rows: aggregate(few), since, until, jobs: 2, mention: '@owner' });
     expect(quiet).not.toContain('@owner');
-    expect(quiet).toContain('| 04-fajr-boundary | Android | 2 | 1 | 1 | 0 | 50% |');
+    expect(quiet).toContain('| 04-fajr-boundary | Android | 2 | 1 | 1 | 0 | 0 | 50% |');
 
     const steady = [];
     for (let i = 0; i < 20; i++) steady.push(job('android', { '05-daily-log': [ok()] }));

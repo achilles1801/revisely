@@ -140,6 +140,10 @@ one slow PR instead of a broken develop.
   timeout to hide it, a skip or a looser assertion.
 - The one retry is E2E's (`E2E_RETRIES=1`): a pass on the retry is a warning on the run, the job keeps
   its results, and the weekly flake report (`e2e-flakes.yml`) lists every flow under 95%.
+- A pass that needed one of a flow's own stand-ins (its `WARNING <what> - …` or `KNOWN BUG <id> - …`
+  line: the second swipe, SYNC-1's relaunch) is a warning on the run too, is recorded in
+  `attempts.json` (`standIns`) and has its own column in the flake report, so a stand-in that hides a
+  flake is counted, not silent.
 - An input a slow emulator loses may be made again only where the screen shows it didn't take: a tap
   in `open-session.yaml` (Home still showing), a swipe in `swipe-page.yaml` (the count unchanged after
   10 s). The swipe one is marked temporary until the cause is found (06, offline: the failed attempts'
