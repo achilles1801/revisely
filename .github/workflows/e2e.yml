@@ -4,8 +4,9 @@ name: E2E
 # (.maestro/README.md): sign-up, a revision session, revise ahead, the Fajr
 # boundary, the daily log, offline and recordings, each at a time and in a time
 # zone the flow sets. The app is an E2E build (EXPO_PUBLIC_E2E=1): it talks only
-# to the Firebase emulators started here (project demo-revisely), never to a
-# real service.
+# to the Firebase emulators started here (project demo-revisely: Auth, Firestore,
+# Storage and our Cloud Functions, where only Anthropic answers from a recording),
+# never to a real service.
 #
 # No secrets: the Firebase native config is a demo file written here
 # (.maestro/scripts/firebase-demo-config.sh), nothing is signed for a store, and
@@ -103,8 +104,9 @@ env:
 jobs:
   # Whether this pull request changes anything the flows exercise: everything
   # that goes into the app (the complement of .github/scripts/app-hash.sh's
-  # list), the flows, this workflow, and what the emulators load
-  # (firestore.rules, firebase.json). Scheduled and manual runs always run.
+  # list), the flows, this workflow, and what the emulators load (firestore.rules,
+  # storage.rules, firebase.json, our functions, scripts/emulators.sh). Scheduled
+  # and manual runs always run.
   changes:
     name: E2E (what changed)
     runs-on: ubuntu-latest
@@ -133,7 +135,7 @@ jobs:
           ANDROID_SET: ${{ inputs.android }}
           PLATFORM: ${{ inputs.platform }}
         run: |
-          full='[{"name":"01 02 03 08 09","flows":".maestro/flows/0[12389]-*.yaml"},{"name":"04 05 06 07","flows":".maestro/flows/0[4567]-*.yaml"}]'
+          full='[{"name":"01 02 03 08 09","flows":".maestro/flows/0[12389]-*.yaml"},{"name":"04 05 06 07 10","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/10-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).
@@ -214,8 +216,9 @@ jobs:
           if [ "$(wc -l < "$files")" -ge "$limit" ]; then app=true; fi
           while IFS= read -r f; do
             case "$f" in
-              .maestro/*|.github/workflows/e2e.yml|firestore.rules|firebase.json) app=true ;;
-              docs/*|tests/*|functions/*|worker/*|store/*|scripts/*|.github/*) ;;
+              # Our functions and the emulators' setup: the flows call the functions emulator.
+              .maestro/*|.github/workflows/e2e.yml|firestore.rules|storage.rules|firebase.json|functions/*|scripts/emulators.sh) app=true ;;
+              docs/*|tests/*|worker/*|store/*|scripts/*|.github/*) ;;
               *.md|firestore.indexes.json|wrangler.jsonc) ;;
               *) app=true ;;
             esac
@@ -339,7 +342,27 @@ jobs:
           path: |
             ~/.maestro
             ~/.cache/firebase/emulators
-          key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}
+          key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}-storage
+
+      # Our Cloud Functions, which the functions emulator runs (emulators.sh builds them).
+      - name: Restore the functions' packages
+        if: matrix.shard.flows != ''
+        id: fnm
+        uses: actions/cache/restore@v4
+        with:
+          path: functions/node_modules
+          key: e2e-functions-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('functions/package-lock.json') }}
+
+      - name: The functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        run: npm ci --prefix functions
+
+      - name: Keep the functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: functions/node_modules
+          key: ${{ steps.fnm.outputs.cache-primary-key }}
 
       - name: Firebase CLI and Maestro
         if: matrix.shard.flows != ''
@@ -356,7 +379,9 @@ jobs:
           for attempt in 1 2; do
             nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
             for i in $(seq 1 90); do
-              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null; then echo ready; exit 0; fi
+              # The functions emulator answers 404 at its root once it serves.
+              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null &&
+                [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/)" != 000 ]; then echo ready; exit 0; fi
               sleep 2
             done
             echo "::warning::The emulators didn't start (attempt $attempt)."
@@ -529,7 +554,27 @@ jobs:
           path: |
             ~/.maestro
             ~/.cache/firebase/emulators
-          key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}
+          key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}-storage
+
+      # Our Cloud Functions, which the functions emulator runs (emulators.sh builds them).
+      - name: Restore the functions' packages
+        if: matrix.shard.flows != ''
+        id: fnm
+        uses: actions/cache/restore@v4
+        with:
+          path: functions/node_modules
+          key: e2e-functions-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('functions/package-lock.json') }}
+
+      - name: The functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        run: npm ci --prefix functions
+
+      - name: Keep the functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: functions/node_modules
+          key: ${{ steps.fnm.outputs.cache-primary-key }}
 
       - name: Firebase CLI and Maestro
         if: matrix.shard.flows != ''
@@ -547,7 +592,9 @@ jobs:
           for attempt in 1 2; do
             nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
             for i in $(seq 1 90); do
-              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null; then echo ready; exit 0; fi
+              # The functions emulator answers 404 at its root once it serves.
+              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null &&
+                [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/)" != 000 ]; then echo ready; exit 0; fi
               sleep 2
             done
             echo "::warning::The emulators didn't start (attempt $attempt)."

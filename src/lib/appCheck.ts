@@ -20,8 +20,9 @@ const DEBUG_TOKEN: string | undefined = __DEV__
 
 export async function setupAppCheck(): Promise<void> {
   if (initialized) return;
-  // E2E builds (EXPO_PUBLIC_E2E=1) talk only to the emulators, which don't
-  // check App Check; every other build drops this line (the variable is inlined).
+  // E2E builds (EXPO_PUBLIC_E2E=1) talk only to the emulators: no native App
+  // Check (getAppCheckToken hands out the emulator's token instead); every other
+  // build drops this line (the variable is inlined).
   if (process.env.EXPO_PUBLIC_E2E === '1') return;
 
   const appCheck = (firebase as any).appCheck();
@@ -49,7 +50,10 @@ export async function setupAppCheck(): Promise<void> {
 }
 
 export async function getAppCheckToken(): Promise<string | null> {
-  if (process.env.EXPO_PUBLIC_E2E === '1') return null;
+  // E2E builds: a token only the functions emulator accepts (lib/e2e/functions); a simulator
+  // can't attest the app. Every other build drops this line (the variable is inlined).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  if (process.env.EXPO_PUBLIC_E2E === '1') return (require('./e2e/functions') as typeof import('./e2e/functions')).E2E_APP_CHECK_TOKEN;
   try {
     if (!initialized) await setupAppCheck();
     const result = await (firebase as any).appCheck().getToken();
