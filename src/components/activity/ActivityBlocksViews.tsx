@@ -131,7 +131,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
         />
       </RNView>
       {view === 'calendar' ? (
-        <RNView style={styles.pad} {...swipe.panHandlers} testID="activity-calendar">
+        <RNView {...swipe.panHandlers} testID="activity-calendar">
           <CalendarMonth
             month={month}
             week={week}
