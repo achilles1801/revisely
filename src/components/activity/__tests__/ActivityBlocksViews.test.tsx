@@ -3,6 +3,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { ActivityBlocksViews } from '../ActivityBlocksViews';
+import { plainText } from '../../../lib/passages';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -79,6 +80,22 @@ describe('the Activity calendar (gap audit §3)', () => {
       expect(screen.getByLabelText('2 recordings')).toBeTruthy();
     } finally {
       service.getActivityItemsBetween.mockResolvedValue(empty);
+    }
+  });
+
+  it('the preview names what was memorized and read by surah, not pages (Majd, Nov 7 2026)', async () => {
+    const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+    service.getActivityItemsBetween.mockResolvedValue({
+      revisions: [],
+      memorized: [{ id: TODAY, day: TODAY, pages: [562] }],
+      reads: [{ id: 'r', day: TODAY, pages: [562, 563, 564], minutes: 22, occurredAt: null }],
+    });
+    try {
+      render(<ActivityBlocksViews {...props} />);
+      expect(await screen.findByText('Start of Al-Mulk', { normalizer: plainText })).toBeTruthy();
+      expect(screen.getByText('Al-Mulk to Al-Qalam · 22 min', { normalizer: plainText })).toBeTruthy();
+    } finally {
+      service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [] });
     }
   });
 
