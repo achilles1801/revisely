@@ -10,6 +10,7 @@ import {
   monthLabel,
   monthName,
   paceView,
+  formatPace,
   quranShare,
   ratedWeakCounts,
   reportMonth,
@@ -54,6 +55,18 @@ describe('Coverage: juz tiles (gap audit §5)', () => {
 
   it('marks a juz being learned', () => {
     expect(juzTiles(new Set(), new Set([juz29[0]]), new Map(), TODAY)[28]).toMatchObject({ state: 'none', learning: true });
+  });
+
+  it('[ACT-4] a juz under half memorized is being learned, so a page memorized today is never “untouched the longest” (mock d4: Juz 29)', () => {
+    const memorized = new Set([...juz28, juz29[0]]);
+    const last = new Map(juz28.map((p) => [p, ago(2)] as [number, string]));
+    const tiles = juzTiles(memorized, new Set(), last, TODAY);
+    expect(tiles[28]).toMatchObject({ juz: 29, state: 'none', learning: true });
+    expect(tiles[27]).toMatchObject({ juz: 28, state: 'week' });
+    expect(untouchedJuz(tiles)).toBeNull();
+    // Half of it memorized: a memorized juz, as recent as those pages.
+    const half = new Set(juz29.slice(0, 10));
+    expect(juzTiles(half, new Set(), new Map(juz29.slice(0, 10).map((p) => [p, ago(10)] as [number, string])), TODAY)[28]).toMatchObject({ state: 'month', learning: false });
   });
 
   it('names the juz untouched the longest, and the next, only when it is stale', () => {
@@ -133,6 +146,17 @@ describe('Weak spots', () => {
     ]);
   });
 
+  it('puts the most flagged first: times rated weak and skipped, then weak now (mock d4’s order)', () => {
+    const rows = weakSpotRows({
+      memorized: new Set([40, 41, 546, 547, 556, 557]),
+      rating: (p) => (p === 40 || p === 41 || p === 546 || p === 547 ? 2 : 4),
+      ratedWeak: new Map([[546, 3]]),
+      revisions: [1, 5, 9].map((n) => ({ day: ago(n), skipped: [556, 557] })),
+      today: TODAY,
+    });
+    expect(rows.map((r) => r.label)).toEqual(['p. 546–547', 'p. 556–557', 'p. 40–41']);
+  });
+
   it('splits a run where a surah begins (548 is Al-Hashr’s last page)', () => {
     const rows = weakSpotRows({ memorized: new Set([548, 549]), rating: () => 2, ratedWeak: new Map(), revisions: [], today: TODAY });
     expect(rows.map((r) => [r.surah, r.label])).toEqual([
@@ -205,5 +229,14 @@ describe('Pace', () => {
     const read = [{ day: ago(2), pages: [1, 2], minutes: 12 }];
     const p = paceView({ revised, read, today: TODAY, capacity: 20 });
     expect(p).toMatchObject({ perPage: 1.8, before: 2.1, dayMinutes: 36, revisions: 10, readingPerPage: 6 });
+  });
+});
+
+describe('formatPace', () => {
+  it('reads "1.8", "6" and "12" (no ".0", whole from 10)', () => {
+    expect(formatPace(1.8)).toBe('1.8');
+    expect(formatPace(6)).toBe('6');
+    expect(formatPace(5.97)).toBe('6');
+    expect(formatPace(12.4)).toBe('12');
   });
 });
