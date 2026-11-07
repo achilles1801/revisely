@@ -39,6 +39,7 @@ import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
@@ -93,7 +94,8 @@ export default function DashboardScreen() {
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
   const homePrefs = useHomePrefs();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const [carrying, setCarrying] = useState(false);
   // "Jump to…": the sheet, and the toast after a jump (with what to put back).
   const [jumpOpen, setJumpOpen] = useState(false);

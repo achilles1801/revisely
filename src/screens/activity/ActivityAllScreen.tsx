@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ActivityItemRow } from '../../components/activity/ActivityItemRow';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { OptionSheet } from '../../components/OptionSheet';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
@@ -39,7 +40,8 @@ export default function ActivityAllScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'ActivityAll'>>();
   const { user, logs } = useApp();
   const { palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const { day: today } = useRevisionDay(user);
   const { readings, journal, recordings, loading } = useActivitySources();
 

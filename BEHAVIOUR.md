@@ -333,7 +333,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   already made room for the keyboard (Android resizing the window), the sheet isn't lifted twice.
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), bottom-right, 14
-  above the tab bar and the mini player; lists end with room for it, so their last row scrolls clear of it.
+  above the tab bar and the mini player. The screens it shows on end their lists with room for it
+  (`useRevoFootprint`), so their last row scrolls clear of it; other screens leave none.
 
 ## Known bugs
 
