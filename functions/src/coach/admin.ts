@@ -7,9 +7,14 @@
  *   coachUsage/{uid__day}            questions asked that UTC day
  *   coachLedger/{YYYY-MM}            spend (dollars) and token totals for the month; no content
  *   coachLedgerDay/{YYYY-MM-DD}      the same totals for one day (the weekly digest reads them)
+ *   config/coach                     monthlyCapUsd: the monthly cap (set-coach-cap.js); server only
  */
 import { FieldValue, Firestore } from 'firebase-admin/firestore';
-import { CallLedger, CoachStore } from './handler';
+import { CallLedger, CoachStore, monthlyCapFrom } from './handler';
+
+/** How long a read of the cap is used before reading it again (a change applies within this). */
+const CAP_CACHE_MS = 60_000;
+let capCache: { value: number; until: number } | null = null;
 import { CoachInsight } from './prompt';
 
 export function adminCoachStore(db: Firestore): CoachStore {
@@ -56,6 +61,13 @@ export function adminCoachStore(db: Firestore): CoachStore {
     async questionsToday(uid, utcDay) {
       const snap = await usageRef(uid, utcDay).get();
       return (snap.get('count') as number | undefined) ?? 0;
+    },
+    async monthlyCapUsd() {
+      if (capCache && Date.now() < capCache.until) return capCache.value;
+      const snap = await db.doc('config/coach').get();
+      const value = monthlyCapFrom(snap.get('monthlyCapUsd'));
+      capCache = { value, until: Date.now() + CAP_CACHE_MS };
+      return value;
     },
     async reserveSpend(month, amount, cap) {
       return db.runTransaction(async (tx) => {

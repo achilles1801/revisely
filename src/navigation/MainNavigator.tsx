@@ -13,6 +13,7 @@ import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScre
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
+import { RevoHost } from '../components/revo/RevoHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
@@ -198,6 +199,8 @@ export function MainNavigator() {
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}
       />
+      {/* Revo (previewTester accounts): its button over the main screens, and its sheet. */}
+      <RevoHost />
     </ReadingTimerProvider>
   );
 }

@@ -9,7 +9,19 @@ import { costUsd, Usage, worstCaseCostUsd } from './pricing';
 import { COACH_MAX_TOKENS, buildCoachRequest, validateTotals, CoachInsight } from './prompt';
 
 export const DAILY_QUESTIONS = 5;
+/**
+ * The monthly hard cap in dollars, shared by the Ask coach and Revo (one ledger), unless
+ * config/coach.monthlyCapUsd sets another (functions/scripts/set-coach-cap.js): raising it
+ * needs no code change or deploy.
+ */
 export const MONTHLY_CAP_USD = 10;
+/** The highest cap the config may set (a typo can't open the budget wide). */
+export const MAX_MONTHLY_CAP_USD = 1000;
+
+/** The cap a config value gives: a number from 0 to MAX_MONTHLY_CAP_USD, else the default. */
+export function monthlyCapFrom(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_MONTHLY_CAP_USD ? value : MONTHLY_CAP_USD;
+}
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type CoachErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'resource-exhausted' | 'unavailable';
@@ -35,6 +47,8 @@ export interface CoachStore {
   questionsToday(uid: string, utcDay: string): Promise<number>;
   /** Adds `amount` to the month's spend if it stays within `cap`. False when it would not. */
   reserveSpend(month: string, amount: number, cap: number): Promise<boolean>;
+  /** The monthly cap in dollars (config/coach.monthlyCapUsd); MONTHLY_CAP_USD when unset. */
+  monthlyCapUsd?(): Promise<number>;
   /** Replaces a reservation with the real cost and adds the call's tokens to the ledger. */
   settleSpend(month: string, reserved: number, actual: number, usage: CallLedger, day: string): Promise<void>;
 }
@@ -69,7 +83,8 @@ function utcDay(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
-function ledgerOf(usage: Usage): CallLedger {
+/** The ledger entry for one call (Revo uses the same). */
+export function ledgerOf(usage: Usage): CallLedger {
   const u = usage as Record<string, number | undefined>;
   const cacheWrite = (u.cache_creation_input_tokens ?? 0) || 0;
   return {
@@ -117,7 +132,8 @@ export async function handleAskCoach(
   const request = buildCoachRequest(insight, totals);
   const month = today.slice(0, 7);
   const reserved = worstCaseCostUsd(JSON.stringify(request).length, COACH_MAX_TOKENS);
-  if (!(await deps.store.reserveSpend(month, reserved, MONTHLY_CAP_USD))) {
+  const cap = (await deps.store.monthlyCapUsd?.()) ?? MONTHLY_CAP_USD;
+  if (!(await deps.store.reserveSpend(month, reserved, cap))) {
     await deps.store.releaseQuestion(uid, today);
     deps.log({ event: 'capped', insight });
     throw new CoachError('resource-exhausted', 'The coach is paused until next month.');

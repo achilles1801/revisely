@@ -1,0 +1,453 @@
+// Revo (functions/src/revo): who may ask, what is sent, the day's questions, the shared monthly cap,
+// the answer cache, the reply's checks, memory, the Day in review and history. Storage and the
+// model are fakes; the request the model would get is inspected.
+import { MONTHLY_CAP_USD, MAX_MONTHLY_CAP_USD, monthlyCapFrom } from '../../../functions/src/coach/handler';
+import { costUsd, worstCaseCostUsd } from '../../../functions/src/coach/pricing';
+import type { MessagesRequest } from '../../../functions/src/coach/call';
+import { CoachCallError } from '../../../functions/src/coach/call';
+import {
+  REVO_DAILY_QUESTIONS,
+  REVO_MEMORY_CAP,
+  RevoStore,
+  handleClear,
+  handleDayInReview,
+  handleRevoAsk,
+  handleSetOptions,
+  mergeMemory,
+  reviewMeta,
+} from '../../../functions/src/revo/handler';
+import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT } from '../../../functions/src/revo/prompt';
+import { parseReply } from '../../../functions/src/revo/reply';
+import type { CachedAnswer, RevoChat, RevoContext, RevoMemoryItem, RevoSettings, StoredMessage } from '../../../functions/src/revo/types';
+import { validateAttachment } from '../../../functions/src/revo/validate';
+
+const usage = { input_tokens: 2000, output_tokens: 200, cache_read_input_tokens: 1800 };
+const NOW = new Date('2026-11-06T18:00:00Z');
+const DAY = '2026-11-06';
+
+const context = (over: Partial<RevoContext['today']> = {}): RevoContext => ({
+  totals: {
+    memorizedPages: 100,
+    revisedWithin7Days: 40,
+    revisedWithin30Days: 90,
+    daysWithSession30: 26,
+    streakDays: 12,
+    sessions30: 28,
+    weakPages: 6,
+    moderatePages: 20,
+    strongPages: 74,
+    weakRevisedLast7Days: 2,
+    pagesPerDay7: 18.6,
+    pagesPerDay30: 17.2,
+    plannedPerDay: 20,
+  },
+  today: { plannedPages: 20, revisedPages: 6, minutes: 31, memorizedPages: 0, nextPages: [548, 549, 550], weakNext: [548, 549], done: false, ...over },
+  weakPages: [548, 549, 12],
+  week: [{ day: DAY, pages: 6 }],
+  localTime: '21:41',
+});
+
+/** An account's Revo, in memory. */
+function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; cap?: number } = {}) {
+  const settings = new Map<string, RevoSettings>();
+  const usageDoc = new Map<string, { day: string; count: number }>();
+  const chats = new Map<string, Map<string, RevoChat>>();
+  const messages = new Map<string, StoredMessage[]>();
+  const answers = new Map<string, CachedAnswer>();
+  const memory = new Map<string, RevoMemoryItem[]>();
+  let spend = 0;
+  let ids = 0;
+  const chatsOf = (uid: string) => chats.get(uid) ?? chats.set(uid, new Map()).get(uid)!;
+  const key = (uid: string, chatId: string) => `${uid}/${chatId}`;
+  const store: RevoStore = {
+    isPreviewTester: async () => opts.tester ?? true,
+    getSettings: async (uid) => settings.get(uid) ?? { optIn: true, memoryOn: true, ...opts.settings },
+    setSettings: async (uid, patch) => {
+      const next = { ...(settings.get(uid) ?? { optIn: true, memoryOn: true, ...opts.settings }), ...patch };
+      settings.set(uid, next);
+      return next;
+    },
+    getUsage: async (uid) => usageDoc.get(uid) ?? null,
+    reserveQuestion: async (uid, day, limit) => {
+      const u = usageDoc.get(uid);
+      if (u && day < u.day) return { ok: false, reason: 'behind' };
+      const count = u && u.day === day ? u.count : 0;
+      if (count >= limit) return { ok: false, reason: 'daily' };
+      usageDoc.set(uid, { day, count: count + 1 });
+      return { ok: true, count: count + 1 };
+    },
+    releaseQuestion: async (uid, day) => {
+      const u = usageDoc.get(uid);
+      if (u && u.day === day && u.count > 0) usageDoc.set(uid, { day, count: u.count - 1 });
+    },
+    reserveSpend: async (_m, amount, cap) => {
+      if (spend + amount > cap) return false;
+      spend += amount;
+      return true;
+    },
+    monthlyCapUsd: opts.cap == null ? undefined : async () => opts.cap!,
+    settleSpend: async (_m, reserved, actual) => void (spend = spend - reserved + actual),
+    getChat: async (uid, id) => chatsOf(uid).get(id) ?? null,
+    getMessage: async (uid, chatId, id) => (messages.get(key(uid, chatId)) ?? []).find((m) => m.id === id) ?? null,
+    lastMessages: async (uid, chatId, n) => (messages.get(key(uid, chatId)) ?? []).slice(-n),
+    saveTurn: async (uid, chat, ms) => {
+      const prev = chatsOf(uid).get(chat.id);
+      chatsOf(uid).set(chat.id, { ...chat, ...(prev?.meta ? { meta: prev.meta } : {}) });
+      messages.set(key(uid, chat.id), [...(messages.get(key(uid, chat.id)) ?? []), ...ms]);
+    },
+    createReview: async (uid, chat, m) => {
+      if (chatsOf(uid).has(chat.id)) return false;
+      chatsOf(uid).set(chat.id, chat);
+      messages.set(key(uid, chat.id), [m]);
+      return true;
+    },
+    getAnswer: async (uid, k) => answers.get(`${uid}__${k}`) ?? null,
+    setAnswer: async (uid, k, _day, a) => void answers.set(`${uid}__${k}`, a),
+    listMemory: async (uid, limit) => [...(memory.get(uid) ?? [])].sort((a, b) => b.at - a.at).slice(0, limit),
+    changeMemory: async (uid, add, removeIds) => {
+      memory.set(uid, [...(memory.get(uid) ?? []).filter((m) => !removeIds.includes(m.id)), ...add]);
+    },
+    deleteHistory: async (uid) => {
+      const n = chatsOf(uid).size;
+      chats.set(uid, new Map());
+      for (const k of [...messages.keys()]) if (k.startsWith(`${uid}/`)) messages.delete(k);
+      for (const k of [...answers.keys()]) if (k.startsWith(`${uid}__`)) answers.delete(k);
+      return n;
+    },
+    deleteMemory: async (uid) => {
+      const n = (memory.get(uid) ?? []).length;
+      memory.set(uid, []);
+      return n;
+    },
+    newId: () => `id${++ids}`,
+  };
+  return { store, spend: () => spend, usage: (uid = 'u') => usageDoc.get(uid), chats: (uid = 'u') => chatsOf(uid), messages: (uid: string, c: string) => messages.get(key(uid, c)) ?? [], memory: (uid = 'u') => memory.get(uid) ?? [], answers };
+}
+
+type Call = (r: MessagesRequest) => Promise<{ text: string; usage: typeof usage; attempts: number }>;
+const json = (o: Record<string, unknown>) => JSON.stringify({ text: 'Revise them first tomorrow.', ...o });
+function model(text = json({})) {
+  const requests: MessagesRequest[] = [];
+  const call: Call = async (r) => {
+    requests.push(r);
+    return { text, usage, attempts: 1 };
+  };
+  return { call, requests };
+}
+const deps = (store: RevoStore, call: Call, logs: Record<string, unknown>[] = [], now = NOW) => ({ store, call, now: () => now, log: (e: Record<string, unknown>) => void logs.push(e) });
+const ask = (over: Record<string, unknown> = {}) => ({ chatId: null, day: DAY, question: 'Why do p. 548–549 keep slipping?', context: context(), attach: null, ...over });
+const U = { uid: 'u' };
+
+describe('who may use Revo (REVO-1)', () => {
+  it('[REVO-1] a signed-out caller, a non-tester and an account that hasn’t turned it on are refused', async () => {
+    const m = model();
+    await expect(handleRevoAsk(undefined, ask(), deps(fakeStore().store, m.call))).rejects.toMatchObject({ code: 'unauthenticated' });
+    await expect(handleRevoAsk(U, ask(), deps(fakeStore({ tester: false }).store, m.call))).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(handleRevoAsk(U, ask(), deps(fakeStore({ settings: { optIn: false } }).store, m.call))).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(handleDayInReview(U, { day: DAY, context: context() }, deps(fakeStore({ settings: { optIn: false } }).store, m.call))).rejects.toMatchObject({ code: 'permission-denied' });
+    expect(m.requests).toHaveLength(0);
+  });
+
+  it('[REVO-1] a tester turns it on (no opt-in needed to do so); memory is on unless turned off', async () => {
+    const f = fakeStore({ settings: { optIn: false } });
+    const m = model();
+    expect(await handleSetOptions(U, { optIn: true }, deps(f.store, m.call))).toEqual({ optIn: true, memoryOn: true });
+    expect(await handleSetOptions(U, { memoryOn: false }, deps(f.store, m.call))).toEqual({ optIn: true, memoryOn: false });
+    await expect(handleSetOptions(U, { optIn: 'yes' }, deps(f.store, m.call))).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(handleSetOptions(U, { optIn: true }, deps(fakeStore({ tester: false }).store, m.call))).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+});
+
+describe('what is sent (REVO-2)', () => {
+  it('[REVO-2] the totals and today’s numbers and pages go with every question; nothing is attached unless picked', async () => {
+    const m = model();
+    await handleRevoAsk(U, ask(), deps(fakeStore().store, m.call));
+    const sent = m.requests[0].messages.map((x) => x.content).join('\n');
+    expect(sent).toContain('"plannedPerDay":20');
+    expect(sent).toContain('"nextPages":[548,549,550]');
+    expect(sent).toContain('Question: Why do p. 548–549 keep slipping?');
+    expect(sent).not.toContain('Attachment');
+  });
+
+  it('[REVO-2] a picked note goes with that question only; a recording is its length and pages, never audio', async () => {
+    const f = fakeStore();
+    const m = model();
+    const note = { kind: 'note', label: 'Note · Wed 4 Nov', day: '2026-11-04', text: 'Al-Hashr felt shaky tonight' };
+    await handleRevoAsk(U, ask({ attach: note }), deps(f.store, m.call));
+    expect(m.requests[0].messages.at(-1)!.content).toContain('Al-Hashr felt shaky tonight');
+    const rec = { kind: 'recording', label: 'Recording · Wed 4 Nov', day: '2026-11-04', of: 'revision', seconds: 312, pages: [548, 549] };
+    expect(validateAttachment(rec)).toMatchObject({ seconds: 312, pages: [548, 549] });
+    expect(() => validateAttachment({ ...rec, uri: 'file:///audio.m4a' })).toThrow();
+    expect(() => validateAttachment({ ...rec, audio: 'AAAA' })).toThrow();
+  });
+
+  it('[REVO-2] anything outside the contract is refused before any call: unknown fields, a long question, a bad day, a page out of range', async () => {
+    const m = model();
+    const d = deps(fakeStore().store, m.call);
+    await expect(handleRevoAsk(U, ask({ extra: 1 }), d)).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(handleRevoAsk(U, ask({ question: 'x'.repeat(601) }), d)).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(handleRevoAsk(U, ask({ day: '2026-11-31' }), d)).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(handleRevoAsk(U, ask({ day: '2026-11-09' }), d)).rejects.toMatchObject({ code: 'invalid-argument', details: { reason: 'clock' } });
+    await expect(handleRevoAsk(U, ask({ context: { ...context(), weakPages: [605] } }), d)).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(handleRevoAsk(U, ask({ context: { ...context(), name: 'Maryam' } }), d)).rejects.toMatchObject({ code: 'invalid-argument' });
+    expect(m.requests).toHaveLength(0);
+  });
+});
+
+describe('the day’s questions (REVO-3)', () => {
+  it(`[REVO-3] ${REVO_DAILY_QUESTIONS} new questions a revision day; then refused as 'daily'; a later day starts again`, async () => {
+    const f = fakeStore();
+    const m = model();
+    for (let i = 0; i < REVO_DAILY_QUESTIONS; i++) {
+      const r = await handleRevoAsk(U, ask({ question: `Question ${i}` }), deps(f.store, m.call));
+      expect(r.remainingToday).toBe(REVO_DAILY_QUESTIONS - i - 1);
+    }
+    await expect(handleRevoAsk(U, ask({ question: 'One more' }), deps(f.store, m.call))).rejects.toMatchObject({ code: 'resource-exhausted', details: { reason: 'daily' } });
+    const tomorrow = new Date('2026-11-07T06:00:00Z');
+    const r = await handleRevoAsk(U, ask({ day: '2026-11-07', question: 'A new day' }), deps(f.store, m.call, [], tomorrow));
+    expect(r.remainingToday).toBe(REVO_DAILY_QUESTIONS - 1);
+  });
+
+  it('[REVO-3] moving the phone’s day back can’t refill it: an earlier day than counted is refused', async () => {
+    const f = fakeStore();
+    const m = model();
+    await handleRevoAsk(U, ask({ day: '2026-11-07' }), deps(f.store, m.call));
+    await expect(handleRevoAsk(U, ask({ day: DAY, question: 'Again' }), deps(f.store, m.call))).rejects.toMatchObject({ code: 'invalid-argument', details: { reason: 'clock' } });
+    expect(f.usage()).toEqual({ day: '2026-11-07', count: 1 });
+  });
+
+  it('[REVO-3] a failed call, or a reply with no answer, gives the question back', async () => {
+    const f = fakeStore();
+    const failing: Call = async () => {
+      throw new CoachCallError('busy', 529, true);
+    };
+    await expect(handleRevoAsk(U, ask(), deps(f.store, failing))).rejects.toMatchObject({ code: 'unavailable' });
+    expect(f.usage()).toEqual({ day: DAY, count: 0 });
+    // The failed call cost nothing: its reserve went back.
+    expect(f.spend()).toBeCloseTo(0, 6);
+    await expect(handleRevoAsk(U, ask(), deps(f.store, model('{"text": ""}').call))).rejects.toMatchObject({ code: 'unavailable' });
+    expect(f.usage()).toEqual({ day: DAY, count: 0 });
+    // An empty answer was still a call: its real cost stays on the ledger.
+    expect(f.spend()).toBeGreaterThan(0);
+  });
+});
+
+describe('the monthly cap (REVO-4)', () => {
+  it('[REVO-4] the cap is shared with the Ask coach, $10 unless config sets another (0 to $1,000)', () => {
+    expect(MONTHLY_CAP_USD).toBe(10);
+    expect(monthlyCapFrom(undefined)).toBe(10);
+    expect(monthlyCapFrom(200)).toBe(200);
+    expect(monthlyCapFrom(0)).toBe(0);
+    expect(monthlyCapFrom(MAX_MONTHLY_CAP_USD + 1)).toBe(10);
+    expect(monthlyCapFrom('200')).toBe(10);
+    expect(monthlyCapFrom(Number.NaN)).toBe(10);
+  });
+
+  it('[REVO-4] over the cap: refused as \'monthly\', no call, and the question given back', async () => {
+    const f = fakeStore({ cap: 0 });
+    const m = model();
+    await expect(handleRevoAsk(U, ask(), deps(f.store, m.call))).rejects.toMatchObject({ code: 'resource-exhausted', details: { reason: 'monthly' } });
+    expect(m.requests).toHaveLength(0);
+    expect(f.usage()).toEqual({ day: DAY, count: 0 });
+  });
+
+  it('[REVO-4] a raised cap applies to the next question; the real cost, at Sonnet 5.5’s prices, replaces the reserve', async () => {
+    const f = fakeStore({ cap: 150 });
+    const m = model();
+    await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    // 2,000 input at $2, 200 output at $10, 1,800 cache reads at $0.10 (per million).
+    expect(f.spend()).toBeCloseTo((2000 * 2 + 200 * 10 + 1800 * 0.1) / 1e6, 8);
+  });
+
+  it('[REVO-4] each model is priced at its own rates (docs.claude.com, Nov 7 2026)', () => {
+    const u = { input_tokens: 1_000_000, output_tokens: 1_000_000, cache_read_input_tokens: 1_000_000, cache_creation: { ephemeral_5m_input_tokens: 1_000_000, ephemeral_1h_input_tokens: 1_000_000 } };
+    expect(costUsd(u, 'claude-sonnet-5-5')).toBeCloseTo(2 + 10 + 0.1 + 2.5 + 4, 6);
+    expect(costUsd(u, 'claude-haiku-5-5')).toBeCloseTo(0.1 + 0.5 + 0.01 + 0.125 + 0.2, 6);
+    expect(costUsd(u)).toBe(costUsd(u, 'claude-haiku-5-5'));
+    expect(worstCaseCostUsd(10_000, 700, 'claude-sonnet-5-5')).toBeGreaterThanOrEqual(costUsd({ input_tokens: 5000, output_tokens: 700 }, 'claude-sonnet-5-5'));
+    expect(() => costUsd(u, 'claude-unknown')).toThrow();
+  });
+});
+
+describe('the answer cache (REVO-5)', () => {
+  it('[REVO-5] the same first question again that day is free: no call, nothing counted, a new chat with the same answer', async () => {
+    const f = fakeStore();
+    const m = model();
+    const a = await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    const b = await handleRevoAsk(U, ask({ question: '  why do P. 548–549   keep slipping? ' }), deps(f.store, m.call));
+    expect(m.requests).toHaveLength(1);
+    expect(b).toMatchObject({ cached: true, remainingToday: REVO_DAILY_QUESTIONS - 1 });
+    expect(b.chatId).not.toBe(a.chatId);
+    expect(b.reply.text).toBe(a.reply.text);
+    expect(f.usage()!.count).toBe(1);
+  });
+
+  it('[REVO-5] a question with something attached, a follow-up, or another day is asked anew', async () => {
+    const f = fakeStore();
+    const m = model();
+    const first = await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    await handleRevoAsk(U, ask({ attach: { kind: 'insight', label: 'Weak spots', insight: 'weakSpots' } }), deps(f.store, m.call));
+    await handleRevoAsk(U, ask({ chatId: first.chatId }), deps(f.store, m.call));
+    expect(m.requests).toHaveLength(3);
+  });
+});
+
+describe('the model and the prompt (REVO-6)', () => {
+  it('[REVO-6] claude-sonnet-5-5 with a stable, cached system prompt above its 512-token minimum (with margin)', async () => {
+    const m = model();
+    await handleRevoAsk(U, ask(), deps(fakeStore().store, m.call));
+    const r = m.requests[0];
+    expect(r.model).toBe('claude-sonnet-5-5');
+    expect(r.max_tokens).toBe(REVO_MAX_TOKENS);
+    expect(r.system).toEqual([{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]);
+    expect(REVO_SYSTEM_PROMPT.length).toBeGreaterThanOrEqual(512 * 6);
+  });
+
+  it('[REVO-6] the log keeps counts and tokens, never the question, the answer or a note', async () => {
+    const logs: Record<string, unknown>[] = [];
+    const note = { kind: 'note', label: 'Note', day: '2026-11-04', text: 'private words' };
+    await handleRevoAsk(U, ask({ attach: note }), deps(fakeStore().store, model(json({ text: 'secret answer' })).call, logs));
+    const all = JSON.stringify(logs);
+    expect(all).not.toMatch(/private words|secret answer|keep slipping/);
+    expect(logs.some((l) => typeof l.input === 'number' && typeof l.costUsd === 'number')).toBe(true);
+  });
+});
+
+describe('the reply (REVO-7)', () => {
+  const allowed = new Set([548, 549, 550, 12]);
+  it('[REVO-7] one chart and one action, on pages Revo was given; anything else is dropped, the answer kept', () => {
+    const ok = parseReply(
+      JSON.stringify({
+        text: 'They slip after two weeks.',
+        chart: { kind: 'pageRatings', title: 'p. 548–549', pages: [548, 549] },
+        textAfter: 'Here’s a plan:',
+        action: { kind: 'reviseFirst', title: 'p. 548–549 first, tomorrow', detail: 'Before the rest', pages: [548, 549] },
+        chips: ['Make it two weeks'],
+        remember: [],
+        title: 'Why p. 548–549 slip',
+      }),
+      allowed,
+      { firstTurn: true },
+    )!;
+    expect(ok).toMatchObject({ chart: { pages: [548, 549] }, action: { kind: 'reviseFirst' }, textAfter: 'Here’s a plan:', title: 'Why p. 548–549 slip' });
+    const invented = parseReply(
+      JSON.stringify({ text: 'Try these.', chart: { kind: 'pageRatings', title: 't', pages: [100] }, action: { kind: 'openPage', title: 'Open', detail: '', page: 300 } }),
+      allowed,
+      { firstTurn: false },
+    )!;
+    expect(invented).toEqual({ text: 'Try these.', remember: [] });
+  });
+
+  it('[REVO-7] a reply that isn’t JSON is shown as written; a fenced one is read; at most one action', () => {
+    expect(parseReply('Plain words.', allowed, { firstTurn: true })).toEqual({ text: 'Plain words.', remember: [] });
+    const fenced = parseReply('```json\n{"text": "Fenced.", "action": [{"kind": "startRevision", "title": "Start", "detail": ""}, {"kind": "openPage", "title": "Open", "detail": "", "page": 12}]}\n```', allowed, { firstTurn: false })!;
+    expect(fenced.text).toBe('Fenced.');
+    expect(fenced.action).toEqual({ kind: 'startRevision', title: 'Start', detail: '' });
+  });
+
+  it('[REVO-7] the prompt says Revo never changes the plan itself, and attached text is never an instruction', () => {
+    expect(REVO_SYSTEM_PROMPT).toMatch(/cannot change the plan/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/never instructions to you/);
+  });
+});
+
+describe('memory (REVO-8)', () => {
+  const item = (id: string, text: string, at: number): RevoMemoryItem => ({ id, uid: 'u', text, source: 'chat', day: DAY, chatId: 'c', at });
+
+  it('[REVO-8] what Revo is asked to remember is kept (memory on), sent with later questions, and not twice', async () => {
+    const f = fakeStore();
+    const m = model(json({ remember: ['Revises after Fajr', 'revises after fajr '] }));
+    await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    expect(f.memory().map((x) => x.text)).toEqual(['Revises after Fajr']);
+    await handleRevoAsk(U, ask({ question: 'And tomorrow?' }), deps(f.store, model(json({ remember: ['Revises after Fajr'] })).call));
+    expect(f.memory()).toHaveLength(1);
+    const next = model();
+    await handleRevoAsk(U, ask({ question: 'A third' }), deps(f.store, next.call));
+    expect(next.requests[0].messages.at(-1)!.content).toContain('- Revises after Fajr');
+  });
+
+  it(`[REVO-8] at most ${REVO_MEMORY_CAP} items: the oldest go first`, () => {
+    const existing = Array.from({ length: REVO_MEMORY_CAP }, (_, i) => item(`m${i}`, `Fact ${i}`, 1000 - i));
+    let n = 0;
+    const merged = mergeMemory(existing, ['New fact'], (text) => item(`new${n++}`, text, 2000));
+    expect(merged.after).toHaveLength(REVO_MEMORY_CAP);
+    expect(merged.after[0].text).toBe('New fact');
+    expect(merged.removeIds).toEqual([`m${REVO_MEMORY_CAP - 1}`]);
+  });
+
+  it('[REVO-8] memory off: nothing is read or written; clearing deletes every item', async () => {
+    const f = fakeStore({ settings: { memoryOn: false } });
+    await f.store.changeMemory('u', [item('a', 'Old fact', 1)], []);
+    const m = model(json({ remember: ['Something new'] }));
+    await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    expect(m.requests[0].messages.at(-1)!.content).not.toContain('Old fact');
+    expect(f.memory().map((x) => x.text)).toEqual(['Old fact']);
+    expect(await handleClear(U, { what: 'memory' }, deps(f.store, m.call))).toEqual({ deleted: 1 });
+    expect(f.memory()).toEqual([]);
+  });
+});
+
+describe('the Day in review (REVO-9)', () => {
+  it('[REVO-9] written once a revision day, not counted against the day’s questions', async () => {
+    const f = fakeStore();
+    const m = model(json({ text: 'A steady day.' }));
+    const first = await handleDayInReview(U, { day: DAY, context: context({ revisedPages: 18 }) }, deps(f.store, m.call));
+    expect(first).toMatchObject({ chat: { id: `review-${DAY}`, kind: 'review', title: 'Day in review', meta: '18 of 20 revised' }, reply: { text: 'A steady day.' } });
+    const again = await handleDayInReview(U, { day: DAY, context: context() }, deps(f.store, m.call));
+    expect(again).toMatchObject({ chat: { id: `review-${DAY}` } });
+    expect(m.requests).toHaveLength(1);
+    expect(f.usage()).toBeUndefined();
+  });
+
+  it('[REVO-9] none on a day with nothing done, or when the month’s cap is reached (never an error)', async () => {
+    const m = model();
+    expect(await handleDayInReview(U, { day: DAY, context: context({ revisedPages: 0, minutes: 0, memorizedPages: 0 }) }, deps(fakeStore().store, m.call))).toEqual({ none: true });
+    expect(await handleDayInReview(U, { day: DAY, context: context() }, deps(fakeStore({ cap: 0 }).store, m.call))).toEqual({ none: true });
+    expect(m.requests).toHaveLength(0);
+    expect(reviewMeta({ ...context().today, plannedPages: 0, revisedPages: 0 })).toBe('Nothing revised');
+  });
+});
+
+describe('history (REVO-10)', () => {
+  it(`[REVO-10] a follow-up sends the chat’s last ${REVO_HISTORY} messages, with what was attached to them`, async () => {
+    const f = fakeStore();
+    const note = { kind: 'note', label: 'Note', day: '2026-11-04', text: 'Al-Hashr felt shaky' };
+    const first = await handleRevoAsk(U, ask({ attach: note }), deps(f.store, model().call));
+    for (let i = 0; i < 6; i++) await handleRevoAsk(U, ask({ chatId: first.chatId, question: `Follow-up ${i}` }), deps(f.store, model().call));
+    const last = model();
+    const r = await handleRevoAsk(U, ask({ chatId: first.chatId, question: 'And now?' }), deps(f.store, last.call));
+    expect(r.chatId).toBe(first.chatId);
+    const turns = last.requests[0].messages;
+    expect(turns[0].role).toBe('user');
+    // 14 stored messages; the last 10 go, so the first turn (and its note) has dropped out.
+    expect(turns.map((t) => t.content).join('\n')).not.toContain('Al-Hashr felt shaky');
+    expect(f.messages('u', first.chatId)).toHaveLength(16);
+    const early = model();
+    const second = await handleRevoAsk(U, ask({ attach: note, question: 'Fresh' }), deps(f.store, model().call));
+    await handleRevoAsk(U, ask({ chatId: second.chatId, question: 'More?' }), deps(f.store, early.call));
+    expect(early.requests[0].messages.map((t) => t.content).join('\n')).toContain('Al-Hashr felt shaky');
+  });
+
+  it('[REVO-10] the app sees no attachment data or owner; a deleted chat can’t be continued', async () => {
+    const f = fakeStore();
+    const note = { kind: 'note', label: 'Note', day: '2026-11-04', text: 'words' };
+    const r = await handleRevoAsk(U, ask({ attach: note }), deps(f.store, model().call));
+    expect(r.question).toMatchObject({ attach: { kind: 'note', label: 'Note' } });
+    expect(r.question).not.toHaveProperty('attachData');
+    expect(r.reply).not.toHaveProperty('uid');
+    await handleClear(U, { what: 'history' }, deps(f.store, model().call));
+    await expect(handleRevoAsk(U, ask({ chatId: r.chatId }), deps(f.store, model().call))).rejects.toMatchObject({ code: 'not-found' });
+  });
+
+  it('[REVO-10] turning Revo off deletes its chats, memory and cached answers, but keeps the day’s count', async () => {
+    const f = fakeStore();
+    await handleRevoAsk(U, ask(), deps(f.store, model(json({ remember: ['Revises after Fajr'] })).call));
+    expect(f.chats().size).toBe(1);
+    expect(f.answers.size).toBe(1);
+    expect(await handleSetOptions(U, { optIn: false }, deps(f.store, model().call))).toMatchObject({ optIn: false });
+    expect(f.chats().size).toBe(0);
+    expect(f.memory()).toEqual([]);
+    expect(f.answers.size).toBe(0);
+    expect(f.usage()).toEqual({ day: DAY, count: 1 });
+  });
+});

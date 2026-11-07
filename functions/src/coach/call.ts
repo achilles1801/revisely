@@ -4,7 +4,6 @@
  * Each attempt has a timeout. The key is passed in (from the ANTHROPIC_COACH_KEY secret); it is
  * never logged, and error text returned to callers never includes it.
  */
-import { CoachRequest } from './prompt';
 import { Usage } from './pricing';
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -22,6 +21,14 @@ export class CoachCallError extends Error {
   ) {
     super(message);
   }
+}
+
+/** A Messages API body: the coach's single question, or Revo's conversation (user and assistant turns). */
+export interface MessagesRequest {
+  model: string;
+  max_tokens: number;
+  system: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[];
+  messages: { role: 'user' | 'assistant'; content: string }[];
 }
 
 export interface CoachReply {
@@ -45,7 +52,7 @@ export function backoffMs(attempt: number, retryAfter: string | null): number {
   return BASE_BACKOFF_MS * 2 ** (attempt - 1);
 }
 
-export async function callCoach(request: CoachRequest, deps: CallDeps): Promise<CoachReply> {
+export async function callCoach(request: MessagesRequest, deps: CallDeps): Promise<CoachReply> {
   const doFetch = deps.fetch ?? ((url, init) => fetch(url, init));
   const sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

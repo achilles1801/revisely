@@ -13,6 +13,7 @@
 import type { DocumentReference as DocRef, Firestore } from 'firebase-admin/firestore';
 import { DocumentReference, GeoPoint, Timestamp } from 'firebase-admin/firestore';
 import { BackupSummary, PAGE_NUMBERS, ResetError, ResetLog, ResetStore, claimReset, freshPage } from './testerReset';
+import { deleteRevoAnswers } from './revo/admin';
 
 /** The parts of a Storage bucket used here (firebase-admin's Bucket has them all). */
 export interface BucketLike {
@@ -162,6 +163,10 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
         if (snap.docs.every((d) => !d.ref.path.startsWith(`${ref.path}/`))) break;
       }
       if (notes) counts.journalNotes = notes;
+      // Revo's chats and memory went with the subcollections above; its cached answers are
+      // top-level. Its daily count (revoUsage) stays, so a reset can't refill the day.
+      const answers = await deleteRevoAnswers(db, uid);
+      if (answers) counts.revoAnswers = answers;
       return counts;
     },
 

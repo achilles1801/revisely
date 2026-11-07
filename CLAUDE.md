@@ -3,6 +3,13 @@
 Guidance for Claude Code in **Revisely**. `README.md` covers setup, tests and the branch table; this
 file is the release mechanics and the traps behind them.
 
+## How a session works
+
+- **Do the work in your own session** (Majd, Nov 6 2026). Don't hand it to sub-agents, forks or
+  new sessions: no "E2E agent", no fork per bug, no follow-up chips for work you could do yourself.
+- If a narrow, mechanical task really needs a sub-agent, set its model to `opus` explicitly. Check
+  its output yourself before you rely on it or report it.
+
 ## Branches and releases
 
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
@@ -1119,6 +1126,50 @@ To rotate one (or after a leak: revoke the old key in the portal first):
    `npx wrangler@4.153.0 tail revisely` while opening a verse in The Clear Quran on a build of that
    channel (App Store or TestFlight for live) and look for no `answered 401/403` lines.
 4. Revoke the old key in the portal.
+
+## Revo (the assistant)
+
+Revo is the in-app AI assistant (Nov 6 2026; mocks and notes `~/Documents/revisely-today-mocks/revo/`,
+privacy draft `~/Documents/revisely-stats/coach-privacy-draft.md` § R). It supersedes the Ask coach in the
+app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. Rules: BEHAVIOUR.md REVO-*.
+- **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. E2E builds show it to every
+  account, with an in-memory server (`lib/e2e/revoFake`, links `revisely://e2e/revo?optin=1&left=0&review=1&memory=1&day=…`).
+- **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (bottom-right, 14 above
+  the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the reader, a session or an
+  editor; hidden with the keyboard and while the sheet is up), and the sheet (`RevoSheetFrame`: about 55%,
+  a drag up or a conversation takes it to full height). The views: `RevoChat`, `RevoPages` (History, Memory,
+  the opt-in), `RevoPicker` (+). No Activity screen is edited: lists clear the button through
+  `useTabBarFootprint` (`lib/revo/presence`). Another screen opens Revo with `openRevo({ attach })` (e.g.
+  `insightAttachment('weakSpots')` for an Insights section's "Ask Revo"); Settings → Revo AI turns it on and off.
+- **What it is told** (`lib/revo/context`): the Insights totals and today's blocks, as numbers and page numbers,
+  built the way Home builds today. Attachments (`lib/revo/attachments`) go only with the question they were
+  picked for; a recording is its length and pages, never audio. The greeting and chips are written on the
+  phone (`lib/revo/greeting`), no call. Charts are named by the model and drawn from the phone's own data
+  (`lib/revo/charts`); an action ("Add to my plan": tomorrow's carry, `carryForTomorrow`) waits for a tap.
+- **Server** (`functions/src/revo/`): `revoAsk`, `revoDayInReview`, `revoSetOptions`, `revoClear`, with the
+  coach's key (`ANTHROPIC_COACH_KEY`), cached system prompt, retries and ledger, on `claude-sonnet-5-5`
+  (`REVO_MODEL`; the Ask coach stays on Haiku 5.5; prices per model in `coach/pricing.ts`, Sonnet 5.5's
+  caching minimum is 512 tokens). 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
+  question without an attachment kept for the day (free), the last 10 messages sent with a follow-up, up to
+  30 memory items (`users/{uid}/revoMemory`), conversations in `users/{uid}/revoChats/{id}/messages`. The
+  owner reads them and may only rate a reply, mark an action, mark a chat "plan added" and delete a memory
+  item (firestore.rules, tests in `tests/firestore-rules/revo.test.ts`). Off deletes conversations, memory and
+  kept answers; account deletion and Reset my data delete them too.
+- **The monthly cap** (shared with the Ask coach, one ledger) is `config/coach.monthlyCapUsd`: **$150** since
+  Nov 7 2026 (the plan's $200 a month of API credit, used only by Revisely, less a buffer); $10 when unset,
+  at most $1,000, read again within a minute: `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-coach-cap.js 200`
+  (`--show` prints it and the month's spend). No code change or deploy.
+- **Day in review:** from 19:00 local on a day with something done, the app asks once (`revoDayInReview`,
+  idempotent per day, `review-{day}`); it never counts toward the 20 and is skipped when capped. The
+  button's dot shows until it is opened (AsyncStorage, per account).
+- **Deploy order:** `firestore.rules` and the functions (`revoAsk,revoDayInReview,revoSetOptions,revoClear`,
+  and `askCoach,deleteUserAccount,resetMyData`, which changed with it) must be live before the app reaches
+  `develop` (it publishes to preview at once).
+- **Dictation:** the mic opens the field with the keyboard up (the keyboard's own dictation). A mic that
+  dictates by itself needs a speech module: a native build.
+- **E2E:** `.maestro/flows/09-revo.yaml` takes a screenshot of each mocked screen (`r1`…`r10`);
+  `~/Documents/revisely-today-mocks/revo/scripts/boards.py <screens folder>` puts them beside the mocks in
+  `revo/verify/`.
 
 ## Widgets (Home Screen, Lock Screen)
 

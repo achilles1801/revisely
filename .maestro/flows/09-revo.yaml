@@ -1,0 +1,163 @@
+# Revo, the assistant (previewTester accounts; an E2E build shows it to every account, with an
+# in-memory stand-in for its server: src/lib/e2e/revoFake.ts). Takes a screenshot of each
+# screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock boards.
+# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T21:41
+      BOUNDARY: midnight
+
+# The button on Home, with a Day in review waiting (the dot).
+- runFlow:
+    file: ../subflows/revo-link.yaml
+    env:
+      QUERY: review=1&memory=1&day=2026-11-03
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 15000
+- assertVisible:
+    id: revo-button-dot
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home
+
+# REVO-21: the first tap opens the opt-in.
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 10000
+- assertVisible: "Your notes and recordings stay private"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r9-opt-in
+- tapOn:
+    id: revo-turn-on
+
+# REVO-20: the greeting, from today's plan, and suggestions.
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 10000
+- assertVisible:
+    id: revo-greeting
+    text: "Salaam.* Today is .* pages, starting at p\\. .*"
+- assertVisible: "How was my week?"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r4-sheet
+
+# + : a day attached, the menu open over it.
+- tapOn:
+    id: revo-plus
+- tapOn:
+    id: revo-add-day
+- tapOn:
+    id: revo-pick-day-0
+- extendedWaitUntil:
+    visible:
+      id: revo-context-chip
+    timeout: 5000
+- tapOn:
+    id: revo-plus
+- assertVisible: "Add to your question"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r6-context
+- tapOn:
+    id: revo-plus
+- tapOn:
+    id: revo-context-remove
+
+# A conversation: a chart and one plan that waits for a tap.
+- tapOn:
+    id: revo-input
+- inputText: "Why do these two keep slipping?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-plan
+    timeout: 15000
+- assertVisible:
+    id: revo-chart-pageRatings
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5-conversation
+- tapOn:
+    id: revo-plan-do
+- extendedWaitUntil:
+    visible:
+      id: revo-plan-added
+    timeout: 10000
+
+# History: the conversation and the Day in review.
+- tapOn:
+    id: revo-history
+- extendedWaitUntil:
+    visible: "Day in review"
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r7-history
+- tapOn:
+    id: revo-back
+
+# Memory: the items, the switch, Clear.
+- tapOn:
+    id: revo-memory
+- extendedWaitUntil:
+    visible: "Let Revo remember"
+    timeout: 5000
+- assertVisible: "You like short, practical plans."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r8-memory
+- tapOn:
+    id: revo-back
+
+# REVO-22: the day's questions used.
+- runFlow:
+    file: ../subflows/revo-link.yaml
+    env:
+      QUERY: left=0&day=2026-11-03
+- extendedWaitUntil:
+    visible:
+      id: revo-limit
+    timeout: 10000
+- assertVisible: "Revo is back at midnight. Your conversations stay in History."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r10-limit
+
+# The button on Activity too.
+- swipe:
+    from:
+      id: revo-sheet-handle
+    direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 5000
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r2-fab-activity
