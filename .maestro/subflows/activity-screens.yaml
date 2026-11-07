@@ -58,17 +58,6 @@ appId: com.revisionbuddy.app
 - tapOn:
     text: "Close menu"
     optional: true
-# The rest of the day (d1 is taller than a screen): Read, Notes and the footer.
-- scrollUntilVisible:
-    element:
-      id: activity-day-footer
-    direction: DOWN
-    timeout: 10000
-    optional: true
-- runFlow:
-    file: shot.yaml
-    env:
-      NAME: 09-day-end-${THEME}
 # The + (d5): add to today.
 - tapOn:
     id: day-add
@@ -157,6 +146,18 @@ appId: com.revisionbuddy.app
     notVisible:
       id: add-note-sheet
     timeout: 10000
+# The rest of the day (d1 is taller than a screen): Read, Notes and the footer. (After the sheets,
+# whose mocks show the day's top behind them.)
+- scrollUntilVisible:
+    element:
+      id: activity-day-footer
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-end-${THEME}
 - tapOn:
     id: back
 - extendedWaitUntil:
