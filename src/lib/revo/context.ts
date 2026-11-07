@@ -9,6 +9,7 @@ import { revisionDayOf } from '../fajrBoundary';
 import { shiftDay } from '../journal';
 import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoContext, RevoTotals } from './types';
+import { contextWords } from './words';
 
 const MAX_PAGES = 20;
 const MAX_WEAK = 30;
@@ -86,6 +87,15 @@ export function buildRevoContext(input: {
     .slice(0, MAX_WEAK);
   const { reading, done: doneDays, scheduled } = snapshot.streak;
   const now = input.now ?? new Date();
+  const nextPages = next.slice(0, MAX_PAGES);
+  const weakNext = next
+    .filter((p) => {
+      const page = byNumber.get(p);
+      return page != null && isWeak(page);
+    })
+    .slice(0, MAX_PAGES);
+  // Surah and juz first (lib/passages): the model names parts of the Qur'an with these words.
+  const words = contextWords({ today: snapshot.pages, next: nextPages, weakNext, weak: weakPages });
   return {
     totals: revoTotals({ pages, logs, today, streakDays: reading.streak, plannedPerDay: user.dailyPageCapacity ?? 0 }),
     today: {
@@ -96,13 +106,8 @@ export function buildRevoContext(input: {
       otherPages: [...revisedHere].filter((p) => !list.has(p)).length,
       minutes,
       memorizedPages: memorizedToday,
-      nextPages: next.slice(0, MAX_PAGES),
-      weakNext: next
-        .filter((p) => {
-          const page = byNumber.get(p);
-          return page != null && isWeak(page);
-        })
-        .slice(0, MAX_PAGES),
+      nextPages,
+      weakNext,
       done: snapshot.status === 'completed',
     },
     weakPages,
@@ -119,6 +124,8 @@ export function buildRevoContext(input: {
         ? { previous: reading.grace.previous, yesterdayPlanned: reading.grace.progress.scheduled, yesterdayDone: reading.grace.progress.credited }
         : null,
     },
+    passages: words.passages,
+    pageNames: words.pageNames,
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }

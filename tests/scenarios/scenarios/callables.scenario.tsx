@@ -326,6 +326,9 @@ function revoContext(day: string) {
     weakPages: [585],
     week: [{ day, pages: 2, planned: 5, done: false }],
     streak: { days: 2, atRisk: null },
+    // As lib/revo/words writes them (surah and juz first).
+    passages: { today: "An-Nazi'at 16 to At-Takwir · Juz 30", next: "An-Nazi'at 16 to At-Takwir · Juz 30", nextAt: "An-Nazi'at, ayah 16", weakNext: "'Abasa · Juz 30", weak: "'Abasa · Juz 30" },
+    pageNames: { '584': "An-Nazi'at, ayahs 16–46 · Juz 30", '585': "'Abasa · Juz 30", '586': 'At-Takwir · Juz 30' },
     localTime: '20:10',
   };
 }
@@ -450,7 +453,7 @@ it('[REVO-9] [REVO-10] [REVO-8] the Day in review once a day, skipped when cappe
   // Not counted among the day's questions.
   expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
   // Nothing done that day: no review.
-  const idle = { ...revoContext('2031-09-10'), today: { plannedPages: 5, revisedPages: 0, carriedPages: 0, doneEarlier: 0, otherPages: 0, minutes: 0, memorizedPages: 0, nextPages: [582], weakNext: [], done: false } };
+  const idle = { ...revoContext('2031-09-10'), today: { plannedPages: 5, revisedPages: 0, carriedPages: 0, doneEarlier: 0, otherPages: 0, minutes: 0, memorizedPages: 0, nextPages: [582], weakNext: [], done: false }, pageNames: {} };
   setNow('2031-09-10 20:30');
   await app.act(async () => {
     review = await withAuthRetry(() => revo().dayInReview({ day: '2031-09-10', context: idle } as Parameters<ReturnType<typeof revo>['dayInReview']>[0]));

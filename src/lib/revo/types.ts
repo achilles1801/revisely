@@ -61,6 +61,13 @@ export interface RevoContext {
    * kept today by finishing yesterday's pages (SESS-6); Home shows `previous` dimmed.
    */
   streak: { days: number; atRisk: { previous: number; yesterdayPlanned: number; yesterdayDone: number } | null };
+  /**
+   * The parts of the Qur'an named above, in words, surah and juz first (lib/revo/words over
+   * lib/passages): today's pages and where they start, what's next and where it starts, the weak ones.
+   */
+  passages: { today?: string; startsAt?: string; next?: string; nextAt?: string; weakNext?: string; weak?: string };
+  /** Each page named above, in words ("Al-Hashr, ayahs 17–24 · Juz 28"), by page number. */
+  pageNames: Record<string, string>;
   localTime: string | null;
 }
 

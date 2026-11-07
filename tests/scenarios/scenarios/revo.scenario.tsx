@@ -13,6 +13,7 @@ import { withAuthRetry } from '../harness/authRetry';
 import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
+import { plainText } from '../../../src/lib/passages';
 
 /** Home and the session in a stack, with Revo mounted as MainNavigator mounts it. */
 function revoStack(mods: Booted): ReactElement {
@@ -103,7 +104,8 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   // [REVO-20] The greeting, written on the phone from today's plan (pages 1–5): no question asked.
   await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
   const greeting = String(app.screen.getByTestId('revo-greeting').props.children);
-  expect(greeting).toMatch(/^Salaam( [^.]+)?\. Today is 5 pages, starting at p\. 1\. Ask me anything about your revision\.$/);
+  // Where today starts, by surah (lib/passages), not by page number.
+  expect(plainText(greeting)).toMatch(/^Salaam( [^.]+)?\. Today is 5 pages, starting at Al-Fatihah\. Ask me anything about your revision\.$/);
   expect(app.screen.getByTestId('revo-chip-How was my week?')).toBeTruthy();
   expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
 

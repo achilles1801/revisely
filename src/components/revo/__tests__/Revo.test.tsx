@@ -3,6 +3,7 @@ import { Alert, ScrollView, DeviceEventEmitter, StyleSheet } from 'react-native'
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { __setRevoBackendForTests, RevoError, type RevoBackend } from '../../../lib/revo/backend';
+import { plainText } from '../../../lib/passages';
 import { createMemoryRevoBackend } from '../../../lib/revo/memoryBackend';
 import type { RevoContext } from '../../../lib/revo/types';
 import { RevoBoundary } from '../RevoBoundary';
@@ -38,6 +39,8 @@ const ctx: RevoContext = {
   weakPages: [548, 549],
   week: [{ day: DAY, pages: 6, planned: 20, done: false }],
   streak: { days: 12, atRisk: null },
+  passages: {},
+  pageNames: {},
   localTime: '21:41',
 };
 const mockSaveUser = jest.fn(async () => undefined);
@@ -111,10 +114,10 @@ describe('Revo’s conversation', () => {
   it('opens on the greeting from today’s data, with suggestions; nothing asked yet', async () => {
     render(<Chat />);
     await flush();
-    expect(screen.getByTestId('revo-greeting').props.children).toBe(
-      'Salaam Maryam. You’re 6 pages into today, and p. 548–549 are coming up next. They’re rated weak. Want a short plan for them?',
+    expect(plainText(String(screen.getByTestId('revo-greeting').props.children))).toBe(
+      'Salaam Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. It’s rated weak. Want a short plan for it?',
     );
-    expect(screen.getByTestId('revo-chip-Plan p. 548–549')).toBeTruthy();
+    expect(screen.getByTestId('revo-chip-Plan Al-Hashr to Al-Mumtahanah')).toBeTruthy();
     expect(backend.state().usage.count).toBe(0);
     fireEvent.press(screen.getByTestId('revo-greeting-copy'));
     expect(mockCopy).toHaveBeenCalledWith(expect.stringMatching(/^Salaam Maryam\./));
@@ -124,7 +127,7 @@ describe('Revo’s conversation', () => {
     render(<Chat />);
     await flush();
     await act(async () => {
-      fireEvent.press(screen.getByTestId('revo-chip-Plan p. 548–549'));
+      fireEvent.press(screen.getByTestId('revo-chip-Plan Al-Hashr to Al-Mumtahanah'));
     });
     await flush();
     expect(screen.getByTestId('revo-question')).toBeTruthy();
@@ -145,7 +148,7 @@ describe('Revo’s conversation', () => {
     render(<Chat />);
     await flush();
     await act(async () => {
-      fireEvent.press(screen.getByTestId('revo-chip-Plan p. 548–549'));
+      fireEvent.press(screen.getByTestId('revo-chip-Plan Al-Hashr to Al-Mumtahanah'));
     });
     await flush();
     await act(async () => {

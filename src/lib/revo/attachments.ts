@@ -5,9 +5,9 @@
 import type { JournalNote, ReadingSession, RevisionLog, User, UserPage } from '../../types';
 import { reviewedOn } from '../aheadCredit';
 import { revisionDayOf } from '../fajrBoundary';
-import { getAllSurahs, getSurahForPage } from '../quranData';
+import { getAllSurahs } from '../quranData';
 import type { RecordingMeta } from '../recordings';
-import { pagesLabel } from './greeting';
+import { juzOf, passageShort } from './words';
 import type { RevoAttachment, RevoInsight } from './types';
 
 const MAX_PAGES = 60;
@@ -66,7 +66,7 @@ export function pageAttachment(input: { pages: number[]; label?: string; logs: r
   const byNumber = new Map(input.userPages.map((p) => [p.pageNumber, p]));
   return {
     kind: 'page',
-    label: (input.label ?? pagesLabel(input.pages)).slice(0, 60),
+    label: (input.label ?? passageShort(input.pages)).slice(0, 60),
     pages: input.pages.slice(0, MAX_PAGES).map((page) => {
       const p = byNumber.get(page);
       const memorized = p?.status === 'memorized';
@@ -94,7 +94,8 @@ export function findPagesOrSurahs(text: string): { label: string; pages: number[
   if (!q) return [];
   const n = Number(q.replace(/^p\.?\s*/, ''));
   if (Number.isInteger(n) && n >= 1 && n <= 604) {
-    return [{ label: `p. ${n}`, pages: [n], detail: getSurahForPage(n).name }];
+    // Asked by page number: the part it holds first, the page after it.
+    return [{ label: passageShort([n]), pages: [n], detail: `p. ${n} · ${juzOf([n])}` }];
   }
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z؀-ۿ]/g, '');
   const want = plain(q);
@@ -102,7 +103,7 @@ export function findPagesOrSurahs(text: string): { label: string; pages: number[
   return getAllSurahs()
     .filter((s) => plain(s.name).includes(want) || s.nameArabic.includes(q))
     .slice(0, 8)
-    .map((s) => ({ label: s.name, pages: surahPages(s.number), detail: `${pagesLabel([s.startPage, s.endPage].filter((v, i, a) => a.indexOf(v) === i))}` }));
+    .map((s) => ({ label: s.name, pages: surahPages(s.number), detail: juzOf(surahPages(s.number)) }));
 }
 
 export function noteAttachment(note: Pick<JournalNote, 'text' | 'at'> & { day: string }): RevoAttachment {
