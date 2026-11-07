@@ -15,6 +15,12 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: tester
+# Revo's functions run once each first, changing nothing (as in 09-revo): a function's first
+# signed-in call in the emulator is slow on a CI macOS runner (17–22 s).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: warm
 - runFlow: ../subflows/seed-revo.yaml
 # Tue 27 October with ratings, a timed read and two notes: every row of the day preview (a4).
 - runScript: ../scripts/seed-revo-day.js

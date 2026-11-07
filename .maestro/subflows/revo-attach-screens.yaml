@@ -25,9 +25,13 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-add-search
 - inputText: "Al-Hashr 1-10"
+# By id, under its "Ayahs" header: on iOS a row is one checkbox, and Maestro matches its value
+# ("checkbox, unchecked"), not its label ("Al-Hashr, ayahs 1–10. …", what VoiceOver reads).
 - extendedWaitUntil:
-    visible: "Al-Hashr, ayahs 1.10"
+    visible:
+      id: revo-add-result-0
     timeout: 5000
+- assertVisible: "Ayahs"
 - runFlow:
     file: shot.yaml
     env:
