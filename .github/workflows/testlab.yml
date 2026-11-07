@@ -8,8 +8,11 @@ name: Real devices (Test Lab)
 # day on the Blaze plan. A crash or an ANR on any phone goes to the develop-red issue
 # (scripts/e2e/develop-red.js, platform "Real Android phones"); a clean night clears it.
 #
-# Robo never presses Sign out or Delete account (ignored by id). Maestro can't drive Test Lab's
-# phones; the flows stay on emulators.
+# One Firebase backend serves store users and testers alike, so the crawl's account is a tester
+# (previewTester) used for nothing else, and Robo never presses what could reach past it or cost:
+# Sign out, Delete account, Reset my data, Load test scenario, and Revo (its button and its switch,
+# which would call the model). All ignored by id. Maestro can't drive Test Lab's phones; the flows
+# stay on emulators.
 #
 # It skips, with a notice, until set up (TESTING.md lists the steps): repository secrets
 # TESTLAB_SA_KEY (a service account allowed to run Test Lab), TESTLAB_EMAIL, TESTLAB_PASSWORD (the
@@ -128,8 +131,8 @@ jobs:
           node scripts/testlab/testlab.js devices "$RUNNER_TEMP/models.json" > "$RUNNER_TEMP/devices.txt"
           cat "$RUNNER_TEMP/devices.txt"
 
-      # Robo signs in with the account's fields (by their ids) and never presses Sign out or
-      # Delete account. gcloud exits non-zero when a phone failed: the results step decides.
+      # Robo signs in with the account's fields (by their ids) and never presses the controls listed
+      # at the top. gcloud exits non-zero when a phone failed: the results step decides.
       - name: Robo crawl
         if: steps.ready.outputs.ok == 'true'
         env:
@@ -141,7 +144,7 @@ jobs:
             --app "$RUNNER_TEMP/testlab/revisely-testlab.apk" \
             $(cat "$RUNNER_TEMP/devices.txt") \
             --timeout 300s \
-            --robo-directives "text:auth-email=$EMAIL,text:auth-password=$PASSWORD,click:auth-submit=,ignore:settings-sign-out=,ignore:settings-delete-account=" \
+            --robo-directives "text:auth-email=$EMAIL,text:auth-password=$PASSWORD,click:auth-submit=,ignore:settings-sign-out=,ignore:settings-delete-account=,ignore:settings-reset-data=,ignore:settings-test-scenario=,ignore:revo-button=,ignore:revo-settings-switch=" \
             --format=json > "$RUNNER_TEMP/outcomes.json"
           echo "gcloud exited $?"
           cat "$RUNNER_TEMP/outcomes.json"

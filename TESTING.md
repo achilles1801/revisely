@@ -143,6 +143,12 @@ Revo history, and fetches one block of The Clear Quran through the worker. Anyth
 fails the run and opens (or comments on) a **`live-smoke`** issue mentioning the owner; a pass closes
 it. It never prints a token, a key or the account's id.
 
+One Firebase backend serves store users and testers alike, so the account is a tester used for nothing
+else, and the check writes only through tester-only features (Revo) to that account's own documents;
+nothing a store user could see. The one shared thing it touches is a read: verse 1:1 through the worker,
+which costs one of the worker's daily requests to The Clear Quran only when the data centre's cache
+misses.
+
 It skips with a notice until it is set up. **Majd's steps** (production data, so only he does them):
 
 1. Create the account: an email and password used for nothing else (not the App Review account), signed
@@ -169,7 +175,9 @@ release-config build of develop (production's config; App Check's debug provider
 registered for it, since Play Integrity can't vouch for an app installed outside Play; no Sentry, so
 its crashes never count against production's gate; no updates) crawled by Test Lab's Robo on three
 physical phones (a Pixel, a Galaxy S, a Galaxy A, each at its newest Android), signed in with its own
-account, five minutes a phone. Robo never presses Sign out or Delete account. A crash or an ANR on
+account, five minutes a phone. One Firebase backend serves store users and testers alike, so that
+account is a tester used for nothing else, and Robo never presses Sign out, Delete account, Reset my
+data, Load test scenario or Revo (its button and its switch, which would call the model). A crash or an ANR on
 any phone goes to the `develop-red` issue as "Real Android phones (Test Lab)"; a clean night clears
 it. Test Lab's no-cost use on the Blaze plan is 30 minutes of physical devices a day ($5 a
 device-hour beyond, per minute; Firebase says not every Blaze project has the same quota, so check
@@ -184,8 +192,9 @@ It skips with a notice until set up. **Majd's steps** (Google Cloud and producti
    Analytics Viewer**; Keys → Add key → JSON. Repository secret `TESTLAB_SA_KEY` = the file's text
    (then delete the file). (Workload Identity Federation instead of a key also works; the workflow's
    auth step would change.)
-3. A production account for the crawl only (email and password, onboarded with a plan, not a
-   tester, not the App Review account). Secrets `TESTLAB_EMAIL`, `TESTLAB_PASSWORD`.
+3. A production account for the crawl only (email and password, onboarded with a plan, not the App
+   Review account), made a tester like the smoke account (`set-preview-tester.js`). Secrets
+   `TESTLAB_EMAIL`, `TESTLAB_PASSWORD`.
 4. Firebase Console → App Check → Apps → the **Android** app → Manage debug tokens → Add ("Test
    Lab"). Secret `TESTLAB_APPCHECK_TOKEN`.
 5. Actions → Real devices (Test Lab) → Run workflow. The first run shows whether Robo signed in

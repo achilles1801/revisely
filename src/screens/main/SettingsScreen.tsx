@@ -756,6 +756,7 @@ export default function SettingsScreen() {
                 value={revoSettings?.optIn === true}
                 onValueChange={(v) => (v ? openRevo({ view: 'optin' }) : confirmRevoOff())}
                 accessibilityLabel="Revo"
+                testID="revo-settings-switch"
               />
             </View>
             {revoSettings?.optIn ? (
@@ -899,6 +900,7 @@ export default function SettingsScreen() {
                 subtitle="Start again as a new account"
                 destructive
                 onPress={() => setResetSheet(true)}
+                testID="settings-reset-data"
               />
             </View>
             {showsTestScenarios(user) && (
@@ -909,6 +911,7 @@ export default function SettingsScreen() {
                   subtitle="Replace your data with a ready-made situation"
                   destructive
                   onPress={() => setScenarioSheet(true)}
+                  testID="settings-test-scenario"
                 />
               </View>
             )}
