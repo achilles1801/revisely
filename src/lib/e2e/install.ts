@@ -40,6 +40,14 @@ export function installE2E(): void {
     .then(handle)
     .catch(() => undefined);
   ready = Promise.all([link, pinFreshTheme()]).then(() => undefined);
+  // PROBE (not for merge): the JS thread's stalls, to tell them from the UI thread's (logcat).
+  let last = Date.now();
+  setInterval(() => {
+    const now = Date.now();
+    // eslint-disable-next-line no-console
+    if (now - last > 1000) console.log(`[e2e] probe js stall ${now - last - 250} ms`);
+    last = now;
+  }, 250);
   // eslint-disable-next-line no-console
   console.log('[e2e] installed: revisely-e2e-build');
 }

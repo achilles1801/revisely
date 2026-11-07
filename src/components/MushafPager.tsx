@@ -498,9 +498,23 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
       showsHorizontalScrollIndicator={false}
       onViewableItemsChanged={handleViewableItemsChanged}
       onScrollBeginDrag={() => {
+        // eslint-disable-next-line no-console
+        if (process.env.EXPO_PUBLIC_E2E === '1') console.log(`[e2e] probe pager drag begins (shown ${shownIndexRef.current})`);
         dragFromRef.current = shownIndexRef.current;
         draggedRef.current = true;
       }}
+      {...(process.env.EXPO_PUBLIC_E2E === '1'
+        ? {
+            // eslint-disable-next-line no-console
+            onTouchStart: (e: { nativeEvent: { pageX: number; pageY: number } }) => console.log(`[e2e] probe pager touch start ${Math.round(e.nativeEvent.pageX)},${Math.round(e.nativeEvent.pageY)}`),
+            // eslint-disable-next-line no-console
+            onTouchEnd: () => console.log('[e2e] probe pager touch end'),
+            // eslint-disable-next-line no-console
+            onTouchCancel: () => console.log('[e2e] probe pager touch CANCEL'),
+            // eslint-disable-next-line no-console
+            onMomentumScrollEnd: (e: { nativeEvent: { contentOffset: { x: number } } }) => console.log(`[e2e] probe pager settled at x=${Math.round(e.nativeEvent.contentOffset.x)}`),
+          }
+        : {})}
       viewabilityConfig={viewabilityConfig}
       getItemLayout={(_, index) => ({
         length: SCREEN_WIDTH,

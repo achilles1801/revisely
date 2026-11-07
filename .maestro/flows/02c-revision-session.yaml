@@ -1,0 +1,152 @@
+# Today's revision session: leaving with nothing marked, swiping pages, leaving
+# and coming back, the check, and finishing on the end card. Day one is pages
+# 1, 582–590 (subflows/onboard.yaml).
+# Rules (BEHAVIOUR.md): SESS-1, SESS-2, SESS-3
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+
+# SESS-3: leaving with nothing marked saves nothing.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow: ../subflows/show-controls.yaml
+- assertVisible:
+    id: session-page
+    text: "Page 1 · .*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-session-page
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-cta
+      text: "Start revision"
+    timeout: 10000
+- assertVisible:
+    id: today-title
+    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+
+# SESS-1: swiping off a page marks it revised (1, 582, 583).
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: 3/10
+- assertVisible:
+    id: session-quiet-count
+    text: "Juz 30 · 3/10"
+- runFlow: ../subflows/show-controls.yaml
+# SESS-3: Back saves what was marked; Home continues at the first page not done.
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at An.Nazi.at, p..584.*"
+    timeout: 10000
+- assertVisible:
+    id: today-summary
+    text: ".*3 of 10 pages done"
+- assertVisible:
+    id: today-cta
+    text: "Continue revision"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-home-continue
+
+# SESS-1: the check marks and unmarks the page on screen.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 30 · 3/10"
+- runFlow: ../subflows/show-controls.yaml
+- assertVisible:
+    id: session-page
+    text: "Page 584 · .*"
+- tapOn: "Mark current page as revised"
+- assertVisible:
+    id: session-title
+    text: ".*4/10"
+- tapOn: "Unmark current page"
+- assertVisible:
+    id: session-title
+    text: ".*3/10"
+
+# The rest (584–590), the last by swiping onto the end card.
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: 10 pages revised today
+
+# SESS-2: every page is in: Home says Done.
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 10.pages"
+    timeout: 10000
+- assertVisible:
+    id: today-cta
+    text: "Review session"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-home-done
+
+# The Insights tab before Smart Tracking is set up: it is in the tab bar (a tap
+# opens the Smart Tracking preview) but not a page of the pager. A swipe past
+# Read opens the preview too; it used to spring back as if it were too short.
+- tapOn:
+    id: tab-Read
+- extendedWaitUntil:
+    visible:
+      id: read-index-v2
+    timeout: 10000
+# Swiped again if the preview hasn't come up (a slow simulator); before the fix,
+# no number of swipes opened it.
+- repeat:
+    while:
+      notVisible:
+        id: smart-preview
+    times: 3
+    commands:
+      - swipe:
+          start: 85%, 55%
+          end: 10%, 55%
+          duration: 300
+      - waitForAnimationToEnd:
+          timeout: 3000
+- assertVisible:
+    id: smart-preview
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-smart-preview
+# Closing it keeps the account as it was (the preview is not marked seen).
+- tapOn:
+    id: preview-close
+- extendedWaitUntil:
+    notVisible:
+      id: smart-preview
+    timeout: 5000
+- assertVisible:
+    id: read-index-v2
