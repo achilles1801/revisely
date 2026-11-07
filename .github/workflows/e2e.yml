@@ -295,7 +295,8 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
     runs-on: macos-26
-    timeout-minutes: 90
+    # Each flow run twice (a change to shared test code): twice the flows' time.
+    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
     # The macOS runner takes 4–14 minutes a flow, and a native build 20 to 35
     # (when the fingerprint has none kept: a native change). (On Nov 4 a third job
     # sometimes waited for a macOS runner until GitHub gave up on it; none has since,
@@ -575,7 +576,8 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_android == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Each flow run twice (a change to shared test code): twice the flows' time.
+    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
     strategy:
       fail-fast: false
       matrix:
