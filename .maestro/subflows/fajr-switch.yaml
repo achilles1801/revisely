@@ -5,10 +5,13 @@ appId: com.revisionbuddy.app
 ---
 - tapOn:
     id: open-settings
+# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap
+# (on iOS Maestro counts a row cut off there as visible).
 - scrollUntilVisible:
     element:
       id: fajr-boundary-switch
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - tapOn:
     id: fajr-boundary-switch
