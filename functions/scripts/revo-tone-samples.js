@@ -168,6 +168,14 @@ async function ask(build, ctx) {
 }
 
 const words = (s) => (s ? s.trim().split(/\s+/).length : 0);
+// Surah-first (the owner's rule): does the answer name a surah or juz, and does it give page numbers?
+const SURAH_OR_JUZ = /\b(?:Al|An|At|As|Ash|Ad|Adh|Ar|Az)-[A-Z]|'Abasa|\bJuz \d/;
+const PAGE_NUMBER = /\bpages? \d|\bp\. ?\d/i;
+function namesNote(r) {
+  if (!r.reply) return '';
+  const all = [r.reply.text, r.reply.textAfter, r.reply.action?.title, r.reply.action?.detail, r.reply.chart?.title].filter(Boolean).join(' ');
+  return ` · names a surah or juz: ${SURAH_OR_JUZ.test(all) ? 'yes' : 'no'} · page numbers: ${PAGE_NUMBER.test(all) ? 'yes' : 'none'}`;
+}
 
 function show(r) {
   if (!r.reply) return `> (no answer: ${r.stop}) \`${r.raw.slice(0, 200)}\``;
@@ -177,7 +185,7 @@ function show(r) {
   if (textAfter) out.push(`> ${textAfter}`);
   if (action) out.push(`> **[${action.title}]**${action.detail ? ` ${action.detail}` : ''}`);
   if (chips?.length) out.push(`> Suggestions: ${chips.map((c) => `“${c}”`).join(', ')}`);
-  out.push('', `<sub>${words(text)} words · ${r.out} output tokens · stop: ${r.stop}</sub>`);
+  out.push('', `<sub>${words(text)} words · ${r.out} output tokens · stop: ${r.stop}${namesNote(r)}</sub>`);
   return out.join('\n');
 }
 

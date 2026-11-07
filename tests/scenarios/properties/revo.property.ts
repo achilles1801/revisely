@@ -322,6 +322,15 @@ describe('how Revo talks (REVO-27)', () => {
     expect(REVO_SYSTEM_PROMPT).toContain('Never guess.');
   });
 
+  it('[REVO-27] nothing in the prompt has Revo name pages by default: page numbers only as the surah-first rule allows', () => {
+    expect(REVO_SYSTEM_PROMPT).toContain('Page numbers refer to the Madani mushaf (1–604); use them only as described above.');
+    expect(REVO_SYSTEM_PROMPT).not.toMatch(/say [“"]page/i);
+    expect(REVO_SYSTEM_PROMPT).not.toMatch(/speak of ayahs only/i);
+    // Every example Revo is given to copy names surahs or juz, never a page.
+    const examples = [...REVO_SYSTEM_PROMPT.matchAll(/“([^”]+)”/g)].map((m) => m[1]);
+    expect(examples.filter((e) => /\bpages? \d|p\. \d/.test(e) && !/^Al-Baqarah, p\. 288$/.test(e))).toEqual([]);
+  });
+
   it('[REVO-27] a Day in review chat opens with its weekday, and an attached day goes without its date', () => {
     const review: StoredMessage = { id: 'r', role: 'revo', text: 'A steady day.', at: 1 } as StoredMessage;
     const r = buildAskRequest({ day: DAY, question: 'And tomorrow?', context: context(), attach: null, memory: [], history: [review], chat: { kind: 'review', day: '2026-11-05' } });
