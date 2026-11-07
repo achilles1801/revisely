@@ -67,6 +67,7 @@ jest.mock('../../../services/firestoreService', () => ({
 const mockQueue = { queueChange: jest.fn(async (..._a: unknown[]) => ({})) };
 jest.mock('../../../lib/offline/queue', () => ({
   queueChange: (...a: unknown[]) => mockQueue.queueChange(...a),
+  currentAccount: () => null,
   withPendingReadings: (list: unknown) => list,
   withPendingJournal: (list: unknown) => list,
   withPendingJournalDay: (_date: string, base: unknown) => base ?? null,

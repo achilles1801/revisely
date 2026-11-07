@@ -4,7 +4,7 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,6 +28,11 @@ import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
 type SheetAction = ContextMenuAction;
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
+import { overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { pendingEntries } from '../../lib/offline/outbox';
+import { currentAccount } from '../../lib/offline/queue';
+
+const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
 /** Whether the Activity blocks show (the preview testers, while C2 is built). */
 export const activityBlocksEnabled = (user: { previewTester?: boolean } | null | undefined) => user?.previewTester === true;
@@ -125,18 +130,43 @@ export function DayBlocks({
   const [recs, setRecs] = useState<RecordingMeta[]>([]);
   // Stable: useActivityReload runs `load` in a focus effect keyed on it, so a new function
   // each render reloaded the day on every render, forever (ACT-9).
+  // Loads can overlap (an add joins the outbox, then reaches the server a moment later): only the
+  // newest one's answer is shown, or an older read from before the server had the add could land
+  // last and hide it.
+  const loads = useRef(0);
+  // The server's last answer for this day, under the changes still waiting.
+  const served = useRef<{ day: string; items: DayItems } | null>(null);
   const load = useCallback(() => {
+    const n = ++loads.current;
+    // What the server has, with the changes still waiting on this phone laid over it (ACT-13): an
+    // add shows at once, offline too.
+    const withPending = (items: DayItems) => {
+      const uid = currentAccount();
+      return uid ? overlayDayItems(items, pendingEntries(uid), day, uid) : items;
+    };
+    // At once, from the last answer: an add shows without waiting for the read below.
+    if (served.current?.day === day) setItems(withPending(served.current.items));
     firestoreService
       .getActivityItemsForDay(day)
-      .then(setItems)
-      .catch((err) => logger.warn('Could not load the day’s Activity items', err));
+      .then((items) => {
+        if (n !== loads.current) return;
+        served.current = { day, items };
+        setItems(withPending(items));
+      })
+      .catch((err) => {
+        logger.warn('Could not load the day’s Activity items', err);
+        if (n !== loads.current) return;
+        // Offline and not in Firestore's memory: what is waiting here still shows.
+        const waiting = withPending(EMPTY_DAY);
+        if (waiting !== EMPTY_DAY) setItems(waiting);
+      });
     listRecordings()
       .then((all) => setRecs(all.filter((r) => r.day === day)))
       .catch((err) => logger.warn('Could not list the day’s recordings', err));
   }, [day]);
   const revRecs = recs.filter((r) => r.kind === 'revision');
   const readRecs = recs.filter((r) => r.kind === 'reading');
-  useActivityReload(load);
+  useActivityReload(load, day);
 
   const memorizedSet = useMemo(() => new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
   const ratingByPage = useMemo(() => new Map(pages.map((p) => [p.pageNumber, p.weaknessRating])), [pages]);
