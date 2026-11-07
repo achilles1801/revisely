@@ -16,13 +16,15 @@ appId: com.revisionbuddy.app
 
 - tapOn:
     id: open-settings
-# Centred: at the screen's foot the row sits under the tab bar, which takes the tap.
+# The last row: on to the end of Settings, where it sits above the tab bar. Found at the screen's
+# foot, it sat under the tab bar, which took the tap (Android); and a last row can't be centred,
+# so centring it timed out on iOS, with the row in plain view (#328's run, Nov 7 2026).
 - scrollUntilVisible:
     element:
       id: settings-delete-account
     direction: DOWN
-    centerElement: true
     timeout: 20000
+- scroll
 - tapOn:
     id: settings-delete-account
 # Two confirmations (Settings), then the server deletes.
