@@ -577,6 +577,16 @@ hard-coded token was deleted from the console on 2026-10-27.
     flows keeps them as the artifact `e2e-<platform>-screens-<job>-<run>` (14 days):
     `gh run download <run> -p 'e2e-*-screens-*'`. Check a visual change there, not on Majd's
     simulator.
+  - **Visual regression** (Nov 7 2026; `.maestro/README.md`, "Screenshots"): after the flows, each
+    job compares its screenshots with the approved baselines in `.maestro/baselines/<platform>/`
+    (`.maestro/visual/`: status bar cropped, what varies between runs masked, pixelmatch). A
+    screen that changed fails E2E, with a board (baseline | this run | differences) in the
+    artifact `e2e-<platform>-visual-…`; a screen with no baseline is only reported. **An intended
+    change is approved in the same PR:** `node .maestro/visual/approve.mjs <run id>` (after
+    `npm ci --prefix .maestro/visual`), look at the PNGs, commit `.maestro/baselines/`. A single PR
+    runs Android's smoke flows only: for a change iOS or other flows show, run E2E by hand on the
+    branch (both platforms) and approve from that run. Activity, Insights and Revo have no
+    baselines yet (being rebuilt): approve theirs once their boards match the mocks.
   - **Cached builds:** the native build is kept per fingerprint, so a JavaScript-only change only
     re-bundles. A PR restores develop's (pushes keep it there) and the nightly run's (kept on
     `main`); a stack's upper layers see only `main`'s, so after a native change they build once,

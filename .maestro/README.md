@@ -14,7 +14,8 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 
 Every run that ran flows keeps their screenshots of key screens (`subflows/shot.yaml`;
 `<flow>/run/takeScreenshot/<name>.png` under the results) as the artifact
-`e2e-<platform>-screens-<job>-<run>`.
+`e2e-<platform>-screens-<job>-<run>`, and compares them with the approved baselines: a screen
+that changed without its baseline being approved fails E2E (see "Screenshots" below).
 
 **The smoke set:**
 - **02 (today's session):** the revision session, the core of the app. Like every flow it starts
@@ -92,6 +93,64 @@ rules it covers in its first lines; recordings have no rule there yet.
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
 memorized (24 pages) and 10 pages a day, so the days are 1, 582–590 | 591–600 | 601–604, 1, 582–586.
 The test clock starts on Tuesday, 3 November 2026.
+
+## Screenshots
+
+After the flows, each job compares their screenshots with the approved ones (step "Compare the
+screenshots", `.maestro/visual/`), so a screen that changes without anyone approving it fails E2E.
+Before Nov 7 2026 nothing did: Activity screens that didn't match the approved mocks shipped.
+
+- **Baselines:** `.maestro/baselines/<platform>/<name>.png`, one per screen and platform, in light
+  (every flow captures light; a dark capture would be named `<name>-dark`). From CI's devices only:
+  iOS an iPhone 17 Pro Simulator (1206×2622), Android the pixel_6 emulator (1080×2400).
+- **Normalised** before comparing or approving (`lib.mjs`): the status bar cropped, what still
+  varies between runs masked (pink), and halved (each pixel the mean of 2×2), which keeps a
+  baseline at 40–160 KB. The masks (`screens.mjs`, in the raw capture's pixels):
+  - the E2E status line's clock (every screen);
+  - a session's minutes in Home's "Recent sessions" (real time spent);
+  - the next prayer's countdown ("in 2h 15m");
+  - the daily log's note times;
+  - Revo's button on Home (Revo is being rebuilt; unmask it when Revo's baselines are approved).
+- **Compared** with pixelmatch (colour distance 0.1, anti-aliasing left out). More than 12 changed
+  pixels of the halved image is a change: a changed digit of the 9 pt status line is about 15, and
+  two runs of the same code differ by 0.
+- **A changed screen fails the job.** The job summary has a table of every screen; the artifact
+  `e2e-<platform>-visual-<job>-<run>` has a board of each one that differs (baseline | this run |
+  differences in red, the changed area boxed) and the normalised captures.
+- **No baseline yet:** reported, not failed. A capture of another size (a new simulator on the
+  runner image) is reported as not compared, with a warning: approve again from a run on it.
+
+**Approving an intended change**, in the same PR as the change:
+
+```bash
+npm ci --prefix .maestro/visual
+node .maestro/visual/approve.mjs <run id>
+```
+
+- It downloads the run's `e2e-*-screens-*` artifacts with `gh` and normalises them as the check
+  does. It writes the baselines that changed and keeps any a capture still matches (no churn).
+- Screens being redesigned (below) are skipped unless named. Name screens to approve only those
+  (`approve.mjs <run id> 02-home-done`); `--platform ios` for one platform.
+- Look at the new PNGs, commit `.maestro/baselines/`, push; the PR's next run compares against them.
+- **Which run:** a single PR into develop runs only Android's smoke flows (02 04 05 06). For a
+  change that shows on iOS or in the other flows, run E2E by hand on the branch (Actions → E2E →
+  Run workflow, both platforms) and approve from that run. Otherwise iOS fails later: at the top
+  of a stack, the PR into `main` or the nightly run.
+- `--from .maestro/build/results` approves a local run's captures: for trying the tool only, since
+  the baselines must come from CI's devices.
+
+**No baselines on purpose** (`PENDING` in `screens.mjs`): Activity (Overview, Day, Insights:
+`07-activity-recording`), Insights' Smart Tracking intro (`02-smart-preview`) and Revo (`09-revo`'s
+`r1`…`r10`) are being rebuilt by other sessions. Approve each once its boards match the approved
+mocks, then take it out of `PENDING` (and unmask Revo's button).
+
+**A new screen:** a `shot.yaml` step in a flow; its first run reports "no baseline yet"; approve
+it. If something on it changes from run to run (a time, a duration, a countdown), mask it in
+`screens.mjs` rather than raising the tolerance. Masks are fixed rectangles: when a screen's layout
+moves, check its masks still cover what varies (the boards show them in pink).
+
+`npm test --prefix .maestro/visual` tests the tool (each job runs it first). The comparison takes
+about a second a job.
 
 ## The E2E build
 
