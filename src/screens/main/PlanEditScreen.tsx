@@ -3,10 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+// Pads on Android too (React Native's own is a plain View there: the top bar sat under the clock).
+import { SafeAreaView } from '../../components/SafeAreaView';
 import Animated, { useAnimatedRef, useScrollOffset, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
