@@ -19,12 +19,12 @@ export const BLOCK_ICON: Record<Exclude<BlockKind, 'revised'>, React.ComponentPr
 /** The Revised block's glyph, inside its ring. */
 export const REVISED_ICON = 'repeat' as const;
 
-/** A bubble circle with its block's icon (36 across, icon 18 in text). */
+/** A bubble circle with its block's icon (36 across, icon 18 in text; the icon is half the mark at any size). */
 export function BlockMark({ kind, size = 36 }: { kind: Exclude<BlockKind, 'revised'>; size?: number }) {
   const { palette } = useTheme();
   return (
     <View style={[styles.bubble, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.bubble }]}>
-      <Ionicons name={BLOCK_ICON[kind]} size={18} color={palette.text} />
+      <Ionicons name={BLOCK_ICON[kind]} size={Math.round(size * 0.5)} color={palette.text} />
     </View>
   );
 }
@@ -38,11 +38,12 @@ export function RevisedMark({ fraction, done, size = 36 }: { fraction: number; d
   if (done) {
     return (
       <View style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.done }]} accessibilityLabel="Revised, done">
-        <Ionicons name="checkmark" size={19} color={palette.onDone} />
+        <Ionicons name="checkmark" size={Math.round(size * 0.52)} color={palette.onDone} />
       </View>
     );
   }
-  const stroke = 3;
+  // 3pt from 30 across (the block's 36), 2.5 on the small marks (a sheet's title, the preview).
+  const stroke = size >= 30 ? 3 : 2.5;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const f = Math.max(0, Math.min(1, fraction));
@@ -62,7 +63,7 @@ export function RevisedMark({ fraction, done, size = 36 }: { fraction: number; d
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <Ionicons name={REVISED_ICON} size={17} color={palette.text} />
+      <Ionicons name={REVISED_ICON} size={Math.round(size * 0.47)} color={palette.text} />
     </View>
   );
 }

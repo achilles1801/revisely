@@ -34,6 +34,8 @@ export interface SheetHeaderAction {
   onPress: () => void;
   /** The confirming action: semibold. */
   strong?: boolean;
+  /** In the accent's text colour (Activity's add sheets: Add); a disabled one is grey. */
+  accent?: boolean;
   disabled?: boolean;
   testID?: string;
 }
@@ -71,6 +73,8 @@ export function Sheet({
   visible,
   onClose,
   title,
+  titleMark,
+  headerRule = 'inset',
   message,
   messageMaxScale,
   left,
@@ -87,6 +91,10 @@ export function Sheet({
   visible: boolean;
   onClose: () => void;
   title?: string;
+  /** A small mark beside the title (Activity's add sheets: the block's mark). */
+  titleMark?: React.ReactNode;
+  /** The hairline under the header: inside the gutter (the default), edge to edge, or none. */
+  headerRule?: 'inset' | 'full' | 'none';
   message?: string;
   /** Caps how far the message grows with Dynamic Type (a header line, like the title). */
   messageMaxScale?: number;
@@ -220,10 +228,29 @@ export function Sheet({
                 <View style={[styles.handle, { backgroundColor: palette.handle }]} />
               </View>
               {hasHeader ? (
-                <View style={[styles.header, { borderBottomColor: palette.separator }]}>
+                <View
+                  style={[
+                    styles.header,
+                    { borderBottomColor: palette.separator },
+                    headerRule === 'full' && styles.headerFull,
+                    headerRule === 'none' && styles.headerBare,
+                  ]}
+                >
                   <View style={[styles.side, styles.sideLeft]}>{left ? <HeaderButton action={left} /> : null}</View>
                   <View style={styles.titleWrap}>
-                    {title ? (
+                    {title && titleMark ? (
+                      <View style={styles.titleRow}>
+                        {titleMark}
+                        <Text
+                          style={[typeV2.sheetTitle, { color: palette.text }]}
+                          accessibilityRole="header"
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.4}
+                        >
+                          {title}
+                        </Text>
+                      </View>
+                    ) : title ? (
                       <Text
                         style={[typeV2.sheetTitle, styles.center, { color: palette.text }]}
                         accessibilityRole="header"
@@ -309,7 +336,10 @@ function HeaderButton({ action }: { action: SheetHeaderAction }) {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={action.label}
-      style={[action.round && [styles.round, { backgroundColor: palette.primary }], action.disabled && { opacity: 0.4 }]}
+      style={[
+        action.round && [styles.round, { backgroundColor: palette.primary }],
+        action.disabled && { opacity: action.accent ? 0.7 : 0.4 },
+      ]}
       testID={action.testID}
     >
       {action.icon ? (
@@ -320,7 +350,14 @@ function HeaderButton({ action }: { action: SheetHeaderAction }) {
           style={action.round && action.icon === 'play' ? styles.playNudge : undefined}
         />
       ) : (
-        <Text style={[typeV2.menu, action.strong && styles.strong, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+        <Text
+          style={[
+            typeV2.menu,
+            action.strong && styles.strong,
+            { color: action.accent ? (action.disabled ? palette.secondary : palette.accentText) : palette.text },
+          ]}
+          maxFontSizeMultiplier={1.4}
+        >
           {action.label}
         </Text>
       )}
@@ -353,6 +390,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: layoutV2.hairline,
     marginBottom: 6,
   },
+  // Edge to edge: out over the sheet's gutter, the buttons kept in it.
+  headerFull: { marginHorizontal: -layoutV2.gutter, paddingHorizontal: layoutV2.gutter },
+  headerBare: { borderBottomWidth: 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   side: { width: 72, flexDirection: 'row' },
   sideLeft: { justifyContent: 'flex-start' },
   sideRight: { justifyContent: 'flex-end' },

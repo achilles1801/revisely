@@ -18,6 +18,7 @@ export interface MemorizedItemView {
   id: string;
   day: string;
   pages: number[];
+  minutes?: number | null;
 }
 export interface ReadItemView {
   id: string;
@@ -62,14 +63,16 @@ export interface DayView {
   blocks: DayBlock[];
 }
 
-/** "Juz N" when every memorized page of juz N is among `revised` and the juz was assigned in full. */
-export function juzLabelFor(revised: number[], assigned: number[], memorized: Set<number>): string | null {
-  const revisedSet = new Set(revised);
+/**
+ * "Juz N" when the day's assignment held every memorized page of juz N. It names what was set, so a
+ * day revised in part keeps it ("Juz 28 · …", "18 of 20": mock d1); the figure says how much was done.
+ */
+export function juzLabelFor(assigned: number[], memorized: Set<number>): string | null {
   const assignedSet = new Set(assigned);
   for (let juz = 1; juz <= 30; juz++) {
     const pages = getPagesForJuz(juz).filter((p) => memorized.has(p));
     if (pages.length === 0) continue;
-    if (pages.every((p) => revisedSet.has(p) && assignedSet.has(p))) return `Juz ${juz}`;
+    if (pages.every((p) => assignedSet.has(p))) return `Juz ${juz}`;
   }
   return null;
 }
@@ -91,7 +94,7 @@ export function buildDayView(
     skipped,
     minutes: own.reduce<number | null>((n, r) => (r.minutes == null ? n : (n ?? 0) + r.minutes), null),
     credits: credits.map((c) => ({ countsFor: c.countsFor, pages: c.pages })),
-    juzLabel: assigned.length > 0 ? juzLabelFor(revised, assigned, memorized) : null,
+    juzLabel: assigned.length > 0 ? juzLabelFor(assigned, memorized) : null,
   };
   return {
     day,

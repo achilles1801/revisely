@@ -82,3 +82,16 @@ describe('deletes that can be undone', () => {
     expect(b).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a Memorized item’s minutes (ACT-5)', () => {
+  const { memorizedMinutesAfter } = jest.requireActual('../activityAdd') as typeof import('../activityAdd');
+  it('[ACT-5] an add’s minutes join the day’s', () => {
+    expect(memorizedMinutesAfter(null, { minutes: 25, at: 100 })).toEqual({ minutes: 25, updatedAt: 100 });
+    expect(memorizedMinutesAfter({ minutes: 25, updatedAt: 100 }, { minutes: 10, at: 200 })).toEqual({ minutes: 35, updatedAt: 200 });
+  });
+  it('[ACT-5] the same add sent again adds nothing, and an add without minutes keeps them', () => {
+    expect(memorizedMinutesAfter({ minutes: 25, updatedAt: 100 }, { minutes: 25, at: 100 })).toEqual({ minutes: 25, updatedAt: 100 });
+    expect(memorizedMinutesAfter({ minutes: 25, updatedAt: 100 }, { minutes: null, at: 300 })).toEqual({ minutes: 25, updatedAt: 300 });
+    expect(memorizedMinutesAfter({ minutes: null }, { at: 300 })).toEqual({ minutes: null, updatedAt: 300 });
+  });
+});
