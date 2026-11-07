@@ -137,6 +137,7 @@ run_flow() {
     # job then failed at sign-up (develop, Nov 7 2026: 06 and 07 together). iOS needs nothing:
     # its offline switch is the app's own, and each flow starts from a fresh install.
     adb -s "$DEVICE" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
+    adb -s "$DEVICE" shell dumpsys input_method > "$out/ime-before.txt" 2>&1 || true  # PROBE
   fi
   if [ "$PLATFORM" = ios ]; then
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
