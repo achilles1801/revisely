@@ -624,7 +624,8 @@ export class ActivityDayView {
     type A11y = { name: string };
     const deleteAction = (el: { props: { accessibilityActions?: A11y[] } }) =>
       (el.props.accessibilityActions ?? []).find((a) => String(a.name).startsWith('delete-'));
-    const header = () => this.app.screen.queryAllByLabelText('Memorized').find((el) => deleteAction(el) != null);
+    // The header reads its title and figure together ("Memorized, 5 pages").
+    const header = () => this.app.screen.queryAllByLabelText(/^Memorized(,|$)/).find((el) => deleteAction(el) != null);
     await this.app.until(() => header() != null, 'the Memorized block header');
     const el = header()!;
     const action = deleteAction(el)!.name;
