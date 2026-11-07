@@ -13,6 +13,7 @@ import { markPreviewTester, watchFunction } from '../harness/admin';
 import { setServerDoc } from '../harness/serverDocs';
 import { loadScenario } from '../harness/testScenario';
 import { DailyLog, Home, Manager, homeStack } from '../harness/screens';
+import { pageOfTitle } from '../harness/words';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 import { SCENARIO_IDS, type ScenarioId, type SeedPlan } from '../../../functions/src/testScenarios';
 import type { RevoContext } from '../../../src/lib/revo/types';
@@ -209,7 +210,8 @@ async function askRevo(app: OpenApp, asks: { sent: unknown[] }, question: string
 
 /** Where Home says today starts or carries on ("Starts at Al-Mujadila, p. 542"), and its "N of M". */
 function homeToday(home: Home): { page: number; done: number | null; of: number | null } {
-  const page = Number(/p\. (\d+)/.exec(home.title() ?? '')?.[1] ?? NaN);
+  // Today's title names where it starts by surah and ayah (NAME-1): the page those words begin.
+  const page = pageOfTitle(home.title());
   const m = /(\d+) of (\d+)/.exec(home.today());
   return { page, done: m ? Number(m[1]) : null, of: m ? Number(m[2]) : null };
 }
