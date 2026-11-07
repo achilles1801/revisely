@@ -20,6 +20,12 @@ import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+/** A day's recordings on this phone: revision ones (the Revised row) and reading ones (Read). */
+export interface RecordingCounts {
+  revision: number;
+  reading: number;
+}
+
 export interface CalendarData {
   revised: Revised[];
   memorized: Memorized[];
@@ -38,6 +44,7 @@ export function CalendarMonth({
   onStep,
   onPick,
   onOpen,
+  recordings,
 }: {
   /** 'YYYY-MM' (the month shown, and the grid's days). */
   month: string;
@@ -51,6 +58,8 @@ export function CalendarMonth({
   onStep: (delta: number) => void;
   onPick: (day: string) => void;
   onOpen: (day: string) => void;
+  /** Recordings by day: the preview's mic and count beside the block they belong to. */
+  recordings?: Map<string, RecordingCounts>;
 }) {
   const { palette } = useTheme();
   const grid = monthGrid(month);
@@ -66,15 +75,16 @@ export function CalendarMonth({
 
   const shownDay = picked ?? today;
   const preview = dayPreview(shownDay, data);
-  const previewRows: { key: string; kind: 'revised' | 'memorized' | 'read' | 'notes'; label: string; value: string }[] = [];
+  const recs = recordings?.get(shownDay);
+  const previewRows: { key: string; kind: 'revised' | 'memorized' | 'read' | 'notes'; label: string; value: string; mics?: number }[] = [];
   if (preview.revised) {
     const minutes = preview.revised.minutes != null && preview.revised.minutes > 0 ? ` · ${formatMinutesLong(preview.revised.minutes)}` : '';
-    previewRows.push({ key: 'revised', kind: 'revised', label: 'Revised', value: `${preview.revised.done} of ${preview.revised.assigned}${minutes}` });
+    previewRows.push({ key: 'revised', kind: 'revised', label: 'Revised', value: `${preview.revised.done} of ${preview.revised.assigned}${minutes}`, mics: recs?.revision });
   }
   if (preview.memorizedPages > 0) previewRows.push({ key: 'memorized', kind: 'memorized', label: 'Memorized', value: `+${preview.memorizedPages} pages` });
   if (preview.readPages > 0) {
     const minutes = preview.readMinutes != null && preview.readMinutes > 0 ? ` · ${formatMinutesLong(preview.readMinutes)}` : '';
-    previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${preview.readPages} pages${minutes}` });
+    previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${preview.readPages} pages${minutes}`, mics: recs?.reading });
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: 'Notes', value: '1' });
 
@@ -180,6 +190,12 @@ export function CalendarMonth({
             {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
             <Text style={[typeV2.body, { color: palette.text, width: 84 }]}>{r.label}</Text>
             <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]}>{r.value}</Text>
+            {r.mics ? (
+              <View style={styles.mics} accessible accessibilityLabel={`${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}`} testID={`preview-recordings-${r.key}`}>
+                <Ionicons name="mic-outline" size={13} color={palette.secondary} />
+                <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]}>{r.mics}</Text>
+              </View>
+            ) : null}
           </View>
         ))}
       </View>
@@ -338,4 +354,5 @@ const styles = StyleSheet.create({
   previewDate: { fontSize: 16, lineHeight: 20, fontWeight: '600' },
   openRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   previewRow: { height: 32, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  mics: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -2 },
 });
