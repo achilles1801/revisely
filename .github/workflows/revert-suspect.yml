@@ -1,0 +1,43 @@
+name: Revert a suspect
+
+# By hand, when develop is red (the develop-red issue names the suspects: the PRs merged since the
+# last green run, the ones that changed a failing flow's files first): opens a PR into develop that
+# reverts one merged PR, with auto-merge, and starts its CI (a PR opened with the workflow token starts
+# no workflow by itself). It reverts a PR merged into develop and nothing else
+# (scripts/e2e/revert-suspect.sh refuses anything else). The revert goes through `Required` like any PR.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The merged PR to revert (its number)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: revert-suspect-${{ inputs.pr }}
+  cancel-in-progress: false
+
+jobs:
+  revert:
+    name: Revert #${{ inputs.pr }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+      - name: Open the revert PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          url=$(bash scripts/e2e/revert-suspect.sh "$PR" | tail -1)
+          echo "::notice title=Revert::$url"

@@ -89,3 +89,38 @@ describe('develop-red', () => {
     expect(readAttempts(path.join(dir, 'missing'))).toEqual({ android: [], ios: [], devices: [] });
   });
 });
+
+describe('develop-red suspects', () => {
+  const { prNumbers, flowFiles, suspects, nextState: next, render: draw } = require('../develop-red');
+
+  it('reads merged PRs from merge commits and squash merges, newest first, once each', () => {
+    expect(prNumbers(['Merge pull request #304 from a/b\n\nbody', 'E2E: fix (#300)', 'Merge pull request #304 from a/b', 'a plain commit'])).toEqual([304, 300]);
+  });
+
+  it('marks the PRs that changed a file a failing flow uses', () => {
+    const closure = (flow) => new Set([flow, '.maestro/subflows/swipe-page.yaml', '.maestro/subflows/launch.yaml']);
+    const files = flowFiles([{ flow: '06-offline-run2' }, { flow: '(the job)' }], closure);
+    expect([...files]).toEqual(['.maestro/flows/06-offline.yaml', '.maestro/subflows/swipe-page.yaml', '.maestro/subflows/launch.yaml']);
+    const prs = [
+      { number: 286, title: 'E2E: flow 02', files: ['.maestro/subflows/swipe-page.yaml', '.maestro/README.md'] },
+      { number: 290, title: 'Fix the daily log', files: ['src/x.tsx'] },
+    ];
+    expect(suspects(prs, files)).toEqual([
+      { number: 286, title: 'E2E: flow 02', touched: ['.maestro/subflows/swipe-page.yaml'] },
+      { number: 290, title: 'Fix the daily log', touched: [] },
+    ]);
+  });
+
+  it('keeps the last green run and the suspects through a red spell, and shows them', () => {
+    const green = nextState(null, run(1), { android: { red: false, flows: [] }, ios: null }).state;
+    const found = [{ number: 286, title: 'E2E: flow 02', touched: ['.maestro/subflows/swipe-page.yaml'] }];
+    const red = next(green, run(2), { android: { red: true, flows: [{ flow: '06-offline', reason: 'x' }] } }, () => found);
+    expect(red.state.android).toMatchObject({ red: true, green: run(1), suspects: found });
+    const still = next(red.state, run(3), { android: { red: true, flows: [{ flow: '06-offline', reason: 'x' }] } }, () => []);
+    expect(still.state.android).toMatchObject({ green: run(1), suspects: found });
+    const body = draw(red.state);
+    expect(body).toContain('**Suspects:** merged since the last green run');
+    expect(body).toContain("- **#286** E2E: flow 02: changed `.maestro/subflows/swipe-page.yaml`, which a failing flow uses");
+    expect(body).toContain('Revert a suspect');
+  });
+});
