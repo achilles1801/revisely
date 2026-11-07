@@ -45,7 +45,12 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 11-jump-surah${SUFFIX}
-- tapOn: "Close"
+# The handle closes on a drag down (a tap does nothing; VoiceOver's activate does).
+- swipe:
+    from:
+      id: sheet-handle
+    direction: DOWN
+    duration: 400
 - extendedWaitUntil:
     notVisible:
       id: jump-sheet
