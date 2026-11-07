@@ -24,7 +24,7 @@ appId: com.revisionbuddy.app
     env:
       TEXT: Revision complete
 # AHEAD-3, DAY-3: Keep going offers the next revision day, Wednesday.
-- assertVisible: "Next: Wed · 10 pages"
+- assertVisible: "Next: Wed · At.Tariq to At.Takathur · 10 pages"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -39,7 +39,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "Page 591 · .*"
+    text: "At.Tariq to Al.A'la.15 · .*"
 # AHEAD-5: three of Wednesday's pages, swiped (591–593).
 - runFlow:
     file: ../subflows/swipe-pages.yaml
@@ -57,7 +57,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: today-ahead
-    text: "Tomorrow starts at Al.Fajr, page 594"
+    text: "Tomorrow starts at Al.Fajr, ayah.24"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -71,7 +71,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at Al.Fajr, p..594.*"
+      text: "Continue at Al.Fajr, ayah.24[^0-9]*"
     timeout: 20000
 - assertVisible:
     id: today-summary
@@ -100,7 +100,7 @@ appId: com.revisionbuddy.app
 # (The line's accessibility label spells out "page".)
 - assertVisible:
     id: today-ahead
-    text: "Tomorrow starts at Al.'Asr, page 601"
+    text: "Tomorrow starts at Al.'Asr"
 - tapOn:
     id: today-ahead
 - runFlow: ../subflows/show-controls.yaml
@@ -111,4 +111,4 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "Page 601 · .*"
+    text: "Al.'Asr to Al.Fil · .*"

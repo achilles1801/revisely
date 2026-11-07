@@ -25,6 +25,7 @@ import { ThemeProvider, isExistingInstall, resolveThemeMode, useTheme } from '..
 import { PressableScale } from '../../components/PressableScale';
 import { TodayPost, formatPercent, memorizedText } from '../../components/home/feed/TodayPost';
 import { NBHY, NBSP } from '../../lib/todayLines';
+import { plainText } from '../../lib/passages';
 
 /** Today's text as written: names held with no-break hyphens. */
 const held = (s: string) => s.replace(/(\w)-(\w)/g, `$1${NBHY}$2`).split(' → ').join(`${NBSP}→ `);
@@ -475,7 +476,7 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.getByText('Karim')).toBeTruthy();
     expect(screen.getByText('Today · 7-day streak')).toBeTruthy();
     // In progress: where to carry on, then how far today has got.
-    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Adh-Dhariyat, p.${NBSP}522`), { exact: false });
+    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Adh-Dhariyat, ayah${NBSP}31`), { exact: false });
     expect(screen.getByTestId('today-progress')).toHaveTextContent('2 of 3');
     expect(screen.queryByTestId('thread-line')).toBeNull();
     expect(screen.queryByText('Juz 26')).toBeNull();
@@ -491,10 +492,10 @@ describe('Home in the new design (a feed)', () => {
 
   it('missed pages are one line above today’s action, and "Add to today" adds them', async () => {
     const props = post({
-      catchUp: { title: 'Missed yesterday · Revise p. 559–563', label: 'Missed yesterday · Revise page 559–563' },
+      catchUp: { title: 'Missed yesterday · Revise At-Talaq to Al-Mulk', label: 'Missed yesterday · Revise At-Talaq to Al-Mulk' },
     });
     await act(async () => {});
-    expect(screen.getByTestId('today-catch-up')).toHaveTextContent('Missed yesterday · Revise p. 559–563');
+    expect(screen.getByTestId('today-catch-up')).toHaveTextContent('Missed yesterday · Revise At-Talaq to Al-Mulk');
     fireEvent.press(screen.getByTestId('today-carry-over'));
     expect(props.onCarryOver).toHaveBeenCalled();
     expect(screen.getByText('Add to today')).toBeTruthy();
@@ -554,7 +555,7 @@ describe('Home in the new design (a feed)', () => {
   });
 
   it('the primary button is solid in the accent (Indigo by default); the catch-up button is an outline pill', async () => {
-    const props = post({ catchUp: { title: 'Missed yesterday · Revise p. 559–561', label: 'Missed yesterday' } });
+    const props = post({ catchUp: { title: 'Missed yesterday · Revise At-Talaq to At-Tahrim', label: 'Missed yesterday' } });
     await act(async () => {});
     const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
     expect(flat('today-cta').backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).primary);
@@ -568,8 +569,10 @@ describe('Home in the new design (a feed)', () => {
     await act(async () => {});
     fireEvent.press(screen.getByTestId('today-summary'));
     const menu = screen.getByTestId('today-menu');
-    // The exact pages in the header, which grows no further than the rows (1.4).
-    expect(within(menu).getByText(held('Pages 520–522 · Qaf → Adh-Dhariyat')).props.maxFontSizeMultiplier).toBe(1.4);
+    // The exact ranges in the header, surahs first and the pages a quiet detail; it grows no further than the rows (1.4).
+    expect(
+      within(menu).getByText('Qaf 36 to Adh-Dhariyat 51 · Juz 26–27 · pp. 520–522', { normalizer: plainText }).props.maxFontSizeMultiplier,
+    ).toBe(1.4);
     expect(within(menu).getByText('Jump to…')).toBeTruthy();
     expect(within(menu).getByText('Start today at another juz, surah or page')).toBeTruthy();
     expect(within(menu).getByText('Edit schedule')).toBeTruthy();
@@ -580,11 +583,11 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onEditSchedule).not.toHaveBeenCalled();
   });
 
-  it('not started: "Starts at …, p. N ›" over how much and to where; the › is held to the page and grows with the text', async () => {
+  it('not started: "Starts at <surah> ›" over how much and to where; the › is held to the words and grows with the text', async () => {
     post({ status: 'not_started', pages: Array.from({ length: 20 }, (_, i) => 542 + i), done: new Set() });
     await act(async () => {});
     const title = screen.getByTestId('today-title');
-    expect(title).toHaveTextContent(held(`Starts at Al-Mujadila, p.${NBSP}542${NBSP}`), { exact: false });
+    expect(title).toHaveTextContent(held(`Starts at Al-Mujadila${NBSP}`), { exact: false });
     expect(screen.getByTestId('today-detail')).toHaveTextContent(held(`20${NBSP}pages · to At-Tahrim · Juz${NBSP}28`));
     // Two lines at most, even at the largest text sizes (it shrinks before a third).
     for (const id of ['today-title', 'today-detail']) {
@@ -621,7 +624,7 @@ describe('Home in the new design (a feed)', () => {
     await act(async () => {});
     const summary = screen.getByTestId('today-summary');
     expect(summary.props.accessibilityRole).toBe('button');
-    expect(summary.props.accessibilityLabel).toBe('Continue at Adh-Dhariyat, page 522. 2 of 3 pages done');
+    expect(summary.props.accessibilityLabel).toBe('Continue at Adh-Dhariyat, ayah 31. 2 of 3 pages done');
     expect(summary.props.accessibilityHint).toBe('Jump to another start, or edit the schedule');
     expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe('27.5% of the Quran memorized. Edit memorized pages');
   });
@@ -636,7 +639,7 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onJump).not.toHaveBeenCalled();
   });
 
-  it('sessions read as what was done, then the pages and surahs', () => {
+  it('sessions read as what was done, then its surahs (never page numbers)', () => {
     const log: RevisionLog = {
       id: 'a',
       date: '2026-10-24',
@@ -648,10 +651,10 @@ describe('Home in the new design (a feed)', () => {
     };
     expect(revisionItem(log)).toMatchObject({
       title: 'Revised 3 of 4 pages',
-      detail: 'Pages 503–506 · 24 min · Al-Ahqaf',
       done: false,
       day: '2026-10-24',
     });
+    expect(plainText(revisionItem(log).detail)).toBe('End of Al-Ahqaf · 24 min');
     expect(revisionItem({ ...log, pagesRevised: [503, 504, 505, 506], pagesSkipped: [] })).toMatchObject({
       title: 'Revised 4 pages',
       done: true,

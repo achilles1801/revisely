@@ -15,7 +15,7 @@ appId: com.revisionbuddy.app
     text: ".*Asia/Kathmandu.*"
 - assertVisible:
     id: today-title
-    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+    text: "Starts at Al.Fatihah[^,0-9]*"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -28,5 +28,5 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Starts at At.Tariq, p..591.*"
+      text: "Starts at At.Tariq[^,0-9]*"
     timeout: 20000

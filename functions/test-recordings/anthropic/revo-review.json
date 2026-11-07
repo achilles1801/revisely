@@ -1,13 +1,13 @@
 {
   "recordedAt": "2026-11-07T09:35:32.700Z",
-  "how": "functions/scripts/record-anthropic.js, with the prompt before the Activity rebuild. The request hash was then moved, without recording again, to the prompt after the guide's Insights lines changed (d5e9bf7, then the tab bar's Insights moving into Activity and its Smart Tracking line, #287): record it again to match exactly.",
+  "how": "functions/scripts/record-anthropic.js, with the prompt before the Activity rebuild. The request hash was then moved, without recording again, to the prompt after the guide's Insights lines changed (d5e9bf7, then the tab bar's Insights moving into Activity and its Smart Tracking line, #287) and its line about + opening Add to chat (PR #345): record it again to match exactly.",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "d748c78c2b9aee9bfb33c5e7a07f494427ca396d4d0b54c0d12e4ccb04eceae9"
+    "systemSha256": "aa7f77f454967f1985ab809ee65b095be856321227149caa7c48e80ef560a19e"
   },
   "status": 200,
   "body": {

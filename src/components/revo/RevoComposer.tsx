@@ -6,25 +6,17 @@ import type { RevoAttachment } from '../../lib/revo/types';
 import { Tap } from '../v2/Tap';
 import { ContextChip } from './RevoParts';
 
-export type PickKind = 'day' | 'page' | 'recording';
-
-const ROWS: { kind: PickKind; title: string; line: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { kind: 'day', title: 'A day', line: 'What was planned and done, with its notes', icon: 'calendar-outline' },
-  { kind: 'page', title: 'A surah, juz or page', line: 'How often it was revised, its weak spots', icon: 'book-outline' },
-  { kind: 'recording', title: 'A recording', line: 'Length and pages, never the audio', icon: 'mic-outline' },
-];
-
 export const QUESTION_MAX = 600;
 
 /**
- * Where the user asks: + (what to add to the question), the field ("Ask Revo anything", with
- * the mic for dictation), and what's attached as a chip above it. Off (`disabled`) when the
+ * Where the user asks: + (Add to chat: RevoAddSheet), the field ("Ask Revo anything", with the mic
+ * for dictation), and what's attached as chips above it, each with ×. Off (`disabled`) when the
  * day's questions are used: 45% and the placeholder says when Revo is back.
  */
 export function RevoComposer({
   onSend,
-  onPick,
-  attach,
+  onAdd,
+  attachments,
   onRemoveAttach,
   disabled,
   disabledText,
@@ -32,9 +24,9 @@ export function RevoComposer({
   onFocus,
 }: {
   onSend: (text: string) => void;
-  onPick: (kind: PickKind) => void;
-  attach: RevoAttachment | null;
-  onRemoveAttach: () => void;
+  onAdd: () => void;
+  attachments: RevoAttachment[];
+  onRemoveAttach: (index: number) => void;
   disabled: boolean;
   disabledText: string;
   busy: boolean;
@@ -42,7 +34,6 @@ export function RevoComposer({
 }) {
   const { palette, isDark } = useTheme();
   const [text, setText] = useState('');
-  const [menu, setMenu] = useState(false);
   const input = useRef<TextInput>(null);
   const canSend = !disabled && !busy && text.trim().length > 0;
   const send = () => {
@@ -52,48 +43,24 @@ export function RevoComposer({
   };
   return (
     <View style={[styles.wrap, disabled && styles.off]}>
-      {menu ? (
-        <View style={[styles.menu, { backgroundColor: palette.sheet, borderColor: palette.separator, shadowColor: palette.shadow }]} testID="revo-plus-menu">
-          <Text style={[styles.menuTitle, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-            Add to your question
-          </Text>
-          {ROWS.map((r, i) => (
-            <Tap
-              key={r.kind}
-              onPress={() => {
-                setMenu(false);
-                onPick(r.kind);
-              }}
-              style={[styles.menuRow, i > 0 && { borderTopColor: palette.separator, borderTopWidth: StyleSheet.hairlineWidth }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${r.title}. ${r.line}`}
-              testID={`revo-add-${r.kind}`}
-            >
-              <View style={styles.menuText}>
-                <Text style={[styles.menuRowTitle, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-                  {r.title}
-                </Text>
-                <Text style={[styles.menuRowLine, { color: palette.secondary }]} maxFontSizeMultiplier={1.3}>
-                  {r.line}
-                </Text>
-              </View>
-              <Ionicons name={r.icon} size={22} color={palette.text} />
-            </Tap>
+      {attachments.length > 0 ? (
+        <View style={styles.chips}>
+          {attachments.map((a, i) => (
+            <ContextChip key={`${a.kind}-${a.label}-${i}`} label={a.label} kind={a.kind} onRemove={() => onRemoveAttach(i)} />
           ))}
         </View>
       ) : null}
-      {attach ? <ContextChip label={attach.label} kind={attach.kind} onRemove={onRemoveAttach} /> : null}
       <View style={styles.row}>
         <Tap
-          onPress={() => setMenu((m) => !m)}
+          onPress={onAdd}
           disabled={disabled}
           style={[styles.plus, { backgroundColor: palette.bubble }]}
           accessibilityRole="button"
-          accessibilityLabel="Add to your question"
-          accessibilityState={{ expanded: menu, disabled }}
+          accessibilityLabel="Add to chat"
+          accessibilityState={{ disabled }}
           testID="revo-plus"
         >
-          <Ionicons name={menu ? 'close' : 'add'} size={26} color={palette.text} />
+          <Ionicons name="add" size={26} color={palette.text} />
         </Tap>
         <View style={[styles.field, { backgroundColor: palette.bubble }]}>
           {/* The outline: primary at 35% (55% in dark). */}
@@ -108,10 +75,7 @@ export function RevoComposer({
             style={[styles.input, { color: palette.text }]}
             multiline
             maxLength={QUESTION_MAX}
-            onFocus={() => {
-              setMenu(false);
-              onFocus?.();
-            }}
+            onFocus={() => onFocus?.()}
             submitBehavior="blurAndSubmit"
             returnKeyType="send"
             onSubmitEditing={send}
@@ -165,19 +129,5 @@ const styles = StyleSheet.create({
   },
   ring: { ...StyleSheet.absoluteFillObject, borderRadius: 22, borderWidth: 1 },
   input: { flex: 1, fontSize: 16, lineHeight: 21, paddingTop: 11, paddingBottom: 11, maxHeight: 120 },
-  menu: {
-    width: 280,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 6,
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  menuTitle: { fontSize: 14, paddingHorizontal: 16, paddingVertical: 8 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
-  menuText: { flex: 1 },
-  menuRowTitle: { fontSize: 17 },
-  menuRowLine: { fontSize: 13, lineHeight: 17, marginTop: 1 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

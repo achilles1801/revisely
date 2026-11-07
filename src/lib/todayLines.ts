@@ -1,39 +1,38 @@
 // What Today's post says about today's pages, in two lines (the owner's
 // choice "E", Nov 2026; mocks in ~/Documents/revisely-today-mocks):
 //
-//   not started   Starts at Al-Mujadila, p. 542 ›     20 pages · to At-Tahrim · Juz 28
-//   in progress   Continue at Al-Hashr, p. 548 ›      ▬▬▭▭▭ 6 of 20
+//   not started   Starts at Al-Mujadila ›             20 pages · to At-Tahrim · Juz 28
+//   in progress   Continue at Al-Hashr, ayah 10 ›     ▬▬▭▭▭ 6 of 20
 //   done          ● Done · 20 pages                   Adh-Dhariyat → Al-Hadid · Juz 27
-//   two ranges    Starts at Ash-Shams, p. 595 ›       20 pages · then Al-Fatihah, p. 1
-//   carried in    Starts at Al-Hadid, p. 538 ›        20 pages · 4 from yesterday first
+//   two ranges    Starts at Ash-Shams ›               20 pages · then Al-Fatihah
+//   carried in    Starts at Al-Hadid, ayah 4 ›        20 pages · 4 from yesterday first
 //
-// "Starts at" names the first surah on the page you open to; in progress, the
+// "Starts at" names where the page you open to begins (lib/passages placeOfPage:
+// the surah, or its ayah when the page begins mid-surah; surahs and juz first,
+// page numbers almost never, the owner's rule of Nov 7 2026); in progress, the
 // first page not yet revised. Pages are read in the order the session serves
-// them (the end of the cycle, then its start). "p. 542", "20 pages", "Juz 28"
+// them (the end of the cycle, then its start). "ayah 10", "20 pages", "Juz 28"
 // and the › are held together with no-break spaces, so the › never sits alone.
 // The juz shows when the day spans one or two; two-range days say "then …".
-// The exact ranges are in the › sheet's header.
+// The exact ranges, with their page numbers, are in the › sheet's header.
 
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
 import type { Leftovers } from './carryOver';
+import { describePassage, NBHY, NBSP, pagesNote, placeOfPage, spokenText } from './passages';
 
-/** A no-break space: keeps "p. 542 ›" and "20 pages" together. */
-export const NBSP = '\u00A0';
-/** A no-break hyphen: a surah name never breaks at its "Al-". */
-export const NBHY = '\u2011';
+/** A no-break space (keeps "ayah 10 ›" and "20 pages" together) and a no-break hyphen ("Al-" never ends a line). */
+export { NBHY, NBSP };
 
 /**
- * The catch-up offer, one line: "Missed yesterday · Revise p. 559–563". A day
- * with some of its pages revised reads "Left" instead of "Missed". Several
- * days say how many ("Missed 3 days"). Null when nothing is left over.
+ * The catch-up offer, one line: "Missed yesterday · Revise At-Talaq to Al-Mulk"
+ * (the pages' surahs, short: lib/passages). A day with some of its pages
+ * revised reads "Left" instead of "Missed". Several days say how many
+ * ("Missed 3 days"). Null when nothing is left over.
  */
 export function catchUpLine(leftovers: Leftovers): { title: string; label: string } | null {
   if (leftovers.pages.length === 0) return null;
-  const runs = runsInOrder([...leftovers.pages].sort((a, b) => a - b));
-  const span = (r: PageRun) => (r.first === r.last ? `${r.first}` : `${r.first}–${r.last}`);
-  const shown = runs.slice(0, 2).map(span).join(', ');
-  const more = runs.length > 2 ? ` and ${runs.length - 2} more` : '';
+  const what = describePassage(leftovers.pages, { form: 'short', sentence: true, max: 2 });
   const missed = leftovers.days.every((d) => d.missed);
   const when =
     leftovers.days.length === 1
@@ -41,7 +40,7 @@ export function catchUpLine(leftovers: Leftovers): { title: string; label: strin
         ? 'yesterday'
         : `${leftovers.days[0].ago} days ago`
       : `${leftovers.days.length} days`;
-  const title = `${missed ? 'Missed' : 'Left'} ${when} · Revise ${runs.length > 1 ? 'pp.' : 'p.'}${NBSP}${shown}${more}`;
+  const title = `${missed ? 'Missed' : 'Left'} ${when} · Revise ${what}`;
   return { title, label: spoken(title) };
 }
 
@@ -63,12 +62,10 @@ export interface TodayLines {
   solid: boolean;
 }
 
-/** How VoiceOver should read a line: "page 542", "Al-Mujadila to At-Tahrim". */
-export const spoken = (s: string) =>
-  s.split(`p.${NBSP}`).join('page ').split(NBSP).join(' ').split(' → ').join(' to ').split(NBHY).join('-');
+/** How VoiceOver should read a line: "Al-Mujadila to At-Tahrim", "ayahs 1 to 11", "pages 542 to 561". */
+export const spoken = (s: string) => spokenText(s.split(`${NBSP}→ `).join(' → ').split(' → ').join(' to '));
 
 const pages = (n: number) => `${n}${NBSP}page${n === 1 ? '' : 's'}`;
-const page = (p: number) => `p.${NBSP}${p}`;
 /** A surah's name, held together ("Al‑Mujadila" never breaks after "Al-"). */
 const held = (name: string | undefined) => (name ?? '').split('-').join(NBHY);
 const firstSurah = (p: number) => held(getSurahsForPage(p)[0]?.name);
@@ -106,23 +103,23 @@ function surahSpan(run: PageRun): string {
   return a === b ? a : to(a, b);
 }
 
-/** "Pages 542–561 · Al-Mujadila → At-Tahrim", "Pages 595–604, 1–10 · Ash-Shams → An-Nas, Al-Fatihah → Al-Baqarah". */
+/**
+ * The › sheet's header, the exact ranges: the surahs (with the juz when it helps),
+ * then the page numbers as a quiet detail. "Al-Mujadila to At-Tahrim · Juz 28 ·
+ * pp. 542–561", "Ash-Shams to An-Nas, then Al-Fatihah to Al-Baqarah 69 · pp. 595–604, 1–10".
+ */
 export function rangesText(list: number[]): string {
-  const runs = runsInOrder(list);
-  if (runs.length === 0) return '';
-  const one = runs.length === 1 && runs[0].first === runs[0].last;
-  const span = (r: PageRun) => (r.first === r.last ? `${r.first}` : `${r.first}–${r.last}`);
-  const shown = runs.slice(0, 3);
-  const more = runs.length > 3 ? ` and ${runs.length - 3} more` : '';
-  return `${one ? 'Page' : 'Pages'} ${shown.map(span).join(', ')}${more} · ${shown.map(surahSpan).join(', ')}${more}`;
+  if (list.length === 0) return '';
+  const what = describePassage(list, { order: 'given', juz: true, wholeJuz: false });
+  return [what, pagesNote(list, { order: 'given' })].filter(Boolean).join(' · ');
 }
 
 /**
  * Done today: the quiet line that opens the next revision day ("Tomorrow starts
- * at Al-Baqarah, p. 22 ›"). `lead` is "Tomorrow", or the weekday after that.
+ * at Al-Baqarah, ayah 142 ›"). `lead` is "Tomorrow", or the weekday after that.
  */
 export function aheadLine(lead: string, first: number): { text: string; label: string } {
-  const text = `${lead} starts at ${firstSurah(first)}, ${page(first)}`;
+  const text = `${lead} starts at ${placeOfPage(first)}`;
   return { text, label: spoken(text) };
 }
 
@@ -172,7 +169,7 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
 
   if (doneHere > 0) {
     const next = ordered.find((p) => !done.has(p)) ?? ordered[ordered.length - 1];
-    const title = `Continue at ${firstSurah(next)}, ${page(next)}`;
+    const title = `Continue at ${placeOfPage(next)}`;
     return {
       title: { text: title, dot: false, chevron: true },
       detail: { kind: 'progress', done: doneHere, total },
@@ -185,12 +182,12 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
   }
 
   const start = ordered[0];
-  const title = `Starts at ${firstSurah(start)}, ${page(start)}`;
+  const title = `Starts at ${placeOfPage(start)}`;
   let detail: string;
   if (carried > 0) {
     detail = `${pages(total)} · ${carried} from yesterday first`;
   } else if (runs.length > 1) {
-    detail = `${pages(total)} · then ${firstSurah(runs[1].first)}, ${page(runs[1].first)}`;
+    detail = `${pages(total)} · then ${placeOfPage(runs[1].first)}`;
   } else {
     const end = lastSurah(ordered[total - 1]);
     detail = [pages(total), end !== firstSurah(start) ? `to ${end}` : null, juzSpan(ordered)].filter(Boolean).join(' · ');

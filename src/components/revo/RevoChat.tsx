@@ -17,7 +17,7 @@ import { greetingName } from '../../lib/displayName';
 import { auth } from '../../lib/firebase';
 import { ChartCard, PlanCard } from './RevoCards';
 import { knownAction } from '../../lib/revo/screens';
-import { RevoComposer, type PickKind } from './RevoComposer';
+import { RevoComposer } from './RevoComposer';
 import { Chips, FeedbackRow, LimitCard, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
 
 /**
@@ -31,9 +31,9 @@ export function RevoChat({
   chatId,
   onChatId,
   usage,
-  attach,
-  onAttach,
-  onPick,
+  attachments,
+  onAttachments,
+  onAdd,
   onHistory,
   onMemory,
   onExpand,
@@ -44,9 +44,11 @@ export function RevoChat({
   chatId: string | null;
   onChatId: (id: string) => void;
   usage: { day: string; count: number };
-  attach: RevoAttachment | null;
-  onAttach: (a: RevoAttachment | null) => void;
-  onPick: (kind: PickKind) => void;
+  /** What + attached to the next question (several at most REVO_MAX_ATTACHMENTS). */
+  attachments: RevoAttachment[];
+  onAttachments: (list: RevoAttachment[]) => void;
+  /** Opens Add to chat. */
+  onAdd: () => void;
   onHistory: () => void;
   onMemory: () => void;
   onExpand: () => void;
@@ -62,7 +64,7 @@ export function RevoChat({
   const backend = revoBackend();
   const [messages, setMessages] = useState<RevoMessage[]>([]);
   // A question sent and not answered yet (shown with Revo thinking).
-  const [pending, setPending] = useState<{ text: string; attach?: { kind: string; label: string } } | null>(null);
+  const [pending, setPending] = useState<{ text: string; attached: { kind: string; label: string }[] } | null>(null);
   const [refusal, setRefusal] = useState<{ kind: RevoRefusal; message: string; retry?: string } | null>(null);
   const scroll = useRef<ScrollView>(null);
   // Whether the list shows its end. A list that gets shorter (the keyboard coming up, the sheet
@@ -97,13 +99,21 @@ export function RevoChat({
   const ask = async (question: string) => {
     const ctx = build();
     if (!ctx) return;
-    const sentAttach = attach;
+    const sent = attachments;
     setRefusal(null);
-    setPending({ text: question, ...(sentAttach ? { attach: { kind: sentAttach.kind, label: sentAttach.label } } : {}) });
-    onAttach(null);
+    setPending({ text: question, attached: sent.map((a) => ({ kind: a.kind, label: a.label })) });
+    onAttachments([]);
     onExpand();
     try {
-      const result = await backend.ask({ chatId, day, question, context: ctx, attach: sentAttach });
+      // One goes as `attach`, as every server takes it; several as `attachments` (from Nov 7 2026).
+      const result = await backend.ask({
+        chatId,
+        day,
+        question,
+        context: ctx,
+        attach: sent.length === 1 ? sent[0] : null,
+        ...(sent.length > 1 ? { attachments: sent } : {}),
+      });
       // Checked by the backend, and read here, never inside a state update: React throws an
       // updater's error again while rendering, outside this try (REACT-NATIVE-10).
       const { question: asked, reply } = result;
@@ -120,7 +130,7 @@ export function RevoChat({
       setRefusal({ kind: e.refusal, message: e.message, retry });
       // Off on the server (turned off on another phone, or not on yet): the opt-in, not a dead end.
       if (e.refusal === 'off' && onOff) onOff();
-      if (sentAttach) onAttach(sentAttach);
+      if (sent.length > 0) onAttachments(sent);
     } finally {
       setPending(null);
     }
@@ -183,7 +193,7 @@ export function RevoChat({
         ) : null}
         {messages.map((m) =>
           m.role === 'user' ? (
-            <UserBubble key={m.id} text={m.text} attach={m.attach} testID="revo-question" />
+            <UserBubble key={m.id} text={m.text} attached={m.attachments ?? (m.attach ? [m.attach] : [])} testID="revo-question" />
           ) : (
             <View key={m.id} style={styles.revo} testID="revo-answer">
               <RevoText text={m.text} />
@@ -208,7 +218,7 @@ export function RevoChat({
         )}
         {pending ? (
           <>
-            <UserBubble text={pending.text} attach={pending.attach} testID="revo-question" />
+            <UserBubble text={pending.text} attached={pending.attached} testID="revo-question" />
             <Typing />
           </>
         ) : null}
@@ -233,9 +243,9 @@ export function RevoChat({
         )}
         <RevoComposer
           onSend={(t) => void ask(t)}
-          onPick={onPick}
-          attach={attach}
-          onRemoveAttach={() => onAttach(null)}
+          onAdd={onAdd}
+          attachments={attachments}
+          onRemoveAttach={(i) => onAttachments(attachments.filter((_, j) => j !== i))}
           disabled={outOfQuestions || capped}
           disabledText={capped ? 'Back next month' : back.short}
           busy={pending != null}

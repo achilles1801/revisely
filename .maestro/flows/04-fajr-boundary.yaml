@@ -46,10 +46,10 @@ appId: com.revisionbuddy.app
       text: "Done · 10.pages"
     timeout: 20000
 # DAY-3, AHEAD-1: "Tomorrow" is the revision day after (Wednesday), not the
-# calendar day after (Thursday, Al-'Asr p. 601), and opens on its first page.
+# calendar day after (Thursday, Al-'Asr, page 601), and opens on its first page.
 - assertVisible:
     id: today-ahead
-    text: "Tomorrow starts at At.Tariq, page 591"
+    text: "Tomorrow starts at At.Tariq"
 - tapOn:
     id: today-ahead
 - runFlow: ../subflows/show-controls.yaml
@@ -60,7 +60,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "Page 591 · .*"
+    text: "At.Tariq to Al.A'la.15 · .*"
 - tapOn: "Back"
 
 # LOG-3: a note written at 03:00 belongs to Tuesday, the revision day.
@@ -84,7 +84,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Starts at At.Tariq, p..591.*"
+      text: "Starts at At.Tariq[^,0-9]*"
     timeout: 10000
 # And on again: back to Tuesday.
 - runFlow:
@@ -105,7 +105,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Starts at At.Tariq, p..591.*"
+      text: "Starts at At.Tariq[^,0-9]*"
     timeout: 20000
 # LOG-3: Wednesday's log is empty; the 03:00 note is Tuesday's.
 - runFlow: ../subflows/open-log.yaml

@@ -31,6 +31,7 @@ import {
   HizbInfo,
 } from '../lib/quranData';
 import { UserPage } from '../types';
+import { describePageRange } from '../lib/passages';
 import { PageStatus } from '../lib/memorizationChanges';
 import { arabicLabelLines } from '../lib/platformUi';
 
@@ -416,10 +417,8 @@ function JuzList({
             <BaseRow
               number={juzNumber}
               englishTitle={`Juz ${juzNumber}`}
-              englishSub={
-                startingSurah ? `starts with ${startingSurah.name}` : undefined
-              }
-              englishSubAlt={`Pages ${range.start}–${range.end}`}
+              // What the juz holds, by surah (surahs and juz first, never page numbers).
+              englishSub={describePageRange(range.start, range.end, { form: 'short', wholeJuz: false })}
               arabic={startingSurah?.nameArabic ?? ''}
               expanded={isExpanded}
               markMode={markMode}
@@ -576,10 +575,8 @@ function HizbRow({
       <BaseRow
         number={hizb.number}
         englishTitle={`Hizb ${hizb.number}`}
-        englishSub={
-          startingSurah ? `starts with ${startingSurah.name}` : undefined
-        }
-        englishSubAlt={`Juz ${hizb.juzNumber} · Pages ${hizb.startPage}–${hizb.endPage}`}
+        englishSub={describePageRange(hizb.startPage, hizb.endPage, { form: 'short', wholeJuz: false })}
+        englishSubAlt={`Juz ${hizb.juzNumber}`}
         arabic={startingSurah?.nameArabic ?? ''}
         expanded={expanded}
         markMode={markMode}

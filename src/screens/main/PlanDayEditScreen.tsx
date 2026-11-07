@@ -19,9 +19,9 @@ import {
   memorizedJuzGroups,
   memorizedSurahGroups,
   pageCountLabel,
-  pageRangeLabel,
   summarizeDay,
 } from '../../lib/planDisplay';
+import { ayahsInSurah, describePassage } from '../../lib/passages';
 import {
   applyGroupSelection,
   isGroupFullyIncluded,
@@ -200,7 +200,7 @@ export default function PlanDayEditScreen() {
         title: `Juz ${g.juz}`,
         subtitle: partial
           ? `${onDay} of ${g.pages.length} pages already on this day`
-          : `${getSurahForPage(g.pages[0]).name} · ${pageCountLabel(g.pages.length)}`,
+          : `${describePassage(g.pages, { form: 'short', wholeJuz: false, max: 2 })} · ${pageCountLabel(g.pages.length)}`,
         trailing: g.name,
         search: String(g.juz),
         checked: draft.has(`juz:${g.juz}`),
@@ -290,7 +290,7 @@ export default function PlanDayEditScreen() {
               <GroupedRow
                 key={s.number}
                 title={s.name}
-                subtitle={`${pageRangeLabel(s.pages)} · ${pageCountLabel(s.pages.length)}`}
+                subtitle={`${ayahsInSurah(s.number, s.pages)} · ${pageCountLabel(s.pages.length)}`}
                 leading={
                   editing ? (
                     <Tap

@@ -16,6 +16,7 @@
 //                        juz or more carved out where surahs alone would need ayah numbers),
 //                        or a session's runs in its own order: "Ash-Shams to An-Nas, then …"
 //   a session            describeSession: whole juz only on the juz plan (SESS-5)
+//   a row named by its surah   ayahsInSurah: "Ayahs 142–252", "Whole surah"
 //
 // Every page of both prints ends at the end of a verse, so a page range is a
 // verse range: its first page's first verse to its last page's last verse,
@@ -285,6 +286,30 @@ export function placeOfPage(page: number, opts: Pick<PassageOptions, 'form' | 'e
   const name = surahName(v.sura);
   if (v.ayah === 1) return name;
   return opts.form === 'short' ? `${name}${NBSP}${v.ayah}` : `${name}, ayah${NBSP}${v.ayah}`;
+}
+
+/**
+ * The part of one surah some pages hold, for a row already named by the surah:
+ * "Whole surah", "Ayahs 142–252", "Ayah 286", "Ayahs 1–5, 20–30". Pages outside
+ * the surah add nothing; '' when none of it is there.
+ */
+export function ayahsInSurah(sura: number, pages: Iterable<number>, edition: MushafEditionId = getMushafEdition()): string {
+  const count = ayahCount(sura);
+  const spans: [number, number][] = [];
+  for (const r of runsOf(pages, 'mushaf')) {
+    const f = firstVerseOfPage(r.first, edition);
+    const l = lastVerseOfPage(r.last, edition);
+    if (f.sura > sura || l.sura < sura) continue;
+    const a = f.sura < sura ? 1 : f.ayah;
+    const b = l.sura > sura ? count : l.ayah;
+    const last = spans[spans.length - 1];
+    if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
+    else spans.push([a, b]);
+  }
+  if (spans.length === 0) return '';
+  if (spans.length === 1 && spans[0][0] === 1 && spans[0][1] === count) return 'Whole surah';
+  const one = spans.length === 1 && spans[0][0] === spans[0][1];
+  return `${one ? 'Ayah' : 'Ayahs'}${NBSP}${spans.map(([x, y]) => (x === y ? `${x}` : `${x}–${y}`)).join(', ')}`;
 }
 
 /**
