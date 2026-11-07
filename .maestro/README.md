@@ -354,13 +354,23 @@ Things that bit:
   buttons in capitals: match with `(?i)`.
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
+- A function's first call in the emulator waits for its worker to start: 13–17 s on a CI macOS
+  runner, against well under a second once it is up (run 42358765158: the app's first `revoAsk`
+  answered in 20.7 s for 3.7 s of work). A step that waits on a function's answer would count that
+  start, so a flow starts the functions it waits on first, with a call they refuse (09-revo:
+  `scripts/server-revo.js`, `MODE=warm`). A worker stays up until `functions/` changes.
 
 A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
 in `.maestro/build/results/<platform>/<flow>/`:
 - `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
   JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
   An iOS release build passes only `console.error` to the unified log.
-- `device.log` (iOS): the unified log.
+- `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
+  (`transaction_duration_ms`; the emulators' ports name the service).
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
+- `run/<time>/<flow>/screen-hierarchy/` and `screenshots/`: what Maestro saw when the step failed,
+  and the screen. The screenshot is taken after the hierarchy, so something that arrived in between
+  (an answer from a function) is on the screenshot and not in the hierarchy: check the time it
+  arrived before calling the screen slow or the hierarchy stale.
 
 CI uploads the folder for a job with any failed attempt.

@@ -1191,7 +1191,8 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   once every tester has the new app. A tap before the switch is read waits for it (up to 2 s). E2E builds
   run the real `revo*` functions in the functions emulator (only the model answers from a recording);
   `09-revo` marks its account a tester, sets the model's text, the day's count and Revo off through the
-  emulators (`.maestro/scripts/server-revo.js`).
+  emulators (`.maestro/scripts/server-revo.js`), and starts the `revo*` functions before anything waits
+  on them (a function's first call there waits 13–17 s for its worker on a CI runner).
 - **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (a 44pt disc,
   bottom-right, 14 above the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the
   reader, a session or an editor; hidden with the keyboard and while the sheet is up), and the sheet
