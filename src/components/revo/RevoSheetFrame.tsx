@@ -9,7 +9,7 @@ import { useReduceMotion } from '../../design/motion';
 import { layoutV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
 import { shouldDismiss } from '../v2/Sheet';
-import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, keyboardOverSheet, revoSheetFit } from '../../lib/revo/sheetFit';
+import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, keyboardOverSheet, revoHeights, revoSheetFit } from '../../lib/revo/sheetFit';
 
 /** Revo opens at about half the screen; a conversation, or a drag up, takes it to full height. */
 export const REVO_MEDIUM = 0.55;
@@ -17,7 +17,7 @@ export const REVO_RADIUS = 22;
 const SPRING = { damping: 24, stiffness: 300, mass: 0.8 };
 
 /** How much of the sheet's frame the keyboard covers (keyboardOverSheet, keyboardCover), live, with the keyboard's own duration. */
-function useKeyboardCover(frameHeight: number, bottomInset: number): { cover: number; duration: number } {
+function useKeyboardCover(frameHeight: number, bottomInset: number): { cover: number; duration: number; rest: number } {
   const [keyboard, setKeyboard] = useState({ height: 0, duration: 0 });
   const base = useRef(frameHeight);
   if (keyboard.height === 0 && frameHeight > 0) base.current = frameHeight;
@@ -32,7 +32,7 @@ function useKeyboardCover(frameHeight: number, bottomInset: number): { cover: nu
     return () => subs.forEach((s) => s.remove());
   }, []);
   const height = keyboardOverSheet(keyboard.height, Platform.OS, bottomInset);
-  return { cover: keyboardCover(height, base.current, frameHeight), duration: keyboard.duration };
+  return { cover: keyboardCover(height, base.current, frameHeight), duration: keyboard.duration, rest: base.current };
 }
 
 /**
@@ -64,15 +64,15 @@ export function RevoSheetFrame({
   const reduceMotion = useReduceMotion();
   // The frame the sheet sits in (the modal's root), measured; the window's height until then.
   const [frameHeight, setFrameHeight] = useState(height);
-  const fullHeight = height - insets.top - REVO_TOP_GAP;
-  const mediumHeight = Math.round(height * REVO_MEDIUM);
+  const { cover, duration, rest } = useKeyboardCover(frameHeight, insets.bottom);
+  // From the frame (keyboard down), not the window: Android's window leaves the system bars out.
+  const { full: fullHeight, medium: mediumHeight, span } = revoHeights({ window: height, frame: rest, top: insets.top, medium: REVO_MEDIUM });
   const [shown, setShown] = useState(visible);
 
   // How far the sheet sits below its place: 0 shown, a sheet's height gone.
-  const offset = useSharedValue(height);
+  const offset = useSharedValue(span);
   const sheetH = useSharedValue(full ? fullHeight : mediumHeight);
   const drag = useSharedValue(0);
-  const { cover, duration } = useKeyboardCover(frameHeight, insets.bottom);
   // The keyboard's cover and the room above it, for the sheet's style on the UI thread.
   const lift = useSharedValue(0);
   const room = useSharedValue(frameHeight - insets.top - REVO_TOP_GAP);
@@ -98,10 +98,10 @@ export function RevoSheetFrame({
       // than coming up at the medium height and growing.
       sheetH.value = full ? fullHeight : mediumHeight;
       drag.value = 0;
-      offset.value = height;
+      offset.value = span;
       offset.value = withTiming(0, { duration: 260 });
     } else if (shown) {
-      offset.value = withTiming(height, { duration: 200 }, (done) => {
+      offset.value = withTiming(span, { duration: 200 }, (done) => {
         if (done) runOnJS(setShown)(false);
       });
     }
