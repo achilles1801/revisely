@@ -3,11 +3,11 @@
 // scenario that checks where today starts compares with the words for that page.
 import { describePassage, placeOfPage, plainText } from '../../../src/lib/passages';
 
-/** Ordinary spaces and hyphens. */
+/** Ordinary spaces and hyphens, and no icons (the test renderer shows one as "[chevron-forward]"). */
 export function plain(text: string): string;
 export function plain(text: string | null): string | null;
 export function plain(text: string | null): string | null {
-  return text == null ? null : plainText(text).replace(/\s+/g, ' ').trim();
+  return text == null ? null : plainText(text).replace(/\[[a-z0-9-]+\]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Where reading a page begins: "An-Naba", "Al-Baqarah, ayah 142" (Today's "Starts at …"). */
@@ -17,6 +17,10 @@ export const place = (page: number): string => plain(placeOfPage(page));
 export const catchUpWhat = (pages: number[]): string =>
   plain(describePassage(pages, { form: 'short', sentence: true, max: 2 }));
 
-/** Today's title for a day that starts (or goes on) at `page`: "Starts at An-Naba", "Continue at Al-Hashr, ayah 17". */
-export const startsAt = (page: number): RegExp =>
-  new RegExp(`^(Starts|Continue) at ${place(page).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Today's title (plain) for a day that starts (or goes on) at `page`: "Starts at An-Naba", "Continue at Al-Hashr, ayah 17". */
+export const startsAt = (page: number): RegExp => new RegExp(`^(Starts|Continue) at ${escaped(place(page))}$`);
+
+/** The line that opens the next day (plain): "Tomorrow starts at At-Tariq", "Thu starts at …". */
+export const aheadAt = (lead: string, page: number): RegExp => new RegExp(`^${lead} starts at ${escaped(place(page))}$`);
