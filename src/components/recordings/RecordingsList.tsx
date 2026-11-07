@@ -23,6 +23,7 @@ import { useKeepScreenOn } from "../../hooks/useKeepScreenOn";
 import { useRecordingPlayback } from "../../hooks/useRecordingPlayback";
 import { useHaptics } from "../../design/haptics";
 import { playedFraction } from "../../lib/waveform";
+import { placeOfPage, spokenText } from "../../lib/passages";
 import { layoutV2, typeV2 } from "../../theme/v2";
 import { Tap } from "../v2/Tap";
 import { ActionSheet } from "../v2/ActionSheet";
@@ -342,7 +343,7 @@ export function RecordingsList({
                               : { backgroundColor: palette.fill, borderColor: palette.separator },
                           ]}
                           accessibilityRole="button"
-                          accessibilityLabel={`Play from page ${m.page}`}
+                          accessibilityLabel={`Play from ${spokenText(placeOfPage(m.page, { form: 'long' }))}`}
                           accessibilityState={{ selected: current }}
                           testID={`recording-page-${r.id}-${m.page}`}
                         >
@@ -350,7 +351,7 @@ export function RecordingsList({
                             style={[styles.chipText, typeV2.numeral, { color: current ? palette.bg : palette.secondary }]}
                             maxFontSizeMultiplier={1.4}
                           >
-                            p. {m.page}
+                            {placeOfPage(m.page, { form: "short" })}
                           </Text>
                         </Tap>
                       );
@@ -385,7 +386,7 @@ export function RecordingsList({
                               },
                         ]}
                         accessibilityRole="button"
-                        accessibilityLabel={`Play from page ${m.page}`}
+                        accessibilityLabel={`Play from ${spokenText(placeOfPage(m.page, { form: 'long' }))}`}
                         accessibilityState={{ selected: current }}
                         testID={`recording-page-${r.id}-${m.page}`}
                       >
@@ -397,7 +398,7 @@ export function RecordingsList({
                           ]}
                           maxFontSizeMultiplier={1.4}
                         >
-                          p. {m.page}
+                          {placeOfPage(m.page, { form: "short" })}
                         </Text>
                       </Tap>
                     );

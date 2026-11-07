@@ -1,3 +1,4 @@
+import { plainText } from '../passages';
 import { creditLine, dayTitle, formatDayLong, formatMinutesLong, formatPagesShort, windowFooter } from '../activityFormat';
 
 describe('Activity minutes (gap audit H)', () => {
@@ -42,12 +43,13 @@ describe('the day view footer (gap audit §4)', () => {
 
 describe('pages credited to another day (AHEAD-2, SESS-7)', () => {
   const day = '2026-11-03';
-  it('names the day by its date, never as YYYY-MM-DD', () => {
-    expect(creditLine(day, { countsFor: '2026-11-04', pages: [562, 563] })).toBe('Ahead for Wednesday 4 November: p. 562–563');
-    expect(creditLine(day, { fromDay: '2026-11-02', pages: [540, 541] })).toBe('Done ahead on Monday 2 November: p. 540–541');
+  const line = (...a: Parameters<typeof creditLine>) => plainText(creditLine(...a));
+  it('names the day by its date and the pages by surah, never as YYYY-MM-DD or page numbers', () => {
+    expect(line(day, { countsFor: '2026-11-04', pages: [562, 563] })).toBe('Ahead for Wednesday 4 November: Al-Mulk 1–26');
+    expect(line(day, { fromDay: '2026-11-02', pages: [556, 557] })).toBe('Done ahead on Monday 2 November: At-Taghabun');
   });
   it('a catch-up page reads as caught up for the day it was missed, never as ahead [SESS-7]', () => {
-    expect(creditLine(day, { countsFor: '2026-11-02', pages: [556, 557] })).toBe('Catch-up for Monday 2 November: p. 556–557');
-    expect(creditLine('2026-11-02', { fromDay: '2026-11-03', pages: [556, 557] })).toBe('Caught up on Tuesday 3 November: p. 556–557');
+    expect(line(day, { countsFor: '2026-11-02', pages: [556, 557] })).toBe('Catch-up for Monday 2 November: At-Taghabun');
+    expect(line('2026-11-02', { fromDay: '2026-11-03', pages: [556, 557] })).toBe('Caught up on Tuesday 3 November: At-Taghabun');
   });
 });

@@ -12,9 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { memorizeSuggestion } from '../../lib/activityAdd';
 import { parsePageRange } from '../../lib/memorizationLog';
-import { formatPagesShort } from '../../lib/activityFormat';
-import { ayahSpan } from '../../lib/ayahSpan';
-import { describeSurahs } from '../../lib/pageRanges';
+import { describePassage } from '../../lib/passages';
 import * as firestoreService from '../../services/firestoreService';
 import { typeV2 } from '../../theme/v2';
 import type { UserPage } from '../../types';
@@ -73,7 +71,7 @@ export function AddMemorizedSheet({
   // When the suggested pages were read: the first session that held one of them.
   const readAt = readings.find((r) => r.pages.some((p) => suggestion.includes(p)))?.startedAt;
   const suggestionText = [
-    [formatPagesShort(suggestion), ayahSpan(suggestion)].filter(Boolean).join(', '),
+    describePassage(suggestion, { form: 'compact' }),
     readAt != null && Number.isFinite(readAt) ? `read ${partOfDay(readAt, dayName === 'today')}` : `read ${dayName}`,
   ].join(' · ');
 
@@ -189,7 +187,7 @@ export function AddMemorizedSheet({
         </View>
         {range ? (
           <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]}>
-            {`${describeSurahs({ first: pageNumbers[0], last: pageNumbers[pageNumbers.length - 1] })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
+            {`${describePassage(pageNumbers, { form: 'compact' })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
           </Text>
         ) : null}
 

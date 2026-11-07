@@ -12,7 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { missedFromSession } from '../../lib/activityAdd';
 import { manualRevisionItem, pagesInRange, parsePageRange, STRENGTH_RATING, type Strength } from '../../lib/manualRevision';
-import { describeSurahs } from '../../lib/pageRanges';
+import { describePassage } from '../../lib/passages';
 import { typeV2 } from '../../theme/v2';
 import type { WeaknessRating } from '../../types/firestore';
 import { RevisedMark } from './BlockMark';
@@ -135,7 +135,7 @@ export function AddRevisedSheet({
           <View style={styles.top}>
             <SuggestionLine
               label="From your session:"
-              text={`the ${pagesWord(missed.length)} it skipped`}
+              text={`${describePassage(missed, { form: 'short' })}, which it skipped`}
               action={usedSession ? 'Undo' : 'Use'}
               onPress={useSession}
               accessibilityLabel={usedSession ? 'Undo the session pages' : 'Use the pages the session skipped'}
@@ -175,7 +175,7 @@ export function AddRevisedSheet({
         </View>
         {range ? (
           <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]} testID="add-revised-range">
-            {`${describeSurahs({ first: range.from, last: range.to })} · ${pagesWord(pageNumbers.length)}`}
+            {`${describePassage(pageNumbers, { form: 'compact' })} · ${pagesWord(pageNumbers.length)}`}
           </Text>
         ) : null}
 
