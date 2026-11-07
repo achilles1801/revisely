@@ -1,11 +1,35 @@
 # Moves the clock to AT and cold-starts the app, so every screen reads the new time.
 appId: com.revisionbuddy.app
 ---
+# iOS: the time comes with the cold start, as a fresh install's does (lib/e2e/clock's launch
+# argument): no link, which on a busy CI Simulator waited 10–15 s for SpringBoard each time.
 - runFlow:
-    file: clock.yaml
-    env:
-      AT: ${AT}
-- runFlow: relaunch.yaml
+    when:
+      platform: iOS
+    commands:
+      - stopApp
+      - launchApp:
+          stopApp: true
+          arguments:
+            e2eClock: ${AT}
+      - extendedWaitUntil:
+          visible:
+            id: e2e-status
+          timeout: 30000
+      - extendedWaitUntil:
+          notVisible:
+            id: root-loading
+          timeout: 30000
+# Android takes no launch arguments in JavaScript: the link, then the cold start.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runFlow:
+          file: clock.yaml
+          env:
+            AT: ${AT}
+      - runFlow: relaunch.yaml
 - runFlow:
     file: clock-is.yaml
     env:
