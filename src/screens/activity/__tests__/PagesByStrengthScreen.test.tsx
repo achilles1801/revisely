@@ -1,7 +1,7 @@
 // "Pages by strength" (ACT-12): the Insights tab's Browse as a screen of its own, behind Weak spots'
 // "See all pages by strength". Every row, no "Show all"; the filters and the page sheet as before.
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 jest.mock('@expo/vector-icons', () => {
@@ -29,6 +29,7 @@ import PagesByStrengthScreen from '../PagesByStrengthScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
+import { plainText } from '../../../lib/passages';
 import type { RevisionLog, User, UserPage } from '../../../types';
 
 const v2 = (ui: React.ReactElement) => (
@@ -110,6 +111,17 @@ describe('Pages by strength (ACT-12)', () => {
     expect(flat(screen.getByTestId('pill-surahs').props.style).backgroundColor).toBe(palette.text);
   });
 
+  it('a page’s row leads with its surah and ayahs; the page number is only the quiet detail (Majd, Nov 7)', async () => {
+    await open();
+    const row = screen.getByTestId('browse-page-50');
+    expect(within(row).getByText("Ali 'Imran, ayahs 1–9", { normalizer: plainText })).toBeTruthy();
+    expect(within(row).getByText('Weak · Juz 3 · p. 50 · revised 3d ago', { normalizer: plainText })).toBeTruthy();
+    // The mark is the surah's number, as in Surahs; no "Page 50" title.
+    expect(within(row).getByText('3', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText(/^Page \d+/)).toBeNull();
+    expect(row.props.accessibilityLabel).toBe("Ali 'Imran, ayahs 1 to 9. Weak · Juz 3 · page 50 · revised 3d ago");
+  });
+
   it('the old Browse: Surahs and Juz, and a juz narrows the pages to it', async () => {
     await open();
     fireEvent.press(screen.getByTestId('pill-surahs'));
@@ -139,8 +151,8 @@ describe('Pages by strength (ACT-12)', () => {
     const now = new Date();
     mockApp.pages = [page(548, 2, now), page(549, 2)];
     await open();
-    expect(screen.getByText('Weak · Juz 28 · revised today')).toBeTruthy();
-    expect(screen.getByText('Weak · Juz 28 · revised 3d ago')).toBeTruthy();
+    expect(screen.getByText('Weak · Juz 28 · p. 548 · revised today', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText('Weak · Juz 28 · p. 549 · revised 3d ago', { normalizer: plainText })).toBeTruthy();
     expect(screen.queryByText(/-\d+d ago/)).toBeNull();
   });
 
@@ -149,7 +161,7 @@ describe('Pages by strength (ACT-12)', () => {
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     mockApp.pages = [page(548, 2, `${today}T00:00:00.000Z`)];
     await open();
-    expect(screen.getByText('Weak · Juz 28 · revised today')).toBeTruthy();
+    expect(screen.getByText('Weak · Juz 28 · p. 548 · revised today', { normalizer: plainText })).toBeTruthy();
   });
 
   it('no revised page yet: one quiet line, no list', async () => {

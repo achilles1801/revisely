@@ -24,6 +24,7 @@ jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 import { ScrollView } from 'react-native';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
 import AlgorithmScreen, { juzMeta } from '../AlgorithmScreen';
+import { plainText } from '../../../lib/passages';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
@@ -121,7 +122,8 @@ describe('Insights in the new design', () => {
   it('focus: the three weakest pages first, as flat rows with their strength', async () => {
     await renderInsights();
     const first = screen.getByTestId('focus-1');
-    expect(within(first).getByText('Page 1 · Al-Fatihah')).toBeTruthy();
+    // Surah first (Majd's rule): the passage, the page only a quiet detail.
+    expect(within(first).getByText('Al-Fatihah', { normalizer: plainText })).toBeTruthy();
     expect(within(first).getByText(/^Very weak · /)).toBeTruthy();
     expect(flat(within(first).getByTestId('strength-dot').props.style).backgroundColor).toBe(palette.red);
     expect(screen.getByTestId('focus-50')).toBeTruthy();

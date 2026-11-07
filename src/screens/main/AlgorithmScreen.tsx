@@ -27,7 +27,7 @@ import {
   SectionHeader,
   StrengthBar,
 } from '../../components/insights/InsightsV2';
-import { BrowseByStrength, PageRow, usePageStrengthRows } from '../../components/insights/BrowseByStrength';
+import { BrowseByStrength, PageRow, pageRowText, usePageStrengthRows } from '../../components/insights/BrowseByStrength';
 import { layoutV2, typeV2 } from '../../theme/v2';
 
 export { juzMeta } from '../../components/insights/BrowseByStrength';
@@ -133,18 +133,22 @@ export default function AlgorithmScreen() {
             {topPages.length === 0 ? (
               <QuietLine testID="focus-empty">Your top priority will appear here.</QuietLine>
             ) : (
-              topPages.map((row, i) => (
-                <InsightRow
-                  key={`focus-${row.pageNumber}`}
-                  number={row.pageNumber}
-                  name={`Page ${row.pageNumber} · ${row.surahName}`}
-                  rating={row.strength}
-                  text={`${getRatingLabel(row.strength)} · ${row.reason}`}
-                  onPress={() => openPagePreview(row.pageNumber)}
-                  separator={i < topPages.length - 1}
-                  testID={`focus-${row.pageNumber}`}
-                />
-              ))
+              topPages.map((row, i) => {
+                const t = pageRowText(row.pageNumber, (page) => `${getRatingLabel(row.strength)} · ${page} · ${row.reason}`);
+                return (
+                  <InsightRow
+                    key={`focus-${row.pageNumber}`}
+                    number={row.surahNumber}
+                    name={t.name}
+                    rating={row.strength}
+                    text={t.text}
+                    onPress={() => openPagePreview(row.pageNumber)}
+                    separator={i < topPages.length - 1}
+                    accessibilityLabel={t.spoken}
+                    testID={`focus-${row.pageNumber}`}
+                  />
+                );
+              })
             )}
             <Hairline />
 
