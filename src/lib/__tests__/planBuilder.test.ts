@@ -280,6 +280,10 @@ describe('planDisplay', () => {
     expect(plainText(summarizeDay(range(542, 561)).subtitle)).toBe('Al-Mujadila to At-Tahrim · 20 pages');
     expect(plainText(summarizeDay([2, 3, 4]).subtitle)).toBe('Start of Al-Baqarah · 3 pages');
     expect(summarizeDay([2, 300, 450, 600]).subtitle).toBe("Al-Baqarah, Al-Kahf +4 · 4 pages");
+    // The cycle's end, then its start: up to three parts, in the day's order.
+    expect(plainText(summarizeDay([601, 602, 603, 604, 1, 582, 583]).subtitle)).toBe(
+      "Al-'Asr to An-Nas, then Al-Fatihah, then An-Naba to An-Nazi'at · 7 pages",
+    );
   });
 
   it('formats page ranges', () => {

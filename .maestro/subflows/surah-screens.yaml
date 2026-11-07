@@ -26,7 +26,8 @@ appId: com.revisionbuddy.app
       NAME: 11-today-menu${SUFFIX}
 
 # Jump to: each juz by its surahs, each surah by its juz.
-- tapOn: "Jump to…"
+# iOS reads the row with its subtitle ("Jump to…, Start today at …").
+- tapOn: "Jump to….*"
 - extendedWaitUntil:
     visible:
       id: jump-juz-list
@@ -86,7 +87,7 @@ appId: com.revisionbuddy.app
     visible:
       id: today-menu
     timeout: 10000
-- tapOn: "Edit schedule"
+- tapOn: "Edit schedule.*"
 - extendedWaitUntil:
     visible:
       id: plan-edit
@@ -95,6 +96,13 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 11-schedule${SUFFIX}
+# On Android the Schedule's top bar sits under the status bar (react-native's SafeAreaView pads
+# only on iOS), where Maestro can't tap Back: the system back instead.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
 - runFlow: back-home.yaml
 
 # The memorized pages: each juz by its surahs.

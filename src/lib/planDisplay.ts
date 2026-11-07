@@ -121,9 +121,10 @@ export interface DaySummary {
 }
 
 /**
- * Row copy for one cycle day: the juz, then the surahs ("Al-Mujadila to
- * At-Tahrim", short: lib/passages) and how many pages. A day of scattered pages
- * (weakest first) lists its surahs' names instead.
+ * Row copy for one cycle day: the juz, then the surahs in the day's order ("Al-Mujadila
+ * to At-Tahrim", "Al-'Asr to An-Nas, then Al-Fatihah, then An-Naba to At-Takwir": short,
+ * lib/passages) and how many pages. A day of scattered pages (more than three runs,
+ * weakest first) lists its surahs' names instead.
  */
 export function summarizeDay(pages: number[]): DaySummary {
   if (pages.length === 0) {
@@ -131,8 +132,8 @@ export function summarizeDay(pages: number[]): DaySummary {
   }
   const juzList = Array.from(new Set(pages.map(getJuzForPage))).sort((a, b) => a - b);
   const surahs =
-    pageRuns(pages).length <= 2
-      ? describePassage(pages, { form: 'short', wholeJuz: false, order: 'given' })
+    pageRuns(pages).length <= 3
+      ? describePassage(pages, { form: 'short', wholeJuz: false, order: 'given', max: 3 })
       : surahNamesLabel(pages);
   return {
     title: juzTitle(juzList),

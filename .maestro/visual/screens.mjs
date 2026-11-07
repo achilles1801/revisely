@@ -77,6 +77,22 @@ export const SCREEN_MASKS = {
     android: [{ x: 800, y: 348, w: 205, h: 53, why: 'prayer countdown' }],
   }),
   '08-home-kathmandu': merge(revoButton),
+  // 11-surah-names: Home done after a session, alone and under today's menu and Jump to, in light
+  // and dark. iOS has no prayer line here (02-home-done's layout); Android shows one (04's).
+  ...Object.fromEntries(
+    ['11-home', '11-today-menu', '11-jump-juz', '11-jump-surah']
+      .flatMap((n) => [n, `${n}-dark`])
+      .map((n) => [
+        n,
+        merge(revoButton, {
+          ios: sessionMinutes(1272, 0).ios,
+          android: [
+            ...sessionMinutes(0, 1186).android,
+            { x: 800, y: 279, w: 205, h: 53, why: 'prayer countdown' },
+          ],
+        }),
+      ]),
+  ),
 };
 
 // Screens left without a baseline on purpose: being redesigned now. Their captures are
