@@ -379,8 +379,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **REVO-30.** Revo knows how the app works from its guide (`functions/src/revo/guide.ts`), in the cached part of its
   prompt: how each rule here works for a user, in plain words; where each screen, sheet and setting is and how to reach
   it; the steps for common tasks; what is for testers only; and what the app can't do, with the closest real way. A
-  how, where or why question is answered from the guide, in at most two short steps and where to find it; when the
-  guide doesn't cover something, Revo says it isn't sure that's possible in Revisely rather than guess. The guide
+  how, where or why question is answered from the guide, in at most two short steps and where to find it (about 35
+  words), with nothing added about today's pages unless asked, and with the screen it names offered as a card. When the
+  guide says the app can't do something, Revo says so plainly ("Not yet", "There's no …") and gives the closest way;
+  when the guide doesn't mention it at all, Revo says it isn't sure that's possible in Revisely rather than guess. The guide
   covers every rule in this file (or says why one isn't for users to ask about) and names only screens the navigation
   has and labels the app shows, word for word; a test fails when that stops being true, so a feature's PR changes the
   guide with it.

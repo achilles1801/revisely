@@ -635,7 +635,12 @@ describe('how the app works: the guide (REVO-30)', () => {
   it('[REVO-30] the guide is in the cached system prompt, with how to answer from it and what to say when it doesn’t cover something', async () => {
     expect(REVO_SYSTEM_PROMPT).toContain(REVO_GUIDE);
     expect(REVO_SYSTEM_PROMPT).toMatch(/from the guide only/);
-    expect(REVO_SYSTEM_PROMPT).toMatch(/at most two short steps with the path/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/the path written once[^\n]*at most two short steps: about 35 words/);
+    // A how-to answer adds nothing about today and offers the screen it names (Nov 7 eval).
+    expect(REVO_SYSTEM_PROMPT).toMatch(/say nothing about today’s pages[^\n]*Its action is an openScreen to the screen the answer names/);
+    // What the guide knows isn't possible is said plainly; "not sure" is for what it doesn't mention.
+    expect(REVO_SYSTEM_PROMPT).toMatch(/say so plainly \(“Not yet\.” or “There’s no …”\)/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/only for something the guide doesn’t mention at all/);
     expect(REVO_SYSTEM_PROMPT).toContain('I’m not sure that’s possible in Revisely');
     expect(REVO_SYSTEM_PROMPT).toMatch(/Never invent a feature, a button, a setting or a path/);
     // Every question carries it, in the one cached system block, the same each time.
