@@ -217,7 +217,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within 7 or 30
   days (a longer window never covers less); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
-  oldest, or never.
+  oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
+  page memorized today never makes its juz the one untouched longest).
 
 - **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
   opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates
@@ -273,8 +274,9 @@ How the tests are made: `tests/scenarios/README.md`.
   is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
   when short), with a timeout per attempt, and its log keeps the usage and never the content.
 
-- **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
-  what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
+- **COACH-4.** The Ask coach sheet is for previewTester accounts only. Before the first question it says what is sent and
+  asks the user to turn it on; the question then sends that one insight's totals, and nothing else. Insights no longer
+  opens it: Weak spots' Ask opens Revo with that insight attached (REVO).
 
 - **COACH-5.** The sheet shows the coach's answer and how many questions are left today; asked again the same day, it
   says the answer was kept. A refusal shows the server's reason (not available on this account, not turned on, today's

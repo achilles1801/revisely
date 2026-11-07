@@ -1,0 +1,25 @@
+# A cold start that asks the E2E build for demo recordings (src/lib/e2e/demoRecordings.ts), which it
+# writes once the account is signed in. iOS takes the set at launch (as the clock, launch.yaml);
+# Android takes the link. Waits for the first screen.
+#   env SET: the set's name (activity)
+appId: com.revisionbuddy.app
+---
+- stopApp
+- launchApp:
+    stopApp: true
+    arguments:
+      e2eRecordings: ${SET}
+- extendedWaitUntil:
+    visible:
+      id: e2e-status
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: root-loading
+    timeout: 30000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - openLink:
+          link: revisely://e2e/recordings?set=${SET}

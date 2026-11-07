@@ -611,6 +611,18 @@ hard-coded token was deleted from the console on 2026-10-27.
     runs Android's smoke flows only: for a change iOS or other flows show, run E2E by hand on the
     branch (both platforms) and approve from that run. Activity, Insights and Revo have no
     baselines yet (being rebuilt): approve theirs once their boards match the mocks.
+  - **Activity boards** (the screens against their mocks, `~/Documents/revisely-today-mocks/activity-redesign/png`):
+    flows `09-activity-light` and `09-activity-dark` seed the mocks' account (`.maestro/scripts/seed-activity.js`:
+    305 pages, the Fajr boundary, October as d3, Insights' figures as d4) and capture Overview, a day
+    (top, end, its menu, a light day), the + menu, the Revised, Memorized and Note sheets, and Insights
+    (top, Weak spots, end). The E2E build writes the mocks' recordings itself
+    (`src/lib/e2e/demoRecordings.ts`, `subflows/relaunch-recordings.yaml`). Run them with
+    `gh workflow run e2e.yml --ref <branch> -f platform=ios -f flows='09-activity-*'`, then
+    `~/Documents/revisely-today-mocks/.venv/bin/python scripts/verify/activity-boards.py --run <id> --platform ios`
+    writes one board per screen (capture left, mock right) into `activity-redesign/verify/`. A UI
+    change to Activity is done when its boards match, light and dark, apart from Majd's decisions.
+    A change to the seed: keep each figure the boards show (a figure that moves is a data change,
+    not a design one).
   - **Cached builds:** the native build is kept per fingerprint, so a JavaScript-only change only
     re-bundles. A PR restores develop's (pushes keep it there) and the nightly run's (kept on
     `main`); a stack's upper layers see only `main`'s, so after a native change they build once,
