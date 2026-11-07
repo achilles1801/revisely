@@ -13,6 +13,7 @@ import { weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalend
 import { PillTabs } from '../v2/PillTabs';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
+import { describePassage } from '../../lib/passages';
 import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
@@ -81,10 +82,14 @@ export function CalendarMonth({
     const minutes = preview.revised.minutes != null && preview.revised.minutes > 0 ? ` · ${formatMinutesLong(preview.revised.minutes)}` : '';
     previewRows.push({ key: 'revised', kind: 'revised', label: 'Revised', value: `${preview.revised.done} of ${preview.revised.assigned}${minutes}`, mics: recs?.revision });
   }
-  if (preview.memorizedPages > 0) previewRows.push({ key: 'memorized', kind: 'memorized', label: 'Memorized', value: `+${preview.memorizedPages} pages` });
+  // What was memorized and read, by surah (Majd, Nov 7 2026: surahs and juz first, pages almost never).
+  const pagesOf = (items: { day: string; pages: number[] }[]) => items.filter((i) => i.day === shownDay).flatMap((i) => i.pages);
+  if (preview.memorizedPages > 0) {
+    previewRows.push({ key: 'memorized', kind: 'memorized', label: 'Memorized', value: describePassage(pagesOf(data.memorized), { form: 'short' }) });
+  }
   if (preview.readPages > 0) {
     const minutes = preview.readMinutes != null && preview.readMinutes > 0 ? ` · ${formatMinutesLong(preview.readMinutes)}` : '';
-    previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${preview.readPages} pages${minutes}`, mics: recs?.reading });
+    previewRows.push({ key: 'read', kind: 'read', label: 'Read', value: `${describePassage(pagesOf(data.read), { form: 'short' })}${minutes}`, mics: recs?.reading });
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: 'Notes', value: '1' });
 
@@ -189,7 +194,9 @@ export function CalendarMonth({
           <View key={r.key} style={styles.previewRow}>
             {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
             <Text style={[typeV2.body, { color: palette.text, width: 84 }]}>{r.label}</Text>
-            <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]}>{r.value}</Text>
+            <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]} numberOfLines={1}>
+              {r.value}
+            </Text>
             {r.mics ? (
               <View style={styles.mics} accessible accessibilityLabel={`${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}`} testID={`preview-recordings-${r.key}`}>
                 <Ionicons name="mic-outline" size={13} color={palette.secondary} />

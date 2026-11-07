@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react-native';
 import { DayBlocks, timeRange } from '../DayBlocks';
 import * as firestoreService from '../../../services/firestoreService';
 import type { JournalNote } from '../../../types';
+import { describePassage, plainText } from '../../../lib/passages';
 
 jest.mock('../../../context/ThemeContext', () => {
   const mockPalette = new Proxy({}, { get: () => '#000000' });
@@ -96,12 +97,12 @@ describe('the blocks as mock d1 and d2 read them', () => {
   const items = firestoreService.getActivityItemsForDay as jest.Mock;
   const assigned = Array.from({ length: 20 }, (_, i) => 522 + i);
 
-  it('Memorized: "p. 562" in its chip, and its verses in the sub-line ("Al-Mulk 1–12 · 25 min")', async () => {
+  it('Memorized: its chip and sub-line name the surah, not the page ("Start of Al-Mulk", "Al-Mulk 1–12 · 25 min")', async () => {
     items.mockResolvedValueOnce({ revisions: [], memorized: [{ id: '2026-11-03', day: '2026-11-03', pages: [562], minutes: 25 }], reads: [], doneAhead: [] });
     render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
-    expect(await screen.findByText('p. 562')).toBeTruthy();
-    expect(screen.getByText('Al-Mulk 1–12 · 25 min')).toBeTruthy();
-    expect(screen.queryByText('Page 562')).toBeNull();
+    expect(await screen.findByText('Start of Al-Mulk', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText('Al-Mulk 1–12 · 25 min', { normalizer: plainText })).toBeTruthy();
+    expect(screen.queryByText(/p\. 562|Page 562/)).toBeNull();
   });
 
   it('pages credited to other days read with their dates, and a catch-up never as ahead [SESS-7]', async () => {
@@ -115,9 +116,9 @@ describe('the blocks as mock d1 and d2 read them', () => {
       doneAhead: [{ fromDay: '2026-11-01', pages: [542] }],
     });
     render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
-    expect(await screen.findByText('Ahead for Wednesday 4 November: p. 562–563')).toBeTruthy();
-    expect(screen.getByText('Catch-up for Monday 2 November: p. 556–557')).toBeTruthy();
-    expect(screen.getByText('Done ahead on Sunday 1 November: p. 542')).toBeTruthy();
+    expect(await screen.findByText('Ahead for Wednesday 4 November: Al-Mulk 1–26', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText('Catch-up for Monday 2 November: At-Taghabun', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText(`Done ahead on Sunday 1 November: ${plainText(describePassage([542], { form: 'compact' }))}`, { normalizer: plainText })).toBeTruthy();
     expect(screen.queryByText(/\d{4}-\d{2}-\d{2}/)).toBeNull();
   });
 
@@ -141,7 +142,7 @@ describe('the blocks as mock d1 and d2 read them', () => {
       doneAhead: [],
     });
     render(<DayBlocks {...base} day="2026-11-01" today="2026-11-01" />);
-    expect(await screen.findByText(/Adh-Dhariyat to Al-Hadid · 9 min$/)).toBeTruthy();
+    expect(await screen.findByText(/Adh.Dhariyat to Al.Hadid · 9 min$/)).toBeTruthy();
     expect(screen.getByText('Sunday runs midnight to midnight')).toBeTruthy();
   });
 });
