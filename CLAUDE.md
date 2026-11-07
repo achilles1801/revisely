@@ -3,6 +3,13 @@
 Guidance for Claude Code in **Revisely**. `README.md` covers setup, tests and the branch table; this
 file is the release mechanics and the traps behind them.
 
+## How a session works
+
+- **Do the work in your own session** (Majd, Nov 6 2026). Don't hand it to sub-agents, forks or
+  new sessions: no "E2E agent", no fork per bug, no follow-up chips for work you could do yourself.
+- If a narrow, mechanical task really needs a sub-agent, set its model to `opus` explicitly. Check
+  its output yourself before you rely on it or report it.
+
 ## Branches and releases
 
 - Work on `develop` (or a branch off it). CI (`.github/workflows/ci.yml`) runs on every push and PR.
