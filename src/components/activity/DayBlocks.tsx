@@ -28,7 +28,7 @@ import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
 type SheetAction = ContextMenuAction;
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
-import { overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { joinedSince, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { currentAccount } from '../../lib/offline/queue';
 
@@ -134,18 +134,24 @@ export function DayBlocks({
   // newest one's answer is shown, or an older read from before the server had the add could land
   // last and hide it.
   const loads = useRef(0);
-  // The server's last answer for this day, under the changes still waiting.
+  // The server's last answer for this day, under the changes still waiting, and those changes' ids.
   const served = useRef<{ day: string; items: DayItems } | null>(null);
+  const waiting = useRef<Set<string>>(new Set());
   const load = useCallback(() => {
     const n = ++loads.current;
     // What the server has, with the changes still waiting on this phone laid over it (ACT-13): an
     // add shows at once, offline too.
+    const uid = currentAccount();
+    const pending = uid ? pendingEntries(uid) : [];
     const withPending = (items: DayItems) => {
-      const uid = currentAccount();
-      return uid ? overlayDayItems(items, pendingEntries(uid), day, uid) : items;
+      const now = currentAccount();
+      return now ? overlayDayItems(items, pendingEntries(now), day, now) : items;
     };
-    // At once, from the last answer: an add shows without waiting for the read below.
-    if (served.current?.day === day) setItems(withPending(served.current.items));
+    // At once, from the last answer, when a change has just joined: an add shows without waiting for
+    // the read below. (One that left is in what's shown already.)
+    const since = joinedSince(waiting.current, pending, day);
+    waiting.current = since.ids;
+    if (since.joined && served.current?.day === day) setItems(withPending(served.current.items));
     firestoreService
       .getActivityItemsForDay(day)
       .then((items) => {
@@ -157,8 +163,8 @@ export function DayBlocks({
         logger.warn('Could not load the day’s Activity items', err);
         if (n !== loads.current) return;
         // Offline and not in Firestore's memory: what is waiting here still shows.
-        const waiting = withPending(EMPTY_DAY);
-        if (waiting !== EMPTY_DAY) setItems(waiting);
+        const shown = withPending(EMPTY_DAY);
+        if (shown !== EMPTY_DAY) setItems(shown);
       });
     listRecordings()
       .then((all) => setRecs(all.filter((r) => r.day === day)))
