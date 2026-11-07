@@ -253,7 +253,7 @@ export function DayBlocks({
 
   const revisedItems: React.ReactNode[] = [
     ...(revRecs.length > 0
-      ? [<RecordingsList key="recordings" day={day} kind="revision" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />]
+      ? [<RecordingsList key="recordings" day={day} kind="revision" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />]
       : []),
     ...taggedTo('revision').map(noteItem),
     ...revisionNotes.map(handItem),
@@ -281,14 +281,14 @@ export function DayBlocks({
           {/* Its recording hangs under it, with no line of its own. */}
           {last && readRecs.length > 0 ? (
             <View style={styles.underItem}>
-              <RecordingsList day={day} kind="reading" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />
+              <RecordingsList day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />
             </View>
           ) : null}
         </View>
       );
     }),
     ...(readItems.items.length === 0 && readRecs.length > 0
-      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />]
+      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />]
       : []),
     ...readItems.items.flatMap((i) => taggedTo('read', i.id).map(noteItem)),
   ];
