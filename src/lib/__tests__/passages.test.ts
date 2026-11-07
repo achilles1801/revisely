@@ -140,6 +140,13 @@ describe('describePassage: part of a surah', () => {
     expect(sayRange(562, 562, { form: 'short' })).toBe('Start of Al-Mulk');
   });
 
+  it('compact: the ayahs without the word (sub-lines)', () => {
+    expect(sayRange(562, 562, { form: 'compact' })).toBe('Al-Mulk 1–12');
+    expect(sayRange(22, 26, { form: 'compact' })).toBe('Al-Baqarah 142–176');
+    expect(sayRange(564, 564, { form: 'compact' })).toBe('Al-Mulk 27 to Al-Qalam 15');
+    expect(sayRange(560, 561, { form: 'compact' })).toBe('At-Tahrim');
+  });
+
   it('mid-sentence: "the start of …"', () => {
     expect(sayRange(2, 5, { form: 'short', sentence: true })).toBe('the start of Al-Baqarah');
     expect(sayRange(42, 49, { form: 'short', sentence: true })).toBe('the end of Al-Baqarah');

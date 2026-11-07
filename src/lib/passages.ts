@@ -4,8 +4,9 @@
 //
 //   whole juz            Juz 28 · Juz 27–28
 //   whole surah          Al-Mulk · Adh-Dhariyat to Al-Hadid
-//   part of one surah    long  Al-Baqarah, ayahs 142–176
-//                        short Start of Al-Baqarah · End of Al-Baqarah · Al-Baqarah 142–176
+//   part of one surah    long    Al-Baqarah, ayahs 142–176
+//                        compact Al-Baqarah 142–176 (sub-lines: the numbers without the word)
+//                        short   Start of Al-Baqarah · End of Al-Baqarah · Al-Baqarah 142–176
 //   across surahs        long  Al-Baqarah 253 to Ali 'Imran 92 (a bare name is the whole
 //                              surah at that end; a number is the verse)
 //                        short Al-Baqarah to Ali 'Imran
@@ -41,10 +42,13 @@ export interface Verse {
   ayah: number;
 }
 
-export type PassageForm = 'short' | 'long';
+export type PassageForm = 'short' | 'compact' | 'long';
 
 export interface PassageOptions {
-  /** 'long' (sentences, rows; the default) or 'short' (chips, chart labels): no ayah numbers at a surah's edge. */
+  /**
+   * 'long' (sentences, rows; the default), 'compact' (the same without ", ayahs": "Al-Mulk 1–12") or
+   * 'short' (chips, chart labels): no ayah numbers at a surah's edge.
+   */
   form?: PassageForm;
   /** Add " · Juz 28" (or "Juz 27–28") when the pages lie in one juz or two in a row and the text names none. */
   juz?: boolean;
@@ -140,7 +144,7 @@ function runPhrase(run: Run, form: PassageForm, wholeJuz: boolean, edition: Mush
       if (endsSurah) return `the end of ${a}`;
       return `${a}${NBSP}${f.ayah}–${l.ayah}`;
     }
-    if (!alone) return f.ayah === l.ayah ? `${a}${NBSP}${f.ayah}` : `${a}${NBSP}${f.ayah}–${l.ayah}`;
+    if (!alone || form === 'compact') return f.ayah === l.ayah ? `${a}${NBSP}${f.ayah}` : `${a}${NBSP}${f.ayah}–${l.ayah}`;
     return f.ayah === l.ayah ? `${a}, ayah${NBSP}${f.ayah}` : `${a}, ayahs${NBSP}${f.ayah}–${l.ayah}`;
   }
   if (form === 'short') return `${a} to ${b}`;
