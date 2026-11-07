@@ -185,7 +185,10 @@ describe('what + attaches adds up (REVO-32)', () => {
     );
   });
 
-  it('[REVO-33] a past day is done for the streak exactly when every page of its plan was revised for it', () => {
+  // Or, a day Keep daily amount filled with carried pages (D1, SESS-7): when its sessions revised them
+  // all, though they count for the days they were missed. The generator makes such a day when a
+  // session catches up the day before and the plan has the same pages (a small plan wraps round).
+  it('[REVO-33] [SESS-7] a past day is done for the streak exactly when every page of its plan was revised for it, or caught up on it', () => {
     fc.assert(
       fc.property(accountArb, (a) => {
         const { src } = build(a);

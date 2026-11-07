@@ -1,6 +1,8 @@
 import {
   applyCarryOver,
+  duePagesOf,
   findLeftoverPages,
+  planDuePages,
   findLeftovers,
   hasCarriedOver,
   settleCarryOverForNewPlan,
@@ -265,5 +267,57 @@ describe('tomorrow’s pages beside today’s carry (carryOver.next)', () => {
       expect(after.carryOver?.pages).toEqual([4]);
       expect(after.carryOver?.next).toEqual({ day: tomorrow, pages: [9], source: 'insights' });
     }
+  });
+});
+
+// D1 (Majd, Nov 7 2026): with Keep daily amount, today is the missed pages alone when they fill it,
+// and finishing them finishes today. Its own pages are the next day's (revised ahead, AHEAD-2).
+describe('[SESS-7] [CARRY-2] the pages that finish a day (duePagesOf)', () => {
+  const big = { days: [[1, 2, 3], [4, 5], [6, 7], [8, 9]], cycleStartDate: '2026-10-16', direction: 'forward' as const };
+  const pagesOf = (user: User) => generateDailyAssignment(memorized, [], user, today).pages;
+
+  // Oct 16 = [1, 2, 3], today (Oct 17) = [4, 5], Oct 18 = [6, 7].
+  it('a day with its own pages left is finished by them, not by the carried pages', () => {
+    const user = applyCarryOver({ ...baseUser, customPlan: big }, memorized, [3], today);
+    expect(pagesOf(user)).toEqual([3, 4]);
+    expect(duePagesOf(pagesOf(user), user, TODAY)).toEqual([4]);
+  });
+
+  it('Keep daily amount with as many leftovers as the day holds or more: the carried pages finish it', () => {
+    for (const leftovers of [[2, 3], [1, 2, 3]]) {
+      const user = applyCarryOver({ ...baseUser, customPlan: big }, memorized, leftovers, today);
+      expect(pagesOf(user)).toEqual(leftovers);
+      expect(duePagesOf(pagesOf(user), user, TODAY)).toEqual(leftovers);
+      // Its own pages (4, 5) are tomorrow's.
+      expect(pagesOn(user, 18)).toEqual([4, 5]);
+    }
+  });
+
+  it('an off day given leftovers moved nothing: no pages of its own are due', () => {
+    const withOff = { days: [[1, 2, 3], [], [4, 5, 6]], cycleStartDate: '2026-10-16', direction: 'forward' as const };
+    const user = applyCarryOver({ ...baseUser, customPlan: withOff }, memorized, [2, 3], today);
+    expect(duePagesOf(pagesOf(user), user, TODAY)).toEqual([]);
+  });
+
+  it('Add (on top) keeps the day’s own pages due', () => {
+    const user = applyCarryOver({ ...baseUser, customPlan: big, carryOverMode: 'add' }, memorized, [2, 3], today);
+    expect(duePagesOf(pagesOf(user), user, TODAY)).toEqual([4, 5]);
+  });
+
+  it('[SESS-6] a missed day with no session is read from the carry that took its pages, not the moved plan', () => {
+    // Oct 16 ([1, 2, 3]) missed entirely; Add to today fills Oct 17 with them and moves the plan.
+    const user = applyCarryOver({ ...baseUser, customPlan: big }, memorized, [1, 2, 3], today, { '1': '2026-10-16', '2': '2026-10-16', '3': '2026-10-16' });
+    expect(planDuePages(user, '2026-10-16', memorized)).toEqual([1, 2, 3]);
+    // The moved plan would have given Oct 16 other pages.
+    expect(pagesOn(user, 16)).not.toEqual([1, 2, 3]);
+    // Today and later days are read from the plan.
+    expect(planDuePages(user, TODAY, memorized)).toEqual([1, 2, 3]);
+    expect(planDuePages(user, '2026-10-18', memorized)).toEqual([4, 5]);
+  });
+
+  it('[CARRY-1] carried pages revised on the day they filled are not offered again the next day', () => {
+    // Oct 17 was filled with Oct 16's pages 4 and 5 (credited to Oct 16) and revised them.
+    const filled: RevisionLog = { ...log(TODAY, [4, 5], []), ahead: { '2026-10-16': [4, 5] } };
+    expect(findLeftoverPages([filled], '2026-10-18', [6, 7], memorizedSet)).toEqual([]);
   });
 });

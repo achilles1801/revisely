@@ -4,10 +4,10 @@
 // read the logs its own way and contradicted itself and Home).
 
 import type { RevisionLog, User, UserPage } from '../types';
-import { creditedOnDay, doneOnDay } from './aheadCredit';
+import { caughtUpOnDay, creditedOnDay, doneOnDay, needDoneCount } from './aheadCredit';
 import { withPhoneSessions } from './activityHistory';
 import { carryOverOn } from './algorithm';
-import { ownPagesOf } from './carryOver';
+import { duePagesOf } from './carryOver';
 import { streakDetailFromLogs, type StreakDetail } from './streak';
 import { streakDetailFromItems, type HistoryItem } from './streakFromItems';
 
@@ -18,7 +18,10 @@ export interface TodaySnapshot {
   day: string;
   /** Today's pages in the session's order, carried pages first: the list Home's lines describe. */
   pages: number[];
-  /** Of them, the day's own pages (SESS-7: today is done when these are). */
+  /**
+   * Of them, the pages that make today done (SESS-7, lib/carryOver duePagesOf): its own pages, or
+   * the carried pages when Keep daily amount filled the day with them.
+   */
   own: number[];
   /** Of them, the pages carried in from earlier days ("4 from yesterday first"). */
   carried: number[];
@@ -34,9 +37,16 @@ export interface TodaySnapshot {
   streak: StreakDetail;
 }
 
-/** Home's status for today: done when its own pages are credited to it (SESS-7). */
-export function todayStatusOf(own: readonly number[], credited: ReadonlySet<number>): { status: TodayStatus; pagesCompleted: number } {
-  const completed = own.filter((p) => credited.has(p)).length;
+/**
+ * Home's status for today: done when its due pages are (SESS-7): credited to it, or, for a day the
+ * carried pages fill, caught up in its sessions (`caughtUp`, lib/aheadCredit needDone).
+ */
+export function todayStatusOf(
+  own: readonly number[],
+  credited: ReadonlySet<number>,
+  caughtUp?: ReadonlySet<number>,
+): { status: TodayStatus; pagesCompleted: number } {
+  const completed = needDoneCount(own, credited, caughtUp);
   // Pages revised today and the assignment later shrank (a custom-plan edit, an un-memorized surah):
   // done, rather than a negative "left".
   if (completed > 0 && completed >= own.length) return { status: 'completed', pagesCompleted: completed };
@@ -67,10 +77,10 @@ export function todaySnapshot(input: {
 }): TodaySnapshot {
   const { user, pages, logs, day, assignment, history } = input;
   const list = [...new Set(assignment)];
-  const own = ownPagesOf(list, user, day);
+  const own = duePagesOf(list, user, day);
   const carried = carriedPagesOn(user, day, list);
   const done = doneOnDay(logs, day);
-  const { status } = todayStatusOf(own, creditedOnDay(logs, day));
+  const { status } = todayStatusOf(own, creditedOnDay(logs, day), caughtUpOnDay(logs, day));
   // From the Activity items once they've loaded, with the phone's sessions over them; the logs until then.
   const streak = history
     ? streakDetailFromItems({ user, pages, items: withPhoneSessions(history, logs, input.now), today: day })

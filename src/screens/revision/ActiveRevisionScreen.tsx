@@ -63,7 +63,7 @@ import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { carryOverOn, generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
-import { catchUpDayOf, ownPagesOf } from '../../lib/carryOver';
+import { catchUpDayOf, duePagesOf } from '../../lib/carryOver';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
 import {
@@ -426,8 +426,9 @@ export default function ActiveRevisionScreen() {
   const commitPendingPages = useCallback(async (): Promise<void> => {
     if (!user || !assignment || !sessionDay) return;
     const revisionDay = sessionDay;
-    // Today's own pages: the catch-up pages are credited to the days they were missed (SESS-7).
-    const assignedPages = ownPagesOf(assignment.pages, user, revisionDay);
+    // The pages that finish the day (SESS-7): its own; or, when Keep daily amount filled it with
+    // catch-up pages, those (still credited to the days they were missed).
+    const assignedPages = duePagesOf(assignment.pages, user, revisionDay);
     while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
       (p) => !silentlySavedRef.current.has(p),
@@ -478,7 +479,7 @@ export default function ActiveRevisionScreen() {
         ahead: credit.ahead,
         // Every page held as revised, catch-up pages too: their credit stays while they are checked (SESS-7).
         checked: heldAsRevised(revisionDay, unrevised),
-        // The day's own pages now: pages a carry moved to tomorrow leave the session's assignment.
+        // The day's due pages now: pages a carry moved to tomorrow leave the session's assignment.
         assignedExact: true,
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
@@ -749,7 +750,7 @@ export default function ActiveRevisionScreen() {
         const revisionDay = sessionDay ?? getCurrentRevisionDay(user!);
         await addLog({
           date: revisionDay,
-          assignedPages: ownPagesOf(assignment?.pages ?? [], user!, revisionDay),
+          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay),
           pagesRevised: sessionCredit(pagesRevised, pageDays, revisionDay).pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,

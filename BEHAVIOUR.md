@@ -87,10 +87,12 @@ How the tests are made: `tests/scenarios/README.md`.
   day ends, and repeats any day a day is missed. Two missed days in a row break the streak; a day done late does not
   restore a missed day, and older days can still be revised, credited to their own days.
 - **SESS-7.** A catch-up page (one carried in from a missed or unfinished day) is credited to the day it was
-  scheduled for, not to today. It never counts toward today's completion: today is done when today's own pages are
-  credited to today (in shift mode, the own pages are the day's usual size; the carried pages stand in for the
-  pages the shift moved). Each carried page keeps its source day in the carry (`carryOver.from`). A session saves a
-  catch-up page under the ahead credit of its own day, and out of its own pagesRevised.
+  scheduled for, not to today. It never counts toward today's completion while today has pages of its own: today
+  is done when today's own pages are credited to today. In shift mode (CARRY-2) today's own pages are what is left
+  of its usual size after the carried pages. When the carried pages fill the day it has none, and it is done when
+  its carried pages are revised, still credited to the days they were missed (Majd, Nov 7 2026). Each carried page
+  keeps its source day in the carry (`carryOver.from`). A session saves a catch-up page under the ahead credit of
+  its own day, and out of its own pagesRevised.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,
@@ -107,7 +109,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AHEAD-1.** Once today is done, Home offers the next revision day ("Tomorrow starts at …"), from its
   first page not done yet. Tapping it opens that day's pages alone, as if it were that day's session:
   today's pages are not behind them (Nov 5 2026). The next day's pages already done are left out
-  (#198).
+  (#198). After Keep daily amount filled today with leftovers (CARRY-2), the next day starts with
+  today's own pages.
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
   That day then needs only the pages left, and is done when none are.
 - **AHEAD-3.** The end card's Keep going goes on to the next revision day's pages not done yet,
@@ -125,7 +128,10 @@ How the tests are made: `tests/scenarios/README.md`.
   "Missed 3 days · Revise pp. …" when several days come to more than one. Earlier days are not offered.
   A page revised at any point in those days is never offered, whichever day the schedule had it on.
 - **CARRY-2.** Keep daily amount (`shift`, the default): today keeps its size. The leftovers come
-  first, and the rest of the plan slides back by as many pages.
+  first, and the rest of the plan slides back by as many pages. With as many leftovers as today holds or
+  more, today is the leftovers alone, all of them, and the whole of today's plan moves on a day: revising
+  them finishes today (SESS-7), and today's own pages, the next day's now, are revised ahead (AHEAD-1,
+  AHEAD-3) if the user wants them (Majd, Nov 7 2026: "let it be missed pages only").
 - **CARRY-3.** Add (`add`): the leftovers go on top of today's pages, and nothing else moves.
 - **CARRY-4.** A missed day (no session) is offered like the rest, but not added: nothing moves until the
   user taps "Add to today". Adding makes them today's pages; if they are still unrevised the day after,
@@ -430,4 +436,7 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | SCHED-6 | A carry-over shift on a custom plan with a page on two neighbouring days could put that page twice on one day. | A shifted day takes such a page once and goes on to the next (`shiftedCycleDay`, `src/lib/algorithm.ts`). |
 | CARRY-5 | With scattered leftovers, saving an edit to a later day brought a page revised yesterday back into today. | Saving keeps today's carry-over as it was (`settleCarryOverForNewPlan`, `src/lib/planChange.ts`). |
 | SESS-2, CARRY-2 | Today's session saved, then Add to today with Keep daily amount: the pages moved to tomorrow stayed in the session's assigned pages (the rules let them only grow), so Home said Done but the streak didn't count today. | A save from the session screen cuts the session's assignment to the day's own pages, in a change of its own (`session.assigned`, `src/lib/offline/ops.ts`); `firestore.rules` lets the list shrink to some of its pages. |
+| CARRY-2, SESS-7, SESS-2 | Keep daily amount with as many leftovers as today holds or more made today the leftovers alone, with no pages of its own: once they were all revised, Home still said "Continue at … 6 of 6", never Done, and today never counted for the streak. | A day the carried pages fill is finished by them (`duePagesOf`, `src/lib/carryOver.ts`): they are its session's assignment, and its session revising them finishes it while they stay credited to the days they were missed (`dueCreditIndex`, `src/lib/aheadCredit.ts`). |
+| SESS-6, CARRY-2 | A day missed entirely, added to today with Keep daily amount and revised, didn't come back: with no session of its own, the streak read it from the plan the carry had moved, which gave it other pages. | A day the last carry took pages from is read from the carry (`planDuePages`, `src/lib/carryOver.ts`). |
+| SESS-7 | A session's first save holding catch-up pages alone lost their credit: the empty session was written without it. | `mergeSessionAdd` keeps it (`src/lib/offline/ops.ts`). |
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |

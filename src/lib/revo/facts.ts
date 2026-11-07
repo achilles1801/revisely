@@ -134,6 +134,31 @@ function outcomeOf(index: CreditIndex, day: string, page: number): Outcome {
   return 'none';
 }
 
+/** Pages revised on `day` for an earlier day: catch-up pages (SESS-7). */
+function caughtUpOn(index: CreditIndex, day: string): Set<number> {
+  const out = new Set<number>();
+  for (const [countsFor, by] of index.creditedBy) {
+    if (countsFor >= day) continue;
+    for (const [p, days] of by) if (days.includes(day)) out.add(p);
+  }
+  return out;
+}
+
+/**
+ * Each page of a day's plan, as the streak counts it (lib/aheadCredit needDone): by what was
+ * credited to the day; or, for a day the carried pages fill (Keep daily amount, D1: Majd, Nov 7
+ * 2026), by the catch-up pages its sessions revised, which count as revised on the day though
+ * they're credited to the days they were missed. Whichever finishes more of it, never some of each.
+ */
+function outcomesOf(index: CreditIndex, day: string, plan: readonly number[]): Map<number, Outcome> {
+  const credited = new Map(plan.map((p): [number, Outcome] => [p, outcomeOf(index, day, p)]));
+  const caught = caughtUpOn(index, day);
+  const byCredit = plan.filter((p) => credited.get(p) !== 'none').length;
+  const byCatchUp = plan.filter((p) => caught.has(p)).length;
+  if (byCatchUp <= byCredit) return credited;
+  return new Map(plan.map((p): [number, Outcome] => [p, caught.has(p) ? 'onDay' : 'none']));
+}
+
 const bucketOf = (rating: number) => (rating <= 2 ? 'weak' : rating === 3 ? 'moderate' : 'strong');
 
 /** Runs of consecutive pages, in order. */
@@ -175,8 +200,9 @@ function tally(index: CreditIndex, set: ReadonlySet<number>, scheduled: (day: st
     t.days++;
     t.pages += mine.length;
     let skipped = false;
+    const outcomes = outcomesOf(index, day, scheduled(day));
     for (const p of mine) {
-      const o = outcomeOf(index, day, p);
+      const o = outcomes.get(p)!;
       if (o === 'onDay') t.onDay++;
       else if (o === 'ahead') t.ahead++;
       else if (o === 'late') t.late++;
@@ -310,7 +336,8 @@ export function dayFacts(day: string, prepared: Prepared, extras: DayExtras = {}
     const list = scheduled(day);
     if (list.length > 0) {
       const n = { onDay: 0, ahead: 0, late: 0, none: 0 };
-      for (const p of list) n[outcomeOf(index, day, p)]++;
+      const outcomes = outcomesOf(index, day, list);
+      for (const p of list) n[outcomes.get(p)!]++;
       plan = { pages: list.length, name: words(list), carried: 0, onDay: n.onDay, ahead: n.ahead, late: n.late, notDone: n.none, done: snap.streak.done.has(day) };
     }
   }

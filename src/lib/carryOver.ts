@@ -12,7 +12,7 @@
 
 import { RevisionLog, User, UserPage } from '../types';
 import { carryOverOn, getPagesForDay, getPagesScheduledForDate, keepLaterCarry } from './algorithm';
-import { creditIndex } from './aheadCredit';
+import { catchUpPagesOf, creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 
 export type CarryOverMode = 'shift' | 'add';
@@ -63,7 +63,9 @@ export function findLeftovers(
   const revisedSince = new Map<number, string>(); // page -> latest day revised
   for (const log of logs) {
     if (log.date < firstDay || log.date > today) continue;
-    for (const p of log.pagesRevised) {
+    // Catch-up pages sit in the session's credit, not its pagesRevised (SESS-7). They are a day's
+    // assignment when Keep daily amount filled the day with them, and were revised there.
+    for (const p of [...log.pagesRevised, ...catchUpPagesOf(log)]) {
       const prev = revisedSince.get(p);
       if (!prev || log.date > prev) revisedSince.set(p, log.date);
     }
@@ -204,6 +206,39 @@ export function carriedPagesFor(user: User, day: string): Set<number> {
 export function ownPagesOf(pages: readonly number[], user: User, day: string): number[] {
   const carried = carriedPagesFor(user, day);
   return pages.filter((p) => !carried.has(p));
+}
+
+/**
+ * A day's due pages from the plan, for a day with no session to say what it held. A day the last
+ * carry took pages from is read from the carry: those pages are what it had (Keep daily amount has
+ * moved the schedule since, so the plan would give that day other pages, and catching its pages up
+ * never finished it: a missed yesterday added to today and revised didn't restore the streak).
+ * Any other day is read from the plan (duePagesOf).
+ */
+export function planDuePages(user: User, day: string, memorizedPages: UserPage[]): number[] {
+  const carry = user.carryOver;
+  if (carry && day < carry.day && carry.from) {
+    const from = carry.from;
+    const gave = carry.pages.filter((p) => from[String(p)] === day);
+    if (gave.length > 0) return gave;
+  }
+  const [y, m, d] = day.split('-').map(Number);
+  return duePagesOf(getPagesForDay(user, new Date(y, m - 1, d), memorizedPages), user, day);
+}
+
+/**
+ * The pages that make `day` done (SESS-7): its own pages; or, when Keep daily amount moved all of
+ * them on (the carried pages fill the day, CARRY-2), its carried pages. Those still count for the
+ * days they were missed; revising them in the day's session is what finishes the day (Majd, Nov 7
+ * 2026: "let it be missed pages only"). Its own pages are the next day's, done by revising ahead.
+ */
+export function duePagesOf(pages: readonly number[], user: User, day: string): number[] {
+  const own = ownPagesOf(pages, user, day);
+  if (own.length > 0) return own;
+  const carry = carryOverOn(user, day);
+  if (!carry || !(carry.skip && carry.skip > 0)) return own;
+  const carried = carriedPagesFor(user, day);
+  return pages.filter((p) => carried.has(p));
 }
 
 /** The day a carried page is credited to, when it came from an earlier day; null otherwise. */
