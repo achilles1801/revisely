@@ -199,7 +199,9 @@ function RevoHostInner() {
     setOptInBusy(true);
     setOptInError(null);
     try {
-      await backend.setOptions({ optIn: true });
+      // The server's answer is the switch now: the account's settings follow a moment later, and a
+      // sheet closed and opened again before they do must open the chat, not the opt-in again.
+      setSettings(await backend.setOptions({ optIn: true }));
       setView({ name: 'chat' });
       setChatId(null);
       setFull(false);
