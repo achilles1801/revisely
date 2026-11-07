@@ -15,11 +15,11 @@ import { getFajrTimeFor } from '../../lib/fajrBoundary';
 import { PageStrip, StrengthCounts, WindowFooter } from './DayParts';
 import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
 import { BlockMark, RevisedMark } from './BlockMark';
-import { creditLine, formatMinutesLong, formatPagesShort, windowFooter } from '../../lib/activityFormat';
-import { ayahSpan } from '../../lib/ayahSpan';
+import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
+import { describePassage } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
-import { describePageRuns, describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
+import { describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { parseTag } from '../../lib/noteTags';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
@@ -168,13 +168,13 @@ export function DayBlocks({
     'Memorized',
     memorized.items.map((i) => ({
       key: `delete-${i.id}`,
-      label: `Delete ${formatPagesShort(i.pages)}`,
+      label: `Delete ${describePassage(i.pages, { form: 'short' })}`,
       icon: 'trash-outline' as const,
       destructive: true,
       onPress: () =>
         confirmDelete(
           'Delete this memorization?',
-          `${describePageRuns(pageRuns(i.pages))} go back to not memorized.`,
+          `${describePassage(i.pages)} goes back to not memorized.`,
           () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
         ),
     })),
@@ -184,7 +184,7 @@ export function DayBlocks({
     readItems.items.flatMap((i) => {
       const session = readings.find((r) => r.id === i.id);
       if (!session) return [];
-      const label = timeRange(i.occurredAt, i.minutes) || (i.pages.length > 0 ? describePageRuns(pageRuns(i.pages)) : 'session');
+      const label = timeRange(i.occurredAt, i.minutes) || (i.pages.length > 0 ? describePassage(i.pages, { form: 'short' }) : 'session');
       return [
         { key: `edit-${i.id}`, label: `Edit ${label}`, icon: 'create-outline' as const, onPress: () => onEditReading(session) },
         { key: `delete-${i.id}`, label: `Delete ${label}`, icon: 'trash-outline' as const, destructive: true, onPress: () => onDeleteReading(session) },
@@ -355,12 +355,16 @@ export function DayBlocks({
           mark={<BlockMark kind="memorized" />}
           title="Memorized"
           figure={memorized.items.length > 0 ? pagesWord(memorizedPages.length) : undefined}
-          subline={subline([ayahSpan(memorizedPages) ?? surahsOf(memorizedPages), memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null])}
+          subline={subline([(memorizedPages.length > 0 ? describePassage(memorizedPages, { form: 'compact' }) : null), memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null])}
           summary={
             memorized.items.length > 0 ? (
               <View style={styles.chips}>
+                {/* By surah, not page (Majd, Nov 7 2026): "Start of Al-Mulk". */}
                 {pageRuns(memorizedPages).map((run) => (
-                  <PageChip key={`${run.first}-${run.last}`} label={formatPagesShort([run.first, run.last])} />
+                  <PageChip
+                    key={`${run.first}-${run.last}`}
+                    label={describePassage(Array.from({ length: run.last - run.first + 1 }, (_, k) => run.first + k), { form: 'short' })}
+                  />
                 ))}
                 <Text style={[typeV2.meta, styles.chipsNote, { color: palette.secondary }]}>{`${memorizedSet.size} pages memorized in all`}</Text>
               </View>

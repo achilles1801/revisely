@@ -84,6 +84,6 @@ describe('Revised add sheet (ACT-5)', () => {
     expect(screen.getByTestId('add-revised-from').props.value).toBe('556');
     expect(screen.getByTestId('add-revised-to').props.value).toBe('557');
     expect(screen.getByText('Adding these makes today 20 of 20.')).toBeTruthy();
-    expect(screen.getByText('At-Taghabun · 2 pages')).toBeTruthy();
+    expect(screen.getByText('At-Taghabun · 2 pages', { normalizer: (t: string) => t.replace(/\u2011/g, '-').replace(/\u00a0/g, ' ') })).toBeTruthy();
   });
 });
