@@ -6,7 +6,7 @@
  * prompt is deployed (functions deploy by hand, after his OK).
  *
  *   cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/revo-tone-samples.js \
- *     [--before <git ref>] [--out <file.md>]
+ *     [--before <git ref>] [--same-context] [--out <file.md>] [--dry]
  *
  * The key is read from the environment, sent only to api.anthropic.com, and never written or
  * printed. 20 requests to claude-sonnet-5-5: a few cents.
@@ -23,6 +23,8 @@ const arg = (name, fallback) => {
 // The prompt deployed now (ad395e1, Nov 7 2026).
 const BEFORE_REF = arg('--before', 'ad395e1');
 const OUT = arg('--out', path.join(os.homedir(), 'Documents/revisely-today-mocks/revo/tone-samples.md'));
+// Both sides with today's context (to compare two new prompts); otherwise "before" gets the older app's.
+const SAME_CONTEXT = process.argv.includes('--same-context');
 
 const lib = path.join(__dirname, '..', 'lib');
 if (!fs.existsSync(path.join(lib, 'revo/prompt.js'))) {
@@ -205,11 +207,11 @@ function show(r) {
   const lines = [
     '# Revo’s tone: before and after',
     '',
-    `Real replies from claude-sonnet-5-5, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. **Before**: the prompt deployed now (${BEFORE_REF}), with the context today’s app sends. **After**: the new prompt, with the context as the app will send it (today’s numbers as Home shows them, parts of the Qur’an named by surah and juz) written out in plain words. Made-up accounts, not anyone’s data. The day is a Thursday. Questions 1–2 are reconstructed from Majd’s screenshots.`,
+    `Real replies from claude-sonnet-5-5, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. **Before**: the prompt at ${BEFORE_REF}, with ${SAME_CONTEXT ? 'the same context as after' : 'the context today’s app sends'}. **After**: the new prompt, with the context as the app will send it (today’s numbers as Home shows them, parts of the Qur’an named by surah and juz) written out in plain words. Made-up accounts, not anyone’s data. The day is a Thursday. Questions 1–2 are reconstructed from Majd’s screenshots.`,
     '',
   ];
   for (const [i, s] of SAMPLES.entries()) {
-    const b = await ask.call(s, before.buildAskRequest, older(s.ctx));
+    const b = await ask.call(s, before.buildAskRequest, SAME_CONTEXT ? s.ctx : older(s.ctx));
     const a = await ask.call(s, after.buildAskRequest, s.ctx);
     lines.push(`## ${i + 1}. “${s.q}”${s.note ? ` (${s.note})` : ''}`, '', '**Before**', '', show(b), '', '**After**', '', show(a), '');
     console.log(`${i + 1}/${SAMPLES.length} ${s.q}: before ${words(b.reply?.text)} words, after ${words(a.reply?.text)}`);

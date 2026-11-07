@@ -313,7 +313,9 @@ describe('how Revo talks (REVO-27)', () => {
 
   it('[REVO-27] the prompt asks for a coach: the answer first, about 60 words, one next step, surahs and juz, no dates, never doubting the data, never guessing', () => {
     expect(REVO_SYSTEM_PROMPT).toContain('A warm, encouraging coach');
-    expect(REVO_SYSTEM_PROMPT).toContain('Answer first, in one plain sentence. Then at most two short sentences of why. About 60 words in all');
+    expect(REVO_SYSTEM_PROMPT).toContain('Then at most one short sentence of why. About 35 words in all');
+    expect(REVO_SYSTEM_PROMPT).toContain('Never add it as filler');
+    expect(REVO_SYSTEM_PROMPT).toContain('While today isn’t done, the next step is today’s');
     expect(REVO_SYSTEM_PROMPT).toContain('End with one clear next step');
     expect(REVO_SYSTEM_PROMPT).toContain('Never write a date like 2026-11-05');
     expect(REVO_SYSTEM_PROMPT).toContain('Name parts of the Qur’an by surah and juz');
