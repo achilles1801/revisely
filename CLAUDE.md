@@ -18,6 +18,16 @@ file is the release mechanics and the traps behind them.
      channel, and builds and submits to TestFlight first if native code changed. Each update's message
      ends with `[app <hash>]`, a hash of every file that goes into the app (`.github/scripts/app-hash.sh`;
      docs, store, scripts, functions, tests, rules and workflows don't count).
+     - A run has two halves (Nov 7 2026). The push's run tests (the scenario gate); a newer push
+       cancels an older push's tests, since its tree holds the older change too.
+     - Once it passes, it starts `Preview · publish <sha>` (the same workflow, `publish` = the tested
+       commit), which builds and publishes. These runs go one at a time and are never cancelled,
+       so updates go out in order and a native build never starts twice.
+     - The publishing half checks the tree's scenario artifact and that the commit is on the branch
+       itself, so a run by hand can't skip the gate.
+     - `dry_run` (by hand) tries both halves without building or publishing.
+     - Before, every push waited for each older push's scenario run: 19–24 minutes from a merge to
+       its update in a burst of merges.
   2. A tester's TestFlight install follows `preview`. The binary's channel is `production`; once the
      account has loaded, `src/lib/updateChannel.ts` switches to `preview` with
      `Updates.setUpdateRequestHeadersOverride` only if the install is from TestFlight (sandbox receipt,
@@ -539,7 +549,9 @@ hard-coded token was deleted from the console on 2026-10-27.
   (fast-check) cover the schedule and day functions. `Scenarios` in CI (`scenarios.yml`) runs both,
   and `preview.yml` builds and publishes nothing unless it passes: on that push, or on exactly its tree
   in the PR's own CI (a PR merged with nothing else landing meanwhile; `scenarios-passed-<tree>`
-  artifacts, same-repository runs only), so a clean merge reaches TestFlight without a second run.
+  artifacts, same-repository runs only), so a clean merge reaches TestFlight without a second run
+  (about 5 minutes from the merge to the update; 15 when the suite runs again). Its publishing half
+  checks that artifact again before it builds or publishes.
   - **Every bug fix adds a scenario** that fails without the fix and names the rule it keeps
     (`[DAY-2]` in its title). The "Behaviour spec" check (`spec.yml`) fails a fix PR (branch `fix/`,
     `hotfix/`, `claude/issue-`, or a title starting "Fix") that changes `src/` without one. Only the
