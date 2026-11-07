@@ -113,6 +113,21 @@ kept. The 529 stays as Anthropic documents it (an overload can't be produced on 
 5. **A new outside service**: stand it in at its outermost edge with a recorded real response, list it
    in the tables above, and add it to the live smoke check if production depends on it.
 
+## Changing the tests themselves
+
+A PR into develop that changes code the tests share must prove it on everything that uses it, before
+it merges (`plan` in ci.yml, `.github/scripts/affected-flows.js`): #286 changed `swipe-page.yaml`,
+passed 06 once in the smoke set, and broke 06 on develop for everyone.
+
+- **A subflow or a script under `.maestro/`, or a flow:** every flow that uses it (followed through
+  other subflows), together with the smoke set, on **both platforms, twice**, with no reruns
+  (`E2E_REPEAT=2`: every run must pass).
+- **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow, both platforms, twice.
+- **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice.
+
+Drafts and a stack's lower layers wait until they are ready (or the top). It is slow on purpose:
+one slow PR instead of a broken develop.
+
 ## Flakes
 
 - **Fix the cause.** A flaky test is a bug in the test or the app, found. Never add a retry, a longer

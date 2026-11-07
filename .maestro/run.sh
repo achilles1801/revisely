@@ -17,6 +17,8 @@
 #   E2E_FUNCTIONS_URL  the functions emulator (http://127.0.0.1:5001)
 #   E2E_OUTPUT         where reports, logs and screenshots go (.maestro/build/results)
 #   E2E_RETRIES        reruns of a failed flow (default 0); a pass on a rerun is reported
+#   E2E_REPEAT         runs of each flow, every one of which must pass, with no reruns (default 1;
+#                      2 for a PR that changes shared test code: plan in ci.yml)
 #   E2E_ZONE           the zone for flows that name none (America/Chicago)
 #   E2E_FLOW_LIMIT     seconds an attempt may take before it is stopped (900)
 #   E2E_WARMUP_LIMIT   seconds the warm-up may take (360)
@@ -31,6 +33,9 @@ if [ ${#FLOWS[@]} -eq 0 ]; then
 fi
 OUT=${E2E_OUTPUT:-$ROOT/.maestro/build/results}
 RETRIES=${E2E_RETRIES:-0}
+REPEAT=${E2E_REPEAT:-1}
+# Repeated runs are the proof that a change to shared test code is sound: none may lean on a rerun.
+[ "$REPEAT" -gt 1 ] && RETRIES=0
 DEFAULT_ZONE=${E2E_ZONE:-America/Chicago}
 AUTH_URL=${E2E_AUTH_URL:-http://127.0.0.1:9099}
 FIRESTORE_URL=${E2E_FIRESTORE_URL:-http://127.0.0.1:8080}
@@ -168,13 +173,17 @@ summary="| Flow | Zone | Result | Time |\n| --- | --- | --- | --- |\n"
 ATTEMPTS="$OUT/$PLATFORM/attempts.tsv"
 : > "$ATTEMPTS"
 for flow in "${FLOWS[@]}"; do
-  name=$(basename "$flow" .yaml)
+  base=$(basename "$flow" .yaml)
   zone=$(zone_of "$flow")
   if ci_skips "$flow"; then
-    echo "▷ $name skipped in CI on $PLATFORM: $(sed -n 's/^# e2e-ci-skip: *//p' "$flow" | head -1)"
-    summary+="| $name | $zone | skipped in CI | |\n"
+    echo "▷ $base skipped in CI on $PLATFORM: $(sed -n 's/^# e2e-ci-skip: *//p' "$flow" | head -1)"
+    summary+="| $base | $zone | skipped in CI | |\n"
     continue
   fi
+  for rep in $(seq 1 "$REPEAT"); do
+  # Each repeated run is its own entry (results folder, attempts, summary).
+  name=$base
+  [ "$REPEAT" -gt 1 ] && name="$base-run$rep"
   result=failed
   start=$(date +%s)
   for attempt in $(seq 0 "$RETRIES"); do
@@ -203,6 +212,7 @@ for flow in "${FLOWS[@]}"; do
     echo "::$level title=E2E $PLATFORM::$name $result ($zone)"
   fi
   summary+="| $name | $zone | $result | $time |\n"
+  done
 done
 
 printf "\n$summary"

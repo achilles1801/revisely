@@ -7,6 +7,7 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 | When | Flows | Jobs |
 | --- | --- | --- |
 | A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
+| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms (TESTING.md, "Changing the tests themselves") |
 | A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
 | The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
 | A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
