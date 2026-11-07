@@ -5,6 +5,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 import { __setRevoBackendForTests, RevoError, type RevoBackend } from '../../../lib/revo/backend';
 import { createMemoryRevoBackend } from '../../../lib/revo/memoryBackend';
 import type { RevoContext } from '../../../lib/revo/types';
+import { RevoBoundary } from '../RevoBoundary';
 import { RevoChat } from '../RevoChat';
 import { RevoHistory, RevoMemory, RevoOptIn } from '../RevoPages';
 
@@ -143,6 +144,64 @@ describe('Revo’s conversation', () => {
     await flush();
     expect(screen.getByTestId('revo-error')).toBeTruthy();
     expect(screen.queryByTestId('revo-typing')).toBeNull();
+  });
+
+  it('a failure says why: offline, or the server’s own reason; both can be tried again', async () => {
+    const offline: RevoBackend = { ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('offline', 'x'))) };
+    __setRevoBackendForTests(offline);
+    render(<Chat />);
+    await flush();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(screen.getByText(/^You’re offline\. Revo needs the internet\.\s+Try again$/)).toBeTruthy();
+    const busy: RevoBackend = { ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('unavailable', 'Revo didn’t answer in time. Try again.'))) };
+    __setRevoBackendForTests(busy);
+    render(<Chat />);
+    await flush();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(screen.getByText(/^Revo didn’t answer in time\. Try again\.\s+Try again$/)).toBeTruthy();
+  });
+
+  it('a follow-up’s answer joins the conversation; the first one shows before the chat is read back', async () => {
+    render(<Chat />);
+    await flush();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-chip-How was my week?'));
+    });
+    await flush();
+    expect(screen.getAllByTestId('revo-answer')).toHaveLength(1);
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'And my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(screen.getAllByTestId('revo-answer')).toHaveLength(2);
+    expect(screen.getAllByTestId('revo-question')).toHaveLength(2);
+  });
+
+  it('an error inside Revo’s sheet stays there: it says so, and the app carries on', async () => {
+    const Throws = () => {
+      throw new TypeError("Cannot read property 'id' of undefined");
+    };
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <ThemeProvider>
+        <RevoBoundary resetKey={1}>
+          <Throws />
+        </RevoBoundary>
+      </ThemeProvider>,
+    );
+    await flush();
+    spy.mockRestore();
+    expect(screen.getByTestId('revo-broken')).toBeTruthy();
+    expect(screen.getByText('Revo ran into a problem')).toBeTruthy();
   });
 
   it('the day’s questions used: the limit card, the composer off with when Revo is back', async () => {

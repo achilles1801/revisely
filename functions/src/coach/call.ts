@@ -27,6 +27,8 @@ export class CoachCallError extends Error {
 export interface MessagesRequest {
   model: string;
   max_tokens: number;
+  /** Revo (Sonnet 5.5) sends `between_tools`: no extended thinking. Left out, the model's default. */
+  thinking?: { type: 'between_tools' } | { type: 'adaptive' };
   system: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[];
   messages: { role: 'user' | 'assistant'; content: string }[];
 }
@@ -35,6 +37,8 @@ export interface CoachReply {
   text: string;
   usage: Usage;
   attempts: number;
+  /** Why the model stopped: 'end_turn', or 'max_tokens' when the reply was cut off. */
+  stopReason?: string;
 }
 
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
@@ -82,14 +86,14 @@ export async function callCoach(request: MessagesRequest, deps: CallDeps): Promi
     clearTimeout(timer);
 
     if (res.ok) {
-      const body = (await res.json()) as { content?: { type?: string; text?: string }[]; usage?: Usage };
+      const body = (await res.json()) as { content?: { type?: string; text?: string }[]; usage?: Usage; stop_reason?: string };
       const text = (body.content ?? [])
         .filter((b) => b.type === 'text' && typeof b.text === 'string')
         .map((b) => b.text)
         .join('')
         .trim();
       if (text === '') throw new CoachCallError('The coach gave no answer. Try again.', res.status, false);
-      return { text, usage: body.usage ?? {}, attempts: attempt };
+      return { text, usage: body.usage ?? {}, attempts: attempt, ...(typeof body.stop_reason === 'string' ? { stopReason: body.stop_reason } : {}) };
     }
 
     const retryable = res.status === 429 || res.status >= 500;

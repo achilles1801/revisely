@@ -6,7 +6,7 @@
 import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester } from '../harness/admin';
+import { markPreviewTester, serveRevo } from '../harness/admin';
 import { Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 
@@ -129,4 +129,88 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   await home.startSession();
   await app.until(() => app.screen.queryByTestId('revo-button') == null, 'no button in the session');
   await app.close();
+});
+
+/** Revo with its real backend: the app's own requests to the callables, served by the functions' code. */
+async function openWithServedRevo(phone: Phone): Promise<OpenApp> {
+  return phone.open((mods) => {
+    mods.require<typeof import('../../../src/lib/revo/backend')>('src/lib/revo/backend').__setRevoBackendForTests(null);
+    return revoStack(mods);
+  });
+}
+
+const reply = (text: string, more: Record<string, unknown> = {}) => JSON.stringify({ text, chart: null, textAfter: null, action: null, remember: [], title: 'My week', chips: ['How is my pace?'], ...more });
+
+it('[REVO-23] [REVO-3] answers come through the real callables, a first question and a follow-up; a failure says why and can be tried again', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-06 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  markPreviewTester(uid);
+
+  const served = serveRevo();
+  try {
+    app = await openWithServedRevo(phone);
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    await new Home(app).ready();
+
+    // Turned on through revoSetOptions (its answer is the callable's { result }).
+    await tap(app, 'revo-button');
+    await tap(app, 'revo-turn-on');
+    await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
+    expect(served.calls.map((c) => c.name)).toEqual(['revoSetOptions']);
+
+    // A first question: the answer the server stored shows in a new conversation.
+    served.reply = (name) => (name === 'revoAsk' ? reply('You revised steadily this week.') : undefined);
+    await tap(app, 'revo-chip-How was my week?');
+    await app.until(() => app.screen.queryByText('You revised steadily this week.') != null, 'the first answer');
+    const first = served.calls[served.calls.length - 1];
+    expect(first).toMatchObject({ name: 'revoAsk', data: { chatId: null, question: 'How was my week?' } });
+
+    // A follow-up in that conversation (the path that crashed on Nov 7 2026, REACT-NATIVE-10).
+    served.reply = () => reply('Today is 5 pages, starting at page 1.');
+    await app.act(async () => {
+      app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'And today?');
+    });
+    await tap(app, 'revo-send');
+    await app.until(() => app.screen.queryByText('Today is 5 pages, starting at page 1.') != null, 'the follow-up’s answer');
+    const followUp = served.calls[served.calls.length - 1];
+    expect(followUp.name).toBe('revoAsk');
+    expect(typeof followUp.data.chatId).toBe('string');
+    expect(app.screen.getByText('You revised steadily this week.')).toBeTruthy();
+    expect(app.screen.queryAllByTestId('revo-question')).toHaveLength(2);
+    expect(app.screen.queryByTestId('revo-broken')).toBeNull();
+
+    // [REVO-3] A reply cut off before its text: the server's reason, the question given back, Try again.
+    served.reply = () => '{"text": "Your weakest pa';
+    await app.act(async () => {
+      app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'Which pages are weakest?');
+    });
+    await tap(app, 'revo-send');
+    await app.until(() => app.screen.queryByTestId('revo-error') != null, 'the failure');
+    expect(app.screen.getByText(/^Revo couldn’t answer that\. Try again\.\s+Try again$/)).toBeTruthy();
+    served.reply = () => reply('Pages 3 and 4 are rated weak.');
+    await app.act(async () => {
+      app.mods.rtl.fireEvent.press(app.screen.getByText(/^\s*Try again$/));
+    });
+    await app.until(() => app.screen.queryByText('Pages 3 and 4 are rated weak.') != null, 'the answer on trying again');
+    expect(app.screen.queryByTestId('revo-error')).toBeNull();
+
+    // Offline: it says so, and nothing reached the server.
+    served.offline = true;
+    const before = served.calls.length;
+    await app.act(async () => {
+      app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'How is my pace?');
+    });
+    await tap(app, 'revo-send');
+    await app.until(() => app.screen.queryByTestId('revo-error') != null, 'the offline note');
+    expect(app.screen.getByText(/^You’re offline\. Revo needs the internet\.\s+Try again$/)).toBeTruthy();
+    expect(served.calls.length).toBe(before);
+    await app.close();
+  } finally {
+    served.restore();
+  }
 });

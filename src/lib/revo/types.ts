@@ -122,4 +122,4 @@ export interface RevoAskResult {
 }
 
 /** Why a question was refused, as the app tells the user. */
-export type RevoRefusal = 'daily' | 'monthly' | 'off' | 'unavailable' | 'clock';
+export type RevoRefusal = 'daily' | 'monthly' | 'off' | 'unavailable' | 'clock' | 'offline' | 'gone';

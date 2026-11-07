@@ -15,6 +15,7 @@ import { onRevoOpen, type RevoOpenRequest } from '../../lib/revo/open';
 import { setRevoPresent } from '../../lib/revo/presence';
 import type { RevoAction, RevoAttachment, RevoSettings } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
+import { RevoBoundary } from './RevoBoundary';
 import { REVO_BUTTON_GAP, RevoButton } from './RevoButton';
 import { RevoChat } from './RevoChat';
 import type { PickKind } from './RevoComposer';
@@ -200,57 +201,59 @@ function RevoHostInner() {
     <>
       {buttonShown ? <RevoButton bottom={bottom} dot={reviewWaiting != null} onPress={() => show()} /> : null}
       <RevoSheetFrame visible={open} onClose={close} full={full} onFullChange={setFull}>
-        {view.name === 'optin' ? (
-          <RevoOptIn onTurnOn={() => void turnOn()} onNotNow={close} busy={optInBusy} error={optInError} />
-        ) : view.name === 'history' ? (
-          <RevoHistory
-            uid={uid}
-            onBack={() => setView({ name: 'chat' })}
-            onOpen={(id) => {
-              setChatId(id);
-              setView({ name: 'chat' });
-              setFull(true);
-            }}
-            onNew={() => {
-              setChatId(null);
-              setView({ name: 'chat' });
-            }}
-          />
-        ) : view.name === 'memory' && settings ? (
-          <RevoMemory uid={uid} settings={settings} today={day} onBack={() => setView({ name: 'chat' })} />
-        ) : view.name === 'pick' ? (
-          <RevoPicker
-            kind={view.kind}
-            onBack={() => setView({ name: 'chat' })}
-            onPick={(a) => {
-              setAttach(a);
-              setView({ name: 'chat' });
-            }}
-          />
-        ) : (
-          <RevoChat
-            uid={uid}
-            chatId={chatId}
-            onChatId={setChatId}
-            usage={usage}
-            attach={attach}
-            onAttach={setAttach}
-            onPick={(kind) => {
-              setView({ name: 'pick', kind });
-              setFull(true);
-            }}
-            onHistory={() => {
-              setView({ name: 'history' });
-              setFull(true);
-            }}
-            onMemory={() => {
-              setView({ name: 'memory' });
-              setFull(true);
-            }}
-            onExpand={() => setFull(true)}
-            onAction={doAction}
-          />
-        )}
+        <RevoBoundary resetKey={open}>
+          {view.name === 'optin' ? (
+            <RevoOptIn onTurnOn={() => void turnOn()} onNotNow={close} busy={optInBusy} error={optInError} />
+          ) : view.name === 'history' ? (
+            <RevoHistory
+              uid={uid}
+              onBack={() => setView({ name: 'chat' })}
+              onOpen={(id) => {
+                setChatId(id);
+                setView({ name: 'chat' });
+                setFull(true);
+              }}
+              onNew={() => {
+                setChatId(null);
+                setView({ name: 'chat' });
+              }}
+            />
+          ) : view.name === 'memory' && settings ? (
+            <RevoMemory uid={uid} settings={settings} today={day} onBack={() => setView({ name: 'chat' })} />
+          ) : view.name === 'pick' ? (
+            <RevoPicker
+              kind={view.kind}
+              onBack={() => setView({ name: 'chat' })}
+              onPick={(a) => {
+                setAttach(a);
+                setView({ name: 'chat' });
+              }}
+            />
+          ) : (
+            <RevoChat
+              uid={uid}
+              chatId={chatId}
+              onChatId={setChatId}
+              usage={usage}
+              attach={attach}
+              onAttach={setAttach}
+              onPick={(kind) => {
+                setView({ name: 'pick', kind });
+                setFull(true);
+              }}
+              onHistory={() => {
+                setView({ name: 'history' });
+                setFull(true);
+              }}
+              onMemory={() => {
+                setView({ name: 'memory' });
+                setFull(true);
+              }}
+              onExpand={() => setFull(true)}
+              onAction={doAction}
+            />
+          )}
+        </RevoBoundary>
       </RevoSheetFrame>
     </>
   );

@@ -124,7 +124,7 @@ function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; c
   return { store, spend: () => spend, usage: (uid = 'u') => usageDoc.get(uid), chats: (uid = 'u') => chatsOf(uid), messages: (uid: string, c: string) => messages.get(key(uid, c)) ?? [], memory: (uid = 'u') => memory.get(uid) ?? [], answers };
 }
 
-type Call = (r: MessagesRequest) => Promise<{ text: string; usage: typeof usage; attempts: number }>;
+type Call = (r: MessagesRequest) => Promise<{ text: string; usage: typeof usage; attempts: number; stopReason?: string }>;
 const json = (o: Record<string, unknown>) => JSON.stringify({ text: 'Revise them first tomorrow.', ...o });
 function model(text = json({})) {
   const requests: MessagesRequest[] = [];
@@ -299,8 +299,26 @@ describe('the model and the prompt (REVO-6)', () => {
     const r = m.requests[0];
     expect(r.model).toBe('claude-sonnet-5-5');
     expect(r.max_tokens).toBe(REVO_MAX_TOKENS);
+    // Sonnet 5.5 thinks by default and its thinking counts against max_tokens: with 700 and
+    // thinking on, every reply was cut off (Nov 7 2026). Thinking off, and room for the reply.
+    expect(r.thinking).toEqual({ type: 'between_tools' });
+    expect(REVO_MAX_TOKENS).toBeGreaterThanOrEqual(1000);
     expect(r.system).toEqual([{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]);
     expect(REVO_SYSTEM_PROMPT.length).toBeGreaterThanOrEqual(512 * 6);
+  });
+
+  it('[REVO-6] the Day in review is asked the same way: thinking off, the same room', async () => {
+    const m = model();
+    await handleDayInReview(U, { day: DAY, context: context() }, deps(fakeStore().store, m.call));
+    expect(m.requests[0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: REVO_MAX_TOKENS, thinking: { type: 'between_tools' } });
+  });
+
+  it('[REVO-6] a reply cut off (max_tokens) is logged as such, without its words', async () => {
+    const logs: Record<string, unknown>[] = [];
+    const call: Call = async () => ({ text: json({ text: 'secret answer' }), usage, attempts: 1, stopReason: 'max_tokens' });
+    await handleRevoAsk(U, ask(), deps(fakeStore().store, call, logs));
+    expect(logs.find((l) => l.event === 'answer')).toMatchObject({ stop: 'max_tokens' });
+    expect(JSON.stringify(logs)).not.toMatch(/secret answer/);
   });
 
   it('[REVO-6] the log keeps counts and tokens, never the question, the answer or a note', async () => {
