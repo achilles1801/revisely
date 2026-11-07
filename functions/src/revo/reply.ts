@@ -118,17 +118,52 @@ function unfenced(raw: string): string {
   return raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
 }
 
-/** The JSON object in the model's text (after any words before it). */
-function jsonObject(t: string): Obj | null {
-  const start = t.indexOf('{');
-  const end = t.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
+function parsedObject(s: string): Obj | null {
   try {
-    const v = JSON.parse(t.slice(start, end + 1));
+    const v = JSON.parse(s);
     return isObj(v) ? v : null;
   } catch {
     return null;
   }
+}
+
+/** The object that opens at `at`: up to its own closing brace (braces inside strings skipped), or null. */
+function objectAt(t: string, at: number): Obj | null {
+  let depth = 0;
+  let inString = false;
+  for (let i = at; i < t.length; i++) {
+    const c = t[i];
+    if (inString) {
+      if (c === '\\') i++;
+      else if (c === '"') inString = false;
+    } else if (c === '"') inString = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return parsedObject(t.slice(at, i + 1));
+  }
+  return null;
+}
+
+/**
+ * The JSON object in the model's text. The model sometimes writes its answer in words first, then
+ * the object in a ```json fence (the recorded "How was my week?", Nov 7 2026): the object is the
+ * reply and the words around it are dropped, never shown with it. Tried in turn: from the first
+ * "{" to the last "}" (as before); the fenced block's own text; each "{" that starts a line, up to
+ * its own closing brace (words with braces in them before or after the object).
+ */
+function jsonObject(t: string): Obj | null {
+  const start = t.indexOf('{');
+  const end = t.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  const whole = parsedObject(t.slice(start, end + 1));
+  if (whole) return whole;
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(t);
+  const fenced = fence ? parsedObject(fence[1].trim()) : null;
+  if (fenced) return fenced;
+  for (const m of t.matchAll(/(?:^|\n)[ \t]*\{/g)) {
+    const found = objectAt(t, (m.index ?? 0) + m[0].indexOf('{'));
+    if (found) return found;
+  }
+  return null;
 }
 
 /** A reply cut off mid-object (out of tokens): its "text" value when that much arrived whole. */

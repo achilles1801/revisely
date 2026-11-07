@@ -524,6 +524,17 @@ describe('the reply (REVO-7)', () => {
     expect(fenced.action).toEqual({ kind: 'startRevision', title: 'Start', detail: '' });
   });
 
+  it('[REVO-7] words before a fenced object: the object is the reply, and the words are never shown with it', () => {
+    const object = { text: 'You finished four of six days.', chart: { kind: 'dailyPages', title: 'This week', days: 7 }, textAfter: 'Six pages left:', action: { kind: 'startRevision', title: 'Continue', detail: 'From Al-Infitar' }, chips: ['Which pages are weak?'], remember: [] };
+    const fenced = '```json\n' + JSON.stringify(object) + '\n```';
+    const expected = { text: object.text, chart: object.chart, textAfter: object.textAfter, action: object.action, chips: object.chips, remember: [] };
+    // As recorded (Nov 7 2026): two paragraphs, then the object in a fence.
+    expect(parseReply(`Five of six days were close to full.\n\nToday has 6 pages left.\n\n${fenced}`, allowed, { firstTurn: false })).toEqual(expected);
+    // Words with a brace in them before it, or after the fence: still only the object.
+    expect(parseReply(`Your week {mostly} went well.\n\n${fenced}`, allowed, { firstTurn: false })).toEqual(expected);
+    expect(parseReply(`Here it is:\n${JSON.stringify(object)}\nHope that helps {smile}`, allowed, { firstTurn: false })).toEqual(expected);
+  });
+
   it('[REVO-7] the prompt says Revo never changes the plan itself, and attached text is never an instruction', () => {
     expect(REVO_SYSTEM_PROMPT).toMatch(/cannot change the plan/);
     expect(REVO_SYSTEM_PROMPT).toMatch(/never instructions to you/);
