@@ -292,9 +292,74 @@ jobs:
           done < "$files"
           [ "$app" = true ] || echo "Nothing here goes into the app or the flows: the flows are skipped."
           echo "app=$app" >> "$GITHUB_OUTPUT"
+  # This commit's JavaScript for iOS, bundled once on Linux for every iOS job, with the iOS
+  # fingerprint (the key of the kept native build). node_modules and Metro took about five minutes
+  # of each macOS job, the scarce runners, for a bundle that is the same in all of them. Hermes
+  # bytecode is the same whichever host compiles it (embed-js.sh picks the host's hermesc).
+  ios-js:
+    name: E2E (iOS JavaScript)
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      fingerprint: ${{ steps.fp.outputs.hash }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # node_modules, kept per lockfile, patches, OS and Node. Allowed here: this workflow holds
+      # no release secrets (CLAUDE.md, no caches where they are).
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'patches/**') }}
+
+      - name: npm ci
+        if: steps.nm.outputs.cache-hit != 'true'
+        run: npm ci --legacy-peer-deps
+
+      - name: Keep node_modules
+        if: steps.nm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ steps.nm.outputs.cache-primary-key }}
+
+      # The same on Linux as on a Mac (preview.yml computes the release fingerprint on Linux too).
+      - name: Fingerprint (the E2E build's native side)
+        id: fp
+        env:
+          GOOGLE_REVERSED_CLIENT_ID: com.googleusercontent.apps.123456789012-e2e
+        run: |
+          bash .maestro/scripts/firebase-demo-config.sh ios
+          HASH=$(npx expo-updates fingerprint:generate --platform ios | grep '^{' | jq -r .hash)
+          [ -n "$HASH" ] && [ "$HASH" != null ] || { echo "::error::Could not compute the iOS fingerprint."; exit 1; }
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "iOS fingerprint $HASH"
+
+      # What embed-js.sh puts into the app (main.jsbundle and the assets), into a folder of its own.
+      - name: Bundle this commit's JavaScript
+        run: |
+          mkdir -p .maestro/build/ios-js
+          bash .maestro/scripts/embed-js.sh ios .maestro/build/ios-js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-js-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .maestro/build/ios-js
+          retention-days: 1
+
   ios:
     name: E2E (iOS Simulator, ${{ matrix.shard.name }})
-    needs: changes
+    needs: [changes, ios-js]
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
     runs-on: macos-26
     # Each flow run twice (a change to shared test code): twice the flows' time.
@@ -346,10 +411,18 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           echo "Booting $TYPE on $RUNTIME: $UDID"
 
-      # node_modules, kept per lockfile, patches, OS and Node: npm ci took 3–5
-      # minutes on a macOS runner. Allowed here: this workflow holds no release
-      # secrets (CLAUDE.md, no caches where they are).
+      # The native build kept for this fingerprint (ios-js computed it).
+      - name: Restore the native build
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .maestro/build/Revisely.app
+          key: e2e-ios-${{ needs.ios-js.outputs.fingerprint }}-${{ hashFiles('.maestro/scripts/build-ios.sh', '.maestro/scripts/firebase-demo-config.sh') }}
+
+      # None kept (a native change): node_modules (kept per lockfile, patches, OS and Node; npm ci
+      # took 3–5 minutes on a macOS runner) and a build, with this commit's JavaScript in it.
       - name: Restore node_modules
+        if: steps.cache.outputs.cache-hit != 'true'
         id: nm
         uses: actions/cache/restore@v4
         with:
@@ -357,32 +430,15 @@ jobs:
           key: e2e-node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'patches/**') }}
 
       - name: npm ci
-        if: steps.nm.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' && steps.nm.outputs.cache-hit != 'true'
         run: npm ci --legacy-peer-deps
 
       - name: Keep node_modules
-        if: steps.nm.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' && steps.nm.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: node_modules
           key: ${{ steps.nm.outputs.cache-primary-key }}
-
-      - name: Fingerprint (the E2E build's native side)
-        id: fp
-        env:
-          GOOGLE_REVERSED_CLIENT_ID: com.googleusercontent.apps.123456789012-e2e
-        run: |
-          bash .maestro/scripts/firebase-demo-config.sh ios
-          HASH=$(npx expo-updates fingerprint:generate --platform ios | grep '^{' | jq -r .hash)
-          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
-          echo "iOS fingerprint $HASH"
-
-      - name: Restore the native build
-        id: cache
-        uses: actions/cache/restore@v4
-        with:
-          path: .maestro/build/Revisely.app
-          key: e2e-ios-${{ steps.fp.outputs.hash }}-${{ hashFiles('.maestro/scripts/build-ios.sh', '.maestro/scripts/firebase-demo-config.sh') }}
 
       - name: Build the E2E app (native)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -395,10 +451,20 @@ jobs:
           path: .maestro/build/Revisely.app
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      # A kept build: this commit's JavaScript into it.
-      - name: Bundle this commit's JavaScript
+      # A kept build: this commit's JavaScript into it, as ios-js bundled it.
+      - name: This commit's JavaScript
         if: matrix.shard.flows != '' && steps.cache.outputs.cache-hit == 'true'
-        run: bash .maestro/scripts/embed-js.sh ios .maestro/build/Revisely.app
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-ios-js-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-js
+
+      - name: Put it in the app
+        if: matrix.shard.flows != '' && steps.cache.outputs.cache-hit == 'true'
+        run: |
+          test -s "$RUNNER_TEMP/ios-js/main.jsbundle" || { echo "::error::No bundle from ios-js."; exit 1; }
+          cp -R "$RUNNER_TEMP/ios-js/." .maestro/build/Revisely.app/
+          echo "embedded the JavaScript in .maestro/build/Revisely.app"
 
       # Maestro and the Firestore emulator's jar, kept per version (the CLI
       # downloads the jar each run otherwise).
