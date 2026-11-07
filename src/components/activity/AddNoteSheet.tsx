@@ -40,7 +40,7 @@ export function AddNoteSheet({
   /** How the sheet names the day: "today", "yesterday", "Sunday" (its stamp: "Today · 9:40 PM"). */
   dayName?: string;
 }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const [text, setText] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const [options, setOptions] = useState<TagOption[]>([]);
@@ -112,6 +112,7 @@ export function AddNoteSheet({
           selectionColor={palette.primary}
           multiline
           autoFocus
+          keyboardAppearance={isDark ? 'dark' : 'light'}
           accessibilityLabel="Note"
           style={[styles.input, { color: palette.text }]}
         />
