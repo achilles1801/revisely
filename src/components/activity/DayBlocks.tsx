@@ -15,7 +15,8 @@ import { getFajrTimeFor } from '../../lib/fajrBoundary';
 import { PageStrip, StrengthCounts, WindowFooter } from './DayParts';
 import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
 import { BlockMark, RevisedMark } from './BlockMark';
-import { formatMinutesLong } from '../../lib/activityFormat';
+import { creditLine, formatMinutesLong, formatPagesShort, windowFooter } from '../../lib/activityFormat';
+import { ayahSpan } from '../../lib/ayahSpan';
 import { RecordingsList } from '../recordings/RecordingsList';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { describePageRuns, describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
@@ -33,6 +34,8 @@ export const activityBlocksEnabled = (user: { previewTester?: boolean } | null |
 
 interface Props {
   day: string;
+  /** Today's revision day: a day before it "ran", today "runs" (the footer); a past day's Revised says what was left. */
+  today?: string;
   /** The day's log notes of each kind this block shows. */
   revisionNotes: JournalNote[];
   memorizationNotes: JournalNote[];
@@ -88,6 +91,7 @@ function confirmDelete(title: string, message: string, onConfirm: () => void) {
 
 export function DayBlocks({
   day,
+  today = day,
   revisionNotes,
   memorizationNotes,
   readings,
@@ -145,13 +149,9 @@ export function DayBlocks({
     return from && to ? { from, to } : null;
   }, [day, user]);
   const footerText = useMemo(() => {
-    const [y, m, d] = day.split('-').map(Number);
-    const weekday = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' });
     const fmt = (x: Date) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return dayWindow
-      ? `${weekday} runs Fajr to Fajr, ${fmt(dayWindow.from)} to ${fmt(dayWindow.to)}`
-      : `${weekday} runs midnight to midnight`;
-  }, [day, dayWindow]);
+    return windowFooter(day, today, dayWindow ? { from: fmt(dayWindow.from), to: fmt(dayWindow.to) } : null);
+  }, [day, today, dayWindow]);
   const view: DayView | null = useMemo(
     () => (items ? buildDayView(day, { ...items, notes: [] }, memorizedSet) : null),
     [items, day, memorizedSet],
@@ -168,7 +168,7 @@ export function DayBlocks({
     'Memorized',
     memorized.items.map((i) => ({
       key: `delete-${i.id}`,
-      label: `Delete ${describePageRuns(pageRuns(i.pages))}`,
+      label: `Delete ${formatPagesShort(i.pages)}`,
       icon: 'trash-outline' as const,
       destructive: true,
       onPress: () =>
@@ -257,8 +257,9 @@ export function DayBlocks({
       : []),
     ...taggedTo('revision').map(noteItem),
     ...revisionNotes.map(handItem),
-    ...revised.credits.map((c) => lineItem(`credit-${c.countsFor}`, `Ahead for ${c.countsFor}: ${describePageRuns(pageRuns(c.pages))}`)),
-    ...doneAhead.map((a) => lineItem(`ahead-${a.fromDay}`, `Done ahead, from ${a.fromDay}: ${describePageRuns(pageRuns(a.pages))}`, 'activity-done-ahead')),
+    // Pages that count for another day (AHEAD-2; a catch-up page for the day it was missed, SESS-7).
+    ...revised.credits.map((c) => lineItem(`credit-${c.countsFor}`, creditLine(day, c), 'activity-credit')),
+    ...doneAhead.map((a) => lineItem(`ahead-${a.fromDay}`, creditLine(day, a), 'activity-done-ahead')),
   ];
   const memorizedPages = memorized.items.flatMap((i) => i.pages);
   const memorizedMinutes = memorized.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
@@ -307,6 +308,14 @@ export function DayBlocks({
     revised.assigned.length > 0
       ? describeSurahs({ first: Math.min(...revised.assigned), last: Math.max(...revised.assigned) })
       : surahsOf(revised.revised);
+  // A day that is over with pages left says how many, in the surahs' place (mock d2: "Juz 27 · 9 min ·
+  // 14 not revised"); today, the strip shows what is left.
+  const revisedSet = new Set(revised.revised);
+  const left = day < today ? new Set(revised.assigned.filter((p) => !revisedSet.has(p))).size : 0;
+  const revisedSubline =
+    left > 0
+      ? subline([revised.juzLabel, revised.minutes != null ? formatMinutesLong(revised.minutes) : null, `${left} not revised`])
+      : subline([revised.juzLabel, assignedSurahs, revised.minutes != null ? formatMinutesLong(revised.minutes) : null]);
 
   return (
     <>
@@ -320,7 +329,7 @@ export function DayBlocks({
           }
           title="Revised"
           figure={revised.assigned.length > 0 ? `${revised.revised.length} of ${revised.assigned.length}` : undefined}
-          subline={subline([revised.juzLabel, assignedSurahs, revised.minutes != null ? formatMinutesLong(revised.minutes) : null])}
+          subline={revisedSubline}
           summary={
             revised.assigned.length > 0 ? (
               <>
@@ -346,14 +355,14 @@ export function DayBlocks({
           mark={<BlockMark kind="memorized" />}
           title="Memorized"
           figure={memorized.items.length > 0 ? pagesWord(memorizedPages.length) : undefined}
-          subline={subline([surahsOf(memorizedPages), memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null])}
+          subline={subline([ayahSpan(memorizedPages) ?? surahsOf(memorizedPages), memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null])}
           summary={
             memorized.items.length > 0 ? (
               <View style={styles.chips}>
                 {pageRuns(memorizedPages).map((run) => (
-                  <PageChip key={describePageRuns([run])} label={describePageRuns([run])} />
+                  <PageChip key={`${run.first}-${run.last}`} label={formatPagesShort([run.first, run.last])} />
                 ))}
-                <Text style={[typeV2.body, { color: palette.secondary }]}>{`${memorizedSet.size} pages memorized in all`}</Text>
+                <Text style={[typeV2.meta, styles.chipsNote, { color: palette.secondary }]}>{`${memorizedSet.size} pages memorized in all`}</Text>
               </View>
             ) : undefined
           }
@@ -396,5 +405,6 @@ export function DayBlocks({
 
 const styles = StyleSheet.create({
   underItem: { marginTop: 10 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  chipsNote: { marginLeft: 4 },
 });

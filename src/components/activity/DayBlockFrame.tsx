@@ -144,12 +144,14 @@ export function ItemLine({
   );
 }
 
-/** A page chip ("p. 562"): the bubble, as under a recording. */
+/** A page chip ("p. 562"): the same chip as a recording's pages (RecordingsList), mock d1. */
 export function PageChip({ label }: { label: string }) {
   const { palette } = useTheme();
   return (
-    <View style={[styles.chip, { backgroundColor: palette.bubble }]}>
-      <Text style={[typeV2.body, styles.tabular, { color: palette.secondary }]}>{label}</Text>
+    <View style={[styles.chip, { backgroundColor: palette.fill, borderColor: palette.separator }]}>
+      <Text style={[styles.chipText, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -179,5 +181,12 @@ const styles = StyleSheet.create({
   itemIcon: { marginTop: 2.5 },
   itemBody: { flex: 1 },
   tabular: { fontVariant: ['tabular-nums'] },
-  chip: { height: 32, borderRadius: 16, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  chip: {
+    minHeight: 26,
+    paddingHorizontal: 10,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
+  },
+  chipText: { fontSize: 13, lineHeight: 17 },
 });

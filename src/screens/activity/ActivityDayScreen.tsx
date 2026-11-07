@@ -381,6 +381,7 @@ export default function ActivityDayScreen() {
           {blocks && (
             <DayBlocks
               day={date}
+              today={today}
               revisionNotes={(journal?.entries ?? []).filter((n) => n.kind === 'revision')}
               memorizationNotes={(journal?.entries ?? []).filter((n) => n.kind === 'memorization')}
               readings={readings}
