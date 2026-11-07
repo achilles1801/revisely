@@ -69,7 +69,7 @@ export function AddRevisedSheet({
   const info = !range
     ? null
     : assigned.length > 0 && after > done.size
-      ? `Adding ${pageNumbers.length === 1 ? 'this makes' : 'these make'} ${dayName} ${after} of ${assigned.length}.`
+      ? `Adding ${pageNumbers.length === 1 ? 'it' : 'these'} makes ${dayName} ${after} of ${assigned.length}.`
       : `Adds ${pagesWord(pageNumbers.length)} to ${dayName === 'today' ? 'today’s' : `${dayName}’s`} Revised block.`;
 
   const clearSession = () => setUsedSession(false);
