@@ -78,3 +78,70 @@ describe('a timed read\'s time range (mock d1)', () => {
     expect(plain(timeRange(at(8, 5), null))).toBe('8:05 AM');
   });
 });
+
+describe('the blocks as mock d1 and d2 read them', () => {
+  const base = {
+    revisionNotes: [],
+    memorizationNotes: [],
+    readings: [],
+    notes: [],
+    onEditReading: jest.fn(),
+    onDeleteReading: jest.fn(),
+    onOpenLog: jest.fn(),
+    revisedLog: null,
+    onDeleteRevised: jest.fn(),
+    onDeleteMemorized: jest.fn(),
+    onOpenRecording: jest.fn(),
+  };
+  const items = firestoreService.getActivityItemsForDay as jest.Mock;
+  const assigned = Array.from({ length: 20 }, (_, i) => 522 + i);
+
+  it('Memorized: "p. 562" in its chip, and its verses in the sub-line ("Al-Mulk 1–12 · 25 min")', async () => {
+    items.mockResolvedValueOnce({ revisions: [], memorized: [{ id: '2026-11-03', day: '2026-11-03', pages: [562], minutes: 25 }], reads: [], doneAhead: [] });
+    render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
+    expect(await screen.findByText('p. 562')).toBeTruthy();
+    expect(screen.getByText('Al-Mulk 1–12 · 25 min')).toBeTruthy();
+    expect(screen.queryByText('Page 562')).toBeNull();
+  });
+
+  it('pages credited to other days read with their dates, and a catch-up never as ahead [SESS-7]', async () => {
+    items.mockResolvedValueOnce({
+      revisions: [
+        { id: 'a', day: '2026-11-03', countsFor: '2026-11-04', pages: [562, 563], skipped: [], assigned: [], minutes: null },
+        { id: 'c', day: '2026-11-03', countsFor: '2026-11-02', pages: [556, 557], skipped: [], assigned: [], minutes: null },
+      ],
+      memorized: [],
+      reads: [],
+      doneAhead: [{ fromDay: '2026-11-01', pages: [542] }],
+    });
+    render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
+    expect(await screen.findByText('Ahead for Wednesday 4 November: p. 562–563')).toBeTruthy();
+    expect(screen.getByText('Catch-up for Monday 2 November: p. 556–557')).toBeTruthy();
+    expect(screen.getByText('Done ahead on Sunday 1 November: p. 542')).toBeTruthy();
+    expect(screen.queryByText(/\d{4}-\d{2}-\d{2}/)).toBeNull();
+  });
+
+  it('a day that is over says what was left, and "ran" (mock d2)', async () => {
+    items.mockResolvedValueOnce({
+      revisions: [{ id: '2026-11-01', day: '2026-11-01', countsFor: '2026-11-01', pages: assigned.slice(0, 6), skipped: [], assigned, minutes: 9 }],
+      memorized: [],
+      reads: [],
+      doneAhead: [],
+    });
+    render(<DayBlocks {...base} day="2026-11-01" today="2026-11-03" />);
+    expect(await screen.findByText(/9 min · 14 not revised$/)).toBeTruthy();
+    expect(screen.getByText('Sunday ran midnight to midnight')).toBeTruthy();
+  });
+
+  it('today keeps its surahs and "runs" (mock d1)', async () => {
+    items.mockResolvedValueOnce({
+      revisions: [{ id: '2026-11-01', day: '2026-11-01', countsFor: '2026-11-01', pages: assigned.slice(0, 6), skipped: [], assigned, minutes: 9 }],
+      memorized: [],
+      reads: [],
+      doneAhead: [],
+    });
+    render(<DayBlocks {...base} day="2026-11-01" today="2026-11-01" />);
+    expect(await screen.findByText(/Adh-Dhariyat to Al-Hadid · 9 min$/)).toBeTruthy();
+    expect(screen.getByText('Sunday runs midnight to midnight')).toBeTruthy();
+  });
+});
