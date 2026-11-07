@@ -93,6 +93,17 @@ export const SCREEN_MASKS = {
         }),
       ]),
   ),
+  // All activity: the session's row, its minutes (Android; iOS once its run is in).
+  ...Object.fromEntries(
+    ['11-see-all', '11-see-all-dark'].map((n) => [n, { android: sessionMinutes(0, 640).android }]),
+  ),
+  // The daily log: the Memorized entry's time ("12:03 pm").
+  ...Object.fromEntries(
+    ['11-daily-log', '11-daily-log-dark'].map((n) => [
+      n,
+      { android: [{ x: 430, y: 294, w: 230, h: 50, why: 'note time' }] },
+    ]),
+  ),
 };
 
 // Screens left without a baseline on purpose: being redesigned now. Their captures are

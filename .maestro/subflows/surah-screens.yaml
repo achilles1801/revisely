@@ -105,12 +105,17 @@ appId: com.revisionbuddy.app
       - back
 - runFlow: back-home.yaml
 
-# The memorized pages: each juz by its surahs.
+# The memorized pages: each juz by its surahs (the Juz tab; Surahs lists page counts).
 - tapOn:
     id: today-memorized
 - extendedWaitUntil:
     visible: "Memorization"
     timeout: 15000
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible: "Juz 1"
+    timeout: 10000
 - runFlow:
     file: shot.yaml
     env:
