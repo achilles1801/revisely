@@ -9,8 +9,8 @@
 # the app had caught up, and on a slow emulator the count read after the third
 # swipe was still 2/10. A fourth swipe followed, the next look said 4/10, and
 # the flow swiped on to the end card (02 on Android, runs 42149084931 and
-# 42169490060, Nov 6 2026). Swipes weren't lost: the passing attempts took
-# exactly one a page.
+# 42169490060, Nov 6 2026). A swipe that is lost (the page doesn't turn) is
+# made again in swipe-page.yaml, once its count has had time to move.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
