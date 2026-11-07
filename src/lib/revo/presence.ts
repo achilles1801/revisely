@@ -1,6 +1,7 @@
-// Whether Revo's button is on screen (RevoHost mounted for this account), for the lists that
-// leave room at their end so the last row scrolls clear of it (TabBar's useTabBarFootprint).
-// Kept tiny on purpose: the tab bar reads it without importing Revo or the app's context.
+// Whether Revo's button is on screen, for the lists that leave room at their end so their last row
+// scrolls clear of it: useRevoFootprint(), which a screen showing the button adds to its scroll
+// view's bottom padding (with useTabBarFootprint for the tab bar and the mini player).
+// Kept tiny on purpose: screens read it without importing Revo or the app's context.
 
 import { useSyncExternalStore } from 'react';
 
@@ -15,23 +16,40 @@ export const REVO_BUTTON_GAP = 14;
 export const REVO_BUTTON_FOOTPRINT = REVO_BUTTON_SIZE + REVO_BUTTON_GAP + 2;
 
 let present = false;
+let buttonRoute = false;
 const listeners = new Set<() => void>();
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+};
 
+/** RevoHost: Revo is on for this account (mounted), or not. */
 export function setRevoPresent(next: boolean): void {
   if (present === next) return;
   present = next;
   listeners.forEach((l) => l());
 }
 
+/** RevoHost: the screen in front is one the button shows on (REVO_BUTTON_ROUTES). */
+export function setRevoButtonRoute(next: boolean): void {
+  if (buttonRoute === next) return;
+  buttonRoute = next;
+  listeners.forEach((l) => l());
+}
+
 export function useRevoPresent(): boolean {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => {
-        listeners.delete(l);
-      };
-    },
-    () => present,
-    () => present,
-  );
+  return useSyncExternalStore(subscribe, () => present, () => present);
+}
+
+/**
+ * Room to leave at the end of a scroll view for Revo's button: REVO_BUTTON_FOOTPRINT where the
+ * button shows (Revo on, on one of its screens), else 0. Add it to the bottom padding, beside
+ * useTabBarFootprint(). It doesn't change while the sheet or the keyboard hides the button, so
+ * lists don't jump.
+ */
+export function useRevoFootprint(): number {
+  const shown = useSyncExternalStore(subscribe, () => present && buttonRoute, () => present && buttonRoute);
+  return shown ? REVO_BUTTON_FOOTPRINT : 0;
 }

@@ -28,6 +28,7 @@ import {
 } from '../../lib/quranData';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { PillButton } from '../../components/v2/PillButton';
@@ -96,7 +97,8 @@ export default function AlgorithmScreen() {
   const [juzPickerOpen, setJuzPickerOpen] = useState(false);
   const [strengthPickerOpen, setStrengthPickerOpen] = useState(false);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const [expandedLists, setExpandedLists] = useState<Record<BrowseMode, boolean>>({
     pages: false,
     surahs: false,
