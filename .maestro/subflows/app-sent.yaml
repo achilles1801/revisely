@@ -1,0 +1,16 @@
+# Until the app has sent every change it holds: the E2E status line's label ends "nothing to send"
+# (src/lib/e2e/outboxStatus.ts; the line on screen doesn't show it). A script that writes the
+# server as its admin waits for this first. A change still held went out after the script's
+# writes and over them: on iOS, run 42414536111, a Firestore write stream had failed during
+# sign-up, so onboarding's three changes were still on the phone when seed-activity.js ran; they
+# reached the server after the relaunch (onboarding's 10 pages a day over the seed's 20), and the
+# day showed neither "Juz 28" nor "From your session". The Firestore SDK's own retries can hold a
+# write for up to a minute; the wait allows for that, and a flow that times out here says the app
+# couldn't send.
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: e2e-status
+      text: ".* · nothing to send"
+    timeout: 120000
