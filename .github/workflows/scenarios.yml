@@ -10,7 +10,10 @@ name: Scenarios
 # Four jobs side by side, each with a quarter of the files (Jest's --shard) and
 # its own emulators on its own runner: as one job it took 18 minutes. The check
 # ci.yml and preview.yml wait for is `Scenario tests`, which passes only when
-# every shard passed.
+# every shard passed. It then keeps an artifact named after the tree it tested
+# (scenarios-passed-<tree>): preview.yml skips its own run of the suite for a
+# push whose tree is exactly one that passed (a PR merged with nothing else
+# landing meanwhile).
 
 on:
   workflow_call:
@@ -23,6 +26,8 @@ jobs:
     name: Scenario tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      tree: ${{ steps.tree.outputs.tree }}
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +41,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      # The tree tested, whatever the commit (a PR's merge commit, a push): what the suite ran on.
+      - id: tree
+        run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
       - run: npm ci --legacy-peer-deps
       - run: npm ci
         working-directory: tests/scenarios
@@ -66,3 +74,15 @@ jobs:
         run: |
           echo "Shards: $RESULT"
           [ "$RESULT" = success ] || { echo "::error::A scenario shard didn't pass ($RESULT)."; exit 1; }
+      # Every shard passed on this tree: said so where preview.yml can find it.
+      - env:
+          TREE: ${{ needs.shard.outputs.tree }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/passed"
+          echo "$TREE $GITHUB_RUN_ID $GITHUB_SHA" > "$RUNNER_TEMP/passed/tree.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scenarios-passed-${{ needs.shard.outputs.tree }}
+          path: ${{ runner.temp }}/passed/tree.txt
+          retention-days: 14
+          overwrite: true
