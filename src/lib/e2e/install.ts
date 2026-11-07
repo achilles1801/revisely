@@ -6,9 +6,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Linking } from 'react-native';
 import { handleClockLink, installClock } from './clock';
+import { handleRecordingsLink, installDemoRecordings } from './demoRecordings';
 import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
-import { handleRecordingsLink, installDemoRecordings } from './demoRecordings';
 
 let installed = false;
 let ready: Promise<void> = Promise.resolve();
