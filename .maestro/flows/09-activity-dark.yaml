@@ -14,11 +14,11 @@ appId: com.revisionbuddy.app
 # Appearance is down the page.
 - scrollUntilVisible:
     element:
-      id: pill-dark
+      text: "Dark"
     direction: DOWN
     timeout: 20000
 - tapOn:
-    id: pill-dark
+    text: "Dark"
 - tapOn:
     id: back
 - runFlow:
