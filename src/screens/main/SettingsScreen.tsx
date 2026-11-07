@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { createContext, useContext, useRef, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
 import { Sheet } from '../../components/v2/Sheet';
 import { reportProblem } from '../../lib/sentry';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
@@ -51,6 +51,7 @@ import { showsUpdateTools } from '../../lib/updates/testerTools';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { RevoSettingsSection } from '../../lib/revo/types';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
@@ -86,12 +87,33 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Reusable bits — kept inline since they're tightly coupled to settings rows.
 // ---------------------------------------------------------------------------
 
+/** Each section's place in the list, by title, so Revo can open Settings at one (REVO-31). */
+const SectionLayout = createContext<((title: string, y: number) => void) | null>(null);
+
+/** The section titles Revo's openScreen names. */
+const REVO_SECTION_TITLES: Record<RevoSettingsSection, readonly string[]> = {
+  activity: ['Activity'],
+  homeScreen: ['Home screen'],
+  // Without prayer times the day boundary has its own section.
+  prayer: ['Prayer', 'Day boundary'],
+  revision: ['Revision'],
+  revo: ['Revo AI'],
+  mushaf: ['Mushaf'],
+  notifications: ['Notifications'],
+  appearance: ['Appearance'],
+  testing: ['Testing'],
+};
+
 function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
   const { palette } = useTheme();
+  const onLayout = useContext(SectionLayout);
   // A flat list: a bold sentence-case header, rows on the ground, a hairline
   // closing the group.
   return (
-    <View style={[v2.section, { borderBottomColor: palette.separator }]}>
+    <View
+      style={[v2.section, { borderBottomColor: palette.separator }]}
+      onLayout={title && onLayout ? (e) => onLayout(title, e.nativeEvent.layout.y) : undefined}
+    >
       {title ? (
         <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
           {title}
@@ -202,6 +224,30 @@ function ThemeSegmentedControl<T extends string>({
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<HomeStackParamList, 'Settings'>>();
+  // Opened at a section (Revo's openScreen): scrolled to it once it has laid out.
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionY = useRef(new Map<string, number>());
+  const wantedSection = route.params?.section;
+  const scrolledTo = useRef<string | null>(null);
+  const scrollToWanted = useCallback(() => {
+    if (!wantedSection || scrolledTo.current === wantedSection) return;
+    const y = REVO_SECTION_TITLES[wantedSection]?.map((t) => sectionY.current.get(t)).find((v) => v != null);
+    if (y == null) return;
+    scrolledTo.current = wantedSection;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
+  }, [wantedSection]);
+  useEffect(() => {
+    scrolledTo.current = null;
+    scrollToWanted();
+  }, [scrollToWanted]);
+  const onSectionLayout = useCallback(
+    (title: string, y: number) => {
+      sectionY.current.set(title, y);
+      scrollToWanted();
+    },
+    [scrollToWanted],
+  );
   const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
@@ -484,7 +530,8 @@ export default function SettingsScreen() {
     <TopSafeAreaView style={styles.container}>
       <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
 
-      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
+      <SectionLayout.Provider value={onSectionLayout}>
+      <ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
         {firebaseUser && (
           <Section title="Account">
             <View style={v2.profileRow}>
@@ -960,6 +1007,7 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
+      </SectionLayout.Provider>
       <SpeechModelSheet visible={speechSheet} onClose={() => setSpeechSheet(false)} onReady={() => setSpeechSheet(false)} />
       <ActionSheet
         visible={deleteSpeechOpen}

@@ -375,6 +375,21 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   the surah. It never says the numbers disagree or corrects itself about them, and says it can't see something rather
   than guess. The context it reads is written out in those words (no dates, field names or JSON).
 
+- **REVO-30.** Revo knows how the app works from its guide (`functions/src/revo/guide.ts`), in the cached part of its
+  prompt: how each rule here works for a user, in plain words; where each screen, sheet and setting is and how to reach
+  it; the steps for common tasks; what is for testers only; and what the app can't do, with the closest real way. A
+  how, where or why question is answered from the guide, in at most two short steps and where to find it; when the
+  guide doesn't cover something, Revo says it isn't sure that's possible in Revisely rather than guess. The guide
+  covers every rule in this file (or says why one isn't for users to ask about) and names only screens the navigation
+  has and labels the app shows, word for word; a test fails when that stops being true, so a feature's PR changes the
+  guide with it.
+
+- **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
+  pages, Activity (testers' Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
+  times, the Qibla, or the reader at a surah or a juz. The server drops any other screen, section, surah or juz (the
+  answer kept, as with a page Revo wasn't given). Nothing opens until the user taps the card's button, and an app that
+  doesn't know an action shows no card for it.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an

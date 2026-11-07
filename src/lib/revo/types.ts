@@ -98,10 +98,19 @@ export type RevoChart =
   | { kind: 'pageRatings'; title: string; pages: number[] }
   | { kind: 'dailyPages'; title: string; days: 7 | 30 };
 
+/** The screens an `openScreen` action may open (REVO-31); the server has the same list. */
+export const REVO_SCREENS = ['jumpTo', 'planEditor', 'memorized', 'activity', 'insights', 'dailyLog', 'settings', 'prayerTimes', 'qibla', 'reader'] as const;
+export type RevoScreen = (typeof REVO_SCREENS)[number];
+
+/** The Settings sections `openScreen` may show (with `screen: 'settings'`). */
+export const REVO_SETTINGS_SECTIONS = ['activity', 'homeScreen', 'prayer', 'revision', 'revo', 'mushaf', 'notifications', 'appearance', 'testing'] as const;
+export type RevoSettingsSection = (typeof REVO_SETTINGS_SECTIONS)[number];
+
 export type RevoAction =
   | { kind: 'reviseFirst'; title: string; detail: string; pages: number[] }
   | { kind: 'openPage'; title: string; detail: string; page: number }
-  | { kind: 'startRevision'; title: string; detail: string };
+  | { kind: 'startRevision'; title: string; detail: string }
+  | { kind: 'openScreen'; title: string; detail: string; screen: RevoScreen; section?: RevoSettingsSection; surah?: number; juz?: number };
 
 export interface RevoMessage {
   id: string;

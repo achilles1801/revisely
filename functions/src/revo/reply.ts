@@ -4,7 +4,7 @@
  * action that names a page the model wasn't given is dropped whole. A reply that isn't JSON is
  * its own text, and nothing else (a reply cut off mid-object keeps its text when it arrived whole).
  */
-import { RevoAction, RevoChart, RevoReplyParts } from './types';
+import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoAction, RevoChart, RevoReplyParts } from './types';
 
 export const MAX_TEXT = 1500;
 export const MAX_TEXT_AFTER = 300;
@@ -65,7 +65,40 @@ export function checkAction(v: unknown, allowed: ReadonlySet<number>): RevoActio
     return typeof page === 'number' && Number.isInteger(page) && allowed.has(page) ? { kind: 'openPage', title, detail, page } : null;
   }
   if (v.kind === 'startRevision') return { kind: 'startRevision', title, detail };
+  if (v.kind === 'openScreen') return checkScreen(v, title, detail);
   return null;
+}
+
+const wholeIn = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
+
+/**
+ * A screen of the fixed list (REVO-31). Settings may name one of its sections, the reader a
+ * surah or a juz; anything else about it (an unknown section, a surah out of range, both a surah
+ * and a juz) drops the action, as a page Revo wasn't given does.
+ */
+function checkScreen(v: Obj, title: string, detail: string): RevoAction | null {
+  const screen = REVO_SCREENS.find((s) => s === v.screen);
+  if (!screen) return null;
+  const out: RevoAction = { kind: 'openScreen', title, detail, screen };
+  if (screen === 'settings' && v.section != null) {
+    const section = REVO_SETTINGS_SECTIONS.find((s) => s === v.section);
+    if (!section) return null;
+    out.section = section;
+  }
+  if (screen === 'reader') {
+    const surah = v.surah ?? null;
+    const juz = v.juz ?? null;
+    if (surah !== null && juz !== null) return null;
+    if (surah !== null) {
+      if (!wholeIn(surah, 1, 114)) return null;
+      out.surah = surah;
+    }
+    if (juz !== null) {
+      if (!wholeIn(juz, 1, 30)) return null;
+      out.juz = juz;
+    }
+  }
+  return out;
 }
 
 function strings(v: unknown, max: number, each: number): string[] {

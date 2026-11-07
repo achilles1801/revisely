@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { bandOf, dailyPagesData, pageRatingsData, shortDate, type RatingBand } from '../../lib/revo/charts';
 import { spokenText } from '../../lib/passages';
 import { passageShort } from '../../lib/revo/words';
+import { SCREEN_BUTTON } from '../../lib/revo/screens';
 import type { RevoAction, RevoChart } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
 
@@ -109,16 +110,20 @@ export function ChartCard({ chart, day }: { chart: RevoChart; day: string }) {
   );
 }
 
-const ACTION_BUTTON: Record<RevoAction['kind'], string> = {
+const ACTION_BUTTON: Record<Exclude<RevoAction['kind'], 'openScreen'>, string> = {
   reviseFirst: 'Add to my plan',
   openPage: 'Open in the reader',
   startRevision: 'Start revision',
 };
 
+/** The card's button: for a screen, what it opens (lib/revo/screens). */
+const actionButton = (a: RevoAction) => (a.kind === 'openScreen' ? SCREEN_BUTTON[a.screen] : ACTION_BUTTON[a.kind]);
+
 const ACTION_ICON: Record<RevoAction['kind'], keyof typeof Ionicons.glyphMap> = {
   reviseFirst: 'calendar-outline',
   openPage: 'book-outline',
   startRevision: 'play-circle-outline',
+  openScreen: 'arrow-forward-circle-outline',
 };
 
 /** The one thing Revo suggests: nothing changes until the user taps it. */
@@ -156,7 +161,7 @@ export function PlanCard({
         </View>
       ) : state === 'dismissed' ? null : (
         <View style={styles.planButtons}>
-          <PillButton title={ACTION_BUTTON[action.kind]} onPress={onDo} size="sm" testID="revo-plan-do" style={styles.planPrimary} />
+          <PillButton title={actionButton(action)} onPress={onDo} size="sm" testID="revo-plan-do" style={styles.planPrimary} />
           <PillButton title="Not now" onPress={onDismiss} size="sm" variant="outline" testID="revo-plan-not-now" />
         </View>
       )}

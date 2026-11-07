@@ -16,6 +16,7 @@ import { carryForTomorrow } from '../../lib/weakSpotActions';
 import { greetingName } from '../../lib/displayName';
 import { auth } from '../../lib/firebase';
 import { ChartCard, PlanCard } from './RevoCards';
+import { knownAction } from '../../lib/revo/screens';
 import { RevoComposer, type PickKind } from './RevoComposer';
 import { Chips, FeedbackRow, LimitCard, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
 
@@ -188,7 +189,7 @@ export function RevoChat({
               <RevoText text={m.text} />
               {m.chart ? <ChartCard chart={m.chart} day={day} /> : null}
               {m.textAfter ? <RevoText text={m.textAfter} /> : null}
-              {m.action ? (
+              {knownAction(m.action) ? (
                 <PlanCard
                   action={m.action}
                   state={m.actionState}
