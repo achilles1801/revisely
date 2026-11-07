@@ -62,26 +62,23 @@ appId: com.revisionbuddy.app
     env:
       NAME: r4-sheet
 
-# + : a day attached, the menu open over it.
+# + : Add to chat (09-revo-attach takes each of its screens): today added from Days, as a chip.
 - tapOn:
     id: revo-plus
 - tapOn:
+    id: pill-days
+- tapOn:
     id: revo-add-day
 - tapOn:
-    id: revo-pick-day-0
+    id: revo-add-done
 - extendedWaitUntil:
     visible:
       id: revo-context-chip
     timeout: 5000
-- tapOn:
-    id: revo-plus
-- assertVisible: "Add to your question"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: r6-context
-- tapOn:
-    id: revo-plus
 - tapOn:
     id: revo-context-remove
 

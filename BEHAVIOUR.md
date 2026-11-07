@@ -353,7 +353,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   or the month's limit (REVO-22); offline and unanswered questions can be tried again, with what was attached. Nothing
   in Revo's sheet takes the app down: an error inside it says so in the sheet.
 
-- **REVO-24.** With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
+- **REVO-24.** A full sheet reaches up to just under the status bar, on Android as on iOS. With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
   Memory) and the conversation stay on screen, and only the composer rides up with the keyboard. Where the system has
   already made room for the keyboard (Android resizing the window), the sheet isn't lifted twice. A conversation
   showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),

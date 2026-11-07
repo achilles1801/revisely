@@ -1,0 +1,79 @@
+# Revo's Add to chat (+, REVO-32, REVO-33): one sheet for a surah, a juz, days or pages, several at
+# once, each row with a line of the account's own data. The account has the Revo mocks' history
+# (Juz 28, 548–549 weak, today 6 of 20: scripts/seed-revo.js), and every screen of the approved
+# mocks (~/Documents/revisely-today-mocks/revo/attach, a1–a7) is taken in light and then in dark,
+# for the screenshot-vs-mock boards (revo/attach/scripts/boards.py there).
+# Rules (BEHAVIOUR.md): REVO-32, REVO-33
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T21:41
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+- runFlow: ../subflows/seed-revo.yaml
+# Tue 27 October with ratings, a timed read and two notes: every row of the day preview (a4).
+- runScript: ../scripts/seed-revo-day.js
+
+# Revo on (its opt-in), then Add to chat in light.
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 15000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 10000
+- tapOn:
+    id: revo-turn-on
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 10000
+- runFlow:
+    file: ../subflows/revo-attach-screens.yaml
+    env:
+      SUFFIX: ""
+
+# The same in dark: Revo's sheet down, Settings → Theme → Dark, Revo again.
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- tapOn:
+    id: open-settings
+- scrollUntilVisible:
+    element: "Theme"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Dark(, selected)?"
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible:
+      id: revo-input
+    timeout: 10000
+- runFlow:
+    file: ../subflows/revo-attach-screens.yaml
+    env:
+      SUFFIX: "-dark"
