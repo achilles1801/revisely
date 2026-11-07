@@ -648,3 +648,42 @@ jobs:
           expect ios "$RUN_IOS" "$IOS" || ok=1
           expect android "$RUN_ANDROID" "$ANDROID" || ok=1
           exit $ok
+
+  # E2E red on develop (what a push landed, or the nightly run): open or update the
+  # develop-red issue with the failing flows, the run and each flow's first failing
+  # step; the first run green on every platform that was red closes it
+  # (scripts/e2e/develop-red.js, TESTING.md). It reads the jobs' attempts.json
+  # artifacts. Not part of the required check.
+  develop-red:
+    name: E2E (develop-red issue)
+    needs: [changes, ios, android]
+    if: ${{ always() && needs.changes.outputs.app == 'true' && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-*-attempts-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/attempts
+
+      - name: Open, update or close the develop-red issue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
+          IOS: ${{ contains(needs.changes.outputs.ios_shards, '.yaml') }}:${{ needs.changes.outputs.run_ios }}:${{ needs.ios.result }}
+          ANDROID: ${{ contains(needs.changes.outputs.android_shards, '.yaml') }}:${{ needs.changes.outputs.run_android }}:${{ needs.android.result }}
+        run: node scripts/e2e/develop-red.js "$RUNNER_TEMP/attempts"
