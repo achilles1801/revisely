@@ -49,6 +49,17 @@ export function touchesDay(op: OutboxOp, day: string): boolean {
   }
 }
 
+/**
+ * Whether a change touching `day` has joined the outbox since `before` (the ids it held then), and
+ * the ids it holds now. A change that joined is laid over what's shown at once; one that left has
+ * reached the server, and what's shown (which already has it) stays until the server's copy comes:
+ * redrawn from an older copy, the add vanished until that read came back (Nov 2026).
+ */
+export function joinedSince(before: ReadonlySet<string>, entries: readonly OutboxEntry[], day: string): { joined: boolean; ids: Set<string> } {
+  const ids = new Set(entries.filter((e) => touchesDay(e.op, day)).map((e) => e.id));
+  return { joined: [...ids].some((id) => !before.has(id)), ids };
+}
+
 /** The ids of the waiting changes that touch `day`, in order: when it changes, the day reloads. */
 export function dayChangesKey(entries: readonly OutboxEntry[], day: string): string {
   return entries

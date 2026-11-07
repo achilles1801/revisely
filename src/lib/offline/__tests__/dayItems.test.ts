@@ -1,4 +1,4 @@
-import { dayChangesKey, overlayDayItems, touchesDay, type DayItems } from '../dayItems';
+import { dayChangesKey, joinedSince, overlayDayItems, touchesDay, type DayItems } from '../dayItems';
 import { manualRevisionItem } from '../../manualRevision';
 import type { OutboxEntry, OutboxOp } from '../ops';
 
@@ -53,5 +53,15 @@ describe('the day’s items with the waiting changes over them (ACT-13)', () => 
     expect(touchesDay({ kind: 'pages', pages: [] }, DAY)).toBe(false);
     const entries = [entry('a', { kind: 'usage', seconds: 30 }), entry('b', { kind: 'revision.add', item })];
     expect(dayChangesKey(entries, DAY)).toBe('b');
+  });
+
+  it('[ACT-13] a change that joined is laid over at once; one that left (sent) is not taken away first', () => {
+    const item = manualRevisionItem({ uid: UID, day: DAY, now: 5, pages: [1], minutes: null });
+    const added = [entry('b', { kind: 'revision.add', item })];
+    const first = joinedSince(new Set(), added, DAY);
+    expect(first.joined).toBe(true);
+    const sent = joinedSince(first.ids, [], DAY);
+    expect(sent.joined).toBe(false);
+    expect(joinedSince(new Set(), [entry('a', { kind: 'usage', seconds: 3 })], DAY).joined).toBe(false);
   });
 });

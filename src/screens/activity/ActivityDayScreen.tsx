@@ -22,7 +22,9 @@ import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
-import { queueChange, withPendingJournalDay, withPendingReadings } from '../../lib/offline/queue';
+import { currentAccount, queueChange, withPendingJournalDay, withPendingReadings } from '../../lib/offline/queue';
+import { pendingEntries } from '../../lib/offline/outbox';
+import { joinedSince } from '../../lib/offline/dayItems';
 import { pagesToUnmark } from '../../lib/activityAdd';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
@@ -134,10 +136,14 @@ export default function ActivityDayScreen() {
   const loads = useRef(0);
   // The server's last copy of the day's log, under the notes still waiting.
   const servedLog = useRef<{ date: string; entry: JournalEntry | null } | null>(null);
+  const waitingIds = useRef<Set<string>>(new Set());
   const load = useCallback(async () => {
     const n = ++loads.current;
-    // At once, from the last copy: a note added from the + shows without waiting for the read.
-    if (servedLog.current?.date === date) {
+    // At once, from the last copy, when a change has just joined the outbox: a note added from the +
+    // shows without waiting for the read. (One that left is in what's shown already.)
+    const since = joinedSince(waitingIds.current, pendingEntries(currentAccount()), date);
+    waitingIds.current = since.ids;
+    if (since.joined && servedLog.current?.date === date) {
       const shown = withPendingJournalDay(date, servedLog.current.entry);
       setJournal(shown && !isJournalEntryEmpty(shown) ? shown : null);
     }
