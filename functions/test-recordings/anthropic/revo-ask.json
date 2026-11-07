@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-11-07T09:31:16.839Z",
-  "how": "functions/scripts/record-anthropic.js, with the prompt at 0b9cc53. The request hash was then moved to the next prompt (a wording change in the guide) without recording again: record it again to match exactly.",
+  "recordedAt": "2026-11-07T09:35:30.530Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
@@ -12,13 +12,13 @@
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgoLNU7j4G52iEo1PeXgx",
+    "id": "msg_011CgoLhDtjuibDYS4F65r63",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "You've revised on five of the last six days, about 9 pages a day, and today you're already 4 pages in after 22 minutes. Saturday was the one gap, and the streak is holding at 5.\n\nToday still has 6 pages to go, starting with the one in the middle that's still weak.\n\n```json\n{\"text\":\"You revised on five of the last six days, about 9 pages a day against a plan of 10, and today you're 4 pages in already. Saturday was the only gap, and your 5-day streak is intact.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Six pages are left today, so let's carry on:\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting with the weak page 589\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"How am I doing today?\",\"Am I covering everything?\"]}\n```"
+        "text": "Five days in a row, with only Saturday empty and about 9 pages a day against a plan of 10. Today you've done 4 of 10 already, so the best close to the week is to carry on with the rest.\n\n\n{\"text\": \"A steady week: five days in a row, only Saturday empty, and about 9 pages a day against the plan's 10. Today is 4 of 10 done, so finish the rest and keep that streak going.\", \"chart\": {\"kind\": \"dailyPages\", \"title\": \"Pages revised each day this week\", \"days\": 7}, \"textAfter\": null, \"action\": {\"kind\": \"startRevision\", \"title\": \"Continue today's revision\", \"detail\": \"Six pages left, starting at page 587\"}, \"remember\": [], \"title\": \"How my week went\", \"chips\": [\"Which pages are weakest?\", \"Why was Saturday empty?\", \"How am I doing today?\"]}"
       }
     ],
     "container": null,
@@ -27,13 +27,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 312,
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 10177,
+      "cache_creation_input_tokens": 10210,
+      "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 10210,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 310,
+      "output_tokens": 281,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

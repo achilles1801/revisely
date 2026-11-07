@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-11-07T09:31:19.106Z",
-  "how": "functions/scripts/record-anthropic.js, with the prompt at 0b9cc53. The request hash was then moved to the next prompt (a wording change in the guide) without recording again: record it again to match exactly.",
+  "recordedAt": "2026-11-07T09:35:32.700Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
@@ -12,13 +12,13 @@
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgoLNiBZ6VwYjUVW1qAQG",
+    "id": "msg_011CgoLhQePbfq4CFshcwfei",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\": \"You sat down today and revised 4 pages in 22 minutes, and the streak is still alive at 5 days. Tomorrow, give page 589 a careful look first, since it's the weakest of what's coming up.\", \"chart\": null, \"textAfter\": \"Here's a gentle start for tomorrow:\", \"action\": {\"kind\": \"reviseFirst\", \"title\": \"Revise page 589 first tomorrow\", \"detail\": \"The weakest page in your next pages, so it gets your freshest attention.\", \"pages\": [589]}, \"remember\": [], \"title\": \"Day in review\", \"chips\": [\"What's left for today?\", \"Which pages are weakest?\", \"How is my week going?\"]}"
+        "text": "{\"text\": \"You sat down to revise today and got 4 pages done in 22 minutes, which keeps your 5-day streak going. For tomorrow, give page 589 a little extra time, since it's the one that's been weakest.\", \"chart\": null, \"textAfter\": null, \"action\": {\"kind\": \"reviseFirst\", \"title\": \"Revise page 589 first tomorrow\", \"detail\": \"Starts tomorrow's session with your weakest page\", \"pages\": [589]}, \"remember\": [], \"title\": \"Day in review\", \"chips\": [\"What's left for today?\", \"How are my weak pages?\", \"How was my week?\"]}"
       }
     ],
     "container": null,
@@ -28,12 +28,12 @@
     "usage": {
       "input_tokens": 316,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 10177,
+      "cache_read_input_tokens": 10210,
       "cache_creation": {
         "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 224,
+      "output_tokens": 201,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
