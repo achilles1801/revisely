@@ -149,6 +149,9 @@ export function RevoChat({
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
+        // The newest message in view once it has laid out: an answer's chart and plan card grow the
+        // list after it arrives, and a scroll at arrival stopped above them (flow 09 on Android).
+        onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
         testID="revo-messages"
       >
         {!chatId && greeting ? (
