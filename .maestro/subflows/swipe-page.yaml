@@ -3,12 +3,23 @@
 # shows it, whichever is up) goes up by one. For a page not yet revised only
 # (swiping off one already revised changes no count). The mushaf runs right to
 # left: the next page comes in from the left.
+#
+# A swipe that didn't turn the page at all (the page number, at the foot or in
+# the title, the same as before it) is made again, at most twice: on a busy
+# emulator a swipe right after the session opens can be lost, as a tap can
+# (open-session.yaml). 06-offline's first swipe was, on most Android runs from
+# Nov 7 2026, once each swipe had to be counted (#286). A swipe that did turn
+# the page is never made again: a page turned and not counted fails the flow.
 appId: com.revisionbuddy.app
 ---
 - copyTextFrom:
     text: ".*· [0-9]+/[0-9]+"
 # "Juz 30 · 2/10" gives "3/10". (No `$` here: Maestro's ${…} can't hold one.)
 - evalScript: ${output.nextCount = (Number(maestro.copiedText.split('/')[0].split(' ').pop()) + 1) + '/' + maestro.copiedText.split('/')[1]}
+# The page on screen: "582" at the foot, or "Page 582 · Juz 30 · Hizb 59" in the title.
+- copyTextFrom:
+    id: "session-quiet-page|session-page"
+- evalScript: ${output.pageBefore = maestro.copiedText.match(/[0-9]+/)[0]}
 - swipe:
     start: 12%, 50%
     end: 88%, 50%
@@ -19,6 +30,30 @@ appId: com.revisionbuddy.app
     visible:
       text: ".*· ${output.nextCount}"
     timeout: 15000
+    optional: true
+- repeat:
+    while:
+      notVisible:
+        text: ".*· ${output.nextCount}"
+    times: 2
+    commands:
+      - copyTextFrom:
+          id: "session-quiet-page|session-page"
+      - assertTrue:
+          condition: ${maestro.copiedText.match(/[0-9]+/)[0] == output.pageBefore}
+          label: The page turned from ${output.pageBefore} but the app didn't count it
+      - evalScript: "${console.log('WARNING swipe-page - the swipe did not turn page ' + output.pageBefore + '; swiping again')}"
+      - swipe:
+          start: 12%, 50%
+          end: 88%, 50%
+          duration: 300
+      - extendedWaitUntil:
+          visible:
+            text: ".*· ${output.nextCount}"
+          timeout: 15000
+          optional: true
+- assertVisible:
+    text: ".*· ${output.nextCount}"
 # And the page done moving, before the next swipe starts.
 - waitForAnimationToEnd:
     timeout: 3000

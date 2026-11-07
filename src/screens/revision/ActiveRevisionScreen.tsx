@@ -1075,7 +1075,11 @@ export default function ActiveRevisionScreen() {
         footerHeight={FOOTER_HEIGHT}
         pageLabel={
           <View style={styles.pageLabel}>
-            <Text style={[styles.pageNum, { color: palette.textPrimary }]} maxFontSizeMultiplier={1.3}>
+            <Text
+              style={[styles.pageNum, { color: palette.textPrimary }]}
+              maxFontSizeMultiplier={1.3}
+              testID="session-quiet-page"
+            >
               {displayPageNumber}
             </Text>
             {isCurrentRevised && <Ionicons name="checkmark" size={12} color={palette.textSecondary} />}
