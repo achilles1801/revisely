@@ -97,6 +97,15 @@ describe('Pages by strength (ACT-12)', () => {
     expect(screen.queryByTestId('browse-page-600')).toBeNull();
   });
 
+  it('each list keeps its id as a view of its own, so iOS doesn’t flatten it away (E2E waits for it)', async () => {
+    await open();
+    expect(screen.getByTestId('browse-pages').props.collapsable).toBe(false);
+    fireEvent.press(screen.getByTestId('pill-surahs'));
+    expect(screen.getByTestId('browse-surahs').props.collapsable).toBe(false);
+    fireEvent.press(screen.getByTestId('pill-juz'));
+    expect(screen.getByTestId('browse-juz').props.collapsable).toBe(false);
+  });
+
   it('Pages | Surahs | Juz are Activity’s tabs: ink pills that hug their labels, the chosen one filled', async () => {
     await open();
     const palette = paletteV2(false, DEFAULT_ACCENT);
