@@ -12,7 +12,8 @@ import { Text } from 'react-native';
  * The segmented control: a row of pills, the chosen one solid.
  *
  * `tone="ink"` (Activity's tabs): the chosen pill is the text colour with a background label, and the
- * others are outlined. `hug`: each pill is as wide as its label, left-aligned (no flex).
+ * others are outlined. `hug`: each pill is as wide as its label, left-aligned (no flex). `compact`: 28
+ * tall (a section's own control, e.g. Insights' 7 days | 30 days).
  */
 export function PillTabs<T extends string>({
   options,
@@ -22,6 +23,7 @@ export function PillTabs<T extends string>({
   testID,
   tone = 'primary',
   hug = false,
+  compact = false,
 }: {
   options: { value: T; label: string; icon?: keyof typeof Ionicons.glyphMap; count?: number }[];
   value: T;
@@ -31,6 +33,7 @@ export function PillTabs<T extends string>({
   testID?: string;
   tone?: 'primary' | 'ink';
   hug?: boolean;
+  compact?: boolean;
 }) {
   const haptics = useHaptics();
   const { palette } = useTheme();
@@ -53,6 +56,7 @@ export function PillTabs<T extends string>({
               accessibilityState={{ selected }}
               style={[
                 styles.ink,
+                compact && styles.compact,
                 selected ? { backgroundColor: palette.text } : { borderWidth: 1, borderColor: palette.outline },
               ]}
               testID={`pill-${o.value}`}
@@ -97,4 +101,5 @@ const styles = StyleSheet.create({
   hug: { alignItems: 'flex-start' },
   pill: { flex: 1 },
   ink: { height: 32, borderRadius: 16, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  compact: { height: 28, borderRadius: 14, paddingHorizontal: 11 },
 });
