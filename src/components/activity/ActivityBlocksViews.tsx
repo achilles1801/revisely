@@ -26,6 +26,8 @@ import { Tap } from '../v2/Tap';
 import { useActivityReload } from './useActivityReload';
 import { AskCoachSheet } from '../coach/AskCoachSheet';
 import { streakReadingFromLogs } from '../../lib/streak';
+import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
+import type { RecordingCounts } from './CalendarMonth';
 
 const WINDOW_DAYS = 90;
 const shiftDays = (day: string, n: number) => {
@@ -85,6 +87,27 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     load();
   }, [load]);
 
+  // The recordings on this phone, by day and kind (the picked day's mic and count, mock d3).
+  const [recordings, setRecordings] = useState<Map<string, RecordingCounts>>(new Map());
+  useEffect(() => {
+    const read = () => {
+      listRecordings()
+        .then((all) => {
+          const out = new Map<string, RecordingCounts>();
+          for (const r of all) {
+            const c = out.get(r.day) ?? { revision: 0, reading: 0 };
+            if (r.kind === 'revision') c.revision += 1;
+            else if (r.kind === 'reading') c.reading += 1;
+            out.set(r.day, c);
+          }
+          setRecordings(out);
+        })
+        .catch((err) => logger.warn('Could not list the recordings for the calendar', err));
+    };
+    read();
+    return onRecordingsChanged(read);
+  }, []);
+
   // Swipe between weeks or months (a horizontal drag on the calendar).
   const stepRef = useRef<(delta: number) => void>(() => undefined);
   stepRef.current = (delta: number) => (span === 'week' ? setWeek(shiftWeek(week, delta)) : setMonth(shiftMonth(month, delta)));
@@ -143,6 +166,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onStep={(delta) => stepRef.current(delta)}
             onPick={setPicked}
             onOpen={onOpenDay}
+            recordings={recordings}
           />
         </RNView>
       ) : (

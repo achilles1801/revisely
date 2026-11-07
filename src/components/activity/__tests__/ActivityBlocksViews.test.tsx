@@ -15,6 +15,15 @@ jest.mock('../../../services/firestoreService', () => ({
   getActivityItemsBetween: jest.fn(() => Promise.resolve({ revisions: [], memorized: [], reads: [] })),
 }));
 jest.mock('../../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
+jest.mock('../../../lib/recordings', () => ({
+  listRecordings: jest.fn(() =>
+    Promise.resolve([
+      { id: 'r1', day: '2026-11-05', kind: 'revision' },
+      { id: 'r2', day: '2026-11-05', kind: 'revision' },
+    ]),
+  ),
+  onRecordingsChanged: jest.fn(() => () => undefined),
+}));
 jest.mock('../useActivityReload', () => {
   const mockReact = jest.requireActual('react');
   return { useActivityReload: (load: () => void) => mockReact.useEffect(() => load(), []) };
@@ -50,6 +59,23 @@ describe('the Activity calendar (gap audit §3)', () => {
     expect(await screen.findByText('November 2026')).toBeTruthy();
     // Each label is in the totals and in the legend: at least one of each.
     for (const label of ['Revised', 'Memorized', 'Read', 'Notes']) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  });
+
+  it('the picked day’s preview shows its recordings beside Revised (mock d3)', async () => {
+    const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+    const empty = { revisions: [], memorized: [], reads: [] };
+    service.getActivityItemsBetween.mockResolvedValue({
+      revisions: [{ id: TODAY, day: TODAY, countsFor: TODAY, pages: [1, 2], skipped: [], assigned: [1, 2], minutes: 12, occurredAt: null }],
+      memorized: [],
+      reads: [],
+    });
+    try {
+      render(<ActivityBlocksViews {...props} />);
+      expect(await screen.findByTestId('preview-recordings-revised')).toBeTruthy();
+      expect(screen.getByLabelText('2 recordings')).toBeTruthy();
+    } finally {
+      service.getActivityItemsBetween.mockResolvedValue(empty);
+    }
   });
 
   it('steps to the next month and shows its title', async () => {
