@@ -174,6 +174,11 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
   (`subflows/set-clock-and-relaunch.yaml`), then check the status line.
 - iOS asks "Open in Revisely?" the first time a simulator opens one of these links, sometimes a
   moment later; `subflows/open-link-prompt.yaml` waits for it and confirms.
+- On iOS a fresh install takes its clock at launch instead: `subflows/launch.yaml` passes
+  `arguments: {e2eClock: …}`, which reach the app as `-e2eClock …` in its defaults, and
+  `subflows/clock.yaml` sends no link once the status line shows the time. On a busy CI Simulator
+  `simctl openurl` can give up after 10 s (SpringBoard was slow to open the app), and Maestro ends
+  the flow on that error even with `optional: true`. Links later in a flow still go through it.
 
 ## Time zones
 
@@ -233,8 +238,12 @@ Things that bit:
 - Percentages in `point:` must be whole numbers (CLAUDE.md). Maestro has no sleep: an optional
   wait for an element that never shows (`e2e-never-shown`) stands in.
 - The mushaf runs right to left: the next page comes in from the left. Swipe until a count or the
-  end card (`subflows/swipe-pages.yaml`), not a fixed number of times: on a slow emulator a swipe
-  can be lost.
+  end card (`subflows/swipe-pages.yaml`), one page at a time: each swipe waits until the app has
+  counted it (`subflows/swipe-page.yaml`). E2E builds draw no page images, so the screen stands
+  still before the app has caught up, and a count read straight after a swipe can be the one from
+  before it; swiping again on that went past the count to the end card.
+- Wait for a button to be enabled before tapping it when the app may still be loading (Continue in
+  onboarding waits for the new account's pages): a tap on a disabled button does nothing.
 - A tap can be lost too: on a slow iOS Simulator, Home's "Start revision" once showed pressed and
   never fired (06-offline, run 41990309194). Open today's session with `subflows/open-session.yaml`,
   which waits for the session's header and taps again while Home's button is still on screen.

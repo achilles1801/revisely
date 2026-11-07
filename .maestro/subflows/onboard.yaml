@@ -90,12 +90,25 @@ appId: com.revisionbuddy.app
       id: juz-selection-summary
       text: "24 of 604 pages memorized"
     timeout: 30000
+# Continue waits for the account's pages (a new account's arrive in two
+# batches): until then it reads "Loading your pages…" and is disabled, even
+# with the count at 24 (ONBOARD-1 counts a juz before its pages arrive). A tap
+# then did nothing (E2E run 42124077552, Nov 5 2026).
+- extendedWaitUntil:
+    visible:
+      id: juz-continue
+      text: "Continue"
+      enabled: true
+    timeout: 30000
 - tapOn:
     id: juz-continue
+# As long as the other screens here get: the schedule had come up, but the CI
+# Simulator stalled for 20 s just after the tap (every process on it went
+# quiet), so the one look a 10 s wait had came back without it (run 42169518547).
 - extendedWaitUntil:
     visible:
       id: schedule
-    timeout: 10000
+    timeout: 30000
 - assertVisible:
     id: schedule-amount
     text: "10"

@@ -1,0 +1,24 @@
+# Swipes the session on to its next page and waits until the app has counted
+# the page it left: the day's count (".*· 2/10" as the quiet header or the title
+# shows it, whichever is up) goes up by one. For a page not yet revised only
+# (swiping off one already revised changes no count). The mushaf runs right to
+# left: the next page comes in from the left.
+appId: com.revisionbuddy.app
+---
+- copyTextFrom:
+    text: ".*· [0-9]+/[0-9]+"
+# "Juz 30 · 2/10" gives "3/10". (No `$` here: Maestro's ${…} can't hold one.)
+- evalScript: ${output.nextCount = (Number(maestro.copiedText.split('/')[0].split(' ').pop()) + 1) + '/' + maestro.copiedText.split('/')[1]}
+- swipe:
+    start: 12%, 50%
+    end: 88%, 50%
+    duration: 300
+# The app counts the page a moment after it has turned (seconds, on a busy
+# emulator); only then is the count worth reading again.
+- extendedWaitUntil:
+    visible:
+      text: ".*· ${output.nextCount}"
+    timeout: 15000
+# And the page done moving, before the next swipe starts.
+- waitForAnimationToEnd:
+    timeout: 3000

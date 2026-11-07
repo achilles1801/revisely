@@ -6,6 +6,10 @@ appId: com.revisionbuddy.app
     clearState: true
     permissions:
       all: allow
+    # iOS starts the app at CLOCK from this (src/lib/e2e/clock.ts), so clock.yaml
+    # below finds it set and sends no link; Android takes the link.
+    arguments:
+      e2eClock: ${CLOCK}
 # Until the auth screen shows. A link prompt left from earlier (iOS) would cover
 # it: confirm it if it comes up.
 - repeat:

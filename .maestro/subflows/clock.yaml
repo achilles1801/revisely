@@ -3,13 +3,22 @@
 # would (a relaunch, coming back to the front). See .maestro/README.md.
 appId: com.revisionbuddy.app
 ---
-# The link. On a slow CI Simulator `simctl openurl` can time out (Nov 5:
-# NSPOSIXErrorDomain 60, 02's first attempt) or meet a driver that dropped for a
-# moment (03); the link may still get there once iOS's prompt is confirmed. So a
-# failure here isn't the end: the loop below sends it again until it takes.
-- openLink:
-    link: revisely://e2e/clock?at=${AT}
-    optional: true
+# The link, unless the app already shows AT (an iOS launch carries it:
+# launch.yaml). On a slow CI Simulator `simctl openurl` can time out
+# (NSPOSIXErrorDomain 60: lsd waits 10 s for SpringBoard to open the app) or
+# meet a driver that dropped for a moment (03). `optional` covers the second
+# only: Maestro ends the flow on the timeout whatever the flag says (02's first
+# attempt, Nov 5 and 6), though the link still got there seconds later. That is
+# why a fresh install, the busiest moment, gets its clock at launch on iOS.
+- runFlow:
+    when:
+      notVisible:
+        id: e2e-status
+        text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+    commands:
+      - openLink:
+          link: revisely://e2e/clock?at=${AT}
+          optional: true
 # Until the status line (E2ERoot) shows the new time (the date and the hour are
 # enough). iOS asks "Open in “Revisely”?" the first time on a simulator, on a
 # slow one many seconds later: confirm it whenever it shows.

@@ -1,8 +1,16 @@
 # Swipes the session on, page by page, until UNTIL: the day's count ("3/10"), as
 # the quiet header ("Juz 30 · 3/10") or the title ("Revising ahead · Wed · 3/10")
-# shows it, whichever is up; or "end" for the end card. The mushaf runs right
-# to left: the next page comes in from the left. A swipe that doesn't take (a
-# slow emulator) is simply made again, and none is made past the target.
+# shows it, whichever is up; or "end" for the end card. Every page swiped off
+# here is one not yet revised, so each swipe adds one to the count.
+#
+# One swipe, then wait for the app to count it (swipe-page.yaml), then look
+# again. This used to swipe, wait for the screen to stand still and look at
+# once; but E2E builds draw no page images, so the screen stood still before
+# the app had caught up, and on a slow emulator the count read after the third
+# swipe was still 2/10. A fourth swipe followed, the next look said 4/10, and
+# the flow swiped on to the end card (02 on Android, runs 42149084931 and
+# 42169490060, Nov 6 2026). Swipes weren't lost: the passing attempts took
+# exactly one a page.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -13,14 +21,9 @@ appId: com.revisionbuddy.app
           while:
             notVisible:
               id: session-end-card
-          times: 25
+          times: 12
           commands:
-            - swipe:
-                start: 12%, 50%
-                end: 88%, 50%
-                duration: 300
-            - waitForAnimationToEnd:
-                timeout: 3000
+            - runFlow: swipe-page.yaml
       - assertVisible:
           id: session-end-card
 - runFlow:
@@ -31,13 +34,8 @@ appId: com.revisionbuddy.app
           while:
             notVisible:
               text: ".*· ${UNTIL}"
-          times: 25
+          times: 12
           commands:
-            - swipe:
-                start: 12%, 50%
-                end: 88%, 50%
-                duration: 300
-            - waitForAnimationToEnd:
-                timeout: 3000
+            - runFlow: swipe-page.yaml
       - assertVisible:
           text: ".*· ${UNTIL}"

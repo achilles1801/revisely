@@ -121,8 +121,8 @@ appId: com.revisionbuddy.app
     visible:
       id: read-index-v2
     timeout: 10000
-# A swipe a slow simulator drops is made again (as in swipe-pages); before the
-# fix, no number of swipes opened it.
+# Swiped again if the preview hasn't come up (a slow simulator); before the fix,
+# no number of swipes opened it.
 - repeat:
     while:
       notVisible:
