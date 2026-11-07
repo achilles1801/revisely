@@ -199,7 +199,8 @@ describe('Insights (gap audit §5)', () => {
     expect(screen.getByText('Consistency')).toBeTruthy();
     expect(screen.getByText('Memorization')).toBeTruthy();
     expect(screen.queryByText('Weak spots')).toBeNull();
-    expect(screen.queryByText('Al-Hashr')).toBeNull();
+    expect(screen.queryByTestId('weak-spot-546')).toBeNull();
+    expect(screen.queryByText(/Al-Hashr/, { normalizer: plainText })).toBeNull();
     expect(screen.queryByTestId('insights-see-all-pages')).toBeNull();
     expect(screen.queryByTestId('insights-ask-revo')).toBeNull();
   });

@@ -5,6 +5,7 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { InsightsView, type InsightsData } from '../../../src/components/activity/InsightsView';
+import { plainText } from '../../../src/lib/passages';
 
 jest.mock('../../../src/context/ThemeContext', () => ({
   useTheme: () => ({ palette: new Proxy({}, { get: () => '#000000' }), theme: new Proxy({}, { get: () => '#000000' }), isDark: false }),
@@ -52,7 +53,8 @@ describe('Insights in Activity', () => {
     expect(getByText('Consistency')).toBeTruthy();
     expect(getByText('Memorization')).toBeTruthy();
     expect(queryByText('Weak spots')).toBeNull();
-    expect(queryByText('Al-Hashr')).toBeNull();
+    expect(queryByTestId('weak-spot-546')).toBeNull();
+    expect(queryByText(/Al-Hashr/, { normalizer: plainText })).toBeNull();
     expect(queryByTestId('insights-ask-revo')).toBeNull();
     expect(queryByTestId('insights-see-all-pages')).toBeNull();
     fireEvent.press(getByRole('link', { name: 'Turn on Smart Tracking to see your weak spots' }));
@@ -62,7 +64,9 @@ describe('Insights in Activity', () => {
   it('[ACT-12] with Smart Tracking: Weak spots lists the weak pages and ends in "See all pages by strength"', () => {
     const { getByText, getByTestId, queryByTestId, onSeeAllPages } = open(true);
     expect(getByText('Weak spots')).toBeTruthy();
-    expect(getByText('Al-Hashr')).toBeTruthy();
+    // Named by surah and ayahs (Majd, Nov 7 2026).
+    expect(getByTestId('weak-spot-546')).toBeTruthy();
+    expect(getByText(/^Al-Hashr, ayahs /, { normalizer: plainText })).toBeTruthy();
     expect(getByTestId('insights-ask-revo')).toBeTruthy();
     expect(queryByTestId('insights-smart-tracking')).toBeNull();
     fireEvent.press(getByText('See all pages by strength'));
