@@ -2,6 +2,7 @@
 // the answer cache, the reply's checks, memory, the Day in review and history. Storage and the
 // model are fakes; the request the model would get is inspected.
 import { MONTHLY_CAP_USD, MAX_MONTHLY_CAP_USD, monthlyCapFrom } from '../../../functions/src/coach/handler';
+import { costUsd, worstCaseCostUsd } from '../../../functions/src/coach/pricing';
 import type { MessagesRequest } from '../../../functions/src/coach/call';
 import { CoachCallError } from '../../../functions/src/coach/call';
 import {
@@ -250,12 +251,21 @@ describe('the monthly cap (REVO-4)', () => {
     expect(f.usage()).toEqual({ day: DAY, count: 0 });
   });
 
-  it('[REVO-4] a raised cap applies to the next question; the real cost replaces the reserve', async () => {
-    const f = fakeStore({ cap: 200 });
+  it('[REVO-4] a raised cap applies to the next question; the real cost, at Sonnet 5.5’s prices, replaces the reserve', async () => {
+    const f = fakeStore({ cap: 150 });
     const m = model();
     await handleRevoAsk(U, ask(), deps(f.store, m.call));
-    expect(f.spend()).toBeGreaterThan(0);
-    expect(f.spend()).toBeLessThan(0.01);
+    // 2,000 input at $2, 200 output at $10, 1,800 cache reads at $0.10 (per million).
+    expect(f.spend()).toBeCloseTo((2000 * 2 + 200 * 10 + 1800 * 0.1) / 1e6, 8);
+  });
+
+  it('[REVO-4] each model is priced at its own rates (docs.claude.com, Nov 7 2026)', () => {
+    const u = { input_tokens: 1_000_000, output_tokens: 1_000_000, cache_read_input_tokens: 1_000_000, cache_creation: { ephemeral_5m_input_tokens: 1_000_000, ephemeral_1h_input_tokens: 1_000_000 } };
+    expect(costUsd(u, 'claude-sonnet-5-5')).toBeCloseTo(2 + 10 + 0.1 + 2.5 + 4, 6);
+    expect(costUsd(u, 'claude-haiku-5-5')).toBeCloseTo(0.1 + 0.5 + 0.01 + 0.125 + 0.2, 6);
+    expect(costUsd(u)).toBe(costUsd(u, 'claude-haiku-5-5'));
+    expect(worstCaseCostUsd(10_000, 700, 'claude-sonnet-5-5')).toBeGreaterThanOrEqual(costUsd({ input_tokens: 5000, output_tokens: 700 }, 'claude-sonnet-5-5'));
+    expect(() => costUsd(u, 'claude-unknown')).toThrow();
   });
 });
 
@@ -283,11 +293,11 @@ describe('the answer cache (REVO-5)', () => {
 });
 
 describe('the model and the prompt (REVO-6)', () => {
-  it('[REVO-6] claude-haiku-5-5 with a stable, cached system prompt above the 512-token minimum (with margin)', async () => {
+  it('[REVO-6] claude-sonnet-5-5 with a stable, cached system prompt above its 512-token minimum (with margin)', async () => {
     const m = model();
     await handleRevoAsk(U, ask(), deps(fakeStore().store, m.call));
     const r = m.requests[0];
-    expect(r.model).toBe('claude-haiku-5-5');
+    expect(r.model).toBe('claude-sonnet-5-5');
     expect(r.max_tokens).toBe(REVO_MAX_TOKENS);
     expect(r.system).toEqual([{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]);
     expect(REVO_SYSTEM_PROMPT.length).toBeGreaterThanOrEqual(512 * 6);

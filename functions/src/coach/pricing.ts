@@ -1,19 +1,48 @@
 /**
- * What a coach call costs, from the usage the Messages API returns. Pricing for claude-haiku-5-5
- * per million tokens, prompts up to 100,000 tokens (docs.claude.com/en/docs/about-claude/pricing,
- * read Nov 5 2026). Prompts over 100k tokens are never sent here, so only that tier is used.
- * Update PRICING and PRICING_AS_OF together when Anthropic changes them.
+ * What a model call costs, from the usage the Messages API returns, per model
+ * (docs.claude.com/en/docs/about-claude/pricing, read Nov 7 2026). The Ask coach runs on
+ * claude-haiku-5-5, Revo on claude-sonnet-5-5; both share one ledger and one monthly cap.
+ * Haiku 5.5's prices here are for prompts up to 100,000 tokens (none sent here is longer);
+ * Sonnet 5.5 has one price at every length, and its cache hits are 0.05x input.
+ * Update PRICES and PRICING_AS_OF together when Anthropic changes them.
  */
 export const COACH_MODEL = 'claude-haiku-5-5';
-export const PRICING_AS_OF = '2026-11-05';
+export const REVO_MODEL = 'claude-sonnet-5-5';
+export const PRICING_AS_OF = '2026-11-07';
 
-export const PRICING = {
-  inputPerMTok: 0.1,
-  outputPerMTok: 0.5,
-  cacheWrite5mPerMTok: 0.125,
-  cacheWrite1hPerMTok: 0.2,
-  cacheReadPerMTok: 0.01,
-} as const;
+export interface Pricing {
+  inputPerMTok: number;
+  outputPerMTok: number;
+  cacheWrite5mPerMTok: number;
+  cacheWrite1hPerMTok: number;
+  cacheReadPerMTok: number;
+}
+
+export const PRICES: Record<string, Pricing> = {
+  'claude-haiku-5-5': {
+    inputPerMTok: 0.1,
+    outputPerMTok: 0.5,
+    cacheWrite5mPerMTok: 0.125,
+    cacheWrite1hPerMTok: 0.2,
+    cacheReadPerMTok: 0.01,
+  },
+  'claude-sonnet-5-5': {
+    inputPerMTok: 2,
+    outputPerMTok: 10,
+    cacheWrite5mPerMTok: 2.5,
+    cacheWrite1hPerMTok: 4,
+    cacheReadPerMTok: 0.1,
+  },
+};
+
+/** The Ask coach's prices (its model's). */
+export const PRICING = PRICES[COACH_MODEL];
+
+function pricesOf(model: string): Pricing {
+  const p = PRICES[model];
+  if (!p) throw new Error(`No prices for ${model}`);
+  return p;
+}
 
 /** The usage object of a Messages API response (the fields this module reads). */
 export interface Usage {
@@ -48,27 +77,28 @@ export function splitUsage(u: Usage): UsageSplit {
   };
 }
 
-/** Dollars for one call's usage, at PRICING. */
-export function costUsd(u: Usage): number {
+/** Dollars for one call's usage, at the model's prices (the Ask coach's by default). */
+export function costUsd(u: Usage, model: string = COACH_MODEL): number {
+  const p = pricesOf(model);
   const s = splitUsage(u);
   const dollars =
-    (s.input * PRICING.inputPerMTok +
-      s.output * PRICING.outputPerMTok +
-      s.cacheWrite5m * PRICING.cacheWrite5mPerMTok +
-      s.cacheWrite1h * PRICING.cacheWrite1hPerMTok +
-      s.cacheRead * PRICING.cacheReadPerMTok) /
+    (s.input * p.inputPerMTok +
+      s.output * p.outputPerMTok +
+      s.cacheWrite5m * p.cacheWrite5mPerMTok +
+      s.cacheWrite1h * p.cacheWrite1hPerMTok +
+      s.cacheRead * p.cacheReadPerMTok) /
     1_000_000;
   return Math.round(dollars * 1e8) / 1e8;
 }
 
 /**
- * The most a call can cost before it is made: its prompt counted at the 1-hour cache write
- * price (the dearest input there is), plus the full output allowance. Reserved against the
- * monthly cap, then replaced by the real cost.
+ * The most a call can cost before it is made: its prompt counted at the model's 1-hour cache
+ * write price (the dearest input there is), plus the full output allowance. Reserved against
+ * the monthly cap, then replaced by the real cost.
  */
-export function worstCaseCostUsd(promptChars: number, maxOutputTokens: number): number {
+export function worstCaseCostUsd(promptChars: number, maxOutputTokens: number, model: string = COACH_MODEL): number {
+  const p = pricesOf(model);
   const promptTokensUpper = Math.ceil(promptChars / 2); // a token is at least two characters' worth
-  const dollars =
-    (promptTokensUpper * PRICING.cacheWrite1hPerMTok + maxOutputTokens * PRICING.outputPerMTok) / 1_000_000;
+  const dollars = (promptTokensUpper * p.cacheWrite1hPerMTok + maxOutputTokens * p.outputPerMTok) / 1_000_000;
   return Math.round(dollars * 1e8) / 1e8;
 }

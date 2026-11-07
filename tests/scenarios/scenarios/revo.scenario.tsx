@@ -115,7 +115,7 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   // [REVO-22] The day's questions used: the composer is greyed and says when Revo is back.
   await app.act(async () => backend.setRemaining('2026-11-06', 0));
   await app.until(() => app.screen.queryByTestId('revo-limit') != null, 'the limit card');
-  expect(app.screen.getByText('That’s today’s 10 questions')).toBeTruthy();
+  expect(app.screen.getByText('That’s today’s 20 questions')).toBeTruthy();
   expect(app.screen.getByText('Revo is back at midnight. Your conversations stay in History.')).toBeTruthy();
   const input = app.screen.getByTestId('revo-input');
   expect(input.props.editable).toBe(false);

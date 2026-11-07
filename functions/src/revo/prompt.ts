@@ -5,10 +5,10 @@
  * one, and the chat's last messages.
  */
 import { MessagesRequest } from '../coach/call';
-import { COACH_MODEL } from '../coach/pricing';
+import { REVO_MODEL } from '../coach/pricing';
 import { RevoAttachment, RevoContext, StoredMessage } from './types';
 
-export const REVO_MODEL = COACH_MODEL;
+export { REVO_MODEL };
 export const REVO_MAX_TOKENS = 700;
 /** Messages of the chat sent with a follow-up. */
 export const REVO_HISTORY = 10;

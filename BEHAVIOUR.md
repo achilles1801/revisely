@@ -277,20 +277,21 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   the audio. Names are never sent. The server refuses any field the contract doesn't name, a page outside 1–604 and a
   question over 600 characters.
 
-- **REVO-3.** An account may ask 10 new questions a revision day (it starts at Fajr or midnight, the user's setting). A
+- **REVO-3.** An account may ask 20 new questions a revision day (it starts at Fajr or midnight, the user's setting). A
   later day starts the count again; a day earlier than the one counted is refused, so moving the phone's date back
   can't refill it. A failed call, or a reply with no answer, gives the question back.
 
 - **REVO-4.** Revo and the Ask coach share one monthly hard cap in dollars and one ledger: $10 unless `config/coach`
   sets another (0 to $1,000, `functions/scripts/set-coach-cap.js`), read again within a minute, with no deploy. A
   question that would pass it is refused as `monthly`, makes no call and is given back; the real cost replaces each
-  call's reserve.
+  call's reserve, at the call's model's prices (Revo: claude-sonnet-5-5; the Ask coach: claude-haiku-5-5). The
+  config is set to $150 (Nov 7 2026), within the $200 of API credit a month that only Revisely uses.
 
 - **REVO-5.** A first question with nothing attached is kept for the revision day: the same question again (case and
   spaces aside) opens a new conversation with the same answer, with no call and nothing counted. A question with an
   attachment, a follow-up or another day is asked anew.
 
-- **REVO-6.** The model is claude-haiku-5-5, called from the functions with the `ANTHROPIC_COACH_KEY` secret (never in
+- **REVO-6.** The model is claude-sonnet-5-5, called from the functions with the `ANTHROPIC_COACH_KEY` secret (never in
   the app). The system prompt is stable and cached (above the 512-token minimum). Logs keep counts, tokens and costs,
   never a question, an answer or a note.
 
