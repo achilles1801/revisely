@@ -144,7 +144,10 @@ export function RevoSheetFrame({
   const dim = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, offset.value / Math.max(1, sheetH.value)) }));
 
   return (
-    <Modal visible={shown} transparent animationType="none" onRequestClose={onClose}>
+    // On Android the modal's window is drawn under the status and navigation bars, as the app is
+    // (edge to edge): otherwise the window starts below them while the heights here take the bars
+    // off again, and a full sheet stopped about 90pt short of the mock's (Nov 7 2026).
+    <Modal visible={shown} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <GestureHandlerRootView style={styles.fill}>
         <Reanimated.View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }, dim]}>
           <Backdrop onPress={onClose} label="Close Revo" />

@@ -16,6 +16,8 @@ appId: com.revisionbuddy.app
     env:
       MODE: tester
 - runFlow: ../subflows/seed-revo.yaml
+# Tue 27 October with ratings, a timed read and two notes: every row of the day preview (a4).
+- runScript: ../scripts/seed-revo-day.js
 
 # Revo on (its opt-in), then Add to chat in light.
 - extendedWaitUntil:

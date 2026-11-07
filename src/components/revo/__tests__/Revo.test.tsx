@@ -333,6 +333,19 @@ describe('Revo’s conversation', () => {
 });
 
 describe('Revo’s sheet and the keyboard', () => {
+  it('on Android its window is drawn under the system bars, as the app is, so a full sheet reaches up under the status bar', async () => {
+    render(
+      <ThemeProvider>
+        <RevoSheetFrame visible onClose={jest.fn()} full onFullChange={jest.fn()}>
+          {null}
+        </RevoSheetFrame>
+      </ThemeProvider>,
+    );
+    await flush();
+    const { Modal } = jest.requireActual<typeof import('react-native')>('react-native');
+    expect(screen.UNSAFE_getByType(Modal).props).toMatchObject({ statusBarTranslucent: true, navigationBarTranslucent: true });
+  });
+
   it('the keyboard up: the sheet sits on it (no safe-area padding under the composer); down: back as it was', async () => {
     render(
       <ThemeProvider>
