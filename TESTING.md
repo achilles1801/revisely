@@ -130,8 +130,14 @@ kept. The 529 stays as Anthropic documents it (an overload can't be produced on 
 
 E2E failing on a push to develop, or in the nightly run, opens (or updates) one issue labelled
 **`develop-red`** (`scripts/e2e/develop-red.js`): per platform, the failing flows, the run and each
-flow's first failing step. The first run green on every platform that was red closes it. Fix it like
-any failure; don't wait for it to pass on its own.
+flow's first failing step, and the **suspects**: the PRs merged since that platform's last green run,
+the ones that changed a file a failing flow uses in bold. The first run green on every platform that
+was red closes it. Fix it like any failure; don't wait for it to pass on its own.
+
+**Revert first** when the cause isn't quick to fix: Actions → **Revert a suspect** → Run workflow with
+the PR's number (`scripts/e2e/revert-suspect.sh`). It opens a PR into develop that reverts that one
+merged PR, with auto-merge, and starts its CI; it refuses anything that isn't a PR merged into
+develop. The change comes back later with its fix.
 
 ## The live smoke check (production)
 

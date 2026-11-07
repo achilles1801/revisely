@@ -752,10 +752,15 @@ jobs:
       contents: read
       actions: read
       issues: write
+      pull-requests: read # the suspects: PRs merged since the last green run, and their files
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+          sparse-checkout: |
+            scripts
+            .github
+            .maestro
 
       - uses: actions/setup-node@v4
         with:

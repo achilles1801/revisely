@@ -7,6 +7,11 @@
 //
 //   node scripts/e2e/develop-red.js <dir of attempts.json files>
 //
+// Suspects: when a platform goes red (or what fails changes), the issue lists the PRs merged since
+// its last green run, and marks those that changed a file a failing flow uses (its subflows and
+// scripts, followed as .github/scripts/affected-flows.js does), so a revert can go up in minutes
+// (Actions → Revert a suspect; scripts/e2e/revert-suspect.sh).
+//
 // Environment: GITHUB_TOKEN, GITHUB_REPOSITORY; RUN_URL, SHA; MENTION (who is told when it opens);
 // IOS, ANDROID and DEVICES, each `<flows planned: true|false>:<job planned: true|false>:<job result>`
 // (a platform left unset keeps what the issue says).
@@ -61,7 +66,7 @@ function verdict(job, records) {
  * The issue's state after this run. `prev`: { android, ios } from the issue (each { red, since,
  * last, flows }) or null. Returns { state, changed, opened, closed }.
  */
-function nextState(prev, run, verdicts) {
+function nextState(prev, run, verdicts, suspectsFor = () => null) {
   const state = { android: prev?.android ?? null, ios: prev?.ios ?? null, devices: prev?.devices ?? null };
   let changed = false;
   for (const p of PLATFORMS) {
@@ -72,6 +77,9 @@ function nextState(prev, run, verdicts) {
       const same = before?.red && JSON.stringify(before.flows.map((f) => f.flow)) === JSON.stringify(v.flows.map((f) => f.flow));
       if (!same) changed = true;
       state[p] = { red: true, since: before?.red ? before.since : run, last: run, flows: v.flows };
+      // The last green run: before this red spell (kept while it lasts).
+      state[p].green = before?.red ? (before.green ?? null) : before?.last ?? null;
+      state[p].suspects = same ? (before.suspects ?? null) : suspectsFor(p, state[p].green, v.flows);
     } else {
       if (before?.red) changed = true;
       state[p] = { red: false, last: run, flows: [] };
@@ -103,6 +111,16 @@ function render(state) {
     }
     lines.push('', `Red since ${runLink(s.since)}; last red run ${runLink(s.last)}.`, '', '| Flow | First failing step |', '| --- | --- |');
     for (const f of s.flows) lines.push(`| ${code(f.flow)} | ${code(f.reason || 'no reason recorded')} |`);
+    if (s.suspects) {
+      const from = s.green ? `the last green run, ${runLink(s.green)}` : 'the last push whose CI passed';
+      lines.push('', `**Suspects:** merged since ${from}:`);
+      if (s.suspects.length === 0) lines.push('- none found (a flake, or a change outside develop: the emulator, a runner image)');
+      for (const x of s.suspects) {
+        const touched = x.touched.length ? `: changed ${x.touched.map((t) => code(t)).join(', ')}, which a failing flow uses` : '';
+        lines.push(`- ${x.touched.length ? '**' : ''}#${x.number}${x.touched.length ? '**' : ''} ${String(x.title).replace(/[<>]/g, '').slice(0, 100)}${touched}`);
+      }
+      lines.push('', 'To revert one: Actions → **Revert a suspect** → Run workflow with its number (a revert PR into develop, with auto-merge).');
+    }
   }
   lines.push('', `<!-- develop-red-state ${JSON.stringify(state)} -->`);
   return lines.join('\n') + '\n';
@@ -118,8 +136,63 @@ function stateOf(issue) {
   }
 }
 
+/** PR numbers named by commit messages, newest first: merge commits and squash merges. */
+function prNumbers(messages) {
+  const out = [];
+  for (const m of messages) {
+    const first = String(m).split('\n')[0];
+    const n = /^Merge pull request #(\d+)/.exec(first)?.[1] ?? /\(#(\d+)\)$/.exec(first)?.[1];
+    if (n && !out.includes(Number(n))) out.push(Number(n));
+  }
+  return out;
+}
+
+/** The failing flows' files: the flow and every subflow and script it uses. */
+function flowFiles(flows, closure) {
+  const files = new Set();
+  for (const f of flows) {
+    const name = String(f.flow).replace(/-run\d+$/, '');
+    if (!/^\d{2}-/.test(name)) continue;
+    for (const file of closure(`.maestro/flows/${name}.yaml`)) files.add(file);
+  }
+  return files;
+}
+
+/** Suspects: each PR, with the files it changed that a failing flow uses. */
+function suspects(prs, files) {
+  return prs.map((pr) => ({ number: pr.number, title: pr.title, touched: pr.files.filter((f) => files.has(f)) }));
+}
+
+async function gh(path) {
+  const res = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}${path}`, {
+    headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+  });
+  if (!res.ok) throw new Error(`GitHub GET ${path} -> ${res.status}`);
+  return res.json();
+}
+
+/** The PRs merged between two commits on develop, with their files (at most 30 PRs). */
+async function mergedBetween(from, to) {
+  const cmp = await gh(`/compare/${from}...${to}`);
+  const numbers = prNumbers((cmp.commits ?? []).map((c) => c.commit.message).reverse()).slice(0, 30);
+  const prs = [];
+  for (const n of numbers) {
+    const pr = await gh(`/pulls/${n}`);
+    const files = [];
+    for (let page = 1; page <= 10; page++) {
+      const batch = await gh(`/pulls/${n}/files?per_page=100&page=${page}`);
+      files.push(...batch.map((f) => f.filename));
+      if (batch.length < 100) break;
+    }
+    prs.push({ number: n, title: pr.title, files });
+  }
+  return prs;
+}
+
 async function main() {
   const { githubApi } = require('../sentry/api');
+  // The nightly run names develop: the commit it tested.
+  if (process.env.SHA === 'develop') process.env.SHA = (await gh('/commits/develop')).sha;
   const run = { url: process.env.RUN_URL, sha: process.env.SHA };
   const attempts = readAttempts(process.argv[2]);
   const verdicts = {
@@ -129,7 +202,25 @@ async function main() {
   };
   console.log(`This run: ${JSON.stringify(verdicts)}`);
   const open = (await githubApi.issuesWithLabel(LABEL, 'open')).find((i) => i.title === TITLE) ?? null;
-  const next = nextState(stateOf(open), run, verdicts);
+  // Worked out before nextState (which is synchronous): the PRs since each platform's last green run.
+  const prev = stateOf(open);
+  let lastPassed = null;
+  const found = {};
+  const { closure } = require('../../.github/scripts/affected-flows');
+  for (const p of PLATFORMS) {
+    if (!verdicts[p]?.red) continue;
+    try {
+      let green = prev?.[p] && !prev[p].red ? prev[p].last?.sha : prev?.[p]?.green?.sha;
+      if (!green) {
+        lastPassed ??= (await gh('/actions/workflows/ci.yml/runs?branch=develop&event=push&status=success&per_page=1')).workflow_runs?.[0]?.head_sha ?? '';
+        green = lastPassed;
+      }
+      if (green && green !== run.sha) found[p] = suspects(await mergedBetween(green, run.sha), flowFiles(verdicts[p].flows, closure));
+    } catch (err) {
+      console.error(`::warning title=develop-red::suspects for ${p}: ${err.message}`);
+    }
+  }
+  const next = nextState(prev, run, verdicts, (p) => found[p] ?? null);
   const red = PLATFORMS.filter((p) => next.state[p]?.red);
 
   if (!open) {
@@ -160,4 +251,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { readAttempts, parseJob, verdict, nextState, render, stateOf };
+module.exports = { readAttempts, parseJob, verdict, nextState, render, stateOf, prNumbers, flowFiles, suspects };
