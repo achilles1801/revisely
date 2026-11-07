@@ -72,6 +72,15 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
   const [q, setQ] = useState('');
   const juzScroll = useRef<ScrollView>(null);
   const juzScrolled = useRef(false);
+  // Where the account's juz row is and how tall the list is: it scrolls there once both are known
+  // (a scroll before the list knew its height stopped at the top: flow 09-revo-attach, Nov 7 2026).
+  const juzTarget = useRef<number | null>(null);
+  const juzContent = useRef(0);
+  const scrollToJuz = () => {
+    if (juzScrolled.current || juzTarget.current == null || juzContent.current <= juzTarget.current) return;
+    juzScrolled.current = true;
+    juzScroll.current?.scrollTo({ y: juzTarget.current, animated: false });
+  };
   const room = REVO_MAX_ATTACHMENTS - others.length;
   const count = keys.length + others.length;
   const canAdd = keys.length < room;
@@ -251,6 +260,8 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
               value={tab}
               onChange={(t) => {
                 juzScrolled.current = false;
+                juzTarget.current = null;
+                juzContent.current = 0;
                 setTab(t);
               }}
               tone="ink"
@@ -271,16 +282,25 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
             />
           ) : tab === 'juz' ? (
             // Opens on the account's own juz (today's), a few rows above it in view (mock a5).
-            <ScrollView ref={juzScroll} style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" testID="revo-add-juzlist">
+            <ScrollView
+              ref={juzScroll}
+              style={styles.fill}
+              contentContainerStyle={styles.list}
+              keyboardShouldPersistTaps="handled"
+              onContentSizeChange={(_, h) => {
+                juzContent.current = h;
+                scrollToJuz();
+              }}
+              testID="revo-add-juzlist"
+            >
               {JUZ.map((n) => (
                 <View
                   key={n}
                   onLayout={
                     n === Math.max(1, initialJuz - 3)
                       ? (e) => {
-                          if (juzScrolled.current) return;
-                          juzScrolled.current = true;
-                          juzScroll.current?.scrollTo({ y: e.nativeEvent.layout.y, animated: false });
+                          juzTarget.current = e.nativeEvent.layout.y;
+                          scrollToJuz();
                         }
                       : undefined
                   }
