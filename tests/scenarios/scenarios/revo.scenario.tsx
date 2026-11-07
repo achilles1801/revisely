@@ -263,7 +263,7 @@ it('[REVO-31] [REVO-30] an answer that offers a screen: its button opens it (Jum
   await tap(app, 'jump-juz-29');
   await tap(app, 'jump-go');
   await app.untilSynced();
-  await app.until(() => /Al-Mulk/.test(home.title() ?? ""), 'today to start at Juz 29');
+  await app.until(() => /Al[-\u2011]Mulk/.test(home.title() ?? ""), 'today to start at Juz 29');
 
   // A screen not on the list: the server drops the action, the answer stays, no card.
   await tap(app, 'revo-button');
