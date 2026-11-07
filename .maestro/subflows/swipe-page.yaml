@@ -11,6 +11,11 @@
 # the first swipe in a session left the page where it was, with nothing on
 # screen moving. So if the count hasn't moved after 10 s, the page didn't turn,
 # and it is swiped once more; that swipe must count.
+#
+# TEMPORARY: the second swipe stays only until the cause of that lost first
+# swipe offline is found and fixed (being looked into: whether the app stops
+# drawing while it retries page downloads offline; no frames for ~15 s after
+# the swipe in run 42322437281). Then remove it, and a lost swipe fails here.
 appId: com.revisionbuddy.app
 ---
 - copyTextFrom:
@@ -30,6 +35,7 @@ appId: com.revisionbuddy.app
 - copyTextFrom:
     text: ".*· [0-9]+/[0-9]+"
 - evalScript: ${output.swipeLost = maestro.copiedText.split(' ').pop() !== output.nextCount}
+# TEMPORARY (see the top): the second swipe, until the offline lost swipe is fixed.
 - runFlow:
     when:
       true: ${output.swipeLost}
