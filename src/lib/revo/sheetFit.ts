@@ -7,6 +7,17 @@ export const REVO_TOP_GAP = 8;
 export const REVO_KEYBOARD_PAD = 8;
 
 /**
+ * The sheet's two heights, from the frame it sits in (the modal's root, measured with the keyboard
+ * down) rather than the window: on Android the window React Native reports leaves the system bars
+ * out (about 97pt on a Pixel), so a full sheet worked out from it stopped that much short of the top
+ * with Home's header showing above it (Nov 7 2026). Until the frame is measured, the window.
+ */
+export function revoHeights(o: { window: number; frame: number; top: number; medium: number }): { full: number; medium: number; span: number } {
+  const span = Math.max(o.window, o.frame);
+  return { full: span - o.top - REVO_TOP_GAP, medium: Math.round(span * o.medium), span };
+}
+
+/**
  * Where the sheet goes with the keyboard up: it sits on the keyboard and gets shorter, so its header
  * and conversation stay on screen and only the composer rides up (before, the whole sheet was
  * pushed up and its top went off the screen). `keyboard` is how much of the frame the keyboard
