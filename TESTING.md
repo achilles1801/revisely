@@ -153,7 +153,15 @@ One Firebase backend serves store users and testers alike, so the account is a t
 else, and the check writes only through tester-only features (Revo) to that account's own documents;
 nothing a store user could see. The one shared thing it touches is a read: verse 1:1 through the worker,
 which costs one of the worker's daily requests to The Clear Quran only when the data centre's cache
-misses.
+misses (about once a month: the worker keeps a block 30 days).
+
+The worker step checks the block as the verse sheet would show it: 1:1 to 1:7 in order, each with text,
+no markup but The Clear Quran's footnote tags, and 1:1 in The Clear Quran's own wording (its licence
+allows no other translation under its name). **A cache hit tests our worker and its sign-in check, not
+The Clear Quran's API**: the run's log gives `X-Cache` (`HIT` or `STALE`: the worker's cache answered;
+`MISS`: The Clear Quran did). The credit line isn't in the worker's answer: the app adds it
+(`creditLine` in `src/lib/translation.ts`), and the verse sheet's tests check it is shown with every
+verse of The Clear Quran.
 
 It skips with a notice until it is set up. **Majd's steps** (production data, so only he does them):
 
