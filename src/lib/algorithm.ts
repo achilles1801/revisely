@@ -637,6 +637,33 @@ export function scheduledDaysFrom(
   );
 }
 
+type Carry = NonNullable<User['carryOver']>;
+
+/**
+ * The carry-over for revision day `day`: User.carryOver when it is that day's, or the next day's
+ * held beside it (`carryOver.next`: "Revise these first tomorrow" while today's own carry still
+ * applies). Null when neither is.
+ */
+export function carryOverOn(user: Pick<User, 'carryOver'> | null | undefined, day: string): Carry | null {
+  const carry = user?.carryOver;
+  if (!carry) return null;
+  if (carry.day === day) return carry;
+  const next = carry.next;
+  return next && next.day === day ? { day: next.day, pages: next.pages, skip: 0, ...(next.source ? { source: next.source } : {}) } : null;
+}
+
+/**
+ * A carry-over for a day after `day` that a new carry for `day` must keep (as its `next`): the
+ * pages "Revise these first tomorrow" put on tomorrow. Empty when there is none.
+ */
+export function keepLaterCarry(user: Pick<User, 'carryOver'> | null | undefined, day: string): { next?: Carry['next'] } {
+  const carry = user?.carryOver;
+  if (!carry) return {};
+  if (carry.day > day) return { next: { day: carry.day, pages: carry.pages, ...(carry.source ? { source: carry.source } : {}) } };
+  if (carry.next && carry.next.day > day) return { next: carry.next };
+  return {};
+}
+
 /**
  * The pages for a day: its scheduled pages, plus any carried into it from the
  * day before. Carried pages go first; with "Keep daily amount" they take the
@@ -648,8 +675,8 @@ export function getPagesForDay(
   date: Date,
   memorizedPages: UserPage[],
 ): number[] {
-  const carry = user.carryOver;
-  if (!carry || carry.day !== dateToISODay(date)) return getPagesScheduledForDate(user, date, memorizedPages);
+  const carry = carryOverOn(user, dateToISODay(date));
+  if (!carry) return getPagesScheduledForDate(user, date, memorizedPages);
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
   const carried = carry.pages.filter((p) => memorized.has(p));
   const rest = scheduledFrom(user, date, memorizedPages, carry.skip ?? 0).filter((p) => !carried.includes(p));

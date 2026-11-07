@@ -12,7 +12,7 @@
 // lib/carryOver): its pages go first, then the scheduled ones not among them.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { getPagesForDay, getPagesScheduledForDate } from './algorithm';
+import { getPagesForDay, getPagesScheduledForDate, keepLaterCarry } from './algorithm';
 import { settleCarryOverForNewPlan } from './carryOver';
 import { dateToLocalISODay } from './schedulePlans';
 
@@ -65,7 +65,7 @@ export function userWithNewSchedule(
 
   const memorizedSet = new Set(memorized.map((p) => p.pageNumber));
   const revised = revisedOn(logs, today).filter((p) => memorizedSet.has(p));
-  return { ...settled, carryOver: { day: today, pages: revised, skip: 0 } };
+  return { ...settled, carryOver: { day: today, pages: revised, skip: 0, ...keepLaterCarry(before, today) } };
 }
 
 const samePages = (a: number[], b: number[]) => a.length === b.length && a.every((p, i) => p === b[i]);
@@ -93,9 +93,9 @@ function keepingToday(before: User, settled: User, revisionDate: Date, memorized
     const rest = day.slice(skip);
     if (rest.length > want.length) continue;
     const carried = want.slice(0, want.length - rest.length);
-    const candidate: User = { ...settled, carryOver: { day: today, pages: carried, skip } };
+    const candidate: User = { ...settled, carryOver: { day: today, pages: carried, skip, ...keepLaterCarry(before, today) } };
     if (gives(candidate)) return candidate;
   }
   // Not reached (skip = the whole day gives `want`), but never lose today.
-  return { ...settled, carryOver: { day: today, pages: want, skip: day.length } };
+  return { ...settled, carryOver: { day: today, pages: want, skip: day.length, ...keepLaterCarry(before, today) } };
 }

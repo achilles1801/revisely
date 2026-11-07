@@ -62,7 +62,7 @@ import { useApp } from '../../context/AppContext';
 import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
-import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
+import { carryOverOn, generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import { catchUpDayOf, ownPagesOf } from '../../lib/carryOver';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
@@ -927,7 +927,7 @@ export default function ActiveRevisionScreen() {
   );
 
   // Pages put in front by "Revise these first tomorrow" (Insights), labelled as such.
-  const fromInsights = user?.carryOver?.source === 'insights' && user.carryOver.day === sessionDay;
+  const fromInsights = !!sessionDay && carryOverOn(user, sessionDay)?.source === 'insights';
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame

@@ -11,7 +11,7 @@
 // Carrying over happens at most once per revision day.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { getPagesForDay, getPagesScheduledForDate } from './algorithm';
+import { carryOverOn, getPagesForDay, getPagesScheduledForDate, keepLaterCarry } from './algorithm';
 import { creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 
@@ -112,7 +112,9 @@ export function leftoversFor(
   const none: Leftovers = { pages: [], from: {}, days: [] };
   if (hasCarriedOver(user, today)) return none;
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
-  const carriedDay = user.carryOver?.day;
+  // Only a carry of leftovers moves the schedule; pages put on tomorrow by "Revise these first
+  // tomorrow" move nothing, and hid today's leftovers when they were the last carry.
+  const carriedDay = user.carryOver && user.carryOver.source !== 'insights' ? user.carryOver.day : undefined;
   const scheduledOn = (day: string) => {
     if (carriedDay && day < carriedDay) return [];
     const [y, m, d] = day.split('-').map(Number);
@@ -134,7 +136,7 @@ export function findLeftoverPages(
 
 /** Whether pages were already carried into the revision day `today`. */
 export function hasCarriedOver(user: User | null | undefined, today: string): boolean {
-  return user?.carryOver?.day === today;
+  return carryOverOn(user, today) != null;
 }
 
 /**
@@ -157,15 +159,17 @@ export function applyCarryOver(
   const today = dateToLocalISODay(revisionDate);
   if (leftovers.length === 0 || hasCarriedOver(user, today)) return user;
   const mode = user.carryOverMode ?? DEFAULT_CARRY_OVER_MODE;
+  // Tomorrow's pages put there by "Revise these first tomorrow" stay, beside today's.
+  const later = keepLaterCarry(user, today);
   if (mode === 'add') {
-    return { ...user, carryOver: { day: today, pages: [...leftovers], skip: 0, ...(from ? { from: pick(from, leftovers) } : {}) } };
+    return { ...user, carryOver: { day: today, pages: [...leftovers], skip: 0, ...(from ? { from: pick(from, leftovers) } : {}), ...later } };
   }
   const scheduled = getPagesScheduledForDate(user, revisionDate, memorizedPages);
   const skip = Math.min(leftovers.length, scheduled.length);
   return {
     ...user,
     scheduleShiftPages: (user.scheduleShiftPages ?? 0) + skip,
-    carryOver: { day: today, pages: [...leftovers], skip, ...(from ? { from: pick(from, leftovers) } : {}) },
+    carryOver: { day: today, pages: [...leftovers], skip, ...(from ? { from: pick(from, leftovers) } : {}), ...later },
   };
 }
 
@@ -190,7 +194,7 @@ function pick(from: Record<string, string>, pages: number[]): Record<string, str
 
 /** The pages carried into `day` (none unless the carry is for that day). */
 export function carriedPagesFor(user: User, day: string): Set<number> {
-  return user.carryOver?.day === day ? new Set(user.carryOver.pages) : new Set<number>();
+  return new Set(carryOverOn(user, day)?.pages ?? []);
 }
 
 /**
@@ -204,7 +208,8 @@ export function ownPagesOf(pages: readonly number[], user: User, day: string): n
 
 /** The day a carried page is credited to, when it came from an earlier day; null otherwise. */
 export function catchUpDayOf(user: User, day: string, page: number): string | null {
-  if (user.carryOver?.day !== day) return null;
-  const from = user.carryOver.from?.[String(page)];
+  const carry = carryOverOn(user, day);
+  if (!carry) return null;
+  const from = carry.from?.[String(page)];
   return from && from < day ? from : null;
 }
