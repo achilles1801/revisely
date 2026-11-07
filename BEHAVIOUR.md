@@ -78,14 +78,18 @@ How the tests are made: `tests/scenarios/README.md`.
   today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
   widget and the reminders share this rule (lib/streak). The Dashboard, the widget and the reminders read it from the Activity items
   (the last 400 days) once they load (lib/streakFromItems); the logs answer until then. An item counts as on time
-  when it was written before its revision day ended: the Fajr that starts the next day with the boundary on (so
-  00:30 before that Fajr is still the day before), midnight otherwise.
+  when it was written before its grace window ended (SESS-6): the end of the revision day after its own, at the
+  Fajr that starts the day after that with the boundary on (so 00:30 before that Fajr is still the day before),
+  midnight otherwise.
 - **SESS-6.** A missed day keeps a grace window. When yesterday is missed (not all its scheduled pages credited to it)
   but the run before it is intact, the streak reads as broken and the widget and Home show the streak dimmed, with a
   ring for the missed pages. Revising yesterday's missed pages, credited to yesterday, restores the streak at once,
   and only pages of the missed day count (today's own pages don't). The grace is recoverable until today's revision
-  day ends, and repeats any day a day is missed. Two missed days in a row break the streak; a day done late does not
-  restore a missed day, and older days can still be revised, credited to their own days.
+  day ends, and repeats any day a day is missed. A day restored in its grace window counts as on time from then on:
+  the streak it brought back is still there the next day, and single missed days, each caught up the day after,
+  keep the run going (Majd, Nov 7 2026). Two missed days in a row break the streak; a day done after its grace
+  window counts itself but does not restore the run behind it, and older days can still be revised, credited to
+  their own days.
 - **SESS-7.** A catch-up page (one carried in from a missed or unfinished day) is credited to the day it was
   scheduled for, not to today. It never counts toward today's completion while today has pages of its own: today
   is done when today's own pages are credited to today. In shift mode (CARRY-2) today's own pages are what is left
@@ -438,7 +442,8 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | SCHED-6 | A carry-over shift on a custom plan with a page on two neighbouring days could put that page twice on one day. | A shifted day takes such a page once and goes on to the next (`shiftedCycleDay`, `src/lib/algorithm.ts`). |
 | CARRY-5 | With scattered leftovers, saving an edit to a later day brought a page revised yesterday back into today. | Saving keeps today's carry-over as it was (`settleCarryOverForNewPlan`, `src/lib/planChange.ts`). |
 | SESS-2, CARRY-2 | Today's session saved, then Add to today with Keep daily amount: the pages moved to tomorrow stayed in the session's assigned pages (the rules let them only grow), so Home said Done but the streak didn't count today. | A save from the session screen cuts the session's assignment to the day's own pages, in a change of its own (`session.assigned`, `src/lib/offline/ops.ts`); `firestore.rules` lets the list shrink to some of its pages. |
-| CARRY-2, SESS-7, SESS-2 | Keep daily amount with as many leftovers as today holds or more made today the leftovers alone, with no pages of its own: once they were all revised, Home still said "Continue at … 6 of 6", never Done, and today never counted for the streak. | A day the carried pages fill is finished by them (`duePagesOf`, `src/lib/carryOver.ts`): they are its session's assignment, and its session revising them finishes it while they stay credited to the days they were missed (`dueCreditIndex`, `src/lib/aheadCredit.ts`). |
+| CARRY-2, SESS-7, SESS-2 | Keep daily amount with as many leftovers as today holds or more made today the leftovers alone, with no pages of its own: once they were all revised, Home still said "Continue at … 6 of 6", never Done, and today never counted for the streak. | A day the carried pages fill is finished by them (`duePagesOf`, `src/lib/carryOver.ts`): they are its session's assignment, and its session revising them finishes it while they stay credited to the days they were missed (`needDone`, `src/lib/aheadCredit.ts`). |
 | SESS-6, CARRY-2 | A day missed entirely, added to today with Keep daily amount and revised, didn't come back: with no session of its own, the streak read it from the plan the carry had moved, which gave it other pages. | A day the last carry took pages from is read from the carry (`planDuePages`, `src/lib/carryOver.ts`). |
+| SESS-6 | A streak brought back in the grace window lasted a day: the next morning it fell back (6 to 1), because the run behind yesterday counted only days done on their own day. | A day restored in its grace window counts as on time from then on (`graceEndMs`, `src/lib/streakFromItems.ts`). |
 | SESS-7 | A session's first save holding catch-up pages alone lost their credit: the empty session was written without it. | `mergeSessionAdd` keeps it (`src/lib/offline/ops.ts`). |
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |

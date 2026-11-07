@@ -1,12 +1,13 @@
 // The streak from the Activity items (C5): the Revised items of the history, not the session logs.
 // Same rule as lib/streak (SESS-2, SESS-6): a day is done when every page scheduled for it is
-// credited to it; a day done late does not carry a run behind a missed day. A day's scheduled
-// pages are its own item's `assigned` snapshot, or the plan when it has no item of its own.
+// credited to it. A day done in time carries the run behind it: by the end of its grace window,
+// the revision day after it (D4, Majd, Nov 7 2026). A day's scheduled pages are its own item's
+// `assigned` snapshot, or the plan when it has no item of its own.
 
 import { User, UserPage } from '../types';
 import { getFajrTimeFor } from './fajrBoundary';
 import { planDuePages } from './carryOver';
-import { completedDays, streakReading, type StreakDetail, type StreakReading } from './streak';
+import { completedDays, nextIsoDay, streakReading, type StreakDetail, type StreakReading } from './streak';
 
 export interface HistoryItem {
   /** The item's id: a session's own day (`day`) or `day-ahead-<countsFor>`; a manual add's `manual-…`. */
@@ -31,6 +32,15 @@ export function dayEndMs(day: string, user?: User | null): number {
   return fajr ? fajr.getTime() : midnight;
 }
 
+/**
+ * When a day's grace window ends (SESS-6): the end of the revision day after it. A day done by then
+ * is done in time, and carries the run behind it from then on (D4, Majd, Nov 7 2026: a day restored
+ * in its grace window still counts the next morning).
+ */
+export function graceEndMs(day: string, user?: User | null): number {
+  return dayEndMs(nextIsoDay(day), user);
+}
+
 export function streakReadingFromItems(input: {
   user: User;
   pages: readonly UserPage[];
@@ -50,9 +60,10 @@ export function streakDetailFromItems(input: {
   const memorized = input.pages.filter((p) => p.status === 'memorized');
   const own = new Map<string, HistoryItem>();
   const credited = new Map<string, Set<number>>();
+  // The pages credited to each day by the end of its grace window (graceEndMs).
   const onTime = new Map<string, Set<number>>();
   // Catch-up pages by the day they were revised on (lib/aheadCredit catchUpIndex), and of them those
-  // revised before that day ended: a day the carried pages fill is done by them (SESS-7).
+  // revised by the end of that day's grace window: a day the carried pages fill is done by them (SESS-7).
   const caughtUp = new Map<string, Set<number>>();
   const caughtUpOnTime = new Map<string, Set<number>>();
   const add = (map: Map<string, Set<number>>, day: string, pages: readonly number[]) => {
@@ -64,10 +75,10 @@ export function streakDetailFromItems(input: {
     const day = item.countsFor;
     if (item.day === day) own.set(day, item);
     add(credited, day, item.pages);
-    if (item.occurredAt != null && item.occurredAt < dayEndMs(day, input.user)) add(onTime, day, item.pages);
+    if (item.occurredAt != null && item.occurredAt < graceEndMs(day, input.user)) add(onTime, day, item.pages);
     if (day < item.day) {
       add(caughtUp, item.day, item.pages);
-      if (item.occurredAt != null && item.occurredAt < dayEndMs(item.day, input.user)) add(caughtUpOnTime, item.day, item.pages);
+      if (item.occurredAt != null && item.occurredAt < graceEndMs(item.day, input.user)) add(caughtUpOnTime, item.day, item.pages);
     }
   }
   const scheduled = (day: string): readonly number[] => {

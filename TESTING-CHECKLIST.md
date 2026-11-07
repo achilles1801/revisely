@@ -77,7 +77,8 @@ Phase 2 (the Activity redesign, the streak and the coach) shows on `previewTeste
   - It counts back from today if today is done, else from yesterday.
   - **Grace:** when yesterday was missed but the run before it is intact, Home (once today has a
     session) and the widget show the streak dimmed, with a ring. Revising yesterday's missed pages
-    restores it at once; today's own pages don't (SESS-6).
+    restores it at once; today's own pages don't (SESS-6). A day restored that way keeps counting:
+    the streak is still there the next morning.
   - Two missed days in a row break it.
 - **Catch-up credit:** a page carried in from a missed or unfinished day is credited to that day, never
   to today. Today is Done only when today's own pages are revised (SESS-7). With *Keep daily amount*,
@@ -167,8 +168,9 @@ D−3 (1 of 2). D−5 and D−2 are missed. Two daily-log notes, on D−6 and D�
   - Revising the three makes today Done (Home: Done · 3 pages). Home then offers "Tomorrow starts
     at" today's own two pages; revising them, there or with Keep going on the end card, counts for
     tomorrow.
-- **Streak:** D−1 was done, so there's no grace. D−2 done today counts for D−2, but it doesn't join
-  the run before it (SESS-6). Today counts once the three are revised: 2 days.
+- **Streak:** D−1 was done, so there's no grace. D−2 done today counts for D−2, but two days late
+  (after its grace window) it doesn't join the run before it (SESS-6). Today counts once the three
+  are revised: 2 days.
 - **Day view:**
   - D−1: the revision note sits under the Revised block (ACT-2).
   - D−6: the note is in the Notes block.
@@ -229,6 +231,8 @@ and D−1. Smart Tracking on.
   - Home (today has a session) and the widget show the streak dimmed, with a ring for D−1's two pages.
   - Revise those two (Add to today, then the session): the streak comes back at once.
   - Today's own pages alone don't bring it back.
+  - With today done too it reads 6, and it stays: the next morning, before anything is revised,
+    still 6. D−1, restored in its grace window, counts as on time from then on (SESS-6).
 - **Catch-up credit:**
   - The two pages count for D−1: its ring fills, and D−1's day shows "Done ahead, from <today>: …".
   - Today's Revised block lists them as "Ahead for <D−1>: …".
@@ -413,8 +417,9 @@ Phase 2 has its own scenario tests:
 - **The memorization items:** ACT-10.
 - **The coach:** `askCoach` (COACH-4).
 - **Catch-up credit:** `catchUpCredit.property` (SESS-7).
-- **The streak and its grace:** `streak.property` (SESS-2, SESS-6), including the 00:30 session with
-  Fajr on.
+- **The streak and its grace:** `streak.property` (SESS-2, SESS-6), including a grace window that ends
+  at Fajr, and days each caught up the next day keeping the run; `checklistCatchUp` › 4 checks the
+  restored streak the next morning on Home, in Revo and on the widget.
 
 E2E covers the session, revise ahead, the Fajr boundary, the daily log, offline and recordings on the
 built app. Every run keeps screenshots of key screens (artifact `e2e-<platform>-screens-…`).

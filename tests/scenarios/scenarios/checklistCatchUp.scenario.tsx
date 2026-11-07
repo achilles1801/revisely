@@ -7,13 +7,50 @@
 // days are fixed and the expected pages below are worked out by hand from its plan
 // (functions/src/testScenarios.ts).
 
+import type { ReactElement } from 'react';
 import { pagesRange } from '../harness/account';
 import { setNow } from '../harness/clock';
 import { Home, homeStack } from '../harness/screens';
 import { addDays, scenarioPhone } from '../harness/testScenario';
-import type { OpenApp } from '../harness/phone';
+import type { Booted, OpenApp } from '../harness/phone';
+import type { RevoContext } from '../../../src/lib/revo/types';
+import type { HistoryItem } from '../../../src/lib/streakFromItems';
 
 type AheadCredit = typeof import('../../../src/lib/aheadCredit');
+type ActivityHistory = typeof import('../../../src/lib/activityHistory');
+
+interface StreakProbe {
+  /** The revision day Revo (and Home) are on. */
+  day: string;
+  /** The Activity items Home's streak read, shared with Revo (null: both use the logs). */
+  history: readonly HistoryItem[] | null;
+  /** Revo's context, built as RevoHost builds it. */
+  revo: () => RevoContext | null;
+}
+const probe = globalThis as unknown as { __streakProbe?: StreakProbe };
+
+/** Home, with Revo's context hook mounted beside it as RevoHost mounts it. */
+function homeWithRevo(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { useRevoContext } = req<typeof import('../../../src/lib/revo/useRevoContext')>('src/lib/revo/useRevoContext');
+  const { useSharedActivityHistory } = req<ActivityHistory>('src/lib/activityHistory');
+  const { useApp } = req<typeof import('../../../src/context/AppContext')>('src/context/AppContext');
+  function Probe() {
+    const { day, build } = useRevoContext();
+    const { user } = useApp();
+    probe.__streakProbe = { day, revo: build, history: useSharedActivityHistory(user?.id, day) };
+    return null;
+  }
+  return React.createElement(React.Fragment, null, homeStack(mods), React.createElement(Probe));
+}
+
+/** A history's items, by id, the day each counts for and their pages. */
+function itemsKey(items: readonly HistoryItem[]): string {
+  return items
+    .map((x) => `${x.id}|${x.countsFor}|${x.pages.join('.')}`)
+    .sort()
+    .join(',');
+}
 
 /** The pages credited to `day` (its own session's and those revised for it on other days). */
 function creditedTo(app: OpenApp, day: string): number[] {
@@ -120,6 +157,68 @@ describe('4. Partly done today', () => {
     const onServer = await app.act(() => svc.getSession('2026-11-05', app.uid));
     expect(onServer?.assignedPages).toEqual([587, 588, 589]);
     await app.close();
+  });
+
+  // D4 (Majd, Nov 7 2026): a day restored in its grace window counts as on time from then on, so the
+  // six it brought back is still six the next morning. Home, Revo and the widget all read it from
+  // the Activity items (lib/streakFromItems); until it fell back to one (the run behind yesterday
+  // counted only days done on their own day).
+  it('[SESS-6] [SESS-2] the next morning the streak yesterday’s pages brought back is still six, on Home, in Revo and on the widget', async () => {
+    const { phone, app, D } = await scenarioPhone('partial-today');
+    let home = new Home(app);
+    await home.ready();
+    await home.untilStreak(4, true);
+    await addToToday(app, home);
+    const session = await home.startSession();
+    await session.swipeThrough(3);
+    await session.back();
+    await app.untilSynced();
+    await home.untilStreak(5);
+    const rest = await home.startSession();
+    await rest.swipe();
+    await rest.back();
+    await app.untilSynced();
+    expect(home.title()).toBe('Done · 5 pages');
+    await home.untilStreak(6);
+    await app.close();
+
+    // Friday at 8:00, nothing revised yet.
+    setNow('2026-11-06 08:00');
+    const friday = addDays(D, 1);
+    const next = await phone.open(homeWithRevo);
+    home = new Home(next);
+    await home.ready();
+    // The logs, read until the items load, count every day done as on time: they say six either
+    // way. So wait for Home's streak to read the items the server holds, yesterday's catch-up among them.
+    const { loadActivityHistory, withPhoneSessions } = next.mods.require<ActivityHistory>('src/lib/activityHistory');
+    const onServer = await next.act(() => loadActivityHistory(friday));
+    expect(onServer.filter((x) => x.day === D && x.countsFor === addDays(D, -1)).flatMap((x) => x.pages).sort()).toEqual([585, 586]);
+    await next.until(
+      () => probe.__streakProbe?.day === friday && probe.__streakProbe.history != null && itemsKey(probe.__streakProbe.history) === itemsKey(onServer),
+      'Home’s streak to read the Activity items',
+      20_000,
+    );
+    await next.idle(300);
+    expect(home.streak()).toEqual({ days: 6, grace: false, ring: null });
+    // Revo is told the same streak.
+    expect(probe.__streakProbe!.revo()?.streak).toEqual({ days: 6, atRisk: null });
+    // And the widget's Friday, built as WidgetSync builds it.
+    const { buildWidgetSnapshot } = next.mods.require<typeof import('../../../src/lib/widgets/snapshot')>('src/lib/widgets/snapshot');
+    const { getQuranData } = next.mods.require<typeof import('../../../src/lib/quranData')>('src/lib/quranData');
+    const a = next.app;
+    const widget = buildWidgetSnapshot({
+      signedIn: true,
+      user: a.user,
+      onboardingComplete: a.onboardingComplete,
+      pages: a.pages,
+      logs: a.logs,
+      quranData: getQuranData(),
+      accent: 'indigo',
+      now: new Date(),
+      history: withPhoneSessions(onServer, a.logs, Date.now()),
+    });
+    expect([widget.days[0].day, widget.days[0].streak]).toEqual([friday, 6]);
+    await next.close();
   });
 
   it('[SESS-6] today’s own pages alone don’t bring the streak back; revising yesterday’s pages afterwards still does', async () => {
@@ -248,7 +347,7 @@ describe('2. Beginner', () => {
     expect(home.title()).toBe('Done · 3 pages');
     expect(home.cta()).toBe('Review session');
     expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s596(?!\d)/);
-    // D−1 and today. D−2 is whole now, but done late: it doesn't join the run before it.
+    // D−1 and today. D−2 is whole now, but done after its grace window (D−1): it doesn't join the run before it.
     await home.untilStreak(2);
     await app.idle(1500);
     expect(home.streak()).toEqual({ days: 2, grace: false, ring: null });
