@@ -9,6 +9,7 @@ import { PagePreviewSheet, QuietLine, SectionHeader } from '../../components/ins
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { layoutV2 } from '../../theme/v2';
 
@@ -23,7 +24,8 @@ export default function PagesByStrengthScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user } = useApp();
   const { palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button, so the last row scrolls clear.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const { rows } = usePageStrengthRows();
   const [previewPage, setPreviewPage] = useState<number | null>(null);
 

@@ -15,6 +15,7 @@ import { getRevisionDateForUser, getRevisionDayForUser } from '../../lib/fajrBou
 import { daysBetween } from '../../lib/activityHeatmap';
 import { getJuzName, getQuranData, getSurahForPage } from '../../lib/quranData';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
+import { describePassage, pagesNote, spokenText } from '../../lib/passages';
 import { layoutV2 } from '../../theme/v2';
 import { ActionSheet } from '../v2/ActionSheet';
 import { PillButton } from '../v2/PillButton';
@@ -71,6 +72,17 @@ export function juzMeta(juz: number, pageCount: number, avgStrength: number): st
 export function lastRevisedDay(user: Parameters<typeof getRevisionDayForUser>[0], iso: string): string {
   if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.slice(0, 10);
   return getRevisionDayForUser(user, new Date(iso));
+}
+
+/**
+ * A page's row, surah first (Majd's rule, Nov 7 2026: surahs and juz, page numbers almost never):
+ * its title is the passage ("Al-Baqarah, ayahs 246–248", lib/passages), its mark the surah's
+ * number (as the Surahs list), and the page number only a quiet detail in `detail`.
+ */
+export function pageRowText(pageNumber: number, detail: (page: string) => string): { name: string; text: string; spoken: string } {
+  const name = describePassage([pageNumber]);
+  const text = detail(pagesNote([pageNumber]));
+  return { name, text, spoken: spokenText(`${name}. ${text}`) };
 }
 
 /** "today", "1d ago", "12d ago": how long since a page's last revision day. */
@@ -308,17 +320,24 @@ export function BrowseByStrength({
       ) : (
         <View testID={`browse-${browseMode}`}>
           {browseMode === 'pages' &&
-            sortedPages.slice(0, limit).map((row) => (
-              <InsightRow
-                key={`page-${row.pageNumber}`}
-                number={row.pageNumber}
-                name={`Page ${row.pageNumber} · ${row.surahName}`}
-                rating={row.strength}
-                text={`${getRatingLabel(row.strength)} · Juz ${row.juzNumber} · revised ${revisedAgo(row.daysSinceRevision)}`}
-                onPress={() => onOpenPage(row.pageNumber)}
-                testID={`browse-page-${row.pageNumber}`}
-              />
-            ))}
+            sortedPages.slice(0, limit).map((row) => {
+              const t = pageRowText(
+                row.pageNumber,
+                (page) => `${getRatingLabel(row.strength)} · Juz ${row.juzNumber} · ${page} · revised ${revisedAgo(row.daysSinceRevision)}`,
+              );
+              return (
+                <InsightRow
+                  key={`page-${row.pageNumber}`}
+                  number={row.surahNumber}
+                  name={t.name}
+                  rating={row.strength}
+                  text={t.text}
+                  onPress={() => onOpenPage(row.pageNumber)}
+                  accessibilityLabel={t.spoken}
+                  testID={`browse-page-${row.pageNumber}`}
+                />
+              );
+            })}
           {browseMode === 'surahs' &&
             sortedSurahs.slice(0, limit).map((row) => (
               <InsightRow
