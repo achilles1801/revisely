@@ -198,9 +198,12 @@ jobs:
     name: E2E
     needs: plan
     if: ${{ needs.plan.outputs.e2e == 'true' }}
+    # actions and issues: the develop-red issue (e2e.yml), written only for pushes to develop.
     permissions:
       contents: read
       pull-requests: read
+      actions: read
+      issues: write
     uses: ./.github/workflows/e2e.yml
     with:
       ios: ${{ needs.plan.outputs.ios }}
