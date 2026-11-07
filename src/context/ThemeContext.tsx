@@ -19,7 +19,7 @@ interface ThemeContextType {
   setThemeMode: (mode: ThemeMode) => void;
 }
 
-const THEME_KEY = '@revisely_theme_v2';
+export const THEME_KEY = '@revisely_theme_v2';
 // The classic design's Light / Dark: people who chose one keep it.
 const CLASSIC_THEME_KEY = '@revision_buddy_theme';
 
