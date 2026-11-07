@@ -92,7 +92,8 @@ function FieldV2({
 }
 
 export default function AuthScreen() {
-  const { signIn, signUp, signInWithGoogle, signInWithApple, sendPasswordReset, error, isLoading, clearError } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithApple, sendPasswordReset, error, isSigningIn, clearError } =
+    useAuth();
   const { isDark, palette } = useTheme();
   const haptics = useHaptics();
   const [mode, setMode] = useState<AuthMode>('login');
@@ -101,6 +102,8 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [localError, setLocalError] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  // The form's own attempt (sign in, sign up, send reset link), shown on its button.
+  const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -112,44 +115,56 @@ export default function AuthScreen() {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
   }, []);
 
+  // An attempt in progress, of any kind: the others wait for it.
+  const busy = submitting || isSigningIn || googleLoading || appleLoading;
+
+  // Google's and Apple's own sheets fail with their own message. Once Firebase
+  // has the credential, a refusal is AuthContext's `error`, in its own words
+  // (it was hidden while a failed attempt remounted this screen).
   const handleGoogleSignIn = async () => {
+    if (busy) return;
     clearError();
     setLocalError('');
     setGoogleLoading(true);
     try {
-      const { idToken } = await triggerGoogleSignIn();
-      await signInWithGoogle(idToken);
-    } catch (err: unknown) {
-      // User cancelled the sheet — not an error worth surfacing.
-      if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
+      let idToken: string;
+      try {
+        ({ idToken } = await triggerGoogleSignIn());
+      } catch (err: unknown) {
+        // User cancelled the sheet — not an error worth surfacing.
+        if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) return;
+        setLocalError(err instanceof Error ? err.message : "Couldn't sign in with Google.");
         return;
       }
-      const message =
-        err instanceof Error ? err.message : "Couldn't sign in with Google.";
-      setLocalError(message);
+      await signInWithGoogle(idToken).catch(() => undefined);
     } finally {
       setGoogleLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
+    if (busy) return;
     clearError();
     setLocalError('');
     setAppleLoading(true);
     try {
-      const { identityToken, rawNonce, fullName } = await triggerAppleSignIn();
-      await signInWithApple(identityToken, rawNonce, fullName ?? undefined);
-    } catch (err: any) {
-      // ERR_REQUEST_CANCELED = user dismissed the sheet; not an error worth surfacing.
-      if (err?.code !== 'ERR_REQUEST_CANCELED') {
-        setLocalError(err?.message ?? "Couldn't sign in with Apple.");
+      let credential: Awaited<ReturnType<typeof triggerAppleSignIn>>;
+      try {
+        credential = await triggerAppleSignIn();
+      } catch (err: any) {
+        // ERR_REQUEST_CANCELED = user dismissed the sheet; not an error worth surfacing.
+        if (err?.code !== 'ERR_REQUEST_CANCELED') setLocalError(err?.message ?? "Couldn't sign in with Apple.");
+        return;
       }
+      const { identityToken, rawNonce, fullName } = credential;
+      await signInWithApple(identityToken, rawNonce, fullName ?? undefined).catch(() => undefined);
     } finally {
       setAppleLoading(false);
     }
   };
 
   const handleSubmit = async () => {
+    if (busy) return;
     clearError();
     setLocalError('');
 
@@ -178,6 +193,7 @@ export default function AuthScreen() {
       return;
     }
 
+    setSubmitting(true);
     try {
       if (mode === 'login') {
         await signIn(email.trim(), password);
@@ -189,7 +205,9 @@ export default function AuthScreen() {
         haptics.success();
       }
     } catch (err) {
-      // Error is handled by AuthContext
+      // AuthContext shows the error; everything typed stays.
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -204,8 +222,6 @@ export default function AuthScreen() {
   };
 
   const displayError = localError || error;
-
-  const busy = isLoading || googleLoading || appleLoading;
   const title = mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password';
   // Flat: the bismillah and a title, filled fields, the one solid action,
   // then Apple and Google under "or". Errors are a red line of text with an
@@ -330,7 +346,8 @@ export default function AuthScreen() {
                   title={mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
                   size="lg"
                   onPress={handleSubmit}
-                  busy={isLoading}
+                  busy={submitting}
+                  disabled={busy && !submitting}
                   style={v2.submit}
                   testID="auth-submit"
                 />

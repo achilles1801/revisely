@@ -258,6 +258,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
+  'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
   'RESET-1': 'the owner’s reset script',
   'ACT-9': 'when a day’s items load',
   'COACH-1': 'the Ask coach’s limits (Revo supersedes it)',
