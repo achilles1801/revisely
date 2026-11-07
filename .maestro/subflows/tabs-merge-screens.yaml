@@ -35,6 +35,24 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: tabs-merge-browse-surahs-${THEME}
+# Juz, at the end of the list: the last row clears Revo's button (useRevoFootprint).
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible:
+      id: browse-juz
+    timeout: 10000
+- repeat:
+    times: 4
+    commands:
+      - swipe:
+          start: 50%, 75%
+          end: 50%, 25%
+          duration: 400
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: tabs-merge-browse-juz-end-${THEME}
 - tapOn:
     id: back
 - extendedWaitUntil:
