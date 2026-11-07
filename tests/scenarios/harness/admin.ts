@@ -81,6 +81,66 @@ export function serveLoadTestScenario(): { calls: number; results: Record<string
   return served;
 }
 
+/** The HTTP status firebase-functions answers a callable error with. */
+const CALLABLE_HTTP: Record<string, number> = {
+  INVALID_ARGUMENT: 400,
+  UNAUTHENTICATED: 401,
+  PERMISSION_DENIED: 403,
+  NOT_FOUND: 404,
+  RESOURCE_EXHAUSTED: 429,
+  INTERNAL: 500,
+  UNAVAILABLE: 503,
+  DEADLINE_EXCEEDED: 504,
+};
+
+export interface RevoServed {
+  /** The callables asked, in order, with what the app sent. */
+  calls: { name: string; data: Record<string, unknown> }[];
+  /** What the model answers next (its raw text); a JSON reply by default. */
+  reply: (name: string, data: Record<string, unknown>) => string | undefined;
+  /** No connection: every call fails as fetch does offline. */
+  offline: boolean;
+  restore: () => void;
+}
+
+/**
+ * Revo's callables (revoAsk, revoDayInReview, revoSetOptions, revoClear), as the app calls them
+ * (`fetch` to their URLs): the ID token's uid is the caller, the functions' own code runs against
+ * the emulators (harness/revoServer.js) with the scenario's clock as the server's, and the answer
+ * comes back as the callable protocol gives it (`{ result }`, or an error with its HTTP status).
+ * Only the model is a stand-in. Restore with the returned function.
+ */
+export function serveRevo(): RevoServed {
+  const { execFileSync } = jest.requireActual<typeof import('child_process')>('child_process');
+  const real = global.fetch;
+  const served: RevoServed = { calls: [], reply: () => undefined, offline: false, restore: () => void (global.fetch = real) };
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const name = /\/(revoAsk|revoDayInReview|revoSetOptions|revoClear)$/.exec(url)?.[1];
+    if (!name) return real(input as RequestInfo, init);
+    if (served.offline) throw new TypeError('Network request failed');
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    const token = (headers.Authorization ?? '').replace(/^Bearer /, '');
+    const claims = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8') || '{}');
+    const uid = claims.user_id ?? claims.sub;
+    const data = JSON.parse(String(init?.body ?? '{}')).data ?? {};
+    served.calls.push({ name, data });
+    let answer: { result?: unknown; error?: { status: string; message: string } };
+    if (!uid) {
+      answer = { error: { status: 'UNAUTHENTICATED', message: 'Unauthenticated' } };
+    } else {
+      const reply = served.reply(name, data);
+      const args = [path.join(__dirname, 'revoServer.js'), name, uid, JSON.stringify(data), '--now', String(Date.now()), ...(reply != null ? ['--reply', reply] : [])];
+      const out = execFileSync(process.execPath, args, { env: emulatorEnv(), encoding: 'utf8' });
+      answer = JSON.parse(out.trim().split('\n').pop()!);
+    }
+    const status = answer.error ? (CALLABLE_HTTP[answer.error.status] ?? 500) : 200;
+    const body = JSON.stringify(answer);
+    return { ok: status === 200, status, text: async () => body, json: async () => answer } as unknown as Response;
+  }) as typeof fetch;
+  return served;
+}
+
 /**
  * A new account as the server holds it part way through sign-up: the user
  * document and pages 1–`lastPage` (harness/newAccountServer.js). `addPages`

@@ -9,7 +9,14 @@ import { REVO_MODEL } from '../coach/pricing';
 import { RevoAttachment, RevoContext, StoredMessage } from './types';
 
 export { REVO_MODEL };
-export const REVO_MAX_TOKENS = 700;
+/**
+ * Room for the reply's JSON (the text is at most 1500 characters, about 400 tokens). Sonnet 5.5
+ * thinks by default and its thinking counts against max_tokens: with 700 and thinking on, every
+ * reply was cut off (Nov 7 2026). Revo's requests turn thinking off (`between_tools`).
+ */
+export const REVO_MAX_TOKENS = 1200;
+/** Sonnet 5.5's lowest thinking setting: no extended thinking (its `disabled` is a 400). */
+export const REVO_THINKING = { type: 'between_tools' } as const;
 /** Messages of the chat sent with a follow-up. */
 export const REVO_HISTORY = 10;
 
@@ -98,6 +105,7 @@ function request(messages: MessagesRequest['messages']): MessagesRequest {
   return {
     model: REVO_MODEL,
     max_tokens: REVO_MAX_TOKENS,
+    thinking: REVO_THINKING,
     system: [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages,
   };

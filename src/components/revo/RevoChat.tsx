@@ -7,7 +7,7 @@ import { copyText } from '../../lib/clipboard';
 import { shiftDay } from '../../lib/journal';
 import { logger } from '../../lib/logger';
 import { revoBackAt } from '../../lib/revo/availability';
-import { RevoError, revoBackend } from '../../lib/revo/backend';
+import { REVO_MESSAGES, RevoError, revoBackend } from '../../lib/revo/backend';
 import { revoChips, revoGreeting } from '../../lib/revo/greeting';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal } from '../../lib/revo/types';
@@ -61,10 +61,13 @@ export function RevoChat({
   const [refusal, setRefusal] = useState<{ kind: RevoRefusal; message: string; retry?: string } | null>(null);
   const scroll = useRef<ScrollView>(null);
 
+  // A chat just asked in: its question and answer, shown until its stored messages arrive.
+  const seeded = useRef<{ chatId: string; messages: RevoMessage[] } | null>(null);
   useEffect(() => {
-    setMessages([]);
+    const seed = seeded.current?.chatId === chatId ? seeded.current.messages : [];
+    setMessages(seed);
     if (!chatId) return;
-    return backend.watchMessages(uid, chatId, setMessages);
+    return backend.watchMessages(uid, chatId, (stored) => setMessages(stored.length === 0 && seed.length > 0 ? seed : stored));
   }, [backend, uid, chatId]);
 
   const usedToday = usage.day === day ? usage.count : 0;
@@ -87,12 +90,20 @@ export function RevoChat({
     onExpand();
     try {
       const result = await backend.ask({ chatId, day, question, context: ctx, attach: sentAttach });
-      if (!chatId) onChatId(result.chatId);
-      else setMessages((list) => (list.some((m) => m.id === result.reply.id) ? list : [...list, result.question, result.reply]));
+      // Checked by the backend, and read here, never inside a state update: React throws an
+      // updater's error again while rendering, outside this try (REACT-NATIVE-10).
+      const { question: asked, reply } = result;
+      if (!chatId || result.chatId !== chatId) {
+        seeded.current = { chatId: result.chatId, messages: [asked, reply] };
+        onChatId(result.chatId);
+      } else {
+        setMessages((list) => (list.some((m) => m.id === reply.id) ? list : [...list.filter((m) => m.id !== asked.id), asked, reply]));
+      }
     } catch (err) {
-      const e = err instanceof RevoError ? err : new RevoError('unavailable', 'Revo couldn’t answer. Try again.');
+      const e = err instanceof RevoError ? err : new RevoError('unavailable', REVO_MESSAGES.unavailable);
       logger.warn('Revo ask failed', { refusal: e.refusal });
-      setRefusal({ kind: e.refusal, message: e.message, retry: e.refusal === 'unavailable' ? question : undefined });
+      const retry = e.refusal === 'unavailable' || e.refusal === 'offline' ? question : undefined;
+      setRefusal({ kind: e.refusal, message: e.message, retry });
       if (sentAttach) onAttach(sentAttach);
     } finally {
       setPending(null);
@@ -179,7 +190,7 @@ export function RevoChat({
         ) : null}
         {refusal && refusal.kind !== 'daily' && refusal.kind !== 'monthly' ? (
           <Text style={[styles.error, { color: palette.secondary }]} testID="revo-error" accessibilityLiveRegion="polite">
-            {refusal.kind === 'off' ? 'Turn Revo on first.' : refusal.kind === 'clock' ? refusal.message : 'Revo couldn’t answer. Try again.'}
+            {refusalText(refusal)}
             {refusal.retry ? (
               <Text style={{ color: palette.link }} onPress={() => void ask(refusal.retry!)} suppressHighlighting>
                 {'  '}Try again
@@ -209,6 +220,12 @@ export function RevoChat({
       </View>
     </View>
   );
+}
+
+/** What the sheet says for a refused or failed question (the limits have their own card). */
+export function refusalText(r: { kind: RevoRefusal; message: string }): string {
+  if (r.kind === 'offline') return REVO_MESSAGES.offline;
+  return r.message || REVO_MESSAGES.unavailable;
 }
 
 const styles = StyleSheet.create({

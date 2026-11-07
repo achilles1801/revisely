@@ -292,8 +292,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   attachment, a follow-up or another day is asked anew.
 
 - **REVO-6.** The model is claude-sonnet-5-5, called from the functions with the `ANTHROPIC_COACH_KEY` secret (never in
-  the app). The system prompt is stable and cached (above the 512-token minimum). Logs keep counts, tokens and costs,
-  never a question, an answer or a note.
+  the app), with thinking off (`between_tools`: its thinking would count against the reply's tokens) and room for the
+  whole reply. The system prompt is stable and cached (above the 512-token minimum). Logs keep counts, tokens, costs and
+  why a reply stopped early, never a question, an answer or a note.
 
 - **REVO-7.** An answer has at most one small chart and one suggested action, each on pages Revo was given (anything
   else is dropped, the answer kept). The app draws the chart from its own data. Revo never changes the plan itself:
@@ -320,6 +321,12 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-22.** When the day's questions are used, the composer is greyed and says when Revo is back (after Fajr, at
   its time, or at midnight); conversations stay in History.
+
+- **REVO-23.** An answer shows in its conversation as the server stored it, for a first question and a follow-up alike.
+  A question that can't be answered says why in the sheet: offline ("You're offline. Revo needs the internet."), the
+  server's own reason (it didn't answer in time, it is busy, it couldn't answer that), the chat was deleted, or the day's
+  or the month's limit (REVO-22); offline and unanswered questions can be tried again, with what was attached. Nothing
+  in Revo's sheet takes the app down: an error inside it says so in the sheet.
 
 ## Known bugs
 

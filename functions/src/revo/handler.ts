@@ -124,6 +124,8 @@ export interface RevoLog {
     cacheWrite?: number;
     code?: string;
     deleted?: number;
+    /** Why the model stopped, when it wasn't the end of its turn (e.g. max_tokens: cut off). */
+    stop?: string;
   }): void;
 }
 
@@ -257,6 +259,7 @@ async function metered(
     output: ledger.output,
     cacheRead: ledger.cacheRead,
     cacheWrite: ledger.cacheWrite,
+    ...(reply.stopReason && reply.stopReason !== 'end_turn' ? { stop: reply.stopReason } : {}),
   });
   return { reply, ledger, cost };
 }

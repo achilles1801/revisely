@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { callFunction } from '../../services/firestoreService';
+import { knownOffline } from '../networkState';
 import type {
   RevoAskResult,
   RevoAttachment,
@@ -43,7 +44,7 @@ export interface RevoBackend {
   deleteMemory(uid: string, id: string): Promise<void>;
 }
 
-/** A question the server refused, and why (the sheet says it in its own words). */
+/** A question the server refused, or that couldn't be asked, and why (the sheet says it in its own words). */
 export class RevoError extends Error {
   constructor(
     readonly refusal: RevoRefusal,
@@ -53,14 +54,48 @@ export class RevoError extends Error {
   }
 }
 
-/** The callable's error as a refusal. */
+export const REVO_MESSAGES = {
+  unavailable: 'Revo couldn’t answer. Try again.',
+  offline: 'You’re offline. Revo needs the internet.',
+  signIn: 'Revo couldn’t check your sign-in. Try again.',
+} as const;
+
+/** A failure of the connection itself (fetch, or Auth refreshing the token), not an answer. */
+function isNetworkFailure(err: unknown): boolean {
+  const e = err as { message?: unknown; code?: unknown } | null;
+  if (e?.code === 'auth/network-request-failed') return true;
+  return typeof e?.message === 'string' && /network request failed|failed to fetch|network error/i.test(e.message);
+}
+
+/**
+ * The callable's error as a refusal. A callable error carries its status (`code`) and our own
+ * server's words, which the sheet may show; anything else (no status) gets the sheet's own.
+ */
 export function refusalOf(err: unknown): RevoError {
+  if (err instanceof RevoError) return err;
   const e = err as { message?: string; code?: string; details?: { reason?: string } } | null;
-  const message = e?.message ?? 'Revo is unavailable. Try again.';
-  if (e?.code === 'RESOURCE_EXHAUSTED') return new RevoError(e.details?.reason === 'monthly' ? 'monthly' : 'daily', message);
-  if (e?.code === 'PERMISSION_DENIED') return new RevoError('off', message);
-  if (e?.code === 'INVALID_ARGUMENT' && /date/i.test(message)) return new RevoError('clock', message);
-  return new RevoError('unavailable', message);
+  // No status means no answer from the server: offline when the connection failed or NetInfo says so.
+  if (isNetworkFailure(err) || (typeof e?.code !== 'string' && knownOffline())) return new RevoError('offline', REVO_MESSAGES.offline);
+  const fromServer = typeof e?.code === 'string' && typeof e?.message === 'string' && e.message.length > 0 && e.message.length <= 160;
+  const message = fromServer ? e!.message! : REVO_MESSAGES.unavailable;
+  switch (e?.code) {
+    case 'RESOURCE_EXHAUSTED':
+      return new RevoError(e.details?.reason === 'monthly' ? 'monthly' : 'daily', message);
+    case 'PERMISSION_DENIED':
+      return new RevoError('off', message);
+    case 'NOT_FOUND':
+      return new RevoError('gone', message);
+    case 'INVALID_ARGUMENT':
+      return e.details?.reason === 'clock' || /date|clock/i.test(message) ? new RevoError('clock', message) : new RevoError('unavailable', REVO_MESSAGES.unavailable);
+    case 'UNAUTHENTICATED':
+      return new RevoError('unavailable', REVO_MESSAGES.signIn);
+    case 'UNAVAILABLE':
+    case 'INTERNAL':
+    case 'DEADLINE_EXCEEDED':
+      return new RevoError('unavailable', message);
+    default:
+      return new RevoError('unavailable', REVO_MESSAGES.unavailable);
+  }
 }
 
 function signedIn() {
@@ -69,13 +104,40 @@ function signedIn() {
   return user;
 }
 
-async function call<T>(name: string, data: Record<string, unknown>): Promise<T> {
+/** What a callable answered: the protocol sends it as `{ result }` (REACT-NATIVE-10 read the envelope as the answer). */
+export function callableResult(out: unknown): unknown {
+  return out !== null && typeof out === 'object' && 'result' in out ? (out as { result: unknown }).result : undefined;
+}
+
+async function call(name: string, data: Record<string, unknown>): Promise<unknown> {
+  let out: unknown;
   try {
-    return (await callFunction(signedIn(), name, data)) as T;
+    out = await callFunction(signedIn(), name, data);
   } catch (err) {
-    if (err instanceof RevoError) throw err;
     throw refusalOf(err);
   }
+  return callableResult(out);
+}
+
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isMessage = (v: unknown): v is RevoMessage => {
+  const m = v as Partial<RevoMessage> | null;
+  return !!m && typeof m === 'object' && isStr(m.id) && (m.role === 'user' || m.role === 'revo') && isStr(m.text) && typeof m.at === 'number';
+};
+
+/** revoAsk's answer, if it is one: the chat, and the question and reply as stored. */
+export function askResultOf(v: unknown): RevoAskResult | null {
+  const r = v as Partial<RevoAskResult> | null;
+  if (!r || typeof r !== 'object' || !isStr(r.chatId) || r.chatId === '') return null;
+  if (!isMessage(r.question) || !isMessage(r.reply)) return null;
+  return {
+    chatId: r.chatId,
+    title: isStr(r.title) ? r.title : '',
+    question: r.question,
+    reply: r.reply,
+    remainingToday: typeof r.remainingToday === 'number' ? r.remainingToday : 0,
+    cached: r.cached === true,
+  };
 }
 
 const num = (v: unknown, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -126,17 +188,20 @@ const firebaseRevo: RevoBackend = {
       () => cb([]),
     );
   },
-  ask(input) {
-    return call<RevoAskResult>('revoAsk', input as unknown as Record<string, unknown>);
+  async ask(input) {
+    const result = askResultOf(await call('revoAsk', input as unknown as Record<string, unknown>));
+    if (!result) throw new RevoError('unavailable', REVO_MESSAGES.unavailable);
+    return result;
   },
   async dayInReview(input) {
-    const out = await call<{ chat?: { id: string }; chatId?: string; none?: boolean }>('revoDayInReview', input as unknown as Record<string, unknown>);
-    if (!out || out.none) return null;
+    const out = (await call('revoDayInReview', input as unknown as Record<string, unknown>)) as { chat?: { id?: unknown }; chatId?: unknown; none?: boolean } | null;
+    if (!out || typeof out !== 'object' || out.none) return null;
     const chatId = out.chat?.id ?? out.chatId;
-    return chatId ? { chatId } : null;
+    return isStr(chatId) ? { chatId } : null;
   },
-  setOptions(input) {
-    return call<RevoSettings>('revoSetOptions', input);
+  async setOptions(input) {
+    const out = (await call('revoSetOptions', input)) as Partial<RevoSettings> | null;
+    return { optIn: out?.optIn === true, memoryOn: out?.memoryOn !== false };
   },
   async clear(what) {
     await call('revoClear', { what });
