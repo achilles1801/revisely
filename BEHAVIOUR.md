@@ -326,7 +326,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
 ordinary test in the fix's PR.
 
-None open.
+| Rule | What happens | Test |
+| --- | --- | --- |
+| SESS-2, CARRY-2 | Today's session saved, then Add to today with Keep daily amount: the pages the shift moves to tomorrow stay in today's session's assigned pages, which `firestore.rules` lets only grow. Home says Done, but the streak doesn't count today, and the next day reads it as missed. A fix needs the assigned pages to shrink (a rules change) or a record of the shift. | `checklistCatchUp` › 4 |
 
 Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 

@@ -10,6 +10,8 @@ import { ownPagesOf } from './carryOver';
 import { completedDays, streakReading, type StreakReading } from './streak';
 
 export interface HistoryItem {
+  /** The item's id: a session's own day (`day`) or `day-ahead-<countsFor>`; a manual add's `manual-…`. */
+  id?: string;
   day: string;
   countsFor: string;
   pages: number[];

@@ -128,9 +128,10 @@ export function aheadLine(lead: string, first: number): { text: string; label: s
 
 /**
  * Today's two lines from its pages (in session order), those revised today,
- * and how many of them were carried in from yesterday.
+ * how many of them were carried in from earlier days, and how many of those
+ * are still to revise.
  */
-export function todayLines(status: TodayStatus, list: number[], done: ReadonlySet<number>, carried = 0): TodayLines {
+export function todayLines(status: TodayStatus, list: number[], done: ReadonlySet<number>, carried = 0, carriedLeft = 0): TodayLines {
   const ordered = [...new Set(list)];
   const total = ordered.length;
   if (total === 0) {
@@ -162,8 +163,10 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
       ranges,
       label: spoken(`${title}. ${detail}`),
       empty: false,
-      cta: 'Review session',
-      solid: false,
+      // Today is done, and pages added from earlier days are still to revise (SESS-6, SESS-7:
+      // yesterday can be restored until today ends): the button goes on to them.
+      cta: carriedLeft > 0 ? 'Continue revision' : 'Review session',
+      solid: carriedLeft > 0,
     };
   }
 

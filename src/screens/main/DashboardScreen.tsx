@@ -62,6 +62,7 @@ import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCre
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import { streakReadingFromLogs } from '../../lib/streak';
 import { streakReadingFromItems, type HistoryItem } from '../../lib/streakFromItems';
+import { historyOf, withPhoneSessions } from '../../lib/activityHistory';
 import { dateToLocalISODay } from '../../lib/schedulePlans';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -196,13 +197,14 @@ export default function DashboardScreen() {
     return leftoversFor(user, logs, revisionDay, assignment.pages, pages.filter((p) => p.status === 'memorized'));
   }, [logs, revisionDay, assignment, pages, user]);
 
-  // How many of today's pages came from yesterday (they come first: "4 from yesterday first").
-  const carriedToday = useMemo(() => {
+  // Today's pages that came from earlier days (they come first: "4 from yesterday first").
+  const carriedPagesToday = useMemo(() => {
     const carry = user?.carryOver;
-    if (!assignment || !carry || carry.day !== revisionDay) return 0;
+    if (!assignment || !carry || carry.day !== revisionDay) return [];
     const carried = new Set(carry.pages);
-    return assignment.pages.filter((p) => carried.has(p)).length;
+    return assignment.pages.filter((p) => carried.has(p));
   }, [user, assignment, revisionDay]);
+  const carriedToday = carriedPagesToday.length;
 
   useEffect(() => {
     registerForPushNotificationsAsync();
@@ -220,7 +222,7 @@ export default function DashboardScreen() {
     firestoreService
       .getActivityItemsBetween(from, to)
       .then((r) => {
-        if (!cancelled) setHistory(r.revisions.map((x) => ({ day: x.day, countsFor: x.countsFor, pages: x.pages, assigned: x.assigned, occurredAt: x.occurredAt })));
+        if (!cancelled) setHistory(historyOf(r.revisions));
       })
       .catch(() => undefined);
     return () => {
@@ -230,8 +232,9 @@ export default function DashboardScreen() {
   const streakNow = useMemo(() => {
     if (!user) return null;
     const today = dateToLocalISODay(revisionDate);
+    // The sessions on the phone over the server's items: a session just saved counts at once.
     return history
-      ? streakReadingFromItems({ user, pages, items: history, today })
+      ? streakReadingFromItems({ user, pages, items: withPhoneSessions(history, logs, Date.now()), today })
       : streakReadingFromLogs({ user, pages, logs, today });
   }, [history, logs, revisionDate, user, pages]);
   const calculatedStreak = streakNow?.streak ?? 0;
@@ -249,6 +252,8 @@ export default function DashboardScreen() {
   // Includes pages revised ahead for today (lib/aheadCredit).
   // Also the pages today's sessions revised ahead, so "Done" counts the whole day.
   const donePagesToday = useMemo(() => doneOnDay(logs, revisionDay), [logs, revisionDay]);
+  // Carried pages still to revise: once today's own pages are done, the button goes on to them.
+  const carriedLeft = carriedPagesToday.filter((p) => !donePagesToday.has(p)).length;
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
@@ -359,7 +364,10 @@ export default function DashboardScreen() {
   };
 
   const handleCtaPress = () => {
-    if (todayStatus.status === 'completed') {
+    if (todayStatus.status === 'completed' && carriedLeft > 0) {
+      // Today is done, and pages added from earlier days are left: the session holds them.
+      navigation.navigate('ActiveRevision');
+    } else if (todayStatus.status === 'completed') {
       // The review is the day's done pages, the same set Home counts as Done:
       // today's first, then the pages revised ahead today (reviewPagesInOrder).
       const done = reviewPagesInOrder(logs, revisionDay, assignment.pages);
@@ -530,6 +538,7 @@ export default function DashboardScreen() {
           pages={assignment.pages}
           done={donePagesToday}
           carried={carriedToday}
+          carriedLeft={carriedLeft}
           streak={calculatedStreak}
           streakGrace={streakNow?.grace ?? null}
           memorized={memorized}

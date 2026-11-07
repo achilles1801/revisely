@@ -64,7 +64,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import { catchUpDayOf, ownPagesOf } from '../../lib/carryOver';
-import { aheadCreditFor, creditedOnDay, sessionCredit } from '../../lib/aheadCredit';
+import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
 import {
   getHizbForPage,
@@ -168,11 +168,14 @@ export default function ActiveRevisionScreen() {
     [user, pages, lastSectionDay, sessionPages, logs],
   );
 
-  // Pages credited to today: revised today, or ahead from an earlier session.
+  // Today's pages already done: credited to today (revised today, or ahead from an earlier
+  // session), or revised in today's sessions for another day: a catch-up page is credited to the
+  // day it was missed (SESS-7), and is still done here. (Counting today's credit alone reopened
+  // the session on the catch-up pages, unchecked, while Home said to continue after them.)
   const alreadyRevisedToday = useMemo(() => {
     if (!assignment || !sessionDay) return new Set<number>();
-    const credited = creditedOnDay(logs, sessionDay);
-    return new Set(assignment.pages.filter((p) => credited.has(p)));
+    const done = doneOnDay(logs, sessionDay);
+    return new Set(assignment.pages.filter((p) => done.has(p)));
   }, [logs, assignment, sessionDay]);
 
   const ratingsFromTodaysLogs = useMemo(() => {
@@ -403,6 +406,23 @@ export default function ActiveRevisionScreen() {
     };
   }, []);
 
+  /**
+   * Every page the day's session holds as revised: the checks on screen, and what today's sessions
+   * have saved (pages credited to other days included), less any page unchecked here. A save's
+   * merge keeps credit only for these pages (SESS-7). Naming the pages just checked dropped the
+   * catch-up and ahead credit saved before them, by the autosave a few seconds earlier or by an
+   * earlier session of the day (Nov 2026).
+   */
+  const heldAsRevised = useCallback(
+    (day: string, unchecked: readonly number[] = []): number[] => {
+      const saved = logsRef.current
+        .filter((l) => l.date === day)
+        .flatMap((l) => [...l.pagesRevised, ...Object.values(l.ahead ?? {}).flat()]);
+      return [...new Set([...completedPages, ...saved.filter((p) => !unchecked.includes(p))])];
+    },
+    [completedPages],
+  );
+
   const commitPendingPages = useCallback(async (): Promise<void> => {
     if (!user || !assignment || !sessionDay) return;
     const revisionDay = sessionDay;
@@ -456,8 +476,8 @@ export default function ActiveRevisionScreen() {
         weaknessUpdates,
         durationMinutes,
         ahead: credit.ahead,
-        // Every page checked, catch-up pages too: their credit stays while they are checked (SESS-7).
-        checked: pending,
+        // Every page held as revised, catch-up pages too: their credit stays while they are checked (SESS-7).
+        checked: heldAsRevised(revisionDay, unrevised),
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
       lastSaveTimeRef.current = Date.now();
@@ -466,13 +486,17 @@ export default function ActiveRevisionScreen() {
     // Take unchecked pages back out of today's session. updateLog also
     // re-derives each page's last-revised date and count from the logs.
     async function removeUnrevised() {
+      // A catch-up page is saved under the day's ahead credit, not its pagesRevised (SESS-7).
       const todaysLog = logsRef.current.find(
-        (l) => l.date === revisionDay && l.pagesRevised.some((p) => unrevised.includes(p)),
+        (l) =>
+          l.date === revisionDay &&
+          (l.pagesRevised.some((p) => unrevised.includes(p)) ||
+            Object.values(l.ahead ?? {}).some((pages) => pages.some((p) => unrevised.includes(p)))),
       );
       if (todaysLog) await updateLog(removeRevisedPages(todaysLog, unrevised));
       unrevised.forEach((p) => silentlySavedRef.current.delete(p));
     }
-  }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog]);
+  }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog, heldAsRevised]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -729,7 +753,7 @@ export default function ActiveRevisionScreen() {
           weaknessUpdates: weaknessUpdatesArray,
           durationMinutes: durationDelta,
           ahead: sessionCredit(pagesRevised, pageDays, revisionDay).ahead,
-          checked: pagesRevised,
+          checked: heldAsRevised(revisionDay),
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
@@ -755,6 +779,7 @@ export default function ActiveRevisionScreen() {
     navigation,
     finishRecording,
     haptics,
+    heldAsRevised,
   ]);
 
   const viewerPages = shownPages;

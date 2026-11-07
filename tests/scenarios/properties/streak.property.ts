@@ -2,6 +2,7 @@
 // credited to it, ahead credits included; alive through yesterday until today's revision day ends.
 import { aliveStreak, completedDays, previousIsoDay, streakFromLogs, streakReading, streakReadingFromLogs } from '../../../src/lib/streak';
 import { streakReadingFromItems } from '../../../src/lib/streakFromItems';
+import { withPhoneSessions } from '../../../src/lib/activityHistory';
 import type { RevisionLog, User, UserPage } from '../../../src/types';
 
 const log = (date: string, assignedPages: number[], pagesRevised: number[], ahead?: Record<string, number[]>): RevisionLog => ({
@@ -120,6 +121,25 @@ describe('the grace window (SESS-6)', () => {
     expect(r.streak).toBe(1);
   });
 
+  it('[SESS-6] yesterday restored today, then today done: the run before it, yesterday and today', () => {
+    // Days 1–2 on time, day 3 missed and restored on day 4 (late), then day 4 done.
+    const onTime = ['2026-11-01', '2026-11-02', '2026-11-04'];
+    expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04') }, '2026-11-04', onTime)).toEqual({ streak: 4, grace: null });
+    // Today done first, yesterday still missed: today alone, until yesterday's pages are revised.
+    expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-04'), '2026-11-03': [1] }, '2026-11-04', onTime).streak).toBe(1);
+  });
+
+  it('[SESS-2] a day with nothing scheduled yesterday doesn’t end the run, today done or not', () => {
+    const scheduledOn = (day: string) => (day === '2026-11-03' ? [] : [1, 2]);
+    const read = (days: string[]) => {
+      const credited = new Map(days.map((d) => [d, new Set([1, 2])]));
+      const done = completedDays(credited, scheduledOn);
+      return streakReading({ done, onTime: done, scheduled: scheduledOn, credited, today: '2026-11-04' });
+    };
+    expect(read(['2026-11-01', '2026-11-02'])).toEqual({ streak: 2, grace: null });
+    expect(read(['2026-11-01', '2026-11-02', '2026-11-04'])).toEqual({ streak: 3, grace: null });
+  });
+
   it('[SESS-6] a day done today is the streak, with no grace', () => {
     expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04') }, '2026-11-04')).toEqual({ streak: 4, grace: null });
   });
@@ -174,6 +194,37 @@ describe('the streak from items (C5)', () => {
       item('2026-11-03', [5, 6], dayMs('2026-11-04')),
     ];
     expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-04' }).streak).toBe(1);
+  });
+
+  it('[SESS-2] a session saved on the phone counts at once, before its items reach the server', () => {
+    // The server has day 1; day 2's session is on the phone only (just saved, or offline).
+    const server = [{ ...item('2026-11-01', [1, 2], dayMs('2026-11-01')), id: '2026-11-01' }];
+    const logs = [log('2026-11-01', [1, 2], [1, 2]), log('2026-11-02', [3, 4], [3, 4])];
+    expect(streakReadingFromItems({ user, pages: [], items: server, today: '2026-11-02' }).streak).toBe(1);
+    const shown = withPhoneSessions(server, logs, dayMs('2026-11-02'));
+    expect(streakReadingFromItems({ user, pages: [], items: shown, today: '2026-11-02' }).streak).toBe(2);
+  });
+
+  it('[SESS-6] yesterday’s pages caught up in today’s session restore it at once; a session deleted on the phone stops counting', () => {
+    // Days 1–2 on the server; day 3 left at one page of two; today (day 4) catches its page 6 up.
+    const server = [
+      { ...item('2026-11-01', [1, 2], dayMs('2026-11-01')), id: '2026-11-01' },
+      { ...item('2026-11-02', [3, 4], dayMs('2026-11-02')), id: '2026-11-02' },
+      { id: '2026-11-03', day: '2026-11-03', countsFor: '2026-11-03', pages: [5], assigned: [5, 6], occurredAt: dayMs('2026-11-03') },
+    ];
+    const before = [log('2026-11-01', [1, 2], [1, 2]), log('2026-11-02', [3, 4], [3, 4]), log('2026-11-03', [5, 6], [5])];
+    expect(streakReadingFromItems({ user, pages: [], items: withPhoneSessions(server, before, dayMs('2026-11-04')), today: '2026-11-04' }).grace).toEqual({
+      previous: 2,
+      progress: { scheduled: 2, credited: 1 },
+    });
+    const caughtUp = [...before, log('2026-11-04', [7, 8], [], { '2026-11-03': [6] })];
+    expect(streakReadingFromItems({ user, pages: [], items: withPhoneSessions(server, caughtUp, dayMs('2026-11-04')), today: '2026-11-04' })).toEqual({
+      streak: 3,
+      grace: null,
+    });
+    // Day 2's session deleted on the phone: the server's item for it no longer counts.
+    const deleted = caughtUp.filter((l) => l.date !== '2026-11-02');
+    expect(streakReadingFromItems({ user, pages: [], items: withPhoneSessions(server, deleted, dayMs('2026-11-04')), today: '2026-11-04' }).streak).toBe(1);
   });
 
   it('[SESS-6] a session at 00:30 before Fajr is still the day before (Fajr on)', () => {

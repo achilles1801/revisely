@@ -155,6 +155,46 @@ export class Home {
     return this.text('today-catch-up');
   }
 
+  /** The Today post's button: Start, Continue, Review session… */
+  cta(): string | null {
+    return this.text('today-cta');
+  }
+
+  /**
+   * The streak beside "Today" ("Today · 8-day streak"): its days (0 when none
+   * shows), and whether it is in grace (SESS-6: the ring for yesterday's missed
+   * pages beside it), with the ring's label ("60 percent revised").
+   */
+  streak(): { days: number; grace: boolean; ring: string | null } {
+    const m = /Today · (\d+)-day streak/.exec(this.today());
+    const post = this.app.screen.queryByTestId('today-post');
+    const { within } = this.app.mods.rtl;
+    const ring = post ? within(post).queryByLabelText(/percent revised$/) : null;
+    return { days: m ? Number(m[1]) : 0, grace: ring != null, ring: ring ? (ring.props.accessibilityLabel as string) : null };
+  }
+
+  /** Waits for the streak to read `days` (and `grace`): it loads from the Activity items after Home shows. */
+  async untilStreak(days: number, grace = false): Promise<void> {
+    await this.app.until(
+      () => {
+        const s = this.streak();
+        return s.days === days && s.grace === grace;
+      },
+      `the streak to read ${days} days${grace ? ' (grace)' : ''}; it reads ${JSON.stringify(this.streak())} ("${this.today()}")`,
+      20_000,
+    );
+  }
+
+  /** The recent sessions under Today, each row as one line of text, newest first. */
+  recent(): string[] {
+    const list = this.app.screen.queryByTestId('home-recent');
+    if (!list) return [];
+    const { within } = this.app.mods.rtl;
+    return within(list)
+      .queryAllByTestId(/^item-revision-(?!.*-menu$)/)
+      .map((r) => flatText(r));
+  }
+
   async tap(testID: string): Promise<void> {
     const { fireEvent } = this.app.mods.rtl;
     const el = this.app.screen.getByTestId(testID);
@@ -352,6 +392,20 @@ export class Session {
     return this.app.screen.queryByTestId('session-end-keep-going') != null;
   }
 
+  /** What the end card says ("Revision complete 5 pages revised today"), the page after the last. */
+  endCard(): string {
+    const el = this.app.screen.queryByTestId('session-end-summary');
+    return el ? flatText(el) : '';
+  }
+
+  /** Whether the page on screen is checked (its check reads "Unmark current page"). */
+  async isChecked(): Promise<boolean> {
+    if (!this.app.screen.queryByLabelText('Unmark current page') && !this.app.screen.queryByLabelText('Mark current page as revised')) {
+      await this.tapPage();
+    }
+    return this.app.screen.queryByLabelText('Unmark current page') != null;
+  }
+
   /** Back to Home (the session saves as it goes). */
   async back(): Promise<void> {
     await this.press('Back');
@@ -378,11 +432,16 @@ export class DailyLog {
 
   /** The day's entries, oldest first: kind and text. */
   entries(): { kind: string; text: string }[] {
+    return this.rows().map(({ kind, text }) => ({ kind, text }));
+  }
+
+  /** The day's entries, oldest first, with the time each shows ("12:40 am", or "12:40 am Wed"). */
+  rows(): { kind: string; text: string; time: string }[] {
     const rows = this.app.screen.queryAllByTestId(/^journal-note-(?!menu)[^-]+$/);
     return rows.map((r) => {
       const label: string = r.props.accessibilityLabel ?? '';
       const parts = label.split(', ');
-      return { kind: parts[0], text: parts.slice(1, -1).join(', ') };
+      return { kind: parts[0], text: parts.slice(1, -1).join(', '), time: parts[parts.length - 1] };
     });
   }
 
@@ -476,6 +535,41 @@ export class Manager {
       nav.current.navigate('Memorization');
     });
     await this.app.until(() => this.app.screen.queryByTestId('memorization-v2') != null, 'the memorization manager to open');
+  }
+
+  /**
+   * Edits, marks or unmarks `changes` (page → status) as the browser's checks do,
+   * then Save and Save in its sheet. "When did you memorize these?" is answered
+   * with `answer`; returns the question's buttons in order (null when not asked).
+   */
+  async save(changes: Record<number, 'memorized' | 'not_memorized'>, answer: string): Promise<string[] | null> {
+    const { fireEvent } = this.app.mods.rtl;
+    const { Alert } = this.app.mods.require<typeof import('react-native')>('react-native');
+    let asked: string[] | null = null;
+    (Alert as { alert: unknown }).alert = (title: string, _m?: string, buttons?: { text?: string; onPress?: () => void }[]) => {
+      if (title !== 'When did you memorize these?') return;
+      asked = (buttons ?? []).map((b) => b.text ?? '');
+      buttons?.find((b) => b.text === answer)?.onPress?.();
+    };
+    await this.app.until(() => this.app.screen.queryByTestId('memorization-edit') != null, 'the edit control');
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('memorization-edit'));
+    });
+    const { MemorizationBrowser } = this.app.mods.require<any>('src/components/MemorizationBrowser');
+    const browser = this.app.screen.UNSAFE_getByType(MemorizationBrowser);
+    const next = new Map(browser.props.pendingChanges as Map<number, string>);
+    for (const [page, status] of Object.entries(changes)) next.set(Number(page), status);
+    await this.app.act(async () => browser.props.onChange(next));
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('memorization-save'));
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('confirm-save') != null, 'the save sheet');
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('confirm-save'));
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('memorization-edit') != null, 'the save to finish');
+    await this.app.untilSynced();
+    return asked;
   }
 
   /** Marks a whole juz (mark mode, its check) and saves; "Today" answers the When question. */
