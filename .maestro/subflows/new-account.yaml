@@ -1,27 +1,59 @@
-# A fresh install, its clock at CLOCK, signed up and onboarded (onboard.yaml,
-# BOUNDARY midnight or fajr), on Home.
+# A fresh install, its clock at CLOCK, with an onboarded account the app makes by itself at
+# launch (src/lib/e2e/account.ts): the calls the sign-up and onboarding screens make, in their
+# order, without the screens. Page 1 and Juz 30 memorized (24 pages), 10 pages a day, the day
+# resetting at BOUNDARY (midnight | fajr). Leaves the address in output.email, on Home.
+# Through the screens this took 1.5–2.5 minutes of every flow (Nov 7 2026); 01-onboarding still
+# goes through them (signup.yaml, onboard.yaml).
 appId: com.revisionbuddy.app
 ---
-- runFlow:
-    file: launch.yaml
-    env:
-      CLOCK: ${CLOCK}
-- runFlow: signup.yaml
-# SYNC-4 is a known bug (BEHAVIOUR.md): a new account can stay on "loading"
-# until a relaunch. 01-onboarding fails on it; flows testing other rules
-# relaunch, as the scenario tests do, and say so in their log.
+- evalScript: ${output.email = 'e2e' + Date.now() + '@example.com'}
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+    # iOS reads both at launch (lib/e2e/clock, lib/e2e/account), so the account is made at the
+    # flow's time with no link (iOS links can wait 10–15 s for SpringBoard). Android ignores them.
+    arguments:
+      e2eClock: ${CLOCK}
+      e2eAccount: email=${output.email}&boundary=${BOUNDARY}
+# Android takes links: the clock first (the account is made at the flow's time), then the account.
 - runFlow:
     when:
-      notVisible:
-        id: welcome
+      platform: Android
     commands:
-      - evalScript: "${console.log('KNOWN BUG SYNC-4 - the new account stayed on loading, relaunching')}"
-      - runFlow: relaunch.yaml
       - extendedWaitUntil:
           visible:
-            id: welcome
+            id: auth
           timeout: 30000
+      - runFlow:
+          file: clock.yaml
+          env:
+            AT: ${CLOCK}
+      - openLink:
+          link: revisely://e2e/account?email=${output.email}&boundary=${BOUNDARY}
+# Until Home shows. A link prompt left from earlier, or a system alert (iOS), would cover it:
+# confirm either if it comes up.
+- repeat:
+    while:
+      notVisible:
+        id: today-post
+    times: 12
+    commands:
+      - runFlow: open-link-prompt.yaml
+      - runFlow: system-alert.yaml
+      - extendedWaitUntil:
+          visible:
+            id: today-post
+          timeout: 5000
+          optional: true
+- assertVisible:
+    id: today-post
+# What onboarding saved: Juz 30 memorized (24 pages, 4.0%), at the flow's time.
+- extendedWaitUntil:
+    visible:
+      text: ".*4.0% of the Quran memorized.*"
+    timeout: 15000
 - runFlow:
-    file: onboard.yaml
+    file: clock.yaml
     env:
-      BOUNDARY: ${BOUNDARY}
+      AT: ${CLOCK}

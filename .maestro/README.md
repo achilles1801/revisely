@@ -18,9 +18,9 @@ Every run that ran flows keeps their screenshots of key screens (`subflows/shot.
 that changed without its baseline being approved fails E2E (see "Screenshots" below).
 
 **The smoke set:**
-- **02 (today's session):** the revision session, the core of the app. Like every flow it starts
-  with sign-up and onboarding (`subflows/new-account.yaml`), checking what onboarding saved on Home,
-  so 01 adds only its own details.
+- **02 (today's session):** the revision session, the core of the app. Like every flow but 01 it
+  starts from an account the app makes at launch (`subflows/new-account.yaml`, below), checking what
+  onboarding saved on Home.
 - **04 (Fajr boundary):** the day and time logic, where the bug that started this suite was
   (revise ahead before Fajr).
 - **05 (daily log):** adding, editing and deleting notes. It found two app bugs on Nov 4.
@@ -91,9 +91,18 @@ rules it covers in its first lines; recordings have no rule there yet.
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
 | `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
 
-Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
-memorized (24 pages) and 10 pages a day, so the days are 1, 582–590 | 591–600 | 601–604, 1, 582–586.
-The test clock starts on Tuesday, 3 November 2026.
+Every account is new, with Al-Fatihah and Juz 30 memorized (24 pages) and 10 pages a day, so the
+days are 1, 582–590 | 591–600 | 601–604, 1, 582–586. The test clock starts on Tuesday, 3 November 2026.
+
+**How accounts are made.** Only `01-onboarding` signs up and onboards through the screens
+(`subflows/signup.yaml`, `subflows/onboard.yaml`). Every other flow starts with
+`subflows/new-account.yaml`: the app makes the account by itself at launch (`src/lib/e2e/account.ts`,
+`E2EAccount.tsx`). It makes the calls the screens make, in their order: `signUp`, the juz's marks and
+`updatePages`, then `createDefaultUser`, `saveUser` and `completeOnboarding`, each once what its
+screen waits for is there. So the account holds what onboarding saves, through the app's own code,
+in seconds instead of 1.5–2.5 minutes. iOS gets the request as a launch argument
+(`e2eAccount: email=…&boundary=midnight`), Android as a link once its clock is set
+(`revisely://e2e/account?email=…&boundary=midnight`). The app's log says each step (`[e2e] account:`).
 
 ## Screenshots
 
@@ -259,6 +268,7 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 | `revisely://e2e/clock?at=2026-11-04T09:00Z` | that instant |
 | `revisely://e2e/clock?at=now` | the real clock again |
 | `revisely://e2e/network?offline=1` (`0`) | the E2E network off: the emulators unreachable (iOS) |
+| `revisely://e2e/account?email=…&boundary=midnight` | an onboarded account made by the app (`subflows/new-account.yaml`) |
 
 - Time runs on from there, as on a phone; timers and animations use real time.
 - The offset is kept in a file in the app's Documents: a relaunch keeps the flow's time, and
@@ -315,7 +325,7 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 ## Writing one
 
 1. Find the rules in `BEHAVIOUR.md` and name them in the flow's first lines.
-2. Start from `subflows/new-account.yaml` (a fresh install, the clock, sign-up, onboarding), with
+2. Start from `subflows/new-account.yaml` (a fresh install, the clock, an onboarded account), with
    `CLOCK` and `BOUNDARY` (`midnight` or `fajr`). Set a zone with `# e2e-zone:` if it matters.
 3. Select by `id:` (a `testID`). Add a `testID` to the app where one is missing.
 4. Work out what the user should see by hand from the plan, as the scenarios do, not with the app's
