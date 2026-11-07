@@ -1,7 +1,10 @@
+import { plainText } from '../../passages';
 import { pagesLabel, revoChips, revoGreeting } from '../greeting';
 import type { RevoContext } from '../types';
 
 const ctx = (today: Partial<RevoContext['today']>, extra: Partial<RevoContext> = {}): RevoContext => ({
+  passages: {},
+  pageNames: {},
   totals: {
     memorizedPages: 100,
     revisedWithin7Days: 40,
@@ -23,7 +26,10 @@ const ctx = (today: Partial<RevoContext['today']>, extra: Partial<RevoContext> =
   streak: { days: 12, atRisk: null },
   localTime: '21:41',
   ...extra,
-});
+}) as RevoContext;
+/** The greeting as plain text (the screen's no-break hyphens and spaces as ordinary ones). */
+const said = (name: string | null, c: RevoContext) => plainText(revoGreeting(name, c));
+const chips = (c: RevoContext) => revoChips(c).map(plainText);
 
 describe('pagesLabel', () => {
   it('joins runs of pages', () => {
@@ -35,28 +41,28 @@ describe('pagesLabel', () => {
 });
 
 describe('Revo’s greeting (REVO-20)', () => {
-  it('[REVO-20] part way through, with weak pages next: the mock’s line', () => {
+  it('[REVO-20] part way through, with weak pages next: by surah, never page numbers', () => {
     const c = ctx({ revisedPages: 6, nextPages: [548, 549, 550], weakNext: [548, 549] });
-    expect(revoGreeting('Maryam', c)).toBe(
-      'Salaam Maryam. You’re 6 pages into today, and p. 548–549 are coming up next. They’re rated weak. Want a short plan for them?',
+    expect(said('Maryam', c)).toBe(
+      'Salaam Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. It’s rated weak. Want a short plan for it?',
     );
-    expect(revoChips(c)).toEqual(['Plan p. 548–549', 'How was my week?', 'How is my pace?']);
+    expect(chips(c)).toEqual(['Plan Al-Hashr to Al-Mumtahanah', 'How was my week?', 'How is my pace?']);
   });
 
-  it('[REVO-20] not started: where today starts; one weak page named', () => {
+  it('[REVO-20] not started: where today starts, by surah; the weak part named', () => {
     const c = ctx({ nextPages: [301, 302], weakNext: [302] });
-    expect(revoGreeting('Maryam', c)).toBe(
-      'Salaam Maryam. Today is 20 pages, starting at p. 301. Page 302 is rated weak. Want a short plan for it?',
+    expect(said('Maryam', c)).toBe(
+      'Salaam Maryam. Today is 20 pages, starting at Al-Kahf, ayah 62. Al-Kahf, ayahs 75–83 is rated weak. Want a short plan for it?',
     );
   });
 
   it('[REVO-20] done, nothing planned, no name', () => {
-    expect(revoGreeting('Maryam', ctx({ done: true, revisedPages: 20 }))).toBe(
+    expect(said('Maryam', ctx({ done: true, revisedPages: 20 }))).toBe(
       'Salaam Maryam. Today’s 20 pages are done. That’s a 12-day streak. Ask me anything about your revision.',
     );
-    expect(revoGreeting(null, ctx({ plannedPages: 0 }))).toBe(
+    expect(said(null, ctx({ plannedPages: 0 }))).toBe(
       'Salaam. Nothing is planned for today. Ask me about your progress, your weak spots or your plan.',
     );
-    expect(revoChips(ctx({ done: true }))).toEqual(['Which pages are weakest?', 'How was my week?', 'What should I revise next?']);
+    expect(chips(ctx({ done: true }))).toEqual(['Which parts are weakest?', 'How was my week?', 'What should I revise next?']);
   });
 });

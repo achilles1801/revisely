@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { bandOf, dailyPagesData, pageRatingsData, shortDate, type RatingBand } from '../../lib/revo/charts';
+import { spokenText } from '../../lib/passages';
+import { passageShort } from '../../lib/revo/words';
 import type { RevoAction, RevoChart } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
 
@@ -30,12 +32,15 @@ export function ChartCard({ chart, day }: { chart: RevoChart; day: string }) {
             <View
               accessible
               accessibilityLabel={data.rows
-                .map((r) => `p. ${r.page}: ${r.dots.length ? r.dots.map((d) => `${d.band} on ${shortDate(d.day)}`).join(', ') : 'no ratings'}`)
+                .map((r) => `${spokenText(passageShort([r.page]))}: ${r.dots.length ? r.dots.map((d) => `${d.band} on ${shortDate(d.day)}`).join(', ') : 'no ratings'}`)
                 .join('. ')}
             >
               {data.rows.map((r) => (
                 <View key={r.page} style={styles.ratingRow}>
-                  <Text style={[styles.axis, { color: palette.secondary }]}>p. {r.page}</Text>
+                  {/* The part by surah, not the page number (lib/revo/words). */}
+                  <Text style={[styles.axis, { color: palette.secondary }]} numberOfLines={1}>
+                    {passageShort([r.page])}
+                  </Text>
                   <View style={styles.track}>
                     <View style={[styles.line, { backgroundColor: palette.separator }]} />
                     {r.dots.map((d, i) => (
@@ -106,7 +111,7 @@ export function ChartCard({ chart, day }: { chart: RevoChart; day: string }) {
 
 const ACTION_BUTTON: Record<RevoAction['kind'], string> = {
   reviseFirst: 'Add to my plan',
-  openPage: 'Open the page',
+  openPage: 'Open in the reader',
   startRevision: 'Start revision',
 };
 

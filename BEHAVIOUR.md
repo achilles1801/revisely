@@ -328,7 +328,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   its conversations, memory and kept answers (the day's count stays); deleting the account deletes all of it.
 
 - **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and which
-  of it is weak), with suggestions; neither is a question or a call.
+  of it is weak), with suggestions; neither is a question or a call. Its own words name parts of the Qur'an by surah
+  and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
+  The context also carries each part it names in those words, for Revo's answers (REVO-27).
 
 - **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent and what isn't; nothing is
   sent before "Turn on Revo", the Day in review included. The sheet opens on the opt-in itself, at its height; a tap

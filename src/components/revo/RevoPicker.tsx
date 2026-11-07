@@ -16,7 +16,7 @@ import {
   pageAttachment,
   recordingAttachment,
 } from '../../lib/revo/attachments';
-import { pagesLabel } from '../../lib/revo/greeting';
+import { passageShort } from '../../lib/revo/words';
 import type { RevoAttachment } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { reviewedOn } from '../../lib/aheadCredit';
@@ -83,8 +83,8 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
       const suggested = q.trim()
         ? []
         : [
-            ...(context && context.today.nextPages.length ? [{ label: pagesLabel(context.today.nextPages.slice(0, 2)), pages: context.today.nextPages.slice(0, 2), detail: 'Coming up today' }] : []),
-            ...(context && context.weakPages.length ? [{ label: pagesLabel(context.weakPages.slice(0, 4)), pages: context.weakPages.slice(0, 4), detail: 'Rated weak' }] : []),
+            ...(context && context.today.nextPages.length ? [{ label: passageShort(context.today.nextPages.slice(0, 2)), pages: context.today.nextPages.slice(0, 2), detail: 'Coming up today' }] : []),
+            ...(context && context.weakPages.length ? [{ label: passageShort(context.weakPages.slice(0, 4)), pages: context.weakPages.slice(0, 4), detail: 'Rated weak' }] : []),
           ];
       return [...suggested, ...found].map((f) => ({
         key: `${f.label}-${f.pages[0]}`,
@@ -107,7 +107,7 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
       const a = recordingAttachment(r);
       const minutes = Math.max(1, Math.round(r.durationMs / 60000));
       const pagesOf = a.kind === 'recording' ? a.pages : [];
-      return { key: r.id, title: a.label, line: `${minutes} min${pagesOf.length ? ` · ${pagesLabel(pagesOf)}` : ''}`, make: () => a };
+      return { key: r.id, title: a.label, line: `${minutes} min${pagesOf.length ? ` · ${passageShort(pagesOf)}` : ''}`, make: () => a };
     });
   }, [kind, today, yesterday, logs, pages, q, context, notes, recordings]);
 

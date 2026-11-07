@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { plainText } from '../../lib/passages';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -168,7 +169,7 @@ export function Chips({ chips, onPick, disabled }: { chips: string[]; onPick: (c
           style={[styles.chip, { borderColor: palette.outline }, disabled && styles.dim]}
           accessibilityRole="button"
           accessibilityLabel={`Ask: ${c}`}
-          testID={`revo-chip-${c}`}
+          testID={`revo-chip-${plainText(c)}`}
         >
           <Text style={[styles.chipText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
             {c}
