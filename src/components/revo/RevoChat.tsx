@@ -36,6 +36,7 @@ export function RevoChat({
   onMemory,
   onExpand,
   onAction,
+  onOff,
 }: {
   uid: string;
   chatId: string | null;
@@ -49,6 +50,8 @@ export function RevoChat({
   onExpand: () => void;
   /** Open a page or today's session (the sheet closes first). */
   onAction: (action: RevoAction) => void;
+  /** The server says Revo is off for this account: show the opt-in (with what was asked kept for after). */
+  onOff?: () => void;
 }) {
   const { palette } = useTheme();
   const haptics = useHaptics();
@@ -104,6 +107,8 @@ export function RevoChat({
       logger.warn('Revo ask failed', { refusal: e.refusal });
       const retry = e.refusal === 'unavailable' || e.refusal === 'offline' ? question : undefined;
       setRefusal({ kind: e.refusal, message: e.message, retry });
+      // Off on the server (turned off on another phone, or not on yet): the opt-in, not a dead end.
+      if (e.refusal === 'off' && onOff) onOff();
       if (sentAttach) onAttach(sentAttach);
     } finally {
       setPending(null);

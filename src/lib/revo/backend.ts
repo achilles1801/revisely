@@ -145,7 +145,8 @@ const firebaseRevo: RevoBackend = {
   watchSettings(uid, cb) {
     return onSnapshot(
       doc(db, 'coachSettings', uid),
-      (snap) => cb({ optIn: snap.get('optIn') === true, memoryOn: snap.get('memoryOn') !== false }),
+      // Revo's own switch (functions/src/revo/admin.ts REVO_ON); `optIn` is the Ask coach's.
+      (snap) => cb({ optIn: snap.get('revoOn') === true, memoryOn: snap.get('memoryOn') !== false }),
       () => cb({ optIn: false, memoryOn: true }),
     );
   },

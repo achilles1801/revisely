@@ -20,6 +20,7 @@ import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT } from '../../../func
 import { parseReply } from '../../../functions/src/revo/reply';
 import type { CachedAnswer, RevoChat, RevoContext, RevoMemoryItem, RevoSettings, StoredMessage } from '../../../functions/src/revo/types';
 import { validateAttachment } from '../../../functions/src/revo/validate';
+import { revoSettingsOf } from '../../../functions/src/revo/settings';
 
 const usage = { input_tokens: 2000, output_tokens: 200, cache_read_input_tokens: 1800 };
 const NOW = new Date('2026-11-06T18:00:00Z');
@@ -155,6 +156,24 @@ describe('who may use Revo (REVO-1)', () => {
     expect(await handleSetOptions(U, { memoryOn: false }, deps(f.store, m.call))).toEqual({ optIn: true, memoryOn: false });
     await expect(handleSetOptions(U, { optIn: 'yes' }, deps(f.store, m.call))).rejects.toMatchObject({ code: 'invalid-argument' });
     await expect(handleSetOptions(U, { optIn: true }, deps(fakeStore({ tester: false }).store, m.call))).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+});
+
+describe('Revo’s own switch, and the changeover (REVO-1)', () => {
+  const settings = (doc: Record<string, unknown>) => revoSettingsOf((f) => doc[f]);
+  it('[REVO-1] revoOn decides; an older app’s account (only the coach’s optIn) stays on until revoOn is set; revoOn false is off', () => {
+    // The app from #310 on turns Revo on through its own opt-in: revoOn.
+    expect(settings({ revoOn: true }).optIn).toBe(true);
+    expect(settings({ revoOn: true, optIn: false }).optIn).toBe(true);
+    // An account turned on with the shared switch (an app from before #310): still on, so that app keeps working.
+    expect(settings({ optIn: true }).optIn).toBe(true);
+    // Turned off with Revo's own switch: off, whatever the coach's.
+    expect(settings({ revoOn: false, optIn: true }).optIn).toBe(false);
+    expect(settings({}).optIn).toBe(false);
+    expect(settings({ optIn: false }).optIn).toBe(false);
+    // Memory is on unless turned off.
+    expect(settings({}).memoryOn).toBe(true);
+    expect(settings({ memoryOn: false }).memoryOn).toBe(false);
   });
 });
 
