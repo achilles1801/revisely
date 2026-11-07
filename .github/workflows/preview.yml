@@ -92,7 +92,9 @@ jobs:
     name: Scenarios passed on this tree already?
     if: ${{ !inputs.publish }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Seconds of work. Short, because a newer push's run waits for this one to stop: a job cancelled
+    # before its runner had started it sat until its timeout (two runs dispatched a second apart).
+    timeout-minutes: 2
     permissions:
       contents: read
       actions: read
