@@ -195,7 +195,9 @@ function Coverage({ data, onPlanIt }: { data: InsightsData; onPlanIt: (pages: nu
         {legend.map((l) => (
           <View key={l.key} style={styles.legendItem}>
             <View style={[styles.swatch, l.swatch]} />
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>{l.label}</Text>
+            <Text style={[typeV2.meta, styles.legendText, { color: palette.secondary }]} numberOfLines={1}>
+              {l.label}
+            </Text>
           </View>
         ))}
       </View>
@@ -449,12 +451,15 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.3 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12 },
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
-  tiles: { marginTop: 12, gap: 4 },
+  tiles: { marginTop: 14, gap: 4 },
   tileRow: { flexDirection: 'row', gap: 4 },
   tile: { flex: 1, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   tileText: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
   learnDot: { position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: 2.5 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 11, rowGap: 4, marginTop: 10 },
+  // One line across the tiles' width, as the mock (iOS draws 13pt a little wider than the mock did,
+  // so the gaps give way first); a narrow phone or large text wraps it.
+  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 6, rowGap: 4, marginTop: 10 },
+  legendText: { letterSpacing: -0.08 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   swatch: { width: 10, height: 10, borderRadius: 3 },
   untouched: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginTop: 14 },
