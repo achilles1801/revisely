@@ -310,7 +310,7 @@ function formatDay(day: string): string {
 
 const styles = StyleSheet.create({
   spanRow: { paddingTop: 12, paddingHorizontal: 16 },
-  summary: { height: 40, flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#00000000' },
+  summary: { height: 40, flexDirection: 'row', alignItems: 'center' },
   monthHead: { height: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthTitle: { fontSize: 20, lineHeight: 24, fontWeight: '700' },
   chevrons: { flexDirection: 'row', gap: 22 },
