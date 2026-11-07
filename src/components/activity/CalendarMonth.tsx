@@ -12,7 +12,7 @@ import { monthGrid, monthTitle } from '../../lib/activityHeatmap';
 import { weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalendar';
 import { PillTabs } from '../v2/PillTabs';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
-import { formatMinutesLong } from '../../lib/activityFormat';
+import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
@@ -169,7 +169,7 @@ export function CalendarMonth({
       {/* The picked day: its date and Open, then one row per block that has something. */}
       <View style={styles.preview}>
         <View style={styles.previewHead}>
-          <Text style={[styles.previewDate, { color: palette.text }]}>{formatDay(shownDay)}</Text>
+          <Text style={[styles.previewDate, { color: palette.text }]}>{formatDayLong(shownDay)}</Text>
           <Tap onPress={() => onOpen(shownDay)} accessibilityRole="button" accessibilityLabel="Open the day" style={styles.openRow}>
             <Text style={[typeV2.name, { color: palette.link }]}>Open</Text>
             <Ionicons name="chevron-forward" size={16} color={palette.link} />
@@ -300,17 +300,9 @@ function LegendItem({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-/** "Wednesday 28 October": the weekday, the day, the month (the mock's order, no comma). */
-function formatDay(day: string): string {
-  const date = new Date(`${day}T00:00:00`);
-  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
-  const month = date.toLocaleDateString('en-US', { month: 'long' });
-  return `${weekday} ${date.getDate()} ${month}`;
-}
-
 const styles = StyleSheet.create({
   spanRow: { paddingTop: 12, paddingHorizontal: 16 },
-  summary: { height: 40, flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#00000000' },
+  summary: { height: 40, flexDirection: 'row', alignItems: 'center' },
   monthHead: { height: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthTitle: { fontSize: 20, lineHeight: 24, fontWeight: '700' },
   chevrons: { flexDirection: 'row', gap: 22 },
