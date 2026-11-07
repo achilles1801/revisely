@@ -80,7 +80,7 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
 
   const opened = await openWithRevo(phone);
   app = opened.app;

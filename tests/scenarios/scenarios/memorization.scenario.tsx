@@ -20,7 +20,7 @@ async function account(): Promise<Phone> {
   await app.untilSynced();
   await app.close();
   // The owner marks the account a tester while the app is closed (the rules keep clients from it).
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
   return phone;
 }
 

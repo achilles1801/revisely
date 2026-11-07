@@ -1,7 +1,9 @@
 name: Scenarios
 
 # The scenario and property tests (tests/scenarios, BEHAVIOUR.md): the app's own
-# code against the Firebase emulators, with a test clock and time zone. Called by
+# code against the Firebase emulators (Auth, Firestore, Storage, and our Cloud
+# Functions, where only Anthropic answers from a recording: TESTING.md), with a
+# test clock and time zone. Called by
 # ci.yml (every push and PR) and by preview.yml, which publishes nothing unless
 # they pass. No caches: preview.yml holds release secrets (CLAUDE.md).
 #
@@ -37,15 +39,16 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm ci
         working-directory: tests/scenarios
-      # firebase-admin, for the owner's scripts the scenarios run (harness/admin.ts).
+      # Our Cloud Functions, which the functions emulator runs (emulators.sh builds them),
+      # and firebase-admin for the owner's scripts the scenarios run (harness/admin.ts).
       - run: npm ci
         working-directory: functions
       - name: BEHAVIOUR.md and its tests
         if: matrix.shard == 1
         run: node tests/scenarios/check-spec.js
-      - name: Scenarios and properties (Firebase emulators), shard ${{ matrix.shard }} of 4
+      - name: Scenarios and properties (Firebase emulators and our functions), shard ${{ matrix.shard }} of 4
         run: >-
-          scripts/emulators.sh exec auth,firestore demo-revisely
+          scripts/emulators.sh exec auth,firestore,functions,storage demo-revisely
           'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4'
 
   # The one check: every shard passed. It runs after a failure too, so it is
