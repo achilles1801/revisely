@@ -5,6 +5,10 @@
 # left: the next page comes in from the left.
 appId: com.revisionbuddy.app
 ---
+# The page swiped from (its number under the page).
+- copyTextFrom:
+    id: session-page-number
+- evalScript: ${output.pageBefore = maestro.copiedText}
 - copyTextFrom:
     text: ".*· [0-9]+/[0-9]+"
 # "Juz 30 · 2/10" gives "3/10". (No `$` here: Maestro's ${…} can't hold one.)
@@ -15,6 +19,25 @@ appId: com.revisionbuddy.app
     duration: 300
 # The app counts the page a moment after it has turned (seconds, on a busy
 # emulator); only then is the count worth reading again.
+- extendedWaitUntil:
+    visible:
+      text: ".*· ${output.nextCount}"
+    timeout: 8000
+    optional: true
+# A swipe can be lost: in 06 on Android (PR #288, Nov 7, twice) the first swipe,
+# 0.7 s after the offline session opened, never moved the page. Once more, but
+# only while the page is still the one swiped from, so a swipe that took (and is
+# just slow to be counted) never gets a second one.
+- runFlow:
+    when:
+      visible:
+        id: session-page-number
+        text: ${output.pageBefore}
+    commands:
+      - swipe:
+          start: 12%, 50%
+          end: 88%, 50%
+          duration: 300
 - extendedWaitUntil:
     visible:
       text: ".*· ${output.nextCount}"
