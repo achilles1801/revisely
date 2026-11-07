@@ -41,7 +41,9 @@ import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, ReadingSession, RevisionLog } from '../../types';
 import { RecordingsList } from '../../components/recordings/RecordingsList';
 import { deleteRecordings, isReadingRecordingDuring } from '../../lib/recordings';
-import { TopBar } from '../../components/v2/TopBar';
+import { IconButton, TopBar } from '../../components/v2/TopBar';
+import { AddToDaySheet } from '../../components/activity/AddToDaySheet';
+import { dayTitle } from '../../lib/activityFormat';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { RowText, ThreadRow } from '../../components/v2/ThreadRow';
@@ -122,6 +124,8 @@ export default function ActivityDayScreen() {
   const [editingLog, setEditingLog] = useState<RevisionLog | null>(null);
   // A timed session's ⋯ menu.
   const [timedMenu, setTimedMenu] = useState<ReadingSession | null>(null);
+  // The + (blocks): add to this day (mock d5).
+  const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [r, j] = await Promise.allSettled([
@@ -211,6 +215,7 @@ export default function ActivityDayScreen() {
   };
 
   const label = formatJournalDayRelative(date, today);
+  const heading = dayTitle(date, today);
   type Reply = {
     key: string;
     mark: React.ReactNode;
@@ -267,8 +272,10 @@ export default function ActivityDayScreen() {
       a11y: `Timed session, ${formatDuration(r.durationSeconds)}. Edit pages`,
     }))),
     // One row per note, in the order they were written.
-    ...(journal
-      ? journal.entries.filter((n) => !blocks).map((n): Reply => {
+    ...(blocks
+      ? []
+      : journal
+      ? journal.entries.map((n): Reply => {
           const text = n.text.trim();
           const time = formatEntryTime(n.at, date, user);
           return {
@@ -315,7 +322,25 @@ export default function ActivityDayScreen() {
 
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
-      <TopBar title={label} onBack={() => navigation.goBack()} separator />
+      {blocks ? (
+        <TopBar
+          onBack={() => navigation.goBack()}
+          center={
+            <View style={styles.title} accessible accessibilityRole="header" accessibilityLabel={`${heading.title}, ${heading.subtitle}`}>
+              <Text style={[typeV2.barTitle, styles.titleText, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                {heading.title}
+              </Text>
+              <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                {heading.subtitle}
+              </Text>
+            </View>
+          }
+          right={<IconButton icon="add" label="Add" onPress={() => setAddOpen(true)} size={28} testID="day-add" />}
+          separator
+        />
+      ) : (
+        <TopBar title={label} onBack={() => navigation.goBack()} separator />
+      )}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.secondary} />
@@ -424,6 +449,16 @@ export default function ActivityDayScreen() {
             : []
         }
       />
+      {blocks && (
+        <AddToDaySheet
+          visible={addOpen}
+          onClose={() => setAddOpen(false)}
+          day={date}
+          title={date === today ? 'Add to today' : `Add to ${heading.title === 'Yesterday' ? 'yesterday' : heading.title}`}
+          logs={logs}
+          onRead={() => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read')}
+        />
+      )}
       <ReadingPagesSheet
         session={editingReading}
         onClose={() => setEditingReading(null)}
@@ -456,6 +491,8 @@ export default function ActivityDayScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  title: { alignItems: 'center' },
+  titleText: { letterSpacing: -0.43 },
 });
 
 // The new design.

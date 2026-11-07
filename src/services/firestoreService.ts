@@ -832,7 +832,7 @@ export async function getActivityItemsForDay(
   userId?: string,
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
-  memorized: { id: string; day: string; pages: number[] }[];
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Pages revised in an earlier session, credited to this day ("done ahead"). */
   doneAhead: { fromDay: string; pages: number[] }[];
@@ -857,7 +857,7 @@ export async function getActivityItemsForDay(
         minutes: x.minutes ?? null,
       };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
     doneAhead: ahead.docs
       .filter((d) => d.data().day !== day)
@@ -933,7 +933,7 @@ export async function getActivityItemsBetween(
   userId?: string,
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null; occurredAt: number | null }[];
-  memorized: { id: string; day: string; pages: number[] }[];
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
@@ -946,7 +946,7 @@ export async function getActivityItemsBetween(
       const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;
       return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
     reads: read.docs.map((d) => {
       const x = d.data();
       const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;

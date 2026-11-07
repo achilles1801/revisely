@@ -2,7 +2,7 @@
 // no swipe, no Delete, and no empty thread item (Majd's TestFlight report).
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { DayBlocks } from '../DayBlocks';
+import { DayBlocks, timeRange } from '../DayBlocks';
 import * as firestoreService from '../../../services/firestoreService';
 import type { JournalNote } from '../../../types';
 
@@ -62,5 +62,19 @@ describe('the Notes block (sub-rows carry no actions)', () => {
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByTestId('activity-block-notes')).toBeNull();
+  });
+});
+
+describe('a timed read\'s time range (mock d1)', () => {
+  const at = (h: number, m: number) => new Date(2026, 10, 3, h, m).getTime();
+  const plain = (t: string) => t.replace(/\s/g, ' ');
+  it('says AM or PM once when both ends share it', () => {
+    expect(plain(timeRange(at(8, 5), 18))).toBe('8:05 – 8:23 AM');
+  });
+  it('says both when the range crosses noon', () => {
+    expect(plain(timeRange(at(11, 50), 20))).toBe('11:50 AM – 12:10 PM');
+  });
+  it('gives the start alone without minutes', () => {
+    expect(plain(timeRange(at(8, 5), null))).toBe('8:05 AM');
   });
 });
