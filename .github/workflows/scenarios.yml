@@ -18,6 +18,11 @@ name: Scenarios
 
 on:
   workflow_call:
+    inputs:
+      repeat:
+        description: Runs of the suite in each shard, every one of which must pass (2 for a PR that changes the scenario harness)
+        type: number
+        default: 1
 
 permissions:
   contents: read
@@ -63,7 +68,8 @@ jobs:
       - name: Scenarios and properties (Firebase emulators and our functions), shard ${{ matrix.shard }} of 4
         run: >-
           scripts/emulators.sh exec auth,firestore,functions,storage demo-revisely
-          'cd tests/scenarios && npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4'
+          'cd tests/scenarios && for run in $(seq 1 ${{ inputs.repeat }}); do echo "Run $run of ${{ inputs.repeat }}";
+          npx jest --config jest.config.js --ci --maxWorkers=2 --forceExit --shard=${{ matrix.shard }}/4 || exit 1; done'
 
   # The one check: every shard passed. It runs after a failure too, so it is
   # never missing, and a shard that didn't run (cancelled, skipped) fails it.
