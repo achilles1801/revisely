@@ -375,6 +375,11 @@ Things that bit:
 - On Android, text typed into a field as it gains focus can be lost; `subflows/type-in-log.yaml`
   checks the field and types again. Android also writes times as "12:23 pm" and may show dialog
   buttons in capitals: match with `(?i)`.
+- The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile (run
+  42403217365: "Keyboard queue task timeout detected" in `device.log`, the keyboard connection
+  interrupted, 12 s before the first character; the sign-up email went out malformed). A sign-up
+  the app refuses fails in `subflows/signup.yaml` on its own error (`auth-error`), not later as
+  SYNC-4 after a relaunch that clears it.
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
 - A function's first signed-in call in the emulator is slow on a CI macOS runner: 17–22 s, against
