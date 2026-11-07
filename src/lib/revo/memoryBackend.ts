@@ -1,6 +1,6 @@
-// An in-memory Revo backend: the server's rules (the 10 a day, one Day in review a day, memory
-// on or off, turning Revo off deletes history and memory) without the model. E2E builds use it
-// (lib/e2e/revoFake), since the flows have no functions emulator and no model, and so do tests.
+// An in-memory Revo backend for component tests (components/revo/__tests__): the server's rules
+// (the questions a day, one Day in review a day, memory on or off, turning Revo off deletes history
+// and memory) without the model. Scenarios and E2E use the real functions (TESTING.md).
 // Its answers are fixed, picked by a few words of the question.
 
 import type { RevoBackend } from './backend';

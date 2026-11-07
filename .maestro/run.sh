@@ -14,6 +14,7 @@
 #   E2E_DEVICE         simulator UDID / adb serial (default: the one booted device)
 #   E2E_AUTH_URL       the Auth emulator as this computer sees it (http://127.0.0.1:9099)
 #   E2E_FIRESTORE_URL  the Firestore emulator (http://127.0.0.1:8080)
+#   E2E_FUNCTIONS_URL  the functions emulator (http://127.0.0.1:5001)
 #   E2E_OUTPUT         where reports, logs and screenshots go (.maestro/build/results)
 #   E2E_RETRIES        reruns of a failed flow (default 0); a pass on a rerun is reported
 #   E2E_ZONE           the zone for flows that name none (America/Chicago)
@@ -33,6 +34,7 @@ RETRIES=${E2E_RETRIES:-0}
 DEFAULT_ZONE=${E2E_ZONE:-America/Chicago}
 AUTH_URL=${E2E_AUTH_URL:-http://127.0.0.1:9099}
 FIRESTORE_URL=${E2E_FIRESTORE_URL:-http://127.0.0.1:8080}
+FUNCTIONS_URL=${E2E_FUNCTIONS_URL:-http://127.0.0.1:5001}
 MAESTRO=${MAESTRO:-$(command -v maestro || echo "$HOME/.maestro/bin/maestro")}
 mkdir -p "$OUT"
 
@@ -138,14 +140,14 @@ run_flow() {
   fi
   if [ "$PLATFORM" = ios ]; then
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test \
-      -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
+      -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1
   else
     set_android_zone "$zone" || return 1
     with_limit "$FLOW_LIMIT" "$MAESTRO" --device "$DEVICE" test \
-      -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" \
+      -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1

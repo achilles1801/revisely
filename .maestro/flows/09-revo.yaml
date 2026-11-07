@@ -1,8 +1,9 @@
-# Revo, the assistant (previewTester accounts; an E2E build shows it to every account, with an
-# in-memory stand-in for its server: src/lib/e2e/revoFake.ts). Takes a screenshot of each
-# screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock boards,
-# in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
-# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-24, REVO-25
+# Revo, the assistant, for a previewTester account (marked one through the emulator, as the owner's
+# script does), against the real revo* functions in the functions emulator: only the model answers
+# from a recording, with the text the flow gives it (scripts/server-revo.js). Takes a screenshot of
+# each screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock
+# boards, in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
+# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -10,6 +11,11 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T21:41
       BOUNDARY: midnight
+# A tester (Revo is theirs only): the app sees it when its user document changes.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
 
 # REVO-21: the button on Home; its first tap opens the opt-in.
 - extendedWaitUntil:
@@ -69,7 +75,13 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-context-remove
 
-# A conversation: a chart and one plan that waits for a tap.
+# A conversation: a chart and one plan that waits for a tap. What the model says (inside its
+# recorded reply): a chart and a plan on two of today's pages, and two things to remember.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Pages 582 and 583 come first in each session, when you are freshest, and they have held up well so far. Give them a second look before Fajr tomorrow.", "chart": {"kind": "pageRatings", "title": "Pages 582 and 583", "pages": [582, 583]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "Revise pages 582 and 583 first tomorrow", "detail": "Two pages, before the rest of the day", "pages": [582, 583]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
 - tapOn:
     id: revo-input
 - inputText: "Why do these two keep slipping?"
@@ -101,11 +113,13 @@ appId: com.revisionbuddy.app
       id: revo-plan-added
     timeout: 10000
 
-# Tonight's Day in review written, and a few things Revo remembers.
-- runFlow:
-    file: ../subflows/revo-link.yaml
+# Tonight's Day in review, written by the real function (as the app asks for it on a day with
+# something done). The memory holds what the conversation's answer asked to remember.
+- runScript:
+    file: ../scripts/server-revo.js
     env:
-      QUERY: review=1&memory=1&day=2026-11-03
+      MODE: review
+      DAY: 2026-11-03
 
 # History: the conversation and the Day in review.
 - tapOn:
@@ -135,11 +149,12 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-back
 
-# REVO-22: the day's questions used.
-- runFlow:
-    file: ../subflows/revo-link.yaml
+# REVO-22: the day's questions used (revoUsage, which only the functions write; the app reads it).
+- runScript:
+    file: ../scripts/server-revo.js
     env:
-      QUERY: left=0&day=2026-11-03
+      MODE: limit
+      DAY: 2026-11-03
 - extendedWaitUntil:
     visible:
       id: revo-limit
@@ -204,10 +219,18 @@ appId: com.revisionbuddy.app
     visible:
       id: today-post
     timeout: 10000
-- runFlow:
-    file: ../subflows/revo-link.yaml
+# Revo off through the real revoSetOptions (what Settings → Revo AI calls), and the day's
+# questions back.
+- runScript:
+    file: ../scripts/server-revo.js
     env:
-      QUERY: optin=0&left=20&day=2026-11-03
+      MODE: off
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: limit
+      DAY: 2026-11-03
+      COUNT: "0"
 - extendedWaitUntil:
     visible:
       id: revo-button
