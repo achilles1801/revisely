@@ -11,6 +11,12 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/backup-notice.yaml
 - tapOn:
     id: open-settings
+# Appearance is down the page.
+- scrollUntilVisible:
+    element:
+      id: pill-dark
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: pill-dark
 - tapOn:
