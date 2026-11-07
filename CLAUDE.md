@@ -1387,6 +1387,19 @@ classic default), and a fresh install starts in light.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. In a line that mixes them, put the Latin first
   and the Arabic last in a first-strong isolate (`⁨…⁩`): a line that starts with Arabic
   is laid out right to left (Insights' juz rows did).
+- **Surahs and juz first, page numbers almost never** (the owner, Nov 7 2026). People memorize by
+  surah and juz: "Your revision starts at page 288" means little, "Al-Baqarah" a lot. So the app
+  names any part of the Qur'an by its surahs and juz ("Al-Baqarah, ayahs 142–176", "Adh-Dhariyat 7
+  to Al-Hadid", "Juz 28"), never as "Pages 522–541", and every such name comes from `lib/passages`:
+  - `describePassage(pages, { form, juz, order, wholeJuz })`: long (rows, sentences) or short (chips,
+    chart labels: "Start of Al-Baqarah"); `juz: true` adds " · Juz 28" when it helps; `order:
+    'given'` keeps a session's order (the reverse plan, the cycle's end then its start).
+  - `describePageRange`, `describeSession` (SESS-5: whole juz only on the juz plan), `placeOfPage`
+    ("Starts at Al-Baqarah, ayah 142"), `pagesNote` ("p. 542") and `spokenText` (VoiceOver).
+  - Page numbers stay only as a quiet detail after the words where they help ("Al-Mujadila ·
+    p. 542"), inside the reader (the printed page is the reference there) and where the user
+    chooses by page (Jump to's Page). Amounts are fine ("20 pages"). Approved mocks that lead with
+    page numbers are overridden by this.
 - `theme.onAccent` is the text colour on an `accent` fill. Use it instead of `'#fff'`.
 - Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
   a native change for a versioned release. Until then Settings offers Light and Dark only
