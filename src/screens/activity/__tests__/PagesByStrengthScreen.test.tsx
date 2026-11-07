@@ -50,12 +50,17 @@ const user = {
   fajrBoundaryEnabled: false,
 } as unknown as User;
 
-const page = (pageNumber: number, weaknessRating: number, revised: boolean | Date = true): UserPage => ({
+const page = (pageNumber: number, weaknessRating: number, revised: boolean | Date | string = true): UserPage => ({
   pageNumber,
   status: 'memorized',
   dateMemorized: '2025-01-01T00:00:00.000Z',
   weaknessRating,
-  lastRevisedDate: revised === false ? null : (revised === true ? new Date(Date.now() - 3 * 86_400_000) : revised).toISOString(),
+  lastRevisedDate:
+    revised === false
+      ? null
+      : typeof revised === 'string'
+        ? revised
+        : (revised === true ? new Date(Date.now() - 3 * 86_400_000) : revised).toISOString(),
   totalRevisionCount: 3,
   skipCount: 0,
 });
@@ -122,6 +127,14 @@ describe('Pages by strength (ACT-12)', () => {
     expect(screen.getByText('Weak · Juz 28 · revised today')).toBeTruthy();
     expect(screen.getByText('Weak · Juz 28 · revised 3d ago')).toBeTruthy();
     expect(screen.queryByText(/-\d+d ago/)).toBeNull();
+  });
+
+  it('a page the self-heal dated (the day, as its midnight UTC) is counted on that day in any zone', async () => {
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    mockApp.pages = [page(548, 2, `${today}T00:00:00.000Z`)];
+    await open();
+    expect(screen.getByText('Weak · Juz 28 · revised today')).toBeTruthy();
   });
 
   it('no revised page yet: one quiet line, no list', async () => {
