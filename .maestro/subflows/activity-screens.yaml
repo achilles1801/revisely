@@ -1,6 +1,7 @@
 # The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month and
-# week, a day, the day's block menu, and Insights, each a screenshot named 09-<screen>-${THEME}.
-# The day as d1 (top, then scrolled), its menu (d10a), the + (d5) and a light day (d2).
+# week, a day, the day's block menu, the add sheets and Insights, each a screenshot named
+# 09-<screen>-${THEME}. The day as d1 (top, then scrolled), its menu (d10a), the + (d5), its Revised,
+# Memorized and Note sheets (d6–d8), a light day (d2), and Insights (d4: top, Weak spots, the end).
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -14,6 +15,11 @@ appId: com.revisionbuddy.app
 - tapOn: "Previous month"
 - tapOn:
     id: calendar-day-2026-10-28
+# The day's recording (the app writes the demo ones after the relaunch): its mic and count.
+- extendedWaitUntil:
+    visible:
+      id: preview-recordings-revised
+    timeout: 30000
 - runFlow:
     file: shot.yaml
     env:
@@ -74,8 +80,94 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-add-menu-${THEME}
+# Revised (d6): the session's skipped pages filled in, 8 minutes, Moderate.
 - tapOn:
-    point: "50%,12%"
+    id: sheet-action-revised
+- extendedWaitUntil:
+    visible:
+      id: add-revised-from-session
+    timeout: 10000
+- tapOn:
+    id: add-revised-from-session
+- tapOn:
+    id: add-revised-minutes
+- inputText: "8"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: activity-keyboard-done
+          optional: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn:
+    id: add-revised-strength-moderate
+- extendedWaitUntil:
+    visible:
+      id: add-revised-info
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-revised-${THEME}
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: add-revised-sheet
+    timeout: 10000
+# Memorized (d7): "From your reading" (p. 563, read at 8:05), nothing typed yet.
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-memorized
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-from-reading
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-memorized-${THEME}
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: add-memorized-sheet
+    timeout: 10000
+# Note (d8): typed, and shown under Revised. (ASCII only: Android's input can't type an en dash.)
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-note
+- extendedWaitUntil:
+    visible:
+      id: add-note-text
+    timeout: 10000
+- tapOn:
+    id: add-note-text
+- inputText: "548-549 keep slipping at the turn. Read them twice before Fajr."
+- tapOn:
+    id: add-note-tag-revised
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-note-${THEME}
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: add-note-sheet
+    timeout: 10000
 - tapOn:
     id: back
 - extendedWaitUntil:
@@ -110,6 +202,17 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-${THEME}
+# Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
+- scrollUntilVisible:
+    element:
+      id: insights-ask-revo
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-weak-${THEME}
 # The rest of Insights (d4 is taller than a screen): Weak spots to Pace.
 - scrollUntilVisible:
     element:
