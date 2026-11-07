@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import { compareImages, encodePng, findCaptures, masksFor, normalise, pendingReason } from './lib.mjs';
-import { PLATFORMS, SCREEN_MASKS, MATCH } from './screens.mjs';
+import { PLATFORMS, SCREEN_MASKS, MATCH, VARIANTS } from './screens.mjs';
 
 const SIZE = { ios: [1206, 2622], android: [1080, 2400] };
 
@@ -101,4 +101,10 @@ test('screens being redesigned have no baseline on purpose', () => {
   assert.match(pendingReason('02-smart-preview'), /Insights/);
   assert.match(pendingReason('r4-sheet'), /Revo/);
   assert.equal(pendingReason('02-home-done'), null);
+});
+
+test("every accent and theme variant of a Revo screen waits for approval", () => {
+  assert.equal(VARIANTS.length, 6);
+  for (const v of VARIANTS) assert.match(pendingReason(`r4-sheet${v}`), /Revo/, `r4-sheet${v}`);
+  assert.equal(pendingReason('02-home-done-dark'), null);
 });

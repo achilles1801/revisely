@@ -101,9 +101,11 @@ After the flows, each job compares their screenshots with the approved ones (ste
 screenshots", `.maestro/visual/`), so a screen that changes without anyone approving it fails E2E.
 Before Nov 7 2026 nothing did: Activity screens that didn't match the approved mocks shipped.
 
-- **Baselines:** `.maestro/baselines/<platform>/<name>.png`, one per screen and platform, in light
-  (every flow captures light; a dark capture would be named `<name>-dark`). From CI's devices only:
-  iOS an iPhone 17 Pro Simulator (1206×2622), Android the pixel_6 emulator (1080×2400).
+- **Baselines:** `.maestro/baselines/<platform>/<name>.png`, one per screen and platform. From
+  CI's devices only: iOS an iPhone 17 Pro Simulator (1206×2622), Android the pixel_6 emulator
+  (1080×2400). Every flow captures Indigo in light today. A capture in another accent or theme is
+  its own screen, named with suffixes: `-crimson` or `-jade`, then `-dark` (`r4-sheet-jade-dark`;
+  `VARIANTS` in `screens.mjs`).
 - **Normalised** before comparing or approving (`lib.mjs`): the status bar cropped, what still
   varies between runs masked (pink), and halved (each pixel the mean of 2×2), which keeps a
   baseline at 40–160 KB. The masks (`screens.mjs`, in the raw capture's pixels):
@@ -140,10 +142,13 @@ node .maestro/visual/approve.mjs <run id>
 - `--from .maestro/build/results` approves a local run's captures: for trying the tool only, since
   the baselines must come from CI's devices.
 
-**No baselines on purpose** (`PENDING` in `screens.mjs`): Activity (Overview, Day, Insights:
-`07-activity-recording`), Insights' Smart Tracking intro (`02-smart-preview`) and Revo (`09-revo`'s
-`r1`…`r10`) are being rebuilt by other sessions. Approve each once its boards match the approved
-mocks, then take it out of `PENDING` (and unmask Revo's button).
+**No baselines on purpose** (`PENDING` in `screens.mjs`), being rebuilt by other sessions. Approve
+each once its boards match the approved mocks, then take it out of `PENDING`:
+- Activity (Overview, Day, Insights: `07-activity-recording`);
+- Insights' Smart Tracking intro (`02-smart-preview`);
+- Revo (`09-revo`'s `r1`…`r10`), **in all six variants**: Indigo, Crimson and Jade, each in light
+  and dark (`r4-sheet`, `r4-sheet-dark`, `r4-sheet-crimson`, … `r4-sheet-jade-dark`), each
+  against its own mock. Then unmask Revo's button on Home (`revoButton`).
 
 **A new screen:** a `shot.yaml` step in a flow; its first run reports "no baseline yet"; approve
 it. If something on it changes from run to run (a time, a duration, a countdown), mask it in
@@ -169,7 +174,7 @@ about a second a job.
   everything else (the page images in the real Storage bucket, translations, the worker, push
   tokens) goes to a closed local port and fails at once. So the session shows "Couldn't load page" where the mushaf would be; the
   pages still swipe and count. NetInfo checks reachability against the Auth emulator.
-- **A fresh install is light** (`pinFreshTheme` in `src/lib/e2e/install.ts`), the theme the
+- **A fresh install is light** (`pinFreshTheme` in `src/lib/e2e/theme.ts`), the theme the
   screenshots are approved in. The app chooses once, at the first launch, and a key written
   earlier in that same launch (the store check's app config, 3 s in) made a slow Simulator's
   fresh install start dark (run 42336185779); the E2E build makes the choice before the app

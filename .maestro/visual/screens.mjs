@@ -91,10 +91,18 @@ export const PENDING = [
     reason: 'Insights (Smart Tracking) is being merged into Activity',
   },
   {
+    // Every Revo screen in every variant (VARIANTS below): r4-sheet, r4-sheet-dark,
+    // r4-sheet-crimson, … r4-sheet-jade-dark. Each is approved once its board matches
+    // that variant's mock.
     pattern: /^(r\d+|09-)/i,
-    reason: 'Revo is being rebuilt',
+    reason: 'Revo is being rebuilt: approve each screen in all six accent and theme variants',
   },
 ];
+
+// A screen captured in another accent or theme is its own baseline, named with suffixes:
+// none for Indigo in light (the defaults), `-crimson` or `-jade` for the accent, then
+// `-dark` for the theme. Revo's screens are to be approved in all six.
+export const VARIANTS = ['', '-dark', '-crimson', '-crimson-dark', '-jade', '-jade-dark'];
 
 // pixelmatch's colour distance per pixel (0–1), and how many changed pixels (of a
 // normalised, halved capture) still count as the same screen.

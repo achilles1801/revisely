@@ -1,13 +1,9 @@
-// The E2E build's start (src/lib/e2e/install.ts): a fresh install's theme is chosen
-// before the app starts, so the flows' screenshots are always taken in light.
-
-jest.mock('../clock', () => ({ handleClockLink: jest.fn(), installClock: jest.fn() }));
-jest.mock('../log', () => ({ flushE2ELog: jest.fn(), installLog: jest.fn() }));
-jest.mock('../network', () => ({ handleNetworkLink: jest.fn(), installNetwork: jest.fn() }));
+// The E2E build's start (src/lib/e2e/theme.ts, run by install.ts): a fresh install's
+// theme is chosen before the app starts, so the flows' screenshots are always light.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { THEME_KEY as APP_THEME_KEY, resolveThemeMode } from '../../../context/ThemeContext';
-import { THEME_KEY, pinFreshTheme } from '../install';
+import { THEME_KEY, pinFreshTheme } from '../theme';
 
 beforeEach(async () => {
   await AsyncStorage.clear();
