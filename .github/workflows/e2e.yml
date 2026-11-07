@@ -512,9 +512,13 @@ jobs:
             .maestro/build/debug.keystore
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      - name: Bundle this commit's JavaScript
+      # Started here, waited for once the emulator is up (await-bundle.sh, in the flows'
+      # script): bundling (about a minute) and the emulator's install and boot (about
+      # another) side by side.
+      - name: Bundle this commit's JavaScript (in the background)
         if: matrix.shard.flows != '' && steps.cache.outputs.cache-hit == 'true'
-        run: bash .maestro/scripts/embed-js.sh android .maestro/build/revisely-e2e.apk
+        run: |
+          nohup bash -c 'bash .maestro/scripts/embed-js.sh android .maestro/build/revisely-e2e.apk; echo $? > "$RUNNER_TEMP/embed-js.status"' > "$RUNNER_TEMP/embed-js.log" 2>&1 &
 
       # Maestro and the Firestore emulator's jar, kept per version (the CLI
       # downloads the jar each run otherwise).
@@ -562,7 +566,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       # The action runs each line of `script` on its own: one line. $E2E_FLOWS
-      # (the job's flows) is a glob, expanded there.
+      # (the job's flows) is a glob, expanded there. It first waits for the bundle
+      # started above (nothing to wait for after a native build, which bundled).
       - name: Run the flows
         id: flows
         if: matrix.shard.flows != ''
@@ -576,7 +581,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
-          script: adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android $E2E_FLOWS
+          script: bash .maestro/scripts/await-bundle.sh && adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android $E2E_FLOWS
 
       # Each flow's attempts (run.sh's attempts.json: passed on the first attempt or
       # not, and why not), from every run, for the weekly flake report (e2e-flakes.yml).
