@@ -11,7 +11,7 @@ import type { ReactElement } from 'react';
 import { pagesRange } from '../harness/account';
 import { setNow } from '../harness/clock';
 import { Home, homeStack } from '../harness/screens';
-import { catchUpWhat, place, plain } from '../harness/words';
+import { aheadAt, catchUpWhat, place, plain, startsAt } from '../harness/words';
 import { addDays, scenarioPhone } from '../harness/testScenario';
 import type { Booted, OpenApp } from '../harness/phone';
 import type { RevoContext } from '../../../src/lib/revo/types';
@@ -282,7 +282,7 @@ describe('5. Missed days', () => {
     const home = new Home(app);
     await home.ready();
     await addToToday(app, home);
-    expect(home.title()).toMatch(/^Starts at .+, p\.\s583(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(583));
     const session = await home.startSession();
     expect(session.pages()).toEqual(pagesRange(583, 588));
     await session.swipeThrough(6);
@@ -295,7 +295,7 @@ describe('5. Missed days', () => {
     expect(home.title()).toBe('Done · 6 pages');
     expect(home.cta()).toBe('Review session');
     // Today's own three (589–591) are tomorrow's now.
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s589(?!\d)/);
+    expect(plain(home.ahead())).toMatch(aheadAt('Tomorrow', 589));
     // The eight days before the two missed ones don't come back: yesterday, caught up in its grace
     // window, and today.
     await home.untilStreak(2);
@@ -347,7 +347,7 @@ describe('2. Beginner', () => {
     expect(creditedTo(app, D)).toEqual([]);
     expect(home.title()).toBe('Done · 3 pages');
     expect(home.cta()).toBe('Review session');
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s596(?!\d)/);
+    expect(plain(home.ahead())).toMatch(aheadAt('Tomorrow', 596));
     // D−1 and today. D−2 is whole now, but done after its grace window (D−1): it doesn't join the run before it.
     await home.untilStreak(2);
     await app.idle(1500);
@@ -372,7 +372,7 @@ describe('2. Beginner', () => {
     expect(creditedTo(app, addDays(D, 1))).toEqual([596, 597]);
     // Today's five: its three, and tomorrow's two revised ahead. Tomorrow is done: Home goes on to Saturday.
     expect(home.title()).toBe('Done · 5 pages');
-    expect(home.ahead()).toMatch(/^Sat starts at .+, p\.\s598(?!\d)/);
+    expect(plain(home.ahead())).toMatch(aheadAt('Sat', 598));
     await app.close();
   });
 });
