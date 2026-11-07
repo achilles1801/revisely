@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# A newer event on the PR (a push, a label, a title edit) supersedes the older run.
+concurrency:
+  group: spec-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   bugfix-scenario:
     name: Bug fixes add a scenario

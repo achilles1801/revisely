@@ -221,15 +221,18 @@ file is the release mechanics and the traps behind them.
   `pr` open the PR. Without it the branch is pushed and the issue gets a link to open the PR by
   hand.
 - `develop` requires one check to merge: **`Required`** (ci.yml's last job, since Nov 6 2026). It
-  runs after a failure too and fails unless every job the change needs passed: Secret scan,
-  Typecheck, Unit + component tests, Cloud Functions tests, Firestore rules tests, Scenarios (four
-  shards; `Scenarios / Scenario tests` passes only if all four did) and E2E when `plan` asks for it.
+  runs after a failure too and fails unless every job the change needs passed: `Fast checks` (one
+  job since Nov 7 2026, a step each: secret scan, typecheck, unit + component tests, Cloud Functions
+  tests, Firestore rules tests; every step runs even after one fails), Scenarios (four shards split
+  by each file's time; `Scenarios / Scenario tests` passes only if all four did) and E2E when `plan`
+  asks for it.
   A job skipped because another failed is not a pass; E2E is the one job that may be skipped, when
   the plan leaves it out. Branches needn't be up to date with develop (`strict` off: the Preview
   workflow's scenario gate still stops a broken develop from publishing). Admins can still bypass
   (`enforce_admins` off). `main` has no branch protection. "Bug fixes add a scenario" (`spec.yml`)
   runs on every PR on its own, so a label or a title edit re-runs it alone.
 - **Where the slow checks run** (`plan` in ci.yml; E2E is `e2e.yml`, called from CI):
+  - a draft PR: no E2E unless it has the `e2e` label; marking it ready runs everything;
   - a lower layer of a GitHub stack: the fast checks only (the top layer tests the whole stack);
   - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
   - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
@@ -237,7 +240,8 @@ file is the release mechanics and the traps behind them.
     where every PR can restore it); a newer push cancels the run of the one before, so a push's
     E2E covers everything since the last push whose CI passed (a docs-only push after a cancelled
     run still tests that run's change);
-  - nightly (develop) and by hand: every flow on both, from e2e.yml itself.
+  - nightly (develop) and by hand: every flow on both, from e2e.yml itself. Runs by hand never cancel
+    each other, and skip iOS jobs the same commit already has running.
 
   So iOS flows run only for the top of a stack, PRs into `main`, nightly and by hand.
 - **Stacks** (GitHub's stacked PRs, GA Oct 6 2026; `gh extension install github/gh-stack`, which
