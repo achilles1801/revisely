@@ -4,6 +4,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import * as firestoreService from '../services/firestoreService';
 import type { RevisionLog } from '../types';
+import { catchUpPagesOf } from './aheadCredit';
 import { revisionItemId } from './revisionItems';
 import { dateToLocalISODay } from './schedulePlans';
 import type { HistoryItem } from './streakFromItems';
@@ -45,7 +46,13 @@ function itemsOfSession(log: RevisionLog, occurredAt: number): HistoryItem[] {
     assigned: [],
     occurredAt,
   }));
-  return own.pages.length > 0 ? [own, ...credited] : credited;
+  // A day Keep daily amount filled with carried pages has none of its own to revise: its item is
+  // still kept here, for its assignment (the carried pages, SESS-7), so the streak can tell when
+  // that day was done after the carry has moved on. The server writes no such item (Activity
+  // shows the day's credits), so older days than the phone's sessions go by the plan.
+  const assigned = new Set(own.assigned);
+  const fillsDay = catchUpPagesOf(log).some((p) => assigned.has(p));
+  return own.pages.length > 0 || fillsDay ? [own, ...credited] : credited;
 }
 
 const isSessionItem = (x: HistoryItem) => x.id != null && (x.id === x.day || x.id.startsWith(`${x.day}-ahead-`));
@@ -64,7 +71,10 @@ export function withPhoneSessions(history: readonly HistoryItem[], logs: readonl
   if (logs.length === 0) return [...history];
   const oldest = logs.reduce((min, l) => (l.date < min ? l.date : min), logs[0].date);
   const at = new Map<string, number>();
+  // A session's items share its time; a session that revised only catch-up pages has no item of
+  // its own on the server, so its credit items give it.
   for (const x of history) if (x.id === x.day && x.occurredAt != null) at.set(x.day, x.occurredAt);
+  for (const x of history) if (isSessionItem(x) && x.occurredAt != null && !at.has(x.day)) at.set(x.day, x.occurredAt);
   const kept = history.filter((x) => !(isSessionItem(x) && x.day >= oldest));
   return [...kept, ...logs.flatMap((l) => itemsOfSession(l, at.get(l.date) ?? now))];
 }

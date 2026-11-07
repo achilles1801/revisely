@@ -244,7 +244,7 @@ export function applySessionAssigned(existing: FirestoreSession | null, op: Sess
   const before = existing.assignedPages ?? [];
   const assignedPages = before.filter((p) => op.assignedPages.includes(p));
   if (assignedPages.length === 0 || assignedPages.length === before.length) return existing;
-  const revisedHere = countOf(assignedPages, existing.pagesRevised ?? []);
+  const revisedHere = countOf(assignedPages, revisedIn(existing.pagesRevised ?? [], existing.ahead));
   const completed = existing.state === 'COMPLETED' || revisedHere >= assignedPages.length;
   return {
     ...existing,
@@ -253,6 +253,15 @@ export function applySessionAssigned(existing: FirestoreSession | null, op: Sess
     state: completed ? 'COMPLETED' : existing.state,
     completionPercentage: safePercent(revisedHere, assignedPages.length),
   };
+}
+
+/**
+ * Every page a session revised: its own pagesRevised and its credit for other days. Catch-up pages
+ * sit only in the credit (SESS-7), and are a day's assignment when Keep daily amount filled the day
+ * with them (lib/carryOver duePagesOf), so they count toward the session's completion there.
+ */
+function revisedIn(pagesRevised: readonly number[], ahead: Record<string, number[]> | undefined): number[] {
+  return [...pagesRevised, ...Object.values(ahead ?? {}).flat()];
 }
 
 /** How many of `list` are in `revised`. */
@@ -283,8 +292,10 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     const assignedPages = [...existingAssigned, ...added];
     const totalAssignedPages =
       (added.length > 0 ? assignedPages.length : existing.totalAssignedPages) || pagesRevised.length;
-    // Pages revised ahead are in pagesRevised too: only this day's own pages count here.
-    const revisedHere = countOf(assignedPages, pagesRevised);
+    // Credit only for pages this session has revised (see aheadWithin).
+    const ahead = aheadWithin(mergeAhead(existing.ahead, op.ahead), checkedOf(op, pagesRevised));
+    // Pages revised ahead are in pagesRevised too: only this day's assigned pages count here.
+    const revisedHere = countOf(assignedPages, revisedIn(pagesRevised, ahead));
     const completed = existing.state === 'COMPLETED' || revisedHere >= totalAssignedPages;
     return {
       ...existing,
@@ -293,8 +304,7 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
       pagesRevised,
       pagesSkipped,
       weaknessUpdates,
-      // Credit only for pages this session has revised (see aheadWithin).
-      ...sessionAheadField(existing.ahead, aheadWithin(mergeAhead(existing.ahead, op.ahead), checkedOf(op, pagesRevised))),
+      ...sessionAheadField(existing.ahead, ahead),
       durationMinutes: Math.max(1, addedMinutes(existing.durationMinutes ?? 0, op)),
       // The rules forbid going back from completed.
       state: completed ? 'COMPLETED' : 'IN_PROGRESS',
@@ -323,16 +333,20 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     weaknessUpdates: [],
     completionPercentage: 0,
   };
-  if (op.pagesRevised.length === 0) return base;
+  const ahead = aheadWithin(mergeAhead(undefined, op.ahead), checkedOf(op, op.pagesRevised));
+  // Nothing revised: an empty session. A first save of catch-up pages alone (credited to the days
+  // they were missed, SESS-7) keeps them: it returned the empty session and lost their credit.
+  if (op.pagesRevised.length === 0 && Object.keys(ahead).length === 0) return base;
   const total = base.totalAssignedPages || op.pagesRevised.length;
-  const revisedHere = countOf(assignedPages, op.pagesRevised);
+  const revisedHere = countOf(assignedPages, revisedIn(op.pagesRevised, ahead));
   return {
     ...base,
     pagesRevised: [...new Set(op.pagesRevised)],
     pagesSkipped: op.pagesSkipped,
-    ...aheadField(aheadWithin(mergeAhead(undefined, op.ahead), checkedOf(op, op.pagesRevised))),
+    ...aheadField(ahead),
     durationMinutes: Math.max(1, op.durationAtLeast || 1),
-    state: revisedHere >= total ? 'COMPLETED' : 'IN_PROGRESS',
+    // Catch-up pages alone on a day with nothing assigned (a day off): started, not complete.
+    state: total > 0 && revisedHere >= total ? 'COMPLETED' : 'IN_PROGRESS',
     completionPercentage: safePercent(revisedHere, total),
     weaknessUpdates: newWeakness,
   };

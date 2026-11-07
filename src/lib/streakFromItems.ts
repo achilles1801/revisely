@@ -4,9 +4,8 @@
 // pages are its own item's `assigned` snapshot, or the plan when it has no item of its own.
 
 import { User, UserPage } from '../types';
-import { getPagesForDay } from './algorithm';
 import { getFajrTimeFor } from './fajrBoundary';
-import { ownPagesOf } from './carryOver';
+import { planDuePages } from './carryOver';
 import { completedDays, streakReading, type StreakDetail, type StreakReading } from './streak';
 
 export interface HistoryItem {
@@ -52,23 +51,27 @@ export function streakDetailFromItems(input: {
   const own = new Map<string, HistoryItem>();
   const credited = new Map<string, Set<number>>();
   const onTime = new Map<string, Set<number>>();
+  const add = (map: Map<string, Set<number>>, day: string, pages: readonly number[]) => {
+    const set = map.get(day) ?? new Set<number>();
+    for (const p of pages) set.add(p);
+    map.set(day, set);
+  };
   for (const item of input.items) {
     const day = item.countsFor;
     if (item.day === day) own.set(day, item);
-    const set = credited.get(day) ?? new Set<number>();
-    for (const p of item.pages) set.add(p);
-    credited.set(day, set);
-    if (item.occurredAt != null && item.occurredAt < dayEndMs(day, input.user)) {
-      const early = onTime.get(day) ?? new Set<number>();
-      for (const p of item.pages) early.add(p);
-      onTime.set(day, early);
+    add(credited, day, item.pages);
+    if (item.occurredAt != null && item.occurredAt < dayEndMs(day, input.user)) add(onTime, day, item.pages);
+    // Catch-up pages (credited to an earlier day) also finish the day they were revised on, where
+    // they are its due pages: Keep daily amount filled it with them (SESS-7, lib/aheadCredit dueCreditIndex).
+    if (day < item.day) {
+      add(credited, item.day, item.pages);
+      if (item.occurredAt != null && item.occurredAt < dayEndMs(item.day, input.user)) add(onTime, item.day, item.pages);
     }
   }
   const scheduled = (day: string): readonly number[] => {
     const item = own.get(day);
     if (item) return item.assigned;
-    const [y, m, d] = day.split('-').map(Number);
-    return ownPagesOf(getPagesForDay(input.user, new Date(y, m - 1, d), memorized), input.user, day);
+    return planDuePages(input.user, day, memorized);
   };
   const done = completedDays(credited, scheduled);
   const early = completedDays(onTime, scheduled);

@@ -34,6 +34,36 @@ export function creditIndex(logs: readonly RevisionLog[]): CreditIndex {
   return index;
 }
 
+/** The catch-up pages a session revised: its credit for days before its own (SESS-7). */
+export function catchUpPagesOf(log: Pick<RevisionLog, 'date' | 'ahead'>): number[] {
+  return Object.entries(log.ahead ?? {})
+    .filter(([day]) => day < log.date)
+    .flatMap(([, pages]) => pages);
+}
+
+/**
+ * What finishes each day, for "is this day done": creditIndex, plus the catch-up pages each
+ * session revised, on the session's own day. They stay credited to the days they were missed; on
+ * the session's day they count only where they are its due pages (lib/carryOver duePagesOf: Keep
+ * daily amount filled the day with them), since a day's own pages never include them.
+ */
+export function dueCreditIndex(logs: readonly RevisionLog[]): CreditIndex {
+  const index = creditIndex(logs);
+  for (const log of logs) {
+    const pages = catchUpPagesOf(log);
+    if (pages.length === 0) continue;
+    const set = index.get(log.date) ?? new Set<number>();
+    for (const p of pages) set.add(p);
+    index.set(log.date, set);
+  }
+  return index;
+}
+
+/** `day`'s pages in dueCreditIndex. Empty when none. */
+export function dueCreditedOnDay(logs: readonly RevisionLog[], day: string): ReadonlySet<number> {
+  return dueCreditIndex(logs).get(day) ?? new Set<number>();
+}
+
 /** The pages credited to `day` (see creditIndex). Empty when none. */
 export function creditedOnDay(logs: readonly RevisionLog[], day: string): ReadonlySet<number> {
   return creditIndex(logs).get(day) ?? new Set<number>();

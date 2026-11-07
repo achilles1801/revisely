@@ -4,9 +4,8 @@
 // through yesterday until today's revision day ends. Pure: the callers pass the logs and pages.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { getPagesForDay } from './algorithm';
-import { creditIndex } from './aheadCredit';
-import { ownPagesOf } from './carryOver';
+import { dueCreditIndex } from './aheadCredit';
+import { planDuePages } from './carryOver';
 
 /** The day before an ISO day ('YYYY-MM-DD'). UTC calendar arithmetic: no daylight-saving shift. */
 export function previousIsoDay(s: string): string {
@@ -60,10 +59,9 @@ export function streakFromLogs(input: {
   const scheduled = (day: string): readonly number[] => {
     const assigned = logOf.get(day)?.assignedPages;
     if (assigned) return assigned;
-    const [y, m, d] = day.split('-').map(Number);
-    return getPagesForDay(input.user, new Date(y, m - 1, d), memorized);
+    return planDuePages(input.user, day, memorized);
   };
-  return aliveStreak(completedDays(creditIndex(input.logs), scheduled), input.today);
+  return aliveStreak(completedDays(dueCreditIndex(input.logs), scheduled), input.today);
 }
 
 /** A day's progress: its scheduled pages and how many are credited to it. */
@@ -149,10 +147,10 @@ export function streakDetailFromLogs(input: { user: User; pages: readonly UserPa
   const scheduled = (day: string): readonly number[] => {
     const assigned = logOf.get(day)?.assignedPages;
     if (assigned) return assigned;
-    const [y, m, d] = day.split('-').map(Number);
-    return ownPagesOf(getPagesForDay(input.user, new Date(y, m - 1, d), memorized), input.user, day);
+    return planDuePages(input.user, day, memorized);
   };
-  const credited = creditIndex(input.logs);
+  // A day's due pages (SESS-7): credited to it, or catch-up pages revised in its session that fill it.
+  const credited = dueCreditIndex(input.logs);
   const done = completedDays(credited, scheduled);
   // The logs alone cannot say when a page was revised. Until the items carry a time, a day counts
   // as on time when it is done (the grace rule then matches the done-day rule).

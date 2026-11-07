@@ -175,22 +175,32 @@ describe('5. Missed days', () => {
     await app.close();
   });
 
-  it('[CARRY-4] [SESS-7] [SESS-6] Add to today: the missed pages become today’s, count for their own days, and don’t restore the streak', async () => {
+  // Keep daily amount with more missed pages than the day holds (D1, Majd, Nov 7 2026): today is
+  // the missed pages alone, and revising them finishes today.
+  it('[CARRY-4] [CARRY-2] [SESS-7] [SESS-6] Add to today: the missed pages are today’s alone; revised, they count for their own days, today is done, and the old streak doesn’t come back', async () => {
     const { app, D } = await scenarioPhone('missed-days');
     const home = new Home(app);
     await home.ready();
     await addToToday(app, home);
+    expect(home.title()).toMatch(/^Starts at .+, p\.\s583(?!\d)/);
     const session = await home.startSession();
-    expect(session.pages().slice(0, 6)).toEqual(pagesRange(583, 588));
+    expect(session.pages()).toEqual(pagesRange(583, 588));
     await session.swipeThrough(6);
+    expect(session.endCard()).toMatch(/Revision complete/);
     await session.back();
     await app.untilSynced();
     expect(creditedTo(app, addDays(D, -2))).toEqual([583, 584, 585]);
     expect(creditedTo(app, addDays(D, -1))).toEqual([586, 587, 588]);
     expect(creditedTo(app, D)).toEqual([]);
-    // Revising them late doesn't bring the streak back (two missed days broke it).
+    expect(home.title()).toBe('Done · 6 pages');
+    expect(home.cta()).toBe('Review session');
+    // Today's own three (589–591) are tomorrow's now.
+    expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s589(?!\d)/);
+    // The eight days before the two missed ones don't come back: yesterday, caught up in its grace
+    // window, and today.
+    await home.untilStreak(2);
     await app.idle(1500);
-    expect(home.streak()).toEqual({ days: 0, grace: false, ring: null });
+    expect(home.streak()).toEqual({ days: 2, grace: false, ring: null });
     await app.close();
   });
 
@@ -214,7 +224,9 @@ describe('5. Missed days', () => {
 // Beginner: Juz 30, two a day from D−7: D−7 582–583, D−6 584–585, D−5 586–587 (missed),
 // D−4 588–589, D−3 590–591 (590 only), D−2 592–593 (missed), D−1 594–595, today 596–597.
 describe('2. Beginner', () => {
-  it('[CARRY-1] [CARRY-2] [SESS-7] [SESS-6] Home offers D−3’s and D−2’s pages; added and revised, they count for those days and don’t join the run', async () => {
+  // Three leftovers for a two-page day: with Keep daily amount, today is the leftovers alone (D1,
+  // Majd, Nov 7 2026: "let it be missed pages only"), and today's own pages are tomorrow's.
+  it('[CARRY-1] [CARRY-2] [SESS-7] [SESS-6] Home offers D−3’s and D−2’s pages; added, they are today’s alone; revised, today is done and counts, and they count for their days without joining the run', async () => {
     const { app, D } = await scenarioPhone('beginner');
     const home = new Home(app);
     await home.ready();
@@ -225,16 +237,42 @@ describe('2. Beginner', () => {
 
     await addToToday(app, home);
     const session = await home.startSession();
-    expect(session.pages().slice(0, 3)).toEqual([591, 592, 593]);
+    expect(session.pages()).toEqual([591, 592, 593]);
     await session.swipeThrough(3);
+    expect(session.endCard()).toMatch(/Revision complete/);
     await session.back();
     await app.untilSynced();
     expect(creditedTo(app, addDays(D, -3))).toEqual([590, 591]);
     expect(creditedTo(app, addDays(D, -2))).toEqual([592, 593]);
     expect(creditedTo(app, D)).toEqual([]);
-    // D−2 is whole now, but done late: it doesn't join the run before it.
+    expect(home.title()).toBe('Done · 3 pages');
+    expect(home.cta()).toBe('Review session');
+    expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s596(?!\d)/);
+    // D−1 and today. D−2 is whole now, but done late: it doesn't join the run before it.
+    await home.untilStreak(2);
     await app.idle(1500);
-    expect(home.streak()).toEqual({ days: 1, grace: false, ring: null });
+    expect(home.streak()).toEqual({ days: 2, grace: false, ring: null });
+    await app.close();
+  });
+
+  it('[AHEAD-3] [AHEAD-2] [AHEAD-4] [SESS-4] today’s own pages, moved to tomorrow: Keep going from the end card revises them, credited to tomorrow', async () => {
+    const { app, D } = await scenarioPhone('beginner');
+    const home = new Home(app);
+    await home.ready();
+    await addToToday(app, home);
+    const session = await home.startSession();
+    await session.swipeThrough(3);
+    expect(session.endCard()).toMatch(/Revision complete/);
+    // Tomorrow alone: today's own two pages.
+    await session.keepGoing();
+    expect(session.pages()).toEqual([596, 597]);
+    await session.swipeThrough(2);
+    await session.back();
+    await app.untilSynced();
+    expect(creditedTo(app, addDays(D, 1))).toEqual([596, 597]);
+    // Today's five: its three, and tomorrow's two revised ahead. Tomorrow is done: Home goes on to Saturday.
+    expect(home.title()).toBe('Done · 5 pages');
+    expect(home.ahead()).toMatch(/^Sat starts at .+, p\.\s598(?!\d)/);
     await app.close();
   });
 });

@@ -6,9 +6,9 @@
 // The widget shows the day whose span holds "now", so it rolls over at fajr (or
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
-import { generateDailyAssignment, getPagesForDay } from '../algorithm';
-import { creditedOnDay, creditIndex } from '../aheadCredit';
-import { ownPagesOf } from '../carryOver';
+import { generateDailyAssignment } from '../algorithm';
+import { dueCreditedOnDay, dueCreditIndex } from '../aheadCredit';
+import { duePagesOf, planDuePages } from '../carryOver';
 import { aliveStreak, completedDays } from '../streak';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
@@ -188,7 +188,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
   // A day with a session, or whose pages were all revised ahead, is a day done.
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
-  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? ownPagesOf(getPagesForDay(user, localDay(d), memorized), user, d));
+  const done = completedDays(dueCreditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? planDuePages(user, d, memorized));
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -198,9 +198,10 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const runs = pageRuns(assignment.pages);
 
     // As Home: done once every page of the day is revised, today or ahead.
-    const credited = creditedOnDay(input.logs, day);
-    // Today's own pages (SESS-7): catch-up pages are credited to the days they were missed.
-    const own = ownPagesOf(assignment.pages, user, day);
+    const credited = dueCreditedOnDay(input.logs, day);
+    // The pages that finish the day (SESS-7): its own; or the carried pages, when Keep daily
+    // amount filled the day with them (they still count for the days they were missed).
+    const own = duePagesOf(assignment.pages, user, day);
     const total = own.length;
     const doneHere = own.filter((p) => credited.has(p)).length;
     const completed = total > 0 && doneHere >= total;

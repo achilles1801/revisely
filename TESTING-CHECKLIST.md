@@ -80,7 +80,10 @@ Phase 2 (the Activity redesign, the streak and the coach) shows on `previewTeste
     restores it at once; today's own pages don't (SESS-6).
   - Two missed days in a row break it.
 - **Catch-up credit:** a page carried in from a missed or unfinished day is credited to that day, never
-  to today. Today is Done only when today's own pages are revised (SESS-7).
+  to today. Today is Done only when today's own pages are revised (SESS-7). With *Keep daily amount*,
+  when the carried pages fill today (as many as the day holds, or more), today is those pages alone and
+  is Done once they're revised; today's own pages are tomorrow's, offered by "Tomorrow starts at" and
+  Keep going (CARRY-2).
 - **Ask the coach** (Insights):
   - The first time, the sheet says what is sent and asks you to turn it on.
   - Then pick one insight and Ask: the answer, and "N questions left today" (5 a day).
@@ -151,7 +154,8 @@ D−3 (1 of 2). D−5 and D−2 are missed. Two daily-log notes, on D−6 and D�
 
 - **Home:** a catch-up line ("Missed …" / "Left …") offering D−3's unrevised page and D−2's two pages,
   with **Add to today**. Pages revised in the last three days are never offered.
-- **Add to today** with *Keep daily amount*: today keeps its size and starts with the leftovers.
+- **Add to today** with *Keep daily amount*: the three leftovers fill today (a 2-page day), so today
+  is those three alone (591–593); today's own two pages move to tomorrow.
 - **Activity calendar:** D−7, D−6, D−4 and D−1 full; D−3 partly; D−5 and D−2 empty.
 - **Daily log:** the D−6 note ("Juz 30 is going well…") and the D−1 revision note (6 min).
 
@@ -160,9 +164,11 @@ D−3 (1 of 2). D−5 and D−2 are missed. Two daily-log notes, on D−6 and D�
 - **Catch-up credit:** Add to today, then revise D−2's two pages.
   - They're credited to D−2: its ring fills in Overview, and D−2's day shows "Done ahead, from <today>: …".
   - Today's Revised block lists them as "Ahead for <D−2>: …".
-  - Today is Done only once today's own pages are revised.
+  - Revising the three makes today Done (Home: Done · 3 pages). Home then offers "Tomorrow starts
+    at" today's own two pages; revising them, there or with Keep going on the end card, counts for
+    tomorrow.
 - **Streak:** D−1 was done, so there's no grace. D−2 done today counts for D−2, but it doesn't join
-  the run before it (SESS-6).
+  the run before it (SESS-6). Today counts once the three are revised: 2 days.
 - **Day view:**
   - D−1: the revision note sits under the Revised block (ACT-2).
   - D−6: the note is in the Notes block.
@@ -226,7 +232,8 @@ and D−1. Smart Tracking on.
 - **Catch-up credit:**
   - The two pages count for D−1: its ring fills, and D−1's day shows "Done ahead, from <today>: …".
   - Today's Revised block lists them as "Ahead for <D−1>: …".
-  - Today stays not Done until its own five pages are revised.
+  - Today stays not Done until its own pages are revised: with Keep daily amount, the three left
+    after the two leftovers (its last two move to tomorrow).
 - **Day view, today:** the strip shows 2 revised and 3 not reached.
 - **+ → Revised, From your session** (after the session skips a memorized page): From and To are
   filled with the skipped pages; Undo clears them.
@@ -237,17 +244,18 @@ and D−1. Smart Tracking on.
 
 - **Home:** the missed-day line: **"Missed 2 days · Revise pp. …"** (D−2 and D−1's pages), with Add
   to today. Today shows its own pages; the schedule hasn't moved (SCHED-5).
-- **Add to today:** the missed pages become today's. If they're still not revised tomorrow, they're
-  offered again (CARRY-4).
+- **Add to today:** the missed pages become today's: with Keep daily amount, the six alone (today's own
+  three move to tomorrow). If they're still not revised tomorrow, they're offered again (CARRY-4).
 - **Activity calendar:** the last two days are empty.
 
 **Phase 2:**
 
 - **Streak:** two missed days in a row break it. There's no dimmed grace ring, and revising those
-  pages later doesn't bring it back (SESS-6).
+  pages doesn't bring the old streak back (SESS-6). Revising them today makes today count: 2 days
+  (yesterday, caught up in its grace window, and today).
 - **Catch-up credit:** after Add to today, the missed pages count for D−2 and D−1, whose rings fill
-  in Overview. Today is Done only when today's own pages are revised (with Keep daily amount, the
-  day's usual 3).
+  in Overview. With Keep daily amount, today is Done once the six are revised (Home: Done · 6 pages);
+  today's usual 3 are tomorrow's, offered by "Tomorrow starts at".
 - **Overview, Week:** D−2 and D−1 read "Revised 0 of 3" before, and are full after.
 
 ## 6. Revised ahead

@@ -1,5 +1,6 @@
 import type { JournalEntry, JournalNote, ReadingSession, RevisionLog, User } from '../types';
 import { isRevisionActivity, normalizeReadingSession } from './activity';
+import { catchUpPagesOf } from './aheadCredit';
 import { formatMinutesShort } from './activityHeatmap';
 import { formatEntryTime, isJournalNoteEmpty, JournalFilter, journalFilterRange } from './journal';
 import { describePageRuns, describeRevised, describeSurahRuns, pageRuns } from './pageRanges';
@@ -93,10 +94,19 @@ function item(base: Omit<ActivityItem, 'search'>, pages: number[] = []): Activit
   return { ...base, search: ` ${words(text.join(' '))}` };
 }
 
+/**
+ * Catch-up pages that were the session's day's assignment: Keep daily amount filled the day with
+ * them (SESS-7). They are credited to the days they were missed, but they are what the day revised.
+ */
+function catchUpAssigned(log: RevisionLog): number[] {
+  const assigned = new Set(log.assignedPages ?? []);
+  return catchUpPagesOf(log).filter((p) => assigned.has(p));
+}
+
 /** The pages a session revised for its own day: revised, less those credited ahead to later days. */
 export function ownRevised(log: RevisionLog): number[] {
   const ahead = new Set(Object.values(log.ahead ?? {}).flat());
-  return log.pagesRevised.filter((p) => !ahead.has(p));
+  return [...log.pagesRevised.filter((p) => !ahead.has(p)), ...catchUpAssigned(log)];
 }
 
 /** How items name what was revised: `juzPlan` is the account's plan (scheduleMode 'juz'). */
@@ -107,7 +117,7 @@ export interface ActivityLabelOptions {
 export function revisionItem(log: RevisionLog, opts: ActivityLabelOptions = {}): ActivityItem {
   const pages = sessionPages(log);
   const total = pageRuns(pages).reduce((n, r) => n + r.last - r.first + 1, 0);
-  const revised = log.pagesRevised.length;
+  const revised = log.pagesRevised.length + catchUpAssigned(log).length;
   const minutes = log.durationMinutes && log.durationMinutes > 0 ? formatMinutesShort(log.durationMinutes) : null;
   return item({
     key: `revision-${log.id}`,

@@ -124,6 +124,38 @@ describe('a session change from the outbox', () => {
     expect(overlaySessions([s], [entry(op)])[0].assignedPages).toEqual([1, 2, 3]);
   });
 
+  // Keep daily amount filled 2026-11-02 with 10–31 Oct's pages 7 and 8 (credited to those days, SESS-7).
+  it('[SESS-7] a first save of catch-up pages alone keeps their credit, and they complete a day they fill', () => {
+    const catchUp = add({ assignedPages: [7, 8], pagesRevised: [], weaknessUpdates: [], ahead: { '2026-10-31': [7] }, checked: [7] });
+    const first = mergeSessionAdd(null, catchUp, AT);
+    expect(first.ahead).toEqual({ '2026-10-31': [7] });
+    expect(first.pagesRevised).toEqual([]);
+    expect(first.state).toBe('IN_PROGRESS');
+    expect(first.completionPercentage).toBe(50);
+    const both = mergeSessionAdd(first, { ...catchUp, ahead: { '2026-10-31': [7, 8] }, checked: [7, 8] }, AT);
+    expect(both.ahead).toEqual({ '2026-10-31': [7, 8] });
+    expect(both.state).toBe('COMPLETED');
+    expect(both.completionPercentage).toBe(100);
+    // Twice is once.
+    expect(mergeSessionAdd(both, { ...catchUp, ahead: { '2026-10-31': [7, 8] }, checked: [7, 8] }, AT)).toEqual(both);
+    // A day with nothing assigned (a day off) is started, not complete.
+    const offDay = mergeSessionAdd(null, { ...catchUp, assignedPages: [] }, AT);
+    expect(offDay.ahead).toEqual({ '2026-10-31': [7] });
+    expect(offDay.state).toBe('IN_PROGRESS');
+    // Nothing revised at all is still an empty session.
+    expect(mergeSessionAdd(null, add({ pagesRevised: [], weaknessUpdates: [] }), AT).state).toBe('NOT_STARTED');
+  });
+
+  it('[SESS-7] a session saved before Keep daily amount filled the day takes the carried pages as its assignment', () => {
+    // 1, 2 of the day's own pages saved; then Add to today moved 1–4 to tomorrow and filled the day with 7, 8.
+    const before = mergeSessionAdd(null, add({ pagesRevised: [1, 2] }), AT);
+    const grown = mergeSessionAdd(before, add({ assignedPages: [7, 8], pagesRevised: [], weaknessUpdates: [], ahead: { '2026-10-31': [7, 8] }, checked: [1, 2, 7, 8] }), AT);
+    const cut = applySessionAssigned(grown, { kind: 'session.assigned', id: grown.id, assignedPages: [7, 8] })!;
+    expect(cut.assignedPages).toEqual([7, 8]);
+    expect(cut.state).toBe('COMPLETED');
+    expect(cut.ahead).toEqual({ '2026-10-31': [7, 8] });
+  });
+
   it('an edit adds and takes out pages as sets (twice is once); a session that’s gone stays gone', () => {
     const s = mergeSessionAdd(null, add({ pagesRevised: [1, 2, 3] }), AT);
     const op = { kind: 'session.edit' as const, id: s.id, addRevised: [4], removeRevised: [2], pagesSkipped: [2], durationMinutes: 9, weaknessUpdates: [] };

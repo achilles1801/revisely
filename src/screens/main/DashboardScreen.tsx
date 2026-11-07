@@ -61,6 +61,7 @@ import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
 import { reviewPagesInOrder } from '../../lib/aheadCredit';
+import { ownRevised } from '../../lib/activityItems';
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
 import { loadActivityHistory, shareActivityHistory } from '../../lib/activityHistory';
@@ -228,7 +229,8 @@ export default function DashboardScreen() {
   const sessionLogs = useMemo(
     () =>
       logs
-        .filter((l) => l.pagesRevised.length > 0)
+        // A day Keep daily amount filled with catch-up pages revised them alone (ownRevised).
+        .filter((l) => l.pagesRevised.length > 0 || ownRevised(l).length > 0)
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [logs],
   );
