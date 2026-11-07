@@ -96,13 +96,7 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 11-schedule${SUFFIX}
-# On Android the Schedule's top bar sits under the status bar (react-native's SafeAreaView pads
-# only on iOS), where Maestro can't tap Back: the system back instead.
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - back
+# Its own Back, on Android too (#348: the top bar sat under the status bar there, out of reach).
 - runFlow: back-home.yaml
 
 # The memorized pages: each juz by its surahs (the Juz tab; Surahs lists page counts).
