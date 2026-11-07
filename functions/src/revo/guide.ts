@@ -309,6 +309,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ACT-27': 'Activity refreshes by itself and with a pull; nothing to ask Revo about',
   'NEW-4': 'what waits for the walkthrough; nothing for Revo to explain',
+  'AUDIO-3': 'putting away a paused recitation’s notification on Android, from the 1.0.4 binary; the guide gets it (with previous and next verse on the notification) at the 1.0.4 release’s re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SHEET-1': 'one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
