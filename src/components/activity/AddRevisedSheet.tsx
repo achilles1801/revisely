@@ -16,7 +16,7 @@ import { describeSurahs } from '../../lib/pageRanges';
 import { typeV2 } from '../../theme/v2';
 import type { WeaknessRating } from '../../types/firestore';
 import { RevisedMark } from './BlockMark';
-import { FormLabel, InfoLine, KeyboardDone, MinutesField, PageRangeFields, Segmented, StrengthChoice, SuggestionLine } from './AddSheetParts';
+import { FormLabel, InfoLine, DismissArea, MinutesField, PageRangeFields, Segmented, StrengthChoice, SuggestionLine } from './AddSheetParts';
 
 type Log = { date: string; pagesRevised: number[]; pagesSkipped: number[]; assignedPages?: number[] };
 type What = 'pages' | 'surah' | 'juz';
@@ -129,6 +129,7 @@ export function AddRevisedSheet({
       keyboard
       testID="add-revised-sheet"
     >
+      <DismissArea>
       <View style={styles.body}>
         {missed.length > 0 && (
           <View style={styles.top}>
@@ -186,8 +187,8 @@ export function AddRevisedSheet({
 
         {info ? <InfoLine text={info} testID="add-revised-info" /> : null}
       </View>
+      </DismissArea>
 
-      <KeyboardDone />
       <RangePickerSheet
         visible={picker != null}
         initialKind={picker ?? 'surah'}
