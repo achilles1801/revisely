@@ -8,7 +8,7 @@ import { greetingName } from '../lib/displayName';
 import { getQuranData } from '../lib/quranData';
 import { logger } from '../lib/logger';
 import { planRevisionReminders } from '../lib/reminders/plan';
-import { useActivityHistory } from '../lib/activityHistory';
+import { useActivityHistory, withPhoneSessions } from '../lib/activityHistory';
 import { clearRevisionReminders, syncRevisionReminders } from '../lib/reminders/sync';
 import { usePrayerPrefs } from '../lib/prayer/prefs';
 import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
@@ -69,7 +69,8 @@ export function RevisionRemindersSync() {
           name,
           pages,
           logs,
-          history,
+          // The sessions on the phone over the server's items: a session just saved counts at once.
+          history: history ? withPhoneSessions(history, logs, Date.now()) : null,
           quranData: getQuranData(),
           place,
           settings,

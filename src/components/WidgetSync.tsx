@@ -7,6 +7,7 @@ import { useRevisionDay } from '../hooks/useRevisionDay';
 import { getQuranData } from '../lib/quranData';
 import { buildWidgetSnapshot } from '../lib/widgets/snapshot';
 import type { HistoryItem } from '../lib/streakFromItems';
+import { historyOf, withPhoneSessions } from '../lib/activityHistory';
 import * as firestoreService from '../services/firestoreService';
 import { writeWidgetSnapshot } from '../lib/widgets/storage';
 import { lastKnownPosition } from '../lib/widgets/position';
@@ -76,7 +77,7 @@ export function WidgetSync() {
     firestoreService
       .getActivityItemsBetween(iso, day)
       .then((r) => {
-        if (!cancelled) setHistory(r.revisions.map((x) => ({ day: x.day, countsFor: x.countsFor, pages: x.pages, assigned: x.assigned, occurredAt: x.occurredAt })));
+        if (!cancelled) setHistory(historyOf(r.revisions));
       })
       .catch(() => undefined);
     return () => {
@@ -93,7 +94,8 @@ export function WidgetSync() {
         onboardingComplete,
         pages,
         logs,
-        history,
+        // The sessions on the phone over the server's items: a session just saved counts at once.
+        history: history ? withPhoneSessions(history, logs, Date.now()) : null,
         quranData: getQuranData(),
         accent,
         now: new Date(),

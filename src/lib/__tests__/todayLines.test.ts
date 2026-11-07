@@ -46,6 +46,13 @@ describe('Today’s lines (E: "Starts at")', () => {
     });
   });
 
+  it('done, with pages added from earlier days still to revise: the button goes on to them', () => {
+    const t = todayLines('completed', [520, 521, ...range(522, 541)], new Set(range(522, 541)), 2, 2);
+    expect(t.title.text.split(' ').join(' ')).toBe('Done · 20 pages');
+    expect(t.cta).toBe('Continue revision');
+    expect(t.solid).toBe(true);
+  });
+
   it('two ranges read in the session’s order: the end of the cycle, "then" its start (no juz)', () => {
     const wrap = [...range(595, 604), ...range(1, 10)];
     expect(lines('not_started', wrap, new Set())).toMatchObject({

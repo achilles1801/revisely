@@ -69,6 +69,7 @@ export function TodayPost({
   pages,
   done,
   carried = 0,
+  carriedLeft = 0,
   streak,
   streakGrace,
   memorized,
@@ -90,6 +91,8 @@ export function TodayPost({
   done: ReadonlySet<number>;
   /** How many of today's pages were carried in from yesterday (they come first). */
   carried?: number;
+  /** Of those, how many are still to revise (once today's own pages are done, the button goes on to them). */
+  carriedLeft?: number;
   streak: number;
   /** Yesterday missed but restorable (SESS-6): the streak reads dimmed, with a ring for the missed pages. */
   streakGrace?: { previous: number; progress: { scheduled: number; credited: number } } | null;
@@ -111,7 +114,7 @@ export function TodayPost({
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const lines = todayLines(status, pages, done, carried);
+  const lines = todayLines(status, pages, done, carried, carriedLeft);
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace

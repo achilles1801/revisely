@@ -92,12 +92,19 @@ export function streakReading(input: {
   today: string;
 }): StreakReading {
   const { done, onTime, today } = input;
-  // A day that is done counts itself (even late, once restored); the run behind it counts only the days done on time.
-  if (done.has(today)) return { streak: 1 + runFrom(onTime, previousIsoDay(today)), grace: null };
   const yesterday = previousIsoDay(today);
-  if (done.has(yesterday)) return { streak: 1 + runFrom(onTime, previousIsoDay(yesterday)), grace: null };
-  // Nothing was scheduled yesterday: no missed day, so the run before it carries on.
-  if (input.scheduled(yesterday).length === 0) return { streak: runFrom(onTime, previousIsoDay(yesterday)), grace: null };
+  // The streak through yesterday. Yesterday counts itself when it is done, even late (restored
+  // today, in its grace window); the run behind it counts only the days done on time. Nothing
+  // scheduled yesterday is no missed day: the run before it carries on.
+  const throughYesterday = done.has(yesterday)
+    ? 1 + runFrom(onTime, previousIsoDay(yesterday))
+    : input.scheduled(yesterday).length === 0
+      ? runFrom(onTime, previousIsoDay(yesterday))
+      : null;
+  // Today done adds itself to that. (Counting back from today through the on-time days alone
+  // dropped a restored yesterday, and the run behind it, once today was done: Nov 2026.)
+  if (done.has(today)) return { streak: 1 + (throughYesterday ?? 0), grace: null };
+  if (throughYesterday != null) return { streak: throughYesterday, grace: null };
   // Yesterday missed. The run before it must have been intact on time, or the streak is broken.
   const previous = runFrom(onTime, previousIsoDay(yesterday));
   if (previous === 0) return { streak: 0, grace: null };
