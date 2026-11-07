@@ -266,9 +266,10 @@ and D−1. Smart Tracking on.
 
 - **Day view, today:** the Revised block, and "Ahead for <tomorrow>: …" for the two pages.
 - **Tomorrow's day:** only "Done ahead, from <today>: …". The session itself stays on today (DAY-9).
-- **Keep going:** Review session, swipe onto the end card, Keep going. It opens tomorrow's one page
-  left, held alone (AHEAD-3). Finish it: tomorrow is now done ahead, so Home's "Tomorrow starts
-  at" moves to the day after (AHEAD-4).
+- **Keep going:** tap "Tomorrow starts at" (the Review session has no end card). It opens
+  tomorrow's one page left, held alone. Swipe onto the end card: tomorrow is now done ahead, and
+  **Keep going** opens the day after's pages, held alone too (AHEAD-3). Back on Home, the line has
+  moved to the day after: "<weekday> starts at …" (AHEAD-4).
 - **Overview:** today's ring is full.
 
 ## 7. Fajr edge
@@ -366,11 +367,12 @@ itself queues three changes and **holds** them:
 - a revision note;
 - an 8-minute reading.
 
-- **Home:** today shows **Done** (from the held session). Changes waiting: 3.
+- **Home:** today shows **Done** (from the held session). The three changes wait on the phone; the
+  app shows no count of them.
 - **Settings → Testing:** a **Send held changes** row. The server doesn't have today's session yet
   (another phone signed in to the account shows today not done).
-- **Send held changes:** the three go, in order (SYNC-1). The waiting count goes to 0, and another
-  phone shows today done, the note and the reading.
+- **Send held changes:** the three go, in order (SYNC-1). The row goes away, and another phone
+  shows today done, the note and the reading.
 - **Relaunching instead:** the hold lives in memory only, so the changes are sent at the next start.
 - **To test offline:** turn on Airplane Mode before Send held changes. They stay queued, and go once
   you're back online.
