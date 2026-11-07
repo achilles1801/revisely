@@ -13,6 +13,12 @@ export function previousIsoDay(s: string): string {
   return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 }
 
+/** The day after an ISO day ('YYYY-MM-DD'), as previousIsoDay. */
+export function nextIsoDay(s: string): string {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
+
 /**
  * The days whose scheduled pages are all credited to them. `credited` maps each day to the
  * pages credited to it (creditIndex); `scheduled` gives a day's pages. A day with nothing
@@ -74,8 +80,10 @@ export interface DayProgress {
 
 /**
  * The streak as Home and the widget show it (SESS-6). `done` is every day all its pages are
- * credited to, at any time. `onTime` is the days that were done by the end of their own revision
- * day: only those keep a streak alive behind a missed day (a day done late doesn't restore it).
+ * credited to, at any time. `onTime` is the days done in time: by the end of their grace window,
+ * the revision day after them. Only those carry the run behind them. A day restored in its grace
+ * window counts as on time from then on, so the streak it brought back is still there the next
+ * morning (D4, Majd, Nov 7 2026); a day done later counts itself but carries nothing.
  * `grace` is set when yesterday is missed but the run before it is intact: the streak reads 0
  * until yesterday is done, and `previous` is the streak that comes back if it is.
  */
@@ -95,9 +103,9 @@ export function streakReading(input: {
 }): StreakReading {
   const { done, onTime, today } = input;
   const yesterday = previousIsoDay(today);
-  // The streak through yesterday. Yesterday counts itself when it is done, even late (restored
-  // today, in its grace window); the run behind it counts only the days done on time. Nothing
-  // scheduled yesterday is no missed day: the run before it carries on.
+  // The streak through yesterday. Yesterday counts itself when it is done (today is its grace
+  // window); the run behind it counts only the days done in time. Nothing scheduled yesterday is
+  // no missed day: the run before it carries on.
   const throughYesterday = done.has(yesterday)
     ? 1 + runFrom(onTime, previousIsoDay(yesterday))
     : input.scheduled(yesterday).length === 0
@@ -107,7 +115,7 @@ export function streakReading(input: {
   // dropped a restored yesterday, and the run behind it, once today was done: Nov 2026.)
   if (done.has(today)) return { streak: 1 + (throughYesterday ?? 0), grace: null };
   if (throughYesterday != null) return { streak: throughYesterday, grace: null };
-  // Yesterday missed. The run before it must have been intact on time, or the streak is broken.
+  // Yesterday missed. The run before it must have been done in time, or the streak is broken.
   const previous = runFrom(onTime, previousIsoDay(yesterday));
   if (previous === 0) return { streak: 0, grace: null };
   const need = input.scheduled(yesterday);

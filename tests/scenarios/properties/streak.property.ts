@@ -113,17 +113,17 @@ describe('the grace window (SESS-6)', () => {
     expect(restored.grace?.previous).toBe(4);
   });
 
-  it('[SESS-6] a day done late counts itself, but does not carry a run behind it', () => {
-    // Days 2 and 3 were done after their own days ended: only day 1 was on time. Restoring day 3
-    // counts day 3 alone; day 2 (late) does not extend it.
+  it('[SESS-6] a day done after its grace window counts itself, but does not carry a run behind it', () => {
+    // Days 2 and 3 were done after their grace windows ended: only day 1 was in time. Restoring day 3
+    // counts day 3 alone; day 2 (too late) does not extend it.
     const r = reading({ '2026-11-01': [1, 2], ...full('2026-11-02', '2026-11-03') }, '2026-11-04', ['2026-11-01']);
     expect(r.grace).toBeNull();
     expect(r.streak).toBe(1);
   });
 
   it('[SESS-6] yesterday restored today, then today done: the run before it, yesterday and today', () => {
-    // Days 1–2 on time, day 3 missed and restored on day 4 (late), then day 4 done.
-    const onTime = ['2026-11-01', '2026-11-02', '2026-11-04'];
+    // Days 1–2 on time, day 3 missed and restored on day 4 (in its grace window), then day 4 done.
+    const onTime = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'];
     expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04') }, '2026-11-04', onTime)).toEqual({ streak: 4, grace: null });
     // Today done first, yesterday still missed: today alone, until yesterday's pages are revised.
     expect(reading({ ...full('2026-11-01', '2026-11-02', '2026-11-04'), '2026-11-03': [1] }, '2026-11-04', onTime).streak).toBe(1);
@@ -153,7 +153,7 @@ describe('the grace window (SESS-6)', () => {
 });
 
 // C5: the streak from the Activity items, not the logs (lib/streakFromItems). Same answers on the same
-// history; a day done late doesn't carry a run behind it.
+// history; a day done after its grace window (the revision day after it) doesn't carry a run behind it.
 describe('the streak from items (C5)', () => {
   const user = { id: 'u1', dailyPageCapacity: 2, scheduleMode: 'pages' } as unknown as User;
   const dayMs = (d: string) => {
@@ -186,14 +186,50 @@ describe('the streak from items (C5)', () => {
     expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-03' }).streak).toBe(2);
   });
 
-  it('[SESS-6] two days done late do not carry each other (items only)', () => {
-    // Day 1 on time; days 2 and 3 both restored late. Only the first restoration brings back day 1.
+  // D4 (Majd, Nov 7 2026): a day restored in its grace window counts as on time from then on.
+  it('[SESS-6] days each caught up the next day carry each other: the run keeps going (items only)', () => {
+    // Day 1 on time; days 2 and 3 each missed and restored the next day, in their grace windows.
     const items = [
       item('2026-11-01', [1, 2], dayMs('2026-11-01')),
       item('2026-11-02', [3, 4], dayMs('2026-11-03')),
       item('2026-11-03', [5, 6], dayMs('2026-11-04')),
     ];
-    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-04' }).streak).toBe(1);
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-04' })).toEqual({ streak: 3, grace: null });
+    // Day 4 left at one page of two. The next morning the grace keeps all three, and catching its
+    // second page up brings them back with day 4.
+    const left = [...items, { day: '2026-11-04', countsFor: '2026-11-04', pages: [7], assigned: [7, 8], occurredAt: dayMs('2026-11-04') }];
+    expect(streakReadingFromItems({ user, pages: [], items: left, today: '2026-11-05' })).toEqual({
+      streak: 0,
+      grace: { previous: 3, progress: { scheduled: 2, credited: 1 } },
+    });
+    const restored = [...left, { day: '2026-11-05', countsFor: '2026-11-04', pages: [8], assigned: [], occurredAt: dayMs('2026-11-05') }];
+    expect(streakReadingFromItems({ user, pages: [], items: restored, today: '2026-11-05' })).toEqual({ streak: 4, grace: null });
+    // And it lasts: the morning after, before day 6 is done, still four.
+    expect(streakReadingFromItems({ user, pages: [], items: restored, today: '2026-11-06' })).toEqual({ streak: 4, grace: null });
+  });
+
+  it('[SESS-6] a day restored in its grace window still counts the next morning, and after (items only)', () => {
+    // Days 1–4 on time, day 5 missed and restored on day 6, day 6 done: six on day 6.
+    const onTime = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'].map((d) => item(d, [1, 2], dayMs(d)));
+    const items = [...onTime, item('2026-11-05', [1, 2], dayMs('2026-11-06')), item('2026-11-06', [1, 2], dayMs('2026-11-06'))];
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-06' }).streak).toBe(6);
+    // The next morning, before day 7 is done: still six. With day 7 done, seven.
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-07' })).toEqual({ streak: 6, grace: null });
+    const next = [...items, item('2026-11-07', [1, 2], dayMs('2026-11-07'))];
+    expect(streakReadingFromItems({ user, pages: [], items: next, today: '2026-11-08' }).streak).toBe(7);
+  });
+
+  it('[SESS-6] a day restored after its grace window counts itself, but does not carry the run behind it (items only)', () => {
+    // Day 1 on time, day 2 revised on day 4 (its window ended with day 3), day 3 on time.
+    const items = [
+      item('2026-11-01', [1, 2], dayMs('2026-11-01')),
+      item('2026-11-02', [3, 4], dayMs('2026-11-04')),
+      item('2026-11-03', [5, 6], dayMs('2026-11-03')),
+    ];
+    const detail = streakDetailFromItems({ user, pages: [], items, today: '2026-11-04' });
+    expect(detail.done.has('2026-11-02')).toBe(true);
+    // Day 3 alone: day 2 was done too late to carry day 1.
+    expect(detail.reading).toEqual({ streak: 1, grace: null });
   });
 
   it('[SESS-2] a session saved on the phone counts at once, before its items reach the server', () => {
@@ -268,8 +304,8 @@ describe('the streak from items (C5)', () => {
     expect(fromItems.done.has('2026-11-03')).toBe(false);
   });
 
-  it('[SESS-6] a session at 00:30 before Fajr is still the day before (Fajr on)', () => {
-    // Revision day 2026-11-03 ends at Fajr on 11-04, not at midnight: 00:30 on 11-04 is on time for it.
+  it('[SESS-6] a grace window ends at Fajr with the boundary on: 00:30 before Fajr is still the day before', () => {
+    // 11-02's grace window is revision day 11-03, which ends at Fajr on 11-04, not at midnight.
     const fajrUser = {
       ...user,
       fajrBoundaryEnabled: true,
@@ -279,13 +315,16 @@ describe('the streak from items (C5)', () => {
     } as unknown as User;
     const at0030 = new Date(2026, 10, 4, 0, 30).getTime();
     const items = [
-      item('2026-11-02', [1, 2], new Date(2026, 10, 2, 12).getTime()),
-      item('2026-11-03', [3, 4], at0030),
-      item('2026-11-04', [5, 6], new Date(2026, 10, 4, 12).getTime()),
+      item('2026-11-01', [1, 2], new Date(2026, 10, 1, 12).getTime()),
+      // 11-02 restored at 00:30 on 11-04.
+      item('2026-11-02', [3, 4], at0030),
+      item('2026-11-03', [5, 6], new Date(2026, 10, 3, 12).getTime()),
+      item('2026-11-04', [7, 8], new Date(2026, 10, 4, 12).getTime()),
     ];
-    // With Fajr: 11-03 is on time, so the run is 11-04, 11-03, 11-02.
-    expect(streakReadingFromItems({ user: fajrUser, pages: [], items, today: '2026-11-05' }).streak).toBe(3);
-    // Without the boundary (midnight), 11-03 is late and carries nothing: the streak is just 11-04.
-    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-05' }).streak).toBe(1);
+    // With Fajr: 00:30 is still revision day 11-03, 11-02's grace window, so the run is 11-04 to 11-01.
+    expect(streakReadingFromItems({ user: fajrUser, pages: [], items, today: '2026-11-05' }).streak).toBe(4);
+    // Without the boundary (midnight), 00:30 is 11-04: 11-02 was restored too late and carries
+    // nothing, so the streak is 11-04 and 11-03.
+    expect(streakReadingFromItems({ user, pages: [], items, today: '2026-11-05' }).streak).toBe(2);
   });
 });
