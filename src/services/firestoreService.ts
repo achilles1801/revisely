@@ -934,7 +934,7 @@ export async function getActivityItemsBetween(
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null; occurredAt: number | null }[];
   memorized: { id: string; day: string; pages: number[] }[];
-  reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
+  reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
   const range = (c: string) =>
@@ -947,8 +947,19 @@ export async function getActivityItemsBetween(
       return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
     }),
     memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
-    reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    reads: read.docs.map((d) => {
+      const x = d.data();
+      const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;
+      return { id: d.id, day: x.day, pages: x.pages ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
+    }),
   };
+}
+
+/** The memorization items between two revision days, inclusive (Insights' twelve months). */
+export async function getMemorizationsBetween(from: string, to: string, userId?: string): Promise<{ day: string; pages: number[] }[]> {
+  const uid = userId || getCurrentUserId();
+  const snap = await getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '>=', from), where('day', '<=', to)));
+  return snap.docs.map((d) => ({ day: d.data().day, pages: d.data().pages ?? [] }));
 }
 
 /** Save a finished session. Returns the new document id. */

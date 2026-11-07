@@ -261,8 +261,9 @@ How the tests are made: `tests/scenarios/README.md`.
   is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
   when short), with a timeout per attempt, and its log keeps the usage and never the content.
 
-- **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
-  what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
+- **COACH-4.** The Ask coach sheet is for previewTester accounts only. Before the first question it says what is sent and
+  asks the user to turn it on; the question then sends that one insight's totals, and nothing else. Insights no longer
+  opens it: Weak spots' Ask opens Revo with that insight attached (REVO).
 
 ## Revo
 
