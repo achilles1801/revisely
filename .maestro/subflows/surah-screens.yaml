@@ -107,8 +107,10 @@ appId: com.revisionbuddy.app
     timeout: 15000
 - tapOn:
     id: pill-juz
+# By id: iOS reads the row with its surahs ("Juz 1, Al-Fatihah to Al-Baqarah, ayah 141").
 - extendedWaitUntil:
-    visible: "Juz 1"
+    visible:
+      id: juz-1
     timeout: 10000
 - runFlow:
     file: shot.yaml
