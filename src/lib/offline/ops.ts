@@ -88,6 +88,17 @@ export type OutboxOp =
     }
   | { kind: 'session.delete'; id: string }
   | {
+      /**
+       * The day's own pages now: the session's assignment keeps only those of its pages (SESS-2,
+       * CARRY-2). Add to today with Keep daily amount moves the end of a day already started to
+       * tomorrow. Only ever shrinks, which the rules allow; a change of its own, so a refusal
+       * loses nothing else.
+       */
+      kind: 'session.assigned';
+      id: string;
+      assignedPages: number[];
+    }
+  | {
       kind: 'reading.add';
       id: string;
       session: {
@@ -221,6 +232,28 @@ function addedMinutes(current: number, op: SessionAdd): number {
   return current >= op.durationAtLeast ? current : current + op.durationAdd;
 }
 type SessionEdit = Extract<OutboxOp, { kind: 'session.edit' }>;
+type SessionAssigned = Extract<OutboxOp, { kind: 'session.assigned' }>;
+
+/**
+ * The session with its assignment cut down to the day's own pages now (session.assigned): only
+ * pages it already has, never none, never more (the rules let the list shrink or grow, not
+ * both). A session that's gone stays gone; nothing to drop changes nothing.
+ */
+export function applySessionAssigned(existing: FirestoreSession | null, op: SessionAssigned): FirestoreSession | null {
+  if (!existing) return null;
+  const before = existing.assignedPages ?? [];
+  const assignedPages = before.filter((p) => op.assignedPages.includes(p));
+  if (assignedPages.length === 0 || assignedPages.length === before.length) return existing;
+  const revisedHere = countOf(assignedPages, existing.pagesRevised ?? []);
+  const completed = existing.state === 'COMPLETED' || revisedHere >= assignedPages.length;
+  return {
+    ...existing,
+    assignedPages,
+    totalAssignedPages: assignedPages.length,
+    state: completed ? 'COMPLETED' : existing.state,
+    completionPercentage: safePercent(revisedHere, assignedPages.length),
+  };
+}
 
 /** How many of `list` are in `revised`. */
 function countOf(list: readonly number[], revised: readonly number[]): number {
@@ -353,6 +386,10 @@ export function overlaySessions(sessions: FirestoreSession[], entries: OutboxEnt
       if (edited) list = list.map((s) => (s.id === op.id ? edited : s));
     } else if (op.kind === 'session.delete') {
       list = list.filter((s) => s.id !== op.id);
+    } else if (op.kind === 'session.assigned') {
+      const existing = list.find((s) => s.id === op.id) ?? null;
+      const cut = applySessionAssigned(existing, op);
+      if (cut && cut !== existing) list = list.map((s) => (s.id === op.id ? cut : s));
     }
   }
   return list;

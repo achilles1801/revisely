@@ -6,6 +6,7 @@ import type { FirestorePage, FirestoreSession, FirestoreUser } from '../../../ty
 import type { JournalNote } from '../../../types';
 import { emptyJournalEntry, journalDayFromEntries } from '../../journal';
 import {
+  applySessionAssigned,
   applySessionEdit,
   mergeSessionAdd,
   overlayAccount,
@@ -102,6 +103,25 @@ describe('a session change from the outbox', () => {
     expect(later.assignedPages).toEqual([1, 2, 3, 4, 5, 6]);
     expect(later.durationMinutes).toBeGreaterThan(0);
     expect(applySessionEdit(done, { kind: 'session.edit', id: done.id, addRevised: [], removeRevised: [], pagesSkipped: [], durationMinutes: 0, weaknessUpdates: [] })!.durationMinutes).toBeNull();
+  });
+
+  it('session.assigned: the assignment keeps only the day’s own pages now, only ever shrinking', () => {
+    const s = mergeSessionAdd(null, add({ assignedPages: [1, 2, 3, 4, 5], pagesRevised: [1, 2, 3] }), AT);
+    const op = { kind: 'session.assigned' as const, id: s.id, assignedPages: [1, 2, 3] };
+    // Keep daily amount moved 4 and 5 to tomorrow: the assignment shrinks, and the day is complete.
+    const cut = applySessionAssigned(s, op)!;
+    expect(cut.assignedPages).toEqual([1, 2, 3]);
+    expect(cut.totalAssignedPages).toBe(3);
+    expect(cut.state).toBe('COMPLETED');
+    expect(cut.completionPercentage).toBe(100);
+    // Twice is once; nothing to drop changes nothing; other pages are never added; never empty.
+    expect(applySessionAssigned(cut, op)).toBe(cut);
+    expect(applySessionAssigned(s, { ...op, assignedPages: [1, 2, 3, 4, 5, 6] })).toBe(s);
+    expect(applySessionAssigned(s, { ...op, assignedPages: [1, 9] })!.assignedPages).toEqual([1]);
+    expect(applySessionAssigned(s, { ...op, assignedPages: [9] })).toBe(s);
+    expect(applySessionAssigned(null, op)).toBeNull();
+    // Laid over the copy like the other session changes.
+    expect(overlaySessions([s], [entry(op)])[0].assignedPages).toEqual([1, 2, 3]);
   });
 
   it('an edit adds and takes out pages as sets (twice is once); a session that’s gone stays gone', () => {

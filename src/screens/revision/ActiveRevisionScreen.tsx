@@ -478,6 +478,8 @@ export default function ActiveRevisionScreen() {
         ahead: credit.ahead,
         // Every page held as revised, catch-up pages too: their credit stays while they are checked (SESS-7).
         checked: heldAsRevised(revisionDay, unrevised),
+        // The day's own pages now: pages a carry moved to tomorrow leave the session's assignment.
+        assignedExact: true,
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
       lastSaveTimeRef.current = Date.now();
@@ -754,6 +756,7 @@ export default function ActiveRevisionScreen() {
           durationMinutes: durationDelta,
           ahead: sessionCredit(pagesRevised, pageDays, revisionDay).ahead,
           checked: heldAsRevised(revisionDay),
+          assignedExact: true,
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();

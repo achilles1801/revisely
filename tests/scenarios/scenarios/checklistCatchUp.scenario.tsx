@@ -95,11 +95,11 @@ describe('4. Partly done today', () => {
     await app.close();
   });
 
-  // KNOWN BUG (SESS-2, CARRY-2): today's session was saved with its five pages (587–591) before
-  // Add to today. Keep daily amount then moves 590 and 591 to tomorrow, but the session's assigned
-  // pages can only grow (firestore.rules: assignedPages.hasAll), so they stay in today's snapshot:
-  // Home says Done, the streak doesn't count today, and tomorrow reads today as missed.
-  it.failing('KNOWN BUG [SESS-2] [CARRY-2] a session started before Add to today: finished, today counts toward the streak', async () => {
+  // Today's session was saved with its five pages (587–591) before Add to today; Keep daily amount
+  // then moves 590 and 591 to tomorrow. They leave the session's assigned pages (the rules let the
+  // list shrink), so today counts once its own pages are done. (Fixed Nov 2026: they stayed, Home
+  // said Done, and the streak didn't count today.)
+  it('[SESS-2] [CARRY-2] a session started before Add to today: finished, today counts toward the streak, with only its own pages assigned', async () => {
     const { app } = await scenarioPhone('partial-today');
     const home = new Home(app);
     await home.ready();
@@ -116,6 +116,9 @@ describe('4. Partly done today', () => {
     await app.untilSynced();
     expect(home.title()).toBe('Done · 5 pages');
     await home.untilStreak(6);
+    const svc = app.mods.require<typeof import('../../../src/services/firestoreService')>('src/services/firestoreService');
+    const onServer = await app.act(() => svc.getSession('2026-11-05', app.uid));
+    expect(onServer?.assignedPages).toEqual([587, 588, 589]);
     await app.close();
   });
 

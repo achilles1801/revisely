@@ -333,9 +333,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
 ordinary test in the fix's PR.
 
-| Rule | What happens | Test |
-| --- | --- | --- |
-| SESS-2, CARRY-2 | Today's session saved, then Add to today with Keep daily amount: the pages the shift moves to tomorrow stay in today's session's assigned pages, which `firestore.rules` lets only grow. Home says Done, but the streak doesn't count today, and the next day reads it as missed. A fix needs the assigned pages to shrink (a rules change) or a record of the shift. | `checklistCatchUp` › 4 |
+None open.
 
 Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 
@@ -345,4 +343,5 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | DAY-8 | With a saved place far from the phone's zone, `getNextRevisionDayStart` named a time when the day doesn't turn (widget days listed twice, reminders ending early). | It returns the first midnight or Fajr at which the revision day changes (`src/lib/fajrBoundary.ts`). |
 | SCHED-6 | A carry-over shift on a custom plan with a page on two neighbouring days could put that page twice on one day. | A shifted day takes such a page once and goes on to the next (`shiftedCycleDay`, `src/lib/algorithm.ts`). |
 | CARRY-5 | With scattered leftovers, saving an edit to a later day brought a page revised yesterday back into today. | Saving keeps today's carry-over as it was (`settleCarryOverForNewPlan`, `src/lib/planChange.ts`). |
+| SESS-2, CARRY-2 | Today's session saved, then Add to today with Keep daily amount: the pages moved to tomorrow stayed in the session's assigned pages (the rules let them only grow), so Home said Done but the streak didn't count today. | A save from the session screen cuts the session's assignment to the day's own pages, in a change of its own (`session.assigned`, `src/lib/offline/ops.ts`); `firestore.rules` lets the list shrink to some of its pages. |
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |
