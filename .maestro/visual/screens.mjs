@@ -92,6 +92,18 @@ export const SCREEN_MASKS = {
     ['11-daily-log', '11-daily-log-dark'].map((n) => [
       n,
       {
+        ios: [
+          { x: 510, y: 384, w: 260, h: 56, why: 'note time' },
+          // Dark is shot straight after Add, with the To field still focused: its cursor blinks,
+          // and the number pad stays up unless Maestro found the keyboard's Done bar (optional in
+          // keyboard-done.yaml). Nothing on the log reaches that low, keyboard or not.
+          ...(n.endsWith('-dark')
+            ? [
+                { x: 858, y: 796, w: 20, h: 76, why: 'text cursor' },
+                { x: 0, y: 1680, w: 1206, h: 894, why: 'keyboard (up or down)' },
+              ]
+            : []),
+        ],
         android: [
           { x: 430, y: 294, w: 230, h: 50, why: 'note time' },
           // The To field keeps the focus after Add: its cursor blinks.
