@@ -4,8 +4,15 @@
 
 import { useSyncExternalStore } from 'react';
 
+/**
+ * The button's disc: 44, the smallest touch target, and clearly smaller than the 56 of the
+ * mocks, which Majd found too big on his phone (Nov 7 2026).
+ */
+export const REVO_BUTTON_SIZE = 44;
+/** Its gap above the tab bar (and the mini player). */
+export const REVO_BUTTON_GAP = 14;
 /** Lists leave this much room at the end so their last row scrolls clear of the button. */
-export const REVO_BUTTON_FOOTPRINT = 72;
+export const REVO_BUTTON_FOOTPRINT = REVO_BUTTON_SIZE + REVO_BUTTON_GAP + 2;
 
 let present = false;
 const listeners = new Set<() => void>();

@@ -1,7 +1,8 @@
 # Revo, the assistant (previewTester accounts; an E2E build shows it to every account, with an
 # in-memory stand-in for its server: src/lib/e2e/revoFake.ts). Takes a screenshot of each
-# screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock boards.
-# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22
+# screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock boards,
+# in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
+# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-24, REVO-25
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -69,6 +70,15 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-input
 - inputText: "Why do these two keep slipping?"
+# REVO-24: with the keyboard up the header and the greeting stay on screen; the composer rides up.
+- assertVisible:
+    id: revo-history
+- assertVisible:
+    id: revo-greeting
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5k-keyboard
 - tapOn:
     id: revo-send
 - extendedWaitUntil:
@@ -170,3 +180,89 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r2-fab-activity
+
+# The same screens in dark: Settings → Theme → Dark, then Revo off (as Settings → Revo AI would
+# turn it off) so its opt-in shows again, with the day's questions back.
+- runFlow:
+    file: ../subflows/back-home.yaml
+- tapOn:
+    id: open-settings
+- scrollUntilVisible:
+    element: "Theme"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Dark"
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 10000
+- runFlow:
+    file: ../subflows/revo-link.yaml
+    env:
+      QUERY: optin=0&left=20&day=2026-11-03
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r9-opt-in-dark
+- tapOn:
+    id: revo-turn-on
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r4-sheet-dark
+- tapOn:
+    id: revo-input
+- inputText: "Why do these two keep slipping?"
+- assertVisible:
+    id: revo-history
+- assertVisible:
+    id: revo-greeting
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5k-keyboard-dark
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-plan
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5-conversation-dark
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home-dark

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, DeviceEventEmitter, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { __setRevoBackendForTests, RevoError, type RevoBackend } from '../../../lib/revo/backend';
@@ -7,6 +7,7 @@ import { createMemoryRevoBackend } from '../../../lib/revo/memoryBackend';
 import type { RevoContext } from '../../../lib/revo/types';
 import { RevoBoundary } from '../RevoBoundary';
 import { RevoChat } from '../RevoChat';
+import { RevoSheetFrame } from '../RevoSheetFrame';
 import { RevoHistory, RevoMemory, RevoOptIn } from '../RevoPages';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -230,6 +231,32 @@ describe('Revo’s conversation', () => {
     await flush();
     expect(screen.getByText('Revo is resting')).toBeTruthy();
     expect(screen.getByTestId('revo-input').props.placeholder).toBe('Back next month');
+  });
+});
+
+describe('Revo’s sheet and the keyboard', () => {
+  it('the keyboard up: the sheet sits on it (no safe-area padding under the composer); down: back as it was', async () => {
+    render(
+      <ThemeProvider>
+        <RevoSheetFrame visible onClose={jest.fn()} full onFullChange={jest.fn()}>
+          {null}
+        </RevoSheetFrame>
+      </ThemeProvider>,
+    );
+    await flush();
+    const pad = () => StyleSheet.flatten(screen.getByTestId('revo-sheet').props.style).paddingBottom;
+    const before = pad();
+    expect(before).toBeGreaterThanOrEqual(12);
+    await act(async () => {
+      DeviceEventEmitter.emit('keyboardWillShow', { endCoordinates: { height: 336, screenY: 620, screenX: 0, width: 440 }, duration: 250 });
+      DeviceEventEmitter.emit('keyboardDidShow', { endCoordinates: { height: 336, screenY: 620, screenX: 0, width: 440 }, duration: 0 });
+    });
+    expect(pad()).toBe(8);
+    await act(async () => {
+      DeviceEventEmitter.emit('keyboardWillHide', { endCoordinates: { height: 0, screenY: 956, screenX: 0, width: 440 }, duration: 250 });
+      DeviceEventEmitter.emit('keyboardDidHide', { endCoordinates: { height: 0, screenY: 956, screenX: 0, width: 440 }, duration: 0 });
+    });
+    expect(pad()).toBe(before);
   });
 });
 
