@@ -72,14 +72,17 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
   const [q, setQ] = useState('');
   const juzScroll = useRef<ScrollView>(null);
   const juzScrolled = useRef(false);
-  // Where the account's juz row is and how tall the list is: it scrolls there once both are known
-  // (a scroll before the list knew its height stopped at the top: flow 09-revo-attach, Nov 7 2026).
+  // Where the account's juz row is, how tall the list and its content are: it scrolls there, on the
+  // next frame, once all three are known. Android drops a scroll asked for before the list itself
+  // is laid out (it stayed at Juz 1 in flow 09-revo-attach, Nov 7 2026).
   const juzTarget = useRef<number | null>(null);
   const juzContent = useRef(0);
+  const juzViewport = useRef(0);
   const scrollToJuz = () => {
-    if (juzScrolled.current || juzTarget.current == null || juzContent.current <= juzTarget.current) return;
+    const y = juzTarget.current;
+    if (juzScrolled.current || y == null || juzViewport.current <= 0 || juzContent.current <= y) return;
     juzScrolled.current = true;
-    juzScroll.current?.scrollTo({ y: juzTarget.current, animated: false });
+    requestAnimationFrame(() => juzScroll.current?.scrollTo({ y: Math.min(y, juzContent.current - juzViewport.current), animated: false }));
   };
   const room = REVO_MAX_ATTACHMENTS - others.length;
   const count = keys.length + others.length;
@@ -262,6 +265,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
                 juzScrolled.current = false;
                 juzTarget.current = null;
                 juzContent.current = 0;
+                juzViewport.current = 0;
                 setTab(t);
               }}
               tone="ink"
@@ -287,6 +291,10 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
               style={styles.fill}
               contentContainerStyle={styles.list}
               keyboardShouldPersistTaps="handled"
+              onLayout={(e) => {
+                juzViewport.current = e.nativeEvent.layout.height;
+                scrollToJuz();
+              }}
               onContentSizeChange={(_, h) => {
                 juzContent.current = h;
                 scrollToJuz();
