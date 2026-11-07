@@ -41,9 +41,21 @@ jest.mock('react-native', () => ({
 // Android's media notification (lib/mediaNotification): what is on show.
 let mockMedia: { media: string[]; orphans: string[] } = { media: [], orphans: [] };
 const mockDismiss = jest.fn((_ids: string[]) => Promise.resolve());
+const mockRead = jest.fn(() => Promise.resolve(mockMedia));
+// The binary's expo-audio fix (2 from 1.0.4; 0 before), and each player's own say.
+let mockLevel = 0;
+// Previous and next on Android's notification (level 2).
+const mockTrack: Array<(direction: 1 | -1) => void> = [];
 jest.mock('../mediaNotification', () => ({
-  readMediaNotifications: () => Promise.resolve(mockMedia),
+  readMediaNotifications: () => mockRead(),
   dismissNotifications: (ids: string[]) => mockDismiss(ids),
+  mediaControlsLevel: () => mockLevel,
+  stillOnLockScreen: (p: { stillOn?: boolean }) => p.stillOn ?? true,
+  onTrackCommand: (l: (direction: 1 | -1) => void) => {
+    if (mockLevel < 2) return null;
+    mockTrack.push(l);
+    return { remove() {} };
+  },
 }));
 
 jest.mock('../logger', () => ({ logger: { warn: jest.fn(), error: jest.fn(), log: jest.fn() } }));
@@ -657,6 +669,25 @@ describe('recitation on Android: its notification (lib/mediaNotification)', () =
     expect(r.getState().status).toBe('playing');
   });
 
+  it('stopped from outside (Hide on the system media control, before 1.0.4): ▶ loads the verse again', () => {
+    const r = new Recitation();
+    r.play(v(2, 13));
+    const p = mockPlayers[0];
+    p.emit({ playing: true, playbackState: 'ready' });
+    r.pause();
+    p.emit({ playing: false, playbackState: 'idle' });
+    expect(r.getState()).toMatchObject({ status: 'paused', verse: v(2, 13) });
+    r.resume();
+    expect(p.replace).toHaveBeenCalledTimes(2);
+    expect(p.replace).toHaveBeenLastCalledWith({ uri: recitationUrl(v(2, 13)) });
+    // Playing when it was stopped: paused, and ▶ loads it again too.
+    p.emit({ playing: true, playbackState: 'ready' });
+    p.emit({ playing: false, playbackState: 'idle' });
+    expect(r.getState().status).toBe('paused');
+    r.resume();
+    expect(p.replace).toHaveBeenCalledTimes(3);
+  });
+
   it('iOS is as before: stop clears the lock screen and keeps the player', () => {
     mockPlatform.OS = 'ios';
     const r = new Recitation();
@@ -665,5 +696,95 @@ describe('recitation on Android: its notification (lib/mediaNotification)', () =
     r.stop();
     expect(p.setActiveForLockScreen).toHaveBeenLastCalledWith(false);
     expect(p.release).not.toHaveBeenCalled();
+  });
+
+  describe('on a binary with the fix (1.0.4 on)', () => {
+    beforeEach(() => {
+      mockLevel = 2;
+      mockTrack.length = 0;
+    });
+    afterEach(() => {
+      mockLevel = 0;
+    });
+
+    it('previous and next on the notification move a verse back or on, within the range', () => {
+      const r = new Recitation();
+      const advance = (x: { sura: number; ayah: number }) => (x.ayah < 14 ? v(2, x.ayah + 1) : null);
+      r.play(v(2, 13), advance, 'reader', { from: v(2, 12), to: v(2, 14) });
+      mockPlayers[0].emit({ playing: true });
+      mockTrack.forEach((l) => l(1));
+      expect(r.getState()).toMatchObject({ status: 'loading', verse: v(2, 14) });
+      mockTrack.forEach((l) => l(1));
+      expect(r.getState().verse).toEqual(v(2, 14));
+      mockTrack.forEach((l) => l(-1));
+      mockTrack.forEach((l) => l(-1));
+      expect(r.getState().verse).toEqual(v(2, 12));
+      mockTrack.forEach((l) => l(-1));
+      expect(r.getState().verse).toEqual(v(2, 12));
+    });
+
+    it('a stop frees the player and looks for nothing afterwards: the service leaves nothing behind', async () => {
+      const r = new Recitation();
+      await settle();
+      mockRead.mockClear();
+      r.play(v(2, 13));
+      const p = mockPlayers[0];
+      p.emit({ playing: true });
+      r.stop();
+      expect(p.release).toHaveBeenCalled();
+      jest.advanceTimersByTime(NOTIFICATION_CHECK_MS * 4);
+      await endSweep();
+      expect(mockRead).not.toHaveBeenCalled();
+      // Away from the app too.
+      r.play(v(2, 14));
+      last().emit({ playing: true });
+      toBackground();
+      r.stop();
+      await endSweep();
+      expect(mockRead).not.toHaveBeenCalled();
+    });
+
+    it('a notification left by an older binary still goes at launch', async () => {
+      mockMedia = { media: ['left-over'], orphans: ['orphan'] };
+      new Recitation();
+      await settle();
+      expect(mockDismiss).toHaveBeenCalledWith(['left-over', 'orphan']);
+    });
+
+    it('paused, its notification swiped away: back in the app it is still paused there, and ▶ goes on with the same player', async () => {
+      const r = new Recitation();
+      r.play(v(79, 8));
+      const p = mockPlayers[0];
+      p.emit({ playing: true });
+      r.pause();
+      jest.advanceTimersByTime(NOTIFICATION_SETTLE_MS);
+      toBackground();
+      mockMedia = { media: [], orphans: [] };
+      toForeground();
+      await settle();
+      expect(p.release).not.toHaveBeenCalled();
+      expect(r.getState()).toMatchObject({ status: 'paused', verse: v(79, 8) });
+      r.resume();
+      expect(mockPlayers).toHaveLength(1);
+      expect(p.play).toHaveBeenCalledTimes(2);
+      expect(p.replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('back in the app after its controls went (the task was removed): paused, its player freed, ▶ starts afresh', async () => {
+      const r = new Recitation();
+      r.play(v(79, 8));
+      const p = mockPlayers[0];
+      p.emit({ playing: true });
+      toBackground();
+      p.emit({ playing: false });
+      p.stillOn = false;
+      toForeground();
+      await settle();
+      expect(p.release).toHaveBeenCalled();
+      expect(r.getState()).toMatchObject({ status: 'paused', verse: v(79, 8) });
+      r.resume();
+      expect(last()).not.toBe(p);
+      expect(last().setActiveForLockScreen).toHaveBeenCalledWith(true, expect.anything(), expect.anything());
+    });
   });
 });
