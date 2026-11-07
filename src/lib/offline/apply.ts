@@ -5,7 +5,7 @@ import type { FirestoreSession } from '../../types/firestore';
 import { logger } from '../logger';
 import { revisionItemsFor } from '../revisionItems';
 import type { OutboxEntry } from './ops';
-import { applySessionEdit, mergeSessionAdd, pageUpdateData, sessionUpdateData } from './ops';
+import { applySessionAssigned, applySessionEdit, mergeSessionAdd, pageUpdateData, sessionUpdateData } from './ops';
 import { readItemFor } from '../readItems';
 
 /** A document id like Firestore's own (20 letters and digits), made on the phone. */
@@ -75,6 +75,20 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
     case 'session.delete':
       await firestoreService.deleteSession(op.id, uid);
       return mirrorRevisionItems(uid, op.id, null);
+    case 'session.assigned': {
+      const session = await firestoreService.mergeSessionOnServer(
+        op.id,
+        (existing) => applySessionAssigned(existing, op),
+        (s) => ({
+          assignedPages: s.assignedPages,
+          totalAssignedPages: s.totalAssignedPages,
+          state: s.state,
+          completionPercentage: s.completionPercentage,
+        }),
+        uid,
+      );
+      return mirrorRevisionItems(uid, op.id, session);
+    }
     case 'memorization.delete':
       return firestoreService.deleteMemorizationItem(op.id, uid);
     case 'memorization.mark':

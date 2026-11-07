@@ -200,6 +200,36 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       );
     });
 
+    it('allows assignedPages to shrink to some of them (the day’s end moved to the next day)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1, 2],
+          totalAssignedPages: 2,
+        }),
+      );
+    });
+
+    it('rejects dropping some assigned pages and adding others in one write', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(
+        updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1, 2, 40],
+          totalAssignedPages: 3,
+        }),
+      );
+    });
+
+    it('rejects another user shrinking the assigned pages', async () => {
+      const bob = env.authenticatedContext(BOB).firestore();
+      await assertFails(
+        updateDoc(doc(bob, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1],
+          totalAssignedPages: 1,
+        }),
+      );
+    });
+
     it('allows assignedPages to grow (pages carried into the day)', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertSucceeds(

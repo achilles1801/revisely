@@ -147,7 +147,7 @@ interface AppContextType extends AppState {
   updatePage: (page: UserPage) => Promise<void>;
   updatePages: (pages: UserPage[], changedPageNumbers?: number[]) => Promise<void>;
   /** `checked`: every page the session holds as revised, catch-up pages included (SESS-7). */
-  addLog: (log: Omit<RevisionLog, 'id'> & { checked?: number[] }) => Promise<void>;
+  addLog: (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean }) => Promise<void>;
   updateLog: (log: RevisionLog & { checked?: number[] }) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
   deleteLogs: (logIds: string[]) => Promise<void>;
@@ -1030,7 +1030,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const checkedOf = (log: { pagesRevised: number[]; ahead?: Record<string, number[]>; checked?: number[] }): number[] =>
     log.checked ?? [...new Set([...log.pagesRevised, ...Object.values(log.ahead ?? {}).flat()])];
 
-  const addLog = useCallback(async (log: Omit<RevisionLog, 'id'> & { checked?: number[] }) => {
+  const addLog = useCallback(async (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean }) => {
     setError(null);
     const at = Date.now();
     const existing = viewRef.current?.sessions.find((s) => s.id === log.date);
@@ -1050,6 +1050,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       at,
     );
+    // The day's own pages now (assignedExact): pages its session holds that left the day (Keep
+    // daily amount moved them to tomorrow) leave its assignment, in a change of their own.
+    const before = existing?.assignedPages ?? [];
+    if (log.assignedExact && log.assignedPages && before.some((p) => !log.assignedPages!.includes(p))) {
+      await enqueueOp({ kind: 'session.assigned', id: log.date, assignedPages: log.assignedPages }, at);
+    }
   }, [enqueueOp]);
 
   const updateLog = useCallback(async (log: RevisionLog & { checked?: number[] }) => {

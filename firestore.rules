@@ -166,7 +166,8 @@ service cloud.firestore {
         'state',
         'pagesRevised', 'pagesSkipped', 'weaknessUpdates',
         'completedAt', 'durationMinutes', 'completionPercentage',
-        // Grow-only: pages carried into the day after the session started.
+        // Grow or shrink (never both): pages carried into the day after the
+        // session started, or moved out of it to the next day.
         'assignedPages', 'totalAssignedPages',
         // Pages revised ahead, credited to later days (lib/aheadCredit).
         'ahead',
@@ -361,12 +362,15 @@ service cloud.firestore {
                          // Cannot change id or date
                          (!hasField('id') || incomingData().id == currentData().id) &&
                          (!hasField('date') || incomingData().date == currentData().date) &&
-                         // Assigned pages can only grow (carry-over adds pages
-                         // to a day after its session started)
+                         // Assigned pages grow (carry-over adds pages to a day
+                         // after its session started) or shrink to some of them
+                         // (Keep daily amount moves the day's end to the next
+                         // day), never both: no other pages swapped in.
                          (!hasField('assignedPages') ||
                           (incomingData().assignedPages is list &&
                            incomingData().assignedPages.size() <= 604 &&
-                           incomingData().assignedPages.hasAll(currentData().assignedPages))) &&
+                           (incomingData().assignedPages.hasAll(currentData().assignedPages) ||
+                            currentData().assignedPages.hasAll(incomingData().assignedPages)))) &&
                          (!hasField('totalAssignedPages') ||
                           (incomingData().totalAssignedPages is int &&
                            isInRange(incomingData().totalAssignedPages, 0, 604))) &&
