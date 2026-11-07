@@ -765,6 +765,7 @@ export default function SettingsScreen() {
               value={localUser.smartTrackingEnabled}
               onValueChange={(v) => updateUser({ smartTrackingEnabled: v })}
               accessibilityLabel="Smart Tracking"
+              testID="smart-tracking-switch"
             />
           </View>
           <CarryOverSetting

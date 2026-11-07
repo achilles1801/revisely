@@ -60,6 +60,7 @@ export function InsightsView({
   onPlanIt,
   onOpenPage,
   onSeeAllPages,
+  onTurnOnSmartTracking,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -67,6 +68,8 @@ export function InsightsView({
   onOpenPage: (page: number) => void;
   /** Weak spots' "See all pages by strength": every revised page, weakest first (ACT-12). */
   onSeeAllPages?: () => void;
+  /** Smart Tracking off: the line in Weak spots' place, to Settings at its switch (ACT-12). */
+  onTurnOnSmartTracking?: () => void;
 }) {
   return (
     <View testID="activity-insights">
@@ -74,6 +77,8 @@ export function InsightsView({
       <Consistency data={data} />
       {data.smartTracking !== false ? (
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
+      ) : onTurnOnSmartTracking ? (
+        <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
       ) : null}
       <Memorization data={data} />
       <Pace data={data} />
@@ -297,6 +302,28 @@ function Consistency({ data }: { data: InsightsData }) {
 
 // ── Weak spots ───────────────────────────────────────────────────────────
 
+/** Links in Insights are chrome: their text stops growing at 1.4× (Dynamic Type). */
+const LINK_MAX_SCALE = 1.4;
+const INVITE = 'Turn on Smart Tracking to see your weak spots';
+
+/**
+ * Smart Tracking off: no page is rated, so Weak spots gives way to one line that turns it on
+ * (Settings → Revision, at its switch). A label, not a guide (ACT-12).
+ */
+function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+  const { palette } = useTheme();
+  return (
+    <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
+      <Tap onPress={onPress} accessibilityRole="link" accessibilityLabel={INVITE} hitSlop={8} style={styles.invite} testID="insights-smart-tracking">
+        <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+          {INVITE}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={palette.link} />
+      </Tap>
+    </View>
+  );
+}
+
 function WeakSpots({
   data,
   onReviseTomorrow,
@@ -382,7 +409,9 @@ function WeakSpots({
           style={styles.seeAll}
           testID="insights-see-all-pages"
         >
-          <Text style={[typeV2.name, { color: palette.link }]}>See all pages by strength</Text>
+          <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+            See all pages by strength
+          </Text>
           <Ionicons name="chevron-forward" size={16} color={palette.link} />
         </Tap>
       ) : null}
@@ -502,6 +531,8 @@ const styles = StyleSheet.create({
   weakList: { marginTop: 4 },
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginTop: 14 },
+  invite: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  linkText: { flexShrink: 1 },
   outlinePill: { alignSelf: 'flex-start', height: 36, borderRadius: 18, borderWidth: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   monthBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 72 + 21, marginTop: 10 },
   monthCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },

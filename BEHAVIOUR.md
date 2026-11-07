@@ -261,9 +261,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-12.** Insights live in Activity (Calendar | Insights) for accounts with the new Activity (preview testers
   while its blocks are built): their tab bar is Home and Read, with or without Smart Tracking, and there is no
   Insights tab to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
-  no "See all"); Smart Tracking is turned on in Settings. With it, Weak spots ends in "See all pages by strength":
-  every revised page, weakest first, by page, surah or juz, filtered by juz and by strength (the Insights tab's
-  Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6 2026.)
+  no "See all"): one line stands in its place, "Turn on Smart Tracking to see your weak spots ›" (a link, not a
+  guide), which opens Settings at Revision, where its switch is; once it is on, Weak spots shows. With it, Weak
+  spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
+  juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
+  2026; the line, Nov 7.)
 
 ## Ask coach
 

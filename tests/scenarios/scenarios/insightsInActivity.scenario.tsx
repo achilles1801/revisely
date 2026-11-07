@@ -1,6 +1,7 @@
 // Insights in Activity (ACT-12): Weak spots reads the pages' ratings, which only Smart Tracking writes.
-// Without it, Activity's Insights has no Weak spots (no Ask, no "See all"); with it, Weak spots ends
-// in "See all pages by strength", the old Insights tab's Browse as a screen of its own.
+// Without it, Activity's Insights has no Weak spots (no Ask, no "See all"), only a line that turns it
+// on; with it, Weak spots ends in "See all pages by strength", the old Insights tab's Browse as a
+// screen of its own.
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { InsightsView, type InsightsData } from '../../../src/components/activity/InsightsView';
@@ -30,15 +31,23 @@ function data(smartTracking: boolean): InsightsData {
 
 function open(smartTracking: boolean) {
   const onSeeAllPages = jest.fn();
+  const onTurnOnSmartTracking = jest.fn();
   const view = render(
-    <InsightsView data={data(smartTracking)} onReviseTomorrow={jest.fn()} onPlanIt={jest.fn()} onOpenPage={jest.fn()} onSeeAllPages={onSeeAllPages} />,
+    <InsightsView
+      data={data(smartTracking)}
+      onReviseTomorrow={jest.fn()}
+      onPlanIt={jest.fn()}
+      onOpenPage={jest.fn()}
+      onSeeAllPages={onSeeAllPages}
+      onTurnOnSmartTracking={onTurnOnSmartTracking}
+    />,
   );
-  return { ...view, onSeeAllPages };
+  return { ...view, onSeeAllPages, onTurnOnSmartTracking };
 }
 
 describe('Insights in Activity', () => {
-  it('[ACT-12] without Smart Tracking: no Weak spots, no Ask and no "See all"; the other sections stay', () => {
-    const { queryByText, queryByTestId, getByText } = open(false);
+  it('[ACT-12] without Smart Tracking: no Weak spots, no Ask and no "See all"; a line turns it on; the other sections stay', () => {
+    const { queryByText, queryByTestId, getByText, getByRole, onTurnOnSmartTracking } = open(false);
     expect(getByText('Coverage')).toBeTruthy();
     expect(getByText('Consistency')).toBeTruthy();
     expect(getByText('Memorization')).toBeTruthy();
@@ -46,13 +55,16 @@ describe('Insights in Activity', () => {
     expect(queryByText('Al-Hashr')).toBeNull();
     expect(queryByTestId('insights-ask-revo')).toBeNull();
     expect(queryByTestId('insights-see-all-pages')).toBeNull();
+    fireEvent.press(getByRole('link', { name: 'Turn on Smart Tracking to see your weak spots' }));
+    expect(onTurnOnSmartTracking).toHaveBeenCalledTimes(1);
   });
 
   it('[ACT-12] with Smart Tracking: Weak spots lists the weak pages and ends in "See all pages by strength"', () => {
-    const { getByText, getByTestId, onSeeAllPages } = open(true);
+    const { getByText, getByTestId, queryByTestId, onSeeAllPages } = open(true);
     expect(getByText('Weak spots')).toBeTruthy();
     expect(getByText('Al-Hashr')).toBeTruthy();
     expect(getByTestId('insights-ask-revo')).toBeTruthy();
+    expect(queryByTestId('insights-smart-tracking')).toBeNull();
     fireEvent.press(getByText('See all pages by strength'));
     expect(onSeeAllPages).toHaveBeenCalledTimes(1);
   });
