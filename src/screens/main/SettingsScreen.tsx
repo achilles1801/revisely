@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { createContext, useContext, useRef, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,13 @@ import {
   Share,
   TextInput,
   AccessibilityState,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import Constants from 'expo-constants';
 import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
-import { useHaptics } from '../../design/haptics';
 import { AccentSetting } from '../../components/settings/AccentPicker';
 import { TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
@@ -24,7 +24,7 @@ import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
 import { Sheet } from '../../components/v2/Sheet';
 import { reportProblem } from '../../lib/sentry';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { FajrBoundaryCard } from '../../components/FajrBoundaryCard';
@@ -47,10 +47,11 @@ import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { useApp } from '../../context/AppContext';
+import { showsUpdateTools } from '../../lib/updates/testerTools';
 import { useAuth } from '../../context/AuthContext';
 import { systemAppearanceAvailable, useTheme } from '../../context/ThemeContext';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
-import { scheduleDailyReminder } from '../../lib/notifications';
+import type { RevoSettingsSection } from '../../lib/revo/types';
 import * as firestoreService from '../../services/firestoreService';
 import { getTotalAppUsageSeconds } from '../../lib/appUsage';
 import { formatDuration } from '../../lib/readingTimer';
@@ -62,12 +63,23 @@ import { logger } from '../../lib/logger';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { supportMailto } from '../../lib/contact';
 import { PillTabs } from '../../components/v2/PillTabs';
+import { setMushafCellular } from '../../lib/mushafOffline';
+import { describeMushaf, mushafMenuActions, useMushafOffline } from '../../lib/mushafOfflineUi';
+import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
+import { MushafPickerSheet } from '../../components/mushaf/MushafPickerSheet';
 import { shareIcon } from '../../lib/platformUi';
+import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
+import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
+import { showsResetMyData } from '../../lib/testerReset';
+import { revoAvailable } from '../../lib/revo/availability';
+import { revoBackend } from '../../lib/revo/backend';
+import { openRevo } from '../../lib/revo/open';
+import { useRevoSettings } from '../../lib/revo/useRevoSettings';
+import { showsTestScenarios } from '../../lib/testScenarios';
+import { releaseSync } from '../../lib/offline/sync';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Settings'>;
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MINUTES = [0, 15, 30, 45];
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -75,12 +87,33 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Reusable bits — kept inline since they're tightly coupled to settings rows.
 // ---------------------------------------------------------------------------
 
+/** Each section's place in the list, by title, so Revo can open Settings at one (REVO-31). */
+const SectionLayout = createContext<((title: string, y: number) => void) | null>(null);
+
+/** The section titles Revo's openScreen names. */
+const REVO_SECTION_TITLES: Record<RevoSettingsSection, readonly string[]> = {
+  activity: ['Activity'],
+  homeScreen: ['Home screen'],
+  // Without prayer times the day boundary has its own section.
+  prayer: ['Prayer', 'Day boundary'],
+  revision: ['Revision'],
+  revo: ['Revo AI'],
+  mushaf: ['Mushaf'],
+  notifications: ['Notifications'],
+  appearance: ['Appearance'],
+  testing: ['Testing'],
+};
+
 function Section({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
   const { palette } = useTheme();
+  const onLayout = useContext(SectionLayout);
   // A flat list: a bold sentence-case header, rows on the ground, a hairline
   // closing the group.
   return (
-    <View style={[v2.section, { borderBottomColor: palette.separator }]}>
+    <View
+      style={[v2.section, { borderBottomColor: palette.separator }]}
+      onLayout={title && onLayout ? (e) => onLayout(title, e.nativeEvent.layout.y) : undefined}
+    >
       {title ? (
         <Text style={[typeV2.name, v2.sectionTitle, { color: palette.text }]} accessibilityRole="header">
           {title}
@@ -107,6 +140,7 @@ function Row({
   onPress,
   destructive,
   accessibilityState,
+  testID,
 }: {
   icon?: IconName;
   label: string;
@@ -117,6 +151,7 @@ function Row({
   onPress?: () => void;
   destructive?: boolean;
   accessibilityState?: AccessibilityState;
+  testID?: string;
 }) {
   const { palette } = useTheme();
   const row = (
@@ -150,6 +185,7 @@ function Row({
       accessibilityRole="button"
       accessibilityLabel={value ? `${label}, ${value}` : label}
       accessibilityState={accessibilityState}
+      testID={testID}
     >
       {row}
     </Tap>
@@ -188,7 +224,31 @@ function ThemeSegmentedControl<T extends string>({
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, saveUser, resetOnboarding } = useApp();
+  const route = useRoute<RouteProp<HomeStackParamList, 'Settings'>>();
+  // Opened at a section (Revo's openScreen): scrolled to it once it has laid out.
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionY = useRef(new Map<string, number>());
+  const wantedSection = route.params?.section;
+  const scrolledTo = useRef<string | null>(null);
+  const scrollToWanted = useCallback(() => {
+    if (!wantedSection || scrolledTo.current === wantedSection) return;
+    const y = REVO_SECTION_TITLES[wantedSection]?.map((t) => sectionY.current.get(t)).find((v) => v != null);
+    if (y == null) return;
+    scrolledTo.current = wantedSection;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
+  }, [wantedSection]);
+  useEffect(() => {
+    scrolledTo.current = null;
+    scrollToWanted();
+  }, [scrollToWanted]);
+  const onSectionLayout = useCallback(
+    (title: string, y: number) => {
+      sectionY.current.set(title, y);
+      scrollToWanted();
+    },
+    [scrollToWanted],
+  );
+  const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
@@ -203,21 +263,57 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (user) setLocalUser(user);
   }, [user]);
-  const [showTimeModal, setShowTimeModal] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [resetSheet, setResetSheet] = useState(false);
+  const [scenarioSheet, setScenarioSheet] = useState(false);
+  const syncHeld = useSyncHeld(firebaseUser?.uid);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [tempHour, setTempHour] = useState(parseInt(user?.reminderTime?.split(':')[0] ?? '8'));
-  const [tempMinute, setTempMinute] = useState(parseInt(user?.reminderTime?.split(':')[1] ?? '0'));
   const [tempName, setTempName] = useState(user?.name ?? '');
   const nameInputRef = useRef<TextInput>(null);
   const homePrefs = useHomePrefs();
   // The speech model (hidden pages, word by word; testers): its size, its
   // download, Delete.
+  // Revo (previewTester accounts): on and off here; off deletes its history and memory.
+  const revoSettings = useRevoSettings(revoAvailable(user));
+  const confirmRevoOff = () =>
+    Alert.alert('Turn off Revo?', 'Your conversations with Revo and what it remembers are deleted.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Turn off',
+        style: 'destructive',
+        onPress: () => {
+          revoBackend()
+            .setOptions({ optIn: false })
+            .catch((err) => Alert.alert('Couldn’t turn off Revo', (err as Error)?.message ?? 'Try again.'));
+        },
+      },
+    ]);
+  const confirmRevoHistoryDelete = () =>
+    Alert.alert('Delete your conversations?', 'Every conversation with Revo is deleted. What Revo remembers stays.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          revoBackend()
+            .clear('history')
+            .catch((err) => Alert.alert('Couldn’t delete them', (err as Error)?.message ?? 'Try again.'));
+        },
+      },
+    ]);
   const speechModel = useSpeechModelState();
   const [speechSheet, setSpeechSheet] = useState(false);
   const [deleteSpeechOpen, setDeleteSpeechOpen] = useState(false);
+  const mushaf = useMushafOffline();
+  const mushafText = describeMushaf(mushaf);
+  // At the accessibility text sizes the line under the label says it all; a
+  // value beside it would leave the label a word wide.
+  const { fontScale } = useWindowDimensions();
+  const [mushafMenu, setMushafMenu] = useState(false);
+  const [mushafPicker, setMushafPicker] = useState(false);
+  const edition = useMushafEdition();
   // Prayer (testers): the section, the Prayer sheet, the Home line's switch.
   const prayerEnabled = prayerTimesEnabled(user);
   const prayerPrefs = usePrayerPrefs();
@@ -279,11 +375,11 @@ export default function SettingsScreen() {
 
   if (!localUser) {
     return (
-      <SafeAreaView style={styles.container}>
+      <TopSafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={[typography.bodyMedium, { color: theme.textSecondary }]}>Loading…</Text>
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
@@ -307,7 +403,6 @@ export default function SettingsScreen() {
 
   const handleNotificationToggle = async (enabled: boolean) => {
     await updateUser({ notificationsEnabled: enabled });
-    await scheduleDailyReminder(localUser.reminderTime, enabled);
   };
 
   const handleSaveName = async () => {
@@ -348,17 +443,15 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSaveTime = async () => {
-    const newTime = `${tempHour.toString().padStart(2, '0')}:${tempMinute
-      .toString()
-      .padStart(2, '0')}`;
-    await updateUser({ reminderTime: newTime });
-    await scheduleDailyReminder(newTime, localUser.notificationsEnabled);
-    setShowTimeModal(false);
-  };
-
   const handleSignOut = () => {
-    Alert.alert('Sign out?', 'Your local data will be preserved.', [
+    // Changes made offline and not yet sent wait on this phone for this
+    // account's next sign-in here (lib/offline).
+    Alert.alert(
+      'Sign out?',
+      pendingChanges > 0
+        ? "Some changes haven't synced yet. They'll sync the next time you sign in to this account on this phone."
+        : 'Your local data will be preserved.',
+      [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
@@ -370,7 +463,8 @@ export default function SettingsScreen() {
           }
         },
       },
-    ]);
+      ],
+    );
   };
 
   const handleDeleteAccount = () => {
@@ -432,18 +526,12 @@ export default function SettingsScreen() {
     );
   };
 
-  const formatTime = (time: string) => {
-    const [hour, minute] = time.split(':').map(Number);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
+    <TopSafeAreaView style={styles.container}>
       <TopBar title="Settings" onBack={() => navigation.goBack()} separator />
 
-      <ScrollView contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
+      <SectionLayout.Provider value={onSectionLayout}>
+      <ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID="settings-scroll">
         {firebaseUser && (
           <Section title="Account">
             <View style={v2.profileRow}>
@@ -701,6 +789,63 @@ export default function SettingsScreen() {
 
         </Section>
 
+        {revoAvailable(user) && (
+          <Section title="Revo AI" footer="Revo AI can make mistakes. It answers from your own revision data.">
+            <View style={v2.iconRow} testID="revo-settings-row">
+              <SettingIcon name="sparkles-outline" />
+              <View style={v2.iconRowText}>
+                <Text style={[typeV2.body, { color: palette.text }]}>Revo</Text>
+                <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                  {revoSettings?.optIn ? 'Your revision coach, from the button on Home' : 'Off. Turn on to ask about your revision'}
+                </Text>
+              </View>
+              <SettingSwitch
+                value={revoSettings?.optIn === true}
+                onValueChange={(v) => (v ? openRevo({ view: 'optin' }) : confirmRevoOff())}
+                accessibilityLabel="Revo"
+                testID="revo-settings-switch"
+              />
+            </View>
+            {revoSettings?.optIn ? (
+              <>
+                <Row icon="bulb-outline" label="Memory" value={revoSettings.memoryOn ? 'On' : 'Off'} onPress={() => openRevo({ view: 'memory' })} />
+                <Row icon="trash-outline" label="Delete conversations" destructive onPress={confirmRevoHistoryDelete} />
+              </>
+            ) : null}
+          </Section>
+        )}
+
+        <Section title="Mushaf">
+          <View testID="mushaf-edition-row">
+            <Row
+              icon="book-outline"
+              label="Mushaf"
+              value={mushafEdition(edition).name}
+              onPress={() => setMushafPicker(true)}
+            />
+          </View>
+          <View testID="mushaf-offline-row">
+            <Row
+              icon="cloud-download-outline"
+              label="Offline mushaf"
+              subtitle={mushafText.subtitle}
+              value={fontScale > 1.35 ? undefined : mushafText.value || undefined}
+              onPress={() => setMushafMenu(true)}
+            />
+          </View>
+          <Row
+            icon="cellular-outline"
+            label="Download over mobile data"
+            rightSlot={
+              <SettingSwitch
+                value={mushaf.prefs.cellular}
+                onValueChange={(v) => void setMushafCellular(v)}
+                accessibilityLabel="Download the mushaf over mobile data"
+              />
+            }
+          />
+        </Section>
+
         <Section title="Notifications">
           <Row
             icon="notifications-outline"
@@ -710,21 +855,6 @@ export default function SettingsScreen() {
                 value={localUser.notificationsEnabled}
                 onValueChange={handleNotificationToggle}
               />
-            }
-          />
-          <Row
-            icon="time-outline"
-            label="Reminder time"
-            value={formatTime(localUser.reminderTime)}
-            onPress={
-              localUser.notificationsEnabled
-                ? () => {
-                    const [h, m] = localUser.reminderTime.split(':').map(Number);
-                    setTempHour(h);
-                    setTempMinute(m);
-                    setShowTimeModal(true);
-                  }
-                : undefined
             }
           />
         </Section>
@@ -805,8 +935,45 @@ export default function SettingsScreen() {
             label="Terms of Service"
             onPress={() => Linking.openURL('https://revisely.app/terms/')}
           />
-          <AppInfo />
+          <AppInfo tools={showsUpdateTools(user)} />
         </Section>
+
+        {firebaseUser && showsResetMyData(user) && (
+          <Section title="Testing">
+            <View testID="reset-data-row">
+              <Row
+                icon="refresh-outline"
+                label="Reset my data"
+                subtitle="Start again as a new account"
+                destructive
+                onPress={() => setResetSheet(true)}
+                testID="settings-reset-data"
+              />
+            </View>
+            {showsTestScenarios(user) && (
+              <View testID="test-scenario-row">
+                <Row
+                  icon="flask-outline"
+                  label="Load test scenario"
+                  subtitle="Replace your data with a ready-made situation"
+                  destructive
+                  onPress={() => setScenarioSheet(true)}
+                  testID="settings-test-scenario"
+                />
+              </View>
+            )}
+            {syncHeld && (
+              <View testID="held-changes-row">
+                <Row
+                  icon="cloud-upload-outline"
+                  label="Send held changes"
+                  subtitle="The test scenario's changes wait on this phone until now"
+                  onPress={() => firebaseUser && releaseSync(firebaseUser.uid)}
+                />
+              </View>
+            )}
+          </Section>
+        )}
 
         {firebaseUser && (
           <Section>
@@ -814,12 +981,14 @@ export default function SettingsScreen() {
               icon="log-out-outline"
               label="Sign out"
               onPress={handleSignOut}
+              testID="settings-sign-out"
             />
             <Row
               icon="trash-outline"
               label="Delete account"
               destructive
               onPress={handleDeleteAccount}
+              testID="settings-delete-account"
             />
           </Section>
         )}
@@ -838,6 +1007,7 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
+      </SectionLayout.Provider>
       <SpeechModelSheet visible={speechSheet} onClose={() => setSpeechSheet(false)} onReady={() => setSpeechSheet(false)} />
       <ActionSheet
         visible={deleteSpeechOpen}
@@ -846,6 +1016,20 @@ export default function SettingsScreen() {
         message={`${formatModelSize()} on this iPhone. It downloads again the next time you follow word by word.`}
         actions={[{ key: 'delete', label: 'Delete speech model', icon: 'trash-outline', destructive: true, onPress: removeSpeechModel }]}
         testID="speech-model-delete-menu"
+      />
+      <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
+      {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
+      {showsTestScenarios(user) ? (
+        <TestScenarioSheet visible={scenarioSheet} onClose={() => setScenarioSheet(false)} />
+      ) : null}
+      <ActionSheet
+        visible={mushafMenu}
+        onClose={() => setMushafMenu(false)}
+        title="Offline mushaf"
+        message={mushafText.subtitle}
+        messageMaxScale={1.4}
+        actions={mushafMenuActions(mushaf)}
+        testID="mushaf-offline-menu"
       />
       {prayerEnabled ? (
         <PrayerSheet
@@ -860,15 +1044,6 @@ export default function SettingsScreen() {
         />
       ) : null}
 
-      <ReminderTimeSheetV2
-        visible={showTimeModal}
-        hour={tempHour}
-        minute={tempMinute}
-        onHour={setTempHour}
-        onMinute={setTempMinute}
-        onCancel={() => setShowTimeModal(false)}
-        onSave={handleSaveTime}
-      />
       <TextSheetV2
         visible={showNameModal}
         title="Display name"
@@ -901,91 +1076,7 @@ export default function SettingsScreen() {
         }}
         testID="feedback-sheet"
       />
-    </SafeAreaView>
-  );
-}
-
-/**
- * The new design's reminder time: a v2 Sheet (Cancel, the title, Save), the
- * hours in a column that scrolls, the minutes beside it. The chosen one sits on
- * the accent's tint.
- */
-function ReminderTimeSheetV2({
-  visible,
-  hour,
-  minute,
-  onHour,
-  onMinute,
-  onCancel,
-  onSave,
-}: {
-  visible: boolean;
-  hour: number;
-  minute: number;
-  onHour: (h: number) => void;
-  onMinute: (m: number) => void;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  const { palette } = useTheme();
-  const haptics = useHaptics();
-  const column = (label: string, values: number[], value: number, onPick: (v: number) => void) => (
-    <View style={v2.timeColumn}>
-      <Text style={[typeV2.meta, v2.timeLabel, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-        {label}
-      </Text>
-      <ScrollView style={v2.timeScroll} showsVerticalScrollIndicator={false} testID={`time-${label.toLowerCase()}s`}>
-        {values.map((v) => {
-          const selected = v === value;
-          const text = v.toString().padStart(2, '0');
-          return (
-            <Tap
-              key={v}
-              onPress={() => {
-                if (selected) return;
-                haptics.selection();
-                onPick(v);
-              }}
-              style={[v2.timeOption, selected && { backgroundColor: palette.accentSubtle }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} ${text}`}
-              accessibilityState={{ selected }}
-              testID={`time-${label.toLowerCase()}-${v}`}
-            >
-              <Text
-                style={[
-                  typeV2.sheetTitle,
-                  typeV2.numeral,
-                  v2.timeText,
-                  { color: selected ? palette.accentText : palette.secondary, fontWeight: selected ? '600' : '400' },
-                ]}
-                maxFontSizeMultiplier={1.4}
-              >
-                {text}
-              </Text>
-            </Tap>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-  return (
-    <Sheet
-      visible={visible}
-      onClose={onCancel}
-      title="Reminder time"
-      left={{ label: 'Cancel', onPress: onCancel, testID: 'time-cancel' }}
-      right={{ label: 'Save', onPress: onSave, strong: true, testID: 'time-save' }}
-      testID="time-sheet"
-    >
-      <View style={v2.timePicker}>
-        {column('Hour', HOURS, hour, onHour)}
-        <Text style={[typeV2.title, v2.timeColon, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          :
-        </Text>
-        {column('Minute', MINUTES, minute, onMinute)}
-      </View>
-    </Sheet>
+    </TopSafeAreaView>
   );
 }
 
@@ -1114,12 +1205,5 @@ const v2 = StyleSheet.create({
   input: { borderRadius: radiusV2.media, paddingHorizontal: 14, paddingVertical: 12 },
   // A minimum, not a height: the field grows with its text and with Dynamic Type.
   inputMultiline: { minHeight: 140 },
-  timePicker: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 8 },
-  timeColumn: { alignItems: 'center', width: 104 },
-  timeLabel: { marginBottom: 8 },
-  timeScroll: { maxHeight: 220, width: '100%' },
-  timeOption: { paddingVertical: 8, borderRadius: radiusV2.chip, marginVertical: 1 },
-  timeText: { textAlign: 'center' },
-  timeColon: { marginHorizontal: 8, marginTop: 28 },
 });
 

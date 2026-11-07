@@ -1,0 +1,16 @@
+{
+  "name": "revisely-e2e-visual",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Visual regression for the E2E flows: their screenshots against approved baselines (.maestro/README.md).",
+  "type": "module",
+  "scripts": {
+    "compare": "node compare.mjs",
+    "approve": "node approve.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0"
+  }
+}

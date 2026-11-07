@@ -1,0 +1,325 @@
+# Revo, the assistant, for a previewTester account (marked one through the emulator, as the owner's
+# script does), against the real revo* functions in the functions emulator: only the model answers
+# from a recording, with the text the flow gives it (scripts/server-revo.js). Takes a screenshot of
+# each screen the mocks show (~/Documents/revisely-today-mocks/revo), for the screenshot-vs-mock
+# boards, in light and then in dark (…-dark), and the sheet with the keyboard up (r5k-keyboard).
+# Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T21:41
+      BOUNDARY: midnight
+# A tester (Revo is theirs only): the app sees it when its user document changes.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+# The mocks' history: Juz 28, 548–549 weak, today 6 of 20 (scripts/seed-revo.js).
+- runFlow: ../subflows/seed-revo.yaml
+
+# REVO-21: the button on Home; its first tap opens the opt-in.
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 15000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 10000
+- assertVisible: "Your notes and recordings stay private"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r9-opt-in
+- tapOn:
+    id: revo-turn-on
+
+# REVO-20: the greeting, from today's plan, and suggestions.
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 10000
+# Waited for, not asserted at once: on a slow iOS runner the check ran before the greeting's text
+# was there (Nov 7 2026). By surah, never page numbers (lib/passages; no-break hyphens and spaces
+# inside, so "." between words).
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+      text: "Salaam.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
+    timeout: 10000
+# The first suggestion is about them, by surah.
+- assertVisible:
+    id: "revo-chip-Plan Al-Hashr to Al-Mumtahanah"
+# By id: on iOS a chip's accessibility label ("Ask: How was my week?") stands for its text. The id
+# is a pattern (Maestro reads it as one), so not its "?".
+- assertVisible:
+    id: "revo-chip-How was my week.*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r4-sheet
+
+# + : a day attached, the menu open over it.
+- tapOn:
+    id: revo-plus
+- tapOn:
+    id: revo-add-day
+- tapOn:
+    id: revo-pick-day-0
+- extendedWaitUntil:
+    visible:
+      id: revo-context-chip
+    timeout: 5000
+- tapOn:
+    id: revo-plus
+- assertVisible: "Add to your question"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r6-context
+- tapOn:
+    id: revo-plus
+- tapOn:
+    id: revo-context-remove
+
+# A conversation: a chart and one plan that waits for a tap. What the model says (inside its
+# recorded reply): a chart and a plan on today's two weak pages, as the mock has them, and two
+# things to remember.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "The end of Al-Hashr and the start of Al-Mumtahanah slipped to weak twice this month, both coming late in a long session. Take them first tomorrow, while you are fresh.", "chart": {"kind": "pageRatings", "title": "End of Al-Hashr and start of Al-Mumtahanah", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "The end of Al-Hashr first, tomorrow", "detail": "Then the start of Al-Mumtahanah, before the rest", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
+- tapOn:
+    id: revo-input
+- inputText: "Why do these two keep slipping?"
+# REVO-24: with the keyboard up the header and the greeting stay on screen; the composer rides up.
+# Waited for: on iOS the check ran while the sheet was still settling with the keyboard (#328's run,
+# Nov 7 2026; the greeting was there a moment later).
+- extendedWaitUntil:
+    visible:
+      id: revo-history
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5k-keyboard
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-plan
+    # The answer's plan card: over 15 s on a slow iOS runner with the seeded history.
+    timeout: 30000
+- assertVisible:
+    id: revo-chart-pageRatings
+# The keyboard away (a tap on the chart, which is no control), as the mock shows the conversation.
+- tapOn:
+    id: revo-chart-pageRatings
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5-conversation
+- tapOn:
+    id: revo-plan-do
+- extendedWaitUntil:
+    visible:
+      id: revo-plan-added
+    timeout: 10000
+
+# Tonight's Day in review, written by the real function (as the app asks for it on a day with
+# something done). The memory holds what the conversation's answer asked to remember.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: review
+      DAY: 2026-11-03
+
+# History: the conversation and the Day in review.
+- tapOn:
+    id: revo-history
+- extendedWaitUntil:
+    # The row's label on iOS is "Day in review, <its line>".
+    visible: "Day in review.*"
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r7-history
+- tapOn:
+    id: revo-back
+
+# Memory: the items, the switch, Clear.
+- tapOn:
+    id: revo-memory
+- extendedWaitUntil:
+    visible: "Let Revo remember"
+    timeout: 5000
+- assertVisible: "You like short, practical plans."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r8-memory
+- tapOn:
+    id: revo-back
+
+# REVO-22: the day's questions used (revoUsage, which only the functions write; the app reads it).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: limit
+      DAY: 2026-11-03
+- extendedWaitUntil:
+    visible:
+      id: revo-limit
+    timeout: 10000
+- assertVisible: "Revo is back at midnight. Your conversations stay in History."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r10-limit
+
+# Closed (a drag down halves a full sheet, a second closes it): the button on Home, its dot
+# for the Day in review not opened yet.
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- extendedWaitUntil:
+    visible:
+      id: revo-button-dot
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home
+
+# The button on Activity too.
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r2-fab-activity
+
+# The same screens in dark: Settings → Theme → Dark, then Revo off (as Settings → Revo AI would
+# turn it off) so its opt-in shows again, with the day's questions back.
+- runFlow:
+    file: ../subflows/back-home.yaml
+- tapOn:
+    id: open-settings
+# Centred: stopped at its first sight, the row sat behind the tab bar and the tap opened Insights.
+- scrollUntilVisible:
+    element: "Theme"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Dark(, selected)?"
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 10000
+# Revo off through the real revoSetOptions (what Settings → Revo AI calls), and the day's
+# questions back.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: off
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: limit
+      DAY: 2026-11-03
+      COUNT: "0"
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- tapOn:
+    id: revo-button
+- extendedWaitUntil:
+    visible: "Meet Revo"
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r9-opt-in-dark
+- tapOn:
+    id: revo-turn-on
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r4-sheet-dark
+- tapOn:
+    id: revo-input
+- inputText: "Why do these two keep slipping?"
+- extendedWaitUntil:
+    visible:
+      id: revo-history
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5k-keyboard-dark
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-plan
+    # The answer's plan card: over 15 s on a slow iOS runner with the seeded history.
+    timeout: 30000
+- tapOn:
+    id: revo-chart-pageRatings
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5-conversation-dark
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
+- extendedWaitUntil:
+    visible:
+      id: revo-button
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home-dark

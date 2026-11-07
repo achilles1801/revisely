@@ -3,10 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+// Pads on Android too (React Native's own is a plain View there: the top bar sat under the clock).
+import { SafeAreaView } from '../../components/SafeAreaView';
 import Animated, { useAnimatedRef, useScrollOffset, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -88,9 +89,16 @@ export default function PlanEditScreen() {
   const haptics = useHaptics();
   const { user, pages, logs, saveUser } = useApp();
   // "Today" in the editor is the revision day (it starts at fajr when that is
-  // on), fixed when the editor opens: the draft is rotated to that day, so it
-  // must not move while the editor is open.
-  const [revisionDate] = useState(() => getRevisionDateForUser(user));
+  // on). It is fixed once the account is loaded: the draft is rotated to that
+  // day, so it must not move while the editor is open. Read before the account
+  // loads, it would be the calendar day and stay so for the whole visit.
+  const [revisionDate, setRevisionDate] = useState(() => getRevisionDateForUser(user));
+  const [dateFixed, setDateFixed] = useState(() => user != null);
+  useEffect(() => {
+    if (dateFixed || !user) return;
+    setRevisionDate(getRevisionDateForUser(user));
+    setDateFixed(true);
+  }, [user, dateFixed]);
 
   const builderRef = useRef<PlanBuilderHandle>(null);
   const quotaSheetRef = useRef<BottomSheetModal>(null);

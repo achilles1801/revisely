@@ -1,0 +1,32 @@
+# Another time zone: Kathmandu, UTC+5:45. The day turns at local midnight there,
+# 18:15 UTC, so a phone that ignored its zone would stay on day one. Days
+# (subflows/onboard.yaml): Tuesday 1, 582–590; Wednesday 591–600.
+# Rules (BEHAVIOUR.md): DAY-1, DAY-6
+# e2e-zone: Asia/Kathmandu
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T23:30
+      BOUNDARY: midnight
+- assertVisible:
+    id: e2e-status
+    text: ".*Asia/Kathmandu.*"
+- assertVisible:
+    id: today-title
+    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 08-home-kathmandu
+# 00:20 in Kathmandu is still 18:35 UTC on Tuesday.
+- runFlow:
+    file: ../subflows/set-clock-and-relaunch.yaml
+    env:
+      AT: 2026-11-04T00:20
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Starts at At.Tariq, p..591.*"
+    timeout: 20000

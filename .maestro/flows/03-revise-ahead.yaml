@@ -1,0 +1,114 @@
+# Revising ahead: Keep going on the end card, Home's "Tomorrow starts at", and a
+# day revised partly ahead needing only what's left. Tuesday is pages 1, 582–590,
+# Wednesday 591–600, Thursday 601–604, 1, 582–586 (subflows/onboard.yaml).
+# Rules (BEHAVIOUR.md): AHEAD-1, AHEAD-2, AHEAD-3, AHEAD-5, DAY-3, SESS-4
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+
+# Tuesday, all ten pages, onto the end card.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+# AHEAD-3, DAY-3: Keep going offers the next revision day, Wednesday.
+- assertVisible: "Next: Wed · 10 pages"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-end-card
+- tapOn:
+    id: session-end-keep-going
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Wed.*"
+    timeout: 10000
+- assertVisible:
+    id: session-page
+    text: "Page 591 · .*"
+# AHEAD-5: three of Wednesday's pages, swiped (591–593).
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: 3/10
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+
+# AHEAD-1: Home says Tuesday is done, and Wednesday goes on from its first page
+# not done. SESS-4: Done counts Tuesday's 10 and the 3 revised ahead in its session.
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 13.pages"
+    timeout: 10000
+- assertVisible:
+    id: today-ahead
+    text: "Tomorrow starts at Al.Fajr, page 594"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 03-home-tomorrow
+
+# AHEAD-2: on Wednesday, the three pages revised ahead count for it.
+- runFlow:
+    file: ../subflows/set-clock-and-relaunch.yaml
+    env:
+      AT: 2026-11-04T12:00
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Continue at Al.Fajr, p..594.*"
+    timeout: 20000
+- assertVisible:
+    id: today-summary
+    text: ".*3 of 10 pages done"
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 30 · 3/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Done · 10.pages"
+    timeout: 10000
+
+# AHEAD-1, DAY-3: "Tomorrow" is Thursday, and it opens on Thursday's first page.
+# (The line's accessibility label spells out "page".)
+- assertVisible:
+    id: today-ahead
+    text: "Tomorrow starts at Al.'Asr, page 601"
+- tapOn:
+    id: today-ahead
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Thu.*"
+    timeout: 10000
+- assertVisible:
+    id: session-page
+    text: "Page 601 · .*"

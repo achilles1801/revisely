@@ -15,10 +15,7 @@ import { useHaptics } from '../../design/haptics';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import {
-  ensureNotificationsPermission,
-  scheduleDailyReminder,
-} from '../../lib/notifications';
+import { ensureNotificationsPermission } from '../../lib/notifications';
 import { DEFAULT_FAJR_METHOD } from '../../lib/fajrBoundary';
 import { getJuzForPage } from '../../lib/quranData';
 
@@ -153,14 +150,10 @@ export default function ScheduleScreen() {
       fajrCalculationMethod: DEFAULT_FAJR_METHOD,
     });
     haptics.success();
-    // saveUser, the daily reminder schedule, and the onboarding flag flip are
-    // independent — running them in parallel collapses three sequential
-    // round-trips into one so the navigation flip to Main is near-instant.
-    await Promise.all([
-      saveUser(user),
-      scheduleDailyReminder(user.reminderTime, user.notificationsEnabled),
-      completeOnboarding(),
-    ]);
+    // saveUser and the onboarding flag flip are independent: running them in
+    // parallel makes the navigation flip to Main near-instant. (The reminders
+    // follow the saved user: components/RevisionRemindersSync.)
+    await Promise.all([saveUser(user), completeOnboarding()]);
   };
 
   const headlineText =

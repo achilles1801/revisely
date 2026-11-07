@@ -1,0 +1,46 @@
+{
+  "recordedAt": "2026-11-07T09:35:30.530Z",
+  "how": "functions/scripts/record-anthropic.js",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 800,
+    "thinking": {
+      "type": "between_tools"
+    },
+    "systemSha256": "ae5e816c4dfeb4b3e233a877ff11dbd0f8bc63be2282dcae131a8357e9e45f8b"
+  },
+  "status": 200,
+  "body": {
+    "model": "claude-sonnet-5-5",
+    "id": "msg_011CgoLhDtjuibDYS4F65r63",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Five days in a row, with only Saturday empty and about 9 pages a day against a plan of 10. Today you've done 4 of 10 already, so the best close to the week is to carry on with the rest.\n\n\n{\"text\": \"A steady week: five days in a row, only Saturday empty, and about 9 pages a day against the plan's 10. Today is 4 of 10 done, so finish the rest and keep that streak going.\", \"chart\": {\"kind\": \"dailyPages\", \"title\": \"Pages revised each day this week\", \"days\": 7}, \"textAfter\": null, \"action\": {\"kind\": \"startRevision\", \"title\": \"Continue today's revision\", \"detail\": \"Six pages left, starting at page 587\"}, \"remember\": [], \"title\": \"How my week went\", \"chips\": [\"Which pages are weakest?\", \"Why was Saturday empty?\", \"How am I doing today?\"]}"
+      }
+    ],
+    "container": null,
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+      "input_tokens": 312,
+      "cache_creation_input_tokens": 10210,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 10210,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 281,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
+  }
+}

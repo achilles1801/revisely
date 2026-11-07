@@ -6,3 +6,18 @@
 export function swipeableTabCount(smartTrackingEnabled: boolean): number {
   return smartTrackingEnabled ? 3 : 2;
 }
+
+/**
+ * The Insights tab, from the account: shown while Smart Tracking is on, or
+ * until its preview has been seen (with a glow; a tap opens the preview then,
+ * and so does a swipe past Read, since it isn't a page of the pager yet).
+ */
+export function insightsTab(smartTrackingEnabled: boolean, hasSeenPreview: boolean): {
+  shown: boolean;
+  opensPreview: boolean;
+} {
+  return {
+    shown: smartTrackingEnabled || !hasSeenPreview,
+    opensPreview: !smartTrackingEnabled && !hasSeenPreview,
+  };
+}

@@ -100,18 +100,34 @@ describe('today: what it already holds', () => {
     expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual([21, 582, ...range(1, 10)]);
   });
 
-  it('pages carried into today stay in it; the old carry-over shift is replaced', () => {
+  it('pages carried into today and not revised are dropped: they were the old start’s, and the new start is today', () => {
     const carried = { ...baseUser, scheduleShiftPages: 1, carryOver: { day: TODAY_KEY, pages: [600], skip: 1 } };
     const r = jumpTo(carried, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30))!;
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual(range(1, 10));
+  });
+
+  it('pages carried into today and revised today stay in it, first', () => {
+    const carried = { ...baseUser, carryOver: { day: TODAY_KEY, pages: [600], skip: 0 } };
+    const logs = [log(TODAY_KEY, [600], [600])];
+    const r = jumpTo(carried, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30, logs))!;
     expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [600], skip: 0 });
     expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).toEqual([600, ...range(1, 10)]);
   });
 
-  it('nothing revised or carried today: carry-over is left alone, so yesterday’s leftovers are still offered', () => {
+  it('nothing revised today: yesterday’s carry-over is dropped, and today is marked carried so no leftovers come back in front of the start', () => {
     const stale = { ...baseUser, carryOver: { day: '2026-10-16', pages: [5], skip: 0 } };
     const r = jumpTo(stale, { kind: 'juz', juz: 30 }, ctx(JUZ_1_AND_30))!;
-    expect(r.user.carryOver).toEqual(stale.carryOver);
-    expect(hasCarriedOver(r.user, TODAY_KEY)).toBe(false);
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(hasCarriedOver(r.user, TODAY_KEY)).toBe(true);
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).not.toContain(5);
+  });
+
+  it('pages revised ahead for today from an earlier session are not kept in front of the new start', () => {
+    const logs = [{ ...log('2026-10-16', [], []), ahead: { [TODAY_KEY]: [600] } }];
+    const r = jumpTo(baseUser, { kind: 'juz', juz: 1 }, ctx(JUZ_1_AND_30, logs))!;
+    expect(r.user.carryOver).toEqual({ day: TODAY_KEY, pages: [], skip: 0 });
+    expect(getPagesForDay(r.user, TODAY, JUZ_1_AND_30)).not.toContain(600);
   });
 
   it('today is the revision (Fajr) day passed in, not the clock’s', () => {

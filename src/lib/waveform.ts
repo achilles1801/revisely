@@ -16,6 +16,31 @@ export const LEVEL_SAMPLE_MS = 100;
 /** Quieter than this (dBFS) is silence: the room, not the voice. */
 export const SILENCE_DB = -50;
 
+/** Voice bars (Variant B): 3pt wide, 3pt apart, round ends; a 3pt dot is silence. */
+export const BAR_WIDTH = 3;
+export const BAR_GAP = 3;
+export const BAR_STEP = BAR_WIDTH + BAR_GAP;
+/** The shortest bar: silence, or a stretch without levels. */
+export const DOT = 3;
+/** Below this level a bar is a dot. */
+export const DOT_BELOW = 0.1;
+/** A played-back recording's loudest bar, as a share of the full height (at 1,
+ *  recitation, loud throughout, drew every bar nearly full). */
+export const PLAYBACK_PEAK = 0.9;
+
+/** How many bars fit `width` points, one every BAR_STEP. */
+export function barCountFor(width: number): number {
+  if (!Number.isFinite(width) || width <= 0) return 0;
+  return Math.max(1, Math.floor((width + BAR_GAP) / BAR_STEP));
+}
+
+/** A bar's height for a level (0–1, or null: no level): 3 + (max − 3) × level^1.1,
+ *  a dot under DOT_BELOW. */
+export function barHeight(level: number | null, max: number): number {
+  if (level == null || !Number.isFinite(level) || level < DOT_BELOW) return DOT;
+  return Math.round((DOT + (max - DOT) * Math.min(1, level) ** 1.1) * 2) / 2;
+}
+
 /** iOS metering (average power, dBFS: -160 silence … 0 full scale) as 0–1. */
 export function dbToLevel(db: number, floorDb = SILENCE_DB): number {
   if (!Number.isFinite(db)) return 0;
@@ -93,8 +118,9 @@ export function cleanLevels(v: unknown): number[] | undefined {
 /**
  * A recording's bars across its whole timeline (its segments back to back,
  * each as long as it lasted): the loudest level under each bar, 0–1, or null
- * where a segment has no levels. Normalised so the loudest bar is full height
- * (a quiet recording still shows its shape, but near-silence isn't blown up).
+ * where a segment has no levels. Normalised so the loudest bar is
+ * PLAYBACK_PEAK of the height (a quiet recording still shows its shape, but
+ * near-silence isn't blown up).
  */
 export function waveformBars(
   segments: { durationMs: number; levels?: unknown }[],
@@ -129,11 +155,12 @@ export function waveformBars(
   return normalizeBars(raw);
 }
 
-/** Scale bars so the loudest is 1; below `minPeak`, scale as if it were `minPeak`. */
-export function normalizeBars(bars: (number | null)[], minPeak = 0.3): (number | null)[] {
+/** Scale bars so the loudest is `top` (PLAYBACK_PEAK); below `minPeak`, scale
+ *  as if it were `minPeak`. */
+export function normalizeBars(bars: (number | null)[], minPeak = 0.3, top = PLAYBACK_PEAK): (number | null)[] {
   const peak = bars.reduce<number>((m, b) => (b != null && b > m ? b : m), 0);
   const scale = Math.max(peak, minPeak);
-  return bars.map((b) => (b == null ? null : Math.max(0, Math.min(1, b / scale))));
+  return bars.map((b) => (b == null ? null : Math.max(0, Math.min(1, (b / scale) * top))));
 }
 
 /** Whether any bar has a level (otherwise the waveform is drawn flat). */

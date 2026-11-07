@@ -10,10 +10,15 @@ jest.mock('../../context/ThemeContext', () => {
   const { paletteLight, v2ThemeColors } = require('../../theme/v2');
   return { useTheme: () => ({ isDark: false, theme: v2ThemeColors(false), palette: paletteLight }) };
 });
+// What is on the phone: every page, unless a test says otherwise.
+let mockCachedUri: string | null = 'file:///page.png';
+let mockDownload: string | null = null;
+// evictCachedPage: the file that failed to load is whole (kept).
+let mockEvictKeeps = false;
 jest.mock('../../lib/pageCache', () => ({
-  getCachedPageUri: () => 'file:///page.png',
-  cachePage: () => Promise.resolve(null),
-  evictCachedPage: jest.fn(),
+  getCachedPageUri: () => mockCachedUri,
+  cachePage: () => Promise.resolve(mockDownload),
+  evictCachedPage: () => mockEvictKeeps,
   prefetchPages: jest.fn(),
   pagesAround: (pages: number[]) => pages.slice(0, 1),
 }));
@@ -93,6 +98,7 @@ describe('<MushafPager /> scrollToPage', () => {
 
   it('swiping forward without a jump still fires onAdvance (unchanged)', () => {
     const { onAdvance, report, drag } = setup();
+    report(0); // the list reports the page it shows, as it does on mount
     drag();
     report(1);
     expect(onAdvance).toHaveBeenCalledWith(1, 2);
@@ -145,6 +151,86 @@ describe('<MushafPager /> scrollToPage', () => {
     drag();
     report(11); // the user swiped on to page 12 before the jump settled
     expect(onPageChange).toHaveBeenLastCalledWith(12, 11);
+  });
+});
+
+describe('<MushafPager /> the start-up scroll', () => {
+  it('a swipe credits the page it started on, as the list reported it', () => {
+    const { report, drag, onAdvance } = setup(1);
+    report(0);
+    drag();
+    report(1);
+    expect(onAdvance).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('a programmatic scroll credits nothing, even when the list then reports the new page', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report } = setup(5);
+      act(() => {
+        ref.current!.scrollToPage(10);
+      });
+      jest.advanceTimersByTime(200);
+      report(9);
+      report(10);
+      expect(onAdvance).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a swipe while a jump has not settled credits the page on screen, not the jump’s target', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report, drag } = setup(1);
+      report(0); // the list shows page 1
+      act(() => {
+        ref.current!.scrollToPage(10); // the jump's scroll has not reached the list yet
+      });
+      drag();
+      report(1); // the user swipes off page 1
+      expect(onAdvance).toHaveBeenCalledWith(1, 2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a swipe after a jump credits the page the list shows, not the jump’s index', () => {
+    jest.useFakeTimers();
+    try {
+      const { ref, onAdvance, report, drag } = setup(1);
+      act(() => {
+        ref.current!.scrollToPage(10);
+      });
+      jest.advanceTimersByTime(200);
+      report(9); // the list settles on the jump's page
+      drag();
+      report(10); // swiped on to the next
+      expect(onAdvance).toHaveBeenCalledWith(10, 11);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a jump made before the start-up scroll settles is where the pager stays', () => {
+    jest.useFakeTimers();
+    try {
+      const ref = createRef<MushafPagerHandle>();
+      render(<MushafPager ref={ref} pages={PAGES} initialPage={1} />);
+      const list = screen.UNSAFE_getByType(FlatList);
+      const scroll = jest.spyOn(list.instance, 'scrollToIndex');
+      // Ahead of the start-up scroll (which waits for layout) the session moves
+      // on to another day's first page.
+      act(() => {
+        ref.current!.scrollToPage(8);
+      });
+      act(() => {
+        jest.advanceTimersByTime(100);
+      });
+      expect(scroll).toHaveBeenLastCalledWith({ index: 7, animated: false });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -367,5 +453,84 @@ describe('<MushafPager /> page overlay and taps on verses', () => {
       nativeEvent: { locationX: ((x0 + x1) / 2) * scale, locationY: ((y0 + y1) / 2) * scale },
     });
     expect(onTap).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('<MushafPager /> pages not on the phone', () => {
+  const { __resetNetworkStateForTests, setNetworkState } = require('../../lib/networkState');
+
+  beforeEach(() => {
+    __resetNetworkStateForTests();
+    mockCachedUri = null;
+    mockDownload = null;
+  });
+
+  afterEach(() => {
+    mockCachedUri = 'file:///page.png';
+    mockDownload = null;
+    mockEvictKeeps = false;
+  });
+
+  it('keeps a whole page file that failed to show (memory), with Try again', async () => {
+    mockCachedUri = 'file:///300.png';
+    mockEvictKeeps = true;
+    render(<MushafPager pages={[300]} />);
+    const image = await screen.findByTestId('page-image');
+    act(() => {
+      image.props.onError();
+    });
+    expect(screen.getByText("Couldn't load page 300")).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('page-retry'));
+    });
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'file:///300.png' });
+  });
+
+  it('a page moved while shown (first launch) is shown from where it went', async () => {
+    mockCachedUri = 'cache/mushaf/300.png';
+    render(<MushafPager pages={[300]} />);
+    const image = await screen.findByTestId('page-image');
+    mockCachedUri = 'documents/mushaf/full/300.png';
+    act(() => {
+      image.props.onError();
+    });
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'documents/mushaf/full/300.png' });
+  });
+
+  it('says a page isn\'t downloaded yet when offline, and shows it once back online', async () => {
+    setNetworkState({ connected: false, type: 'none' });
+    render(<MushafPager pages={[300]} />);
+    expect(await screen.findByTestId('page-missing')).toBeTruthy();
+    expect(screen.getByText("Page 300 isn't downloaded yet")).toBeTruthy();
+    expect(screen.queryByTestId('page-image')).toBeNull();
+
+    mockDownload = 'file:///300.png';
+    await act(async () => {
+      setNetworkState({ connected: true, type: 'wifi' });
+    });
+    expect(screen.queryByTestId('page-missing')).toBeNull();
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'file:///300.png' });
+  });
+
+  it('tries again from its button', async () => {
+    setNetworkState({ connected: false, type: 'none' });
+    render(<MushafPager pages={[300]} />);
+    await screen.findByTestId('page-missing');
+    mockCachedUri = 'file:///300.png';
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('page-retry'));
+    });
+    expect(screen.getByTestId('page-image').props.source).toEqual({ uri: 'file:///300.png' });
+  });
+
+  it('online, loads it from Storage; if that fails too, says so', async () => {
+    setNetworkState({ connected: true, type: 'wifi' });
+    render(<MushafPager pages={[300]} />);
+    const image = await screen.findByTestId('page-image');
+    expect(image.props.source).toEqual({ uri: 'https://x/p.png' });
+    act(() => {
+      image.props.onError();
+    });
+    expect(screen.getByText("Couldn't load page 300")).toBeTruthy();
   });
 });

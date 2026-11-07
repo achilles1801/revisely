@@ -18,7 +18,6 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { logger } from './logger';
 import {
   getFirestore,
   doc,
@@ -31,22 +30,26 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
-  enableIndexedDbPersistence,
 } from 'firebase/firestore';
 import Constants from 'expo-constants';
 import { User, UserPage, RevisionLog } from '../types';
 
-// Firebase configuration from environment variables
+// Firebase configuration from environment variables. An E2E build
+// (EXPO_PUBLIC_E2E=1, .maestro/README.md) uses a demo project on the emulators
+// instead; every other build drops that branch (the variable is inlined).
 const extra = Constants.expoConfig?.extra;
-const firebaseConfig = {
-  apiKey: extra?.firebase?.apiKey,
-  authDomain: extra?.firebase?.authDomain,
-  projectId: extra?.firebase?.projectId,
-  storageBucket: extra?.firebase?.storageBucket,
-  messagingSenderId: extra?.firebase?.messagingSenderId,
-  appId: extra?.firebase?.appId,
-  measurementId: extra?.firebase?.measurementId,
-};
+const firebaseConfig =
+  process.env.EXPO_PUBLIC_E2E === '1'
+    ? require('./e2e/firebase').E2E_FIREBASE_CONFIG
+    : {
+        apiKey: extra?.firebase?.apiKey,
+        authDomain: extra?.firebase?.authDomain,
+        projectId: extra?.firebase?.projectId,
+        storageBucket: extra?.firebase?.storageBucket,
+        messagingSenderId: extra?.firebase?.messagingSenderId,
+        appId: extra?.firebase?.appId,
+        measurementId: extra?.firebase?.measurementId,
+      };
 
 // Initialize Firebase only if not already initialized
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -63,20 +66,16 @@ try {
   auth = getAuth(app);
 }
 
-// Initialize Firestore with offline persistence
+// Firestore keeps only a memory cache here: its disk persistence needs
+// IndexedDB, which React Native doesn't have (enableIndexedDbPersistence only
+// ever failed with "unimplemented"). The app keeps its own copy of the account
+// and an outbox of changes on the phone instead (src/lib/offline).
 const db = getFirestore(app);
 
-// Enable offline persistence for mobile
-// This allows the app to work offline and sync when back online
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    // Multiple tabs open, persistence can only be enabled in one tab at a time
-    logger.warn('Firestore persistence failed: Multiple tabs open');
-  } else if (err.code === 'unimplemented') {
-    // The current browser doesn't support persistence
-    logger.warn('Firestore persistence not supported in this browser');
-  }
-});
+// E2E builds: the Auth and Firestore emulators, before anything uses either.
+if (process.env.EXPO_PUBLIC_E2E === '1') {
+  require('./e2e/firebase').connectEmulators(auth, db);
+}
 
 export { auth, db };
 export type { FirebaseUser };

@@ -13,21 +13,31 @@ import { PillButton } from '../v2/PillButton';
  * marks the last page done (ActiveRevisionScreen). Every page done: "Revision
  * complete"; when the swipe finished the session (`celebrate` goes
  * up) a burst of confetti in the accent's colours, or with Reduce Motion the
- * check fading in; Submit is in the controls. Pages left: how many are done,
- * and End session.
+ * check fading in. Pages left: how many are done. The session is saved as it
+ * goes, and Back leaves it. When every page is done and a next revision day
+ * exists, Keep going continues into its pages (#168). A session that was
+ * recorded offers Listen back: the recording over its pages.
  */
 export function SessionEndCard({
   total,
   done,
   celebrate,
-  onEnd,
+  dayLabel = 'today',
+  next,
+  onKeepGoing,
+  onListenBack,
 }: {
   total: number;
   done: number;
   /** Goes up each time a swipe finished the session. */
   celebrate: number;
-  /** End session, with pages left (every page done, Submit is in the controls). */
-  onEnd: () => void;
+  /** What this card closes: "today", or the weekday of a day revised ahead. */
+  dayLabel?: string;
+  /** The next revision day's pages (Keep going), or none at the end of the cycle. */
+  next?: { label: string; pages: number } | null;
+  onKeepGoing?: () => void;
+  /** The session was recorded: play it back over its pages. */
+  onListenBack?: () => void;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -64,14 +74,27 @@ export function SessionEndCard({
         </Text>
         <Text style={[typeV2.body, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {complete
-            ? `${total} ${total === 1 ? 'page' : 'pages'} revised today`
-            : 'Swipe back for the pages left, or end the session here.'}
+            ? `${total} ${total === 1 ? 'page' : 'pages'} revised ${dayLabel}`
+            : 'Swipe back for the pages left.'}
         </Text>
       </View>
-      {/* Every page done: Submit is in the controls, which stay up. */}
-      {complete ? null : (
-        <PillButton title="End session" variant="outline" onPress={onEnd} testID="session-end-end" />
-      )}
+      {complete && next && onKeepGoing ? (
+        <View style={styles.keep}>
+          <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+            {`Next: ${next.label} · ${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`}
+          </Text>
+          <PillButton title="Keep going" onPress={onKeepGoing} testID="session-end-keep-going" />
+        </View>
+      ) : null}
+      {onListenBack ? (
+        <PillButton
+          title="Listen back"
+          icon="headset-outline"
+          variant="outline"
+          onPress={onListenBack}
+          testID="session-end-listen-back"
+        />
+      ) : null}
     </View>
   );
 }
@@ -79,6 +102,7 @@ export function SessionEndCard({
 const styles = StyleSheet.create({
   card: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 28 },
   body: { alignItems: 'center', gap: 8 },
+  keep: { alignItems: 'center', gap: 12 },
   check: {
     width: 64,
     height: 64,

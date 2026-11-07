@@ -16,11 +16,34 @@
 
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
+import type { Leftovers } from './carryOver';
 
 /** A no-break space: keeps "p. 542 ›" and "20 pages" together. */
 export const NBSP = '\u00A0';
 /** A no-break hyphen: a surah name never breaks at its "Al-". */
 export const NBHY = '\u2011';
+
+/**
+ * The catch-up offer, one line: "Missed yesterday · Revise p. 559–563". A day
+ * with some of its pages revised reads "Left" instead of "Missed". Several
+ * days say how many ("Missed 3 days"). Null when nothing is left over.
+ */
+export function catchUpLine(leftovers: Leftovers): { title: string; label: string } | null {
+  if (leftovers.pages.length === 0) return null;
+  const runs = runsInOrder([...leftovers.pages].sort((a, b) => a - b));
+  const span = (r: PageRun) => (r.first === r.last ? `${r.first}` : `${r.first}–${r.last}`);
+  const shown = runs.slice(0, 2).map(span).join(', ');
+  const more = runs.length > 2 ? ` and ${runs.length - 2} more` : '';
+  const missed = leftovers.days.every((d) => d.missed);
+  const when =
+    leftovers.days.length === 1
+      ? leftovers.days[0].ago === 1
+        ? 'yesterday'
+        : `${leftovers.days[0].ago} days ago`
+      : `${leftovers.days.length} days`;
+  const title = `${missed ? 'Missed' : 'Left'} ${when} · Revise ${runs.length > 1 ? 'pp.' : 'p.'}${NBSP}${shown}${more}`;
+  return { title, label: spoken(title) };
+}
 
 export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
@@ -95,10 +118,20 @@ export function rangesText(list: number[]): string {
 }
 
 /**
- * Today's two lines from its pages (in session order), those revised today,
- * and how many of them were carried in from yesterday.
+ * Done today: the quiet line that opens the next revision day ("Tomorrow starts
+ * at Al-Baqarah, p. 22 ›"). `lead` is "Tomorrow", or the weekday after that.
  */
-export function todayLines(status: TodayStatus, list: number[], done: ReadonlySet<number>, carried = 0): TodayLines {
+export function aheadLine(lead: string, first: number): { text: string; label: string } {
+  const text = `${lead} starts at ${firstSurah(first)}, ${page(first)}`;
+  return { text, label: spoken(text) };
+}
+
+/**
+ * Today's two lines from its pages (in session order), those revised today,
+ * how many of them were carried in from earlier days, and how many of those
+ * are still to revise.
+ */
+export function todayLines(status: TodayStatus, list: number[], done: ReadonlySet<number>, carried = 0, carriedLeft = 0): TodayLines {
   const ordered = [...new Set(list)];
   const total = ordered.length;
   if (total === 0) {
@@ -119,7 +152,8 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
   const doneHere = ordered.filter((p) => done.has(p)).length;
 
   if (status === 'completed') {
-    const title = `Done · ${pages(Math.max(done.size, total))}`;
+    // The day's done pages, the same set "Review session" lists (see doneOnDay).
+    const title = `Done · ${pages(done.size)}`;
     const span = runs.length === 1 ? surahSpan(runs[0]) : to(firstSurah(runs[0].first), lastSurah(runs[runs.length - 1].last));
     const juz = runs.length === 1 ? juzSpan(ordered) : null;
     const detail = [span, juz].filter(Boolean).join(' · ');
@@ -129,8 +163,10 @@ export function todayLines(status: TodayStatus, list: number[], done: ReadonlySe
       ranges,
       label: spoken(`${title}. ${detail}`),
       empty: false,
-      cta: 'Review session',
-      solid: false,
+      // Today is done, and pages added from earlier days are still to revise (SESS-6, SESS-7:
+      // yesterday can be restored until today ends): the button goes on to them.
+      cta: carriedLeft > 0 ? 'Continue revision' : 'Review session',
+      solid: carriedLeft > 0,
     };
   }
 

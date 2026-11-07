@@ -7,15 +7,17 @@ rules_version = '2';
  * - Users can only access their own data
  * - All writes require authentication
  * - Data validation at the database level
- * - No public read/write access
+ * - No public access, except reading config/app (below)
  *
  * Collection Structure:
  * - users/{userId} - User profile and settings
  * - users/{userId}/pages/{pageNumber} - Page progress (604 documents)
  * - users/{userId}/sessions/{sessionId} - Daily revision sessions
- * - users/{userId}/journal/{day} - Daily log entries
+ * - users/{userId}/journal/{day} - Daily log (a day's block, and entries/{id}: its timestamped notes)
  * - users/{userId}/readingSessions/{id} - Reading timer sessions
+ * - users/{userId}/revisions|memorizations|reads/{id} - Activity items
  * - users/{userId}/stats/usage - Time spent in the app
+ * - config/app - Supported and latest app versions (read by every install)
  */
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -164,8 +166,11 @@ service cloud.firestore {
         'state',
         'pagesRevised', 'pagesSkipped', 'weaknessUpdates',
         'completedAt', 'durationMinutes', 'completionPercentage',
-        // Grow-only: pages carried into the day after the session started.
+        // Grow or shrink (never both): pages carried into the day after the
+        // session started, or moved out of it to the next day.
         'assignedPages', 'totalAssignedPages',
+        // Pages revised ahead, credited to later days (lib/aheadCredit).
+        'ahead',
         'updatedAt'
       ];
     }
@@ -236,13 +241,29 @@ service cloud.firestore {
                         incomingData().carryOverMode in ['shift', 'add']) &&
                        (!hasField('carryOver') || incomingData().carryOver == null ||
                         (incomingData().carryOver is map &&
-                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip']) &&
+                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip', 'source', 'from', 'next']) &&
                          incomingData().carryOver.day is string &&
                          incomingData().carryOver.pages is list &&
                          incomingData().carryOver.pages.size() <= 604 &&
                          (!('skip' in incomingData().carryOver) ||
                           (incomingData().carryOver.skip is int &&
-                           isInRange(incomingData().carryOver.skip, 0, 604))))) &&
+                           isInRange(incomingData().carryOver.skip, 0, 604))) &&
+                         (!('source' in incomingData().carryOver) ||
+                          incomingData().carryOver.source == 'insights') &&
+                         (!('from' in incomingData().carryOver) ||
+                          (incomingData().carryOver.from is map &&
+                           incomingData().carryOver.from.size() <= 604)) &&
+                         // The next day's pages ("Revise these first tomorrow")
+                         // held beside this day's carry (lib/weakSpotActions).
+                         (!('next' in incomingData().carryOver) ||
+                          incomingData().carryOver.next == null ||
+                          (incomingData().carryOver.next is map &&
+                           incomingData().carryOver.next.keys().hasOnly(['day', 'pages', 'source']) &&
+                           incomingData().carryOver.next.day is string &&
+                           incomingData().carryOver.next.pages is list &&
+                           incomingData().carryOver.next.pages.size() <= 604 &&
+                           (!('source' in incomingData().carryOver.next) ||
+                            incomingData().carryOver.next.source == 'insights'))))) &&
                        (!hasField('reciter') ||
                         (incomingData().reciter is string &&
                          incomingData().reciter.size() <= 60)) &&
@@ -340,7 +361,10 @@ service cloud.firestore {
                          hasField('pagesRevised') &&
                          incomingData().pagesRevised is list &&
                          hasField('pagesSkipped') &&
-                         incomingData().pagesSkipped is list;
+                         incomingData().pagesSkipped is list &&
+                         (!hasField('ahead') ||
+                          (incomingData().ahead is map &&
+                           incomingData().ahead.size() <= 400));
 
         // Users can update sessions
         allow update: if isOwner(userId) &&
@@ -349,15 +373,23 @@ service cloud.firestore {
                          // Cannot change id or date
                          (!hasField('id') || incomingData().id == currentData().id) &&
                          (!hasField('date') || incomingData().date == currentData().date) &&
-                         // Assigned pages can only grow (carry-over adds pages
-                         // to a day after its session started)
+                         // Assigned pages grow (carry-over adds pages to a day
+                         // after its session started) or shrink to some of them
+                         // (Keep daily amount moves the day's end to the next
+                         // day), never both: no other pages swapped in.
                          (!hasField('assignedPages') ||
                           (incomingData().assignedPages is list &&
                            incomingData().assignedPages.size() <= 604 &&
-                           incomingData().assignedPages.hasAll(currentData().assignedPages))) &&
+                           (incomingData().assignedPages.hasAll(currentData().assignedPages) ||
+                            currentData().assignedPages.hasAll(incomingData().assignedPages)))) &&
                          (!hasField('totalAssignedPages') ||
                           (incomingData().totalAssignedPages is int &&
                            isInRange(incomingData().totalAssignedPages, 0, 604))) &&
+                         // Pages revised ahead: a map from a day to its pages
+                         // (at most one entry per day of a cycle).
+                         (!hasField('ahead') ||
+                          (incomingData().ahead is map &&
+                           incomingData().ahead.size() <= 400)) &&
                          // Validate state if present
                          (!hasField('state') ||
                           isValidSessionState(incomingData().state)) &&
@@ -389,6 +421,13 @@ service cloud.firestore {
       match /journal/{day} {
         allow read, delete: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidJournalEntry(day);
+
+        // Timestamped notes of the day (lib/journal). The count per day is
+        // kept by the app: rules can't count documents.
+        match /entries/{entryId} {
+          allow read, delete: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidJournalNote(day, entryId, userId);
+        }
       }
 
       // ======================================================================
@@ -403,6 +442,29 @@ service cloud.firestore {
         allow update: if isOwner(userId) &&
                          changedKeys().hasOnly(['pages', 'updatedAt']) &&
                          isValidPageList(incomingData().pages);
+      }
+
+      // ======================================================================
+      // ACTIVITY ITEMS (docs: Activity spec, sections 2 and 6)
+      // ======================================================================
+      // One item per revision, memorization or reading, each with its own time.
+      // Written only by the Activity release (dual write); nothing writes them
+      // before then, so the older builds never touch these collections.
+      // A Revised item counts for `countsFor`, the schedule day its pages belong to.
+
+      match /revisions/{itemId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidRevisionItem(itemId, userId);
+      }
+
+      match /memorizations/{itemId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidMemorizationItem(itemId, userId);
+      }
+
+      match /reads/{itemId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidReadItem(itemId, userId);
       }
 
       // ======================================================================
@@ -438,6 +500,34 @@ service cloud.firestore {
                                  incomingData().appSeconds >= 0 &&
                                  (resource == null ||
                                   incomingData().appSeconds >= resource.data.appSeconds);
+      }
+
+      // ======================================================================
+      // REVO (functions/src/revo): written by the functions only
+      // ======================================================================
+      // The owner reads their chats, messages and memory. From the app they
+      // may only mark a chat's plan added, rate a reply or mark its action,
+      // and delete a memory item. Nothing is created from the app.
+
+      match /revoChats/{chatId} {
+        allow read: if isOwner(userId);
+        allow update: if isOwner(userId) &&
+                         changedKeys().hasOnly(['meta']) &&
+                         incomingData().meta == 'plan added';
+
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow update: if isOwner(userId) &&
+                           changedKeys().hasOnly(['feedback', 'actionState']) &&
+                           (!('feedback' in changedKeys()) ||
+                            incomingData().get('feedback', null) in ['up', 'down', null]) &&
+                           (!('actionState' in changedKeys()) ||
+                            incomingData().get('actionState', null) in ['added', 'dismissed']);
+        }
+      }
+
+      match /revoMemory/{itemId} {
+        allow read, delete: if isOwner(userId);
       }
     }
 
@@ -496,6 +586,78 @@ service cloud.firestore {
       return value == null || (value is int && isInRange(value, 0, 1440));
     }
 
+    // Activity items (Activity spec, section 2). Every item carries its own id,
+    // owner, the day it happened and its time; the lists are capped at a mushaf.
+    function isValidActivityItem(itemId, userId, allowed, required) {
+      let data = incomingData();
+      return data.keys().hasOnly(allowed) &&
+             data.keys().hasAll(required) &&
+             data.id == itemId &&
+             data.uid == userId &&
+             isValidDateString(data.day) &&
+             data.occurredAt is int && data.occurredAt > 0 &&
+             data.pages is list && data.pages.size() <= 604 &&
+             isValidJournalMinutes(data.get('minutes', null)) &&
+             (!('recordings' in data) ||
+              (data.recordings is list && data.recordings.size() <= 50));
+    }
+
+    function isValidRevisionItem(itemId, userId) {
+      let data = incomingData();
+      return isValidActivityItem(itemId, userId,
+               ['id', 'uid', 'day', 'occurredAt', 'countsFor', 'source', 'pages', 'skipped',
+                'ratings', 'assigned', 'minutes', 'recordings', 'createdAt', 'updatedAt'],
+               ['id', 'uid', 'day', 'occurredAt', 'countsFor', 'source', 'pages', 'skipped',
+                'assigned', 'minutes']) &&
+             isValidDateString(data.countsFor) &&
+             data.source in ['session', 'manual'] &&
+             data.skipped is list && data.skipped.size() <= 604 &&
+             data.assigned is list && data.assigned.size() <= 604 &&
+             (!('ratings' in data) || data.ratings == null || data.ratings is map);
+    }
+
+    function isValidMemorizationItem(itemId, userId) {
+      let data = incomingData();
+      return isValidActivityItem(itemId, userId,
+               ['id', 'uid', 'day', 'occurredAt', 'source', 'pages', 'minutes',
+                'recordings', 'createdAt', 'updatedAt'],
+               ['id', 'uid', 'day', 'occurredAt', 'source', 'pages', 'minutes']) &&
+             data.source in ['auto', 'manual'];
+    }
+
+    function isValidReadItem(itemId, userId) {
+      let data = incomingData();
+      return isValidActivityItem(itemId, userId,
+               ['id', 'uid', 'day', 'occurredAt', 'source', 'pages', 'minutes',
+                'recordings', 'readingSessionId', 'createdAt', 'updatedAt'],
+               ['id', 'uid', 'day', 'occurredAt', 'source', 'pages', 'minutes']) &&
+             data.source in ['auto', 'manual'] &&
+             (!('readingSessionId' in data) ||
+              data.readingSessionId == null ||
+              (data.readingSessionId is string && data.readingSessionId.size() <= 60));
+    }
+
+    // A timestamped note (users/{uid}/journal/{day}/entries/{id}). Text caps
+    // by kind mirror src/lib/journal.ts; the note stored for a migrated day
+    // can run past the typed limit (JOURNAL_NOTE_STORED_MAX).
+    function isValidJournalNote(day, noteId, userId) {
+      let data = incomingData();
+      return data.keys().hasOnly(['id', 'uid', 'day', 'at', 'kind', 'text', 'minutes', 'tag']) &&
+             data.keys().hasAll(['id', 'uid', 'day', 'at', 'kind', 'text', 'minutes']) &&
+             data.id == noteId &&
+             data.uid == userId &&
+             data.day == day &&
+             isValidDateString(data.day) &&
+             data.at is int && data.at > 0 &&
+             data.kind in ['memorization', 'revision', 'note'] &&
+             data.text is string &&
+             (data.kind == 'note' ? data.text.size() <= 5500 : data.text.size() <= 200) &&
+             isValidJournalMinutes(data.minutes) &&
+             // An optional tag: the id of one of the day's Activity items (spec, section 2).
+             (!('tag' in data) || data.tag == null ||
+              (data.tag is string && data.tag.size() <= 100));
+    }
+
     function isValidJournalEntry(day) {
       let data = incomingData();
       return data.keys().hasOnly([
@@ -534,8 +696,43 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // APP CONFIG
+    // ========================================================================
+    // config/app: the oldest supported version on each platform and the
+    // version on Google Play (src/lib/updates/storeUpdates.ts). Every install
+    // reads it, before sign-in too; only the admin SDK writes it
+    // (functions/scripts/set-app-config.js).
+    match /config/app {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ========================================================================
     // DEFAULT DENY
     // ========================================================================
+
+    // Every note of an account at once (the daily log's list): a
+    // collection-group query must filter on uid, so only its own notes read.
+    match /{path=**}/entries/{entryId} {
+      allow read: if isOwner(resource.data.uid);
+    }
+
+    // Revo's and the Ask coach's settings (optIn, memoryOn) and Revo's daily
+    // count: written by the functions only; the owner reads their own.
+    match /coachSettings/{userId} {
+      allow get: if isOwner(userId);
+    }
+
+    match /revoUsage/{userId} {
+      allow get: if isOwner(userId);
+    }
+
+    // Tester resets (functions resetMyData): how often each account reset.
+    // Written by the function only; no client reads or writes it, its own
+    // account included.
+    match /adminResets/{userId} {
+      allow read, write: if false;
+    }
 
     // Deny all other access
     match /{document=**} {

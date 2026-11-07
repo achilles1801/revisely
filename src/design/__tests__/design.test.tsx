@@ -460,7 +460,7 @@ describe('Home in the new design (a feed)', () => {
       onEditSchedule: jest.fn(),
       onMemorization: jest.fn(),
       onJump: jest.fn(),
-      leftovers: 0,
+      catchUp: null,
       onCarryOver: jest.fn(),
       carrying: false,
       ...over,
@@ -487,6 +487,17 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onMemorization).toHaveBeenCalled();
     // No ⋯ on today: its two actions are behind today's pages.
     expect(screen.queryByTestId('today-post-menu')).toBeNull();
+  });
+
+  it('missed pages are one line above today’s action, and "Add to today" adds them', async () => {
+    const props = post({
+      catchUp: { title: 'Missed yesterday · Revise p. 559–563', label: 'Missed yesterday · Revise page 559–563' },
+    });
+    await act(async () => {});
+    expect(screen.getByTestId('today-catch-up')).toHaveTextContent('Missed yesterday · Revise p. 559–563');
+    fireEvent.press(screen.getByTestId('today-carry-over'));
+    expect(props.onCarryOver).toHaveBeenCalled();
+    expect(screen.getByText('Add to today')).toBeTruthy();
   });
 
   it('how much is memorized is always shown (no setting), with its dots; it wraps rather than cutting off', async () => {
@@ -542,13 +553,13 @@ describe('Home in the new design (a feed)', () => {
     expect(memorizedText([]).fraction).toBe(0);
   });
 
-  it('the primary button is solid in the accent (Indigo by default); yesterday’s leftovers are an outline pill', async () => {
-    const props = post({ leftovers: 3 });
+  it('the primary button is solid in the accent (Indigo by default); the catch-up button is an outline pill', async () => {
+    const props = post({ catchUp: { title: 'Missed yesterday · Revise p. 559–561', label: 'Missed yesterday' } });
     await act(async () => {});
     const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
     expect(flat('today-cta').backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).primary);
     expect(flat('today-carry-over').borderWidth).toBe(1);
-    fireEvent.press(screen.getByText('Add 3 from yesterday'));
+    fireEvent.press(screen.getByText('Add to today'));
     expect(props.onCarryOver).toHaveBeenCalled();
   });
 

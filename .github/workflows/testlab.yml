@@ -1,0 +1,178 @@
+name: Real devices (Test Lab)
+
+# Nightly, the app on real Android phones (TESTING.md "Real devices"): a release-config build of
+# develop (scripts/testlab/build-apk.sh: production's config, App Check's debug provider with a
+# token registered for Test Lab, no Sentry, no updates) crawled by Firebase Test Lab's Robo on three
+# physical phones (a Pixel, a Galaxy S, a Galaxy A; scripts/testlab/testlab.js), signed in with its
+# own test account, five minutes a phone: inside Test Lab's no-cost 30 physical-device minutes a
+# day on the Blaze plan. A crash or an ANR on any phone goes to the develop-red issue
+# (scripts/e2e/develop-red.js, platform "Real Android phones"); a clean night clears it.
+#
+# One Firebase backend serves store users and testers alike, so the crawl's account is a tester
+# (previewTester) used for nothing else, and Robo never presses what could reach past it or cost:
+# Sign out, Delete account, Reset my data, Load test scenario, and Revo (its button and its switch,
+# which would call the model). All ignored by id. Maestro can't drive Test Lab's phones; the flows
+# stay on emulators.
+#
+# It skips, with a notice, until set up (TESTING.md lists the steps): repository secrets
+# TESTLAB_SA_KEY (a service account allowed to run Test Lab), TESTLAB_EMAIL, TESTLAB_PASSWORD (the
+# crawl's account), TESTLAB_APPCHECK_TOKEN (an App Check debug token for the Android app), plus the
+# existing EXPO_TOKEN and GOOGLE_SERVICES_JSON. Scheduled runs start from main and test develop.
+# No caches: it holds release secrets (CLAUDE.md).
+
+on:
+  schedule:
+    # 10:00 UTC, after the nightly E2E run.
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: testlab
+  cancel-in-progress: false
+
+jobs:
+  phones:
+    name: Robo on real Android phones
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Set up yet?
+        id: ready
+        env:
+          A: ${{ secrets.TESTLAB_SA_KEY }}
+          B: ${{ secrets.TESTLAB_EMAIL }}
+          C: ${{ secrets.TESTLAB_PASSWORD }}
+          D: ${{ secrets.TESTLAB_APPCHECK_TOKEN }}
+          E: ${{ secrets.EXPO_TOKEN }}
+          F: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          missing=""
+          [ -n "$A" ] || missing="$missing TESTLAB_SA_KEY"
+          [ -n "$B" ] || missing="$missing TESTLAB_EMAIL"
+          [ -n "$C" ] || missing="$missing TESTLAB_PASSWORD"
+          [ -n "$D" ] || missing="$missing TESTLAB_APPCHECK_TOKEN"
+          [ -n "$E" ] || missing="$missing EXPO_TOKEN"
+          [ -n "$F" ] || missing="$missing GOOGLE_SERVICES_JSON"
+          if [ -n "$missing" ]; then
+            echo "::notice title=Test Lab::Skipped, not set up yet:$missing (TESTING.md, Real devices)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      # An Android build needs about 15 GB; the image ships tools this job never uses.
+      - name: Free disk space
+        if: steps.ready.outputs.ok == 'true'
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android/sdk/emulator "$AGENT_TOOLSDIRECTORY/CodeQL" && df -h /
+
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle memory
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+
+      - if: steps.ready.outputs.ok == 'true'
+        run: npm ci --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          eas-version: latest
+          eas-cache: false
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write google-services.json
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$JSON" | base64 -d > "$RUNNER_TEMP/google-services.json"
+
+      - name: Build the Test Lab app
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ runner.temp }}/google-services.json
+          EXPO_PUBLIC_TESTLAB_APPCHECK_TOKEN: ${{ secrets.TESTLAB_APPCHECK_TOKEN }}
+          TESTLAB_BUILD_DIR: ${{ runner.temp }}/testlab
+        run: eas env:exec production 'bash scripts/testlab/build-apk.sh' --non-interactive
+
+      - uses: google-github-actions/auth@v2
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          credentials_json: ${{ secrets.TESTLAB_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.ready.outputs.ok == 'true'
+
+      - name: Pick three phones
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          gcloud firebase test android models list --filter='form=PHYSICAL' --format=json > "$RUNNER_TEMP/models.json"
+          node scripts/testlab/testlab.js devices "$RUNNER_TEMP/models.json" > "$RUNNER_TEMP/devices.txt"
+          cat "$RUNNER_TEMP/devices.txt"
+
+      # Robo signs in with the account's fields (by their ids) and never presses the controls listed
+      # at the top. gcloud exits non-zero when a phone failed: the results step decides.
+      - name: Robo crawl
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          EMAIL: ${{ secrets.TESTLAB_EMAIL }}
+          PASSWORD: ${{ secrets.TESTLAB_PASSWORD }}
+        run: |
+          set +e
+          gcloud firebase test android run --type robo \
+            --app "$RUNNER_TEMP/testlab/revisely-testlab.apk" \
+            $(cat "$RUNNER_TEMP/devices.txt") \
+            --timeout 300s \
+            --robo-directives "text:auth-email=$EMAIL,text:auth-password=$PASSWORD,click:auth-submit=,ignore:settings-sign-out=,ignore:settings-delete-account=,ignore:settings-reset-data=,ignore:settings-test-scenario=,ignore:revo-button=,ignore:revo-settings-switch=" \
+            --format=json > "$RUNNER_TEMP/outcomes.json"
+          echo "gcloud exited $?"
+          cat "$RUNNER_TEMP/outcomes.json"
+
+      - name: Results
+        id: results
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          node scripts/testlab/testlab.js results "$RUNNER_TEMP/outcomes.json" "$RUNNER_TEMP/models.json" "$RUNNER_TEMP/attempts/devices" >> "$GITHUB_OUTPUT"
+
+      - name: Report to the develop-red issue
+        if: steps.ready.outputs.ok == 'true' && steps.results.outputs.ran == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: develop
+          DEVICES: true:true:${{ steps.results.outputs.failed == 'true' && 'failure' || 'success' }}
+        run: node scripts/e2e/develop-red.js "$RUNNER_TEMP/attempts"
+
+      - name: No result from Test Lab
+        if: steps.ready.outputs.ok == 'true' && steps.results.outputs.ran != 'true'
+        run: |
+          echo "::error title=Test Lab::Test Lab gave no pass or fail for any phone (see the Robo crawl step)."
+          exit 1
+
+      - name: Fail on a crash or an ANR
+        if: steps.results.outputs.failed == 'true'
+        run: |
+          echo "::error title=Test Lab::A phone's crawl crashed or froze: see the develop-red issue and Test Lab's results."
+          exit 1

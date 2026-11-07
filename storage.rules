@@ -8,6 +8,7 @@ rules_version = '2';
  *   at most 200 MB a file, readable, creatable and deletable only by the
  *   account, never overwritten (a name is one file, ever). Account deletion
  *   removes them on the server (functions deleteUserAccount).
+ * - backups/: tester resets' backups (functions resetMyData), admin only.
  * - The mushaf page images and the speech model are public objects served from
  *   storage.googleapis.com, outside these rules.
  * - Everything else is closed.
@@ -37,6 +38,11 @@ service firebase.storage {
                        fileName.matches('[A-Za-z0-9._-]+') &&
                        request.resource.size < 200 * 1024 * 1024 &&
                        request.resource.contentType.matches('audio/.*');
+    }
+
+    // Tester resets' backups (functions resetMyData): admin only, never a client.
+    match /backups/{allPaths=**} {
+      allow read, write: if false;
     }
 
     // Deny all other access

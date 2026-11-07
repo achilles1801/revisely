@@ -1,0 +1,19 @@
+# Home → Activity → Log today: the daily log for today.
+appId: com.revisionbuddy.app
+---
+# Right after a relaunch the first tap can be lost (CI): tapped again until
+# Activity shows.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          id: open-activity
+          optional: true
+      - extendedWaitUntil:
+          visible: "Log today"
+          timeout: 10000
+- tapOn: "Log today"
+- extendedWaitUntil:
+    visible:
+      id: journal-composer
+    timeout: 15000

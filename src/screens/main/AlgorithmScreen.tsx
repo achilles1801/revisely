@@ -7,7 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs).
 import { ScrollView } from 'react-native-gesture-handler';
@@ -20,6 +20,7 @@ import {
   getMissedScheduledRevisions,
   INSIGHTS_MIN_SESSIONS,
 } from '../../lib/algorithm';
+import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import {
   getQuranData,
   getSurahForPage,
@@ -27,6 +28,7 @@ import {
 } from '../../lib/quranData';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { PillButton } from '../../components/v2/PillButton';
@@ -95,7 +97,8 @@ export default function AlgorithmScreen() {
   const [juzPickerOpen, setJuzPickerOpen] = useState(false);
   const [strengthPickerOpen, setStrengthPickerOpen] = useState(false);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const [expandedLists, setExpandedLists] = useState<Record<BrowseMode, boolean>>({
     pages: false,
     surahs: false,
@@ -124,7 +127,8 @@ export default function AlgorithmScreen() {
 
   const allPageRows = useMemo((): PageRow[] => {
     if (!user) return [];
-    const today = new Date();
+    // The revision day, not the calendar: between midnight and fajr it is still yesterday.
+    const today = getRevisionDateForUser(user);
 
     return memorizedPages
       .filter((p) => p.lastRevisedDate)
@@ -280,11 +284,11 @@ export default function AlgorithmScreen() {
 
   if (!user) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
         <View style={styles.loadingContainer} testID="insights-loading">
           <ActivityIndicator color={palette.secondary} />
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
@@ -303,11 +307,11 @@ export default function AlgorithmScreen() {
   const emptyBrowse =
     browseMode === 'juz' ? 'Nothing memorized yet' : `No ${browseMode} match these filters`;
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} />}
         testID="insights-v2"
       >
@@ -494,7 +498,7 @@ export default function AlgorithmScreen() {
         testID="strength-picker"
       />
       <PagePreviewSheet pageNumber={previewPage} onClose={() => setPreviewPage(null)} />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

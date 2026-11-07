@@ -7,13 +7,17 @@
     {
       "source": "functions",
       "codebase": "default",
-      "runtime": "nodejs20",
+      "runtime": "nodejs22",
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ]
     }
   ],
   "emulators": {
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9099
+    },
     "firestore": {
       "host": "127.0.0.1",
       "port": 8080

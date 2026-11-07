@@ -1,0 +1,63 @@
+# Delete account: Settings → Delete account, confirmed twice. The real deleteUserAccount function
+# (in the functions emulator) removes the account and its data from the server, and the app is
+# back at sign-in.
+# Rules (BEHAVIOUR.md): ACCOUNT-1
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runScript: ../scripts/server-account.js
+- assertTrue:
+    condition: ${output.accountExists && output.userDocExists && output.serverPagesCount > 0}
+    label: The server has the new account, its user document and its pages
+
+- tapOn:
+    id: open-settings
+# The last row: on to the end of Settings, where it sits above the tab bar. Found at the screen's
+# foot, it sat under the tab bar, which took the tap (Android); and a last row can't be centred,
+# so centring it timed out on iOS, with the row in plain view (#328's run, Nov 7 2026).
+- scrollUntilVisible:
+    element:
+      id: settings-delete-account
+    direction: DOWN
+    timeout: 20000
+- scroll
+- tapOn:
+    id: settings-delete-account
+# Two confirmations (Settings), then the server deletes.
+- extendedWaitUntil:
+    visible:
+      text: Delete account\?
+    timeout: 10000
+- tapOn:
+    text: (?i)Delete
+- extendedWaitUntil:
+    visible:
+      text: Are you absolutely sure\?
+    timeout: 10000
+- tapOn:
+    text: (?i)I understand, delete
+- extendedWaitUntil:
+    visible:
+      text: Account deleted
+    timeout: 60000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 10-account-deleted
+- tapOn:
+    text: (?i)OK
+# Signed out: the sign-in screen.
+- extendedWaitUntil:
+    visible:
+      id: auth-title
+    timeout: 20000
+
+# Gone on the server: the sign-in, the user document and its pages.
+- runScript: ../scripts/server-account.js
+- assertTrue:
+    condition: ${!output.accountExists && !output.userDocExists && output.serverPagesCount == 0}
+    label: The account, its user document and its pages are gone from the server

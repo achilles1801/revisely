@@ -1,0 +1,15 @@
+# A cold start: the app is stopped and opened again, keeping its data and the
+# clock the flow set. Waits for the first screen.
+appId: com.revisionbuddy.app
+---
+- stopApp
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: e2e-status
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: root-loading
+    timeout: 30000

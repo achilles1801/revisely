@@ -1,0 +1,22 @@
+# The session's end card shows TEXT (a regex for part of it). iOS reads the
+# card's summary as one label (", Revision complete, 10 pages revised today");
+# Android keeps its lines as they are.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: session-end-summary
+            text: ".*${TEXT}.*"
+          timeout: 10000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: "${TEXT}"
+          timeout: 10000

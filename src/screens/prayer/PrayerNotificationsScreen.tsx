@@ -23,6 +23,7 @@ import { formatTime, TIME_LABELS } from '../../lib/prayer/times';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { usePrayerNotifyPermission } from '../../components/prayer/usePrayerNotifyPermission';
 import { useScheduledPrayerDays } from '../../lib/prayer/status';
+import { previewPrayerSound } from '../../lib/prayer/soundPreview';
 
 /** "Standard tone · 10 min before", "Silent". */
 export function alertSummary(a: PrayerAlert): string {
@@ -57,7 +58,7 @@ export default function PrayerNotificationsScreen() {
       <View style={{ paddingTop: insets.top }}>
         <TopBar title="Prayer notifications" onBack={() => navigation.goBack()} separator />
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <GroupedSection
           header="Prayers"
           footer={
@@ -167,10 +168,16 @@ function AlertSheet({ prayer, onClose }: { prayer: PrayerName | null; onClose: (
           return (
             <Tap
               key={o.id}
-              onPress={() => setPrayerAlert(shown, { sound: o.id })}
+              // Picks it and plays it, as iOS's own sound settings do (again on
+              // each tap). Silent plays nothing.
+              onPress={() => {
+                setPrayerAlert(shown, { sound: o.id });
+                void previewPrayerSound(o.id);
+              }}
               style={styles.option}
               accessibilityRole="radio"
               accessibilityState={{ checked: selected }}
+              accessibilityHint={o.id === 'silent' ? undefined : 'Plays the sound'}
               testID={`prayer-sound-${o.id}`}
             >
               <View style={styles.rowText}>

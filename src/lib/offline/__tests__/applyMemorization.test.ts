@@ -1,0 +1,36 @@
+import { applyEntry } from '../apply';
+import * as firestoreService from '../../../services/firestoreService';
+
+jest.mock('../../../services/firestoreService', () => ({
+  deleteMemorizationItem: jest.fn(),
+  addMemorizationPages: jest.fn(),
+  removeMemorizationPages: jest.fn(),
+}));
+jest.mock('../../logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() } }));
+const mocked = firestoreService as jest.Mocked<typeof firestoreService>;
+
+beforeEach(() => jest.clearAllMocks());
+
+describe('removing a memorization (C4)', () => {
+  it('removes its item', async () => {
+    await applyEntry('u1', { id: 'e1', at: 1, op: { kind: 'memorization.delete', day: '2026-11-04', id: '2026-11-04' } });
+    expect(mocked.deleteMemorizationItem).toHaveBeenCalledWith('2026-11-04', 'u1');
+  });
+
+  it('a failed delete is not dropped: it throws, so the outbox retries it', async () => {
+    mocked.deleteMemorizationItem.mockRejectedValue(new Error('offline'));
+    await expect(
+      applyEntry('u1', { id: 'e1', at: 1, op: { kind: 'memorization.delete', day: '2026-11-04', id: '2026-11-04' } }),
+    ).rejects.toThrow('offline');
+  });
+
+  it('pages memorized today are merged into the day’s item', async () => {
+    await applyEntry('u1', { id: 'e2', at: 1, op: { kind: 'memorization.mark', day: '2026-11-05', pages: [7, 8], at: 1793800000000 } });
+    expect(mocked.addMemorizationPages).toHaveBeenCalledWith('2026-11-05', [7, 8], 1793800000000, 'u1');
+  });
+
+  it('un-memorized pages are removed from the items that hold them', async () => {
+    await applyEntry('u1', { id: 'e3', at: 1, op: { kind: 'memorization.unmark', pages: [7] } });
+    expect(mocked.removeMemorizationPages).toHaveBeenCalledWith([7], 'u1');
+  });
+});

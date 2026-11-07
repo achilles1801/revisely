@@ -82,6 +82,7 @@ jobs:
     if: ${{ inputs.platform == 'android' || (inputs.platform == 'all' && vars.ANDROID_RELEASES == 'true') }}
     permissions:
       contents: write # pushes the android-fp/<hash> tag
+      id-token: write # android-build.yml's available job proves itself to playBuildAvailable
     uses: ./.github/workflows/android-build.yml
     with:
       submit: ${{ inputs.submit }}

@@ -120,12 +120,13 @@ export function localDay(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-/** The six times of the local day of `date`. A time adhan can't give is null. */
-export function dayTimes(place: Place, date: Date, settings: CalcSettings): DayTimes {
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
-  const t = new PrayerTimes(new Coordinates(place.latitude, place.longitude), day, calcParams(settings, place));
+const TIME_NAMES: TimeName[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+type Times = Record<TimeName, Date | null>;
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+
+function timesOf(t: PrayerTimes): Times {
   return {
-    day: localDay(day),
     fajr: valid(t.fajr),
     sunrise: valid(t.sunrise),
     dhuhr: valid(t.dhuhr),
@@ -133,6 +134,68 @@ export function dayTimes(place: Place, date: Date, settings: CalcSettings): DayT
     maghrib: valid(t.maghrib),
     isha: valid(t.isha),
   };
+}
+
+/** The times in order, Fajr to Isha (a time adhan can't give is skipped). */
+function inOrder(t: Times): boolean {
+  const seq = TIME_NAMES.map((n) => t[n]).filter((d): d is Date => d !== null);
+  return seq.every((d, i) => i === 0 || seq[i - 1].getTime() < d.getTime());
+}
+
+/**
+ * `a` and `b` moved by `da` and `db` milliseconds, averaged time by time (either
+ * alone where the other has none), to the minute as adhan gives them.
+ */
+function blend(a: Times | null, da: number, b: Times | null, db: number): Times {
+  const out = {} as Times;
+  for (const n of TIME_NAMES) {
+    const x = a?.[n] ? a[n]!.getTime() + da : null;
+    const y = b?.[n] ? b[n]!.getTime() + db : null;
+    const v = x !== null && y !== null ? (x + y) / 2 : (x ?? y);
+    out[n] = v === null ? null : new Date(Math.round(v / MINUTE_MS) * MINUTE_MS);
+  }
+  return out;
+}
+
+/**
+ * The six times of the local day of `date`: the prayers whose Dhuhr falls on
+ * that day. A time adhan can't give is null.
+ *
+ * adhan reads the date it is given as the UTC day of the sun's transit at the
+ * place. Near the date line (Kiritimati, Samoa, Tonga; Fiji around October and
+ * November) that transit is on the next or the previous local day, so the
+ * phone's date alone gave another day's prayers; the dates either side are
+ * asked too. Where the transit crosses 00:00 UTC, adhan skips a day (no date
+ * gives its prayers) or returns a set out of order (a "Fajr" at noon). That day
+ * is then made from the days either side, moved by 24 hours: Fajr moves by
+ * seconds a day there. A saved place far from the phone's zone may have no
+ * Dhuhr on a day at all; the set nearest the day's noon is used.
+ */
+export function dayTimes(place: Place, date: Date, settings: CalcSettings): DayTimes {
+  const at = (k: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + k, 12);
+  const noon = at(0);
+  const target = localDay(noon);
+  const coords = new Coordinates(place.latitude, place.longitude);
+  const params = calcParams(settings, place);
+  const sets = [-1, 0, 1].map((k) => timesOf(new PrayerTimes(coords, at(k), params))).filter((t) => t.dhuhr && inOrder(t));
+  const on = (day: string) =>
+    sets
+      .filter((t) => localDay(t.dhuhr!) === day)
+      .sort((a, b) => Math.abs(a.dhuhr!.getTime() - noon.getTime()) - Math.abs(b.dhuhr!.getTime() - noon.getTime()))[0] ?? null;
+
+  let times = on(target);
+  if (!times) {
+    const before = on(localDay(at(-1)));
+    const after = on(localDay(at(1)));
+    const made = before || after ? blend(before, DAY_MS, after, -DAY_MS) : null;
+    if (made?.dhuhr && localDay(made.dhuhr) === target && inOrder(made)) times = made;
+  }
+  if (!times) {
+    times =
+      [...sets].sort((a, b) => Math.abs(a.dhuhr!.getTime() - noon.getTime()) - Math.abs(b.dhuhr!.getTime() - noon.getTime()))[0] ??
+      timesOf(new PrayerTimes(coords, noon, params));
+  }
+  return { day: target, ...times };
 }
 
 /** The next prayer after `now` (today's, else tomorrow's Fajr). */

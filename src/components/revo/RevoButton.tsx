@@ -1,0 +1,68 @@
+import React from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
+import { useHaptics } from '../../design/haptics';
+import { REVO_BUTTON_GAP, REVO_BUTTON_SIZE } from '../../lib/revo/presence';
+import { RevoMark } from './RevoMark';
+
+export { REVO_BUTTON_GAP, REVO_BUTTON_SIZE };
+/** From the right edge, and above the tab bar (and the mini player). */
+export const REVO_BUTTON_INSET = 16;
+/** Its touch area reaches this far past the disc. */
+export const REVO_BUTTON_SLOP = 8;
+const DOT = 10;
+const DOT_BORDER = 2;
+
+/**
+ * Revo's button: bottom-right on the main screens, above the content and below sheets. The R
+ * disc; dark adds a lavender ring and an Indigo glow, light a soft shadow. A dot when a new Day
+ * in review is waiting. A press shrinks it a little, with a light haptic.
+ */
+export function RevoButton({ bottom, dot, onPress }: { bottom: number; dot: boolean; onPress: () => void }) {
+  const { palette, isDark } = useTheme();
+  const haptics = useHaptics();
+  // In the accent: a glow in dark, a shadow in light.
+  const lift = isDark
+    ? { shadowColor: palette.revo.glow, shadowOpacity: 0.5, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } }
+    : { shadowColor: palette.revo.shadow, shadowOpacity: 0.28, shadowRadius: 9, shadowOffset: { width: 0, height: 6 } };
+  return (
+    <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
+      <Pressable
+        onPress={() => {
+          haptics.light();
+          onPress();
+        }}
+        hitSlop={REVO_BUTTON_SLOP}
+        accessibilityRole="button"
+        accessibilityLabel={dot ? 'Revo, a new Day in review' : 'Revo'}
+        accessibilityHint="Ask about your revision"
+        style={({ pressed }) => [styles.button, lift, Platform.OS === 'android' && styles.elevation, pressed && styles.pressed]}
+        testID="revo-button"
+      >
+        <RevoMark size={REVO_BUTTON_SIZE} ring={isDark} />
+        {dot ? (
+          <View
+            style={[styles.dot, { backgroundColor: palette.primary, borderColor: palette.bg }]}
+            testID="revo-button-dot"
+          />
+        ) : null}
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { position: 'absolute', right: REVO_BUTTON_INSET },
+  button: { width: REVO_BUTTON_SIZE, height: REVO_BUTTON_SIZE, borderRadius: REVO_BUTTON_SIZE / 2 },
+  elevation: { elevation: 8 },
+  pressed: { transform: [{ scale: 0.94 }] },
+  dot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: DOT + DOT_BORDER * 2,
+    height: DOT + DOT_BORDER * 2,
+    borderRadius: DOT / 2 + DOT_BORDER,
+    borderWidth: DOT_BORDER,
+  },
+});

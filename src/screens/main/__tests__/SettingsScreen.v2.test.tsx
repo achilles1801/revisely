@@ -25,6 +25,7 @@ jest.mock('@react-navigation/native', () => {
   const { useEffect } = require('react');
   return {
     useNavigation: () => mockNavigation,
+    useRoute: () => ({ params: undefined }),
     useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
   };
 });
@@ -44,8 +45,6 @@ jest.mock('../../../context/AppContext', () => ({
 jest.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({ firebaseUser: { uid: 'u1', email: 'majd@example.com' }, signOutUser: jest.fn(), deleteAccount: jest.fn() }),
 }));
-const mockSchedule = jest.fn(async () => undefined);
-jest.mock('../../../lib/notifications', () => ({ scheduleDailyReminder: (...a: unknown[]) => mockSchedule(...(a as [])) }));
 const mockSubmitFeedback = jest.fn(async () => undefined);
 jest.mock('../../../services/firestoreService', () => ({
   getReadingSessions: jest.fn(async () => []),
@@ -109,24 +108,12 @@ describe('Settings in the new design: its sheets and rows', () => {
     expect(flat(screen.getByText(/^Revisely · v/).props.style).color).toBe(palette.secondary);
   });
 
-  it('reminder time: a v2 sheet, the chosen hour on the accent tint, Save schedules it', async () => {
+  it('Notifications is the Enable notifications switch only: no Reminder time row or sheet', async () => {
     await renderV2();
-    fireEvent.press(screen.getByLabelText('Reminder time, 8:00 AM'));
-    await act(async () => {});
-    const sheet = flat(screen.getByTestId('time-sheet').props.style);
-    expect(sheet.backgroundColor).toBe(palette.sheet);
-    expect(sheet.borderTopLeftRadius).toBe(20);
-    expect(within(screen.getByTestId('time-sheet')).getByText('Reminder time')).toBeTruthy();
-    expect(flat(screen.getByTestId('time-hour-8').props.style).backgroundColor).toBe(palette.accentSubtle);
-    expect(flat(screen.getByTestId('time-hour-9').props.style).backgroundColor).toBeUndefined();
-    fireEvent.press(screen.getByTestId('time-hour-9'));
-    fireEvent.press(screen.getByTestId('time-minute-30'));
-    expect(flat(screen.getByTestId('time-hour-9').props.style).backgroundColor).toBe(palette.accentSubtle);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('time-save'));
-    });
-    expect(mockSaveUser).toHaveBeenCalledWith(expect.objectContaining({ reminderTime: '09:30' }));
-    expect(mockSchedule).toHaveBeenCalledWith('09:30', true);
+    expect(screen.getByText('Enable notifications')).toBeTruthy();
+    expect(screen.queryByText('Reminder time')).toBeNull();
+    expect(screen.queryByLabelText(/Reminder time/)).toBeNull();
+    expect(screen.queryByTestId('time-sheet')).toBeNull();
   });
 
   it('display name: a field on the quiet fill, saved from the header', async () => {
@@ -279,5 +266,69 @@ describe('Settings: the speech model (testers)', () => {
     mockModelState = { status: 'downloading', progress: 0.3 };
     await renderV2();
     expect(screen.getByText('30%')).toBeTruthy();
+  });
+});
+
+describe('Settings: Reset my data (testers)', () => {
+  afterEach(() => {
+    delete mockUser.previewTester;
+  });
+
+  it('not a previewTester account: no Testing section, no row', async () => {
+    await renderV2();
+    expect(screen.queryByTestId('reset-data-row')).toBeNull();
+    expect(screen.queryByText('Reset my data')).toBeNull();
+  });
+
+  it('a previewTester account: the row, in red, says what it does and opens the RESET sheet', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    expect(screen.getByText('Testing')).toBeTruthy();
+    const label = screen.getByText('Reset my data');
+    expect(flat(label.props.style).color).toBe(palette.red);
+    expect(screen.getByText('Start again as a new account')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(label);
+    });
+    expect(screen.getByTestId('reset-data-input')).toBeTruthy();
+    expect(screen.getByTestId('reset-data-confirm').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe('Settings: Load test scenario (testers)', () => {
+  afterEach(() => {
+    delete mockUser.previewTester;
+    jest.requireActual('../../../lib/offline/sync').releaseSync('u1');
+  });
+
+  it('changes held by the Offline queue scenario: a row sends them', async () => {
+    mockUser.previewTester = true;
+    const sync = jest.requireActual('../../../lib/offline/sync');
+    sync.holdSync('u1');
+    await renderV2();
+    expect(screen.getByTestId('held-changes-row')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByText('Send held changes'));
+    });
+    expect(sync.isSyncHeld('u1')).toBe(false);
+    expect(screen.queryByTestId('held-changes-row')).toBeNull();
+  });
+
+  it('not a previewTester account: no row', async () => {
+    await renderV2();
+    expect(screen.queryByTestId('test-scenario-row')).toBeNull();
+    expect(screen.queryByText('Load test scenario')).toBeNull();
+  });
+
+  it('a previewTester account: the row, in red, opens the scenario sheet', async () => {
+    mockUser.previewTester = true;
+    await renderV2();
+    const label = screen.getByText('Load test scenario');
+    expect(flat(label.props.style).color).toBe(palette.red);
+    await act(async () => {
+      fireEvent.press(label);
+    });
+    expect(screen.getByTestId('test-scenario-hafiz')).toBeTruthy();
+    expect(screen.getByTestId('test-scenario-confirm').props.accessibilityState).toMatchObject({ disabled: true });
   });
 });

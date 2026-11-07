@@ -7,7 +7,7 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { ScrollView } from 'react-native-gesture-handler';
@@ -20,6 +20,11 @@ import { greetingName } from '../../lib/displayName';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { isKahfDay, kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
 import * as firestoreService from '../../services/firestoreService';
+import { queueChange, withPendingReadings } from '../../lib/offline/queue';
+import { OfflineNote } from '../../components/offline/OfflineNote';
+import { UpdateReadySheet } from '../../components/updates/UpdateReadySheet';
+import { StoreUpdateSheet } from '../../components/updates/StoreUpdateSheet';
+import { autoId } from '../../lib/offline/apply';
 import { logger } from '../../lib/logger';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { typography } from '../../theme/typography';
@@ -34,6 +39,7 @@ import { registerForPushNotificationsAsync } from '../../lib/notifications';
 import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
@@ -47,11 +53,19 @@ import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { prayerTimesEnabled } from '../../lib/prayer/status';
 import { usePrayerPrefs } from '../../lib/prayer/prefs';
 import { onPrayerSheetRequest } from '../../lib/widgets/links';
+import { onJumpSheetRequest } from '../../lib/revo/screens';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
-import { applyCarryOver, findLeftoverPages, hasCarriedOver } from '../../lib/carryOver';
+import { catchUpLine } from '../../lib/todayLines';
+import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
+import { reviewPagesInOrder } from '../../lib/aheadCredit';
+import { ownRevised } from '../../lib/activityItems';
+import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
+import type { HistoryItem } from '../../lib/streakFromItems';
+import { loadActivityHistory, shareActivityHistory } from '../../lib/activityHistory';
+import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
@@ -77,12 +91,13 @@ export default function DashboardScreen() {
   const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const { user, pages, logs, updateLog, deleteLog, loadData, error, saveUser } = useApp();
+  const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser } = useApp();
   const { firebaseUser } = useAuth();
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
   const homePrefs = useHomePrefs();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const [carrying, setCarrying] = useState(false);
   // "Jump to…": the sheet, and the toast after a jump (with what to put back).
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -133,6 +148,8 @@ export default function DashboardScreen() {
       }),
     [],
   );
+  // Revo's "Open Jump to" (REVO-31) opens Jump to… here.
+  useEffect(() => onJumpSheetRequest(() => setJumpOpen(true)), []);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
@@ -149,89 +166,81 @@ export default function DashboardScreen() {
     if (assignment && assignment.pages.length > 0) prefetchPages(assignment.pages);
   }, [assignment]);
 
-  const todayStatus = useMemo(() => {
-    const todayLogs = logs.filter((log) => log.date === revisionDay);
-    if (todayLogs.length === 0)
-      return { status: 'not_started' as const, pagesCompleted: 0 };
+  // The streak's history: the Activity items of the last 400 days (C5), read when the day or the
+  // number of sessions changes, and shared with Revo (lib/activityHistory), which builds from it too.
+  const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const to = revisionDay;
+    const uid = user.id;
+    loadActivityHistory(to)
+      .then((items) => {
+        if (cancelled) return;
+        setHistory(items);
+        shareActivityHistory(uid, to, items);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, revisionDay, logs.length]);
 
-    const pagesRevisedToday = new Set<number>();
-    todayLogs.forEach((log) =>
-      log.pagesRevised.forEach((p) => pagesRevisedToday.add(p)),
-    );
-    const totalAssigned = assignment?.totalPages || 0;
-    const completed = pagesRevisedToday.size;
-    // If the user revised pages today and the assignment later shrank
-    // (custom-plan edit, un-memorized surah), treat that as completed
-    // rather than letting `remaining` go negative downstream.
-    if (completed > 0 && completed >= totalAssigned) {
-      return { status: 'completed' as const, pagesCompleted: completed };
-    }
-    if (completed > 0)
-      return { status: 'partial' as const, pagesCompleted: completed };
-    return { status: 'not_started' as const, pagesCompleted: 0 };
-  }, [logs, assignment, revisionDay]);
+  // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
+  // streak. Revo's context is built from the same function, so the two never disagree.
+  const snapshot = useMemo(
+    () =>
+      user && assignment
+        ? todaySnapshot({ user, pages, logs, day: revisionDay, assignment: assignment.pages, history, now: Date.now() })
+        : null,
+    [user, pages, logs, revisionDay, assignment, history],
+  );
+  const todayStatus = { status: snapshot?.status ?? ('not_started' as const) };
 
-  // Pages from yesterday's session that were never revised, offered as
-  // "Add to today". Empty once they are in today's assignment.
-  const leftovers = useMemo(() => {
-    // Once a day: after carrying over, today's leftovers are part of today.
-    if (!assignment || hasCarriedOver(user, revisionDay)) return [];
-    const memorized = new Set(
-      pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber),
-    );
-    return findLeftoverPages(logs, revisionDay, assignment.pages, memorized);
+  // Done today: the next revision day, which Home's quiet line opens (#168).
+  const aheadNext = useMemo(() => {
+    if (!user || !assignment || todayStatus.status !== 'completed' || assignment.pages.length === 0) return null;
+    const plan = nextRevisionDayPlan(user, pages, revisionDay, new Set(assignment.pages), logs);
+    if (!plan || plan.pages.length === 0) return null;
+    const lead = plan.day === revisionDayAfter(revisionDay) ? 'Tomorrow' : weekdayLabel(plan.day);
+    return { plan, lead };
+  }, [user, pages, logs, assignment, revisionDay, todayStatus.status]);
+
+  // Pages from the last few revision days that were never revised (a day with
+  // no session at all counts as missed), offered as "Add to today". Empty once
+  // they are in today's assignment.
+  const leftovers = useMemo<Leftovers>(() => {
+    if (!user || !assignment) return { pages: [], from: {}, days: [] };
+    return leftoversFor(user, logs, revisionDay, assignment.pages, pages.filter((p) => p.status === 'memorized'));
   }, [logs, revisionDay, assignment, pages, user]);
 
-  // How many of today's pages came from yesterday (they come first: "4 from yesterday first").
-  const carriedToday = useMemo(() => {
-    const carry = user?.carryOver;
-    if (!assignment || !carry || carry.day !== revisionDay) return 0;
-    const carried = new Set(carry.pages);
-    return assignment.pages.filter((p) => carried.has(p)).length;
-  }, [user, assignment, revisionDay]);
+  // Today's pages that came from earlier days (they come first: "4 from yesterday first").
+  const carriedToday = snapshot?.carried.length ?? 0;
 
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
 
-  const calculatedStreak = useMemo(() => {
-    if (logs.length === 0) return 0;
-    // Log dates are revision days ('YYYY-MM-DD'), so count back from the
-    // revision day, parsing them as local dates: `new Date('YYYY-MM-DD')` is
-    // UTC midnight, the previous evening west of Greenwich.
-    const localDay = (s: string) => {
-      const [y, m, d] = s.split('-').map(Number);
-      return new Date(y, m - 1, d).getTime();
-    };
-    const sortedDays = logs.map((l) => localDay(l.date)).sort((a, b) => b - a);
-    let streak = 0;
-    for (const logDay of sortedDays) {
-      const expectedDate = new Date(revisionDate);
-      expectedDate.setDate(revisionDate.getDate() - streak);
-      if (logDay === expectedDate.getTime()) {
-        streak++;
-      } else if (logDay < expectedDate.getTime()) {
-        break;
-      }
-    }
-    return streak;
-  }, [logs, revisionDate]);
+  // The streak (lib/streak): the same rule and the same answer as the widget.
+  const streakNow = snapshot?.streak.reading ?? null;
+  const calculatedStreak = streakNow?.streak ?? 0;
 
   // Sessions
   const sessionLogs = useMemo(
     () =>
       logs
-        .filter((l) => l.pagesRevised.length > 0)
+        // A day Keep daily amount filled with catch-up pages revised them alone (ownRevised).
+        .filter((l) => l.pagesRevised.length > 0 || ownRevised(l).length > 0)
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [logs],
   );
 
   // Pages revised today: the Today post's page chips fill in as they're done.
-  const donePagesToday = useMemo(() => {
-    const done = new Set<number>();
-    logs.filter((log) => log.date === revisionDay).forEach((log) => log.pagesRevised.forEach((p) => done.add(p)));
-    return done;
-  }, [logs, revisionDay]);
+  // Includes pages revised ahead for today (lib/aheadCredit).
+  // Also the pages today's sessions revised ahead, so "Done" counts the whole day.
+  const donePagesToday = useMemo(() => snapshot?.done ?? new Set<number>(), [snapshot]);
+  // Carried pages still to revise: once today's own pages are done, the button goes on to them.
+  const carriedLeft = snapshot?.carriedLeft ?? 0;
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 
@@ -250,7 +259,7 @@ export default function DashboardScreen() {
       firestoreService
         .getReadingSessions(20)
         .then((s) => {
-          if (live) setReadingSessions(s);
+          if (live) setReadingSessions(withPendingReadings(s));
         })
         .catch((err) => logger.warn('Failed to load reading sessions for Al-Kahf', err))
         .finally(() => {
@@ -278,7 +287,7 @@ export default function DashboardScreen() {
 
   if (!user || !assignment) {
     return (
-      <SafeAreaView style={styles.container}>
+      <TopSafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           {error ? (
             <>
@@ -294,25 +303,38 @@ export default function DashboardScreen() {
             <Text style={styles.loadingText}>Loading…</Text>
           )}
         </View>
-      </SafeAreaView>
+      </TopSafeAreaView>
     );
   }
 
-  const handleEditSession = (log: RevisionLog) => {
+  const handleEditSession = (log: RevisionLog, reviewPages?: number[]) => {
     // Prefer the day's actual assignedPages so the edit modal shows the
     // whole session, not just what the user marked. Fall back to
     // revised+skipped for legacy logs without the assignedPages field.
     const sessionPages =
-      log.assignedPages && log.assignedPages.length > 0
+      reviewPages ??
+      (log.assignedPages && log.assignedPages.length > 0
         ? [...log.assignedPages].sort((a, b) => a - b)
-        : [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b);
+        : [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b));
     setSelectedLog(log);
     setSelectedSessionPages(sessionPages);
     setShowEditModal(true);
   };
 
   const handleSaveSession = async (updatedLog: RevisionLog) => {
-    await updateLog(updatedLog);
+    if (updatedLog.id) {
+      await updateLog(updatedLog);
+    } else {
+      // A review of a day with no session yet (see handleCtaPress) is saved as its first session.
+      await addLog({
+        date: updatedLog.date,
+        assignedPages: updatedLog.assignedPages,
+        pagesRevised: updatedLog.pagesRevised,
+        pagesSkipped: updatedLog.pagesSkipped,
+        weaknessUpdates: updatedLog.weaknessUpdates,
+        durationMinutes: updatedLog.durationMinutes,
+      });
+    }
     setShowEditModal(false);
     setSelectedLog(null);
     setSelectedSessionPages([]);
@@ -320,7 +342,8 @@ export default function DashboardScreen() {
 
   const handleDeleteSession = async () => {
     if (selectedLog) {
-      await deleteLog(selectedLog.id);
+      // A review with no session yet has nothing to delete.
+      if (selectedLog.id) await deleteLog(selectedLog.id);
       setShowEditModal(false);
       setSelectedLog(null);
       setSelectedSessionPages([]);
@@ -328,11 +351,26 @@ export default function DashboardScreen() {
   };
 
   const handleCtaPress = () => {
-    if (todayStatus.status === 'completed') {
-      const todayLog = logs.find(
-        (log) => log.date === revisionDay,
-      );
-      if (todayLog) handleEditSession(todayLog);
+    if (todayStatus.status === 'completed' && carriedLeft > 0) {
+      // Today is done, and pages added from earlier days are left: the session holds them.
+      navigation.navigate('ActiveRevision');
+    } else if (todayStatus.status === 'completed') {
+      // The review is the day's done pages, the same set Home counts as Done:
+      // today's first, then the pages revised ahead today (reviewPagesInOrder).
+      const done = reviewPagesInOrder(logs, revisionDay, assignment.pages);
+      const todayLog = logs.find((log) => log.date === revisionDay);
+      // Done only by pages revised ahead from an earlier session: no session of
+      // today yet, so the review opens as a new one, with those pages checked.
+      const draft: RevisionLog = {
+        id: '',
+        date: revisionDay,
+        assignedPages: assignment.pages,
+        pagesRevised: done,
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 0,
+      };
+      handleEditSession(todayLog ?? draft, done);
     } else if (assignment.totalPages === 0) {
       navigation.navigate('Memorization', { edit: true });
     } else {
@@ -355,14 +393,10 @@ export default function DashboardScreen() {
     kahfSavingRef.current = true;
     setKahfSaving(true);
     const session = kahfReadingSession(revisionDay, minutes, Date.now());
-    const write = firestoreService.addReadingSession(session);
     try {
-      // Offline, the write is queued and only settles when the server acks
-      // (as with the reading timer): show it as read after a few seconds.
-      const id = await Promise.race([
-        write,
-        new Promise<string>((resolve) => setTimeout(() => resolve(`pending-${session.startedAt}`), 6000)),
-      ]);
+      // Saved on the phone at once; it reaches the server when it can.
+      const id = autoId();
+      await queueChange({ kind: 'reading.add', id, session });
       setReadingSessions((prev) => [{ ...session, id }, ...prev]);
     } catch (err) {
       logger.error('Failed to save Al-Kahf reading session', err);
@@ -371,17 +405,16 @@ export default function DashboardScreen() {
       kahfSavingRef.current = false;
       setKahfSaving(false);
     }
-    write.catch((err) => logger.error('Al-Kahf reading session write failed', err));
   };
 
   const handleCarryOver = async () => {
     // The ref stops a double tap before the state update re-renders.
-    if (!user || carryingRef.current || leftovers.length === 0) return;
+    if (!user || carryingRef.current || leftovers.pages.length === 0) return;
     carryingRef.current = true;
     setCarrying(true);
     try {
       const memorized = pages.filter((p) => p.status === 'memorized');
-      await saveUser(applyCarryOver(user, memorized, leftovers, revisionDate));
+      await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate, leftovers.from));
     } catch {
       Alert.alert("Couldn't update today's session", 'Please try again.');
     } finally {
@@ -444,7 +477,7 @@ export default function DashboardScreen() {
   const memorized = memorizedText(pages);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <HeroGlow />
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
@@ -462,8 +495,8 @@ export default function DashboardScreen() {
         right={
           <>
             <IconButton icon="compass-outline" label="Find the Qibla" onPress={() => openPrayer('qibla')} testID="open-qibla" />
-            <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} />
-            <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} />
+            <IconButton icon="pulse-outline" label="Open activity" onPress={() => navigation.navigate('Activity')} testID="open-activity" />
+            <IconButton icon="settings-outline" label="Open settings" onPress={() => navigation.navigate('Settings')} testID="open-settings" />
           </>
         }
         // Three icons on the right: both sides widen so the salam stays centred.
@@ -472,7 +505,7 @@ export default function DashboardScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         refreshControl={
           // Transparent: an opaque pull area cut Home's glow off in a hard line.
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
@@ -481,6 +514,7 @@ export default function DashboardScreen() {
       >
         {/* No line under the header: one across the glow ended it in a hard
             edge, at rest and while pulling (it read as a box). */}
+        <OfflineNote />
         {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
           <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
         ) : null}
@@ -491,15 +525,19 @@ export default function DashboardScreen() {
           pages={assignment.pages}
           done={donePagesToday}
           carried={carriedToday}
+          carriedLeft={carriedLeft}
           streak={calculatedStreak}
+          streakGrace={streakNow?.grace ?? null}
           memorized={memorized}
           onPrimary={handleCtaPress}
           onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
           onJump={() => setJumpOpen(true)}
-          leftovers={leftovers.length}
+          catchUp={catchUpLine(leftovers)}
           onCarryOver={handleCarryOver}
           carrying={carrying}
+          ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
+          onAhead={() => aheadNext && navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day })}
         />
 
         {showKahfCard && (
@@ -524,6 +562,7 @@ export default function DashboardScreen() {
               key={log.id}
               log={log}
               today={revisionDay}
+              juzPlan={user?.scheduleMode === 'juz'}
               onEdit={() => handleEditSession(log)}
               onDelete={() => deleteLog(log.id)}
               separator={i < recent.length - 1}
@@ -532,6 +571,8 @@ export default function DashboardScreen() {
         </RecentSection>
       </ScrollView>
       {editModal}
+      <UpdateReadySheet />
+      <StoreUpdateSheet />
       <JumpSheet
         visible={jumpOpen}
         onClose={() => setJumpOpen(false)}
@@ -562,7 +603,7 @@ export default function DashboardScreen() {
       ) : (
         <QiblaSheet visible={qiblaOpen} onClose={() => setQiblaOpen(false)} />
       )}
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

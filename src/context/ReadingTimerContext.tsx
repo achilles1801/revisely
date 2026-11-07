@@ -27,9 +27,11 @@ import {
   resumeTimer,
   startTimer,
 } from '../lib/readingTimer';
-import * as firestoreService from '../services/firestoreService';
+import { queueChange } from '../lib/offline/queue';
+import { autoId } from '../lib/offline/apply';
 import { alertSessionSaved } from '../components/timer/sessionSavedAlert';
 import { logger } from '../lib/logger';
+import { setBusy } from '../lib/updates/busy';
 import { REMINDER_CHANNEL_ID } from '../lib/notificationChannels';
 import { ReadingTimerMode } from '../types';
 
@@ -92,12 +94,8 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     const session = readingSessionFromTimer(t, now);
     const { durationSeconds } = session;
     if (durationSeconds < MIN_SESSION_SECONDS) return null;
-    const write = firestoreService.addReadingSession(session);
-    // Offline, the SDK queues the write and the promise only settles once
-    // the server acks — don't hold the UI hostage to that. Real rejections
-    // (e.g. rules) that arrive in time still surface.
-    await Promise.race([write, new Promise((resolve) => setTimeout(resolve, 6000))]);
-    write.catch((err) => logger.error('Reading session write failed', err));
+    // Saved on the phone at once; it reaches the server when it can.
+    await queueChange({ kind: 'reading.add', id: autoId(), session });
     return durationSeconds;
   }, []);
 
@@ -113,7 +111,7 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (err) {
       logger.error('Failed to save reading session', err);
-      Alert.alert("Couldn't save session", 'Check your connection and try again.');
+      Alert.alert("Couldn't save session", 'Please try again.');
       // Keep the recorded time, but paused so it doesn't keep growing.
       setTimer(pauseTimer(t, now));
       return false;
@@ -130,6 +128,13 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     if (!(await finish())) return;
     alertSessionSaved(t.date, t.targetSeconds ?? 0, 'Session complete');
   }, [finish]);
+
+  // A restart for an update waits while a timer is on (lib/updates/busy).
+  const timerOn = timer != null;
+  useEffect(() => {
+    setBusy('timer', timerOn);
+  }, [timerOn]);
+  useEffect(() => () => setBusy('timer', false), []);
 
   // Restore a timer that was running when the app was closed.
   useEffect(() => {

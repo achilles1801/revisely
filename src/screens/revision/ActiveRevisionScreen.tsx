@@ -1,20 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
-  Alert,
   AppState,
-  SafeAreaView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from '../../components/SafeAreaView';
+import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '../../navigation/MainNavigator';
 import { PillButton } from '../../components/v2/PillButton';
-import { PressableScale } from '../../components/PressableScale';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
@@ -29,6 +27,7 @@ import { RecitePanel } from '../../components/recite/RecitePanel';
 import { usePauseListener } from '../../components/recite/usePauseListener';
 import { canFollowWords, useReciteFollow } from '../../components/recite/useReciteFollow';
 import { reciteModeEnabled } from '../../lib/recite/availability';
+import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
 import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
 import { followLabel, WordByWordChip } from '../../components/recite/RecitePanel';
 import { useSpeechModelState } from '../../lib/recite/speechModelStore';
@@ -43,8 +42,10 @@ import {
 import type { AyahRef } from '../../lib/ayahBounds';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
-import { RecordButton } from '../../components/recordings/RecordButton';
+import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
+import { latestRevisionRecording } from '../../lib/listenBack';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { TimerChip } from '../../components/timer/TimerChip';
 import { ReaderFrame } from '../../components/reader/ReaderFrame';
@@ -57,11 +58,14 @@ import { RoundButton } from '../../components/reader/RoundButton';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { typography, fonts } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { radius } from '../../theme/radius';
 import { useApp } from '../../context/AppContext';
+import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
-import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
+import { carryOverOn, generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
+import { catchUpDayOf, duePagesOf } from '../../lib/carryOver';
+import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
+import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
 import {
   getHizbForPage,
   getQuranData,
@@ -69,8 +73,15 @@ import {
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
 import { pagesToUnrevise, removeRevisedPages } from '../../lib/revisionSession';
+import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 
 const NO_PAGES: number[] = [];
+
+/** The pages of a planned day that are already credited to it (revised ahead earlier). */
+function creditedPagesOf(logs: RevisionLog[], plan: RevisionDayPlan): number[] {
+  const credited = creditedOnDay(logs, plan.day);
+  return plan.pages.filter((p) => credited.has(p));
+}
 
 const AUTO_SAVE_INTERVAL_MS = 5000;
 // Under the page, with the controls: the capsule.
@@ -80,6 +91,7 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevis
 
 export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<HomeStackParamList, 'ActiveRevision'>>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
   const { theme, isDark, palette: v2Palette } = useTheme();
   const haptics = useHaptics();
@@ -96,6 +108,11 @@ export default function ActiveRevisionScreen() {
   }
   const sessionDay = sessionDayRef.current;
 
+  // Opening a session lifts the revision reminders off the lock screen.
+  useEffect(() => {
+    dismissPresentedRevisionReminders();
+  }, []);
+
   const assignment = useMemo(() => {
     if (!user || !sessionDay) return null;
     const quranData = getQuranData();
@@ -103,17 +120,62 @@ export default function ActiveRevisionScreen() {
     return generateDailyAssignment(pages, quranData, user, new Date(y, m - 1, d));
   }, [user, pages, sessionDay]);
 
-  const alreadyRevisedToday = useMemo(() => {
-    if (!assignment) return new Set<number>();
-    const assignmentSet = new Set(assignment.pages);
-    const revised = new Set<number>();
-    for (const log of logs) {
-      if (log.date !== sessionDay) continue;
-      for (const p of log.pagesRevised) {
-        if (assignmentSet.has(p)) revised.add(p);
+  // Home's "Tomorrow starts at …" (#168) opens on that day's pages alone.
+  // Planned here, at mount, when the user is already loaded: the pager then
+  // starts on the day's first page with no jump (and no flash of today's).
+  // Otherwise the effect below adds the day as soon as the user is there.
+  const openAheadDay = route.params?.aheadDay;
+  const [openedAhead] = useState<RevisionDayPlan | null>(() => {
+    if (!user || !sessionDay || !openAheadDay || openAheadDay <= sessionDay) return null;
+    const plan = revisionDayPlan(user, pages, openAheadDay, logs);
+    return plan.pages.length > 0 ? plan : null;
+  });
+  const openedCredited = openedAhead ? creditedPagesOf(logs, openedAhead) : NO_PAGES;
+
+  // Keep going (#168): the revision days after today, each with its pages, in
+  // order. The session's pages are today's, then these.
+  const [aheadDays, setAheadDays] = useState<RevisionDayPlan[]>(() => (openedAhead ? [openedAhead] : []));
+  const sections = useMemo(
+    () => [{ day: sessionDay ?? '', pages: assignment?.pages ?? [] }, ...aheadDays],
+    [sessionDay, assignment, aheadDays],
+  );
+  const sessionPages = useMemo(() => sections.flatMap((s) => s.pages), [sections]);
+  const pageDays = useMemo(() => {
+    const days = new Map<number, string>();
+    for (const s of sections) for (const p of s.pages) days.set(p, s.day);
+    // A catch-up page is credited to the day it was missed, not to today (SESS-7).
+    if (user && sessionDay) {
+      for (const p of sessionPages) {
+        const d = catchUpDayOf(user, sessionDay, p);
+        if (d) days.set(p, d);
       }
     }
-    return revised;
+    return days;
+  }, [sections, sessionPages, user, sessionDay]);
+  const lastSectionDay = sections[sections.length - 1].day;
+  const lastSectionPages = sections[sections.length - 1].pages;
+  // The pager holds one revision day: today's, or once the session has gone
+  // ahead (Home's "Tomorrow starts at", Keep going), only that later day's, as
+  // if it were that day's own session. Today's pages, done, don't sit behind it
+  // (Majd, Nov 5 2026). The session still spans every day it covered: marks,
+  // credit and saves go by page, each page's day in pageDays.
+  const shownPages = lastSectionPages.length > 0 ? lastSectionPages : NO_PAGES;
+  const keepGoingPlan = useMemo(
+    () =>
+      user && lastSectionDay
+        ? nextRevisionDayPlan(user, pages, lastSectionDay, new Set(sessionPages), logs)
+        : null,
+    [user, pages, lastSectionDay, sessionPages, logs],
+  );
+
+  // Today's pages already done: credited to today (revised today, or ahead from an earlier
+  // session), or revised in today's sessions for another day: a catch-up page is credited to the
+  // day it was missed (SESS-7), and is still done here. (Counting today's credit alone reopened
+  // the session on the catch-up pages, unchecked, while Home said to continue after them.)
+  const alreadyRevisedToday = useMemo(() => {
+    if (!assignment || !sessionDay) return new Set<number>();
+    const done = doneOnDay(logs, sessionDay);
+    return new Set(assignment.pages.filter((p) => done.has(p)));
   }, [logs, assignment, sessionDay]);
 
   const ratingsFromTodaysLogs = useMemo(() => {
@@ -127,12 +189,14 @@ export default function ActiveRevisionScreen() {
   }, [logs, smartTrackingEnabled, sessionDay]);
 
   const [completedPages, setCompletedPages] = useState<Set<number>>(
-    () => new Set(alreadyRevisedToday),
+    () => new Set([...alreadyRevisedToday, ...openedCredited]),
   );
   const [localRatings, setLocalRatings] = useState<Map<number, number>>(
     () => new Map(ratingsFromTodaysLogs),
   );
-  const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(null);
+  const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(
+    () => openedAhead?.pages[0] ?? null,
+  );
   const [sessionStartTime] = useState(Date.now());
   const [saving, setSaving] = useState(false);
 
@@ -144,7 +208,6 @@ export default function ActiveRevisionScreen() {
   // this session's pages, and the pages it turns are not marked revised
   // (scrollToPage never reports an advance).
   const pagerRef = useRef<MushafPagerHandle>(null);
-  const sessionPages = useMemo(() => assignment?.pages ?? [], [assignment]);
   // Record yourself reciting; page marks follow the page on screen.
   // After ending a recording: "Recording saved · View" (opens it in Activity).
   const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
@@ -161,6 +224,28 @@ export default function ActiveRevisionScreen() {
     onFinished: setSavedRecording,
   });
 
+  // Listen back: the end card offers the day's recording over its pages
+  // (ListenBackScreen), unless it is being recorded right now.
+  const [dayRecordingId, setDayRecordingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sessionDay) return;
+    let live = true;
+    const refresh = () => {
+      listRecordings()
+        .then((all) => {
+          if (live) setDayRecordingId(latestRevisionRecording(all, sessionDay)?.id ?? null);
+        })
+        .catch((err) => logger.warn('Could not list recordings', err));
+    };
+    refresh();
+    const off = onRecordingsChanged(refresh);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [sessionDay]);
+  const listenBackId = recorder.phase === 'idle' || recorder.phase === 'paused' ? dayRecordingId : null;
+
   // Reading or revising without touching the screen: don't let it lock.
   const isScreenFocused = useIsFocused();
   useKeepScreenOn(isScreenFocused);
@@ -170,7 +255,10 @@ export default function ActiveRevisionScreen() {
   // a verse shows again when tapped, with Next verse, or when the reciter
   // pauses after it (usePauseListener). Each hide starts covered again; what
   // was shown on a page stays shown while it lasts.
-  const reciteAvailable = reciteModeEnabled(user);
+  // Hidden recite mode needs the lines and words of the print shown (lib/mushafEdition):
+  // the 1405 pages only, for now.
+  const edition = useMushafEdition();
+  const reciteAvailable = reciteModeEnabled(user) && mushafEdition(edition).reciteData;
   const [hidden, setHidden] = useState(false);
   const [reveal, setReveal] = useState<RevealState>(NOTHING_REVEALED);
   const [listenOn, setListenOn] = useState(true);
@@ -201,7 +289,7 @@ export default function ActiveRevisionScreen() {
   // Each hide is a new round: what was followed before is covered again.
   const [hideRound, setHideRound] = useState(0);
   const markRevisedRef = useRef<(page: number) => void>(() => undefined);
-  const followPages = assignment?.pages ?? NO_PAGES;
+  const followPages = shownPages;
   const follow = useReciteFollow({
     active: wordMode && listenOn && isScreenFocused && !recorder.recording,
     round: hideRound,
@@ -260,7 +348,7 @@ export default function ActiveRevisionScreen() {
   );
 
   const verseActions = useVerseActions({
-    pages: sessionPages,
+    pages: shownPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
     focused: isScreenFocused,
@@ -278,10 +366,11 @@ export default function ActiveRevisionScreen() {
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (beside the page, never over it); another
   // tap, or turning the page, puts them away.
-  // Every page revised: the controls stay up, with Submit.
-  const submitVisible =
-    !!assignment && completedPages.size === assignment.pages.length && assignment.pages.length > 0;
-  const chrome = useReaderChrome({ locked: submitVisible });
+  // Every page revised: the session is complete, and the controls stay up
+  // (Back is the way out; there is no Submit or End session).
+  const allDone =
+    !!assignment && assignment.pages.length > 0 && assignment.pages.every((p) => completedPages.has(p));
+  const chrome = useReaderChrome({ locked: allDone });
   const tapHint = useTapHint();
   const dismissHint = tapHint.dismiss;
   const toggleChrome = chrome.toggle;
@@ -301,7 +390,7 @@ export default function ActiveRevisionScreen() {
     message: string;
   } | null>(null);
 
-  const silentlySavedRef = useRef<Set<number>>(new Set(alreadyRevisedToday));
+  const silentlySavedRef = useRef<Set<number>>(new Set([...alreadyRevisedToday, ...openedCredited]));
   const lastSaveTimeRef = useRef<number>(sessionStartTime);
   // The save currently running, so an exit can wait for it and then save
   // again instead of silently skipping (which used to drop late changes).
@@ -317,10 +406,29 @@ export default function ActiveRevisionScreen() {
     };
   }, []);
 
+  /**
+   * Every page the day's session holds as revised: the checks on screen, and what today's sessions
+   * have saved (pages credited to other days included), less any page unchecked here. A save's
+   * merge keeps credit only for these pages (SESS-7). Naming the pages just checked dropped the
+   * catch-up and ahead credit saved before them, by the autosave a few seconds earlier or by an
+   * earlier session of the day (Nov 2026).
+   */
+  const heldAsRevised = useCallback(
+    (day: string, unchecked: readonly number[] = []): number[] => {
+      const saved = logsRef.current
+        .filter((l) => l.date === day)
+        .flatMap((l) => [...l.pagesRevised, ...Object.values(l.ahead ?? {}).flat()]);
+      return [...new Set([...completedPages, ...saved.filter((p) => !unchecked.includes(p))])];
+    },
+    [completedPages],
+  );
+
   const commitPendingPages = useCallback(async (): Promise<void> => {
     if (!user || !assignment || !sessionDay) return;
     const revisionDay = sessionDay;
-    const assignedPages = assignment.pages;
+    // The pages that finish the day (SESS-7): its own; or, when Keep daily amount filled it with
+    // catch-up pages, those (still credited to the days they were missed).
+    const assignedPages = duePagesOf(assignment.pages, user, revisionDay);
     while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
       (p) => !silentlySavedRef.current.has(p),
@@ -360,13 +468,19 @@ export default function ActiveRevisionScreen() {
       const weaknessUpdates = Array.from(localRatings.entries())
         .filter(([page]) => pending.includes(page))
         .map(([page, rating]) => ({ page, rating }));
+      const credit = sessionCredit(pending, pageDays, revisionDay);
       await addLog({
         date: revisionDay,
         assignedPages,
-        pagesRevised: pending,
+        pagesRevised: credit.pagesRevised,
         pagesSkipped: [],
         weaknessUpdates,
         durationMinutes,
+        ahead: credit.ahead,
+        // Every page held as revised, catch-up pages too: their credit stays while they are checked (SESS-7).
+        checked: heldAsRevised(revisionDay, unrevised),
+        // The day's due pages now: pages a carry moved to tomorrow leave the session's assignment.
+        assignedExact: true,
       });
       pending.forEach((p) => silentlySavedRef.current.add(p));
       lastSaveTimeRef.current = Date.now();
@@ -375,13 +489,17 @@ export default function ActiveRevisionScreen() {
     // Take unchecked pages back out of today's session. updateLog also
     // re-derives each page's last-revised date and count from the logs.
     async function removeUnrevised() {
+      // A catch-up page is saved under the day's ahead credit, not its pagesRevised (SESS-7).
       const todaysLog = logsRef.current.find(
-        (l) => l.date === revisionDay && l.pagesRevised.some((p) => unrevised.includes(p)),
+        (l) =>
+          l.date === revisionDay &&
+          (l.pagesRevised.some((p) => unrevised.includes(p)) ||
+            Object.values(l.ahead ?? {}).some((pages) => pages.some((p) => unrevised.includes(p)))),
       );
       if (todaysLog) await updateLog(removeRevisedPages(todaysLog, unrevised));
       unrevised.forEach((p) => silentlySavedRef.current.delete(p));
     }
-  }, [user, assignment, sessionDay, completedPages, pages, localRatings, updatePages, addLog, updateLog]);
+  }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog, heldAsRevised]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -398,6 +516,13 @@ export default function ActiveRevisionScreen() {
     });
     return () => sub.remove();
   }, [commitPendingPages]);
+
+  // Every way out saves. The Back arrow does, but the iOS edge swipe and
+  // Android's back button close the screen without it, and the timer above
+  // stops with the screen: a page marked in its last seconds was lost.
+  const commitRef = useRef(commitPendingPages);
+  commitRef.current = commitPendingPages;
+  useEffect(() => () => void commitRef.current(), []);
 
   // ===== Timer =====
   // The app has one timer (in the controls under the page, and Home's top bar
@@ -416,18 +541,19 @@ export default function ActiveRevisionScreen() {
   // Every hook runs before the loading / error return below: "Try again"
   // after a failed load would otherwise render more hooks than before.
   const quranData = getQuranData();
-  const assignedPages = assignment?.pages ?? NO_PAGES;
+  // Every page of the session: today's, then any revised ahead.
+  const assignedPages = sessionPages.length > 0 ? sessionPages : NO_PAGES;
 
   const scopeLabel = useMemo(() => {
-    // Prefer juz scope when the assignment fits one juz; otherwise show count.
+    // Prefer juz scope when the day's pages fit one juz; otherwise show count.
     const juzes = new Set(
-      assignedPages
+      shownPages
         .map((p) => quranData.find((q) => q.pageNumber === p)?.juzNumber)
         .filter((j): j is number => typeof j === 'number'),
     );
     if (juzes.size === 1) return `Juz ${[...juzes][0]}`;
-    return `${assignedPages.length} pages`;
-  }, [assignedPages, quranData]);
+    return `${shownPages.length} pages`;
+  }, [shownPages, quranData]);
 
   // ===== Mark / unmark =====
 
@@ -471,6 +597,15 @@ export default function ActiveRevisionScreen() {
     },
     [assignedPages, completedPages, markRevised],
   );
+  // The pager's swipe: credited only for the page on screen, as the screen
+  // knows it (a page the screen doesn't show is never marked).
+  const handleSwipeAdvance = useCallback(
+    (leftPage: number, newPage: number) => {
+      if (currentPageNumber != null && leftPage !== currentPageNumber) return;
+      handleAdvance(leftPage, newPage);
+    },
+    [currentPageNumber, handleAdvance],
+  );
 
   // ===== The end card, after the last page =====
   // Swiping off the last page onto it marks that page done, as for any page.
@@ -483,7 +618,9 @@ export default function ActiveRevisionScreen() {
       // The header names the page just left, not where the session would resume.
       setCurrentPageNumber(lastPage);
       if (!bySwipe || !assignedPages.includes(lastPage) || completedPages.has(lastPage)) return;
-      const finishes = assignedPages.every((p) => p === lastPage || completedPages.has(p));
+      // The day the page belongs to: finishing it is what the card celebrates.
+      const dayPages = sections.find((s) => s.pages.includes(lastPage))?.pages ?? [];
+      const finishes = dayPages.every((p) => p === lastPage || completedPages.has(p));
       if (!finishes) {
         handleAdvance(lastPage, lastPage);
         return;
@@ -493,11 +630,67 @@ export default function ActiveRevisionScreen() {
       haptics.success();
       setCelebrate((c) => c + 1);
       AccessibilityInfo.announceForAccessibility(
-        `Revision complete. ${assignedPages.length} ${assignedPages.length === 1 ? 'page' : 'pages'} revised.`,
+        `Revision complete. ${dayPages.length} ${dayPages.length === 1 ? 'page' : 'pages'} revised.`,
       );
     },
-    [assignedPages, completedPages, handleAdvance, haptics],
+    [assignedPages, completedPages, handleAdvance, haptics, sections],
   );
+  // ===== The session completes =====
+  // When the last page is marked (a swipe onto the end card, the check, Jump or
+  // mark in bulk, or recited through), the session is complete: saved at once,
+  // and its recording finished ("Recording saved · View"), as Submit did. A
+  // Record after that carries on the day's recording; Back before the end
+  // leaves it paused for when the session is reopened. Only a mark completes
+  // it: a day already done when the screen opens finishes nothing.
+  const recorderRef = useRef(recorder);
+  recorderRef.current = recorder;
+  const prevMarksRef = useRef(completedPages);
+  useEffect(() => {
+    const prev = prevMarksRef.current;
+    prevMarksRef.current = completedPages;
+    // Today's pages: a session revised on past them (Keep going) completes once.
+    const todays = assignment?.pages ?? [];
+    if (prev === completedPages || todays.length === 0) return;
+    const doneWith = (marks: Set<number>) => todays.every((p) => marks.has(p));
+    if (doneWith(prev) || !doneWith(completedPages)) return;
+    void commitRef.current();
+    // Only a recording in progress (idle, finish would wait for the next one).
+    if (recorderRef.current.phase !== 'idle') void recorderRef.current.finish();
+  }, [completedPages, assignment]);
+
+
+  // ===== Keep going (#168) =====
+  // Adds the next revision day after the last section. The pager then holds
+  // that day alone (it is keyed by day), opening on its first page.
+  const addSection = useCallback(
+    (plan: RevisionDayPlan) => {
+      if (plan.pages.length === 0) return;
+      const credited = creditedOnDay(logs, plan.day);
+      const already = plan.pages.filter((p) => credited.has(p));
+      // The header names the page the pager opens on, the day's first.
+      setCurrentPageNumber(plan.pages[0]);
+      // Pages already credited to that day are done, as on the day itself.
+      setCompletedPages((prev) => new Set([...prev, ...already]));
+      already.forEach((p) => silentlySavedRef.current.add(p));
+      setAheadDays((prev) => [...prev, plan]);
+    },
+    [logs],
+  );
+  const keepGoing = useCallback(() => {
+    if (!keepGoingPlan) return;
+    addSection(keepGoingPlan);
+    haptics.selection();
+  }, [keepGoingPlan, addSection, haptics]);
+
+  // Home's "Tomorrow starts at …" (#168) when the user wasn't loaded at mount:
+  // the day is added once they are (planned at mount otherwise, above).
+  const openedAheadRef = useRef(openedAhead != null);
+  useEffect(() => {
+    if (openedAheadRef.current || !user || !sessionDay || !openAheadDay) return;
+    if (openAheadDay <= sessionDay) return;
+    openedAheadRef.current = true;
+    addSection(revisionDayPlan(user, pages, openAheadDay, logs));
+  }, [openAheadDay, user, pages, logs, sessionDay, addSection]);
   // Saved as soon as the last page is in (the render after the swipe).
   useEffect(() => {
     if (celebrate > 0) commitPendingPages();
@@ -521,7 +714,8 @@ export default function ActiveRevisionScreen() {
       const pagesRevised = Array.from(completedPages).filter(
         (p) => !silentlySavedRef.current.has(p),
       );
-      const pagesSkipped = assignedPages.filter(
+      // Only today's pages can be skipped; ahead pages not done are simply not revised.
+      const pagesSkipped = (assignment?.pages ?? []).filter(
         (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
       );
       const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
@@ -553,13 +747,17 @@ export default function ActiveRevisionScreen() {
         const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
           ([page, rating]) => ({ page, rating }),
         );
+        const revisionDay = sessionDay ?? getCurrentRevisionDay(user!);
         await addLog({
-          date: sessionDay ?? getCurrentRevisionDay(user!),
-          assignedPages: assignedPages,
-          pagesRevised,
+          date: revisionDay,
+          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay),
+          pagesRevised: sessionCredit(pagesRevised, pageDays, revisionDay).pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,
           durationMinutes: durationDelta,
+          ahead: sessionCredit(pagesRevised, pageDays, revisionDay).ahead,
+          checked: heldAsRevised(revisionDay),
+          assignedExact: true,
         });
         pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
         lastSaveTimeRef.current = Date.now();
@@ -574,6 +772,9 @@ export default function ActiveRevisionScreen() {
     commitPendingPages,
     completedPages,
     assignedPages,
+    assignment,
+    pageDays,
+    sessionDay,
     pages,
     updatePages,
     localRatings,
@@ -582,12 +783,10 @@ export default function ActiveRevisionScreen() {
     navigation,
     finishRecording,
     haptics,
+    heldAsRevised,
   ]);
 
-  const viewerPages = useMemo(
-    () => assignedPages,
-    [assignedPages],
-  );
+  const viewerPages = shownPages;
 
   // Force re-render of the pager's extraData when revision state of any page
   // changes (so any overlay can update). We don't actually render an overlay
@@ -620,13 +819,23 @@ export default function ActiveRevisionScreen() {
     );
   }
 
-  const totalPages = assignment.pages.length;
-  const completedCount = completedPages.size;
+  const todaysPages = assignment.pages;
 
+  // A later day (Home's "Tomorrow starts at …", Keep going): its first page,
+  // the first not yet done (its plan leaves out the ones done). Today: the
+  // first of today's not yet revised.
   const resumePage =
-    assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ??
-    assignment.pages[0];
+    lastSectionDay !== sessionDay
+      ? lastSectionPages[0]
+      : (assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ?? assignment.pages[0]);
   const displayPageNumber = currentPageNumber || resumePage;
+  // The day of the page on screen: its own pages and count (the header says
+  // "Revising ahead" for a day revised ahead).
+  const viewDay = pageDays.get(displayPageNumber) ?? sessionDay ?? '';
+  const viewPages = sections.find((s) => s.day === viewDay)?.pages ?? todaysPages;
+  const viewDone = viewPages.filter((p) => completedPages.has(p)).length;
+  const totalPages = viewPages.length;
+  const aheadView = viewDay !== sessionDay;
   const currentJuz = quranData.find((q) => q.pageNumber === displayPageNumber)?.juzNumber || 1;
   const currentHizb = getHizbForPage(displayPageNumber);
   const firstSurahOnPage = getSurahsForPage(displayPageNumber)[0];
@@ -644,23 +853,9 @@ export default function ActiveRevisionScreen() {
     setUndoState(null);
   };
 
-  // ===== End session =====
-
-  const handleEndSession = () => {
-    if (completedCount === 0) {
-      Alert.alert(
-        'No pages revised',
-        "You haven't marked any pages. End the session anyway?",
-        [
-          { text: 'Continue', style: 'cancel' },
-          { text: 'End session', style: 'destructive', onPress: submitSession },
-        ],
-      );
-    } else {
-      submitSession();
-    }
-  };
-
+  // ===== Back =====
+  // Saves and leaves; reopening the session resumes at the first page not yet
+  // revised. Leaving any other way saves too (above).
   const handleSaveAndBack = async () => {
     if (saving) return;
     setSaving(true);
@@ -675,10 +870,12 @@ export default function ActiveRevisionScreen() {
 
   // ===== Bulk-action handlers (used inside BulkActionsModal) =====
 
-  const handleMarkAllComplete = () => setCompletedPages(new Set(assignment.pages));
-  const handleMarkAllIncomplete = () => setCompletedPages(new Set());
+  // In bulk: the day on screen (today's, or the later day the session is on).
+  const handleMarkAllComplete = () => setCompletedPages((prev) => new Set([...prev, ...viewerPages]));
+  const handleMarkAllIncomplete = () =>
+    setCompletedPages((prev) => new Set([...prev].filter((p) => !viewerPages.includes(p))));
   const handleMarkJuzComplete = (juzNumber: number) => {
-    const juzPages = assignment.pages.filter((pageNum) => {
+    const juzPages = viewerPages.filter((pageNum) => {
       const quranPage = quranData.find((q) => q.pageNumber === pageNum);
       return quranPage?.juzNumber === juzNumber;
     });
@@ -713,25 +910,14 @@ export default function ActiveRevisionScreen() {
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
-    {
-      key: 'save',
-      label: saving ? 'Saving…' : 'Save and exit',
-      icon: 'save-outline',
-      onPress: handleSaveAndBack,
-    },
-    {
-      key: 'end',
-      label: 'End session',
-      icon: 'flag-outline',
-      destructive: true,
-      onPress: handleEndSession,
-    },
   ];
 
   const palette = getReadPalette(isDark);
-  const crowded = recorder.phase !== 'idle' || timer != null || submitVisible;
-  const compact = width < 430 && crowded;
-  const recordButton = <RecordButton recorder={recordButtonRecorder} />;
+  const crowded = recorder.phase !== 'idle' || timer != null;
+  // Recording: the recorder is the whole capsule, the timer beside it (compact).
+  const recordingLive = recorderTakesCapsule(recorder);
+  const compact = (width < 430 && crowded) || (recordingLive && timer != null);
+  const recordButton = <RecordButton recorder={recordButtonRecorder} crowded={timer != null} />;
   const timerChip = (
     <TimerChip
       compact={compact}
@@ -740,17 +926,9 @@ export default function ActiveRevisionScreen() {
       }}
     />
   );
-  const submitButton = submitVisible ? (
-    <PressableScale
-      onPress={handleEndSession}
-      style={[styles.submit, { backgroundColor: theme.accent }]}
-      accessibilityRole="button"
-      accessibilityLabel="Submit session"
-    >
-      <Text style={styles.submitText}>Submit</Text>
-    </PressableScale>
-  ) : undefined;
 
+  // Pages put in front by "Revise these first tomorrow" (Insights), labelled as such.
+  const fromInsights = !!sessionDay && carryOverOn(user, sessionDay)?.source === 'insights';
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame
@@ -761,9 +939,24 @@ export default function ActiveRevisionScreen() {
         isDark={isDark}
         quietHeader={
           <View style={styles.quietHeader}>
-            <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-              {hidden ? 'Hidden' : `Juz ${currentJuz}`} · {completedCount}/{totalPages}
+            <Text
+              style={[styles.quietText, { color: palette.textSecondary }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
+              testID="session-quiet-count"
+            >
+              {hidden ? 'Hidden' : `Juz ${currentJuz}`} · {viewDone}/{totalPages}
             </Text>
+            {fromInsights ? (
+              <Text
+                style={[styles.quietText, { color: palette.textSecondary }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                testID="session-from-insights"
+              >
+                From Insights: the weak pages first
+              </Text>
+            ) : null}
             {hidden ? (
               <Text
                 style={[styles.quietText, { color: palette.textSecondary }]}
@@ -795,13 +988,23 @@ export default function ActiveRevisionScreen() {
           <View style={styles.header}>
             <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
-              <Text style={[styles.title, typeV2.name, { color: palette.textPrimary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                Revising {scopeLabel}{' '}
+              <Text
+                style={[styles.title, typeV2.name, { color: palette.textPrimary }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                testID="session-title"
+              >
+                {aheadView ? `Revising ahead · ${weekdayLabel(viewDay)}` : `Revising ${scopeLabel}`}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
-                  · {completedCount}/{totalPages}
+                  · {viewDone}/{totalPages}
                 </Text>
               </Text>
-              <Text style={[styles.subtitle, typeV2.meta, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text
+                style={[styles.subtitle, typeV2.meta, { color: palette.textSecondary }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                testID="session-page"
+              >
                 Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
               </Text>
             </View>
@@ -857,19 +1060,18 @@ export default function ActiveRevisionScreen() {
                 nextDisabled={nextHiddenVerse(reveal, displayPageNumber) == null}
                 compact={compact}
                 surface={{ background: palette.control, border: palette.divider }}
-                record={recordButton}
+                record={<RecordButton recorder={recordButtonRecorder} layout="inline" />}
                 timer={timerChip}
-                trailing={submitButton}
               />
             ) : (
               <PlayerCapsule
+                recording={recordingLive}
                 player={verseActions.player}
                 page={displayPageNumber}
                 compact={compact}
                 surface={{ background: palette.control, border: palette.divider }}
                 record={recordButton}
                 timer={timerChip}
-                trailing={submitButton}
               />
             )}
           </View>
@@ -895,11 +1097,13 @@ export default function ActiveRevisionScreen() {
         }
       >
         <MushafPager
+          // One pager per revision day: a later day opens fresh on its first page.
+          key={lastSectionDay}
           ref={pagerRef}
           pages={viewerPages}
           initialPage={resumePage}
           onPageChange={handlePageChange}
-          onAdvance={handleAdvance}
+          onAdvance={handleSwipeAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
           highlightedAyah={verseActions.highlightedAyah}
           onTap={onTapPage}
@@ -909,10 +1113,19 @@ export default function ActiveRevisionScreen() {
           onTapVerse={hidden ? onTapVerse : undefined}
           endCard={
             <SessionEndCard
-              total={totalPages}
-              done={completedCount}
+              total={lastSectionPages.length}
+              done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}
-              onEnd={handleEndSession}
+              dayLabel={lastSectionDay === sessionDay ? 'today' : `for ${weekdayLabel(lastSectionDay)}`}
+              next={
+                keepGoingPlan
+                  ? { label: weekdayLabel(keepGoingPlan.day), pages: keepGoingPlan.pages.length }
+                  : null
+              }
+              onKeepGoing={keepGoing}
+              onListenBack={
+                listenBackId ? () => navigation.navigate('ListenBack', { recordingId: listenBackId }) : undefined
+              }
             />
           }
           onReachEnd={handleReachEnd}
@@ -1063,12 +1276,4 @@ const makeStyles = (theme: ThemeColors) =>
       fontWeight: '500',
       fontVariant: ['tabular-nums'],
     },
-    submit: {
-      height: 36,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    submitText: { color: theme.onAccent, fontWeight: '700', fontSize: 14 },
   });

@@ -48,6 +48,17 @@ describe('releaseInfo', () => {
     expect(sentryReports({ isDev: false, isDevice: true, channel: 'development' })).toBe(false);
   });
 
+  it('never reports from the Test Lab build (its crashes would count against production)', () => {
+    const saved = process.env.EXPO_PUBLIC_TESTLAB;
+    try {
+      process.env.EXPO_PUBLIC_TESTLAB = '1';
+      expect(sentryReports({ isDev: false, isDevice: true, channel: 'production' })).toBe(false);
+    } finally {
+      if (saved === undefined) delete process.env.EXPO_PUBLIC_TESTLAB;
+      else process.env.EXPO_PUBLIC_TESTLAB = saved;
+    }
+  });
+
   it('only accepts 8 hex characters for the short form', () => {
     expect(shortUpdate('84b0091f-17b0')).toBe('84b0091f');
     expect(shortUpdate('xyz')).toBeNull();

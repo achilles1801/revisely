@@ -1,0 +1,15 @@
+# The one-time notice before the first recording backup ("Your recordings are
+# backed up"): it comes about 2 s after a recording is saved, once the app knows
+# it is on Wi-Fi. Waits for it a little and accepts it (OK) if it shows. The
+# upload itself can't leave an E2E build (src/lib/e2e/network.ts).
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible: "Your recordings are backed up"
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      visible: "Your recordings are backed up"
+    commands:
+      - tapOn: "OK"

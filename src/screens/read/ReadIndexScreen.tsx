@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 // Gesture Handler's list, so a sideways swipe on it can move to the next tab
 // (navigation/PagerTabs): over React Native's own, the swipe never started.
 import { FlatList } from 'react-native-gesture-handler';
@@ -23,6 +23,7 @@ import {
   ReadingHistoryEntry,
 } from '../../lib/readingHistory';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
 
@@ -70,7 +71,8 @@ function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
 export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark, palette: v2Palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
 
   const [recent, setRecent] = useState<ReadingHistoryEntry[]>([]);
   // Tapping the Read tab while on it scrolls the index back to the top.
@@ -143,7 +145,7 @@ export default function ReadIndexScreen() {
     </View>
   );
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: v2Palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: v2Palette.bg }]}>
       <FlatList
         ref={listRef}
         data={juzGroups}
@@ -153,7 +155,7 @@ export default function ReadIndexScreen() {
         indicatorStyle={isDark ? 'white' : 'black'}
         keyExtractor={(item) => `juz-group-${item.juz}`}
         ListHeaderComponent={headerV2}
-        contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
         renderItem={({ item }) => (
           <View testID={`read-juz-${item.juz}`}>
             <SectionTitleV2 title={`Juz' ${item.juz}`} />
@@ -164,7 +166,7 @@ export default function ReadIndexScreen() {
         )}
         testID="read-index-v2"
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

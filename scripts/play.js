@@ -3,6 +3,7 @@
 // production rollout. The Android twin of scripts/asc.js. No dependencies (Node 20+).
 //
 //   node scripts/play.js status                                  every track's releases; changes nothing
+//   node scripts/play.js latest internal [--json]                the newest build a track gives all its testers
 //   node scripts/play.js promote <versionCode> --to alpha        put a build on a track (alpha = Closed testing)
 //   node scripts/play.js promote <versionCode> --to production --rollout 0.2 --yes
 //   node scripts/play.js rollout 0.5|1 --yes                     widen production's staged rollout (1 = everyone)
@@ -123,6 +124,30 @@ function planRollout(tracks, { fraction, halt }) {
   return [...live, { ...staged, status: 'inProgress', userFraction: f }];
 }
 
+/** A version name in a release's name ("1.0.3", "5 (1.0.3)"), or null. */
+function versionOf(name) {
+  const m = /(?:^|[^\d.])(\d{1,4}(?:\.\d{1,4}){1,3})(?![\d.])/.exec(String(name || ''));
+  return m ? m[1] : null;
+}
+
+/**
+ * The newest build a track gives everyone on it: the highest version code in a completed
+ * release (not a staged or halted one), with the version from the release's name, or null.
+ */
+function latestOnTrack(tracks, track) {
+  if (!TRACKS.includes(track)) throw new Error(`Unknown track "${track}" (one of ${TRACKS.join(', ')}).`);
+  let best = null;
+  for (const r of tracks.find((t) => t.track === track)?.releases || []) {
+    if (r.status !== 'completed') continue;
+    for (const c of r.versionCodes || []) {
+      const code = Number(c);
+      if (Number.isInteger(code) && code > 0 && (!best || code > best.code)) best = { track, version: versionOf(r.name), code };
+    }
+  }
+  if (best && !best.version) throw new Error(`The release holding version code ${best.code} has no version in its name.`);
+  return best;
+}
+
 /** Plain-text summary of every track. */
 function describeTracks(tracks) {
   const lines = [];
@@ -215,6 +240,22 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
 
+  if (command === 'latest') {
+    const track = args._[0];
+    if (!track) throw new Error('Name the track: node scripts/play.js latest internal');
+    await withEdit(api, async (edit) => {
+      const latest = latestOnTrack(await tracksOf(api, edit), track);
+      if (args.json) {
+        if (!latest) throw new Error(`${TRACK_NAMES[track]} has no completed release.`);
+        console.log(JSON.stringify(latest));
+      } else {
+        console.log(latest ? `${TRACK_NAMES[track]}: ${latest.version} (version code ${latest.code})` : `${TRACK_NAMES[track]}: nothing`);
+      }
+      return false;
+    });
+    return;
+  }
+
   if (command === 'promote') {
     const versionCode = parseVersionCode(args._[0]);
     const to = args.to;
@@ -246,6 +287,12 @@ async function main(argv = process.argv.slice(2)) {
       await api('PUT', `/edits/${edit}/tracks/production`, { track: 'production', releases });
       return true;
     });
+    if (!dryRun && command === 'rollout' && parseFraction(args._[0]) === 1) {
+      console.log(
+        'Everyone on production can get it now. Tell phones: cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json ' +
+          'node scripts/set-app-config.js --latest-android <version> --latest-android-code <code>',
+      );
+    }
     return;
   }
 
@@ -259,4 +306,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, parseFraction, parseVersionCode, findRelease, planPromote, planRollout, describeTracks };
+module.exports = { parseArgs, parseFraction, parseVersionCode, findRelease, planPromote, planRollout, describeTracks, latestOnTrack, versionOf };

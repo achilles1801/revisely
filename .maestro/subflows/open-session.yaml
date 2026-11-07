@@ -1,0 +1,38 @@
+# Opens today's session from Home (today-cta) and waits for its quiet header,
+# QUIET (e.g. "Juz 1 · 0/10"; ".*" for any).
+#
+# On a slow CI simulator a tap can be lost: the button shows pressed and its
+# press never fires, so Home stays (06-offline, E2E run 41990309194; the same
+# tap opened the session in 2 s on the retry). While Home's button is still on
+# screen and the session isn't, it is tapped again, up to 3 times. A tap that
+# did take leaves Home behind the session, so it is never tapped twice.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: today-cta
+- repeat:
+    while:
+      notVisible:
+        id: session-quiet-count
+        text: ${QUIET}
+    times: 3
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: session-quiet-count
+            text: ${QUIET}
+          timeout: 8000
+          optional: true
+      - runFlow:
+          when:
+            visible:
+              id: today-cta
+          commands:
+            - evalScript: "${console.log('WARNING open-session - the session did not open 8 s after the tap; tapping today-cta again')}"
+            - tapOn:
+                id: today-cta
+- extendedWaitUntil:
+    visible:
+      id: session-quiet-count
+      text: ${QUIET}
+    timeout: 8000

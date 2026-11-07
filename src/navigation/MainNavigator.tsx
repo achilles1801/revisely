@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
@@ -13,6 +13,8 @@ import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScre
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
+import { RevoHost } from '../components/revo/RevoHost';
+import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
@@ -26,9 +28,11 @@ import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
 import { getRecitation } from '../lib/recitation';
 import { openReaderAt } from './openReader';
 import { createPagerTabNavigator } from './PagerTabs';
-import { swipeableTabCount } from './tabPages';
+import { insightsTab, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
+import type { JournalKind } from '../types';
+import type { RevoSettingsSection } from '../lib/revo/types';
 
 export type MainTabParamList = {
   // Non-screen code (the timer) opens a day of Activity on the Home stack.
@@ -40,8 +44,10 @@ export type MainTabParamList = {
 
 export type HomeStackParamList = {
   Dashboard: undefined;
-  ActiveRevision: undefined;
-  Settings: undefined;
+  // aheadDay: open with that later revision day's pages after today's (Home's "starts at" line).
+  ActiveRevision: { aheadDay?: string } | undefined;
+  // section: scroll to that section (Revo's openScreen, REVO-31).
+  Settings: { section?: RevoSettingsSection } | undefined;
   // edit: open with the pages ready to edit (Home's Memorized line).
   Memorization: { edit?: boolean } | undefined;
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
@@ -54,11 +60,14 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. */
   ActivityDay: { date: string; focusRecordingId?: string };
+  // A recording played over the pages it was recorded on, from fromMs (ms
+  // into it; default the start).
+  ListenBack: { recordingId: string; fromMs?: number };
   // Everything done, searchable (new design's "See all"); kind preselects a filter.
   ActivityAll: { kind?: ActivityKind } | undefined;
   // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
   // revision day).
-  JournalEntry: { date?: string } | undefined;
+  JournalEntry: { date?: string; kind?: JournalKind } | undefined;
   // Settings → Prayer (testers).
   PrayerCalculation: undefined;
   PrayerNotifications: undefined;
@@ -84,6 +93,7 @@ const HIDE_TAB_BAR_ON = new Set([
   'Memorization',
   'QuranReader',
   'JournalEntry',
+  'ListenBack',
 ]);
 
 function HomeStackNavigator() {
@@ -105,6 +115,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
+      <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
     </HomeStack.Navigator>
@@ -145,10 +156,10 @@ export function MainNavigator() {
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const hasSeenPreview = user?.hasSeenSmartTrackingPreview ?? false;
 
-  const showInsightsTab = smartTrackingEnabled || !hasSeenPreview;
-  const glowInsightsTab = !smartTrackingEnabled && !hasSeenPreview;
+  const { shown: showInsightsTab, opensPreview: glowInsightsTab } = insightsTab(smartTrackingEnabled, hasSeenPreview);
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  const openPreview = useCallback(() => setPreviewOpen(true), []);
   useAppUsageTracking();
   // Signing out leaves the app's screens: the recitation stops with them.
   useEffect(() => () => getRecitation().stop(), []);
@@ -171,12 +182,15 @@ export function MainNavigator() {
                 <TabBar
                   {...props}
                   showInsightsTab={showInsightsTab}
-                  onInsightsTabPress={glowInsightsTab ? () => setPreviewOpen(true) : undefined}
+                  onInsightsTabPress={glowInsightsTab ? openPreview : undefined}
                 />
               </>
             );
           }}
           swipeableCount={swipeableTabCount(smartTrackingEnabled)}
+          // Before Smart Tracking is set up, Insights is in the bar but not a
+          // page: a swipe past Read opens its preview, as a tap on it does.
+          onSwipePastEnd={glowInsightsTab ? openPreview : undefined}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />
@@ -187,6 +201,8 @@ export function MainNavigator() {
         visible={previewOpen}
         onClose={() => setPreviewOpen(false)}
       />
+      {/* Revo (previewTester accounts): its button over the main screens, and its sheet. */}
+      <RevoHost />
     </ReadingTimerProvider>
   );
 }

@@ -1,0 +1,41 @@
+# Swipes the session on, page by page, until UNTIL: the day's count ("3/10"), as
+# the quiet header ("Juz 30 · 3/10") or the title ("Revising ahead · Wed · 3/10")
+# shows it, whichever is up; or "end" for the end card. Every page swiped off
+# here is one not yet revised, so each swipe adds one to the count.
+#
+# One swipe, then wait for the app to count it (swipe-page.yaml), then look
+# again. This used to swipe, wait for the screen to stand still and look at
+# once; but E2E builds draw no page images, so the screen stood still before
+# the app had caught up, and on a slow emulator the count read after the third
+# swipe was still 2/10. A fourth swipe followed, the next look said 4/10, and
+# the flow swiped on to the end card (02 on Android, runs 42149084931 and
+# 42169490060, Nov 6 2026). A swipe that is lost (the page doesn't turn) is
+# made again in swipe-page.yaml, once its count has had time to move.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      true: ${UNTIL == 'end'}
+    commands:
+      - repeat:
+          while:
+            notVisible:
+              id: session-end-card
+          times: 12
+          commands:
+            - runFlow: swipe-page.yaml
+      - assertVisible:
+          id: session-end-card
+- runFlow:
+    when:
+      true: ${UNTIL != 'end'}
+    commands:
+      - repeat:
+          while:
+            notVisible:
+              text: ".*· ${UNTIL}"
+          times: 12
+          commands:
+            - runFlow: swipe-page.yaml
+      - assertVisible:
+          text: ".*· ${UNTIL}"

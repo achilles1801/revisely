@@ -8,8 +8,10 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { RecordingBackupController } from './src/components/RecordingBackupController';
+import { MushafOfflineController } from './src/components/MushafOfflineController';
 import { WidgetSync } from './src/components/WidgetSync';
 import { PrayerSync } from './src/components/prayer/PrayerSync';
+import { RevisionRemindersSync } from './src/components/RevisionRemindersSync';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
 import { AndroidSystemTheme } from './src/components/AndroidSystemTheme';
@@ -17,6 +19,9 @@ import { registerForPushNotificationsAsync } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
 import { currentRelease, releaseTags } from './src/lib/releaseInfo';
+import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
+import { startStoreChecks } from './src/lib/updates/storeUpdates';
+import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
 
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
 // (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
@@ -76,6 +81,12 @@ Sentry.init({
 });
 Sentry.setTags(releaseTags(release));
 
+// Updates reach people sooner: the splash waits briefly for one at launch, and
+// one that has waited is applied at a safe moment (src/lib/updates/ota.ts).
+// New store versions are offered, or required below the minimum (storeUpdates.ts).
+startOtaUpdates();
+startStoreChecks();
+
 function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
   // render — text falls back to the system Arabic face rather than blocking
@@ -89,7 +100,13 @@ function App() {
     registerForPushNotificationsAsync();
   }, []);
 
-  if (!fontsLoaded && !fontError) return null;
+  // Something to show: the splash can go once the launch check is done.
+  const fontsSettled = fontsLoaded || !!fontError;
+  useEffect(() => {
+    if (fontsSettled) markUiReady();
+  }, [fontsSettled]);
+
+  if (!fontsSettled) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -106,8 +123,12 @@ function App() {
                   <DesignGate />
                   <AndroidSystemTheme />
                   <RecordingBackupController />
+                  <MushafOfflineController />
                   <WidgetSync />
                   <PrayerSync />
+                  <RevisionRemindersSync />
+                  {/* Last: over everything when this version is no longer supported. */}
+                  <UpdateRequiredGate />
                 </BottomSheetModalProvider>
               </AppProvider>
             </AuthProvider>

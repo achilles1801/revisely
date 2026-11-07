@@ -59,6 +59,14 @@ describe('users/{userId}/readingSessions/{id}', () => {
     await assertSucceeds(deleteDoc(ref));
   });
 
+  it('the outbox sending a session twice (fixed createdAt, id made on the phone): the second write is allowed', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    const ref = doc(alice, `users/${ALICE}/readingSessions/AbCdEfGhIjKlMnOpQrSt`);
+    const created = Timestamp.fromMillis(1_790_000_000_000);
+    await assertSucceeds(setDoc(ref, validSession({ createdAt: created })));
+    await assertSucceeds(setDoc(ref, validSession({ createdAt: created })));
+  });
+
   it('allows a stopwatch session with no target', async () => {
     const alice = env.authenticatedContext(ALICE).firestore();
     await assertSucceeds(

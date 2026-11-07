@@ -34,9 +34,25 @@ jest.mock('../../../lib/notifications', () => ({
   scheduleDailyReminder: jest.fn(async () => undefined),
 }));
 // The browser has its own owner and tests; here it only has to be there.
+// The browser stands in for its rows; "mark Juz 2" does what its check does:
+// the pages it covers go into the selection, on top of what is there.
 jest.mock('../../../components/MemorizationBrowser', () => {
-  const { Text } = require('react-native');
-  return { MemorizationBrowser: () => <Text testID="memorization-browser">browser</Text> };
+  const { Pressable, Text } = require('react-native');
+  return {
+    MemorizationBrowser: ({ pendingChanges, onChange }: { pendingChanges: Map<number, string>; onChange: (m: Map<number, string>) => void }) => (
+      <>
+        <Text testID="memorization-browser">browser</Text>
+        <Pressable
+          testID="mark-juz-2"
+          onPress={() => {
+            const next = new Map(pendingChanges);
+            for (let p = 22; p <= 41; p++) next.set(p, 'memorized');
+            onChange(next);
+          }}
+        />
+      </>
+    ),
+  };
 });
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
@@ -198,6 +214,60 @@ describe('<JuzSelectionScreen /> in the new design', () => {
     });
     expect(mockApp.updatePages).toHaveBeenCalled();
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Schedule', { journeyStage: 'in_progress' });
+  });
+
+  it('a juz marked before the pages have loaded is kept when they arrive, and saved', async () => {
+    // A new account on a slow connection: its 604 pages aren't here yet.
+    mockApp.pages = [];
+    await show(v2(<JuzSelectionScreen />));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('mark-juz-2'));
+    });
+    mockApp.pages = Array.from({ length: 604 }, (_, i) => page(i + 1));
+    await act(async () => {
+      screen.rerender(v2(<JuzSelectionScreen />));
+    });
+    // Page 1 (in progress starts there) and Juz 2's 20 pages, 22–41.
+    expect(screen.getByTestId('juz-selection-summary')).toHaveTextContent('21 of 604 pages memorized');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('juz-continue'));
+    });
+    const [, changed] = (mockApp.updatePages as jest.Mock).mock.calls[0] as [UserPage[], number[]];
+    expect([...changed].sort((a, b) => a - b)).toEqual([1, ...Array.from({ length: 20 }, (_, i) => 22 + i)]);
+  });
+
+  it('[ONBOARD-1] a juz the phone has not loaded yet counts at once, and Continue waits for its pages', async () => {
+    // A new account's pages come in batches (on the device, 1–450 then 451–604;
+    // here the list is short so the juz is on screen): Juz 2's pages aren't here yet.
+    mockApp.pages = Array.from({ length: 21 }, (_, i) => page(i + 1));
+    await show(v2(<JuzSelectionScreen />));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('mark-juz-2'));
+    });
+    // Page 1 (in progress starts there) and Juz 2's 20 pages, 22–41: counted before they load.
+    expect(screen.getByTestId('juz-selection-summary')).toHaveTextContent('21 of 604 pages memorized');
+    // Saving now would leave Juz 30 out: Continue waits, and says why.
+    expect(screen.getByTestId('juz-continue').props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByText('Loading your pages…')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('juz-continue'));
+    });
+    expect(mockApp.updatePages).not.toHaveBeenCalled();
+
+    mockApp.pages = Array.from({ length: 604 }, (_, i) => page(i + 1));
+    await act(async () => {
+      screen.rerender(v2(<JuzSelectionScreen />));
+    });
+    expect(screen.getByTestId('juz-continue').props.accessibilityState).toMatchObject({ disabled: false });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('juz-continue'));
+    });
+    const [updated, changed] = (mockApp.updatePages as jest.Mock).mock.calls[0] as [UserPage[], number[]];
+    const juz2 = Array.from({ length: 20 }, (_, i) => 22 + i);
+    expect([...changed].sort((a, b) => a - b)).toEqual([1, ...juz2]);
+    // Every one of them goes into the save as memorized (none dropped for not being loaded).
+    const saved = new Set(updated.filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+    expect(juz2.every((p) => saved.has(p))).toBe(true);
   });
 
   it('nothing marked: Continue is off', async () => {

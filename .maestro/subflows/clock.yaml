@@ -1,0 +1,55 @@
+# Sets the app's clock: AT is a wall time in the phone's zone (2026-11-03T00:30)
+# or an instant (…Z). Time runs on from there; the app reads it as a phone
+# would (a relaunch, coming back to the front). See .maestro/README.md.
+appId: com.revisionbuddy.app
+---
+# The link, unless the app already shows AT (an iOS launch carries it:
+# launch.yaml). On a slow CI Simulator `simctl openurl` can time out
+# (NSPOSIXErrorDomain 60: lsd waits 10 s for SpringBoard to open the app) or
+# meet a driver that dropped for a moment (03). `optional` covers the second
+# only: Maestro ends the flow on the timeout whatever the flag says (02's first
+# attempt, Nov 5 and 6), though the link still got there seconds later. That is
+# why a fresh install, the busiest moment, gets its clock at launch on iOS.
+- runFlow:
+    when:
+      notVisible:
+        id: e2e-status
+        text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+    commands:
+      - openLink:
+          link: revisely://e2e/clock?at=${AT}
+          optional: true
+# Until the status line (E2ERoot) shows the new time (the date and the hour are
+# enough). iOS asks "Open in “Revisely”?" the first time on a simulator, on a
+# slow one many seconds later: confirm it whenever it shows.
+- repeat:
+    while:
+      notVisible:
+        id: e2e-status
+        text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+    times: 20
+    commands:
+      - runFlow: open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: e2e-status
+            text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+          timeout: 3000
+          optional: true
+      # Not taken and no prompt up: the link didn't get there; again.
+      - runFlow:
+          when:
+            notVisible: "Open"
+          commands:
+            - runFlow:
+                when:
+                  notVisible:
+                    id: e2e-status
+                    text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"
+                commands:
+                  - openLink:
+                      link: revisely://e2e/clock?at=${AT}
+                      optional: true
+- assertVisible:
+    id: e2e-status
+    text: "e2e ${AT.replace('T', ' ').slice(0, 13)}.*"

@@ -1,0 +1,18 @@
+{
+  "recordedAt": null,
+  "how": "Hand-written in the shape Anthropic sends for an unknown key, not recorded yet: functions/scripts/record-anthropic.js records the real one.",
+  "request": {
+    "model": "claude-haiku-5-5",
+    "max_tokens": 300,
+    "thinking": null,
+    "systemSha256": "20509939c9b3a5aef339bb46f71aefdb0be76344b2c622b9096d00808ce9e4c9"
+  },
+  "status": 401,
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "authentication_error",
+      "message": "invalid x-api-key"
+    }
+  }
+}

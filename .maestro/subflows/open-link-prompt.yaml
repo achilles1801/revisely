@@ -1,0 +1,11 @@
+# iOS's "Open in “Revisely”?" for a revisely:// link: confirmed if it is up.
+# (Callers loop until the link has taken: on a slow simulator the prompt comes
+# many seconds later, and left open it covers the app across relaunches.)
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+      visible: "Open"
+    commands:
+      - tapOn: "Open"

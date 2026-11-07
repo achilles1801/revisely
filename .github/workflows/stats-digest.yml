@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   issues: write
+  id-token: write # the Ask coach ledger (scripts/stats/weekly.js, coachDigestDays)
 
 jobs:
   digest:

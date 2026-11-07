@@ -1,0 +1,31 @@
+{
+  "recordedAt": null,
+  "how": "Hand-written in the Messages API response shape, not recorded yet: replace it with a real reply by running functions/scripts/record-anthropic.js with an Anthropic key (TESTING.md).",
+  "request": {
+    "model": "claude-haiku-5-5",
+    "max_tokens": 300,
+    "thinking": null,
+    "systemSha256": "20509939c9b3a5aef339bb46f71aefdb0be76344b2c622b9096d00808ce9e4c9"
+  },
+  "status": 200,
+  "body": {
+    "id": "msg_handwritten",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-haiku-5-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "You are revising about 9 pages a day this week against a plan of 10, a little faster than your 30-day average of 8.4. Add one page a day to reach the plan."
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 64,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 1247,
+      "output_tokens": 48
+    }
+  }
+}

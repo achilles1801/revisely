@@ -12,20 +12,21 @@
 //   juz a day — today becomes the chosen juz (the start date moves); if the
 //       juz pattern can't land on it (two juz a day over an odd split), the page
 //       offset as above.
-// Today follows the Fajr day (revisionDate). Pages already revised today stay
-// counted, and pages already carried into today stay in it (the same rule as a
-// new plan, lib/planChange): they go first, then the new start's pages. With
-// neither, carry-over is left alone, so yesterday's leftovers are still offered.
+// Today follows the Fajr day (revisionDate). Pages revised in today's own session
+// stay counted and go first, then the new start's pages. Pages carried into today,
+// and pages revised ahead for today from an earlier session, are dropped: they
+// were the old start's. Today's carry-over is written by the jump, so yesterday's
+// leftovers are not offered again today.
 
 import { getPagesForJuz, getPagesForSurah, getSurah, getSurahDisplay } from './quranData';
 import {
   calendarDaysBetween,
   getPagesScheduledForDate,
+  keepLaterCarry,
   juzKeyForPage,
   juzModeCycle,
   scheduleStartingByToday,
 } from './algorithm';
-import { revisedOn } from './planChange';
 import { dateToLocalISODay } from './schedulePlans';
 import type { RevisionLog, User, UserPage } from '../types';
 
@@ -171,13 +172,16 @@ export function jumpTo(before: User, target: JumpTarget, ctx: JumpContext): Jump
       : jumpPages(user, ctx, pages);
   if (!moved) return null;
 
-  // Today: what was revised and what was carried in stay; the rest is the new start's.
+  // Today: what was revised in today's own session stays counted, and goes first.
+  // Pages revised ahead for today from an earlier session belong to the start being
+  // jumped from, so they are dropped, as are pages carried into today. Today's carry
+  // is always written (even empty), so nothing carried in front of the new start can
+  // come back when Home is opened again.
   const today = dateToLocalISODay(ctx.revisionDate);
   const memorizedSet = new Set(ctx.memorized.map((p) => p.pageNumber));
-  const carried = user.carryOver?.day === today ? user.carryOver.pages : [];
-  const keep = [...new Set([...carried, ...revisedOn(ctx.logs, today)])].filter((p) => memorizedSet.has(p));
-  const carryOver =
-    keep.length > 0 || user.carryOver?.day === today ? { day: today, pages: keep, skip: 0 } : user.carryOver;
+  const ownToday = ctx.logs.filter((log) => log.date === today).flatMap((log) => log.pagesRevised);
+  const keep = [...new Set(ownToday)].filter((p) => memorizedSet.has(p));
+  const carryOver = { day: today, pages: keep, skip: 0, ...keepLaterCarry(user, today) };
 
   return { user: { ...user, ...moved.fields, carryOver }, startPage: moved.startPage, today: moved.today };
 }

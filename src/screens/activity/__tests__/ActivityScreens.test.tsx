@@ -46,16 +46,20 @@ const mockService: Record<string, jest.Mock> = {
   getReadingSessionsForDay: jest.fn(),
   getJournalEntries: jest.fn(),
   getJournalEntry: jest.fn(),
-  updateReadingSessionPages: jest.fn(() => Promise.resolve()),
-  deleteReadingSession: jest.fn(() => Promise.resolve()),
 };
 jest.mock('../../../services/firestoreService', () => ({
   getReadingSessions: (...a: unknown[]) => mockService.getReadingSessions(...a),
   getReadingSessionsForDay: (...a: unknown[]) => mockService.getReadingSessionsForDay(...a),
   getJournalEntries: (...a: unknown[]) => mockService.getJournalEntries(...a),
   getJournalEntry: (...a: unknown[]) => mockService.getJournalEntry(...a),
-  updateReadingSessionPages: (...a: unknown[]) => mockService.updateReadingSessionPages(...a),
-  deleteReadingSession: (...a: unknown[]) => mockService.deleteReadingSession(...a),
+}));
+// Edits go into the outbox (lib/offline); nothing is waiting in these tests.
+const mockQueue = { queueChange: jest.fn(async (..._a: unknown[]) => ({})) };
+jest.mock('../../../lib/offline/queue', () => ({
+  queueChange: (...a: unknown[]) => mockQueue.queueChange(...a),
+  withPendingReadings: (list: unknown) => list,
+  withPendingJournal: (list: unknown) => list,
+  pendingJournalEntry: () => undefined,
 }));
 
 jest.mock('../../../components/EditSessionModal', () => {
@@ -147,7 +151,7 @@ describe('<ActivityDayScreen />', () => {
     await act(async () => {
       fireEvent.press(screen.getByText('Done'));
     });
-    expect(mockService.updateReadingSessionPages).toHaveBeenCalledWith(s.id, [45, 46, 47]);
+    expect(mockQueue.queueChange).toHaveBeenCalledWith({ kind: 'reading.pages', id: s.id, pages: [45, 46, 47] });
     expect(await screen.findByText('Pages 45–47')).toBeTruthy();
   });
 });

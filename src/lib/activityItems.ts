@@ -1,8 +1,9 @@
-import type { JournalEntry, ReadingSession, RevisionLog, User } from '../types';
+import type { JournalEntry, JournalNote, ReadingSession, RevisionLog, User } from '../types';
 import { isRevisionActivity, normalizeReadingSession } from './activity';
+import { catchUpPagesOf } from './aheadCredit';
 import { formatMinutesShort } from './activityHeatmap';
-import { isJournalEntryEmpty, JournalFilter, journalFilterRange, journalTotalMinutes } from './journal';
-import { describePageRuns, describeSurahRuns, pageRuns } from './pageRanges';
+import { formatEntryTime, isJournalNoteEmpty, JournalFilter, journalFilterRange } from './journal';
+import { describePageRuns, describeRevised, describeSurahRuns, pageRuns } from './pageRanges';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
 
@@ -93,10 +94,30 @@ function item(base: Omit<ActivityItem, 'search'>, pages: number[] = []): Activit
   return { ...base, search: ` ${words(text.join(' '))}` };
 }
 
-export function revisionItem(log: RevisionLog): ActivityItem {
+/**
+ * Catch-up pages that were the session's day's assignment: Keep daily amount filled the day with
+ * them (SESS-7). They are credited to the days they were missed, but they are what the day revised.
+ */
+function catchUpAssigned(log: RevisionLog): number[] {
+  const assigned = new Set(log.assignedPages ?? []);
+  return catchUpPagesOf(log).filter((p) => assigned.has(p));
+}
+
+/** The pages a session revised for its own day: revised, less those credited ahead to later days. */
+export function ownRevised(log: RevisionLog): number[] {
+  const ahead = new Set(Object.values(log.ahead ?? {}).flat());
+  return [...log.pagesRevised.filter((p) => !ahead.has(p)), ...catchUpAssigned(log)];
+}
+
+/** How items name what was revised: `juzPlan` is the account's plan (scheduleMode 'juz'). */
+export interface ActivityLabelOptions {
+  juzPlan?: boolean;
+}
+
+export function revisionItem(log: RevisionLog, opts: ActivityLabelOptions = {}): ActivityItem {
   const pages = sessionPages(log);
   const total = pageRuns(pages).reduce((n, r) => n + r.last - r.first + 1, 0);
-  const revised = log.pagesRevised.length;
+  const revised = log.pagesRevised.length + catchUpAssigned(log).length;
   const minutes = log.durationMinutes && log.durationMinutes > 0 ? formatMinutesShort(log.durationMinutes) : null;
   return item({
     key: `revision-${log.id}`,
@@ -106,7 +127,11 @@ export function revisionItem(log: RevisionLog): ActivityItem {
     at: Number.MAX_SAFE_INTEGER,
     title: total > revised ? `Revised ${revised} of ${plural(total, 'page')}` : `Revised ${plural(revised, 'page')}`,
     // The time before the surahs, which a narrow line cuts off first.
-    detail: [describePageRuns(pageRuns(pages)), minutes, describeSurahRuns(pageRuns(pages))].filter(Boolean).join(' · '),
+    detail: [
+      describePageRuns(pageRuns(pages)),
+      minutes,
+      describeRevised(pages, { juzPlan: opts.juzPlan, revised: ownRevised(log) }),
+    ].filter(Boolean).join(' · '),
     done: total > 0 && revised >= total,
     log,
   }, pages);
@@ -140,22 +165,55 @@ function recordingItem(r: RecordingItemSource): ActivityItem {
   }, pages);
 }
 
-function logItem(e: JournalEntry): ActivityItem {
-  const minutes = journalTotalMinutes(e);
+/** One note of a day's log: its time, what it says, its minutes. */
+function logItem(day: JournalEntry, note: JournalNote, user?: User | null): ActivityItem {
+  const text = note.text.trim();
+  const said =
+    note.kind === 'memorization' ? `Memorized ${text}` : note.kind === 'revision' ? `Revised ${text}` : text;
   const parts = [
-    e.memorization.trim() ? `Memorized ${e.memorization.trim()}` : null,
-    e.revision.trim() ? `Revised ${e.revision.trim()}` : null,
-    e.notes.trim() || null,
-    minutes ? formatMinutesShort(minutes) : null,
+    formatEntryTime(note.at, day.date, user),
+    said || null,
+    note.minutes ? formatMinutesShort(note.minutes) : null,
   ].filter(Boolean);
   return item({
-    key: `log-${e.date}`,
+    key: `log-${day.date}-${note.id}`,
     kind: 'log',
-    day: e.date,
-    at: e.updatedAt ?? 0,
+    day: day.date,
+    at: note.at,
     title: 'Daily log',
     detail: parts.join(' · '),
   });
+}
+
+function weekdayName(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+/**
+ * A session's pages revised ahead (lib/aheadCredit): one item on the day they
+ * were revised ("Revised ahead for Wed"). Nothing goes on the day they count
+ * for: Activity shows what was done on each day, and that day may not have
+ * started yet (DAY-9). Home and the schedule still count them for it.
+ */
+function aheadItems(log: RevisionLog, opts: ActivityLabelOptions = {}): ActivityItem[] {
+  const out: ActivityItem[] = [];
+  for (const [day, pages] of Object.entries(log.ahead ?? {})) {
+    if (!DAY_RE.test(day) || pages.length === 0) continue;
+    const runs = pageRuns(pages);
+    const detail = [describePageRuns(runs), describeRevised(pages, { juzPlan: opts.juzPlan })].filter(Boolean).join(' · ');
+    // Just after the session's own item on its day.
+    const at = Number.MAX_SAFE_INTEGER - 1;
+    out.push(item({
+      key: `ahead-from-${log.id}-${day}`,
+      kind: 'revision',
+      day: log.date,
+      at,
+      title: `Revised ahead for ${weekdayName(day)} · ${plural(pages.length, 'page')}`,
+      detail,
+    }, pages));
+  }
+  return out;
 }
 
 /** Everything done, one item each, newest first. */
@@ -174,13 +232,20 @@ export function buildActivityItems(
   user?: User | null,
 ): ActivityItem[] {
   const out: ActivityItem[] = [];
-  for (const log of logs) if (isRevisionActivity(log) && DAY_RE.test(log.date)) out.push(revisionItem(log));
+  const labels: ActivityLabelOptions = { juzPlan: user?.scheduleMode === 'juz' };
+  for (const log of logs) {
+    if (!isRevisionActivity(log) || !DAY_RE.test(log.date)) continue;
+    out.push(revisionItem(log, labels), ...aheadItems(log, labels));
+  }
   for (const raw of readings) {
     const s = normalizeReadingSession(raw, user);
     if (s) out.push(readingItem(s));
   }
   for (const r of recordings) if (DAY_RE.test(r.day)) out.push(recordingItem(r));
-  for (const e of journal) if (DAY_RE.test(e.date) && !isJournalEntryEmpty(e)) out.push(logItem(e));
+  for (const day of journal) {
+    if (!DAY_RE.test(day.date)) continue;
+    for (const note of day.entries) if (!isJournalNoteEmpty(note)) out.push(logItem(day, note, user));
+  }
   return out.sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.at - a.at));
 }
 

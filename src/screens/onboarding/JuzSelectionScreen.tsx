@@ -19,6 +19,8 @@ import {
   applyPendingSurahChanges,
   buildInitialPendingForJourney,
   buildInitialPendingSurahsForJourney,
+  countMemorizedWithPending,
+  markedPagesNotLoaded,
 } from '../../lib/memorizationChanges';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -46,34 +48,39 @@ export default function JuzSelectionScreen() {
   >(new Map());
 
   // Seed the buffer once pages have loaded so the initial selection matches
-  // the chosen journey stage. Subsequent edits replace this baseline.
+  // the chosen journey stage. Subsequent edits replace this baseline. Anything
+  // marked before the pages arrived (a slow first load) stays on top of it:
+  // replacing the buffer threw it away, and Continue saved page 1 alone.
   const hasSeededRef = useRef(false);
   useEffect(() => {
     if (hasSeededRef.current) return;
     if (pages.length === 0) return;
     hasSeededRef.current = true;
-    setPendingChanges(buildInitialPendingForJourney(pages, journeyStage));
-    setPendingSurahChanges(
-      buildInitialPendingSurahsForJourney(
-        user?.memorizedSurahs ?? [],
-        journeyStage,
-      ),
-    );
+    setPendingChanges((marked) => {
+      const seeded = buildInitialPendingForJourney(pages, journeyStage);
+      marked.forEach((status, page) => seeded.set(page, status));
+      return seeded;
+    });
+    setPendingSurahChanges((marked) => {
+      const seeded = buildInitialPendingSurahsForJourney(user?.memorizedSurahs ?? [], journeyStage);
+      marked.forEach((status, surah) => seeded.set(surah, status));
+      return seeded;
+    });
   }, [pages, journeyStage, user]);
 
-  // Effective memorized count = base memorized status with pendingChanges applied.
-  const effectiveMemorizedCount = useMemo(() => {
-    let n = 0;
-    for (const p of pages) {
-      const override = pendingChanges.get(p.pageNumber);
-      const effective =
-        override !== undefined ? override : p.status === 'memorized' ? 'memorized' : 'not_memorized';
-      if (effective === 'memorized') n++;
-    }
-    return n;
-  }, [pages, pendingChanges]);
+  // Effective memorized count = base memorized status with pendingChanges
+  // applied, over every page number: a marked page counts before it has loaded,
+  // as its juz's check already shows it (ONBOARD-1).
+  const effectiveMemorizedCount = useMemo(
+    () => countMemorizedWithPending(pages, pendingChanges),
+    [pages, pendingChanges],
+  );
+  // Marked pages the phone hasn't loaded yet (a new account's pages arrive in
+  // two batches): saving now would leave them out, so Continue waits for them.
+  const notLoaded = useMemo(() => markedPagesNotLoaded(pages, pendingChanges), [pages, pendingChanges]);
 
   const handleContinue = async () => {
+    if (notLoaded.length > 0) return;
     const { updatedPages, changedPageNumbers } = applyPendingChanges(
       pages,
       pendingChanges,
@@ -91,7 +98,7 @@ export default function JuzSelectionScreen() {
     navigation.navigate('Schedule', { journeyStage });
   };
 
-  const canContinue = effectiveMemorizedCount > 0;
+  const canContinue = effectiveMemorizedCount > 0 && notLoaded.length === 0;
 
   // The button shows it's saving, and a second tap waits.
   const [saving, setSaving] = useState(false);
@@ -154,7 +161,7 @@ export default function JuzSelectionScreen() {
           {' of 604 pages memorized'}
         </Text>
         <PillButton
-          title="Continue"
+          title={notLoaded.length > 0 ? 'Loading your pages…' : 'Continue'}
           size="lg"
           onPress={continueV2}
           disabled={!canContinue}

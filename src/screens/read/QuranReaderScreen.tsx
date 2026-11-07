@@ -7,7 +7,7 @@ import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { UndoToast } from '../../components/revision/UndoToast';
-import { RecordButton } from '../../components/recordings/RecordButton';
+import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
@@ -31,6 +31,8 @@ import {
   getSurahsForPage,
 } from '../../lib/quranData';
 import { appendReadingHistory } from '../../lib/readingHistory';
+import { firstSurahOnPage } from '../../lib/verses';
+import { useMushafEdition } from '../../lib/mushafEdition';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
@@ -140,12 +142,16 @@ export default function QuranReaderScreen() {
 
   const juz = getJuzForPage(currentPage);
   const hizb = getHizbForPage(currentPage);
-  const firstSurah = getSurahsForPage(currentPage)[0];
+  // The surah at the top of the page drawn (the 1441 print's can differ; lib/mushafEdition).
+  const edition = useMushafEdition();
+  const firstSurah = useMemo(() => firstSurahOnPage(currentPage, edition), [currentPage, edition]);
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
   // anything narrower than the largest phones.
   const crowded = recorder.phase !== 'idle' || timer != null;
-  const compact = width < 430 && crowded;
+  // Recording: the recorder is the whole capsule, the timer beside it (compact).
+  const recordingLive = recorderTakesCapsule(recorder);
+  const compact = (width < 430 && crowded) || (recordingLive && timer != null);
 
   return (
     <View style={styles.container}>
@@ -184,7 +190,8 @@ export default function QuranReaderScreen() {
               page={currentPage}
               compact={compact}
               surface={{ background: palette.control, border: palette.divider }}
-              record={<RecordButton recorder={recorder} />}
+              recording={recordingLive}
+              record={<RecordButton recorder={recorder} crowded={timer != null} />}
               timer={<TimerChip compact={compact} />}
             />
           </View>

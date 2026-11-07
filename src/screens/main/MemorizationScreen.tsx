@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
@@ -16,6 +16,9 @@ import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { PillButton } from '../../components/v2/PillButton';
 import { Sheet } from '../../components/v2/Sheet';
 import { computeMemorizationStats, formatFractional } from '../../lib/memorizationStats';
+import { defaultWhen, memorizationChangeSet, type WhenMemorized } from '../../lib/memorizationLog';
+import { queueChange } from '../../lib/offline/queue';
+import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -56,15 +59,24 @@ export default function MemorizationScreen() {
     setMarkMode(false);
   };
 
-  const handleSave = async () => {
+  // Saves the manager's changes. Pages newly marked are logged for Today (one dated memorization
+  // item for the day) or not logged (Before). Unmarked pages come out of the items that hold them.
+  const commit = async (when: WhenMemorized | null) => {
     setSaving(true);
     try {
       const { updatedPages, changedPageNumbers } = applyPendingChanges(
         pages,
         pendingChanges,
       );
+      const { marked, unmarked } = memorizationChangeSet(pages, pendingChanges);
       if (changedPageNumbers.length > 0) {
         await updatePages(updatedPages, changedPageNumbers);
+      }
+      if (when === 'today' && marked.length > 0 && user) {
+        await queueChange({ kind: 'memorization.mark', day: getRevisionDayForUser(user), pages: marked, at: Date.now() });
+      }
+      if (unmarked.length > 0) {
+        await queueChange({ kind: 'memorization.unmark', pages: unmarked });
       }
 
       if (user) {
@@ -107,6 +119,21 @@ export default function MemorizationScreen() {
     }
   };
 
+  const handleSave = () => {
+    const { marked } = memorizationChangeSet(pages, pendingChanges);
+    if (marked.length === 0) {
+      void commit('before');
+      return;
+    }
+    const today = { text: 'Today', onPress: () => void commit('today') };
+    const before = { text: "Before (don't log)", onPress: () => void commit('before') };
+    Alert.alert(
+      'When did you memorize these?',
+      `${marked.length} ${marked.length === 1 ? 'page' : 'pages'} marked memorized.`,
+      defaultWhen(marked) === 'today' ? [today, before, { text: 'Cancel', style: 'cancel' }] : [before, today, { text: 'Cancel', style: 'cancel' }],
+    );
+  };
+
   const handleReviewSchedule = () => {
     setReviewPromptOpen(false);
     navigation.navigate('PlanEdit');
@@ -125,7 +152,7 @@ export default function MemorizationScreen() {
     else navigation.goBack();
   };
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         title="Memorization"
         onBack={backV2}
@@ -143,7 +170,7 @@ export default function MemorizationScreen() {
       />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
         testID="memorization-v2"
       >
         <View style={[v2.summary, { borderBottomColor: palette.separator }]} testID="memorization-summary">
@@ -223,7 +250,7 @@ export default function MemorizationScreen() {
           <PillButton size="lg" variant="outline" title="Later" onPress={() => setReviewPromptOpen(false)} testID="review-later" />
         </View>
       </Sheet>
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

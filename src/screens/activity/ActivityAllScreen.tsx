@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityItemRow } from '../../components/activity/ActivityItemRow';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { OptionSheet } from '../../components/OptionSheet';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
@@ -39,7 +40,8 @@ export default function ActivityAllScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'ActivityAll'>>();
   const { user, logs } = useApp();
   const { palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const { day: today } = useRevisionDay(user);
   const { readings, journal, recordings, loading } = useActivitySources();
 
@@ -109,7 +111,7 @@ export default function ActivityAllScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar title="All activity" onBack={() => navigation.goBack()} separator />
       {loading ? (
         <View style={styles.center}>
@@ -128,7 +130,7 @@ export default function ActivityAllScreen() {
           }
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+          contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
           initialNumToRender={15}
           testID="activity-all"
         />
@@ -146,7 +148,7 @@ export default function ActivityAllScreen() {
         onSelect={setRange}
         onClose={() => setRangeOpen(false)}
       />
-    </SafeAreaView>
+    </TopSafeAreaView>
   );
 }
 

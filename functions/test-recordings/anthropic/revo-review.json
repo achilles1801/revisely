@@ -1,0 +1,46 @@
+{
+  "recordedAt": "2026-11-07T09:35:32.700Z",
+  "how": "functions/scripts/record-anthropic.js",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 800,
+    "thinking": {
+      "type": "between_tools"
+    },
+    "systemSha256": "ae5e816c4dfeb4b3e233a877ff11dbd0f8bc63be2282dcae131a8357e9e45f8b"
+  },
+  "status": 200,
+  "body": {
+    "model": "claude-sonnet-5-5",
+    "id": "msg_011CgoLhQePbfq4CFshcwfei",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"text\": \"You sat down to revise today and got 4 pages done in 22 minutes, which keeps your 5-day streak going. For tomorrow, give page 589 a little extra time, since it's the one that's been weakest.\", \"chart\": null, \"textAfter\": null, \"action\": {\"kind\": \"reviseFirst\", \"title\": \"Revise page 589 first tomorrow\", \"detail\": \"Starts tomorrow's session with your weakest page\", \"pages\": [589]}, \"remember\": [], \"title\": \"Day in review\", \"chips\": [\"What's left for today?\", \"How are my weak pages?\", \"How was my week?\"]}"
+      }
+    ],
+    "container": null,
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+      "input_tokens": 316,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 10210,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 201,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
+  }
+}

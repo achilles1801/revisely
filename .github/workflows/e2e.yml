@@ -1,0 +1,806 @@
+name: E2E
+
+# The real app on the iOS Simulator and the Android emulator, driven by Maestro
+# (.maestro/README.md): sign-up, a revision session, revise ahead, the Fajr
+# boundary, the daily log, offline and recordings, each at a time and in a time
+# zone the flow sets. The app is an E2E build (EXPO_PUBLIC_E2E=1): it talks only
+# to the Firebase emulators started here (project demo-revisely: Auth, Firestore,
+# Storage and our Cloud Functions, where only Anthropic answers from a recording),
+# never to a real service.
+#
+# No secrets: the Firebase native config is a demo file written here
+# (.maestro/scripts/firebase-demo-config.sh), nothing is signed for a store, and
+# nothing is published. That is why this workflow may cache (CLAUDE.md: no caches
+# where release secrets are): the native build is kept per fingerprint, so a
+# JavaScript-only change rebuilds only the bundle (.maestro/scripts/embed-js.sh).
+#
+# Scheduled runs start from main (CLAUDE.md) and test develop.
+#
+# What runs where (each flow takes 2–10 minutes; a macOS runner is the scarce
+# part: five at a time on this plan). CI (ci.yml) calls this workflow and its
+# `plan` job picks the iOS and Android sets (inputs `ios`, `android`: none, build,
+# smoke, full):
+#   - a lower layer of a GitHub stack: not called (the top layer tests the stack);
+#   - the top of a stack into develop, a PR into main, a merge group: every flow,
+#     two iOS jobs and two Android jobs;
+#   - a single PR into develop: the smoke set, 02 04 05 06, on Android only, in
+#     two jobs side by side (.maestro/README.md says why these four);
+#   - a push to develop (what just landed): every Android flow, and the iOS native
+#     build alone (kept where every PR into develop can restore it). A newer push
+#     cancels the run of the one before.
+# On its own: the nightly run (develop; every flow) and Run workflow (by hand).
+#
+# Its last job, `E2E`, passes when every platform job that had to run passed, or
+# when nothing that goes into the app (or into these flows) changed (`changes`
+# says so and the platform jobs are skipped). CI's `Required` check waits for it.
+# A run by hand on part of the matrix (one platform, some flows) reports as
+# "E2E (partial run)".
+#
+# Screenshots of key screens (the flows' takeScreenshot steps) are kept as an
+# artifact of every run that ran flows (e2e-<platform>-screens-…), so a change's
+# look can be checked without a simulator, and compared with the approved
+# baselines in .maestro/baselines/: a screen that changed fails its job, with a
+# board of it (e2e-<platform>-visual-…). An intended change is approved with
+# `node .maestro/visual/approve.mjs <run id>` in the same PR (.maestro/README.md).
+
+on:
+  # From CI (ci.yml): pull requests, pushes to develop, merge groups.
+  workflow_call:
+    inputs:
+      ios:
+        description: none, build (the native build alone), smoke or full
+        type: string
+        default: none
+      android:
+        description: none, build, smoke or full
+        type: string
+        default: none
+  schedule:
+    # 07:30 UTC: the small hours in Chicago.
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which platform
+        type: choice
+        options: [both, ios, android]
+        default: both
+      flows:
+        description: Only these flows (a glob in .maestro/flows, e.g. 06-*); empty for all
+        type: string
+        default: ''
+      debug:
+        description: Firestore's debug log in the app's log (for a flow being looked into)
+        type: boolean
+        default: false
+      smoke:
+        description: The smoke set only (both platforms)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One run per PR: a push cancels the run of the commit before it. Elsewhere one
+# per branch and event: a push to develop cancels the run of the push before it
+# (a burst of merges is tested once, at its end), and never a full run started
+# by hand or on schedule there (a release's proof). Runs by hand never cancel
+# each other (two runs of different flows on one branch did); a run by hand
+# skips its iOS jobs when the same commit's same iOS jobs are already running
+# (`changes`).
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || format('{0}-{1}', github.ref, github.event_name) }}
+  cancel-in-progress: true
+
+env:
+  MAESTRO_VERSION: '2.11.0'
+  FIREBASE_TOOLS_VERSION: '15.15.0'
+  MAESTRO_CLI_NO_ANALYTICS: '1'
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
+  # The emulators, as Maestro (on the runner) sees them: firebase.json's ports.
+  E2E_AUTH_URL: http://127.0.0.1:9099
+  E2E_FIRESTORE_URL: http://127.0.0.1:8080
+  # One rerun of a failed flow; a pass on a rerun is reported as a warning, and
+  # the job keeps its results (screenshots, logs) as for a failure.
+  E2E_RETRIES: '1'
+  # A run by hand with `debug`: Firestore's debug log goes into the app's log
+  # (src/lib/e2e/firebase.ts), which run.sh keeps for each failed attempt.
+  EXPO_PUBLIC_E2E_FIRESTORE_DEBUG: ${{ inputs.debug && '1' || '' }}
+
+jobs:
+  # Whether this pull request changes anything the flows exercise: everything
+  # that goes into the app (the complement of .github/scripts/app-hash.sh's
+  # list), the flows, this workflow, and what the emulators load (firestore.rules,
+  # storage.rules, firebase.json, our functions, scripts/emulators.sh). Scheduled
+  # and manual runs always run.
+  changes:
+    name: E2E (what changed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read # a run by hand looks for iOS jobs already running on its commit
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+      ios_shards: ${{ steps.shards.outputs.ios }}
+      android_shards: ${{ steps.shards.outputs.android }}
+      run_ios: ${{ steps.shards.outputs.run_ios }}
+      run_android: ${{ steps.shards.outputs.run_android }}
+    steps:
+      # The jobs and their flows. Every flow: two jobs a platform of about the
+      # same length (03 and 04, the long ones, apart). The smoke set: two Android jobs, one iOS.
+      # Called from CI: what `ios` and `android` say. On its own: a run by hand
+      # with `flows` is one job each with those, `smoke` the smoke set, and
+      # otherwise (and nightly) every flow.
+      - id: shards
+        env:
+          ONLY: ${{ inputs.flows }}
+          SMOKE: ${{ inputs.smoke }}
+          EVENT: ${{ github.event_name }}
+          IOS_SET: ${{ inputs.ios }}
+          ANDROID_SET: ${{ inputs.android }}
+          PLATFORM: ${{ inputs.platform }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          full='[{"name":"01 02 03 08 09","flows":".maestro/flows/0[12389]-*.yaml"},{"name":"04 05 06 07 10","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/10-*.yaml"}]'
+          # Android's smoke set is a single PR's long pole: two jobs side by side
+          # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
+          # iOS keeps one job: macOS runners are the scarce part (5 at a time).
+          smoke_android='[{"name":"smoke: 02 05","flows":".maestro/flows/0[25]-*.yaml"},{"name":"smoke: 04 06","flows":".maestro/flows/0[46]-*.yaml"}]'
+          smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
+          build='[{"name":"native build","flows":""}]'
+          set_of() { # set platform
+            case "$1" in
+              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;;
+              smoke) if [ "$2" = android ]; then echo "$smoke_android"; else echo "$smoke_ios"; fi ;;
+              *) echo "::error::Unknown set '$1' (none, build, smoke, full)" >&2; return 1 ;;
+            esac
+          }
+          if [ -n "$IOS_SET" ] || [ -n "$ANDROID_SET" ]; then
+            ios=$(set_of "${IOS_SET:-none}" ios); android=$(set_of "${ANDROID_SET:-none}" android)
+          elif [ -n "$ONLY" ]; then
+            case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
+            ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]'); android="$ios"
+          elif [ "$SMOKE" = true ]; then
+            ios="$smoke_ios"; android="$smoke_android"
+          else
+            ios="$full"; android="$full"
+          fi
+          if [ "$EVENT" = workflow_dispatch ] && [ -z "$IOS_SET$ANDROID_SET" ]; then
+            if [ "$PLATFORM" = android ]; then ios='[]'; fi
+            if [ "$PLATFORM" = ios ]; then android='[]'; fi
+          fi
+          # By hand: iOS jobs the same commit already has running (another run by hand, a
+          # PR's or develop's run, the nightly one) aren't started twice; macOS runners
+          # are five at a time.
+          if [ "$EVENT" = workflow_dispatch ] && [ "$ios" != '[]' ]; then
+            running=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=50" --jq ".workflow_runs[] | select(.id != $RUN_ID) | select(.status == \"in_progress\" or .status == \"queued\" or .status == \"waiting\") | .id" 2>/dev/null || true)
+            busy=""
+            for r in $running; do
+              busy="$busy$(gh api "repos/$REPO/actions/runs/$r/jobs?per_page=100" --jq '.jobs[] | select(.status != "completed") | .name' 2>/dev/null | grep 'iOS Simulator' || true)
+          "
+            done
+            left=$(jq -c --arg busy "$busy" '[.[] | . as $j | select(($busy | contains("iOS Simulator, " + $j.name + ")")) | not)]' <<<"$ios")
+            if [ "$left" != "$ios" ]; then
+              echo "::notice title=E2E::iOS jobs already running for $SHA are not started again: $(jq -r --argjson left "$left" '[.[] | select(. as $j | $left | index($j) | not) | .name] | join(", ")' <<<"$ios")"
+              ios="$left"
+            fi
+          fi
+          run_ios=true; if [ "$ios" = '[]' ]; then run_ios=false; fi
+          run_android=true; if [ "$android" = '[]' ]; then run_android=false; fi
+          { echo "ios=$ios"; echo "android=$android"; echo "run_ios=$run_ios"; echo "run_android=$run_android"; } >> "$GITHUB_OUTPUT"
+          echo "iOS: $ios"; echo "Android: $android"
+
+      # What the change holds. A PR: its files; the top of a stack: the whole
+      # stack's (from the stack's base); a push: everything since the last push
+      # whose CI passed. Anything else
+      # (nightly, by hand, a merge group): every flow runs.
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha }}
+          BRANCH: ${{ github.ref_name }}
+          AFTER: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          files="$RUNNER_TEMP/files.txt"
+          # Renames count by both names. Past what the API lists (3000 files for
+          # a PR, 300 for a comparison), the flows run.
+          case "$EVENT" in
+            pull_request)
+              if [ -n "$STACK_BASE_SHA" ]; then
+                echo "A stack: its whole change, from $STACK_BASE_SHA."
+                gh api "repos/$REPO/compare/$STACK_BASE_SHA...$HEAD_SHA" --jq '.files[] | .filename, (.previous_filename // empty)' > "$files"
+                limit=300
+              else
+                gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > "$files"
+                limit=3000
+              fi ;;
+            push)
+              # Since the last push whose CI passed, not since the push before: a
+              # newer push cancels an older run, and the older one's change must
+              # still be tested. (Pushes reach this workflow through ci.yml.)
+              since=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$BRANCH&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty')
+              if [ -z "$since" ]; then
+                echo "app=true" >> "$GITHUB_OUTPUT"; echo "No push here has passed CI yet: every flow runs."; exit 0
+              fi
+              echo "What changed since $since, the last push whose CI passed."
+              gh api "repos/$REPO/compare/$since...$AFTER" --jq '.files[] | .filename, (.previous_filename // empty)' > "$files"
+              limit=300 ;;
+            *)
+              echo "app=true" >> "$GITHUB_OUTPUT"
+              echo "A $EVENT run: every flow runs."
+              exit 0 ;;
+          esac
+          app=false
+          if [ "$(wc -l < "$files")" -ge "$limit" ]; then app=true; fi
+          while IFS= read -r f; do
+            case "$f" in
+              # Our functions and the emulators' setup: the flows call the functions emulator.
+              .maestro/*|.github/workflows/e2e.yml|firestore.rules|storage.rules|firebase.json|functions/*|scripts/emulators.sh) app=true ;;
+              docs/*|tests/*|worker/*|store/*|scripts/*|.github/*) ;;
+              *.md|firestore.indexes.json|wrangler.jsonc) ;;
+              *) app=true ;;
+            esac
+            if [ "$app" = true ]; then echo "Goes into the app or the flows: $f"; break; fi
+          done < "$files"
+          [ "$app" = true ] || echo "Nothing here goes into the app or the flows: the flows are skipped."
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+  ios:
+    name: E2E (iOS Simulator, ${{ matrix.shard.name }})
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
+    runs-on: macos-26
+    timeout-minutes: 90
+    # The macOS runner takes 4–9 minutes a flow, and a native build 20 to 35
+    # (when the fingerprint has none kept: a native change). (A third job often
+    # waited for a macOS runner until GitHub gave up on it.)
+    # (A run by hand with some flows: one job with those; `changes` picks.)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.ios_shards) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The Firestore emulator needs Java 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # As ios-build.yml: a runner image update can't change the toolchain under us.
+      - name: Select Xcode
+        run: |
+          if [ -d /Applications/Xcode_26.6.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app
+          else
+            echo "::warning::Xcode 26.6 is not on this image; using the default $(xcodebuild -version | head -1)."
+          fi
+          xcodebuild -version
+
+      # Started now, finished later: a new simulator's first boot takes minutes,
+      # which the install and the build hide.
+      - name: Boot a simulator
+        if: matrix.shard.flows != ''
+        id: sim
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | sort_by(.version) | last | .identifier')
+          TYPE=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.productFamily == "iPhone") | .identifier] | map(select(test("iPhone-1[6-9]-Pro$"))) | last // empty')
+          [ -n "$TYPE" ] || TYPE=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.productFamily == "iPhone")] | last | .identifier')
+          UDID=$(xcrun simctl create "Revisely E2E" "$TYPE" "$RUNTIME")
+          xcrun simctl boot "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Booting $TYPE on $RUNTIME: $UDID"
+
+      # node_modules, kept per lockfile, patches, OS and Node: npm ci took 3–5
+      # minutes on a macOS runner. Allowed here: this workflow holds no release
+      # secrets (CLAUDE.md, no caches where they are).
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'patches/**') }}
+
+      - name: npm ci
+        if: steps.nm.outputs.cache-hit != 'true'
+        run: npm ci --legacy-peer-deps
+
+      - name: Keep node_modules
+        if: steps.nm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ steps.nm.outputs.cache-primary-key }}
+
+      - name: Fingerprint (the E2E build's native side)
+        id: fp
+        env:
+          GOOGLE_REVERSED_CLIENT_ID: com.googleusercontent.apps.123456789012-e2e
+        run: |
+          bash .maestro/scripts/firebase-demo-config.sh ios
+          HASH=$(npx expo-updates fingerprint:generate --platform ios | grep '^{' | jq -r .hash)
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "iOS fingerprint $HASH"
+
+      - name: Restore the native build
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .maestro/build/Revisely.app
+          key: e2e-ios-${{ steps.fp.outputs.hash }}-${{ hashFiles('.maestro/scripts/build-ios.sh', '.maestro/scripts/firebase-demo-config.sh') }}
+
+      - name: Build the E2E app (native)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash .maestro/scripts/build-ios.sh
+
+      - name: Keep the native build
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .maestro/build/Revisely.app
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      # A kept build: this commit's JavaScript into it.
+      - name: Bundle this commit's JavaScript
+        if: matrix.shard.flows != '' && steps.cache.outputs.cache-hit == 'true'
+        run: bash .maestro/scripts/embed-js.sh ios .maestro/build/Revisely.app
+
+      # Maestro and the Firestore emulator's jar, kept per version (the CLI
+      # downloads the jar each run otherwise).
+      - name: Restore Maestro and the emulators
+        if: matrix.shard.flows != ''
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.maestro
+            ~/.cache/firebase/emulators
+          key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}-storage
+
+      # Our Cloud Functions, which the functions emulator runs (emulators.sh builds them).
+      - name: Restore the functions' packages
+        if: matrix.shard.flows != ''
+        id: fnm
+        uses: actions/cache/restore@v4
+        with:
+          path: functions/node_modules
+          key: e2e-functions-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('functions/package-lock.json') }}
+
+      - name: The functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        run: npm ci --prefix functions
+
+      - name: Keep the functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: functions/node_modules
+          key: ${{ steps.fnm.outputs.cache-primary-key }}
+
+      - name: Firebase CLI and Maestro
+        if: matrix.shard.flows != ''
+        run: |
+          npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
+          [ -x "$HOME/.maestro/bin/maestro" ] || curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Start the Firebase emulators
+        if: matrix.shard.flows != ''
+        # Twice if need be: on a busy runner the Firestore emulator can miss the
+        # CLI's own one-minute start limit.
+        run: |
+          for attempt in 1 2; do
+            nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
+            for i in $(seq 1 90); do
+              # The functions emulator answers 404 at its root once it serves.
+              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null &&
+                [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/)" != 000 ]; then echo ready; exit 0; fi
+              sleep 2
+            done
+            echo "::warning::The emulators didn't start (attempt $attempt)."
+            cat "$RUNNER_TEMP/emulators.log"
+            pkill -f "firebase emulators" || true
+            pkill -f cloud-firestore-emulator || true
+            sleep 5
+          done
+          exit 1
+
+      # Booted (above) while the app was built: the first boot of a new simulator takes minutes.
+      - name: Install the app on the simulator
+        if: matrix.shard.flows != ''
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" .maestro/build/Revisely.app
+
+      - name: Run the flows
+        id: flows
+        if: matrix.shard.flows != ''
+        env:
+          E2E_DEVICE: ${{ steps.sim.outputs.udid }}
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+          FLOWS: ${{ matrix.shard.flows }}
+        # $FLOWS is a glob, expanded here.
+        run: bash .maestro/run.sh ios $FLOWS
+
+      # Each flow's attempts (run.sh's attempts.json: passed on the first attempt or
+      # not, and why not), from every run, for the weekly flake report (e2e-flakes.yml).
+      - name: Keep the attempts
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') && hashFiles('.maestro/build/results/ios/attempts.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-attempts-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .maestro/build/results/ios/attempts.json
+          retention-days: 14
+
+      - name: Keep the results
+        if: failure() || cancelled() || hashFiles('.maestro/build/results/**/attempt-failed') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-${{ strategy.job-index }}-${{ github.run_id }}
+          path: |
+            .maestro/build/results
+            .maestro/build/xcodebuild.log
+            ${{ runner.temp }}/emulators.log
+          retention-days: 7
+          # Maestro keeps its screenshots under a .maestro folder.
+          include-hidden-files: true
+
+      # The flows' screenshots of key screens (takeScreenshot), from every run.
+      - name: Keep the screenshots
+        if: ${{ always() && matrix.shard.flows != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-screens-${{ strategy.job-index }}-${{ github.run_id }}
+          path: .maestro/build/results/**/takeScreenshot/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      # The screenshots against the approved baselines (.maestro/baselines/ios/,
+      # .maestro/README.md "Screenshots"): a changed screen fails the job, with a
+      # board of it in the artifact below; one with no baseline yet is only reported.
+      - name: Compare the screenshots
+        id: visual
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') }}
+        run: |
+          npm ci --prefix .maestro/visual --no-audit --no-fund --loglevel=error
+          (cd .maestro/visual && node --test --test-reporter=dot)
+          node .maestro/visual/compare.mjs ios
+
+      - name: Keep the screenshot boards
+        if: ${{ always() && steps.visual.outcome != 'skipped' && hashFiles('.maestro/build/visual/*/boards/*.png') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-visual-${{ strategy.job-index }}-${{ github.run_id }}
+          path: .maestro/build/visual
+          retention-days: 14
+
+  android:
+    name: E2E (Android emulator, ${{ matrix.shard.name }})
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_android == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.android_shards) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # React Native 0.81 builds with JDK 17 (as android-build.yml); the
+      # Firestore emulator needs 21, which stays the default.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+
+      - name: Gradle memory
+        run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+
+      # node_modules, kept per lockfile, patches, OS and Node: npm ci took 3–5
+      # minutes on a macOS runner. Allowed here: this workflow holds no release
+      # secrets (CLAUDE.md, no caches where they are).
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'patches/**') }}
+
+      - name: npm ci
+        if: steps.nm.outputs.cache-hit != 'true'
+        run: npm ci --legacy-peer-deps
+
+      - name: Keep node_modules
+        if: steps.nm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: ${{ steps.nm.outputs.cache-primary-key }}
+
+      - name: Fingerprint (the E2E build's native side)
+        id: fp
+        run: |
+          export GOOGLE_SERVICES_JSON="$PWD/.maestro/build/google-services.json"
+          bash .maestro/scripts/firebase-demo-config.sh android
+          HASH=$(npx expo-updates fingerprint:generate --platform android | grep '^{' | jq -r .hash)
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "Android fingerprint $HASH"
+
+      - name: Restore the native build
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .maestro/build/revisely-e2e.apk
+            .maestro/build/debug.keystore
+          key: e2e-android-${{ steps.fp.outputs.hash }}-${{ hashFiles('.maestro/scripts/build-android.sh', '.maestro/scripts/firebase-demo-config.sh') }}
+
+      # An Android build needs about 15 GB; the image ships tools this job never uses.
+      # Only before a build (26 s a job): a kept build needs none of it.
+      - name: Free disk space
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL" && df -h /
+
+      - name: Build the E2E app (native)
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          E2E_ABI: x86_64
+        run: JAVA_HOME="$JAVA_HOME_17_X64" bash .maestro/scripts/build-android.sh
+
+      - name: Keep the native build
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .maestro/build/revisely-e2e.apk
+            .maestro/build/debug.keystore
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      # Started here, waited for once the emulator is up (await-bundle.sh, in the flows'
+      # script): bundling (about a minute) and the emulator's install and boot (about
+      # another) side by side.
+      - name: Bundle this commit's JavaScript (in the background)
+        if: matrix.shard.flows != '' && steps.cache.outputs.cache-hit == 'true'
+        run: |
+          nohup bash -c 'bash .maestro/scripts/embed-js.sh android .maestro/build/revisely-e2e.apk; echo $? > "$RUNNER_TEMP/embed-js.status"' > "$RUNNER_TEMP/embed-js.log" 2>&1 &
+
+      # Maestro and the Firestore emulator's jar, kept per version (the CLI
+      # downloads the jar each run otherwise).
+      - name: Restore Maestro and the emulators
+        if: matrix.shard.flows != ''
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.maestro
+            ~/.cache/firebase/emulators
+          key: e2e-tools-${{ runner.os }}-maestro${{ env.MAESTRO_VERSION }}-firebase${{ env.FIREBASE_TOOLS_VERSION }}-storage
+
+      # Our Cloud Functions, which the functions emulator runs (emulators.sh builds them).
+      - name: Restore the functions' packages
+        if: matrix.shard.flows != ''
+        id: fnm
+        uses: actions/cache/restore@v4
+        with:
+          path: functions/node_modules
+          key: e2e-functions-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('functions/package-lock.json') }}
+
+      - name: The functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        run: npm ci --prefix functions
+
+      - name: Keep the functions' packages
+        if: matrix.shard.flows != '' && steps.fnm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: functions/node_modules
+          key: ${{ steps.fnm.outputs.cache-primary-key }}
+
+      - name: Firebase CLI and Maestro
+        if: matrix.shard.flows != ''
+        run: |
+          npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
+          [ -x "$HOME/.maestro/bin/maestro" ] || curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # The emulator sees this computer's 127.0.0.1 as 10.0.2.2.
+      - name: Start the Firebase emulators
+        if: matrix.shard.flows != ''
+        # Twice if need be: on a busy runner the Firestore emulator can miss the
+        # CLI's own one-minute start limit.
+        run: |
+          for attempt in 1 2; do
+            nohup bash .maestro/scripts/emulators.sh > "$RUNNER_TEMP/emulators.log" 2>&1 &
+            for i in $(seq 1 90); do
+              # The functions emulator answers 404 at its root once it serves.
+              if curl -fs http://127.0.0.1:9099/ >/dev/null && curl -fs http://127.0.0.1:8080/ >/dev/null &&
+                [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/)" != 000 ]; then echo ready; exit 0; fi
+              sleep 2
+            done
+            echo "::warning::The emulators didn't start (attempt $attempt)."
+            cat "$RUNNER_TEMP/emulators.log"
+            pkill -f "firebase emulators" || true
+            pkill -f cloud-firestore-emulator || true
+            sleep 5
+          done
+          exit 1
+
+      - name: Enable KVM
+        if: matrix.shard.flows != ''
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The action runs each line of `script` on its own: one line. $E2E_FLOWS
+      # (the job's flows) is a glob, expanded there. It first waits for the bundle
+      # started above (nothing to wait for after a native build, which bundled).
+      - name: Run the flows
+        id: flows
+        if: matrix.shard.flows != ''
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          E2E_FLOWS: ${{ matrix.shard.flows }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
+          script: bash .maestro/scripts/await-bundle.sh && adb install -r .maestro/build/revisely-e2e.apk && bash .maestro/run.sh android $E2E_FLOWS
+
+      # Each flow's attempts (run.sh's attempts.json: passed on the first attempt or
+      # not, and why not), from every run, for the weekly flake report (e2e-flakes.yml).
+      - name: Keep the attempts
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') && hashFiles('.maestro/build/results/android/attempts.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-attempts-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .maestro/build/results/android/attempts.json
+          retention-days: 14
+
+      - name: Keep the results
+        if: failure() || cancelled() || hashFiles('.maestro/build/results/**/attempt-failed') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-${{ strategy.job-index }}-${{ github.run_id }}
+          path: |
+            .maestro/build/results
+            .maestro/build/gradle.log
+            ${{ runner.temp }}/emulators.log
+          retention-days: 7
+          # Maestro keeps its screenshots under a .maestro folder.
+          include-hidden-files: true
+
+      # The flows' screenshots of key screens (takeScreenshot), from every run.
+      - name: Keep the screenshots
+        if: ${{ always() && matrix.shard.flows != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-screens-${{ strategy.job-index }}-${{ github.run_id }}
+          path: .maestro/build/results/**/takeScreenshot/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      # The screenshots against the approved baselines (.maestro/baselines/android/,
+      # .maestro/README.md "Screenshots"): a changed screen fails the job, with a
+      # board of it in the artifact below; one with no baseline yet is only reported.
+      - name: Compare the screenshots
+        id: visual
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') }}
+        run: |
+          npm ci --prefix .maestro/visual --no-audit --no-fund --loglevel=error
+          (cd .maestro/visual && node --test --test-reporter=dot)
+          node .maestro/visual/compare.mjs android
+
+      - name: Keep the screenshot boards
+        if: ${{ always() && steps.visual.outcome != 'skipped' && hashFiles('.maestro/build/visual/*/boards/*.png') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-visual-${{ strategy.job-index }}-${{ github.run_id }}
+          path: .maestro/build/visual
+          retention-days: 14
+
+  # The required check: green when every platform job that had to run passed,
+  # or when nothing in the change goes into the app (they were skipped).
+  e2e:
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.ios == '' && (inputs.platform != 'both' || inputs.flows != '') && 'E2E (partial run)' || 'E2E' }}
+    needs: [changes, ios, android]
+    # Also after a failure or a cancellation, so the check is never missing.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          APP: ${{ needs.changes.outputs.app }}
+          RUN_IOS: ${{ needs.changes.outputs.run_ios }}
+          RUN_ANDROID: ${{ needs.changes.outputs.run_android }}
+          IOS: ${{ needs.ios.result }}
+          ANDROID: ${{ needs.android.result }}
+          EVENT: ${{ github.event_name }}
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          echo "changes: $CHANGES (app: $APP), iOS: $IOS, Android: $ANDROID"
+          if [ "$CHANGES" != success ]; then echo "::error::Couldn't tell what changed ($CHANGES)."; exit 1; fi
+          if [ "$APP" != true ]; then echo "Nothing that goes into the app changed: no flows to run."; exit 0; fi
+          expect() { # platform planned result
+            if [ "$2" != true ]; then echo "$1: not in this run's plan"; return 0; fi
+            if [ "$3" != success ]; then echo "::error::E2E on $1: $3"; return 1; fi
+          }
+          ok=0
+          expect ios "$RUN_IOS" "$IOS" || ok=1
+          expect android "$RUN_ANDROID" "$ANDROID" || ok=1
+          exit $ok
+
+  # E2E red on develop (what a push landed, or the nightly run): open or update the
+  # develop-red issue with the failing flows, the run and each flow's first failing
+  # step; the first run green on every platform that was red closes it
+  # (scripts/e2e/develop-red.js, TESTING.md). It reads the jobs' attempts.json
+  # artifacts. Not part of the required check.
+  develop-red:
+    name: E2E (develop-red issue)
+    needs: [changes, ios, android]
+    if: ${{ always() && needs.changes.outputs.app == 'true' && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+      pull-requests: read # the suspects: PRs merged since the last green run, and their files
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+          sparse-checkout: |
+            scripts
+            .github
+            .maestro
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-*-attempts-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/attempts
+
+      - name: Open, update or close the develop-red issue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
+          IOS: ${{ contains(needs.changes.outputs.ios_shards, '.yaml') }}:${{ needs.changes.outputs.run_ios }}:${{ needs.ios.result }}
+          ANDROID: ${{ contains(needs.changes.outputs.android_shards, '.yaml') }}:${{ needs.changes.outputs.run_android }}:${{ needs.android.result }}
+        run: node scripts/e2e/develop-red.js "$RUNNER_TEMP/attempts"

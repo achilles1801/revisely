@@ -9,9 +9,25 @@ jest.mock('../clearQuran', () => ({
   prefetchClearQuran: (...a: unknown[]) => mockPrefetchClearQuran(...a),
   prefetchClearQuranAround: (...a: unknown[]) => mockPrefetchAround(...a),
 }));
+// Saheeh International (lib/saheeh, its own tests): a sura of seven verses kept once one loads.
+const mockSaheehLoaded = new Map<string, { text: string; footnotes: string; version: string }>();
+const mockSaheehVerse = jest.fn(async (s: number, a: number) => {
+  for (let n = 1; n <= 7; n++) {
+    mockSaheehLoaded.set(`${s}:${n}`, { text: `saheeh ${n}`, footnotes: n === 6 ? '[11] A note.' : '', version: '1.1.2' });
+  }
+  return mockSaheehLoaded.get(`${s}:${a}`)!;
+});
+const mockPrefetchSaheeh = jest.fn();
+jest.mock('../saheeh', () => ({
+  SAHEEH_PAGE_URL: 'https://quranenc.com/en/browse/english_saheeh',
+  getSaheehVerse: (s: number, a: number) => mockSaheehVerse(s, a),
+  peekSaheehVerse: (s: number, a: number) => mockSaheehLoaded.get(`${s}:${a}`) ?? null,
+  prefetchSaheeh: (...a: unknown[]) => mockPrefetchSaheeh(...a),
+}));
 
 import {
   CLEAR_QURAN_ID,
+  creditLine,
   getVerseText,
   peekVerseText,
   prefetchVerseNeighbours,
@@ -19,6 +35,7 @@ import {
   isTranslationAvailable,
   parsePageResponse,
   pickerTitle,
+  __resetTranslationForTests,
   resolveTranslation,
   stripBismillah,
   TRANSLATIONS,
@@ -44,32 +61,45 @@ describe('parsePageResponse', () => {
   });
 });
 
-describe('getAyahTranslation', () => {
-  const pageResponse = {
-    data: {
-      ayahs: [{ numberInSurah: 10, text: 'Ten.', surah: { number: 3, englishName: 'Aal-i-Imraan' } }],
-    },
-  };
-  const single = {
-    data: { numberInSurah: 9, text: 'Nine.', surah: { number: 3, englishName: 'Aal-i-Imraan' } },
+describe('Saheeh International (QuranEnc.com)', () => {
+  const saheeh = TRANSLATIONS.find((t) => t.id === 'en.sahih')!;
+  const arabicPage = {
+    data: { ayahs: [{ numberInSurah: 6, text: 'إِنَّ ٱلَّذِينَ', surah: { number: 2, englishName: 'Al-Baqarah' } }] },
   };
 
   beforeEach(() => {
-    (global as any).fetch = jest.fn(async (url: string) => ({
-      ok: true,
-      json: async () => (url.includes('/page/') ? pageResponse : single),
-    }));
+    __resetTranslationForTests();
+    mockSaheehLoaded.clear();
+    mockSaheehVerse.mockClear();
+    (global as any).fetch = jest.fn(async () => ({ ok: true, json: async () => arabicPage }));
   });
 
-  it('takes a verse from its page, and fetches one carried over from the previous page', async () => {
-    const { getAyahTranslation } = require('../translation');
-    expect((await getAyahTranslation(51, 3, 10)).text).toBe('Ten.');
-    expect((await getAyahTranslation(51, 3, 9)).text).toBe('Nine.');
-    const urls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
-    expect(urls).toEqual([
-      'https://api.alquran.cloud/v1/page/51/en.sahih',
-      'https://api.alquran.cloud/v1/ayah/3:9/en.sahih',
-    ]);
+  it('comes from QuranEnc, with its footnotes and the version shown', async () => {
+    const text = await getVerseText(3, 2, 6, 'en.sahih');
+    expect(mockSaheehVerse).toHaveBeenCalledWith(2, 6);
+    expect(text).toEqual({
+      sura: 2,
+      ayah: 6,
+      surahName: 'Al-Baqarah',
+      arabic: 'إِنَّ ٱلَّذِينَ',
+      translation: 'saheeh 6',
+      translationName: 'Saheeh International',
+      footnotes: '[11] A note.',
+      version: '1.1.2',
+    });
+    // alquran.cloud gives only the Arabic now: its Saheeh copy had no licence.
+    const urls = (global.fetch as jest.Mock).mock.calls.map(([u]) => String(u));
+    expect(urls.every((u) => u.includes('quran-uthmani'))).toBe(true);
+  });
+
+  it('carries the credit QuranEnc requires: the publisher, the source and the version', () => {
+    expect(saheeh.credit).toEqual({
+      text: 'Saheeh International, issued by Noor International Center',
+      linkLabel: 'QuranEnc.com',
+      url: 'https://quranenc.com/en/browse/english_saheeh',
+    });
+    expect(creditLine(saheeh, '1.1.2')).toBe('Saheeh International, issued by Noor International Center · v1.1.2');
+    expect(pickerTitle(saheeh)).toBe('Saheeh International — Noor International Center');
   });
 });
 
@@ -105,7 +135,8 @@ describe('The Clear Quran', () => {
       url: 'https://theclearquran.org',
     });
     expect(pickerTitle(tcq)).toBe('The Clear Quran® — Dr. Mustafa Khattab');
-    expect(pickerTitle(TRANSLATIONS[0])).toBe('Saheeh International');
+    // No version of its own: the credit stays as the publisher requires.
+    expect(creditLine(tcq)).toBe('The Clear Quran® by Dr. Mustafa Khattab');
   });
 
   it('is a normal choice now: a saved choice keeps it', () => {
@@ -132,34 +163,34 @@ describe('The Clear Quran', () => {
   });
 
   it('when its text fails, the error stands: never another translation in its place', async () => {
+    mockSaheehVerse.mockClear();
     mockClearQuranVerse.mockRejectedValue(new Error('RATE_LIMITED'));
     await expect(getVerseText(3, 2, 6, CLEAR_QURAN_ID)).rejects.toThrow('RATE_LIMITED');
-    const urls = (global.fetch as jest.Mock).mock.calls.map(([url]) => String(url));
-    expect(urls.some((u) => u.includes('en.sahih'))).toBe(false);
+    expect(mockSaheehVerse).not.toHaveBeenCalled();
   });
 });
 
 describe('ready before it is asked for', () => {
-  // Page 50 holds 2:6–7 in both editions (made up, as the API answers).
-  const page = (edition: string) => ({
+  // Page 50 holds 2:6–7 (made up, as the API answers).
+  const page = {
     data: {
       ayahs: [6, 7].map((n) => ({
         numberInSurah: n,
-        text: edition === 'quran-uthmani' ? `arabic ${n}` : `saheeh ${n}`,
+        text: `arabic ${n}`,
         surah: { number: 2, englishName: 'Al-Baqarah' },
       })),
     },
-  });
+  };
 
   beforeEach(() => {
     mockClearQuranVerse.mockReset();
     mockPeekClearQuran.mockReset().mockReturnValue(undefined);
     mockPrefetchClearQuran.mockReset();
     mockPrefetchAround.mockReset();
-    (global as any).fetch = jest.fn(async (url: string) => ({
-      ok: true,
-      json: async () => page(url.includes('quran-uthmani') ? 'quran-uthmani' : 'en.sahih'),
-    }));
+    mockPrefetchSaheeh.mockReset();
+    mockSaheehLoaded.clear();
+    __resetTranslationForTests();
+    (global as any).fetch = jest.fn(async () => ({ ok: true, json: async () => page }));
   });
 
   it('peekVerseText gives exactly what getVerseText gave, without waiting; nothing it lacks', async () => {
@@ -187,8 +218,10 @@ describe('ready before it is asked for', () => {
     expect(mockPrefetchClearQuran).toHaveBeenCalledWith(2, 6);
     await new Promise((r) => setTimeout(r, 0));
     const urls = (global.fetch as jest.Mock).mock.calls.map(([u]) => String(u));
-    expect(urls.some((u) => u.includes('en.sahih'))).toBe(false);
+    expect(mockPrefetchSaheeh).not.toHaveBeenCalled();
     expect(urls.some((u) => u.includes('quran-uthmani'))).toBe(true);
+    prefetchVerseText(60, 3, 6, 'en.sahih');
+    expect(mockPrefetchSaheeh).toHaveBeenCalledWith(3);
   });
 
   it('neighbours: the Clear Quran two verses either side; others by page', async () => {

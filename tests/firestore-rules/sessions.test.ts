@@ -3,7 +3,7 @@ import {
   assertSucceeds,
   RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { getTestEnv, cleanupTestEnv } from './setup';
 
 const ALICE = 'alice';
@@ -79,6 +79,80 @@ describe('users/{userId}/sessions/{sessionId}', () => {
     });
   });
 
+  // The outbox (src/lib/offline) creates a day's session with the whole
+  // document, then updates it with the session's mutable fields only.
+  describe('from the outbox', () => {
+    const created = Timestamp.fromMillis(1_793_600_000_000);
+    const full = (over: Record<string, unknown> = {}) => ({
+      ...validSession('2026-11-02'),
+      state: 'IN_PROGRESS',
+      createdAt: created,
+      updatedAt: serverTimestamp(),
+      completedAt: null,
+      durationMinutes: 12,
+      totalAssignedPages: 3,
+      pagesRevised: [1],
+      weaknessUpdates: [{ pageNumber: 1, previousRating: 4, newRating: 2, changedAt: created }],
+      completionPercentage: 33.33333333333333,
+      ...over,
+    });
+    const mutable = (s: Record<string, unknown>) => ({
+      state: s.state,
+      pagesRevised: s.pagesRevised,
+      pagesSkipped: s.pagesSkipped,
+      weaknessUpdates: s.weaknessUpdates,
+      durationMinutes: s.durationMinutes,
+      completionPercentage: s.completionPercentage,
+      assignedPages: s.assignedPages,
+      totalAssignedPages: s.totalAssignedPages,
+      ...(s.ahead !== undefined ? { ahead: s.ahead } : {}),
+      updatedAt: serverTimestamp(),
+    });
+
+    it('creates the day with the whole document, then merges into it (twice is fine)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      const merged = full({ pagesRevised: [1, 2], durationMinutes: 15, completionPercentage: 66.66666666666666 });
+      await assertSucceeds(updateDoc(ref, mutable(merged)));
+      await assertSucceeds(updateDoc(ref, mutable(merged)));
+      const done = full({ state: 'COMPLETED', pagesRevised: [1, 2, 3], assignedPages: [1, 2, 3, 4], totalAssignedPages: 4, completionPercentage: 75 });
+      await assertSucceeds(updateDoc(ref, mutable(done)));
+      await assertSucceeds(updateDoc(ref, mutable(done)));
+    });
+
+    it('an edit sets revised and skipped pages, minutes and ratings', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      await assertSucceeds(
+        updateDoc(ref, { pagesRevised: [2], pagesSkipped: [1], durationMinutes: null, weaknessUpdates: [], updatedAt: serverTimestamp() }),
+      );
+    });
+
+    // Revising ahead (#168): pages credited to a later day, as a map from the day.
+    it('writes pages revised ahead, keyed by the day they count for', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      await assertSucceeds(updateDoc(ref, mutable(full({ ahead: { '2026-11-03': [4, 5] } }))));
+      await assertSucceeds(updateDoc(ref, mutable(full({ ahead: {} }))));
+    });
+
+    it('rejects ahead credit that is not a map', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/sessions/2026-11-02`);
+      await assertSucceeds(setDoc(ref, full()));
+      await assertFails(updateDoc(ref, mutable(full({ ahead: [4, 5] }))));
+    });
+
+    it('creates a session with pages revised ahead, and rejects a list there too', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(setDoc(doc(alice, `users/${ALICE}/sessions/2026-11-02`), full({ ahead: { '2026-11-03': [4] } })));
+      await assertFails(setDoc(doc(alice, `users/${ALICE}/sessions/2026-11-04`), { ...validSession('2026-11-04'), ahead: [4] }));
+    });
+  });
+
   describe('update', () => {
     const DATE = '2026-05-10';
 
@@ -122,6 +196,36 @@ describe('users/{userId}/sessions/{sessionId}', () => {
       await assertFails(
         updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
           assignedPages: [99, 100],
+        }),
+      );
+    });
+
+    it('allows assignedPages to shrink to some of them (the day’s end moved to the next day)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1, 2],
+          totalAssignedPages: 2,
+        }),
+      );
+    });
+
+    it('rejects dropping some assigned pages and adding others in one write', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(
+        updateDoc(doc(alice, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1, 2, 40],
+          totalAssignedPages: 3,
+        }),
+      );
+    });
+
+    it('rejects another user shrinking the assigned pages', async () => {
+      const bob = env.authenticatedContext(BOB).firestore();
+      await assertFails(
+        updateDoc(doc(bob, `users/${ALICE}/sessions/${DATE}`), {
+          assignedPages: [1],
+          totalAssignedPages: 1,
         }),
       );
     });

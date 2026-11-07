@@ -3,9 +3,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { computeMemorizationStats } from '../../../lib/memorizationStats';
-import { NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
+import { aheadLine, NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
+import { ProgressRing } from '../../activity/DayParts';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
 import { JuzDots } from '../../v2/JuzDots';
@@ -68,15 +69,19 @@ export function TodayPost({
   pages,
   done,
   carried = 0,
+  carriedLeft = 0,
   streak,
+  streakGrace,
   memorized,
   onPrimary,
   onEditSchedule,
   onMemorization,
   onJump,
-  leftovers,
+  catchUp,
   onCarryOver,
   carrying,
+  ahead,
+  onAhead,
 }: {
   name: string;
   initial: string;
@@ -86,7 +91,11 @@ export function TodayPost({
   done: ReadonlySet<number>;
   /** How many of today's pages were carried in from yesterday (they come first). */
   carried?: number;
+  /** Of those, how many are still to revise (once today's own pages are done, the button goes on to them). */
+  carriedLeft?: number;
   streak: number;
+  /** Yesterday missed but restorable (SESS-6): the streak reads dimmed, with a ring for the missed pages. */
+  streakGrace?: { previous: number; progress: { scheduled: number; credited: number } } | null;
   /** How much is memorized (memorizedText): the line and the juz dots. */
   memorized: { body: string; fraction: number; juz: number[] };
   onPrimary: () => void;
@@ -95,14 +104,24 @@ export function TodayPost({
   onMemorization: () => void;
   /** Where today starts (Jump to…). */
   onJump: () => void;
-  leftovers: number;
+  /** The catch-up offer for pages missed on earlier days (catchUpLine), or none. */
+  catchUp: { title: string; label: string } | null;
   onCarryOver: () => void;
   carrying: boolean;
+  /** Done today: the next revision day, for the quiet line that opens it (revise ahead). */
+  ahead?: { lead: string; first: number } | null;
+  onAhead?: () => void;
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const lines = todayLines(status, pages, done, carried);
-  const meta = streak > 0 ? `Today · ${streak}-day streak` : 'Today';
+  const lines = todayLines(status, pages, done, carried, carriedLeft);
+  const grace = streakGrace ?? null;
+  // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
+  const meta = grace
+    ? `Today · ${grace.previous}-day streak`
+    : streak > 0
+      ? `Today · ${streak}-day streak`
+      : 'Today';
 
   const actions: SheetAction[] = [
     {
@@ -162,25 +181,57 @@ export function TodayPost({
         mark={<Mark label={initial} />}
         name={name || 'Today'}
         meta={name ? meta : undefined}
+        figure={
+          grace ? (
+            <ProgressRing
+              fraction={grace.progress.scheduled > 0 ? grace.progress.credited / grace.progress.scheduled : 0}
+              done={false}
+              size={18}
+            />
+          ) : undefined
+        }
         headerMaxScale={HEADER_MAX_SCALE}
         testID="today-post"
         footer={
           <>
+            {catchUp ? (
+              // The missed pages come first: one line, then the button that adds them to today.
+              <View style={styles.catchUp}>
+                <Text style={[typeV2.body, { color: palette.secondary }]} {...fit} testID="today-catch-up">
+                  {catchUp.title}
+                </Text>
+                <PillButton
+                  title={carrying ? 'Adding…' : 'Add to today'}
+                  variant="outline"
+                  onPress={onCarryOver}
+                  disabled={carrying}
+                  accessibilityLabel={`${catchUp.label}. Add to today`}
+                  testID="today-carry-over"
+                />
+              </View>
+            ) : null}
             <PillButton
               title={lines.cta}
               onPress={onPrimary}
               variant={lines.solid ? 'solid' : 'outline'}
               testID="today-cta"
             />
-            {leftovers > 0 ? (
-              <PillButton
-                title={carrying ? 'Adding…' : `Add ${leftovers} from yesterday`}
-                variant="outline"
-                onPress={onCarryOver}
-                disabled={carrying}
-                accessibilityLabel={`Add ${leftovers} unrevised pages from yesterday to today`}
-                testID="today-carry-over"
-              />
+            {ahead && onAhead && status === 'completed' ? (
+              // Quiet: a grey line, not a second button. Opens that day's pages.
+              <Tap
+                onPress={onAhead}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={aheadLine(ahead.lead, ahead.first).label}
+                style={styles.memorized}
+                testID="today-ahead"
+              >
+                <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
+                  {aheadLine(ahead.lead, ahead.first).text}
+                  {NBSP}
+                  <Chevron color={palette.secondary} />
+                </Text>
+              </Tap>
             ) : null}
             <Tap
               onPress={onMemorization}
@@ -234,6 +285,7 @@ export function TodayPost({
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  catchUp: { gap: 8 },
   shrink: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
