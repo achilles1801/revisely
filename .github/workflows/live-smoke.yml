@@ -1,0 +1,53 @@
+name: Live smoke check
+
+# The one test that talks to production (scripts/smoke/live.js, TESTING.md): once a day it signs in
+# as the dedicated smoke account, gets an App Check token with a registered debug token, asks Revo
+# one tiny question (one real model call, counted in Revo's monthly cap) and fetches one block of
+# The Clear Quran through the worker. Anything but a valid answer fails the run and opens (or
+# comments on) an issue labelled live-smoke, mentioning the owner; a pass closes it.
+#
+# It skips, with a notice, until the smoke account's secrets exist (TESTING.md lists them):
+# SMOKE_EMAIL, SMOKE_PASSWORD, SMOKE_FIREBASE_API_KEY, SMOKE_APPCHECK_APP_ID,
+# SMOKE_APPCHECK_DEBUG_TOKEN. Scheduled runs start from main (CLAUDE.md). No caches: it holds
+# secrets.
+
+on:
+  schedule:
+    # 15:00 UTC: morning in Chicago, evening in the Gulf.
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: live-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Live smoke check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No dependencies: Node's own fetch.
+      - name: Sign in, ask Revo, read a verse
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          SMOKE_FIREBASE_API_KEY: ${{ secrets.SMOKE_FIREBASE_API_KEY }}
+          SMOKE_APPCHECK_APP_ID: ${{ secrets.SMOKE_APPCHECK_APP_ID }}
+          SMOKE_APPCHECK_DEBUG_TOKEN: ${{ secrets.SMOKE_APPCHECK_DEBUG_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MENTION: '@${{ github.repository_owner }}'
+        run: node scripts/smoke/live.js --report

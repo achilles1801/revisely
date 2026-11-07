@@ -101,6 +101,8 @@ const githubApi = {
   createIssue: (title, body, labels) => github('POST', '/issues', { title, body, labels }),
   comment: (number, body) => github('POST', `/issues/${number}/comments`, { body }),
   reopen: (number) => github('PATCH', `/issues/${number}`, { state: 'open' }),
+  /** Changes an issue's fields (body, state, state_reason…). */
+  update: (number, fields) => github('PATCH', `/issues/${number}`, fields),
   ensureLabel: async (name, color, description) => {
     try {
       await github('POST', '/labels', { name, color, description });
