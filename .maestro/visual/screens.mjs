@@ -85,10 +85,8 @@ export const SCREEN_MASKS = {
       .flatMap((n) => [n, `${n}-dark`])
       .map((n) => [n, merge(revoButton, sessionMinutes(1272, 1081))]),
   ),
-  // All activity: the session's row, its minutes (Android; iOS once its run is in).
-  ...Object.fromEntries(
-    ['11-see-all', '11-see-all-dark'].map((n) => [n, { android: sessionMinutes(0, 640).android }]),
-  ),
+  // All activity: the session's row, its minutes.
+  ...Object.fromEntries(['11-see-all', '11-see-all-dark'].map((n) => [n, sessionMinutes(777, 640)])),
   // The daily log: the Memorized entry's time ("12:03 pm").
   ...Object.fromEntries(
     ['11-daily-log', '11-daily-log-dark'].map((n) => [
