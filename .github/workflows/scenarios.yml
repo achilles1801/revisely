@@ -7,8 +7,9 @@ name: Scenarios
 # ci.yml (every push and PR) and by preview.yml, which publishes nothing unless
 # they pass. No caches: preview.yml holds release secrets (CLAUDE.md).
 #
-# Four jobs side by side, each with a quarter of the files (Jest's --shard) and
-# its own emulators on its own runner: as one job it took 18 minutes. The check
+# Four jobs side by side, each with a quarter of the work (Jest's --shard, split
+# by each file's time in tests/scenarios/durations.json: harness/sequencer.js)
+# and its own emulators on its own runner: as one job it took 18 minutes. The check
 # ci.yml and preview.yml wait for is `Scenario tests`, which passes only when
 # every shard passed.
 

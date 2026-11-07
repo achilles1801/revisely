@@ -28,6 +28,8 @@ module.exports = {
   // @firebase/util loads a .mjs file, which the preset's transform skips.
   transform: { ...preset.transform, '\\.mjs$': babel },
   testEnvironment: '<rootDir>/tests/scenarios/harness/environment.js',
+  // CI's shards split by each file's time, not by a hash of its path (harness/sequencer.js).
+  testSequencer: '<rootDir>/tests/scenarios/harness/sequencer.js',
   // A week of days is a minute on a CI runner.
   testTimeout: 180000,
   collectCoverageFrom: base.collectCoverageFrom,
