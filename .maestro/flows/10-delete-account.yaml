@@ -16,10 +16,12 @@ appId: com.revisionbuddy.app
 
 - tapOn:
     id: open-settings
+# Centred: at the screen's foot the row sits under the tab bar, which takes the tap.
 - scrollUntilVisible:
     element:
       id: settings-delete-account
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - tapOn:
     id: settings-delete-account
