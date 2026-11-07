@@ -66,6 +66,22 @@ interface AccentTokens {
   heat: readonly [string, string, string, string, string];
   /** A day's number on each `heat` step (≥ 4.5:1). */
   heatInk: readonly [string, string, string, string, string];
+  /** Revo's mark and glows, in the accent (components/revo). */
+  revo: RevoTokens;
+}
+
+/**
+ * Revo in the accent: the R's gradient on its black disc (each end ≥ 3:1 on the disc), the disc's
+ * light from the top-left, the button's ring and glow in dark and its shadow in light, and the
+ * sheet's glow at the top-left (null for none: Jade has no glow in dark, as on Home).
+ */
+export interface RevoTokens {
+  r: readonly [string, string];
+  disc: string;
+  ring: string;
+  glow: string;
+  shadow: string;
+  sheetGlow: { color: string; opacity: number } | null;
 }
 
 export interface PaletteV2 extends AccentTokens {
@@ -212,6 +228,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#0E6B5A', '#0E6B5A'],
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
+      revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: { color: '#3FA084', opacity: 0.12 } },
     },
     dark: {
       primary: '#FFFFFF',
@@ -229,6 +246,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#4DBA9F', '#4DBA9F'],
       heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
+      revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: null },
     },
   },
   // RedotPay, from colours sampled off its screens: #DC1433 for the action,
@@ -252,6 +270,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#3E0812', '#DC1433'],
       heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
+      revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.08 } },
     },
     dark: {
       primary: '#DC1433',
@@ -275,6 +294,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#DC1433', '#F03C56'],
       heat: ['#2E0E15', '#8A0E26', '#B3112C', '#DC1433', '#F5455E'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000'],
+      revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.22 } },
     },
   },
   // The real-estate app, from sampled colours: #624BD5 for the action (white
@@ -297,6 +317,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#2E0EC6', '#9789DA'],
       heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
+      revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.1 } },
     },
     dark: {
       primary: '#624BD5',
@@ -320,6 +341,7 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#624BD5', '#9789DA'],
       heat: ['#1C1C1E', '#3F2AA2', '#624BD5', '#7E6CD8', '#9789DA'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
+      revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.22 } },
     },
   },
 };
@@ -481,21 +503,11 @@ export function mixColors(a: string, b: string, t: number): string {
 }
 
 /**
- * Revo's mark (the assistant's button, its header capsule, the opt-in): the app icon's
- * gradient R on a black disc lit from the top-left. The same in light and dark; the disc
- * gets a lavender ring and an Indigo glow in dark, a soft shadow in light.
+ * Revo's mark (the assistant's button, its header capsule, the opt-in): an R on a black disc lit
+ * from the top-left, in the accent (palette.revo: the R, the disc's light, the ring and glow in
+ * dark, the shadow in light). The disc's middle and edge are the same for every accent.
  */
 export const revoV2 = {
-  /** The R's gradient (the app icon's Indigo → Lavender). */
-  rStart: '#624BD5',
-  rEnd: '#9789DA',
-  /** The disc's radial light, top-left to edge. */
-  discLight: '#2B2352',
   discMid: '#0A0A12',
   discEdge: '#000000',
-  /** Dark: the 1pt ring (at 60%) and the glow. */
-  ring: '#9789DA',
-  glow: '#624BD5',
-  /** Light: the shadow. */
-  shadow: '#14103C',
 } as const;

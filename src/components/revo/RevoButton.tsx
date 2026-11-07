@@ -3,7 +3,6 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { REVO_BUTTON_GAP, REVO_BUTTON_SIZE } from '../../lib/revo/presence';
-import { revoV2 } from '../../theme/v2';
 import { RevoMark } from './RevoMark';
 
 export { REVO_BUTTON_GAP, REVO_BUTTON_SIZE };
@@ -22,9 +21,10 @@ const DOT_BORDER = 2;
 export function RevoButton({ bottom, dot, onPress }: { bottom: number; dot: boolean; onPress: () => void }) {
   const { palette, isDark } = useTheme();
   const haptics = useHaptics();
+  // In the accent: a glow in dark, a shadow in light.
   const lift = isDark
-    ? { shadowColor: revoV2.glow, shadowOpacity: 0.5, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } }
-    : { shadowColor: revoV2.shadow, shadowOpacity: 0.28, shadowRadius: 9, shadowOffset: { width: 0, height: 6 } };
+    ? { shadowColor: palette.revo.glow, shadowOpacity: 0.5, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } }
+    : { shadowColor: palette.revo.shadow, shadowOpacity: 0.28, shadowRadius: 9, shadowOffset: { width: 0, height: 6 } };
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
       <Pressable

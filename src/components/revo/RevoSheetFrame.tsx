@@ -56,7 +56,8 @@ export function RevoSheetFrame({
   children: React.ReactNode;
   testID?: string;
 }) {
-  const { palette, isDark } = useTheme();
+  const { palette } = useTheme();
+  const glow = palette.revo.sheetGlow;
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
@@ -151,16 +152,18 @@ export function RevoSheetFrame({
             style={[styles.sheet, { backgroundColor: palette.sheet, paddingBottom: cover > 0 ? REVO_KEYBOARD_PAD : Math.max(insets.bottom, 12) }, sheetStyle]}
             testID={testID}
           >
-            {/* One soft glow, top-left: the primary at 10% (30% in dark). */}
-            <Svg pointerEvents="none" style={styles.glow} width={420} height={260}>
-              <Defs>
-                <RadialGradient id="revoGlow" cx="20%" cy="0%" rx="80%" ry="100%">
-                  <Stop offset="0" stopColor={palette.primary} stopOpacity={isDark ? 0.3 : 0.1} />
-                  <Stop offset="1" stopColor={palette.primary} stopOpacity={0} />
-                </RadialGradient>
-              </Defs>
-              <Rect x="0" y="0" width={420} height={260} fill="url(#revoGlow)" />
-            </Svg>
+            {/* One soft glow, top-left, in the accent (none for Jade in dark, as on Home). */}
+            {glow ? (
+              <Svg pointerEvents="none" style={styles.glow} width={420} height={260}>
+                <Defs>
+                  <RadialGradient id="revoGlow" cx="20%" cy="0%" rx="80%" ry="100%">
+                    <Stop offset="0" stopColor={glow.color} stopOpacity={glow.opacity} />
+                    <Stop offset="1" stopColor={glow.color} stopOpacity={0} />
+                  </RadialGradient>
+                </Defs>
+                <Rect x="0" y="0" width={420} height={260} fill="url(#revoGlow)" />
+              </Svg>
+            ) : null}
             <GestureDetector gesture={pan}>
               <View
                 collapsable={false}
