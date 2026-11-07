@@ -7,6 +7,7 @@
 import { pagesRange } from '../harness/account';
 import { setNow } from '../harness/clock';
 import { Home, homeStack } from '../harness/screens';
+import { catchUpWhat, plain } from '../harness/words';
 import { addDays, scenarioPhone } from '../harness/testScenario';
 import type { OpenApp } from '../harness/phone';
 
@@ -64,7 +65,7 @@ it('[CARRY-2] [CARRY-1] "Revise these first tomorrow" first, then Add to today: 
   await home.ready();
   await reviseFirstTomorrow(app, D, [600, 601]);
   // The leftovers are still offered today.
-  expect(home.catchUp()).toMatch(/^Left yesterday · Revise p\.\s585–586$/);
+  expect(plain(home.catchUp())).toBe(`Left yesterday · Revise ${catchUpWhat(pagesRange(585, 586))}`);
   await home.tap('today-carry-over');
   await app.until(() => home.catchUp() == null, 'the leftovers to be added');
   await app.untilSynced();
