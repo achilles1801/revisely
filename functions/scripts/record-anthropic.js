@@ -11,6 +11,7 @@
  * scenario test "[TEST-1]" fails on drift until then. It costs a few cents.
  *
  *   cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/record-anthropic.js [kind…]
+ *   (--dry builds every request without a call)
  *
  * The key is read from the environment, sent only to api.anthropic.com, and never written or
  * printed. Response headers are not kept (they carry request ids and rate-limit state).
@@ -64,7 +65,7 @@ const context = {
 
 const REQUESTS = {
   'revo-ask': () =>
-    buildAskRequest({ day: DAY, question: 'How was my week?', context, attach: null, memory: [], history: [], chat: null }),
+    buildAskRequest({ day: DAY, question: 'How was my week?', context, attached: [], memory: [], history: [], chat: null }),
   'revo-review': () => buildReviewRequest({ day: DAY, context: { ...context, localTime: '21:10' }, memory: [] }),
   coach: () => buildCoachRequest('pace', { pagesPerDay7: 9.1, pagesPerDay30: 8.4, plannedPerDay: 10 }),
 };
@@ -86,9 +87,18 @@ function write(name, rec) {
 }
 
 (async () => {
+  // --dry: build every request and check the emulator reads it as its kind; no call, no key.
+  if (process.argv.includes('--dry')) {
+    for (const [name, build] of Object.entries(REQUESTS)) {
+      const request = build();
+      if (kindOf(request) !== name) throw new Error(`${name}: the emulator would read this request as ${kindOf(request)}`);
+    }
+    console.log(`${Object.keys(REQUESTS).join(', ')}: every request builds and reads as its kind.`);
+    return;
+  }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
-    console.error('Set ANTHROPIC_API_KEY.');
+    console.error('Set ANTHROPIC_API_KEY, or pass --dry to check the requests.');
     process.exit(2);
   }
   const only = process.argv.slice(2);

@@ -1,33 +1,46 @@
 {
-  "recordedAt": null,
-  "how": "Hand-written in the Messages API response shape, not recorded yet: replace it with a real reply by running functions/scripts/record-anthropic.js with an Anthropic key (TESTING.md).",
+  "recordedAt": "2026-11-07T09:35:30.530Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "6190401a03c1489dfd7fd6491130afd7b640dd7eb9089e5d29ca84fd8a7c38a7"
+    "systemSha256": "ae5e816c4dfeb4b3e233a877ff11dbd0f8bc63be2282dcae131a8357e9e45f8b"
   },
   "status": 200,
   "body": {
-    "id": "msg_handwritten",
+    "model": "claude-sonnet-5-5",
+    "id": "msg_011CgoLhDtjuibDYS4F65r63",
     "type": "message",
     "role": "assistant",
-    "model": "claude-sonnet-5-5",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised on 6 of the last 7 revision days, 63 pages in all, against a plan of 10 a day. Page 589 is your one weak page in today’s set: revise it first while it is fresh.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Start today’s revision\",\"detail\":\"6 pages left today\"},\"remember\":[],\"title\":\"This week’s revision\",\"chips\":[\"Which pages are weakest?\",\"How is my pace?\"]}"
+        "text": "Five days in a row, with only Saturday empty and about 9 pages a day against a plan of 10. Today you've done 4 of 10 already, so the best close to the week is to carry on with the rest.\n\n\n{\"text\": \"A steady week: five days in a row, only Saturday empty, and about 9 pages a day against the plan's 10. Today is 4 of 10 done, so finish the rest and keep that streak going.\", \"chart\": {\"kind\": \"dailyPages\", \"title\": \"Pages revised each day this week\", \"days\": 7}, \"textAfter\": null, \"action\": {\"kind\": \"startRevision\", \"title\": \"Continue today's revision\", \"detail\": \"Six pages left, starting at page 587\"}, \"remember\": [], \"title\": \"How my week went\", \"chips\": [\"Which pages are weakest?\", \"Why was Saturday empty?\", \"How am I doing today?\"]}"
       }
     ],
+    "container": null,
     "stop_reason": "end_turn",
     "stop_sequence": null,
+    "stop_details": null,
     "usage": {
-      "input_tokens": 412,
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 1663,
-      "output_tokens": 171
-    }
+      "input_tokens": 312,
+      "cache_creation_input_tokens": 10210,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 10210,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 281,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
   }
 }

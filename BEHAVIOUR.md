@@ -390,8 +390,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
   pages, Activity (testers' Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
   times, the Qibla, or the reader at a surah or a juz. The server drops any other screen, section, surah or juz (the
-  answer kept, as with a page Revo wasn't given). Nothing opens until the user taps the card's button, and an app that
-  doesn't know an action shows no card for it.
+  answer kept, as with a page Revo wasn't given). An answer that suggests nothing but names one of those screens the way
+  the app does ("Edit schedule", "Settings → Appearance", "Jump to…") gets that screen's card from the server, the
+  first one it names. Nothing opens until the user taps the card's button, and an app that doesn't know an action shows
+  no card for it.
 
 - **REVO-32.** A surah, a juz or pages attached with + go with what the app shows for them, worked out on the phone
   from the sources Insights, Activity and the streak read, the way they read them: how many of its pages are
