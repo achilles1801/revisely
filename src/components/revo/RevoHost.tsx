@@ -100,6 +100,8 @@ function RevoHostInner() {
   const [view, setView] = useState<View_>({ name: 'chat' });
   const [chatId, setChatId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<RevoAttachment[]>([]);
+  // The sheet's height before Add to chat took it to full height: back to it after (mock a7).
+  const fullBeforeAdd = useRef(false);
   const [optInBusy, setOptInBusy] = useState(false);
   const [optInError, setOptInError] = useState<string | null>(null);
   const [reviewWaiting, setReviewWaiting] = useState<string | null>(null);
@@ -258,10 +260,14 @@ function RevoHostInner() {
           ) : view.name === 'add' ? (
             <RevoAddSheet
               initial={attachments}
-              onCancel={() => setView({ name: 'chat' })}
+              onCancel={() => {
+                setView({ name: 'chat' });
+                setFull(fullBeforeAdd.current);
+              }}
               onAdd={(list) => {
                 setAttachments(list);
                 setView({ name: 'chat' });
+                setFull(fullBeforeAdd.current);
               }}
             />
           ) : (
@@ -273,6 +279,7 @@ function RevoHostInner() {
               attachments={attachments}
               onAttachments={setAttachments}
               onAdd={() => {
+                fullBeforeAdd.current = full;
                 setView({ name: 'add' });
                 setFull(true);
               }}
