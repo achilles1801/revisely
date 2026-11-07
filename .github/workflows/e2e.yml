@@ -21,13 +21,13 @@ name: E2E
 # `plan` job picks the iOS and Android sets (inputs `ios`, `android`: none, build,
 # smoke, full):
 #   - a lower layer of a GitHub stack: not called (the top layer tests the stack);
-#   - the top of a stack into develop, a PR into main, a merge group: every flow,
-#     two iOS jobs and two Android jobs;
-#   - a single PR into develop: the smoke set, 02 04 05 06, on Android only, in
-#     two jobs side by side (.maestro/README.md says why these four);
-#   - a push to develop (what just landed): every Android flow, and the iOS native
-#     build alone (kept where every PR into develop can restore it). A newer push
-#     cancels the run of the one before.
+#   - a PR into develop, single or the top of a stack, and a merge group: the smoke
+#     set, 02 04 05 06, on Android only, in two jobs side by side (.maestro/README.md
+#     says why these four); a change to code the flows share adds the flows using
+#     it, on Android, twice;
+#   - a push to develop (what just landed): every flow, iOS and Android. It holds
+#     up nothing; develop's runs go one at a time and each finishes;
+#   - a PR into main (the release to production): every flow, iOS and Android.
 # On its own: the nightly run (develop; every flow) and Run workflow (by hand).
 #
 # Its last job, `E2E`, passes when every platform job that had to run passed, or

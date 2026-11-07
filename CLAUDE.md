@@ -272,25 +272,34 @@ BEHAVIOUR.md NEW-1 to NEW-4.
   A job skipped because another failed is not a pass; E2E is the one job that may be skipped, when
   the plan leaves it out. Branches needn't be up to date with develop (`strict` off: the Preview
   workflow's scenario gate still stops a broken develop from publishing). Admins can still bypass
-  (`enforce_admins` off). `main` has no branch protection. "Bug fixes add a scenario" (`spec.yml`)
+  (`enforce_admins` off). `main` needs `Required` as a required check for the release gate (Majd sets
+  it: Settings → Branches → main); until then nothing enforces it. "Bug fixes add a scenario" (`spec.yml`)
   runs on every PR on its own, so a label or a title edit re-runs it alone.
-- **Where the slow checks run** (`plan` in ci.yml; E2E is `e2e.yml`, called from CI):
+- **Where the slow checks run** (`plan` in ci.yml; E2E is `e2e.yml`, called from CI). **The long E2E
+  flows gate production, not TestFlight** (Majd, Nov 7 2026): every check stays, only where it runs
+  changed, so a merge reaches TestFlight in minutes and nothing reaches store users without every flow.
   - a draft PR: no E2E unless it has the `e2e` label; marking it ready runs everything;
-  - a PR into develop that changes code the tests share (`.maestro` subflows and scripts, a flow,
-    `run.sh`, `e2e.yml`, `ci.yml`): the flows using it, with the smoke set, on both platforms, each
-    run twice with no reruns (all flows for `run.sh`, `e2e.yml`, `ci.yml`); a change to the scenario
-    harness runs that suite twice (TESTING.md);
   - a lower layer of a GitHub stack: the fast checks only (the top layer tests the whole stack);
-  - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
-  - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
-  - what lands on develop (each push): every Android flow, and the iOS native build alone (kept
-    where every PR can restore it); a newer push cancels the run of the one before, so a push's
-    E2E covers everything since the last push whose CI passed (a docs-only push after a cancelled
-    run still tests that run's change);
+  - **a PR into develop, single or the top of a stack** (and claude-fix's runs), a merge group:
+    `Required` is the fast checks, every scenario shard and the Android E2E smoke set (Linux, KVM). No
+    iOS, no full set before merging;
+  - such a PR that changes code the tests share (`.maestro` subflows and scripts, a flow, `run.sh`,
+    `e2e.yml`, `ci.yml`) adds the flows using it to the smoke set, on Android, each run twice with no
+    reruns (all flows for `run.sh`, `e2e.yml`, `ci.yml`); a change to the scenario harness runs that
+    suite twice (TESTING.md);
+  - **what lands on develop** (each push): every flow, iOS and Android. It holds up nothing: Preview
+    publishes on the scenario gate. A failure opens or updates the `develop-red` issue naming its
+    suspects, and Revert a suspect is ready, so what slipped through is caught within the hour.
+    Develop's runs go one at a time (never cancelled; the newest waiting push replaces older ones), so
+    each covers everything merged since the last one that ran;
+  - **a PR into `main`** (the release to production): every flow, iOS and Android, with the visual
+    baselines, as its `Required` gate. Promote to production publishes only what `main` holds;
   - nightly (develop) and by hand: every flow on both, from e2e.yml itself. Runs by hand never cancel
-    each other, and skip iOS jobs the same commit already has running.
+    each other, and skip iOS jobs the same commit already has running;
+  - UI work: the screenshot boards against the mocks are still required for a UI PR. Run E2E by hand
+    on its branch (Actions → E2E → Run workflow) and attach the boards; the gate doesn't make them.
 
-  So iOS flows run only for the top of a stack, PRs into `main`, nightly and by hand.
+  So iOS flows run after each merge to develop, for PRs into `main`, nightly and by hand.
 - **Stacks** (GitHub's stacked PRs, GA Oct 6 2026; `gh extension install github/gh-stack`, which
   needs gh 2.90 or later): a large change is a stack, one layer per PR, each based on the one below.
   - **Linear history.** Rebase a branch onto develop (or onto the layer below) and force-push with
@@ -661,11 +670,11 @@ hard-coded token was deleted from the console on 2026-10-27.
   session, revise ahead, the Fajr boundary, the daily log, offline, recordings). CI calls it with
   the sets `plan` picks (see "Where the slow checks run" above): the smoke set is 02 session, 04 Fajr
   boundary, 05 daily log, 06 offline (two Android jobs side by side: 02 + 05, 04 + 06); every flow is
-  two jobs a platform. The top of a stack tests the
-  stack's whole change. One run per PR (a push cancels the older one); a push to develop cancels the
-  run of the push before it, and never a full run started by hand. A red run on develop doesn't stop
-  the preview (the scenario gate does that): fix it like any failure. iOS runners are the slow part
-  (5 macOS jobs at once on this plan): don't start iOS runs you don't need.
+  two jobs a platform. The top of a stack runs the smoke set for the stack's whole change. One run
+  per PR (a push cancels the older one); develop's runs queue instead, and never cancel a full run
+  started by hand. A red run on develop doesn't stop the preview (the scenario gate does that): fix
+  it like any failure, or revert the suspect. iOS runners are the slow part (5 macOS jobs at once
+  on this plan): don't start iOS runs you don't need.
   - **Screenshots:** the flows take one on key screens (`subflows/shot.yaml`: Home's states, a
     session page, the end card, the daily log, offline, a recording, Kathmandu). Every run that ran
     flows keeps them as the artifact `e2e-<platform>-screens-<job>-<run>` (14 days):
@@ -677,7 +686,7 @@ hard-coded token was deleted from the console on 2026-10-27.
     screen that changed fails E2E, with a board (baseline | this run | differences) in the
     artifact `e2e-<platform>-visual-…`; a screen with no baseline is only reported. **An intended
     change is approved in the same PR:** `node .maestro/visual/approve.mjs <run id>` (after
-    `npm ci --prefix .maestro/visual`), look at the PNGs, commit `.maestro/baselines/`. A single PR
+    `npm ci --prefix .maestro/visual`), look at the PNGs, commit `.maestro/baselines/`. A PR into develop
     runs Android's smoke flows only: for a change iOS or other flows show, run E2E by hand on the
     branch (both platforms) and approve from that run. Activity, Insights and Revo have no
     baselines yet (being rebuilt): approve theirs once their boards match the mocks.
