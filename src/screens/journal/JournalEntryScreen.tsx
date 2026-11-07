@@ -47,7 +47,8 @@ import {
   summarizeRevisedPages,
 } from '../../lib/journal';
 import { logger } from '../../lib/logger';
-import { memorizeSuggestion, missedFromSession } from '../../lib/activityAdd';
+import { UndoQueue, memorizeSuggestion, missedFromSession } from '../../lib/activityAdd';
+import { UndoToast } from '../../components/revision/UndoToast';
 import { parsePageRange } from '../../lib/memorizationLog';
 import { RangePickerSheet } from '../../components/memorization/RangePickerSheet';
 import { describePageRuns, pageRuns } from '../../lib/pageRanges';
@@ -247,8 +248,18 @@ export default function JournalEntryScreen() {
     });
   }, [uid, date]);
 
-  const notes = useMemo(() => day?.entries ?? [], [day]);
-  const total = day ? journalTotalMinutes(day) : null;
+  // A note swiped away goes at once, with Undo; its delete is saved once the undo window has
+  // passed (ACT-6), and leaving the screen saves any delete still waiting.
+  const undoQueue = useRef(new UndoQueue());
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const [undoNote, setUndoNote] = useState<string | null>(null);
+  useEffect(() => {
+    const queue = undoQueue.current;
+    return () => queue.flush();
+  }, []);
+
+  const notes = useMemo(() => (day?.entries ?? []).filter((n) => !gone.has(n.id)), [day, gone]);
+  const total = day ? journalTotalMinutes({ ...day, entries: notes }) : null;
   // What the composer shows: the kind being edited, or the kind's own draft.
   const composingKind: JournalKind = editing ? editing.note.kind : kind;
   const draft = editing ? editing.draft : drafts[kind];
@@ -423,26 +434,26 @@ export default function JournalEntryScreen() {
   };
 
   const deleteNote = (note: JournalNote) => {
-    Alert.alert('Delete this entry?', 'It is removed from the log.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setSaving(true);
-          try {
-            await queueChange({ kind: 'journal.entry.delete', date, id: note.id });
-            if (editing?.note.id === note.id) setEditing(null);
-            refreshDay();
-          } catch (err) {
-            logger.error('Failed to delete journal note', err);
-            Alert.alert("Couldn't delete", 'Please try again.');
-          } finally {
-            setSaving(false);
-          }
-        },
-      },
-    ]);
+    if (editing?.note.id === note.id) setEditing(null);
+    setGone((g) => new Set(g).add(note.id));
+    setUndoNote(note.id);
+    undoQueue.current.schedule(`note-${note.id}`, () => {
+      queueChange({ kind: 'journal.entry.delete', date, id: note.id }).catch((err) => {
+        logger.error('Failed to delete journal note', err);
+      });
+    });
+  };
+
+  const undoDelete = () => {
+    const id = undoNote;
+    setUndoNote(null);
+    if (!id) return;
+    undoQueue.current.undo(`note-${id}`);
+    setGone((g) => {
+      const next = new Set(g);
+      next.delete(id);
+      return next;
+    });
   };
 
   const deleteDay = () => {
@@ -481,7 +492,7 @@ export default function JournalEntryScreen() {
   const canSend = (editing != null || text.trim() !== '' || minutesText !== '' || parsePageRange(draft.from, draft.to) != null) && !saving && !loading && !loadFailed;
   const field = [typeV2.body, v2.field, { color: palette.text }];
   // A hold on a note (or its VoiceOver action) opens this menu. Delete is the
-  // swipe: it confirms before it removes the note.
+  // swipe: the note goes at once, with Undo.
   const openMenu = (note: JournalNote) => {
     haptics.selection();
     setMenuNote(note);
@@ -776,6 +787,15 @@ export default function JournalEntryScreen() {
         testID="journal-note-menu"
       />
     <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
+      <UndoToast
+        visible={undoNote != null}
+        message="Note deleted"
+        actionLabel="Undo"
+        onUndo={undoDelete}
+        onDismiss={() => setUndoNote(null)}
+        duration={5000}
+        bottomInset={insets.bottom}
+      />
     </TopSafeAreaView>
   );
 }

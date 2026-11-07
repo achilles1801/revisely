@@ -110,7 +110,7 @@ function holdNote(id: string) {
   fireEvent(screen.getByTestId(`journal-note-${id}`), 'accessibilityAction', { nativeEvent: { actionName: 'options' } });
 }
 
-// A swipe to the left reveals Delete; VoiceOver's "Delete" does the same, and it asks first.
+// A swipe to the left deletes, with Undo; VoiceOver's "Delete" does the same.
 function swipeDeleteNote(id: string) {
   fireEvent(screen.getByTestId(`journal-note-${id}`), 'accessibilityAction', { nativeEvent: { actionName: 'delete' } });
 }
@@ -239,19 +239,6 @@ describe('adding, editing and deleting notes', () => {
     fireEvent.changeText(screen.getByLabelText('Minutes'), '');
     await pressSend();
     expect(mockQueue.queueChange).toHaveBeenCalledWith({ kind: 'journal.entry.delete', date: '2026-10-20', id: 'n1' });
-  });
-
-  it('Delete on a note asks first, then queues its delete', async () => {
-    mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
-    const alert = jest.spyOn(Alert, 'alert');
-    await renderScreen();
-    swipeDeleteNote('n1');
-    const buttons = alert.mock.calls.at(-1)?.[2] ?? [];
-    await act(async () => {
-      await buttons.find((b) => b.text === 'Delete')?.onPress?.();
-    });
-    expect(mockQueue.queueChange).toHaveBeenCalledWith({ kind: 'journal.entry.delete', date: '2026-10-20', id: 'n1' });
-    alert.mockRestore();
   });
 
   it('a day already holding the most notes refuses another, without a write', async () => {
@@ -443,14 +430,54 @@ describe('a note: hold for its menu, swipe for Delete', () => {
     expect(screen.queryByTestId('sheet-action-copy')).toBeNull();
   });
 
-  it('the swipe Delete confirms before it queues the delete', async () => {
+  it('the swipe Delete removes the note at once, with Undo, and queues the delete after five seconds (ACT-6)', async () => {
+    jest.useFakeTimers();
+    try {
+      mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo, rev]));
+      const alert = jest.spyOn(Alert, 'alert');
+      await renderScreen();
+      swipeDeleteNote('n1');
+      expect(alert).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('journal-note-n1')).toBeNull();
+      expect(screen.getByTestId('undo-toast-action')).toBeTruthy();
+      await act(async () => {
+        jest.advanceTimersByTime(4_900);
+      });
+      expect(mockQueue.queueChange).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+      expect(mockQueue.queueChange).toHaveBeenCalledWith({ kind: 'journal.entry.delete', date: '2026-10-20', id: 'n1' });
+      alert.mockRestore();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('Undo brings the swiped note back and deletes nothing', async () => {
+    jest.useFakeTimers();
+    try {
+      mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
+      await renderScreen();
+      swipeDeleteNote('n1');
+      fireEvent.press(screen.getByTestId('undo-toast-action'));
+      expect(screen.getByTestId('journal-note-n1')).toBeTruthy();
+      await act(async () => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(mockQueue.queueChange).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('leaving the log saves a delete still waiting', async () => {
     mockService.getJournalEntry.mockResolvedValue(journalDayFromEntries('2026-10-20', [memo]));
-    const alert = jest.spyOn(Alert, 'alert');
     await renderScreen();
     swipeDeleteNote('n1');
-    expect(alert).toHaveBeenCalledWith('Delete this entry?', expect.any(String), expect.any(Array));
     expect(mockQueue.queueChange).not.toHaveBeenCalled();
-    alert.mockRestore();
+    screen.unmount();
+    expect(mockQueue.queueChange).toHaveBeenCalledWith({ kind: 'journal.entry.delete', date: '2026-10-20', id: 'n1' });
   });
 
   it('no ⋯ button is left on a note', async () => {

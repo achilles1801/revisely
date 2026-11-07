@@ -70,7 +70,8 @@ appId: com.revisionbuddy.app
     id: journal-note-.*
     text: "Note, Repeat Al-Mutaffifin twice, .*"
 
-# LOG-2: deleting one removes only it. Swipe the note left, Delete, confirm.
+# LOG-2: deleting one removes only it. Swipe the note left, Delete: it goes at
+# once, with Undo for five seconds (ACT-6); then the delete is sent.
 - swipe:
     from:
       id: journal-note-.*
@@ -79,16 +80,15 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: journal-note-.*-delete
 - extendedWaitUntil:
-    visible: "Delete this entry\\?"
-    timeout: 5000
-- tapOn:
-    text: "(?i)delete"
-    below:
-      text: "Delete this entry\\?"
-- extendedWaitUntil:
     notVisible:
       text: "Note, Repeat Al-Mutaffifin twice, .*"
     timeout: 10000
+- assertVisible:
+    id: undo-toast-action
+- extendedWaitUntil:
+    notVisible:
+      id: undo-toast-action
+    timeout: 15000
 # Still gone once the delete has been sent and the day read again.
 - runFlow: ../subflows/wait-sync.yaml
 - assertNotVisible:
