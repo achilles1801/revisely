@@ -1,4 +1,5 @@
 import { getPagesForJuz } from '../quranData';
+import { plainText } from '../passages';
 import {
   busiestHours,
   coverageCount,
@@ -12,6 +13,7 @@ import {
   paceView,
   formatPace,
   quranShare,
+  reviseFirstLabel,
   ratedWeakCounts,
   reportMonth,
   untouchedJuz,
@@ -140,9 +142,10 @@ describe('Weak spots', () => {
       revisions: [1, 5, 9].map((n) => ({ day: ago(n), skipped: [556, 557] })),
       today: TODAY,
     });
-    expect(rows.map((r) => [r.surah, r.label, r.reason])).toEqual([
-      ['Al-Hashr', 'p. 546–547', 'Weak now · rated weak 3 times in 30 days'],
-      ['At-Taghabun', 'p. 556–557', 'Skipped 3 times in 30 days'],
+    // By surah and ayahs, the pages a quiet detail (Majd, Nov 7 2026).
+    expect(rows.map((r) => [r.surah, plainText(r.label), plainText(r.pagesNote), r.reason])).toEqual([
+      ['Al-Hashr', 'Al-Hashr, ayahs 4–16', 'pp. 546–547', 'Weak now · rated weak 3 times in 30 days'],
+      ['At-Taghabun', 'At-Taghabun', 'pp. 556–557', 'Skipped 3 times in 30 days'],
     ]);
   });
 
@@ -154,14 +157,16 @@ describe('Weak spots', () => {
       revisions: [1, 5, 9].map((n) => ({ day: ago(n), skipped: [556, 557] })),
       today: TODAY,
     });
-    expect(rows.map((r) => r.label)).toEqual(['p. 546–547', 'p. 556–557', 'p. 40–41']);
+    expect(rows.map((r) => plainText(r.label))).toEqual(['Al-Hashr, ayahs 4–16', 'At-Taghabun', 'Al-Baqarah, ayahs 246–252']);
+    expect(plainText(reviseFirstLabel(rows))).toBe('Revise these weak spots first tomorrow');
+    expect(plainText(reviseFirstLabel(rows.slice(1, 2)))).toBe('Revise At-Taghabun first tomorrow');
   });
 
   it('splits a run where a surah begins (548 is Al-Hashr’s last page)', () => {
     const rows = weakSpotRows({ memorized: new Set([548, 549]), rating: () => 2, ratedWeak: new Map(), revisions: [], today: TODAY });
-    expect(rows.map((r) => [r.surah, r.label])).toEqual([
-      ['Al-Hashr', 'p. 548'],
-      ['Al-Mumtahanah', 'p. 549'],
+    expect(rows.map((r) => [r.surah, plainText(r.label)])).toEqual([
+      ['Al-Hashr', 'Al-Hashr, ayahs 17–24'],
+      ['Al-Mumtahanah', 'Al-Mumtahanah, ayahs 1–5'],
     ]);
   });
 
