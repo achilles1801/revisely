@@ -1,44 +1,59 @@
-// The Revised add sheet (Activity d6): pages revised outside a session, for today. A
-// strength choice writes each page's weakness rating (the same field a session's ratings write).
+// The Revised add sheet (Activity d6): pages revised outside a session, for the day. A strength
+// choice writes each page's weakness rating (the same field a session's ratings write).
+// "From your session" fills in the pages the day's session skipped (ACT-5); the line at the foot
+// says what adding does to the day ("Adding these makes today 20 of 20.").
 
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Sheet } from '../v2/Sheet';
-import { Tap } from '../v2/Tap';
+import { RangePickerSheet } from '../memorization/RangePickerSheet';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { missedFromSession } from '../../lib/activityAdd';
-import {
-  manualRevisionItem,
-  pagesInRange,
-  parsePageRange,
-  STRENGTH_RATING,
-  type Strength,
-} from '../../lib/manualRevision';
+import { manualRevisionItem, pagesInRange, parsePageRange, STRENGTH_RATING, type Strength } from '../../lib/manualRevision';
+import { describeSurahs } from '../../lib/pageRanges';
 import { typeV2 } from '../../theme/v2';
 import type { WeaknessRating } from '../../types/firestore';
+import { RevisedMark } from './BlockMark';
+import { FormLabel, InfoLine, MinutesField, PageRangeFields, Segmented, StrengthChoice, SuggestionLine } from './AddSheetParts';
 
-const STRENGTHS: { key: Strength; label: string }[] = [
-  { key: 'weak', label: 'Weak' },
-  { key: 'moderate', label: 'Moderate' },
-  { key: 'strong', label: 'Strong' },
-];
+type Log = { date: string; pagesRevised: number[]; pagesSkipped: number[]; assignedPages?: number[] };
+type What = 'pages' | 'surah' | 'juz';
 
-export function AddRevisedSheet({ visible, onClose, day, logs }: { visible: boolean; onClose: () => void; day: string; logs: { date: string; pagesRevised: number[]; pagesSkipped: number[] }[] }) {
+const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
+
+export function AddRevisedSheet({
+  visible,
+  onClose,
+  day,
+  dayName = 'today',
+  logs,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  day: string;
+  /** How the sheet names the day: "today", "yesterday", "Sunday". */
+  dayName?: string;
+  logs: Log[];
+}) {
   const { user, pages, updatePages } = useApp();
   const { palette } = useTheme();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [minutes, setMinutes] = useState('');
   const [strength, setStrength] = useState<Strength | null>(null);
+  const [what, setWhat] = useState<What>('pages');
+  const [picker, setPicker] = useState<'surah' | 'juz' | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // "From your session": the pages today's session skipped and that are memorized (the add menu's
-  // own suggestion). Using it fills From and To with its first and last page; Undo clears them.
+  // "From your session": the pages the day's session skipped that are memorized (the add menu's own
+  // suggestion). Using it fills From and To with its first and last page; Undo clears them.
   const memorized = useMemo(() => new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
-  const todaysLog = logs.find((l) => l.date === day);
-  const missed = todaysLog ? missedFromSession(todaysLog, memorized) : [];
+  const log = logs.find((l) => l.date === day);
+  const missed = log ? missedFromSession(log, memorized) : [];
+  const assigned = log ? (log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages : [...log.pagesRevised, ...log.pagesSkipped]) : [];
+  const done = new Set(log?.pagesRevised ?? []);
   const [usedSession, setUsedSession] = useState(false);
 
   const range = parsePageRange(from, to);
@@ -47,6 +62,17 @@ export function AddRevisedSheet({ visible, onClose, day, logs }: { visible: bool
   const minutesOk = minutesValue === null || (Number.isInteger(minutesValue) && minutesValue >= 0);
   const canAdd = range != null && minutesOk && !saving && !!user;
 
+  // What adding does to the day: the session's figure once these pages join it (credit follows the
+  // pages, ACT-5), or how many it adds when none of them were assigned.
+  const assignedSet = new Set(assigned);
+  const after = new Set([...done, ...pageNumbers.filter((p) => assignedSet.has(p))]).size;
+  const info = !range
+    ? null
+    : assigned.length > 0 && after > done.size
+      ? `Adding ${pageNumbers.length === 1 ? 'this makes' : 'these make'} ${dayName} ${after} of ${assigned.length}.`
+      : `Adds ${pagesWord(pageNumbers.length)} to ${dayName === 'today' ? 'today’s' : `${dayName}’s`} Revised block.`;
+
+  const clearSession = () => setUsedSession(false);
   const useSession = () => {
     if (missed.length === 0) return;
     if (usedSession) {
@@ -55,6 +81,7 @@ export function AddRevisedSheet({ visible, onClose, day, logs }: { visible: bool
       setUsedSession(false);
       return;
     }
+    setWhat('pages');
     setFrom(String(missed[0]));
     setTo(String(missed[missed.length - 1]));
     setUsedSession(true);
@@ -77,120 +104,109 @@ export function AddRevisedSheet({ visible, onClose, day, logs }: { visible: bool
       setMinutes('');
       setStrength(null);
       setUsedSession(false);
+      setWhat('pages');
       onClose();
     } finally {
       setSaving(false);
     }
   };
 
-  const fieldStyle = [styles.field, { backgroundColor: palette.fill }];
-
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
       title="Revised"
+      titleMark={
+        <RevisedMark
+          fraction={assigned.length > 0 ? done.size / assigned.length : 0}
+          done={assigned.length > 0 && done.size >= assigned.length}
+          size={24}
+        />
+      }
+      headerRule="full"
       left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, disabled: !canAdd }}
+      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-revised-add' }}
       keyboard
       testID="add-revised-sheet"
     >
       <View style={styles.body}>
         {missed.length > 0 && (
-          <Tap onPress={useSession} accessibilityRole="button" accessibilityLabel={usedSession ? 'Undo the session pages' : 'Use the pages the session skipped'} style={[styles.banner, { backgroundColor: palette.fill }]}>
-            <Text style={[typeV2.body, { color: palette.primary, flex: 1 }]}>
-              <Text style={{ fontWeight: '700' }}>From your session: </Text>
-              {`the ${missed.length} ${missed.length === 1 ? 'page' : 'pages'} it skipped`}
-            </Text>
-            <Text style={[typeV2.body, { color: palette.primary, fontWeight: '600' }]}>{usedSession ? 'Undo' : 'Use'}</Text>
-          </Tap>
+          <View style={styles.top}>
+            <SuggestionLine
+              label="From your session:"
+              text={`the ${pagesWord(missed.length)} it skipped`}
+              action={usedSession ? 'Undo' : 'Use'}
+              onPress={useSession}
+              accessibilityLabel={usedSession ? 'Undo the session pages' : 'Use the pages the session skipped'}
+              testID="add-revised-from-session"
+            />
+          </View>
         )}
 
-        <Text style={[styles.label, { color: palette.secondary }]}>PAGES</Text>
-        <View style={styles.pair}>
-          <View style={[...fieldStyle, styles.pageField]}>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>p.</Text>
-            <TextInput
-              testID="add-revised-from"
-              value={from}
-              onChangeText={(v) => {
-                setUsedSession(false);
-                setFrom(v.replace(/[^0-9]/g, ''));
-              }}
-              keyboardType="number-pad"
-              accessibilityLabel="From page"
-              style={[typeV2.body, styles.input, { color: palette.text }]}
-            />
-          </View>
-          <Text style={[typeV2.body, { color: palette.secondary }]}>to</Text>
-          <View style={[...fieldStyle, styles.pageField]}>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>p.</Text>
-            <TextInput
-              testID="add-revised-to"
-              value={to}
-              onChangeText={(v) => {
-                setUsedSession(false);
-                setTo(v.replace(/[^0-9]/g, ''));
-              }}
-              keyboardType="number-pad"
-              accessibilityLabel="To page"
-              style={[typeV2.body, styles.input, { color: palette.text }]}
-            />
-          </View>
-        </View>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>
-          {range ? `${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}` : 'Enter the first and last page you revised'}
-        </Text>
-
-        <Text style={[styles.label, { color: palette.secondary }]}>MINUTES</Text>
-        <View style={fieldStyle}>
-          <TextInput
-            testID="add-revised-minutes"
-            value={minutes}
-            onChangeText={(v) => setMinutes(v.replace(/[^0-9]/g, ''))}
-            keyboardType="number-pad"
-            accessibilityLabel="Minutes"
-            style={[typeV2.body, styles.input, { color: palette.text }]}
+        <FormLabel text="WHAT" />
+        <Segmented<What>
+          options={[
+            { value: 'pages', label: 'Pages' },
+            { value: 'surah', label: 'Surah' },
+            { value: 'juz', label: 'Juz' },
+          ]}
+          value={what}
+          onChange={(w) => {
+            setWhat(w);
+            if (w !== 'pages') setPicker(w);
+          }}
+          testID="add-revised-what"
+        />
+        <View style={styles.fields}>
+          <PageRangeFields
+            from={from}
+            to={to}
+            onFrom={(v) => {
+              clearSession();
+              setFrom(v);
+            }}
+            onTo={(v) => {
+              clearSession();
+              setTo(v);
+            }}
+            testIDs={{ from: 'add-revised-from', to: 'add-revised-to' }}
           />
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>min</Text>
         </View>
+        {range ? (
+          <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]} testID="add-revised-range">
+            {`${describeSurahs({ first: range.from, last: range.to })} · ${pagesWord(pageNumbers.length)}`}
+          </Text>
+        ) : null}
 
-        <Text style={[styles.label, { color: palette.secondary }]}>HOW DID IT GO? (OPTIONAL)</Text>
-        <View style={styles.choices}>
-          {STRENGTHS.map((s) => {
-            const on = strength === s.key;
-            return (
-              <Tap
-                key={s.key}
-                testID={`add-revised-strength-${s.key}`}
-                onPress={() => setStrength(on ? null : s.key)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={s.label}
-                style={[styles.choice, { backgroundColor: on ? palette.primary : palette.fill }]}
-              >
-                <Text style={[typeV2.body, { color: on ? palette.onPrimary : palette.text, fontWeight: '600' }]}>{s.label}</Text>
-              </Tap>
-            );
-          })}
-        </View>
+        <FormLabel text="MINUTES" />
+        <MinutesField value={minutes} onChange={setMinutes} testID="add-revised-minutes" />
 
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>
-          {range ? `Adds ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'} to today’s Revised block.` : ' '}
-        </Text>
+        <FormLabel text="HOW DID IT GO?" right="Optional" />
+        <StrengthChoice value={strength} onChange={setStrength} />
+
+        {info ? <InfoLine text={info} testID="add-revised-info" /> : null}
       </View>
+
+      <RangePickerSheet
+        visible={picker != null}
+        initialKind={picker ?? 'surah'}
+        onClose={() => {
+          setPicker(null);
+          setWhat('pages');
+        }}
+        onUse={(r) => {
+          clearSession();
+          setFrom(String(r.from));
+          setTo(String(r.to));
+        }}
+      />
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { gap: 10, paddingVertical: 8 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  label: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, marginTop: 6 },
-  pair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  field: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingHorizontal: 14, minHeight: 48 },
-  pageField: { flex: 1 },
-  input: { flex: 1, padding: 0 },
-  choices: { flexDirection: 'row', gap: 8 },
-  choice: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999, minHeight: 44 },
+  body: { paddingBottom: 8 },
+  top: { marginTop: 8 },
+  fields: { marginTop: 10 },
+  under: { marginTop: 8, marginHorizontal: 2 },
 });

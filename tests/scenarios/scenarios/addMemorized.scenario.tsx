@@ -68,4 +68,14 @@ describe('Memorized add sheet (ACT-5)', () => {
     expect(mockUpdatePages).not.toHaveBeenCalled();
     expect(queueChange).toHaveBeenCalledTimes(1);
   });
+
+  it('[ACT-5] minutes typed go with the day’s Memorized item; none typed sends none', async () => {
+    const screen = render(<AddMemorizedSheet visible onClose={jest.fn()} day="2026-11-03" />);
+    fireEvent.changeText(screen.getByTestId('add-memorized-from'), '562');
+    fireEvent.changeText(screen.getByTestId('add-memorized-to'), '562');
+    fireEvent.changeText(screen.getByTestId('add-memorized-minutes'), '25');
+    fireEvent.press(screen.getByTestId('sheet-right'));
+    await flush();
+    expect(queueChange).toHaveBeenCalledWith({ kind: 'memorization.mark', day: '2026-11-03', pages: [562], at: expect.any(Number), minutes: 25 });
+  });
 });

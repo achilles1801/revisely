@@ -455,7 +455,7 @@ export default function ActivityDayScreen() {
           visible={addOpen}
           onClose={() => setAddOpen(false)}
           day={date}
-          title={date === today ? 'Add to today' : `Add to ${heading.title === 'Yesterday' ? 'yesterday' : heading.title}`}
+          dayName={date === today ? 'today' : heading.title === 'Yesterday' ? 'yesterday' : heading.title}
           logs={logs}
           onRead={() => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read')}
         />
