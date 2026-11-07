@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
@@ -180,28 +180,33 @@ const OPT_IN_ROWS: { icon: keyof typeof Ionicons.glyphMap; title: string; line: 
 /** The first time: what Revo is, what it is sent and what isn't, and how to turn it off. */
 export function RevoOptIn({ onTurnOn, onNotNow, busy, error }: { onTurnOn: () => void; onNotNow: () => void; busy: boolean; error: string | null }) {
   const { palette } = useTheme();
+  // A smaller mark on short phones (an iPhone SE), so more of what is sent shows above the buttons.
+  const short = useWindowDimensions().height < SHORT_SCREEN;
   return (
-    <ScrollView contentContainerStyle={styles.optIn} testID="revo-optin">
-      <RevoMark size={120} style={styles.optInMark} />
-      <Text style={[styles.optInTitle, { color: palette.text }]} accessibilityRole="header">
-        Meet Revo
-      </Text>
-      <Text style={[styles.optInBody, { color: palette.secondary }]}>
-        Your revision coach. Ask about your progress, your weak spots or your plan, and get answers from your own Revisely data.
-      </Text>
-      <View style={styles.optInRows}>
-        {OPT_IN_ROWS.map((r) => (
-          <View key={r.title} style={styles.optInRow}>
-            <View style={[styles.optInIcon, { backgroundColor: palette.bubble }]}>
-              <Ionicons name={r.icon} size={22} color={palette.text} />
+    <View style={styles.fill} testID="revo-optin">
+      <ScrollView contentContainerStyle={styles.optIn}>
+        <RevoMark size={short ? 84 : 120} style={short ? styles.optInMarkShort : styles.optInMark} />
+        <Text style={[styles.optInTitle, { color: palette.text }]} accessibilityRole="header">
+          Meet Revo
+        </Text>
+        <Text style={[styles.optInBody, { color: palette.secondary }]}>
+          Your revision coach. Ask about your progress, your weak spots or your plan, and get answers from your own Revisely data.
+        </Text>
+        <View style={styles.optInRows}>
+          {OPT_IN_ROWS.map((r) => (
+            <View key={r.title} style={styles.optInRow}>
+              <View style={[styles.optInIcon, { backgroundColor: palette.bubble }]}>
+                <Ionicons name={r.icon} size={22} color={palette.text} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[styles.optInRowTitle, { color: palette.text }]}>{r.title}</Text>
+                <Text style={[styles.optInRowLine, { color: palette.secondary }]}>{r.line}</Text>
+              </View>
             </View>
-            <View style={styles.rowText}>
-              <Text style={[styles.optInRowTitle, { color: palette.text }]}>{r.title}</Text>
-              <Text style={[styles.optInRowLine, { color: palette.secondary }]}>{r.line}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      </ScrollView>
+      {/* Always on screen, under what scrolls: on an iPhone SE the button was below the fold. */}
       <View style={styles.optInFoot}>
         {error ? (
           <Text style={[styles.rowLine, styles.center, { color: palette.red }]} testID="revo-optin-error">
@@ -219,9 +224,12 @@ export function RevoOptIn({ onTurnOn, onNotNow, busy, error }: { onTurnOn: () =>
           </Text>
         </Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
+
+/** Below this height (points), the opt-in's mark is smaller. */
+export const SHORT_SCREEN = 740;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
@@ -246,6 +254,7 @@ const styles = StyleSheet.create({
   clearText: { fontSize: 17, fontWeight: '600' },
   optIn: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 12, flexGrow: 1 },
   optInMark: { alignSelf: 'center', marginBottom: 20 },
+  optInMarkShort: { alignSelf: 'center', marginBottom: 12 },
   optInTitle: { fontSize: 30, fontWeight: '700', textAlign: 'center' },
   optInBody: { fontSize: 17, lineHeight: 23, textAlign: 'center', marginTop: 8, paddingHorizontal: 12 },
   optInRows: { gap: 18, marginTop: 28 },
@@ -253,7 +262,7 @@ const styles = StyleSheet.create({
   optInIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   optInRowTitle: { fontSize: 17, fontWeight: '600' },
   optInRowLine: { fontSize: 15, lineHeight: 20 },
-  optInFoot: { marginTop: 'auto', paddingTop: 28, gap: 6 },
+  optInFoot: { paddingHorizontal: 16, paddingTop: 12, gap: 6 },
   notNow: { alignItems: 'center', paddingVertical: 12 },
   notNowText: { fontSize: 17, fontWeight: '600' },
   fine: { fontSize: 13, lineHeight: 18, textAlign: 'center' },

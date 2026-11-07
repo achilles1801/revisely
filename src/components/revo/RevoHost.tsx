@@ -12,7 +12,7 @@ import { REVO_BUTTON_ROUTES, revoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
 import { onRevoOpen, type RevoOpenRequest } from '../../lib/revo/open';
-import { setRevoPresent } from '../../lib/revo/presence';
+import { setRevoButtonRoute, setRevoPresent } from '../../lib/revo/presence';
 import type { RevoAction, RevoAttachment, RevoSettings } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { RevoBoundary } from './RevoBoundary';
@@ -194,7 +194,12 @@ function RevoHostInner() {
     }
   };
 
-  const buttonShown = route != null && REVO_BUTTON_ROUTES.has(route) && !open && !keyboard;
+  const buttonRoute = route != null && REVO_BUTTON_ROUTES.has(route);
+  useEffect(() => {
+    setRevoButtonRoute(buttonRoute);
+    return () => setRevoButtonRoute(false);
+  }, [buttonRoute]);
+  const buttonShown = buttonRoute && !open && !keyboard;
   const bottom = tabBar + (miniPlayer ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0) + REVO_BUTTON_GAP;
 
   return (

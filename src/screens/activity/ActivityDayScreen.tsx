@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { useTabBarFootprint } from '../../navigation/TabBar';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
 import { DayBlocks, activityBlocksEnabled } from '../../components/activity/DayBlocks';
 import { useActivityReload } from '../../components/activity/useActivityReload';
@@ -105,7 +106,8 @@ export default function ActivityDayScreen() {
   const scrolledToRecordingRef = useRef(false);
   const { user, logs, updateLog, deleteLog, pages, updatePages } = useApp();
   const { theme, palette } = useTheme();
-  const tabFootprint = useTabBarFootprint();
+  // Room for the tab bar (and the mini player) and for Revo's button.
+  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   const { day: today } = useRevisionDay(user);
   // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
   const juzPlan = user?.scheduleMode === 'juz';

@@ -2,13 +2,16 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
-import { revoV2 } from '../../theme/v2';
+import { REVO_BUTTON_GAP, REVO_BUTTON_SIZE } from '../../lib/revo/presence';
 import { RevoMark } from './RevoMark';
 
-export const REVO_BUTTON_SIZE = 56;
+export { REVO_BUTTON_GAP, REVO_BUTTON_SIZE };
 /** From the right edge, and above the tab bar (and the mini player). */
 export const REVO_BUTTON_INSET = 16;
-export const REVO_BUTTON_GAP = 14;
+/** Its touch area reaches this far past the disc. */
+export const REVO_BUTTON_SLOP = 8;
+const DOT = 10;
+const DOT_BORDER = 2;
 
 /**
  * Revo's button: bottom-right on the main screens, above the content and below sheets. The R
@@ -18,9 +21,10 @@ export const REVO_BUTTON_GAP = 14;
 export function RevoButton({ bottom, dot, onPress }: { bottom: number; dot: boolean; onPress: () => void }) {
   const { palette, isDark } = useTheme();
   const haptics = useHaptics();
+  // In the accent: a glow in dark, a shadow in light.
   const lift = isDark
-    ? { shadowColor: revoV2.glow, shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 10 } }
-    : { shadowColor: revoV2.shadow, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 10 } };
+    ? { shadowColor: palette.revo.glow, shadowOpacity: 0.5, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } }
+    : { shadowColor: palette.revo.shadow, shadowOpacity: 0.28, shadowRadius: 9, shadowOffset: { width: 0, height: 6 } };
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
       <Pressable
@@ -28,7 +32,7 @@ export function RevoButton({ bottom, dot, onPress }: { bottom: number; dot: bool
           haptics.light();
           onPress();
         }}
-        hitSlop={6}
+        hitSlop={REVO_BUTTON_SLOP}
         accessibilityRole="button"
         accessibilityLabel={dot ? 'Revo, a new Day in review' : 'Revo'}
         accessibilityHint="Ask about your revision"
@@ -50,7 +54,15 @@ export function RevoButton({ bottom, dot, onPress }: { bottom: number; dot: bool
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', right: REVO_BUTTON_INSET },
   button: { width: REVO_BUTTON_SIZE, height: REVO_BUTTON_SIZE, borderRadius: REVO_BUTTON_SIZE / 2 },
-  elevation: { elevation: 10 },
+  elevation: { elevation: 8 },
   pressed: { transform: [{ scale: 0.94 }] },
-  dot: { position: 'absolute', top: -1, right: -1, width: 12 + 5, height: 12 + 5, borderRadius: 8.5, borderWidth: 2.5 },
+  dot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: DOT + DOT_BORDER * 2,
+    height: DOT + DOT_BORDER * 2,
+    borderRadius: DOT / 2 + DOT_BORDER,
+    borderWidth: DOT_BORDER,
+  },
 });
