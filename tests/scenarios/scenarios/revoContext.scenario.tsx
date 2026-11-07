@@ -16,13 +16,16 @@ import { DailyLog, Home, Manager, homeStack } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 import { SCENARIO_IDS, type ScenarioId, type SeedPlan } from '../../../functions/src/testScenarios';
 import type { RevoContext } from '../../../src/lib/revo/types';
+import type { HistoryItem } from '../../../src/lib/streakFromItems';
 
 type Fajr = typeof import('../../../src/lib/fajrBoundary');
 
 interface Probe {
   build: () => RevoContext | null;
-  /** Whether Revo has the Activity items Home's streak read (else both use the logs). */
-  hasHistory: boolean;
+  /** Revo's day. */
+  day: string;
+  /** The Activity items Home's streak read, shared with Revo (null: both use the logs). */
+  history: readonly HistoryItem[] | null;
 }
 const probe = globalThis as unknown as { __revoProbe?: Probe };
 
@@ -35,7 +38,7 @@ function homeWithRevo(mods: Booted): ReactElement {
   function RevoProbe() {
     const { day, build } = useRevoContext();
     const { user } = useApp();
-    probe.__revoProbe = { build, hasHistory: useSharedActivityHistory(user?.id, day) != null };
+    probe.__revoProbe = { build, day, history: useSharedActivityHistory(user?.id, day) };
     return null;
   }
   return React.createElement(React.Fragment, null, homeStack(mods), React.createElement(RevoProbe));
@@ -58,7 +61,18 @@ async function revoAgreesWithHome(app: OpenApp, scenario: ScenarioId, plan: Seed
   const home = new Home(app);
   await home.ready();
   // Home's streak loads from the Activity items after the Today post shows; Revo reads the same copy.
-  await app.until(() => probe.__revoProbe?.hasHistory === true, `Revo to have Home's history (${scenario})`, 20_000);
+  // After a reset that copy is still the scenario before until Home reads it again (same account,
+  // same day), so wait for the items the server holds now: on a slow runner Revo was built from the
+  // last scenario's items (revise-ahead read missed-days' days as done, Nov 7 2026).
+  const { loadActivityHistory } = app.mods.require<typeof import('../../../src/lib/activityHistory')>('src/lib/activityHistory');
+  const onServer = await app.act(() => loadActivityHistory(probe.__revoProbe!.day));
+  const itemsKey = (items: readonly HistoryItem[]) =>
+    items.map((x) => `${x.id}|${x.countsFor}|${x.pages.join('.')}`).sort().join(',');
+  await app.until(
+    () => probe.__revoProbe?.history != null && itemsKey(probe.__revoProbe.history) === itemsKey(onServer),
+    `Revo to have Home's history of ${scenario}`,
+    20_000,
+  );
   await app.idle(300);
   const ctx = probe.__revoProbe!.build()!;
   expect(ctx).not.toBeNull();
