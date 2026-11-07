@@ -53,14 +53,52 @@ permissions:
   contents: read
 
 jobs:
-  # Nothing is built or published unless the scenario tests pass (BEHAVIOUR.md).
+  # Nothing is built or published unless the scenario tests pass (BEHAVIOUR.md): here, or on
+  # exactly this tree. A PR merged with nothing else landing meanwhile has a merge commit whose
+  # tree is the one its CI tested (refs/pull/N/merge); that run kept an artifact named after the
+  # tree (scenarios.yml). Same tree, same suite, same result: the suite isn't run again, and the
+  # update reaches TestFlight about ten minutes sooner. Only this repository's own runs count (a
+  # fork's PR runs its own workflow files).
+  gate:
+    name: Scenarios passed on this tree already?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tested: ${{ steps.find.outputs.tested }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          TREE=$(gh api "repos/$REPO/git/commits/$SHA" --jq .tree.sha 2>/dev/null || true)
+          RUN=""
+          if [ -n "$TREE" ]; then
+            RUN=$(gh api "repos/$REPO/actions/artifacts?name=scenarios-passed-$TREE&per_page=30" \
+              --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)] | first | .workflow_run.id // empty' 2>/dev/null || true)
+          fi
+          if [ -n "$RUN" ]; then
+            echo "tested=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Scenarios::This tree ($TREE) passed the scenario suite in run $RUN: not run again."
+          else
+            echo "tested=false" >> "$GITHUB_OUTPUT"
+            echo "No passing run of the scenario suite on tree ${TREE:-?}: running it."
+          fi
+
   scenarios:
     name: Scenarios
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.tested != 'true' }}
     uses: ./.github/workflows/scenarios.yml
 
+  # Alongside the gate: it only looks (computes the fingerprint, finds a build); nothing is built
+  # or published until the gate has passed.
   fingerprint:
     name: Fingerprint
-    needs: scenarios
     runs-on: ubuntu-latest
     outputs:
       hash: ${{ steps.fp.outputs.hash }}
@@ -149,8 +187,8 @@ jobs:
 
   build:
     name: Build
-    needs: fingerprint
-    if: ${{ needs.fingerprint.outputs.needs_build == 'true' }}
+    needs: [gate, scenarios, fingerprint]
+    if: ${{ !cancelled() && (needs.gate.outputs.tested == 'true' || needs.scenarios.result == 'success') && needs.fingerprint.outputs.needs_build == 'true' }}
     permissions:
       contents: write # pushes the ios-fp/<hash> tag
     uses: ./.github/workflows/ios-build.yml
@@ -164,8 +202,8 @@ jobs:
   # native change needs EAS Build (android) by hand and an upload in Play Console (the notice says so).
   android-build:
     name: Build (android)
-    needs: fingerprint
-    if: ${{ vars.ANDROID_RELEASES == 'true' && vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
+    needs: [gate, scenarios, fingerprint]
+    if: ${{ !cancelled() && (needs.gate.outputs.tested == 'true' || needs.scenarios.result == 'success') && vars.ANDROID_RELEASES == 'true' && vars.ANDROID_SUBMIT == 'true' && needs.fingerprint.outputs.android_needs_build == 'true' }}
     permissions:
       contents: write # pushes the android-fp/<hash> tag
       id-token: write # android-build.yml's available job proves itself to playBuildAvailable
@@ -179,8 +217,8 @@ jobs:
   # and does no harm.
   update:
     name: Publish update
-    needs: [fingerprint, build, android-build]
-    if: ${{ !cancelled() && needs.fingerprint.result == 'success' }}
+    needs: [gate, scenarios, fingerprint, build, android-build]
+    if: ${{ !cancelled() && needs.fingerprint.result == 'success' && (needs.gate.outputs.tested == 'true' || needs.scenarios.result == 'success') }}
     runs-on: ubuntu-latest
     env:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

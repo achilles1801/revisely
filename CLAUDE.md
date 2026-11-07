@@ -533,7 +533,9 @@ hard-coded token was deleted from the console on 2026-10-27.
   the Auth, Firestore, Storage and Functions emulators (real rules, our real functions; only Anthropic
   answers from a recording, `functions/src/emulator.ts`), with a test clock and time zone. Property tests
   (fast-check) cover the schedule and day functions. `Scenarios` in CI (`scenarios.yml`) runs both,
-  and `preview.yml` builds and publishes nothing unless it passes.
+  and `preview.yml` builds and publishes nothing unless it passes: on that push, or on exactly its tree
+  in the PR's own CI (a PR merged with nothing else landing meanwhile; `scenarios-passed-<tree>`
+  artifacts, same-repository runs only), so a clean merge reaches TestFlight without a second run.
   - **Every bug fix adds a scenario** that fails without the fix and names the rule it keeps
     (`[DAY-2]` in its title). The "Behaviour spec" check (`spec.yml`) fails a fix PR (branch `fix/`,
     `hotfix/`, `claude/issue-`, or a title starting "Fix") that changes `src/` without one. Only the
