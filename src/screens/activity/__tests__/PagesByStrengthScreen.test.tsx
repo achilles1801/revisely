@@ -28,6 +28,7 @@ import { touchHandlingAncestor } from '../../../../jest/scrollable';
 import PagesByStrengthScreen from '../PagesByStrengthScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
+import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 import type { RevisionLog, User, UserPage } from '../../../types';
 
 const v2 = (ui: React.ReactElement) => (
@@ -93,6 +94,20 @@ describe('Pages by strength (ACT-12)', () => {
     expect(order).toEqual(['browse-page-1', 'browse-page-50', 'browse-page-2', 'browse-page-583', 'browse-page-582']);
     expect(screen.queryByTestId('show-more')).toBeNull();
     expect(screen.queryByTestId('browse-page-600')).toBeNull();
+  });
+
+  it('Pages | Surahs | Juz are Activity's tabs: ink pills that hug their labels, the chosen one filled', async () => {
+    await open();
+    const palette = paletteV2(false, DEFAULT_ACCENT);
+    const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
+    const row = flat(screen.getByTestId('browse-tabs').props.style);
+    expect(row.alignItems).toBe('flex-start');
+    expect(flat(screen.getByTestId('pill-pages').props.style).backgroundColor).toBe(palette.text);
+    expect(flat(screen.getByTestId('pill-pages').props.style).flex).toBeUndefined();
+    expect(flat(screen.getByTestId('pill-surahs').props.style).borderColor).toBe(palette.outline);
+    expect(screen.getByLabelText('Pages, selected')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('pill-surahs'));
+    expect(flat(screen.getByTestId('pill-surahs').props.style).backgroundColor).toBe(palette.text);
   });
 
   it('the old Browse: Surahs and Juz, and a juz narrows the pages to it', async () => {

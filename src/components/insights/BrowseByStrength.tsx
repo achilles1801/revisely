@@ -148,16 +148,19 @@ export function usePageStrengthRows(): {
  * The Browse list: Pages | Surahs | Juz, the juz and strength filters (menus), then the rows,
  * weakest first. A page or surah row opens its (weakest) page; a juz narrows the pages to it.
  * `collapsed` shows three rows, then "Show all" (the Insights tab); a screen of its own shows
- * every row.
+ * every row. `activityTabs`: Pages | Surahs | Juz as Activity's tabs (ink pills that hug their
+ * labels, gap audit §1 A), for Pages by strength, which is part of Activity.
  */
 export function BrowseByStrength({
   rows,
   onOpenPage,
   collapsed = true,
+  activityTabs = false,
 }: {
   rows: PageRow[];
   onOpenPage: (pageNumber: number) => void;
   collapsed?: boolean;
+  activityTabs?: boolean;
 }) {
   const [juzFilter, setJuzFilter] = useState<number | null>(null);
   const [strengthFilter, setStrengthFilter] = useState<number | null>(null);
@@ -273,6 +276,8 @@ export function BrowseByStrength({
           value={browseMode}
           onChange={setBrowseMode}
           testID="browse-tabs"
+          tone={activityTabs ? 'ink' : 'primary'}
+          hug={activityTabs}
         />
         <View style={styles.filters}>
           {browseMode !== 'juz' && (

@@ -16,8 +16,8 @@ type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PagesByStre
 
 /**
  * Every revised page by strength, weakest first (the Insights tab's Browse), behind "See all
- * pages by strength" at the foot of Activity's Weak spots (ACT-12). Pages, surahs or juz, the
- * juz and strength filters, every row; a row opens its page in a sheet.
+ * pages by strength" at the foot of Activity's Weak spots (ACT-12). Pages, surahs or juz (as
+ * Activity's ink tabs), the juz and strength filters, every row; a row opens its page in a sheet.
  */
 export default function PagesByStrengthScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -46,7 +46,7 @@ export default function PagesByStrengthScreen() {
           ) : (
             <>
               <SectionHeader title={`${rows.length} revised page${rows.length === 1 ? '' : 's'}`} detail="Weakest first" />
-              <BrowseByStrength rows={rows} onOpenPage={setPreviewPage} collapsed={false} />
+              <BrowseByStrength rows={rows} onOpenPage={setPreviewPage} collapsed={false} activityTabs />
             </>
           )}
         </ScrollView>
