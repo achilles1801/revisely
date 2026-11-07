@@ -203,6 +203,16 @@ describe("<RecordingsList /> as voice bubbles (Variant B)", () => {
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "r1" }));
   });
 
+  it("in an Activity block (mock d1): no name line or ›, the bubble across the column, the chips with the time on their right", async () => {
+    await renderV2(<RecordingsList day="2026-10-19" variant="block" onOpen={jest.fn()} />);
+    expect(screen.getByTestId("recording-bubble-r1")).toBeTruthy();
+    expect(screen.queryByText("Revision")).toBeNull();
+    expect(screen.queryByTestId("recording-open-r1")).toBeNull();
+    expect(screen.getByTestId("recording-page-r1-5")).toBeTruthy();
+    expect(screen.getByTestId("recording-when-r1")).toBeTruthy();
+    expect(flat(screen.getByTestId("recording-bubble-r1").props.style).maxWidth).toBeUndefined();
+  });
+
   it("bars 3 wide and 3 apart, as many as fit; not playing, all in secondary (lighter on white)", async () => {
     const p = paletteV2(false, "indigo");
     await renderV2(<RecordingsList day="2026-10-19" />);
