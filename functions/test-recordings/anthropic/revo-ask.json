@@ -1,13 +1,13 @@
 {
   "recordedAt": "2026-11-07T09:35:30.530Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "how": "functions/scripts/record-anthropic.js, with the prompt before the Activity rebuild. The request hash was then moved, without recording again, to the prompt after the guide's Insights line changed (d5e9bf7): record it again to match exactly.",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "ae5e816c4dfeb4b3e233a877ff11dbd0f8bc63be2282dcae131a8357e9e45f8b"
+    "systemSha256": "10496827c271c2223af1cb3210c1505583e32442822e0c5a03231a833076dd1d"
   },
   "status": 200,
   "body": {
