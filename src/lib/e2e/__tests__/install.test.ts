@@ -4,7 +4,6 @@
 jest.mock('../clock', () => ({ handleClockLink: jest.fn(), installClock: jest.fn() }));
 jest.mock('../log', () => ({ flushE2ELog: jest.fn(), installLog: jest.fn() }));
 jest.mock('../network', () => ({ handleNetworkLink: jest.fn(), installNetwork: jest.fn() }));
-jest.mock('../revoFake', () => ({ handleRevoLink: jest.fn() }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { THEME_KEY as APP_THEME_KEY, resolveThemeMode } from '../../../context/ThemeContext';
