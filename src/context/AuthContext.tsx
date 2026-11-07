@@ -48,7 +48,18 @@ export async function savedSignInUid(): Promise<string | null> {
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   isAuthenticated: boolean;
+  /**
+   * The launch check (Auth reading its saved sign-in), and a sign-out or an
+   * account deletion in progress: RootNavigator shows its spinner meanwhile.
+   */
   isLoading: boolean;
+  /**
+   * A sign-in or sign-up in progress (email, Google or Apple). It never sets
+   * `isLoading`: the sign-in screen stays and shows it on its button, so a
+   * failed attempt keeps what the user typed (BEHAVIOUR.md ACCOUNT-2). Firebase's
+   * auth change takes the user on once it works.
+   */
+  isSigningIn: boolean;
   /**
    * While Firebase Auth is still checking its saved sign-in (a weak
    * connection), the uid it saved: the app shows that account's copy meanwhile.
@@ -75,6 +86,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [provisionalUid, setProvisionalUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, name?: string) => {
-    setIsLoading(true);
+    setIsSigningIn(true);
     setError(null);
     try {
       const user = await registerUser(email, password, name);
@@ -124,12 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(getErrorMessage(err.code));
       throw err;
     } finally {
-      setIsLoading(false);
+      setIsSigningIn(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    setIsLoading(true);
+    setIsSigningIn(true);
     setError(null);
     try {
       const user = await loginUser(email, password);
@@ -152,12 +164,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(getErrorMessage(err.code));
       throw err;
     } finally {
-      setIsLoading(false);
+      setIsSigningIn(false);
     }
   };
 
   const signInWithGoogle = async (idToken: string) => {
-    setIsLoading(true);
+    setIsSigningIn(true);
     setError(null);
     try {
       const user = await signInWithGoogleCredential(idToken);
@@ -181,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(getErrorMessage(err.code));
       throw err;
     } finally {
-      setIsLoading(false);
+      setIsSigningIn(false);
     }
   };
 
@@ -190,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     rawNonce: string,
     fullName?: { givenName?: string | null; familyName?: string | null },
   ) => {
-    setIsLoading(true);
+    setIsSigningIn(true);
     setError(null);
     try {
       const user = await signInWithAppleCredential(identityToken, rawNonce);
@@ -218,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(getErrorMessage(err.code));
       throw err;
     } finally {
-      setIsLoading(false);
+      setIsSigningIn(false);
     }
   };
 
@@ -305,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUser,
         isAuthenticated: !!firebaseUser,
         isLoading,
+        isSigningIn,
         provisionalUid,
         error,
         signUp,
