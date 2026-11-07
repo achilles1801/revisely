@@ -1,8 +1,7 @@
 // Where Revo's data comes from. The real one: the revo* Cloud Functions for everything that
 // calls the model or deletes in bulk, and the account's own Firestore documents (read live,
 // with the few changes the rules allow: thumbs, an action's state, deleting a memory item).
-// An E2E build uses an in-memory stand-in instead (lib/e2e/revoFake), since the flows have no
-// functions emulator and no model.
+// E2E builds use the same, against the functions emulator (lib/e2e/functions, TESTING.md).
 
 import {
   collection,
@@ -218,9 +217,8 @@ const firebaseRevo: RevoBackend = {
   },
 };
 
-/** The backend for this build: E2E builds use the in-memory stand-in. */
+/** The backend for this build: the functions and Firestore (E2E builds too, against the emulators). */
 export function revoBackend(): RevoBackend {
-  if (process.env.EXPO_PUBLIC_E2E === '1') return require('../e2e/revoFake').revoFake as RevoBackend;
   return testBackend ?? firebaseRevo;
 }
 

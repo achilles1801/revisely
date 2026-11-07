@@ -1158,7 +1158,14 @@ export async function callFunction(
   };
   if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
 
-  const url = `https://us-central1-${projectId}.cloudfunctions.net/${name}`;
+  let url = `https://us-central1-${projectId}.cloudfunctions.net/${name}`;
+  // E2E builds: the functions emulator (lib/e2e/functions). Every other build drops this branch.
+  if (process.env.EXPO_PUBLIC_E2E === '1') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const e2e = (require('../lib/e2e/functions') as typeof import('../lib/e2e/functions')).e2eFunction(name);
+    url = e2e.url;
+    Object.assign(headers, e2e.headers);
+  }
   const resp = await fetch(url, {
     method: 'POST',
     headers,

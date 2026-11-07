@@ -8,9 +8,9 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 | --- | --- | --- |
 | A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
 | A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
-| The top of a stack into `develop`, a PR into `main`, a merge group | all eight | two iOS, two Android |
-| A push to `develop` (what just landed) | all eight on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
-| Every night (testing develop), by hand | all eight | two iOS, two Android |
+| The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
+| A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
+| Every night (testing develop), by hand | every flow | two iOS, two Android |
 
 Every run that ran flows keeps their screenshots of key screens (`subflows/shot.yaml`;
 `<flow>/run/takeScreenshot/<name>.png` under the results) as the artifact
@@ -26,7 +26,7 @@ that changed without its baseline being approved fails E2E (see "Screenshots" be
 - **05 (daily log):** adding, editing and deleting notes. It found two app bugs on Nov 4.
 - **06 (offline):** the phone's copy, the outbox and syncing back, where a bug would lose data.
 
-03, 07 and 08 run before a release (the PR into `main`) and every night.
+01, 03, 07, 08, 09 and 10 run before a release (the PR into `main`) and every night.
 
 **Why not every flow on every PR:** a macOS runner is the scarce part, five at a time on this plan,
 and each iOS job takes 21–39 minutes of flows.
@@ -39,7 +39,7 @@ and each iOS job takes 21–39 minutes of flows.
   a push: what it added). When nothing in them goes into the app
   or the flows, the iOS and Android jobs are skipped and `E2E` passes. "Goes into" means anything
   outside `.github/scripts/app-hash.sh`'s ignore list, plus `.maestro/`, `e2e.yml`,
-  `firestore.rules` and `firebase.json`.
+  `firestore.rules`, `storage.rules`, `firebase.json`, `functions/` and `scripts/emulators.sh`.
 - **Never missing:** it runs after a failure or a cancellation too, so a PR never waits for a check
   that won't come.
 - **Partial runs:** a run by hand on one platform, or with `flows` (a glob such as `06-*`), reports
@@ -89,6 +89,7 @@ rules it covers in its first lines; recordings have no rule there yet.
 | `06-offline` | A session offline; a cold start offline; back online, the server has it | SYNC-1, SYNC-2, SESS-3 |
 | `07-recordings` | Record in a session, find it in Activity, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
+| `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
 
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
 memorized (24 pages) and 10 pages a day, so the days are 1, 582–590 | 591–600 | 601–604, 1, 582–586.
@@ -157,10 +158,16 @@ about a second a job.
 `EXPO_PUBLIC_E2E=1` at bundle time makes an E2E build (`src/lib/e2e/`):
 - **Firebase** is a demo project, `demo-revisely`, on the Auth and Firestore emulators at
   `EXPO_PUBLIC_E2E_HOST` (default `localhost` on iOS, `10.0.2.2` on the Android emulator, which is
-  how it sees this computer). App Check is skipped.
-- **The network is hermetic.** JavaScript reaches only the emulators; everything else (the page
-  images in the real Storage bucket, translations, the worker, push tokens) goes to a closed local
-  port and fails at once. So the session shows "Couldn't load page" where the mushaf would be; the
+  how it sees this computer).
+- **Our Cloud Functions** run for real in the functions emulator beside them (with Storage), built
+  from `functions/`: the app calls them as in production (`callFunction`, `src/lib/e2e/functions.ts`
+  gives the URL), with the account's sign-in and an App Check token only the emulator accepts (a
+  simulator can't attest the app), and the E2E clock in `X-Revisely-Test-Now`, which the functions
+  follow there. Inside them only Anthropic answers from a recording (`functions/src/emulator.ts`,
+  TESTING.md).
+- **The network is hermetic.** JavaScript reaches only the emulators (Auth, Firestore, Functions);
+  everything else (the page images in the real Storage bucket, translations, the worker, push
+  tokens) goes to a closed local port and fails at once. So the session shows "Couldn't load page" where the mushaf would be; the
   pages still swipe and count. NetInfo checks reachability against the Auth emulator.
 - **A fresh install is light** (`pinFreshTheme` in `src/lib/e2e/install.ts`), the theme the
   screenshots are approved in. The app chooses once, at the first launch, and a key written
@@ -186,15 +193,16 @@ fingerprint doesn't either.
 You need Java 21 and the Firebase CLI (as for the rules tests), Maestro (`~/.maestro/bin/maestro`,
 2.11), Xcode for iOS, and the Android SDK with an emulator for Android.
 
-1. **The emulators**, in a terminal of their own:
+1. **The emulators** (Auth, Firestore, Storage and our functions; the functions need their packages
+   once: `cd functions && npm ci`), in a terminal of their own:
 
    ```bash
    bash .maestro/scripts/emulators.sh
    ```
 
    The scenario tests use the same ports. To run both at once, move these:
-   `E2E_AUTH_PORT=19099 E2E_FIRESTORE_PORT=18080 bash .maestro/scripts/emulators.sh`, and build with
-   `EXPO_PUBLIC_E2E_AUTH_PORT=19099 EXPO_PUBLIC_E2E_FIRESTORE_PORT=18080`.
+   `E2E_AUTH_PORT=19099 E2E_FIRESTORE_PORT=18080 E2E_FUNCTIONS_PORT=15001 E2E_STORAGE_PORT=19199 bash .maestro/scripts/emulators.sh`,
+   and build with `EXPO_PUBLIC_E2E_AUTH_PORT=19099 EXPO_PUBLIC_E2E_FIRESTORE_PORT=18080 EXPO_PUBLIC_E2E_FUNCTIONS_PORT=15001`.
 
 2. **The app.** A local build for testing, never a release (unsigned on iOS, the debug key on
    Android, never uploaded):
