@@ -15,6 +15,8 @@
 //   - Tuesday 3 November as d1 shows it: Juz 28, 18 of 20 revised (556–557 skipped) in 34 minutes, a
 //     note tagged to it and a revision written by hand; p. 562 memorized in 25 minutes, with a note;
 //     a timed read of 562–563 from 8:05 to 8:23; a note of its own.
+//   - for Insights (d4): sessions at dawn and every third day at night, 2 November skipping 556–557
+//     too, and eleven months of memorizing before October.
 // Times are the simulator's (America/Chicago; CST from 1 November).
 
 var AUTH = typeof E2E_AUTH_URL !== 'undefined' && E2E_AUTH_URL ? E2E_AUTH_URL : 'http://127.0.0.1:9099';
@@ -64,6 +66,12 @@ function range(from, to) {
   for (var p = from; p <= to; p++) out.push(p);
   return out;
 }
+/** `hour`:`minute` in Chicago on `day` (CDT until 1 November 2026, CST from then). */
+function local(day, hour, minute) {
+  var parts = day.split('-');
+  var offset = day < '2026-11-01' ? 5 : 6;
+  return Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), hour + offset, minute || 0);
+}
 function noon(day) {
   var parts = day.split('-');
   return Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 18, 0); // 12:00 in Chicago
@@ -88,6 +96,11 @@ for (var k = 522; k <= 541; k++) {
 var POOL = JUZ28.concat([1]).concat(range(582, 604));
 
 /** `skipped` defaults to every assigned page not revised; pass [] for a session that stopped early. */
+/** Sessions run at dawn, and every third day at night (Insights' minutes by hour, d4). */
+function sessionTime(day) {
+  var d = Number(day.slice(8, 10));
+  return d % 3 === 0 ? local(day, 21, 5) : local(day, 5, 20);
+}
 function revision(day, assigned, revised, minutes, skippedPages) {
   var skipped =
     skippedPages ||
@@ -98,7 +111,7 @@ function revision(day, assigned, revised, minutes, skippedPages) {
     id: day,
     uid: uid,
     day: day,
-    occurredAt: noon(day),
+    occurredAt: sessionTime(day),
     countsFor: day,
     source: 'session',
     pages: revised,
@@ -125,7 +138,7 @@ function read(day, pages, minutes, at) {
     id: 'read-' + day,
     uid: uid,
     day: day,
-    occurredAt: at || noon(day) + 6 * 3600000,
+    occurredAt: at || local(day, 20, 15),
     pages: pages,
     minutes: minutes,
     source: 'automatic',
@@ -161,7 +174,20 @@ for (var d = 1; d <= 31; d++) {
 var JUZ27 = range(522, 541);
 revision('2026-11-01', JUZ27, JUZ27.slice(0, 6), 9, []);
 note('2026-11-01', 'note-d2', 'Guests tonight. Picking up from At-Tur tomorrow.', Date.UTC(2026, 10, 2, 2, 20), null);
-revision('2026-11-02', POOL.slice(0, 20), POOL.slice(0, 20), 30);
+// 2 November skipped 556–557 as 3 November did (Weak spots: "Skipped 2 times in 30 days").
+revision('2026-11-02', JUZ28, JUZ28.filter(function (p) {
+  return p !== 556 && p !== 557;
+}), 30);
+
+// 4b. Eleven months of memorizing before October (Insights' Memorization bars, d4).
+var MONTHS = ['2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
+var PER_MONTH = [4, 3, 5, 4, 7, 7, 5, 5, 5, 5, 5];
+var next = 380;
+for (var mo = 0; mo < MONTHS.length; mo++) {
+  var pagesThatMonth = range(next, next + PER_MONTH[mo] - 1);
+  next += PER_MONTH[mo];
+  memorization(MONTHS[mo] + '-15', pagesThatMonth);
+}
 
 // 5. Tuesday 3 November, as d1 shows it.
 revision('2026-11-03', JUZ28, JUZ28.filter(function (p) {
