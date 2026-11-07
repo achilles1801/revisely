@@ -78,10 +78,32 @@ export type RevoAttachment =
 
 export type RevoChart = { kind: 'pageRatings'; title: string; pages: number[] } | { kind: 'dailyPages'; title: string; days: 7 | 30 };
 
+/**
+ * The screens an `openScreen` action may open (REVO-31). The app has the same list
+ * (src/lib/revo/types.ts REVO_SCREENS); guide.test.ts checks they agree.
+ */
+export const REVO_SCREENS = ['jumpTo', 'planEditor', 'memorized', 'activity', 'insights', 'dailyLog', 'settings', 'prayerTimes', 'qibla', 'reader'] as const;
+export type RevoScreen = (typeof REVO_SCREENS)[number];
+
+/** The Settings sections `openScreen` may scroll to (with `screen: 'settings'`). */
+export const REVO_SETTINGS_SECTIONS = ['activity', 'homeScreen', 'prayer', 'revision', 'revo', 'mushaf', 'notifications', 'appearance', 'testing'] as const;
+export type RevoSettingsSection = (typeof REVO_SETTINGS_SECTIONS)[number];
+
 export type RevoAction =
   | { kind: 'reviseFirst'; title: string; detail: string; pages: number[] }
   | { kind: 'openPage'; title: string; detail: string; page: number }
-  | { kind: 'startRevision'; title: string; detail: string };
+  | { kind: 'startRevision'; title: string; detail: string }
+  | {
+      kind: 'openScreen';
+      title: string;
+      detail: string;
+      screen: RevoScreen;
+      /** settings only: the section to show. */
+      section?: RevoSettingsSection;
+      /** reader only: where it opens, a surah (1–114) or a juz (1–30); neither opens the Read tab's list. */
+      surah?: number;
+      juz?: number;
+    };
 
 export interface RevoMessage {
   id: string;

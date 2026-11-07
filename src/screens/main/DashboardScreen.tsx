@@ -53,6 +53,7 @@ import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { prayerTimesEnabled } from '../../lib/prayer/status';
 import { usePrayerPrefs } from '../../lib/prayer/prefs';
 import { onPrayerSheetRequest } from '../../lib/widgets/links';
+import { onJumpSheetRequest } from '../../lib/revo/screens';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
@@ -146,6 +147,8 @@ export default function DashboardScreen() {
       }),
     [],
   );
+  // Revo's "Open Jump to" (REVO-31) opens Jump to… here.
+  useEffect(() => onJumpSheetRequest(() => setJumpOpen(true)), []);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);

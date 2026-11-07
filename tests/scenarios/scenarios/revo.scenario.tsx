@@ -220,6 +220,66 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
   }
 });
 
+it('[REVO-31] [REVO-30] an answer that offers a screen: its button opens it (Jump to… on Home) and nothing happens before the tap; a screen the server doesn’t know never reaches the app', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-06 10:00');
+  const phone = new Phone('phone');
+  // Juz 28 and 29 memorized, 20 pages a day.
+  let app = await newAccount(phone, { memorized: pagesRange(542, 581), user: { dailyPageCapacity: 20 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+
+  app = await phone.open(revoStack);
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  const home = new Home(app);
+  await home.ready();
+  const startBefore = home.title();
+  await tap(app, 'revo-button');
+  await tap(app, 'revo-turn-on');
+  await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
+
+  // A how-to question: the answer, and a card that opens Jump to….
+  await modelSays(uid, reply('Open Jump to and pick Juz 29: today starts there, and the days after carry on from it.', {
+    action: { kind: 'openScreen', title: 'Revise Juz 29 today', detail: 'In Jump to, choose Juz 29', screen: 'jumpTo' },
+  }));
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'How do I revise Juz 29 today?');
+  });
+  await tap(app, 'revo-send');
+  await app.until(() => app.screen.queryByTestId('revo-plan') != null, 'the card');
+  expect(app.screen.getByText('Open Jump to')).toBeTruthy();
+  // The guide went with the question, in the system prompt.
+  const asked = (await modelRequests(uid)).pop()!;
+  expect(asked.problems).toEqual([]);
+  // Nothing has moved before the tap.
+  expect(app.screen.queryByTestId('jump-go')).toBeNull();
+  expect(home.title()).toBe(startBefore);
+
+  // The tap closes Revo and opens Jump to… over Home; choosing Juz 29 starts today there.
+  await tap(app, 'revo-plan-do');
+  await app.until(() => app.screen.queryByTestId('jump-go') != null, 'the Jump to… sheet');
+  await tap(app, 'jump-juz-29');
+  await tap(app, 'jump-go');
+  await app.untilSynced();
+  await app.until(() => /Al-Mulk/.test(home.title() ?? ""), 'today to start at Juz 29');
+
+  // A screen not on the list: the server drops the action, the answer stays, no card.
+  await tap(app, 'revo-button');
+  await modelSays(uid, reply('That isn’t something Revisely has.', {
+    action: { kind: 'openScreen', title: 'Open it', detail: '', screen: 'adminPanel' },
+  }));
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'Where are the admin tools?');
+  });
+  await tap(app, 'revo-send');
+  await app.until(() => app.screen.queryByText('That isn’t something Revisely has.') != null, 'the answer');
+  // (Opening Revo again started a new conversation: the first card isn't on screen.)
+  expect(app.screen.queryByTestId('revo-plan')).toBeNull();
+  await app.close();
+});
+
 type RevoBackendMod = typeof import('../../../src/lib/revo/backend');
 
 /** What a Revo call through the app's backend is refused with ('off', 'daily', …). */

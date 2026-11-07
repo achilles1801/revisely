@@ -12,6 +12,7 @@ import { REVO_BUTTON_ROUTES, revoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
 import { onRevoOpen, type RevoOpenRequest } from '../../lib/revo/open';
+import { openScreen } from '../../lib/revo/screens';
 import { setRevoButtonRoute, setRevoPresent } from '../../lib/revo/presence';
 import type { RevoAction, RevoAttachment, RevoSettings } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
@@ -219,6 +220,8 @@ function RevoHostInner() {
       navigationRef.navigate('Read', { screen: 'QuranReader', params: { pageNumber: action.page } });
     } else if (action.kind === 'startRevision') {
       navigationRef.navigate('Home', { screen: 'ActiveRevision', params: undefined, initial: false });
+    } else if (action.kind === 'openScreen') {
+      openScreen((name, params) => (navigationRef.navigate as (n: string, p: object) => void)(name, params), action);
     }
   };
 

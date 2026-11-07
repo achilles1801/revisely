@@ -16,9 +16,10 @@ import {
   mergeMemory,
   reviewMeta,
 } from '../../../functions/src/revo/handler';
-import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest } from '../../../functions/src/revo/prompt';
+import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest, historyTurn } from '../../../functions/src/revo/prompt';
+import { GUIDE_SECTIONS, REVO_GUIDE } from '../../../functions/src/revo/guide';
 import { parseReply } from '../../../functions/src/revo/reply';
-import type { CachedAnswer, RevoChat, RevoContext, RevoMemoryItem, RevoSettings, StoredMessage } from '../../../functions/src/revo/types';
+import { REVO_SCREENS, type CachedAnswer, type RevoChat, type RevoContext, type RevoMemoryItem, type RevoSettings, type StoredMessage } from '../../../functions/src/revo/types';
 import { validateAttachment, validateContext } from '../../../functions/src/revo/validate';
 import { revoSettingsOf } from '../../../functions/src/revo/settings';
 
@@ -627,5 +628,68 @@ describe('history (REVO-10)', () => {
     expect(f.memory()).toEqual([]);
     expect(f.answers.size).toBe(0);
     expect(f.usage()).toEqual({ day: DAY, count: 1 });
+  });
+});
+
+describe('how the app works: the guide (REVO-30)', () => {
+  it('[REVO-30] the guide is in the cached system prompt, with how to answer from it and what to say when it doesn’t cover something', async () => {
+    expect(REVO_SYSTEM_PROMPT).toContain(REVO_GUIDE);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/from the guide only/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/at most two short steps with the path/);
+    expect(REVO_SYSTEM_PROMPT).toContain('I’m not sure that’s possible in Revisely');
+    expect(REVO_SYSTEM_PROMPT).toMatch(/Never invent a feature, a button, a setting or a path/);
+    // Every question carries it, in the one cached system block, the same each time.
+    const m = model();
+    await handleRevoAsk(U, ask(), deps(fakeStore().store, m.call));
+    await handleRevoAsk(U, ask({ question: 'Where is the Qibla?' }), deps(fakeStore().store, m.call));
+    expect(m.requests.map((r) => r.system)).toEqual([0, 1].map(() => [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]));
+  });
+
+  it('[REVO-30] it answers the owner’s questions and says what isn’t possible, with the closest way', () => {
+    // "I want to revise Juz 29 backwards but I don't see where I can do that."
+    expect(REVO_GUIDE).toMatch(/Revising one juz backwards[^\n]*“Reverse order” on[^\n]*“Today starts at”/);
+    // "Will I keep my streak if I revise yesterday's stuff?"
+    const streak = GUIDE_SECTIONS.find((s) => s.covers.includes('SESS-6'))!.text;
+    expect(streak).toMatch(/Revising yesterday’s missed pages before today ends brings it back at once/);
+    expect(streak).toMatch(/Two missed days in a row break the streak/);
+    expect(REVO_GUIDE).toMatch(/### Not possible \(yet\), and the closest way/);
+  });
+});
+
+describe('opening a screen (REVO-31)', () => {
+  const allowed = new Set([548, 549]);
+  const reply = (action: Record<string, unknown>) => parseReply(JSON.stringify({ text: 'Here.', action }), allowed, { firstTurn: false });
+  const go = { kind: 'openScreen', title: 'Open Jump to', detail: 'Pick Juz 29' };
+
+  it('[REVO-31] a screen of the list is kept, with a Settings section or the reader’s surah or juz', () => {
+    for (const screen of REVO_SCREENS) expect(reply({ ...go, screen })?.action).toEqual({ ...go, screen });
+    expect(reply({ ...go, screen: 'settings', section: 'mushaf' })?.action).toEqual({ ...go, screen: 'settings', section: 'mushaf' });
+    expect(reply({ ...go, screen: 'reader', surah: 67 })?.action).toEqual({ ...go, screen: 'reader', surah: 67 });
+    expect(reply({ ...go, screen: 'reader', juz: 29 })?.action).toEqual({ ...go, screen: 'reader', juz: 29 });
+    // A field another screen would take is left out.
+    expect(reply({ ...go, screen: 'jumpTo', surah: 2, section: 'mushaf' })?.action).toEqual({ ...go, screen: 'jumpTo' });
+  });
+
+  it('[REVO-31] any other screen, section, surah or juz drops the action; the answer is kept', () => {
+    for (const bad of [
+      { screen: 'adminPanel' },
+      { screen: 'settings', section: 'billing' },
+      { screen: 'reader', surah: 115 },
+      { screen: 'reader', juz: 0 },
+      { screen: 'reader', surah: 2.5 },
+      { screen: 'reader', surah: 2, juz: 1 },
+      { screen: 'reader', juz: '29' },
+    ]) {
+      expect(reply({ ...go, ...bad })).toEqual({ text: 'Here.', remember: [] });
+    }
+  });
+
+  it('[REVO-31] the server stores and returns it like any action, and a follow-up shows the model what was offered', async () => {
+    const f = fakeStore();
+    const action = { kind: 'openScreen', title: 'Open Jump to', detail: 'Then choose Juz 29', screen: 'jumpTo' };
+    const r = await handleRevoAsk(U, ask({ question: 'How do I revise Juz 29 today?' }), deps(f.store, model(json({ action })).call));
+    expect(r.reply.action).toEqual(action);
+    expect(f.messages('u', r.chatId)[1].action).toEqual(action);
+    expect(historyTurn(f.messages('u', r.chatId)[1]).content).toContain('[suggested: open jumpTo]');
   });
 });

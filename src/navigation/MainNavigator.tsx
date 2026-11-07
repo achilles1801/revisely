@@ -32,6 +32,7 @@ import { insightsTab, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
 import type { JournalKind } from '../types';
+import type { RevoSettingsSection } from '../lib/revo/types';
 
 export type MainTabParamList = {
   // Non-screen code (the timer) opens a day of Activity on the Home stack.
@@ -45,7 +46,8 @@ export type HomeStackParamList = {
   Dashboard: undefined;
   // aheadDay: open with that later revision day's pages after today's (Home's "starts at" line).
   ActiveRevision: { aheadDay?: string } | undefined;
-  Settings: undefined;
+  // section: scroll to that section (Revo's openScreen, REVO-31).
+  Settings: { section?: RevoSettingsSection } | undefined;
   // edit: open with the pages ready to edit (Home's Memorized line).
   Memorization: { edit?: boolean } | undefined;
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can

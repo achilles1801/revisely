@@ -1238,6 +1238,18 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   is "Ask: …"): match by id, and an id is a regex (no bare `?`).
 - **Scenarios:** `harness/revoServer.js` serves the callables from the functions' own code against the
   emulators (only the model is a stand-in), so `[REVO-23]` runs the app's real requests.
+- **The guide** (`functions/src/revo/guide.ts`, REVO-30): how Revisely works, for Revo, in the cached part of its
+  prompt: each rule in user words, where every screen and setting is, the steps for common tasks, what is for testers,
+  and what the app can't do with the closest way. **Change the guide in the same PR as a feature** (a rule, a screen, a
+  route, a label, a setting): `guide.test.ts` fails when BEHAVIOUR.md has a rule the guide doesn't cover (or list in
+  `GUIDE_INTERNAL` with why), or the guide names a route or a “label” the app no longer has (curly quotes mean the
+  app's exact text; plain quotes are examples). `functions/scripts/revo-guide-samples.js` asks the real model ~25
+  how-to questions and checks each answer's facts (`--dry` checks the requests; live needs the coach key). A changed
+  guide is a changed system prompt: deploy `revoAsk,revoDayInReview` and re-record (`scripts/record-anthropic.js`).
+- **Opening a screen** (`openScreen`, REVO-31): Revo's card can open Jump to…, Edit schedule, the memorized pages,
+  Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
+  (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`
+  maps each to its route). A new screen goes in both lists, `screenTarget` and the guide's `SCREEN_HINTS`.
 
 ## Widgets (Home Screen, Lock Screen)
 
