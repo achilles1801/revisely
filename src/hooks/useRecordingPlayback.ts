@@ -94,12 +94,22 @@ export function useRecordingPlayback({ onDownloaded }: { onDownloaded?: (r: Reco
     [owner, stop],
   );
 
-  // Unmounting stops playback and frees the player.
+  // Unmounting stops playback and frees the player. remove() alone only lets go
+  // of it (on Android it went on playing, with nothing on screen to stop it);
+  // release() frees it, as lib/recitation does.
   useEffect(
     () => () => {
       currentRef.current = null;
-      playerRef.current?.remove();
+      const player = playerRef.current;
       playerRef.current = null;
+      if (!player) return;
+      try {
+        player.pause();
+        player.remove();
+        player.release();
+      } catch (err) {
+        logger.warn('Recording player not released', err);
+      }
     },
     [],
   );

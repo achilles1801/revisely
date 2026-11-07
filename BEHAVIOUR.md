@@ -186,6 +186,9 @@ How the tests are made: `tests/scenarios/README.md`.
   the app.
 - **AUDIO-2.** On Android, Pause and ▶ on the recitation's notification work with the app away;
   paused, the notification stays, and the app shows what was pressed.
+- **AUDIO-4.** When the day's recordings or Listen back go away (another day picked, the screen
+  closed) while a recording plays, it stops and its player is freed: nothing plays on with nothing
+  on screen to stop it.
 
 ## Activity
 

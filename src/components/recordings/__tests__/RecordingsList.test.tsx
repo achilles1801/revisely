@@ -26,6 +26,7 @@ jest.mock("expo-audio", () => ({
       play: jest.fn(),
       pause: jest.fn(),
       remove: jest.fn(),
+      release: jest.fn(),
       seekTo: jest.fn(() => Promise.resolve()),
       addListener: (_e: string, l: (s: any) => void) => listeners.push(l),
       emit: (s: any) =>
@@ -119,6 +120,21 @@ describe("<RecordingsList /> playback", () => {
     act(() => p.emit({ didJustFinish: true, currentTime: 4 }));
     // Never deactivated: deactivating made the next recording fail to start.
     expect(mockSetActive).not.toHaveBeenCalledWith(false);
+  });
+
+  it("going away while it plays stops it and frees the player (remove() alone frees nothing on Android)", async () => {
+    render(
+      <ThemeProvider>
+        <RecordingsList day="2026-10-19" />
+      </ThemeProvider>,
+    );
+    fireEvent.press(await screen.findByLabelText("Play recording"));
+    const p = mockPlayers[0];
+    act(() => p.emit({ playing: true, duration: 10, currentTime: 2 }));
+    screen.unmount();
+    expect(p.pause).toHaveBeenCalled();
+    expect(p.remove).toHaveBeenCalled();
+    expect(p.release).toHaveBeenCalled();
   });
 
   it("a page chip plays from that moment, seeking once the file has loaded", async () => {
