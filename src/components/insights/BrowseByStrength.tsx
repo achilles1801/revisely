@@ -62,6 +62,17 @@ export function juzMeta(juz: number, pageCount: number, avgStrength: number): st
   return `${pageCount} page${pageCount === 1 ? '' : 's'} · average ${avgStrength.toFixed(1)} · ⁨${getJuzName(juz)}⁩`;
 }
 
+/**
+ * The revision day a page was last revised on. A page holds either the moment of its last
+ * revision (a session sets it) or the revision day itself, stored as that day's midnight UTC (the
+ * self-heal from the logs, AppContext's syncPagesFromLogs). Read as a moment, the second fell on
+ * the evening before in the Americas.
+ */
+export function lastRevisedDay(user: Parameters<typeof getRevisionDayForUser>[0], iso: string): string {
+  if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.slice(0, 10);
+  return getRevisionDayForUser(user, new Date(iso));
+}
+
 /** "today", "1d ago", "12d ago": how long since a page's last revision day. */
 export function revisedAgo(days: number): string {
   return days === 0 ? 'today' : `${days}d ago`;
@@ -92,8 +103,7 @@ export function usePageStrengthRows(): {
       .map((page) => {
         // Whole revision days from the one it was last revised on: a page revised this morning is
         // 0 (today). Measuring from today's midnight made it -1 ("revised -1d ago").
-        const lastRevised = new Date(page.lastRevisedDate!);
-        const daysSinceRevision = Math.max(0, daysBetween(getRevisionDayForUser(user, lastRevised), todayDay));
+        const daysSinceRevision = Math.max(0, daysBetween(lastRevisedDay(user, page.lastRevisedDate!), todayDay));
 
         let daysSinceMemorized: number | null = null;
         if (page.dateMemorized) {
