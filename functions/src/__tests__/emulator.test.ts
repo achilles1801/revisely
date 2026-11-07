@@ -62,7 +62,7 @@ describe('inTestEmulator', () => {
 
 describe('the recorded replies', () => {
   const requests = {
-    'revo-ask': buildAskRequest({ day: '2026-11-03', question: 'How was my week?', context, attach: null, memory: [], history: [], chat: null }),
+    'revo-ask': buildAskRequest({ day: '2026-11-03', question: 'How was my week?', context, attached: [], memory: [], history: [], chat: null }),
     'revo-review': buildReviewRequest({ day: '2026-11-03', context, memory: [] }),
     coach: buildCoachRequest('pace', { pagesPerDay7: 1, pagesPerDay30: 1, plannedPerDay: 1 }),
   } as const;

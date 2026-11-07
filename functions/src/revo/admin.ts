@@ -5,7 +5,7 @@
  *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn; optIn is the Ask coach's
  *   revoUsage/{uid}                                { uid, day, count }: questions on that revision day
  *   users/{uid}/revoChats/{chatId}                 { uid, kind, title, day, createdAt, updatedAt, turns, meta? }
- *   users/{uid}/revoChats/{chatId}/messages/{id}   the message, uid, and attachData on a user message
+ *   users/{uid}/revoChats/{chatId}/messages/{id}   the message, uid, and on a user message the attachments (attachData: one; attachList: several)
  *   users/{uid}/revoMemory/{id}                    { uid, text, source, day, chatId, at }
  *   revoAnswers/{uid}__{sha256}                    a cached first answer (server only)
  *   coachLedger, coachLedgerDay                    the Ask coach's ledger, shared (coach/admin.ts)

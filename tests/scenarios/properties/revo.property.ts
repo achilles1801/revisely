@@ -270,7 +270,7 @@ describe('the context the app sends (REVO-2, REVO-26)', () => {
 
 describe('how Revo talks (REVO-27)', () => {
   const said = (c: RevoContext) => {
-    const r = buildAskRequest({ day: DAY, question: 'How am I doing?', context: c, attach: null, memory: [], history: [] });
+    const r = buildAskRequest({ day: DAY, question: 'How am I doing?', context: c, attached: [], memory: [], history: [] });
     return r.messages[r.messages.length - 1].content;
   };
   const worded = (): RevoContext => ({
@@ -337,13 +337,13 @@ describe('how Revo talks (REVO-27)', () => {
 
   it('[REVO-27] a Day in review chat opens with its weekday, and an attached day goes without its date', () => {
     const review: StoredMessage = { id: 'r', role: 'revo', text: 'A steady day.', at: 1 } as StoredMessage;
-    const r = buildAskRequest({ day: DAY, question: 'And tomorrow?', context: context(), attach: null, memory: [], history: [review], chat: { kind: 'review', day: '2026-11-05' } });
+    const r = buildAskRequest({ day: DAY, question: 'And tomorrow?', context: context(), attached: [], memory: [], history: [review], chat: { kind: 'review', day: '2026-11-05' } });
     expect(r.messages[0].content).toBe('Day in review (Thursday).');
     const withDay = buildAskRequest({
       day: DAY,
       question: 'What about this day?',
       context: context(),
-      attach: { kind: 'day', label: 'Yesterday · Thu 5 Nov', day: '2026-11-05', revisedPages: [548], memorizedPages: [], readMinutes: 0, minutes: 5, ratings: [] },
+      attached: [{ kind: 'day', label: 'Yesterday · Thu 5 Nov', day: '2026-11-05', revisedPages: [548], memorizedPages: [], readMinutes: 0, minutes: 5, ratings: [] }],
       memory: [],
       history: [],
     });
@@ -691,5 +691,82 @@ describe('opening a screen (REVO-31)', () => {
     expect(r.reply.action).toEqual(action);
     expect(f.messages('u', r.chatId)[1].action).toEqual(action);
     expect(historyTurn(f.messages('u', r.chatId)[1]).content).toContain('[suggested: open jumpTo]');
+describe('what + attaches, on the server (REVO-32, REVO-33)', () => {
+  const tally = { days: 1, pages: 2, onDay: 1, late: 0, ahead: 0, skipped: 1, skippedDays: 1 };
+  const facts = {
+    name: 'Al-Mulk · Juz 29',
+    pages: 3,
+    memorized: 3,
+    revised: { last7: { days: 1, minEach: 0, maxEach: 1 }, last30: { days: 3, minEach: 1, maxEach: 2 }, all: { days: 5, minEach: 2, maxEach: 3 } },
+    lastRevisedDaysAgo: 2,
+    oldest: { name: 'Al-Mulk, ayahs 13–26', page: 563, daysAgo: 9 },
+    neverRevised: 0,
+    plan: { last7: tally, last30: tally },
+    strength: { weak: 1, moderate: 1, strong: 1, unrated: 0, average: 3 },
+    weakSpots: [{ name: 'Al-Mulk, ayahs 13–26', pages: [563], rating: 2 }],
+    today: null,
+    next: { inDays: 3, pages: 3 },
+  };
+  const mulk = { kind: 'surah', label: 'Al-Mulk', surah: 67, facts };
+  const day = {
+    kind: 'revisionDay',
+    label: 'Wed 4 Nov · 1 note',
+    day: '2026-11-04',
+    facts: {
+      daysAgo: 2,
+      plan: { pages: 2, name: 'Al-Mulk 1–12', carried: 0, onDay: 1, ahead: 0, late: 0, notDone: 1, done: false },
+      revised: { pages: 1, name: 'Al-Mulk 1–12', forLater: 0, forEarlier: 0 },
+      minutes: 12,
+      readMinutes: 0,
+      memorized: { pages: 0 },
+      ratings: { weak: 0, moderate: 0, strong: 0, weakPages: [] },
+      recordings: { count: 1, minutes: 4 },
+      notes: ['Al-Mulk felt shaky tonight'],
+    },
+  };
+
+  it('[REVO-32] a surah goes as sentences of its facts; a chart on its pages is kept, as the context’s are', async () => {
+    const f = fakeStore();
+    const m = model(json({ chart: { kind: 'pageRatings', title: 'Al-Mulk', pages: [563, 564] } }));
+    const r = await handleRevoAsk(U, ask({ attach: mulk }), deps(f.store, m.call));
+    const sent = m.requests[0].messages.at(-1)!.content;
+    expect(sent).toContain('Attached: Al-Mulk (Al-Mulk · Juz 29)');
+    expect(sent).toContain('Weak spots, weakest first: Al-Mulk, ayahs 13–26 (page 563, rated 2)');
+    expect(sent).toContain('revised in full twice (each memorized page 2 to 3 times), on 5 days');
+    expect(r.reply.chart).toEqual({ kind: 'pageRatings', title: 'Al-Mulk', pages: [563, 564] });
+    expect(r.question).toMatchObject({ attach: { kind: 'surah', label: 'Al-Mulk' } });
+    expect(r.cached).toBe(false);
+  });
+
+  it('[REVO-33] several at once: each in the question, every chip on the message, and all of them again with a follow-up', async () => {
+    const f = fakeStore();
+    const m = model();
+    const first = await handleRevoAsk(U, ask({ attachments: [mulk, day] }), deps(f.store, m.call));
+    expect(first.question).toMatchObject({
+      attach: { kind: 'surah', label: 'Al-Mulk' },
+      attachments: [
+        { kind: 'surah', label: 'Al-Mulk' },
+        { kind: 'revisionDay', label: 'Wed 4 Nov · 1 note' },
+      ],
+    });
+    // The attachments themselves stay on the server.
+    expect(JSON.stringify(first.question)).not.toContain('shaky');
+    const stored = f.messages('u', first.chatId).find((x) => x.role === 'user')!;
+    expect(stored.attachList).toHaveLength(2);
+    expect(stored.attachData).toBeUndefined();
+    const sent = m.requests[0].messages.at(-1)!.content;
+    expect(sent).toContain('Attached: Wed 4 Nov · 1 note, 2 days ago');
+    expect(sent).toContain('“Al-Mulk felt shaky tonight”');
+    await handleRevoAsk(U, ask({ chatId: first.chatId, question: 'And Al-Mulk?' }), deps(f.store, m.call));
+    const history = m.requests[1].messages.map((x) => x.content).join('\n');
+    expect(history).toContain('Attached: Al-Mulk');
+    expect(history).toContain('Al-Mulk felt shaky tonight');
+  });
+
+  it('[REVO-32] refused: a day the question’s day doesn’t put where it says, and both ways of attaching at once', async () => {
+    const m = model();
+    await expect(handleRevoAsk(U, ask({ attach: { ...day, facts: { ...day.facts, daysAgo: 1 } } }), deps(fakeStore().store, m.call))).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(handleRevoAsk(U, ask({ attach: mulk, attachments: [day] }), deps(fakeStore().store, m.call))).rejects.toMatchObject({ code: 'invalid-argument' });
+    expect(m.requests).toHaveLength(0);
   });
 });
