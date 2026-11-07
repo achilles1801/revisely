@@ -22,8 +22,8 @@ name: E2E
 #   - a lower layer of a GitHub stack: not called (the top layer tests the stack);
 #   - the top of a stack into develop, a PR into main, a merge group: every flow,
 #     two iOS jobs and two Android jobs;
-#   - a single PR into develop: the smoke set, 02 04 05 06, on Android only
-#     (.maestro/README.md says why these four);
+#   - a single PR into develop: the smoke set, 02 04 05 06, on Android only, in
+#     two jobs side by side (.maestro/README.md says why these four);
 #   - a push to develop (what just landed): every Android flow, and the iOS native
 #     build alone (kept where every PR into develop can restore it). A newer push
 #     cancels the run of the one before.
@@ -120,7 +120,7 @@ jobs:
       run_android: ${{ steps.shards.outputs.run_android }}
     steps:
       # The jobs and their flows. Every flow: two jobs a platform of about the
-      # same length (03 and 04, the long ones, apart). The smoke set: one job.
+      # same length (03 and 04, the long ones, apart). The smoke set: two Android jobs, one iOS.
       # Called from CI: what `ios` and `android` say. On its own: a run by hand
       # with `flows` is one job each with those, `smoke` the smoke set, and
       # otherwise (and nightly) every flow.
@@ -134,21 +134,26 @@ jobs:
           PLATFORM: ${{ inputs.platform }}
         run: |
           full='[{"name":"01 02 03 08 09","flows":".maestro/flows/0[12389]-*.yaml"},{"name":"04 05 06 07","flows":".maestro/flows/0[4567]-*.yaml"}]'
-          smoke='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
+          # Android's smoke set is a single PR's long pole: two jobs side by side
+          # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
+          # iOS keeps one job: macOS runners are the scarce part (5 at a time).
+          smoke_android='[{"name":"smoke: 02 05","flows":".maestro/flows/0[25]-*.yaml"},{"name":"smoke: 04 06","flows":".maestro/flows/0[46]-*.yaml"}]'
+          smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
-          set_of() {
+          set_of() { # set platform
             case "$1" in
-              none) echo '[]' ;; build) echo "$build" ;; smoke) echo "$smoke" ;; full) echo "$full" ;;
+              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;;
+              smoke) if [ "$2" = android ]; then echo "$smoke_android"; else echo "$smoke_ios"; fi ;;
               *) echo "::error::Unknown set '$1' (none, build, smoke, full)" >&2; return 1 ;;
             esac
           }
           if [ -n "$IOS_SET" ] || [ -n "$ANDROID_SET" ]; then
-            ios=$(set_of "${IOS_SET:-none}"); android=$(set_of "${ANDROID_SET:-none}")
+            ios=$(set_of "${IOS_SET:-none}" ios); android=$(set_of "${ANDROID_SET:-none}" android)
           elif [ -n "$ONLY" ]; then
             case "$ONLY" in *[!A-Za-z0-9*?._-]*) echo "::error::flows: a glob of flow names, like 06-*"; exit 1 ;; esac
             ios=$(jq -cn --arg n "$ONLY" '[{name: $n, flows: (".maestro/flows/" + $n)}]'); android="$ios"
           elif [ "$SMOKE" = true ]; then
-            ios="$smoke"; android="$smoke"
+            ios="$smoke_ios"; android="$smoke_android"
           else
             ios="$full"; android="$full"
           fi
@@ -425,10 +430,6 @@ jobs:
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.android_shards) }}
     steps:
-      # An Android build needs about 15 GB; the image ships tools this job never uses.
-      - name: Free disk space
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL" && df -h /
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
@@ -489,6 +490,12 @@ jobs:
             .maestro/build/revisely-e2e.apk
             .maestro/build/debug.keystore
           key: e2e-android-${{ steps.fp.outputs.hash }}-${{ hashFiles('.maestro/scripts/build-android.sh', '.maestro/scripts/firebase-demo-config.sh') }}
+
+      # An Android build needs about 15 GB; the image ships tools this job never uses.
+      # Only before a build (26 s a job): a kept build needs none of it.
+      - name: Free disk space
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL" && df -h /
 
       - name: Build the E2E app (native)
         if: steps.cache.outputs.cache-hit != 'true'
