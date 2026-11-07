@@ -92,7 +92,7 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: reply
-      REPLY: '{"text": "Pages 548 and 549 come late in a long day, when attention dips, and both slipped to weak on 18 October and again on 1 November. Give them a fresh look first tomorrow, before the rest.", "chart": {"kind": "pageRatings", "title": "p. 548–549 · last 30 days", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "p. 548–549 first, tomorrow", "detail": "Two pages, before the rest of the day", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
+      REPLY: '{"text": "The end of Al-Hashr and the start of Al-Mumtahanah slipped to weak twice this month, both coming late in a long session. Take them first tomorrow, while you are fresh.", "chart": {"kind": "pageRatings", "title": "End of Al-Hashr and start of Al-Mumtahanah", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "The end of Al-Hashr first, tomorrow", "detail": "Then the start of Al-Mumtahanah, before the rest", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
 - tapOn:
     id: revo-input
 - inputText: "Why do these two keep slipping?"
