@@ -29,12 +29,13 @@ export const PLATFORMS = {
 // Per screen and platform: what still varies between runs on that screen. A screen whose
 // layout moves needs its masks moved too: the boards show masked areas in pink.
 
-// A session's minutes in Home's "Recent sessions" row ("Pages 1 and 582–590 · 2 min · …"):
-// real time spent in the session. From the minutes to the end of the line (the rest is cut
-// short to fit after them). `ios`/`android`: the top of that line on the screen.
+// A session's minutes in Home's "Recent sessions" row ("Al-Fatihah and An-Naba to … · 2 min"):
+// real time spent in the session. The row names its surahs first (NAME-1), so the minutes sit
+// wherever those words end: the whole line, from the text's start (after the 40 pt mark) to
+// the end. `ios`/`android`: the top of that line on the screen.
 const sessionMinutes = (ios, android) => ({
-  ios: [{ x: 684, y: ios - 6, w: 522, h: 52, why: 'session minutes' }],
-  android: [{ x: 592, y: android - 6, w: 488, h: 50, why: 'session minutes' }],
+  ios: [{ x: 204, y: ios - 6, w: 1002, h: 52, why: 'session minutes' }],
+  android: [{ x: 178, y: android - 6, w: 902, h: 50, why: 'session minutes' }],
 });
 
 // Revo's button (bottom right, over Home): Revo is being rebuilt. Unmask it when Revo's
@@ -76,6 +77,31 @@ export const SCREEN_MASKS = {
     android: [{ x: 800, y: 348, w: 205, h: 53, why: 'prayer countdown' }],
   }),
   '08-home-kathmandu': merge(revoButton),
+  // 11-surah-names: Home done after a session, alone and under today's menu and Jump to, in light
+  // and dark: 02-home-done's layout. It runs in the first job, where no flow before it has given the
+  // Android emulator a location (04 does, in the second), so Home has no prayer line.
+  ...Object.fromEntries(
+    ['11-home', '11-today-menu', '11-jump-juz', '11-jump-surah']
+      .flatMap((n) => [n, `${n}-dark`])
+      .map((n) => [n, merge(revoButton, sessionMinutes(1272, 1081))]),
+  ),
+  // All activity: the session's row, its minutes (Android; iOS once its run is in).
+  ...Object.fromEntries(
+    ['11-see-all', '11-see-all-dark'].map((n) => [n, { android: sessionMinutes(0, 640).android }]),
+  ),
+  // The daily log: the Memorized entry's time ("12:03 pm").
+  ...Object.fromEntries(
+    ['11-daily-log', '11-daily-log-dark'].map((n) => [
+      n,
+      {
+        android: [
+          { x: 430, y: 294, w: 230, h: 50, why: 'note time' },
+          // The To field keeps the focus after Add: its cursor blinks.
+          { x: 740, y: 660, w: 120, h: 76, why: 'text cursor' },
+        ],
+      },
+    ]),
+  ),
 };
 
 // Screens left without a baseline on purpose: being redesigned now. Their captures are

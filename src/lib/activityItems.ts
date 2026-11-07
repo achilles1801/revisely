@@ -2,7 +2,8 @@ import type { JournalEntry, JournalNote, ReadingSession, RevisionLog, User } fro
 import { isRevisionActivity, normalizeReadingSession } from './activity';
 import { formatMinutesShort } from './activityHeatmap';
 import { formatEntryTime, isJournalNoteEmpty, JournalFilter, journalFilterRange } from './journal';
-import { describePageRuns, describeRevised, describeSurahRuns, pageRuns } from './pageRanges';
+import { describePageRuns, pageRuns } from './pageRanges';
+import { describePassage, describeSession, plainText } from './passages';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
 
@@ -40,7 +41,7 @@ export interface ActivityItem {
   at: number;
   /** What happened: "Revised 20 pages". */
   title: string;
-  /** The specifics: "Pages 503–522 · Al-Ahqaf to Adh-Dhariyat · 41 min". */
+  /** The specifics, surahs and juz first: "Al-Ahqaf to Adh-Dhariyat · 41 min" (lib/passages, short). */
   detail: string;
   /** A revision session with every page revised. */
   done?: boolean;
@@ -60,10 +61,8 @@ export function sessionPages(log: RevisionLog): number[] {
     : [...log.pagesRevised, ...(log.pagesSkipped ?? [])];
 }
 
-function pagesText(pages: number[]): string {
-  const runs = pageRuns(pages);
-  return [describePageRuns(runs), describeSurahRuns(runs)].filter(Boolean).join(' · ');
-}
+/** What pages hold, by surah and juz (never page numbers), short for a one-line detail. */
+const passageText = (pages: number[]) => describePassage(pages, { form: 'short', max: 2 });
 
 function dateWords(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
@@ -89,7 +88,9 @@ function surahNames(pages: number[]): string {
 }
 
 function item(base: Omit<ActivityItem, 'search'>, pages: number[] = []): ActivityItem {
-  const text = [base.title, base.detail, surahNames(pages), ACTIVITY_KIND_LABELS[base.kind], dateWords(base.day)];
+  // The page numbers and ayahs aren't shown, but a search for "pages 503" or "baqarah 142" still finds them.
+  const hidden = pages.length > 0 ? [describePageRuns(pageRuns(pages)), plainText(describePassage(pages))] : [];
+  const text = [base.title, plainText(base.detail), surahNames(pages), ...hidden, ACTIVITY_KIND_LABELS[base.kind], dateWords(base.day)];
   return { ...base, search: ` ${words(text.join(' '))}` };
 }
 
@@ -116,12 +117,10 @@ export function revisionItem(log: RevisionLog, opts: ActivityLabelOptions = {}):
     // No time is stored: a day's session leads that day.
     at: Number.MAX_SAFE_INTEGER,
     title: total > revised ? `Revised ${revised} of ${plural(total, 'page')}` : `Revised ${plural(revised, 'page')}`,
-    // The time before the surahs, which a narrow line cuts off first.
-    detail: [
-      describePageRuns(pageRuns(pages)),
-      minutes,
-      describeRevised(pages, { juzPlan: opts.juzPlan, revised: ownRevised(log) }),
-    ].filter(Boolean).join(' · '),
+    // What was revised, by surah or juz (SESS-5), then the time.
+    detail: [describeSession(pages, { form: 'short', max: 2, juzPlan: opts.juzPlan, revised: ownRevised(log) }), minutes]
+      .filter(Boolean)
+      .join(' · '),
     done: total > 0 && revised >= total,
     log,
   }, pages);
@@ -136,7 +135,7 @@ function readingItem(s: ReadingSession): ActivityItem {
     day: s.date,
     at: s.endedAt,
     title: `Read for ${time}`,
-    detail: pages.length > 0 ? pagesText(pages) : 'Timed session',
+    detail: pages.length > 0 ? passageText(pages) : 'Timed session',
   }, pages);
 }
 
@@ -148,7 +147,7 @@ function recordingItem(r: RecordingItemSource): ActivityItem {
     day: r.day,
     at: r.createdAt,
     title: `Recorded ${formatClock(r.durationMs)}`,
-    detail: [describePageRuns(pageRuns(pages)), r.kind === 'revision' ? 'During revision' : 'While reading']
+    detail: [passageText(pages), r.kind === 'revision' ? 'During revision' : 'While reading']
       .filter(Boolean)
       .join(' · '),
     recordingId: r.id,
@@ -190,8 +189,7 @@ function aheadItems(log: RevisionLog, opts: ActivityLabelOptions = {}): Activity
   const out: ActivityItem[] = [];
   for (const [day, pages] of Object.entries(log.ahead ?? {})) {
     if (!DAY_RE.test(day) || pages.length === 0) continue;
-    const runs = pageRuns(pages);
-    const detail = [describePageRuns(runs), describeRevised(pages, { juzPlan: opts.juzPlan })].filter(Boolean).join(' · ');
+    const detail = describeSession(pages, { form: 'short', max: 2, juzPlan: opts.juzPlan });
     // Just after the session's own item on its day.
     const at = Number.MAX_SAFE_INTEGER - 1;
     out.push(item({

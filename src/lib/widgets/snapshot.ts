@@ -13,7 +13,7 @@ import { aliveStreak, completedDays } from '../streak';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
-import { describePageRuns, describeSurahRuns, pageRuns } from '../pageRanges';
+import { describePassage, placeOfPage } from '../passages';
 import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
@@ -32,11 +32,11 @@ export interface WidgetDay {
   startsAt: number;
   /** When it ends: the next fajr, or midnight. */
   endsAt: number;
-  /** "Pages 41–50". */
+  /** What the day revises, by surah (never page numbers; lib/passages, short): "Al-Mujadila to At-Tahrim". */
   title: string;
-  /** "Juz 3 · Al-Baqarah to Aal-i-Imraan". */
+  /** Its juz: "Juz 28", "Juz 27–28". */
   where: string;
-  /** For the Lock Screen: "p. 41–50", or "12 pages" for several ranges. */
+  /** For the Lock Screen (one short line): the title when it fits, else where the day starts ("Al-Baqarah 142"). */
   short: string;
   total: number;
   /** Today's pages revised (only today can have any). */
@@ -146,14 +146,12 @@ export function juzLabel(juzBreakdown: { juz: number }[]): string {
   return js.length <= 3 ? `Juz ${js.join(', ')}` : `${js.length} juz`;
 }
 
-function shortLabel(pages: number[]): string {
-  const runs = pageRuns(pages);
-  if (runs.length === 1) {
-    const r = runs[0];
-    return r.first === r.last ? `p. ${r.first}` : `p. ${r.first}–${r.last}`;
-  }
-  const n = runs.reduce((sum, r) => sum + r.last - r.first + 1, 0);
-  return `${n} page${n === 1 ? '' : 's'}`;
+/** The Lock Screen's rectangular widget fits about this many characters on its line. */
+const SHORT_FITS = 20;
+
+function shortLabel(pages: number[], title: string): string {
+  if (pages.length === 0) return '';
+  return title.length <= SHORT_FITS ? title : placeOfPage(pages[0], { form: 'short' });
 }
 
 function localDay(s: string): Date {
@@ -195,7 +193,8 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const day = getRevisionDayForUser(user, startsAt);
     const endsAt = getNextRevisionDayStart(user, startsAt);
     const assignment = generateDailyAssignment(input.pages, input.quranData, user, localDay(day));
-    const runs = pageRuns(assignment.pages);
+    // The day's pages in the order it reads them, by surah (CLAUDE.md: surahs and juz first).
+    const title = describePassage(assignment.pages, { form: 'short', order: 'given', wholeJuz: false, max: 2 });
 
     // As Home: done once every page of the day is revised, today or ahead.
     const credited = creditedOnDay(input.logs, day);
@@ -209,9 +208,9 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       day,
       startsAt: startsAt.getTime(),
       endsAt: endsAt.getTime(),
-      title: describePageRuns(runs),
-      where: [juzLabel(assignment.juzBreakdown), describeSurahRuns(runs)].filter(Boolean).join(' · '),
-      short: shortLabel(assignment.pages),
+      title,
+      where: juzLabel(assignment.juzBreakdown),
+      short: shortLabel(assignment.pages, title),
       total,
       done: completed ? total : doneHere,
       completed,

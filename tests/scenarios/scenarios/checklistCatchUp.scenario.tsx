@@ -10,6 +10,7 @@
 import { pagesRange } from '../harness/account';
 import { setNow } from '../harness/clock';
 import { Home, homeStack } from '../harness/screens';
+import { catchUpWhat, place, plain } from '../harness/words';
 import { addDays, scenarioPhone } from '../harness/testScenario';
 import type { OpenApp } from '../harness/phone';
 
@@ -34,8 +35,8 @@ describe('4. Partly done today', () => {
     const { app } = await scenarioPhone('partial-today');
     const home = new Home(app);
     await home.ready();
-    expect(home.catchUp()).toMatch(/^Left yesterday · Revise p\.\s585–586$/);
-    expect(home.title()).toMatch(/^Continue at .+, p\.\s589(?!\d)/);
+    expect(plain(home.catchUp())).toBe(`Left yesterday · Revise ${catchUpWhat(pagesRange(585, 586))}`);
+    expect(plain(home.title())).toBe(`Continue at ${place(589)}`);
     expect(home.today()).toContain('2 of 5');
     expect(home.cta()).toBe('Continue revision');
 
@@ -77,7 +78,7 @@ describe('4. Partly done today', () => {
     // They count for yesterday, not today (SESS-7): yesterday is whole, today is not done by them.
     expect(creditedTo(app, addDays(D, -1))).toEqual(pagesRange(582, 586));
     expect(creditedTo(app, D)).toEqual([587, 588]);
-    expect(home.title()).toMatch(/^Continue at .+, p\.\s589(?!\d)/);
+    expect(plain(home.title())).toBe(`Continue at ${place(589)}`);
     // The streak is back at once: yesterday, and the four days before it.
     await home.untilStreak(5);
 
@@ -142,7 +143,7 @@ describe('4. Partly done today', () => {
 
     // Yesterday's two pages are still offered until today ends (SESS-6), and revising them
     // restores the run: yesterday, the four days before it, and today.
-    expect(home.catchUp()).toMatch(/^Left yesterday · Revise p\.\s585–586$/);
+    expect(plain(home.catchUp())).toBe(`Left yesterday · Revise ${catchUpWhat(pagesRange(585, 586))}`);
     await addToToday(app, home);
     const catchUp = await home.startSession();
     expect(catchUp.pages()).toEqual(expect.arrayContaining([585, 586]));
@@ -164,8 +165,8 @@ describe('5. Missed days', () => {
     const { app } = await scenarioPhone('missed-days');
     const home = new Home(app);
     await home.ready();
-    expect(home.catchUp()).toMatch(/^Missed 2 days · Revise p\.\s583–588$/);
-    expect(home.title()).toMatch(/^Starts at .+, p\.\s589(?!\d)/);
+    expect(plain(home.catchUp())).toBe(`Missed 2 days · Revise ${catchUpWhat(pagesRange(583, 588))}`);
+    expect(plain(home.title())).toBe(`Starts at ${place(589)}`);
     expect(home.detail()).toMatch(/^3\spages/);
     expect(home.cta()).toBe('Start revision');
     // No grace: two days missed in a row.
@@ -206,7 +207,7 @@ describe('5. Missed days', () => {
     home = new Home(next);
     await home.ready();
     expect(addDays(D, 1)).toBe('2026-11-06');
-    expect(home.catchUp()).toMatch(/^Missed yesterday · Revise p\.\s583–588$/);
+    expect(plain(home.catchUp())).toBe(`Missed yesterday · Revise ${catchUpWhat(pagesRange(583, 588))}`);
     await next.close();
   });
 });
@@ -219,7 +220,7 @@ describe('2. Beginner', () => {
     const home = new Home(app);
     await home.ready();
     // Pages revised in the last three days (590, 594, 595) are never offered.
-    expect(home.catchUp()).toMatch(/^Left 2 days · Revise p\.\s591–593$/);
+    expect(plain(home.catchUp())).toBe(`Left 2 days · Revise ${catchUpWhat(pagesRange(591, 593))}`);
     // D−1 was done: no grace, a one-day streak.
     await home.untilStreak(1);
 

@@ -4,6 +4,7 @@
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
+import { plain, startsAt } from '../harness/words';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
 
@@ -40,9 +41,9 @@ describe('Jump to… on a juz plan', () => {
   it('[JUMP-1] [JUMP-2] Juz 29 today: jumping back to Juz 28 starts today there, and the session holds Juz 28 from its start', async () => {
     const phone = await account();
     const { app, home } = await openHome(phone, '2026-11-04 12:00');
-    expect(home.title()).toMatch(/p\. 562(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(562));
     await home.jumpTo('jump-juz-28');
-    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(542));
     const session = await home.startSession();
     expect(session.pages()).toEqual(range(542, 561));
     await session.back();
@@ -78,10 +79,10 @@ describe('Jump to… with a carry-over into today', () => {
     await app.untilSynced();
     await app.until(() => home.carryOver() == null, 'the offer to go');
     const before = home.title();
-    expect(before).toMatch(/p\. 546(?!\d)/);
+    expect(plain(before)).toMatch(startsAt(546));
     await home.jumpTo('jump-juz-28');
     // The start moves to Juz 28: 542, and the session holds Juz 28 from there.
-    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(542));
     const session = await home.startSession();
     expect(session.pages()).toEqual(range(542, 561));
     await session.back();
@@ -114,7 +115,7 @@ describe('Jump to… before the leftovers are taken', () => {
     let { app, home } = await openHome(phone, '2026-11-04 09:00');
     expect(home.carryOver()).toBe('Add to today');
     await home.jumpTo('jump-juz-28');
-    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(542));
     expect(home.carryOver()).toBeNull();
     let session = await home.startSession();
     expect(session.pages()).toEqual(range(542, 561));
@@ -125,7 +126,7 @@ describe('Jump to… before the leftovers are taken', () => {
     // Reopened later: the offer is still gone, and today still starts at Juz 28.
     ({ app, home } = await openHome(phone, '2026-11-04 15:00'));
     expect(home.carryOver()).toBeNull();
-    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(542));
     session = await home.startSession();
     expect(session.pages()).toEqual(range(542, 561));
     await session.back();
@@ -162,7 +163,7 @@ describe('Jump to… with pages revised ahead for today', () => {
     // Wed 4 Nov (Juz 29, from 562): jump back to Juz 28.
     const { app, home } = await openHome(phone, '2026-11-04 09:00');
     await home.jumpTo('jump-juz-28');
-    expect(home.title()).toMatch(/p\. 542(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(542));
     const session = await home.startSession();
     expect(session.pages()).toEqual(range(542, 561));
     await session.back();

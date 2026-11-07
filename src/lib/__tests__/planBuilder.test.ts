@@ -17,6 +17,7 @@ import {
   rotatePagesToStart,
   splitIntoBalancedDays,
 } from '../planBuilder';
+import { plainText } from '../passages';
 import {
   describeStartPage,
   memorizedJuzGroups,
@@ -273,9 +274,16 @@ describe('planDisplay', () => {
     expect(summarizeDay([])).toMatchObject({ title: 'Rest Day', isRest: true });
     const s = summarizeDay(range(22, 31));
     expect(s.title).toBe('Juz 2');
-    expect(s.subtitle).toContain('Al-Baqarah');
-    expect(s.subtitle).toContain('10 pages');
+    expect(plainText(s.subtitle)).toBe('Al-Baqarah 142–202 · 10 pages');
     expect(summarizeDay([21, 22]).title).toBe('Juz 1–2');
+    // Surahs first, never page numbers; a whole surah by name; scattered pages list their surahs.
+    expect(plainText(summarizeDay(range(542, 561)).subtitle)).toBe('Al-Mujadila to At-Tahrim · 20 pages');
+    expect(plainText(summarizeDay([2, 3, 4]).subtitle)).toBe('Start of Al-Baqarah · 3 pages');
+    expect(summarizeDay([2, 300, 450, 600]).subtitle).toBe("Al-Baqarah, Al-Kahf +4 · 4 pages");
+    // The cycle's end, then its start: up to three parts, in the day's order.
+    expect(plainText(summarizeDay([601, 602, 603, 604, 1, 582, 583]).subtitle)).toBe(
+      "Al-'Asr to An-Nas, then Al-Fatihah, then An-Naba to An-Nazi'at · 7 pages",
+    );
   });
 
   it('formats page ranges', () => {
@@ -296,7 +304,9 @@ describe('planDisplay', () => {
   });
 
   it('describes a start page', () => {
-    expect(describeStartPage(22)).toEqual({ title: 'Al-Baqarah', subtitle: 'Page 22 · Juz 2' });
+    const start = describeStartPage(22);
+    expect({ ...start, title: plainText(start.title) }).toEqual({ title: 'Al-Baqarah, ayah 142', subtitle: 'Juz 2 · p. 22' });
+    expect(plainText(describeStartPage(542).title)).toBe('Al-Mujadila');
   });
 });
 

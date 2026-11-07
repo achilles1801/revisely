@@ -6,6 +6,7 @@ import { newAccount, pagesRange } from '../harness/account';
 import { flatText, Home, homeStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
 import type { OpenApp } from '../harness/phone';
+import { plain } from '../harness/words';
 
 /** Home's recent session rows, newest first, as one line of text each. */
 function recentSessions(app: OpenApp): string[] {
@@ -32,8 +33,8 @@ it('[SESS-5] [SCHED-2] juz plan: a whole juz revised reads "Juz 29"; part of a j
   await monday.back();
   await app.untilSynced();
   await app.until(() => recentSessions(app).length === 1, 'the session in Recent sessions');
-  expect(recentSessions(app)[0]).toContain('Juz 29');
-  expect(recentSessions(app)[0]).not.toContain('Al-Mulk');
+  expect(plain(recentSessions(app)[0])).toContain('Juz 29');
+  expect(plain(recentSessions(app)[0])).not.toContain('Al-Mulk');
   await app.close();
 
   // Tuesday: five pages of juz 30, then Back. That isn't the whole juz: its surahs.
@@ -47,7 +48,7 @@ it('[SESS-5] [SCHED-2] juz plan: a whole juz revised reads "Juz 29"; part of a j
   await tuesday.back();
   await app.untilSynced();
   await app.until(() => recentSessions(app).length === 2, 'both sessions in Recent sessions');
-  const [tue, mon] = recentSessions(app);
+  const [tue, mon] = recentSessions(app).map((r) => plain(r));
   expect(tue).not.toContain('Juz');
   expect(tue).toContain('An-Naba');
   expect(mon).toContain('Juz 29');

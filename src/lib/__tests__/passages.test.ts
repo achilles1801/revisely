@@ -1,4 +1,5 @@
 import {
+  ayahsInSurah,
   describePageRange,
   describePassage,
   describeSession,
@@ -304,6 +305,27 @@ describe('placeOfPage: where reading begins', () => {
     expect(plainText(placeOfPage(1, { edition: 'madani1405' }))).toBe('Al-Fatihah');
     expect(plainText(placeOfPage(586, { edition: 'madani1441' }))).toBe("'Abasa, ayah 41");
     expect(placeOfPage(0)).toBe('');
+  });
+
+  it('names every page differently, in both prints (where a day starts can be read back from the words)', () => {
+    for (const edition of ['madani1405', 'madani1441'] as const) {
+      const places = range(1, 604).map((p) => placeOfPage(p, { edition }));
+      expect(new Set(places).size).toBe(604);
+    }
+  });
+});
+
+describe('ayahsInSurah: the part of a surah, for a row named by it', () => {
+  it('whole, a part, one ayah, several parts; other surahs on the pages add nothing', () => {
+    const say1 = (sura: number, pages: number[]) => plainText(ayahsInSurah(sura, pages, 'madani1405'));
+    expect(say1(67, [562, 563, 564])).toBe('Whole surah');
+    expect(say1(2, range(22, 41))).toBe('Ayahs 142–252');
+    expect(say1(68, [564])).toBe('Ayahs 1–15');
+    expect(say1(67, [564])).toBe('Ayahs 27–30');
+    expect(say1(2, [...range(2, 3), ...range(22, 23)])).toBe('Ayahs 1–16, 142–153');
+    expect(say1(2, [49])).toBe('Ayahs 283–286');
+    expect(say1(3, [49])).toBe('');
+    expect(say1(112, [604])).toBe('Whole surah');
   });
 });
 

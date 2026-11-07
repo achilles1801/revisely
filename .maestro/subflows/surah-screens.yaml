@@ -1,0 +1,117 @@
+# The screens that name the Qur'an by surah and juz (NAME-1), from Home, each captured as
+# 11-<screen>${SUFFIX}: Home, today's › menu, Jump to (juz and surah), All activity, the schedule
+# and the memorized pages. Starts and ends on Home.
+#   env SUFFIX: "" (light) or "-dark"
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-home${SUFFIX}
+
+# Today's › menu: the exact ranges, surahs first and the pages a quiet detail after them.
+- tapOn:
+    id: today-summary
+- extendedWaitUntil:
+    visible:
+      id: today-menu
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-today-menu${SUFFIX}
+
+# Jump to: each juz by its surahs, each surah by its juz.
+# iOS reads the row with its subtitle ("Jump to…, Start today at …").
+- tapOn: "Jump to….*"
+- extendedWaitUntil:
+    visible:
+      id: jump-juz-list
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-jump-juz${SUFFIX}
+- tapOn:
+    id: pill-surah
+- extendedWaitUntil:
+    visible:
+      id: jump-surah-list
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-jump-surah${SUFFIX}
+# The handle closes on a drag down (a tap does nothing; VoiceOver's activate does).
+- swipe:
+    from:
+      id: sheet-handle
+    direction: DOWN
+    duration: 400
+- extendedWaitUntil:
+    notVisible:
+      id: jump-sheet
+    timeout: 10000
+
+# All activity (See all): each session by its surahs.
+- scrollUntilVisible:
+    element:
+      id: see-all
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: see-all
+- extendedWaitUntil:
+    visible: "All activity"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-see-all${SUFFIX}
+- runFlow: back-home.yaml
+
+# The schedule: each day by its juz and surahs.
+- scrollUntilVisible:
+    element:
+      id: today-summary
+    direction: UP
+    timeout: 15000
+- tapOn:
+    id: today-summary
+- extendedWaitUntil:
+    visible:
+      id: today-menu
+    timeout: 10000
+- tapOn: "Edit schedule.*"
+- extendedWaitUntil:
+    visible:
+      id: plan-edit
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-schedule${SUFFIX}
+# Its own Back, on Android too (#348: the top bar sat under the status bar there, out of reach).
+- runFlow: back-home.yaml
+
+# The memorized pages: each juz by its surahs (the Juz tab; Surahs lists page counts).
+- tapOn:
+    id: today-memorized
+- extendedWaitUntil:
+    visible: "Memorization"
+    timeout: 15000
+- tapOn:
+    id: pill-juz
+- extendedWaitUntil:
+    visible: "Juz 1"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 11-memorized${SUFFIX}
+- runFlow: back-home.yaml

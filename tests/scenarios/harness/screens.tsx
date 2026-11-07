@@ -150,7 +150,7 @@ export class Home {
     return this.text('today-carry-over');
   }
 
-  /** The catch-up line above it: "Missed yesterday · Revise p. 1–5". */
+  /** The catch-up line above it: "Missed yesterday · Revise Al-Fatihah to Al-Baqarah" (harness/words catchUpWhat). */
   catchUp(): string | null {
     return this.text('today-catch-up');
   }

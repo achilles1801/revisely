@@ -66,6 +66,7 @@ import { carryOverOn, generateDailyAssignment, getCurrentRevisionDay } from '../
 import { catchUpDayOf, ownPagesOf } from '../../lib/carryOver';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
+import { describePageRange, describePassage } from '../../lib/passages';
 import {
   getHizbForPage,
   getQuranData,
@@ -544,13 +545,19 @@ export default function ActiveRevisionScreen() {
   const assignedPages = sessionPages.length > 0 ? sessionPages : NO_PAGES;
 
   const scopeLabel = useMemo(() => {
-    // Prefer juz scope when the day's pages fit one juz; otherwise show count.
-    const juzes = new Set(
-      shownPages
-        .map((p) => quranData.find((q) => q.pageNumber === p)?.juzNumber)
-        .filter((j): j is number => typeof j === 'number'),
-    );
-    if (juzes.size === 1) return `Juz ${[...juzes][0]}`;
+    // Juz first, as the title is short (surahs and juz first, CLAUDE.md): one juz, or two in a row;
+    // else the day's one surah when it fits; else how many pages.
+    const juzes = [
+      ...new Set(
+        shownPages
+          .map((p) => quranData.find((q) => q.pageNumber === p)?.juzNumber)
+          .filter((j): j is number => typeof j === 'number'),
+      ),
+    ].sort((a, b) => a - b);
+    if (juzes.length === 1) return `Juz ${juzes[0]}`;
+    if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return `Juz ${juzes[0]}–${juzes[1]}`;
+    const words = describePassage(shownPages, { form: 'short', order: 'given', max: 1 });
+    if (words && words.length <= 16 && !words.includes(' more')) return words;
     return `${shownPages.length} pages`;
   }, [shownPages, quranData]);
 
@@ -591,7 +598,7 @@ export default function ActiveRevisionScreen() {
       if (undoTimer.current) clearTimeout(undoTimer.current);
       setUndoState({
         page: leftPage,
-        message: `Page ${leftPage} marked as revised`,
+        message: `${describePageRange(leftPage, leftPage, { form: 'compact' })} marked as revised`,
       });
     },
     [assignedPages, completedPages, markRevised],
@@ -1004,7 +1011,8 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-page"
               >
-                Page {displayPageNumber} · Juz {currentJuz} · Hizb {currentHizb}
+                {/* What the page holds, by surah; the printed page number is under the page. */}
+                {describePageRange(displayPageNumber, displayPageNumber, { form: 'compact' })} · Juz {currentJuz} · Hizb {currentHizb}
               </Text>
             </View>
             {reciteAvailable ? (
@@ -1116,9 +1124,14 @@ export default function ActiveRevisionScreen() {
               done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}
               dayLabel={lastSectionDay === sessionDay ? 'today' : `for ${weekdayLabel(lastSectionDay)}`}
+              what={describePassage(lastSectionPages, { order: 'given' })}
               next={
                 keepGoingPlan
-                  ? { label: weekdayLabel(keepGoingPlan.day), pages: keepGoingPlan.pages.length }
+                  ? {
+                      label: weekdayLabel(keepGoingPlan.day),
+                      what: describePassage(keepGoingPlan.pages, { form: 'short', order: 'given', max: 2 }),
+                      pages: keepGoingPlan.pages.length,
+                    }
                   : null
               }
               onKeepGoing={keepGoing}
