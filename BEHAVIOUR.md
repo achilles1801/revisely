@@ -275,6 +275,10 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
+- **ACT-13.** What the day's + adds (Revised, Memorized, a note, or the session's skipped pages) shows on
+  that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
+  changes still waiting on the phone over what it read. Once the server has them, the day shows the
+  server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
 - **ACT-16.** Revised pages added by hand are revisions of those pages on that day: the strength chosen
   for them (Weak, Moderate, Strong; ACT-8's ratings) stays, and they count in each page's last revised day
   and number of revisions, as a session's pages do, from the next launch on too. On their day they come
@@ -377,7 +381,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   or the month's limit (REVO-22); offline and unanswered questions can be tried again, with what was attached. Nothing
   in Revo's sheet takes the app down: an error inside it says so in the sheet.
 
-- **REVO-24.** With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
+- **REVO-24.** A full sheet reaches up to just under the status bar, on Android as on iOS. With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
   Memory) and the conversation stay on screen, and only the composer rides up with the keyboard. Where the system has
   already made room for the keyboard (Android resizing the window), the sheet isn't lifted twice. A conversation
   showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),
