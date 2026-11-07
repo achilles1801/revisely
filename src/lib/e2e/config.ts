@@ -10,12 +10,14 @@ function port(set: string | undefined, fallback: number): number {
 
 /**
  * The emulators' ports: firebase.json's, unless the build set others
- * (EXPO_PUBLIC_E2E_AUTH_PORT, EXPO_PUBLIC_E2E_FIRESTORE_PORT; .maestro/scripts/
- * emulators.sh), so an E2E run can share a computer with the scenario tests.
+ * (EXPO_PUBLIC_E2E_AUTH_PORT, EXPO_PUBLIC_E2E_FIRESTORE_PORT,
+ * EXPO_PUBLIC_E2E_FUNCTIONS_PORT; .maestro/scripts/emulators.sh), so an E2E run
+ * can share a computer with the scenario tests.
  */
 export const EMULATOR_PORTS = {
   auth: port(process.env.EXPO_PUBLIC_E2E_AUTH_PORT, 9099),
   firestore: port(process.env.EXPO_PUBLIC_E2E_FIRESTORE_PORT, 8080),
+  functions: port(process.env.EXPO_PUBLIC_E2E_FUNCTIONS_PORT, 5001),
 } as const;
 
 /** A demo- project id: the emulators accept it, and it can't reach a real project. */
