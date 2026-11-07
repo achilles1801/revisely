@@ -29,6 +29,12 @@ import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
 // sessions: promotion to production checks the candidate's preview sessions
 // (.github/workflows/promote.yml). Promotion republishes the update under a new
 // group, so production sessions carry that group's name.
+// E2E builds only: the account a flow asks for at launch (src/lib/e2e/account.ts). The bundler
+// inlines the variable, as undefined in every other build, so the module is dropped from them.
+const E2EAccount: React.ComponentType | null =
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  process.env.EXPO_PUBLIC_E2E === '1' ? require('./src/lib/e2e/E2EAccount').E2EAccount : null;
+
 const release = currentRelease();
 
 Sentry.init({
@@ -127,6 +133,7 @@ function App() {
                   <WidgetSync />
                   <PrayerSync />
                   <RevisionRemindersSync />
+                  {E2EAccount ? <E2EAccount /> : null}
                   {/* Last: over everything when this version is no longer supported. */}
                   <UpdateRequiredGate />
                 </BottomSheetModalProvider>

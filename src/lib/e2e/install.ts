@@ -4,6 +4,7 @@
 // What it sets up, and how flows drive it: .maestro/README.md.
 
 import { AppState, Linking } from 'react-native';
+import { handleAccountLink, readLaunchAccount } from './account';
 import { handleClockLink, installClock } from './clock';
 import { handleRecordingsLink, installDemoRecordings } from './demoRecordings';
 import { handleVerseLink, installDemoTranslations } from './demoTranslations';
@@ -21,6 +22,7 @@ function handle(url: string | null | undefined): void {
   if (handleRecordingsLink(url)) return;
   if (handleVerseLink(url)) return;
   if (handleUpdateLink(url)) return;
+  if (handleAccountLink(url)) return;
   handleNetworkLink(url);
 }
 
@@ -32,6 +34,8 @@ export function installE2E(): void {
   installNetwork();
   installDemoRecordings();
   installDemoTranslations();
+  // iOS: an account asked for at launch (lib/e2e/account), made once the app is up (E2EAccount).
+  readLaunchAccount();
   Linking.addEventListener('url', ({ url }) => {
     // eslint-disable-next-line no-console
     console.log(`[e2e] link ${url}`);
