@@ -41,7 +41,8 @@ MOCK_FOR = {
     "09-day-sunday": ("d2-day-light", None),
     "09-menu-revised": ("d10a-long-press", None),
     "09-add-menu": ("d5-add-menu", None),
-    "09-insights": ("d4-insights", None),
+    "09-insights": ("d4-insights", "top"),
+    "09-insights-end": ("d4-insights", "bottom"),
 }
 MARGIN = 24
 TITLE_H = 44

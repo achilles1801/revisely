@@ -110,3 +110,15 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-${THEME}
+# The rest of Insights (d4 is taller than a screen): Weak spots to Pace.
+- scrollUntilVisible:
+    element:
+      id: insights-pace
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-end-${THEME}
