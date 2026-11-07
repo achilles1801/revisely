@@ -173,7 +173,7 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
 
 const OPT_IN_ROWS: { icon: keyof typeof Ionicons.glyphMap; title: string; line: string }[] = [
   { icon: 'stats-chart-outline', title: 'Uses your totals', line: 'Coverage, consistency, weak spots and pace.' },
-  { icon: 'lock-closed-outline', title: 'Your notes and recordings stay private', line: 'They’re only sent when you add one to a question.' },
+  { icon: 'lock-closed-outline', title: 'Your notes and recordings stay private', line: 'Only sent when you add their day, or the recording, to a question.' },
   { icon: 'settings-outline', title: 'Off any time', line: 'Settings → Revo AI. Your history can be deleted there too.' },
 ];
 

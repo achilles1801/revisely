@@ -5,7 +5,20 @@
  * length) and are rounded; page numbers, ratings and counts must be whole.
  * Messages here never say "date": the app reads that word as a clock problem.
  */
-import { REVO_INSIGHTS, REVO_PASSAGE_KEYS, REVO_TOTALS, RevoAttachment, RevoContext, RevoInsight, RevoTotals } from './types';
+import { juzPages, surahPages } from './quranIndex';
+import {
+  REVO_INSIGHTS,
+  REVO_PASSAGE_KEYS,
+  REVO_TOTALS,
+  RevoAttachment,
+  RevoContext,
+  RevoDayFacts,
+  RevoInsight,
+  RevoPassageFacts,
+  RevoPlanTally,
+  RevoTimes,
+  RevoTotals,
+} from './types';
 
 export class RevoInvalid extends Error {}
 
@@ -213,25 +226,266 @@ const ATTACH_KEYS: Record<RevoAttachment['kind'], readonly string[]> = {
   note: ['kind', 'label', 'day', 'text'],
   recording: ['kind', 'label', 'day', 'of', 'seconds', 'pages'],
   insight: ['kind', 'label', 'insight'],
+  surah: ['kind', 'label', 'surah', 'facts'],
+  juz: ['kind', 'label', 'juz', 'facts'],
+  pages: ['kind', 'label', 'pages', 'facts'],
+  revisionDay: ['kind', 'label', 'day', 'facts'],
 };
 
-export function validateAttachment(v: unknown): RevoAttachment | null {
+/** At most this many attachments with one question. */
+export const MAX_ATTACHMENTS = 6;
+/** Days back an attached day may be (Activity reads 400). */
+export const MAX_DAYS_AGO = 400;
+const MAX_LOOKAHEAD = 366;
+const MAX_DAY_NUMBER = 100_000;
+const MAX_NOTES = 10;
+const NOTE_CHARS = 1000;
+const DAY_NOTE_CHARS = 3000;
+const MAX_DAY_MINUTES = 1440;
+
+function bool(v: unknown, path: string): boolean {
+  if (typeof v !== 'boolean') fail(path);
+  return v;
+}
+
+function maybe<T>(v: unknown, f: (x: unknown) => T): T | null {
+  return v === null ? null : f(v);
+}
+
+/** Every key of `a` is at most the same key of `b` (a window inside a longer one). */
+function within<T extends object>(a: T, b: T, path: string): void {
+  const x = a as Record<string, number>;
+  const y = b as Record<string, number>;
+  for (const k of Object.keys(x)) if (x[k] > y[k]) fail(`${path}.${k}`);
+}
+
+function times(v: unknown, path: string, window: number | null, memorized: number): RevoTimes {
+  const t = obj(v, path);
+  keys(t, ['days', 'minEach', 'maxEach'], path);
+  const out = {
+    days: int(t.days, 0, window ?? MAX_DAY_NUMBER, `${path}.days`),
+    minEach: int(t.minEach, 0, MAX_DAY_NUMBER, `${path}.minEach`),
+    maxEach: int(t.maxEach, 0, MAX_DAY_NUMBER, `${path}.maxEach`),
+  };
+  // A page counts once a day; the least is at most the most; nothing memorized counts nothing.
+  if (out.maxEach > out.days || out.minEach > out.maxEach || (memorized === 0 && out.maxEach > 0)) fail(path);
+  return out;
+}
+
+function tally(v: unknown, path: string, window: number): RevoPlanTally {
+  const t = obj(v, path);
+  const K = ['days', 'pages', 'onDay', 'late', 'ahead', 'skipped', 'skippedDays'] as const;
+  keys(t, K, path);
+  const out = {} as RevoPlanTally;
+  for (const k of K) out[k] = int(t[k], 0, MAX_COUNT, `${path}.${k}`);
+  if (out.days > window || out.skippedDays > out.days || out.skippedDays > out.skipped) fail(path);
+  if (out.onDay + out.late + out.ahead + out.skipped !== out.pages || out.pages < out.days || out.pages > out.days * MAX_PAGE) fail(path);
+  return out;
+}
+
+/** What the app shows for a surah, a juz or pages (`span`: its pages), checked to add up. */
+function passageFacts(v: unknown, path: string, span: readonly number[]): RevoPassageFacts {
+  const f = obj(v, path);
+  keys(f, ['name', 'pages', 'memorized', 'revised', 'lastRevisedDaysAgo', 'oldest', 'neverRevised', 'plan', 'strength', 'weakSpots', 'today', 'next'], path);
+  const inSpan = new Set(span);
+  const spanPages = (x: unknown, p: string, max: number) => {
+    const list = pages(x, max, p);
+    if (list.length === 0 || new Set(list).size !== list.length || list.some((n) => !inSpan.has(n))) fail(p);
+    return list;
+  };
+  if (f.pages !== span.length) fail(`${path}.pages`);
+  const memorized = int(f.memorized, 0, span.length, `${path}.memorized`);
+
+  const r = obj(f.revised, `${path}.revised`);
+  keys(r, ['last7', 'last30', 'all'], `${path}.revised`);
+  const revised = {
+    last7: times(r.last7, `${path}.revised.last7`, 7, memorized),
+    last30: times(r.last30, `${path}.revised.last30`, 30, memorized),
+    all: times(r.all, `${path}.revised.all`, null, memorized),
+  };
+  within(revised.last7, revised.last30, `${path}.revised.last7`);
+  within(revised.last30, revised.all, `${path}.revised.last30`);
+
+  const neverRevised = int(f.neverRevised, 0, memorized, `${path}.neverRevised`);
+  if (neverRevised > 0 && revised.all.minEach > 0) fail(`${path}.neverRevised`);
+  const lastRevisedDaysAgo = maybe(f.lastRevisedDaysAgo, (x) => int(x, 0, MAX_DAY_NUMBER, `${path}.lastRevisedDaysAgo`));
+  if ((lastRevisedDaysAgo === null) !== (memorized === neverRevised)) fail(`${path}.lastRevisedDaysAgo`);
+  const oldest = maybe(f.oldest, (x) => {
+    const o = obj(x, `${path}.oldest`);
+    keys(o, ['name', 'page', 'daysAgo'], `${path}.oldest`);
+    const page = int(o.page, 1, MAX_PAGE, `${path}.oldest.page`);
+    if (!inSpan.has(page)) fail(`${path}.oldest.page`);
+    return {
+      name: passageText(o.name, MAX_PAGE_NAME, `${path}.oldest.name`),
+      page,
+      daysAgo: maybe(o.daysAgo, (d) => int(d, 0, MAX_DAY_NUMBER, `${path}.oldest.daysAgo`)),
+    };
+  });
+  if (oldest && memorized < 2) fail(`${path}.oldest`);
+
+  const pl = obj(f.plan, `${path}.plan`);
+  keys(pl, ['last7', 'last30'], `${path}.plan`);
+  const plan = { last7: tally(pl.last7, `${path}.plan.last7`, 7), last30: tally(pl.last30, `${path}.plan.last30`, 30) };
+  within(plan.last7, plan.last30, `${path}.plan.last7`);
+
+  const st = obj(f.strength, `${path}.strength`);
+  keys(st, ['weak', 'moderate', 'strong', 'unrated', 'average'], `${path}.strength`);
+  const strength = {
+    weak: int(st.weak, 0, memorized, `${path}.strength.weak`),
+    moderate: int(st.moderate, 0, memorized, `${path}.strength.moderate`),
+    strong: int(st.strong, 0, memorized, `${path}.strength.strong`),
+    unrated: int(st.unrated, 0, memorized, `${path}.strength.unrated`),
+    average: maybe(st.average, (x) => num(x, 1, 5, `${path}.strength.average`)),
+  };
+  const rated = strength.weak + strength.moderate + strength.strong;
+  if (rated + strength.unrated !== memorized) fail(`${path}.strength`);
+  if ((strength.average === null) !== (rated === 0) || (strength.average !== null && Math.round(strength.average * 10) !== strength.average * 10)) {
+    fail(`${path}.strength.average`);
+  }
+
+  const weakSpots = list(f.weakSpots, 6, `${path}.weakSpots`, (x, p) => {
+    const w = obj(x, p);
+    keys(w, ['name', 'pages', 'rating'], p);
+    return { name: passageText(w.name, MAX_PAGE_NAME, `${p}.name`), pages: spanPages(w.pages, `${p}.pages`, MAX_PAGE), rating: int(w.rating, 1, 2, `${p}.rating`) };
+  });
+  if (weakSpots.reduce((n, w) => n + w.pages.length, 0) > strength.weak) fail(`${path}.weakSpots`);
+
+  const today = maybe(f.today, (x) => {
+    const t = obj(x, `${path}.today`);
+    keys(t, ['pages', 'done'], `${path}.today`);
+    const n = int(t.pages, 1, span.length, `${path}.today.pages`);
+    return { pages: n, done: int(t.done, 0, n, `${path}.today.done`) };
+  });
+  const next = maybe(f.next, (x) => {
+    const t = obj(x, `${path}.next`);
+    keys(t, ['inDays', 'pages'], `${path}.next`);
+    return { inDays: int(t.inDays, 1, MAX_LOOKAHEAD, `${path}.next.inDays`), pages: int(t.pages, 1, span.length, `${path}.next.pages`) };
+  });
+
+  return {
+    name: passageText(f.name, MAX_PASSAGE, `${path}.name`),
+    pages: span.length,
+    memorized,
+    revised,
+    lastRevisedDaysAgo,
+    oldest,
+    neverRevised,
+    plan,
+    strength,
+    weakSpots,
+    today,
+    next,
+  };
+}
+
+/** What the app shows for one revision day, `daysAgo` before the question's day; checked to add up. */
+function dayFacts(v: unknown, path: string, daysAgo: number | null): RevoDayFacts {
+  const f = obj(v, path);
+  keys(f, ['daysAgo', 'plan', 'revised', 'minutes', 'readMinutes', 'memorized', 'ratings', 'recordings', 'notes'], path);
+  const ago = int(f.daysAgo, 0, MAX_DAYS_AGO, `${path}.daysAgo`);
+  if (daysAgo !== null && ago !== daysAgo) fail(`${path}.daysAgo`);
+  const optName = (o: Obj, k: string, p: string, present: boolean) => {
+    if (o[k] === undefined) return {};
+    if (!present) fail(`${p}.${k}`);
+    return { [k]: passageText(o[k], MAX_PASSAGE, `${p}.${k}`) };
+  };
+
+  const plan = maybe(f.plan, (x) => {
+    const p = `${path}.plan`;
+    const o = obj(x, p);
+    keys(o, ['pages', 'name', 'carried', 'onDay', 'ahead', 'late', 'notDone', 'done'], p, ['pages', 'carried', 'onDay', 'ahead', 'late', 'notDone', 'done']);
+    const n = int(o.pages, 1, MAX_PAGE, `${p}.pages`);
+    const out = {
+      pages: n,
+      ...optName(o, 'name', p, true),
+      carried: int(o.carried, 0, n, `${p}.carried`),
+      onDay: int(o.onDay, 0, n, `${p}.onDay`),
+      ahead: int(o.ahead, 0, n, `${p}.ahead`),
+      late: int(o.late, 0, n, `${p}.late`),
+      notDone: int(o.notDone, 0, n, `${p}.notDone`),
+      done: bool(o.done, `${p}.done`),
+    };
+    if (out.onDay + out.ahead + out.late + out.notDone !== n) fail(p);
+    // Carried pages are known for today only, and a page can't be caught up later yet; a past day
+    // is done (for the streak) exactly when every page of it was revised for it.
+    if (ago > 0 && (out.carried > 0 || out.done !== (out.notDone === 0))) fail(p);
+    if (ago === 0 && out.late > 0) fail(p);
+    return out;
+  });
+
+  const rv = obj(f.revised, `${path}.revised`);
+  keys(rv, ['pages', 'name', 'forLater', 'forEarlier'], `${path}.revised`, ['pages', 'forLater', 'forEarlier']);
+  const revisedPages = int(rv.pages, 0, MAX_PAGE, `${path}.revised.pages`);
+  const revised = {
+    pages: revisedPages,
+    ...optName(rv, 'name', `${path}.revised`, revisedPages > 0),
+    forLater: int(rv.forLater, 0, revisedPages, `${path}.revised.forLater`),
+    forEarlier: int(rv.forEarlier, 0, revisedPages, `${path}.revised.forEarlier`),
+  };
+  if (revised.forLater + revised.forEarlier > revisedPages) fail(`${path}.revised`);
+  // A page revised on its day was revised in the day's sessions.
+  if (plan && plan.onDay > revisedPages) fail(`${path}.revised`);
+
+  const m = obj(f.memorized, `${path}.memorized`);
+  keys(m, ['pages', 'name'], `${path}.memorized`, ['pages']);
+  const memorizedPages = int(m.pages, 0, MAX_PAGE, `${path}.memorized.pages`);
+  const memorized = { pages: memorizedPages, ...optName(m, 'name', `${path}.memorized`, memorizedPages > 0) };
+
+  const ra = obj(f.ratings, `${path}.ratings`);
+  keys(ra, ['weak', 'moderate', 'strong', 'weakName', 'weakPages'], `${path}.ratings`, ['weak', 'moderate', 'strong', 'weakPages']);
+  const weak = int(ra.weak, 0, MAX_PAGE, `${path}.ratings.weak`);
+  const weakPages = pages(ra.weakPages, 20, `${path}.ratings.weakPages`);
+  if (weakPages.length > weak || new Set(weakPages).size !== weakPages.length || (weak > 0 && weakPages.length === 0)) fail(`${path}.ratings.weakPages`);
+  const ratings = {
+    weak,
+    moderate: int(ra.moderate, 0, MAX_PAGE, `${path}.ratings.moderate`),
+    strong: int(ra.strong, 0, MAX_PAGE, `${path}.ratings.strong`),
+    ...optName(ra, 'weakName', `${path}.ratings`, weak > 0),
+    weakPages,
+  };
+
+  const recordings = maybe(f.recordings, (x) => {
+    const o = obj(x, `${path}.recordings`);
+    keys(o, ['count', 'minutes'], `${path}.recordings`);
+    return { count: int(o.count, 0, 500, `${path}.recordings.count`), minutes: int(o.minutes, 0, MAX_DAY_MINUTES, `${path}.recordings.minutes`) };
+  });
+  const notes = maybe(f.notes, (x) => {
+    const n = list(x, MAX_NOTES, `${path}.notes`, (t, p) => str(t, NOTE_CHARS, p));
+    if (n.reduce((c, t) => c + t.length, 0) > DAY_NOTE_CHARS) fail(`${path}.notes`);
+    return n;
+  });
+
+  return {
+    daysAgo: ago,
+    plan,
+    revised,
+    minutes: maybe(f.minutes, (x) => rounded(x, MAX_DAY_MINUTES, `${path}.minutes`)),
+    readMinutes: maybe(f.readMinutes, (x) => rounded(x, MAX_DAY_MINUTES, `${path}.readMinutes`)),
+    memorized,
+    ratings,
+    recordings,
+    notes,
+  };
+}
+
+/** One attachment. `today` (the question's revision day) checks a day's place; null skips that (stored ones). */
+export function validateAttachment(v: unknown, today: string | null = null, path = 'attach'): RevoAttachment | null {
   if (v === null || v === undefined) return null;
-  const a = obj(v, 'attach');
+  const a = obj(v, path);
   const kind = a.kind;
-  if (typeof kind !== 'string' || !(kind in ATTACH_KEYS)) fail('attach.kind');
-  keys(a, ATTACH_KEYS[kind as RevoAttachment['kind']], 'attach');
+  if (typeof kind !== 'string' || !(kind in ATTACH_KEYS)) fail(`${path}.kind`);
+  keys(a, ATTACH_KEYS[kind as RevoAttachment['kind']], path);
   switch (kind as RevoAttachment['kind']) {
     case 'day':
       return {
         kind: 'day',
-        label: str(a.label, 40, 'attach.label'),
-        day: day(a.day, 'attach.day'),
-        revisedPages: pages(a.revisedPages, 60, 'attach.revisedPages'),
-        memorizedPages: pages(a.memorizedPages, 60, 'attach.memorizedPages'),
-        readMinutes: rounded(a.readMinutes, 1440, 'attach.readMinutes'),
-        minutes: rounded(a.minutes, 1440, 'attach.minutes'),
-        ratings: list(a.ratings, 60, 'attach.ratings', (x, p) => {
+        label: str(a.label, 40, `${path}.label`),
+        day: day(a.day, `${path}.day`),
+        revisedPages: pages(a.revisedPages, 60, `${path}.revisedPages`),
+        memorizedPages: pages(a.memorizedPages, 60, `${path}.memorizedPages`),
+        readMinutes: rounded(a.readMinutes, 1440, `${path}.readMinutes`),
+        minutes: rounded(a.minutes, 1440, `${path}.minutes`),
+        ratings: list(a.ratings, 60, `${path}.ratings`, (x, p) => {
           const r = obj(x, p);
           keys(r, ['page', 'rating'], p);
           return { page: int(r.page, 1, MAX_PAGE, `${p}.page`), rating: int(r.rating, 1, 5, `${p}.rating`) };
@@ -240,8 +494,8 @@ export function validateAttachment(v: unknown): RevoAttachment | null {
     case 'page':
       return {
         kind: 'page',
-        label: str(a.label, 60, 'attach.label'),
-        pages: list(a.pages, 60, 'attach.pages', (x, p) => {
+        label: str(a.label, 60, `${path}.label`),
+        pages: list(a.pages, 60, `${path}.pages`, (x, p) => {
           const g = obj(x, p);
           keys(g, ['page', 'rating', 'revisions', 'lastRevised', 'history'], p);
           return {
@@ -258,22 +512,59 @@ export function validateAttachment(v: unknown): RevoAttachment | null {
         }),
       };
     case 'note':
-      return { kind: 'note', label: str(a.label, 40, 'attach.label'), day: day(a.day, 'attach.day'), text: str(a.text, 2000, 'attach.text') };
+      return { kind: 'note', label: str(a.label, 40, `${path}.label`), day: day(a.day, `${path}.day`), text: str(a.text, 2000, `${path}.text`) };
     case 'recording':
-      if (a.of !== 'revision' && a.of !== 'reading') fail('attach.of');
+      if (a.of !== 'revision' && a.of !== 'reading') fail(`${path}.of`);
       return {
         kind: 'recording',
-        label: str(a.label, 40, 'attach.label'),
-        day: day(a.day, 'attach.day'),
+        label: str(a.label, 40, `${path}.label`),
+        day: day(a.day, `${path}.day`),
         of: a.of,
-        seconds: rounded(a.seconds, 86_400, 'attach.seconds'),
-        pages: pages(a.pages, 60, 'attach.pages'),
+        seconds: rounded(a.seconds, 86_400, `${path}.seconds`),
+        pages: pages(a.pages, 60, `${path}.pages`),
       };
     case 'insight':
-      if (typeof a.insight !== 'string' || !(REVO_INSIGHTS as readonly string[]).includes(a.insight)) fail('attach.insight');
-      return { kind: 'insight', label: str(a.label, 40, 'attach.label'), insight: a.insight as RevoInsight };
+      if (typeof a.insight !== 'string' || !(REVO_INSIGHTS as readonly string[]).includes(a.insight)) fail(`${path}.insight`);
+      return { kind: 'insight', label: str(a.label, 40, `${path}.label`), insight: a.insight as RevoInsight };
+    case 'surah': {
+      const surah = int(a.surah, 1, 114, `${path}.surah`);
+      return { kind: 'surah', label: str(a.label, 60, `${path}.label`), surah, facts: passageFacts(a.facts, `${path}.facts`, surahPages(surah)) };
+    }
+    case 'juz': {
+      const juz = int(a.juz, 1, 30, `${path}.juz`);
+      return { kind: 'juz', label: str(a.label, 60, `${path}.label`), juz, facts: passageFacts(a.facts, `${path}.facts`, juzPages(juz)) };
+    }
+    case 'pages': {
+      const list_ = pages(a.pages, 60, `${path}.pages`);
+      if (list_.length === 0 || list_.some((p, i) => i > 0 && p <= list_[i - 1])) fail(`${path}.pages`);
+      return { kind: 'pages', label: str(a.label, 60, `${path}.label`), pages: list_, facts: passageFacts(a.facts, `${path}.facts`, list_) };
+    }
+    case 'revisionDay': {
+      const d = day(a.day, `${path}.day`);
+      if (today !== null && (d > today || dayNumber(today) - dayNumber(d) > MAX_DAYS_AGO)) fail(`${path}.day`);
+      return {
+        kind: 'revisionDay',
+        label: str(a.label, 60, `${path}.label`),
+        day: d,
+        facts: dayFacts(a.facts, `${path}.facts`, today === null ? null : dayNumber(today) - dayNumber(d)),
+      };
+    }
   }
-  return fail('attach.kind');
+  return fail(`${path}.kind`);
+}
+
+/**
+ * What a question carries: `attach` (one, as every app version sends it) or `attachments` (up to
+ * MAX_ATTACHMENTS, from apps after Nov 7 2026), never both; each checked as above.
+ */
+export function validateAttachments(attach: unknown, attachments: unknown, today: string): RevoAttachment[] {
+  if (attachments !== undefined && attachments !== null) {
+    if (attach !== undefined && attach !== null) fail('attachments');
+    if (!Array.isArray(attachments) || attachments.length === 0 || attachments.length > MAX_ATTACHMENTS) fail('attachments');
+    return attachments.map((x, i) => validateAttachment(x, today, `attachments[${i}]`)!);
+  }
+  const one = validateAttachment(attach, today);
+  return one ? [one] : [];
 }
 
 /** The pages an attachment names (what a chart or an action may point at). */
@@ -286,6 +577,14 @@ export function attachmentPages(a: RevoAttachment | null | undefined): number[] 
       return a.pages.map((p) => p.page);
     case 'recording':
       return a.pages;
+    case 'surah':
+      return surahPages(a.surah);
+    case 'juz':
+      return juzPages(a.juz);
+    case 'pages':
+      return a.pages;
+    case 'revisionDay':
+      return a.facts.ratings.weakPages;
     default:
       return [];
   }

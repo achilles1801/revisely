@@ -91,7 +91,7 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   await tap(app, 'revo-button');
   await app.until(() => app.screen.queryByTestId('revo-optin') != null, 'the opt-in');
   expect(app.screen.getByText('Meet Revo')).toBeTruthy();
-  expect(app.screen.getByText('They’re only sent when you add one to a question.')).toBeTruthy();
+  expect(app.screen.getByText('Only sent when you add their day, or the recording, to a question.')).toBeTruthy();
   await tap(app, 'revo-not-now');
   expect((await getServerDoc(`coachSettings/${uid}`))?.revoOn ?? false).toBe(false);
   await tap(app, 'revo-button');

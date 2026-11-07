@@ -1205,6 +1205,16 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   picked for; a recording is its length and pages, never audio. The greeting and chips are written on the
   phone (`lib/revo/greeting`), no call. Charts are named by the model and drawn from the phone's own data
   (`lib/revo/charts`); an action ("Add to my plan": tomorrow's carry, `carryForTomorrow`) waits for a tap.
+- **Attachments** (+; REVO-32, REVO-33, Nov 7 2026): a surah, a juz, pages or a day go with their facts, worked out
+  on the phone by `lib/revo/facts` from the sources Insights, Activity and the streak read, the way they read them
+  (the credits: the Activity items with the phone's sessions over them, else the logs as the streak reads them; the
+  plan: `snapshot.streak.scheduled`; strength: Insights' rule; a day: Activity's minutes, the timer, the daily log,
+  this phone's recordings). `prepare(sources)` reads them once for many rows (the picker's previews). A day goes
+  with its notes, and the picker and the chip say so ("includes 2 notes"); there is no separate Notes option. The
+  server checks the facts strictly (`validate.ts`: they must add up, a surah's or juz's pages are its own,
+  `quranIndex.ts`; a day's place matches the question's day) and writes them out as sentences (`attachText.ts`).
+  A question takes one (`attach`, every app) or up to six (`attachments`, stored as `attachList`); the older kinds
+  (day, page, note) are still accepted from older apps.
 - **Tone** (REVO-27, Majd's choice, Nov 7 2026): a warm coach; the answer first, about 35 words; one next step
   (today's while today isn't done); surahs and juz, a page number only when asked. Check a prompt change with
   `functions/scripts/revo-tone-samples.js` (real replies, before and after, for the owner) before deploying it.

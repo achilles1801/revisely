@@ -28,7 +28,7 @@ import {
   contextPages,
   dayNearServer,
   isDay,
-  validateAttachment,
+  validateAttachments,
   validateChatId,
   validateContext,
   validateQuestion,
@@ -158,8 +158,13 @@ export function answerKey(day: string, question: string, context: RevoContext, m
 
 /** A message as the app gets it: no owner, no attachment data. */
 export function publicMessage(m: StoredMessage): RevoMessage {
-  const { uid: _uid, attachData: _attach, ...rest } = m;
+  const { uid: _uid, attachData: _attach, attachList: _list, ...rest } = m;
   return rest;
+}
+
+/** The attachments a stored user message carries (one, several, or none). */
+export function attachmentsOf(m: StoredMessage): RevoAttachment[] {
+  return m.attachList ?? (m.attachData ? [m.attachData] : []);
 }
 
 function body(data: unknown, allowed: readonly string[]): Record<string, unknown> {
@@ -273,11 +278,16 @@ function revoMessage(id: string, uid: string, at: number, parts: Omit<RevoReplyP
   return m;
 }
 
-function userMessage(id: string, uid: string, at: number, text: string, attach: RevoAttachment | null): StoredMessage {
+function userMessage(id: string, uid: string, at: number, text: string, attached: readonly RevoAttachment[]): StoredMessage {
   const m: StoredMessage = { id, uid, role: 'user', text, at };
-  if (attach) {
-    m.attach = { kind: attach.kind, label: attach.label };
-    m.attachData = attach;
+  if (attached.length > 0) {
+    // The first as a chip every app version shows; all of them when there are several.
+    m.attach = { kind: attached[0].kind, label: attached[0].label };
+    if (attached.length === 1) m.attachData = attached[0];
+    else {
+      m.attachments = attached.map((a) => ({ kind: a.kind, label: a.label }));
+      m.attachList = [...attached];
+    }
   }
   return m;
 }
@@ -300,13 +310,13 @@ async function remember(
 
 export async function handleRevoAsk(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoAskResult> {
   const { uid, settings } = await gate(auth, deps, true);
-  const b = body(data, ['chatId', 'day', 'question', 'context', 'attach']);
+  const b = body(data, ['chatId', 'day', 'question', 'context', 'attach', 'attachments']);
   const started = deps.now();
   const chatId = checked(() => validateChatId(b.chatId));
   const day = revisionDay(b.day, started);
   const question = checked(() => validateQuestion(b.question));
   const context = checked(() => validateContext(b.context));
-  const attach = checked(() => validateAttachment(b.attach));
+  const attached = checked(() => validateAttachments(b.attach, b.attachments, day));
 
   // Moving the clock back can't refill the day.
   const usage = await deps.store.getUsage(uid);
@@ -319,12 +329,12 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   const atAsk = started.getTime();
 
   // A first question with nothing attached: the same one again today is free.
-  const cacheable = !chat && !attach;
+  const cacheable = !chat && attached.length === 0;
   if (cacheable) {
     const hit = await deps.store.getAnswer(uid, answerKey(day, question, context, memory.map((m) => m.id)));
     if (hit) {
       const id = deps.store.newId();
-      const q = userMessage(deps.store.newId(), uid, atAsk, question, null);
+      const q = userMessage(deps.store.newId(), uid, atAsk, question, []);
       const r = revoMessage(deps.store.newId(), uid, atAsk + 1, hit.reply);
       const newChat: RevoChat = { id, kind: 'chat', title: hit.title, day, createdAt: atAsk, updatedAt: atAsk + 1, turns: 1 };
       await deps.store.saveTurn(uid, newChat, [q, r]);
@@ -340,7 +350,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
     throw new RevoError('resource-exhausted', MESSAGES.daily, { reason: 'daily' });
   }
 
-  const request = buildAskRequest({ day, question, context, attach, memory: memory.map((m) => m.text), history, chat });
+  const request = buildAskRequest({ day, question, context, attached, memory: memory.map((m) => m.text), history, chat });
   let result: Awaited<ReturnType<typeof metered>>;
   try {
     result = await metered(deps, request, 'answer');
@@ -353,7 +363,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
     throw new RevoError('resource-exhausted', MESSAGES.monthly, { reason: 'monthly' });
   }
 
-  const allowed = new Set([...contextPages(context), ...attachmentPages(attach), ...history.flatMap((m) => attachmentPages(m.attachData))]);
+  const allowed = new Set([...contextPages(context), ...attached.flatMap(attachmentPages), ...history.flatMap((m) => attachmentsOf(m).flatMap(attachmentPages))]);
   const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat });
   if (!parts) {
     await deps.store.releaseQuestion(uid, day);
@@ -364,7 +374,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   const atReply = Math.max(deps.now().getTime(), atAsk + 1);
   const id = chat?.id ?? deps.store.newId();
   const title = chat?.title ?? parts.title ?? question.slice(0, 60).trimEnd();
-  const q = userMessage(deps.store.newId(), uid, atAsk, question, attach);
+  const q = userMessage(deps.store.newId(), uid, atAsk, question, attached);
   const r = revoMessage(deps.store.newId(), uid, atReply, parts);
   const saved: RevoChat = chat
     ? { ...chat, updatedAt: atReply, turns: chat.turns + 1 }
@@ -381,7 +391,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
     const { remember: _r, title: _t, ...reply } = parts;
     await deps.store.setAnswer(uid, answerKey(day, question, context, memoryIds), day, { title, reply });
   }
-  deps.log({ event: 'saved', attach: attach?.kind, history: history.length, memory: memory.length, remembered: added });
+  deps.log({ event: 'saved', attach: attached.map((a) => a.kind).join(',') || undefined, history: history.length, memory: memory.length, remembered: added });
   return {
     chatId: id,
     title: saved.title,

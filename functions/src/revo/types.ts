@@ -56,6 +56,58 @@ export type RevoPassageKey = (typeof REVO_PASSAGE_KEYS)[number];
 export const REVO_INSIGHTS = ['coverage', 'consistency', 'weakSpots', 'pace'] as const;
 export type RevoInsight = (typeof REVO_INSIGHTS)[number];
 
+/** How often a part of the Qur'an was revised in a window (the app's lib/revo/facts). */
+export interface RevoTimes {
+  days: number;
+  minEach: number;
+  maxEach: number;
+}
+
+/** Its pages on the plan over past days: onDay + late + ahead + skipped = pages. */
+export interface RevoPlanTally {
+  days: number;
+  pages: number;
+  onDay: number;
+  late: number;
+  ahead: number;
+  skipped: number;
+  skippedDays: number;
+}
+
+/** What the app shows for a surah, a juz or some pages. */
+export interface RevoPassageFacts {
+  name: string;
+  pages: number;
+  memorized: number;
+  revised: { last7: RevoTimes; last30: RevoTimes; all: RevoTimes };
+  lastRevisedDaysAgo: number | null;
+  oldest: { name: string; page: number; daysAgo: number | null } | null;
+  neverRevised: number;
+  plan: { last7: RevoPlanTally; last30: RevoPlanTally };
+  strength: { weak: number; moderate: number; strong: number; unrated: number; average: number | null };
+  weakSpots: { name: string; pages: number[]; rating: number }[];
+  today: { pages: number; done: number } | null;
+  next: { inDays: number; pages: number } | null;
+}
+
+/** What the app shows for one revision day. */
+export interface RevoDayFacts {
+  daysAgo: number;
+  plan: { pages: number; name?: string; carried: number; onDay: number; ahead: number; late: number; notDone: number; done: boolean } | null;
+  revised: { pages: number; name?: string; forLater: number; forEarlier: number };
+  minutes: number | null;
+  readMinutes: number | null;
+  memorized: { pages: number; name?: string };
+  ratings: { weak: number; moderate: number; strong: number; weakName?: string; weakPages: number[] };
+  recordings: { count: number; minutes: number } | null;
+  notes: string[] | null;
+}
+
+/**
+ * What the user attached with +. The first five kinds come from apps before Nov 7 2026 and are
+ * still accepted; newer apps send surah, juz, pages and revisionDay (with what the app shows for
+ * them, `facts`), recording and insight.
+ */
 export type RevoAttachment =
   | {
       kind: 'day';
@@ -74,7 +126,11 @@ export type RevoAttachment =
     }
   | { kind: 'note'; label: string; day: string; text: string }
   | { kind: 'recording'; label: string; day: string; of: 'revision' | 'reading'; seconds: number; pages: number[] }
-  | { kind: 'insight'; label: string; insight: RevoInsight };
+  | { kind: 'insight'; label: string; insight: RevoInsight }
+  | { kind: 'surah'; label: string; surah: number; facts: RevoPassageFacts }
+  | { kind: 'juz'; label: string; juz: number; facts: RevoPassageFacts }
+  | { kind: 'pages'; label: string; pages: number[]; facts: RevoPassageFacts }
+  | { kind: 'revisionDay'; label: string; day: string; facts: RevoDayFacts };
 
 export type RevoChart = { kind: 'pageRatings'; title: string; pages: number[] } | { kind: 'dailyPages'; title: string; days: 7 | 30 };
 
@@ -115,12 +171,17 @@ export interface RevoMessage {
   action?: RevoAction;
   chips?: string[];
   attach?: { kind: RevoAttachment['kind']; label: string };
+  /** Every attachment's chip, when there were several (apps after Nov 7 2026 show them all; older ones show `attach`). */
+  attachments?: { kind: RevoAttachment['kind']; label: string }[];
 }
 
-/** A message as stored: the returned fields, the owner, and on a user message the attachment itself. */
+/** A message as stored: the returned fields, the owner, and on a user message the attachments themselves. */
 export interface StoredMessage extends RevoMessage {
   uid: string;
+  /** One attachment. */
   attachData?: RevoAttachment;
+  /** Several (never set together with attachData). */
+  attachList?: RevoAttachment[];
 }
 
 export interface RevoChat {

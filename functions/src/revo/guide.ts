@@ -229,11 +229,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Revo itself',
-    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31'],
+    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33'],
     routes: ['Settings'],
     text: lines(
       '- For testers, off until turned on. Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
-      '- + attaches a day, a page, a note or a recording (its length and pages, never the audio) to one question. History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
+      '- + attaches “A day” (its plan, what was done, its minutes and its daily-log notes), “A surah, juz or page” (how often it was revised, what was missed, its weak spots, when it comes up next) or “A recording” (its length and pages, never the audio) to one question; Revo answers about it from those figures. History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
       '- Revo can’t change anything itself: a suggestion happens only when tapped (“Add to my plan” puts pages first in tomorrow’s session; a card can also open a screen, such as Jump to… or a Settings section). It answers how-to questions from this guide. It needs the internet.',
       '- Settings → Revo AI → off deletes its conversations and memory.',
     ),

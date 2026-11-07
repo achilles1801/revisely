@@ -1,20 +1,19 @@
-// What + adds to a question: built on the phone from the account's own data, and sent only
-// with the question it was added to. A note's text goes only when the user picks that note;
-// a recording goes as its length and pages, never the audio.
+// What + adds to a question: built on the phone from the account's own data (lib/revo/facts), and
+// sent only with the question it was added to. A surah, a juz or some pages go as what the app
+// shows for them; a day as its plan, what was done, its minutes and recordings, and the notes of
+// its daily log (the picker says "includes 2 notes" before it is added: there is no separate
+// Notes option any more, Nov 7 2026). A recording goes as its length and pages, never the audio.
 
-import type { JournalNote, ReadingSession, RevisionLog, User, UserPage } from '../../types';
-import { reviewedOn } from '../aheadCredit';
-import { revisionDayOf } from '../fajrBoundary';
-import { getAllSurahs } from '../quranData';
+import { getAllSurahs, getJuzRange, getSurah } from '../quranData';
+import { plainText } from '../passages';
 import type { RecordingMeta } from '../recordings';
+import { dayFacts, type DayExtras, passageFacts, type Prepared } from './facts';
 import { juzOf, passageShort } from './words';
 import type { RevoAttachment, RevoInsight } from './types';
 
-const MAX_PAGES = 60;
-const MAX_HISTORY = 12;
-export const NOTE_MAX = 2000;
+/** At most this many pages in a pick of pages (Al-Baqarah has 48). */
+export const MAX_PICK_PAGES = 60;
 
-const dayOf = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
 const shortDay = (day: string) =>
   new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -25,77 +24,58 @@ export function dayLabel(day: string, today: string, yesterday: string): string 
   return shortDay(day);
 }
 
-export function dayAttachment(input: {
-  day: string;
-  label: string;
-  logs: readonly RevisionLog[];
-  pages: readonly UserPage[];
-  readings?: readonly ReadingSession[];
-  /** For the revision day each page was marked memorized on (DAY-2). */
-  user?: User | null;
-}): RevoAttachment {
-  const logs = input.logs.filter((l) => l.date === input.day);
-  // Every page revised in the day's sessions, catch-up pages included, as Revo's week counts them.
-  const revised = [...reviewedOn(input.logs, input.day)].slice(0, MAX_PAGES);
-  const ratings = new Map<number, number>();
-  for (const l of logs) for (const w of l.weaknessUpdates) ratings.set(w.page, w.rating);
-  return {
-    kind: 'day',
-    label: input.label,
-    day: input.day,
-    revisedPages: revised,
-    memorizedPages: input.pages
-      .filter((p) => p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), input.user) === input.day)
-      .map((p) => p.pageNumber)
-      .slice(0, MAX_PAGES),
-    readMinutes: Math.min(1440, Math.round((input.readings ?? []).filter((r) => r.date === input.day).reduce((n, r) => n + r.durationSeconds, 0) / 60)),
-    minutes: Math.min(1440, logs.reduce((n, l) => n + (l.durationMinutes ?? 0), 0)),
-    ratings: [...ratings].slice(0, MAX_PAGES).map(([page, rating]) => ({ page, rating: Math.max(1, Math.min(5, Math.round(rating))) })),
-  };
-}
-
-/** Each page's rating history, newest last (from the sessions that rated it). */
-function historyOf(logs: readonly RevisionLog[], page: number): { day: string; rating: number }[] {
-  return logs
-    .flatMap((l) => l.weaknessUpdates.filter((w) => w.page === page).map((w) => ({ day: l.date, rating: Math.max(1, Math.min(5, Math.round(w.rating))) })))
-    .sort((a, b) => a.day.localeCompare(b.day))
-    .slice(-MAX_HISTORY);
-}
-
-export function pageAttachment(input: { pages: number[]; label?: string; logs: readonly RevisionLog[]; userPages: readonly UserPage[] }): RevoAttachment {
-  const byNumber = new Map(input.userPages.map((p) => [p.pageNumber, p]));
-  return {
-    kind: 'page',
-    label: (input.label ?? passageShort(input.pages)).slice(0, 60),
-    pages: input.pages.slice(0, MAX_PAGES).map((page) => {
-      const p = byNumber.get(page);
-      const memorized = p?.status === 'memorized';
-      return {
-        page,
-        rating: memorized ? Math.max(1, Math.min(5, Math.round(p!.weaknessRating))) : null,
-        revisions: Math.min(100000, p?.totalRevisionCount ?? 0),
-        lastRevised: dayOf(p?.lastRevisedDate ?? null),
-        history: historyOf(input.logs, page),
-      };
-    }),
-  };
-}
-
-/** A surah's pages (its first to last page). */
+/** A surah's pages (its first to last page; a page it shares with the surah before or after included). */
 export function surahPages(surahNumber: number): number[] {
-  const s = getAllSurahs().find((x) => x.number === surahNumber);
+  const s = getSurah(surahNumber);
   if (!s) return [];
   return Array.from({ length: s.endPage - s.startPage + 1 }, (_, i) => s.startPage + i);
 }
 
-/** What a page search finds: a page number, or surahs by name (Latin or Arabic). */
-export function findPagesOrSurahs(text: string): { label: string; pages: number[]; detail: string }[] {
+export function juzPages(juz: number): number[] {
+  const { start, end } = getJuzRange(juz);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+export function surahAttachment(surah: number, prepared: Prepared): RevoAttachment {
+  const name = plainText(getSurah(surah)?.name ?? `Surah ${surah}`);
+  const pages = surahPages(surah);
+  // Named by the surah itself ("Yusuf · Juz 12–13"): its first page may end the surah before.
+  return { kind: 'surah', label: name, surah, facts: passageFacts(pages, prepared, `${name} · ${plainText(juzOf(pages))}`) };
+}
+
+export function juzAttachment(juz: number, prepared: Prepared): RevoAttachment {
+  return { kind: 'juz', label: `Juz ${juz}`, juz, facts: passageFacts(juzPages(juz), prepared) };
+}
+
+/** Pages the user picked (named by their surahs: "Al-Mulk", "Al-Baqarah 142–176"). */
+export function pagesAttachment(pages: readonly number[], prepared: Prepared, label?: string): RevoAttachment {
+  const list = [...new Set(pages)].filter((p) => Number.isInteger(p) && p >= 1 && p <= 604).sort((a, b) => a - b).slice(0, MAX_PICK_PAGES);
+  return { kind: 'pages', label: plainText(label ?? passageShort(list)).slice(0, 60), pages: list, facts: passageFacts(list, prepared) };
+}
+
+/** A revision day, with its notes when the daily log has any (the label says so). */
+export function dayAttachment(day: string, label: string, prepared: Prepared, extras: DayExtras = {}): RevoAttachment {
+  const facts = dayFacts(day, prepared, extras);
+  const notes = facts.notes?.length ?? 0;
+  const withNotes = notes > 0 ? `${label} · ${notes} ${notes === 1 ? 'note' : 'notes'}` : label;
+  return { kind: 'revisionDay', label: withNotes.slice(0, 60), day, facts };
+}
+
+export type Found = { kind: 'surah'; surah: number; label: string } | { kind: 'juz'; juz: number; label: string } | { kind: 'pages'; pages: number[]; label: string };
+
+/** What a search finds: "Juz 14", a page number ("288", "p. 288"), or surahs by name (Latin or Arabic). */
+export function findPassages(text: string): Found[] {
   const q = text.trim().toLowerCase();
   if (!q) return [];
-  const n = Number(q.replace(/^p\.?\s*/, ''));
-  if (Number.isInteger(n) && n >= 1 && n <= 604) {
-    // Asked by page number: the part it holds first, the page after it.
-    return [{ label: passageShort([n]), pages: [n], detail: `p. ${n} · ${juzOf([n])}` }];
+  const juz = /^(?:juz'?|j)\s*(\d{1,2})$/.exec(q);
+  if (juz) {
+    const n = Number(juz[1]);
+    return n >= 1 && n <= 30 ? [{ kind: 'juz', juz: n, label: `Juz ${n}` }] : [];
+  }
+  const page = /^(?:p\.?|page)?\s*(\d{1,3})$/.exec(q);
+  if (page) {
+    const n = Number(page[1]);
+    return n >= 1 && n <= 604 ? [{ kind: 'pages', pages: [n], label: plainText(passageShort([n])) }] : [];
   }
   const plain = (s: string) => s.toLowerCase().replace(/[^a-z؀-ۿ]/g, '');
   const want = plain(q);
@@ -103,11 +83,14 @@ export function findPagesOrSurahs(text: string): { label: string; pages: number[
   return getAllSurahs()
     .filter((s) => plain(s.name).includes(want) || s.nameArabic.includes(q))
     .slice(0, 8)
-    .map((s) => ({ label: s.name, pages: surahPages(s.number), detail: juzOf(surahPages(s.number)) }));
+    .map((s) => ({ kind: 'surah', surah: s.number, label: plainText(s.name) }));
 }
 
-export function noteAttachment(note: Pick<JournalNote, 'text' | 'at'> & { day: string }): RevoAttachment {
-  return { kind: 'note', label: `Note · ${shortDay(note.day)}`, day: note.day, text: note.text.trim().slice(0, NOTE_MAX) };
+/** The attachment for what a search found. */
+export function attachmentFor(found: Found, prepared: Prepared): RevoAttachment {
+  if (found.kind === 'surah') return surahAttachment(found.surah, prepared);
+  if (found.kind === 'juz') return juzAttachment(found.juz, prepared);
+  return pagesAttachment(found.pages, prepared, found.label);
 }
 
 export function recordingAttachment(rec: Pick<RecordingMeta, 'day' | 'kind' | 'durationMs' | 'pageMarks' | 'createdAt'>): RevoAttachment {
@@ -118,7 +101,7 @@ export function recordingAttachment(rec: Pick<RecordingMeta, 'day' | 'kind' | 'd
     day: rec.day,
     of: rec.kind,
     seconds: Math.min(86400, Math.round(rec.durationMs / 1000)),
-    pages: [...new Set(rec.pageMarks.map((m) => m.page))].slice(0, MAX_PAGES),
+    pages: [...new Set(rec.pageMarks.map((m) => m.page))].slice(0, MAX_PICK_PAGES),
   };
 }
 
