@@ -30,7 +30,8 @@ import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
 import { joinedSince, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
 import { pendingEntries } from '../../lib/offline/outbox';
-import { currentAccount } from '../../lib/offline/queue';
+import { currentAccount, queueChange } from '../../lib/offline/queue';
+import { isManualRevisionId } from '../../lib/manualRevision';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -246,23 +247,39 @@ export function DayBlocks({
 
   const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0 || taggedTo('revision').length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0 || taggedTo('memorization').length > 0;
-  // The block headers' menus: Revised (its session), Memorized (each entry), Read (each timed session).
-  const revisedMenu = revisedLog
-    ? headerMenu('Revised', [
-        {
-          key: 'delete',
-          label: 'Delete this session',
-          icon: 'trash-outline' as const,
-          destructive: true,
-          onPress: () =>
-            confirmDelete(
-              'Delete this session?',
-              `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
-              () => onDeleteRevised(revisedLog),
-            ),
-        },
-      ])
-    : {};
+  // The block headers' menus: Revised (its session, and each entry added by hand), Memorized (each
+  // entry), Read (each timed session). Every item can be deleted, confirmed first (ACT-6, ACT-7): an
+  // entry added by hand had no way out before (Nov 2026).
+  const sessionRevised = revisedLog ? new Set(revisedLog.pagesRevised).size : 0;
+  const handAdded = (items?.revisions ?? []).filter((r) => r.day === day && r.countsFor === day && isManualRevisionId(r.id) && r.pages.length > 0);
+  const revisedMenu = headerMenu('Revised', [
+    ...(revisedLog
+      ? [
+          {
+            key: 'delete',
+            label: 'Delete this session',
+            icon: 'trash-outline' as const,
+            destructive: true,
+            onPress: () =>
+              confirmDelete(
+                'Delete this session?',
+                `Its ${sessionRevised} revised ${sessionRevised === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
+                () => onDeleteRevised(revisedLog),
+              ),
+          },
+        ]
+      : []),
+    ...handAdded.map((a) => ({
+      key: `delete-${a.id}`,
+      label: `Delete ${describePassage(a.pages, { form: 'short' })}, added by hand`,
+      icon: 'trash-outline' as const,
+      destructive: true,
+      onPress: () =>
+        confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
+          queueChange({ kind: 'revision.delete', day, id: a.id }).catch((err) => logger.warn('Could not delete pages added by hand', err));
+        }),
+    })),
+  ]);
   const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
   const noteItem = (n: JournalNote) => (
