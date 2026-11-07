@@ -52,9 +52,17 @@ on:
         type: string
         default: none
       android:
-        description: none, build, smoke or full
+        description: none, build, smoke, full or infra (the flows in `only`)
         type: string
         default: none
+      only:
+        description: For infra, the flows a change to shared test code touches (paths, or all)
+        type: string
+        default: ''
+      repeat:
+        description: Runs of each flow, every one of which must pass, with no reruns
+        type: string
+        default: '1'
   schedule:
     # 07:30 UTC: the small hours in Chicago.
     - cron: '30 7 * * *'
@@ -77,6 +85,10 @@ on:
         description: The smoke set only (both platforms)
         type: boolean
         default: false
+      repeat:
+        description: Runs of each flow, every one of which must pass, with no reruns
+        type: string
+        default: '1'
 
 permissions:
   contents: read
@@ -153,6 +165,7 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
+          INFRA_ONLY: ${{ inputs.only }}
         run: |
           full='[{"name":"02 03 08 12 13 16 17","flows":".maestro/flows/0[238]-*.yaml .maestro/flows/1[2367]-*.yaml"},{"name":"01 04 07 09-revo-attach 14 15","flows":".maestro/flows/0[147]-*.yaml .maestro/flows/09-revo-attach.yaml .maestro/flows/1[45]-*.yaml"},{"name":"10 09-activity-dark 09-activity-light 09-insights-history","flows":".maestro/flows/10-*.yaml .maestro/flows/09-activity-*.yaml .maestro/flows/09-insights-history.yaml"},{"name":"05 06 09-revo 11","flows":".maestro/flows/0[56]-*.yaml .maestro/flows/09-revo.yaml .maestro/flows/11-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
@@ -161,11 +174,20 @@ jobs:
           smoke_android='[{"name":"smoke: 02 05","flows":".maestro/flows/0[25]-*.yaml"},{"name":"smoke: 04 06","flows":".maestro/flows/0[46]-*.yaml"}]'
           smoke_ios='[{"name":"smoke: 02 04 05 06","flows":".maestro/flows/0[2456]-*.yaml"}]'
           build='[{"name":"native build","flows":""}]'
+          # A change to shared test code (CI's plan): the flows it touches, or every flow.
+          if [ "$INFRA_ONLY" = all ]; then infra="$full"
+          else
+            # More than three flows: two jobs, alternately (each flow runs twice).
+            infra=$(jq -cn --arg f "$INFRA_ONLY" '
+              ($f | split(" ") | map(select(. != ""))) as $all
+              | (if ($all | length) > 3 then [[$all | to_entries[] | select(.key % 2 == 0) | .value], [$all | to_entries[] | select(.key % 2 == 1) | .value]] else [$all] end)
+              | map({name: ("changed: " + (map(split("/") | last | split("-") | first) | join(" "))), flows: join(" ")})')
+          fi
           set_of() { # set platform
             case "$1" in
-              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;;
+              none) echo '[]' ;; build) echo "$build" ;; full) echo "$full" ;; infra) echo "$infra" ;;
               smoke) if [ "$2" = android ]; then echo "$smoke_android"; else echo "$smoke_ios"; fi ;;
-              *) echo "::error::Unknown set '$1' (none, build, smoke, full)" >&2; return 1 ;;
+              *) echo "::error::Unknown set '$1' (none, build, smoke, full, infra)" >&2; return 1 ;;
             esac
           }
           if [ -n "$IOS_SET" ] || [ -n "$ANDROID_SET" ]; then
@@ -219,7 +241,12 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           AFTER: ${{ github.sha }}
           REPO: ${{ github.repository }}
+          ONLY: ${{ inputs.only }}
         run: |
+          # CI asked for the flows a change to shared test code touches: they run.
+          if [ -n "$ONLY" ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; echo "Flows a change to shared test code touches: $ONLY"; exit 0
+          fi
           files="$RUNNER_TEMP/files.txt"
           # Renames count by both names. Past what the API lists (3000 files for
           # a PR, 300 for a comparison), the flows run.
@@ -475,6 +502,7 @@ jobs:
           # and 11 pass in 12 to 14.5 minutes on a busy runner, and 11's first attempt in
           # run 42649421053 was stopped at 900 s while still going (560 of its ~586 steps).
           E2E_FLOW_LIMIT: '1200'
+          E2E_REPEAT: ${{ inputs.repeat || '1' }}
         # $FLOWS is a glob, expanded here.
         run: bash .maestro/run.sh ios $FLOWS
 
@@ -761,6 +789,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           E2E_FLOWS: ${{ matrix.shard.flows }}
+          E2E_REPEAT: ${{ inputs.repeat || '1' }}
         with:
           api-level: 34
           target: google_apis
