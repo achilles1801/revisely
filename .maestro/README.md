@@ -354,13 +354,26 @@ Things that bit:
   buttons in capitals: match with `(?i)`.
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
+- A function's first signed-in call in the emulator is slow on a CI macOS runner: 17–22 s, against
+  2–5 s for its later calls (run 42403200017: the app's first `revoSetOptions` 17.5 s, `revoAsk`
+  21.9 s). The emulator runs each function in a worker of its own, so each pays it once. A step that
+  waits on a function's answer would count it, so a flow first calls the functions it waits on as
+  its account, in a way that changes nothing (09-revo: `scripts/server-revo.js`, `MODE=warm`, after
+  the account exists). A call without an ID token isn't enough: refused before the token checks and
+  Firestore, it starts the worker (1–3 s) and leaves the rest to the app's call. A worker stays up
+  until `functions/` changes.
 
 A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
 in `.maestro/build/results/<platform>/<flow>/`:
 - `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
   JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
   An iOS release build passes only `console.error` to the unified log.
-- `device.log` (iOS): the unified log.
+- `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
+  (`transaction_duration_ms`; the emulators' ports name the service).
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
+- `run/<time>/<flow>/screen-hierarchy/` and `screenshots/`: what Maestro saw when the step failed,
+  and the screen. The screenshot is taken after the hierarchy, so something that arrived in between
+  (an answer from a function) is on the screenshot and not in the hierarchy: check the time it
+  arrived before calling the screen slow or the hierarchy stale.
 
 CI uploads the folder for a job with any failed attempt.

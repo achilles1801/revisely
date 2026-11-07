@@ -1,5 +1,14 @@
 // Maestro runScript (runs in Maestro, on this computer): Revo's server side for 09-revo, against the
 // emulators, as an admin or the app would set it. The account is output.email (subflows/signup.yaml).
+//   MODE=warm    the Revo functions the flow waits on, run once each before any step waits on them,
+//                as the account (a tester, Revo still off), changing nothing: revoSetOptions with no
+//                change only reads, revoDayInReview and revoAsk are refused once they have read that
+//                Revo is off. The emulator runs each function in a worker of its own, and a worker's
+//                first signed-in call is slow on a CI macOS runner: 17–22 s (run 42403200017: the
+//                app's first revoSetOptions 17.5 s, revoDayInReview 17.2 s, revoAsk 21.9 s; later
+//                calls 2–5 s), longer than a step's wait. A call without an ID token didn't help:
+//                refused before the token checks and Firestore, it left that cost to the app's call.
+//                The worker keeps it for the job's later calls (it goes only when functions/ changes)
 //   MODE=tester  marks it a previewTester (functions/scripts/set-preview-tester.js does this in
 //                production; clients can't write the field)
 //   MODE=reply   the model's next answers for this account: REPLY (its text, inside the recorded
@@ -50,7 +59,18 @@ function callable(name, data, nowMs) {
   });
 }
 
-if (MODE === 'tester') {
+if (MODE === 'warm') {
+  // What each answers with Revo off: the settings (200), or "Turn Revo on first." (403) once its
+  // gate has read the account (functions/src/revo/handler.ts). Anything else (not a tester, an
+  // error) fails the step.
+  [['revoSetOptions', 200], ['revoDayInReview', 403], ['revoAsk', 403]].forEach(function (call) {
+    var started = Date.now();
+    var res = callable(call[0], {}, Date.now());
+    var ok = res.status === call[1] && (call[1] === 200 ? (json(res.body).result || {}).optIn === false : /Turn Revo on first/.test(res.body));
+    if (!ok) throw new Error('warm ' + call[0] + ': ' + res.status + ' ' + res.body);
+    console.log('server-revo: warm ' + call[0] + ' in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s');
+  });
+} else if (MODE === 'tester') {
   patch('users/' + uid, { previewTester: { booleanValue: true } });
 } else if (MODE === 'reply') {
   patch('emulator/anthropic/accounts/' + uid, { reply: { mapValue: { fields: { text: { stringValue: REPLY } } } } });
