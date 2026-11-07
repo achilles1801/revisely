@@ -486,6 +486,34 @@ service cloud.firestore {
                                  (resource == null ||
                                   incomingData().appSeconds >= resource.data.appSeconds);
       }
+
+      // ======================================================================
+      // REVO (functions/src/revo): written by the functions only
+      // ======================================================================
+      // The owner reads their chats, messages and memory. From the app they
+      // may only mark a chat's plan added, rate a reply or mark its action,
+      // and delete a memory item. Nothing is created from the app.
+
+      match /revoChats/{chatId} {
+        allow read: if isOwner(userId);
+        allow update: if isOwner(userId) &&
+                         changedKeys().hasOnly(['meta']) &&
+                         incomingData().meta == 'plan added';
+
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow update: if isOwner(userId) &&
+                           changedKeys().hasOnly(['feedback', 'actionState']) &&
+                           (!('feedback' in changedKeys()) ||
+                            incomingData().get('feedback', null) in ['up', 'down', null]) &&
+                           (!('actionState' in changedKeys()) ||
+                            incomingData().get('actionState', null) in ['added', 'dismissed']);
+        }
+      }
+
+      match /revoMemory/{itemId} {
+        allow read, delete: if isOwner(userId);
+      }
     }
 
     function isValidRecordingDoc() {
@@ -672,6 +700,16 @@ service cloud.firestore {
     // collection-group query must filter on uid, so only its own notes read.
     match /{path=**}/entries/{entryId} {
       allow read: if isOwner(resource.data.uid);
+    }
+
+    // Revo's and the Ask coach's settings (optIn, memoryOn) and Revo's daily
+    // count: written by the functions only; the owner reads their own.
+    match /coachSettings/{userId} {
+      allow get: if isOwner(userId);
+    }
+
+    match /revoUsage/{userId} {
+      allow get: if isOwner(userId);
     }
 
     // Tester resets (functions resetMyData): how often each account reset.

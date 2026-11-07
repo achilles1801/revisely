@@ -1,0 +1,142 @@
+/**
+ * Revo's reply, checked. The model is asked for one JSON object; every part is validated and an
+ * invalid chart, action, chip or fact is dropped rather than failing the answer. A chart or an
+ * action that names a page the model wasn't given is dropped whole. A reply that isn't JSON is
+ * its own text, and nothing else (a reply cut off mid-object keeps its text when it arrived whole).
+ */
+import { RevoAction, RevoChart, RevoReplyParts } from './types';
+
+export const MAX_TEXT = 1500;
+export const MAX_TEXT_AFTER = 300;
+export const MAX_TITLE = 60;
+export const MAX_CHIPS = 3;
+export const MAX_CHIP = 40;
+export const MAX_REMEMBER = 2;
+export const MAX_FACT = 160;
+
+type Obj = Record<string, unknown>;
+
+const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** A trimmed, non-empty string of at most `max` characters, or null. */
+function clean(v: unknown, max: number): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length > 0 && s.length <= max ? s : null;
+}
+
+/** The answer's text cut to MAX_TEXT. */
+export function cutText(s: string): string {
+  const t = s.trim();
+  return t.length <= MAX_TEXT ? t : `${t.slice(0, MAX_TEXT - 1).trimEnd()}…`;
+}
+
+/** Whole page numbers, all given to the model, no repeats, `min`..`max` of them; else null. */
+function givenPages(v: unknown, allowed: ReadonlySet<number>, min: number, max: number): number[] | null {
+  if (!Array.isArray(v) || v.length < min || v.length > max) return null;
+  if (!v.every((p) => typeof p === 'number' && Number.isInteger(p) && allowed.has(p))) return null;
+  if (new Set(v).size !== v.length) return null;
+  return v as number[];
+}
+
+export function checkChart(v: unknown, allowed: ReadonlySet<number>): RevoChart | null {
+  if (!isObj(v)) return null;
+  const title = clean(v.title, MAX_TITLE);
+  if (!title) return null;
+  if (v.kind === 'pageRatings') {
+    const pages = givenPages(v.pages, allowed, 1, 4);
+    return pages ? { kind: 'pageRatings', title, pages } : null;
+  }
+  if (v.kind === 'dailyPages' && (v.days === 7 || v.days === 30)) return { kind: 'dailyPages', title, days: v.days };
+  return null;
+}
+
+export function checkAction(v: unknown, allowed: ReadonlySet<number>): RevoAction | null {
+  if (!isObj(v)) return null;
+  const title = clean(v.title, 80);
+  const detail = typeof v.detail === 'string' && v.detail.trim().length <= 100 ? v.detail.trim() : null;
+  if (!title || detail === null) return null;
+  if (v.kind === 'reviseFirst') {
+    const pages = givenPages(v.pages, allowed, 1, 10);
+    return pages ? { kind: 'reviseFirst', title, detail, pages } : null;
+  }
+  if (v.kind === 'openPage') {
+    const page = v.page;
+    return typeof page === 'number' && Number.isInteger(page) && allowed.has(page) ? { kind: 'openPage', title, detail, page } : null;
+  }
+  if (v.kind === 'startRevision') return { kind: 'startRevision', title, detail };
+  return null;
+}
+
+function strings(v: unknown, max: number, each: number): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    const s = clean(x, each);
+    if (s && !out.includes(s)) out.push(s);
+    if (out.length === max) break;
+  }
+  return out;
+}
+
+/** The model's text without a code fence around it. */
+function unfenced(raw: string): string {
+  return raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+}
+
+/** The JSON object in the model's text (after any words before it). */
+function jsonObject(t: string): Obj | null {
+  const start = t.indexOf('{');
+  const end = t.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try {
+    const v = JSON.parse(t.slice(start, end + 1));
+    return isObj(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A reply cut off mid-object (out of tokens): its "text" value when that much arrived whole. */
+function salvageText(raw: string): string | null {
+  const m = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
+  if (!m) return null;
+  try {
+    const s = JSON.parse(`"${m[1]}"`);
+    return typeof s === 'string' && s.trim().length > 0 ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The reply's parts. `allowed`: the pages in the context and attachments. Null when there is no
+ * answer to show (the model's object had no text).
+ */
+export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { firstTurn: boolean }): RevoReplyParts | null {
+  const t = unfenced(raw);
+  const o = jsonObject(t);
+  if (!o || typeof o.text !== 'string' || o.text.trim() === '') {
+    // Not the object: plain words are the answer; a broken object keeps its text if it can.
+    const text = t.startsWith('{') ? salvageText(t) : raw;
+    return text && text.trim() ? { text: cutText(text), remember: [] } : null;
+  }
+  const out: RevoReplyParts = { text: cutText(o.text), remember: strings(o.remember, MAX_REMEMBER, MAX_FACT) };
+  const chart = checkChart(o.chart, allowed);
+  if (chart) out.chart = chart;
+  const textAfter = clean(o.textAfter, MAX_TEXT_AFTER);
+  if (textAfter) out.textAfter = textAfter;
+  // One action: an object, or the first valid one of a list.
+  const actions = Array.isArray(o.action) ? o.action : [o.action];
+  for (const a of actions) {
+    const action = checkAction(a, allowed);
+    if (action) {
+      out.action = action;
+      break;
+    }
+  }
+  const chips = strings(o.chips, MAX_CHIPS, MAX_CHIP);
+  if (chips.length > 0) out.chips = chips;
+  if (opts.firstTurn && typeof o.title === 'string' && o.title.trim()) out.title = o.title.trim().slice(0, MAX_TITLE).trimEnd();
+  return out;
+}

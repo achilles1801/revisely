@@ -264,6 +264,62 @@ How the tests are made: `tests/scenarios/README.md`.
 - **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
   what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
 
+## Revo
+
+Revo is the in-app assistant (it supersedes the Ask coach, whose rules above still hold for its own calls).
+
+- **REVO-1.** Revo is for previewTester accounts only, and off until the account turns it on (the opt-in, or Settings →
+  Revo AI). Only the functions change that switch, its memory switch and the day's count; the account reads its own.
+
+- **REVO-2.** Every question sends the totals behind Insights (coverage, consistency, weak spots, pace) and today's
+  blocks, as numbers and page numbers. A day, a page or surah, a note or a recording goes only with the question it was
+  picked for with +: a note's text only when that note is picked, a recording only as its length and pages, never
+  the audio. Names are never sent. The server refuses any field the contract doesn't name, a page outside 1–604 and a
+  question over 600 characters.
+
+- **REVO-3.** An account may ask 10 new questions a revision day (it starts at Fajr or midnight, the user's setting). A
+  later day starts the count again; a day earlier than the one counted is refused, so moving the phone's date back
+  can't refill it. A failed call, or a reply with no answer, gives the question back.
+
+- **REVO-4.** Revo and the Ask coach share one monthly hard cap in dollars and one ledger: $10 unless `config/coach`
+  sets another (0 to $1,000, `functions/scripts/set-coach-cap.js`), read again within a minute, with no deploy. A
+  question that would pass it is refused as `monthly`, makes no call and is given back; the real cost replaces each
+  call's reserve.
+
+- **REVO-5.** A first question with nothing attached is kept for the revision day: the same question again (case and
+  spaces aside) opens a new conversation with the same answer, with no call and nothing counted. A question with an
+  attachment, a follow-up or another day is asked anew.
+
+- **REVO-6.** The model is claude-haiku-5-5, called from the functions with the `ANTHROPIC_COACH_KEY` secret (never in
+  the app). The system prompt is stable and cached (above the 512-token minimum). Logs keep counts, tokens and costs,
+  never a question, an answer or a note.
+
+- **REVO-7.** An answer has at most one small chart and one suggested action, each on pages Revo was given (anything
+  else is dropped, the answer kept). The app draws the chart from its own data. Revo never changes the plan itself:
+  "Add to my plan" puts the pages first in tomorrow's session only when tapped, and "Not now" changes nothing.
+  Attached text is never taken as an instruction.
+
+- **REVO-8.** With memory on (the default), Revo keeps short facts from conversations (at most 30; the oldest go first)
+  and sends them with later questions. The user sees every item, deletes one, clears them all or turns memory off
+  (then none are read or written). Memory goes with the account when it is deleted or reset.
+
+- **REVO-9.** The Day in review is written at most once a revision day, from the evening, on a day with something
+  done; it never counts toward the day's questions and is skipped (never an error) when the month's cap is reached.
+  The button's dot shows until it is opened. It is covered by Revo's opt-in.
+
+- **REVO-10.** Conversations are kept with the account: a follow-up sends the conversation's last 10 messages with what
+  was attached to them. The app reads its own conversations and memory and can't create them. Turning Revo off deletes
+  its conversations, memory and kept answers (the day's count stays); deleting the account deletes all of it.
+
+- **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and which
+  of it is weak), with suggestions; neither is a question or a call.
+
+- **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent and what isn't; nothing is
+  sent before "Turn on Revo". The button shows on the main screens only, never in the reader or a session.
+
+- **REVO-22.** When the day's questions are used, the composer is greyed and says when Revo is back (after Fajr, at
+  its time, or at midnight); conversations stay in History.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an

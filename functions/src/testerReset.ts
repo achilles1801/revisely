@@ -192,8 +192,9 @@ export interface ResetStore {
   resetPages(uid: string, now: unknown): Promise<number>;
   /**
    * Every subcollection but pages and recordings deleted (sessions, journal and
-   * its notes, readingSessions, stats, revisions, memorizations, reads, …).
-   * Returns how many documents each held.
+   * its notes, readingSessions, stats, revisions, memorizations, reads, Revo's
+   * chats and memory, …), and Revo's cached answers (revoAnswers; its daily
+   * count, revoUsage, is kept). Returns how many documents each held.
    */
   deleteHistory(uid: string): Promise<Record<string, number>>;
   /** Each live recording record becomes a tombstone ({deletedAt}); returns how many. */
