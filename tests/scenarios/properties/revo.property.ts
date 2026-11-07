@@ -16,7 +16,7 @@ import {
   mergeMemory,
   reviewMeta,
 } from '../../../functions/src/revo/handler';
-import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT } from '../../../functions/src/revo/prompt';
+import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest } from '../../../functions/src/revo/prompt';
 import { parseReply } from '../../../functions/src/revo/reply';
 import type { CachedAnswer, RevoChat, RevoContext, RevoMemoryItem, RevoSettings, StoredMessage } from '../../../functions/src/revo/types';
 import { validateAttachment, validateContext } from '../../../functions/src/revo/validate';
@@ -182,8 +182,9 @@ describe('what is sent (REVO-2)', () => {
     const m = model();
     await handleRevoAsk(U, ask(), deps(fakeStore().store, m.call));
     const sent = m.requests[0].messages.map((x) => x.content).join('\n');
-    expect(sent).toContain('"plannedPerDay":20');
-    expect(sent).toContain('"nextPages":[548,549,550]');
+    // Written out in words (REVO-27): the plan a day, and today's next pages.
+    expect(sent).toContain('the plan is 20 a day');
+    expect(sent).toContain('pages 548–550');
     expect(sent).toContain('Question: Why do p. 548–549 keep slipping?');
     expect(sent).not.toContain('Attachment');
   });
@@ -263,6 +264,79 @@ describe('the context the app sends (REVO-2, REVO-26)', () => {
     expect(bad((c) => (c.pageNames['300'] = 'Al-Anfal, ayahs 1–8'))).toThrow();
     expect(bad((c) => (c.pageNames = Object.fromEntries(Array.from({ length: 71 }, (_, i) => [String(i + 1), 'Juz 1']))))).toThrow();
     expect(bad((c) => delete c.passages)).not.toThrow();
+  });
+});
+
+describe('how Revo talks (REVO-27)', () => {
+  const said = (c: RevoContext) => {
+    const r = buildAskRequest({ day: DAY, question: 'How am I doing?', context: c, attach: null, memory: [], history: [] });
+    return r.messages[r.messages.length - 1].content;
+  };
+  const worded = (): RevoContext => ({
+    ...context({ carriedPages: 0, doneEarlier: 0, otherPages: 3 }),
+    week: [
+      { day: '2026-11-04', pages: 20, planned: 20, done: true },
+      { day: '2026-11-05', pages: 0, planned: 20, done: false },
+      { day: DAY, pages: 9, planned: 20, done: false },
+    ],
+    streak: { days: 0, atRisk: { previous: 11, yesterdayPlanned: 20, yesterdayDone: 0 } },
+    passages: { today: 'Al-Mujadila to At-Tahrim · Juz 28', nextAt: 'Al-Hashr, ayah 17', next: 'Al-Hashr 17 to Al-Mumtahanah', weakNext: 'End of Al-Hashr and start of Al-Mumtahanah' },
+    pageNames: { '548': 'Al-Hashr, ayahs 17–24', '549': 'Al-Mumtahanah, ayahs 1–5', '12': 'Al-Baqarah, ayahs 77–83' },
+  });
+
+  it('[REVO-27] the context is written out in plain words: days as people say them, never a date, a field name or JSON', () => {
+    const text = said(worded());
+    expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(text).not.toMatch(/[{}"]|plannedPages|revisedPages|streakDays|nextPages|weakNext|pagesPerDay|atRisk|otherPages/);
+    expect(text).toMatch(/^It is \w+day, 21:41, their revision day\./);
+    expect(text).toContain('Yesterday 0 (missed)');
+    expect(text).toContain('Also revised today, beyond today’s pages: 3 pages.');
+    expect(text).toContain('keeps their 11-day streak');
+    expect(text).toMatch(/Question: How am I doing\?$/);
+  });
+
+  it('[REVO-27] parts of the Qur’an by surah and juz first, the pages after them as a detail', () => {
+    const text = said(worded());
+    expect(text).toContain('Today: 20 pages, Al-Mujadila to At-Tahrim · Juz 28, 6 done so far.');
+    expect(text).toContain('from Al-Hashr, ayah 17: Al-Hashr 17 to Al-Mumtahanah (pages 548–550)');
+    expect(text).toContain('weak: End of Al-Hashr and start of Al-Mumtahanah (pages 548–549)');
+    expect(text).toContain('Al-Hashr, ayahs 17–24 (page 548); Al-Mumtahanah, ayahs 1–5 (page 549); Al-Baqarah, ayahs 77–83 (page 12)');
+  });
+
+  it('[REVO-27] an older app’s context (numbers only) is written out too, with pages where it has no words', () => {
+    const text = said(context());
+    expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}|[{}"]/);
+    expect(text).toContain('Today: 20 pages, 6 done so far.');
+    expect(text).toContain('Next up, pages 548–550; of those, weak: pages 548–549.');
+    expect(text).toContain('Streak: 12 days in a row.');
+  });
+
+  it('[REVO-27] the prompt asks for a coach: the answer first, about 60 words, one next step, surahs and juz, no dates, never doubting the data, never guessing', () => {
+    expect(REVO_SYSTEM_PROMPT).toContain('A warm, encouraging coach');
+    expect(REVO_SYSTEM_PROMPT).toContain('Answer first, in one plain sentence. Then at most two short sentences of why. About 60 words in all');
+    expect(REVO_SYSTEM_PROMPT).toContain('End with one clear next step');
+    expect(REVO_SYSTEM_PROMPT).toContain('Never write a date like 2026-11-05');
+    expect(REVO_SYSTEM_PROMPT).toContain('Name parts of the Qur’an by surah and juz');
+    expect(REVO_SYSTEM_PROMPT).toContain('Give a page number only when they use page numbers or ask for one');
+    expect(REVO_SYSTEM_PROMPT).toContain('Never say the numbers disagree');
+    expect(REVO_SYSTEM_PROMPT).toContain('Never guess.');
+  });
+
+  it('[REVO-27] a Day in review chat opens with its weekday, and an attached day goes without its date', () => {
+    const review: StoredMessage = { id: 'r', role: 'revo', text: 'A steady day.', at: 1 } as StoredMessage;
+    const r = buildAskRequest({ day: DAY, question: 'And tomorrow?', context: context(), attach: null, memory: [], history: [review], chat: { kind: 'review', day: '2026-11-05' } });
+    expect(r.messages[0].content).toBe('Day in review (Thursday).');
+    const withDay = buildAskRequest({
+      day: DAY,
+      question: 'What about this day?',
+      context: context(),
+      attach: { kind: 'day', label: 'Yesterday · Thu 5 Nov', day: '2026-11-05', revisedPages: [548], memorizedPages: [], readMinutes: 0, minutes: 5, ratings: [] },
+      memory: [],
+      history: [],
+    });
+    const last = withDay.messages[withDay.messages.length - 1].content;
+    expect(last).toContain('Attachment (Yesterday · Thu 5 Nov)');
+    expect(last).not.toContain('2026-11-05');
   });
 });
 
@@ -374,7 +448,9 @@ describe('the model and the prompt (REVO-6)', () => {
     // Sonnet 5.5 thinks by default and its thinking counts against max_tokens: with 700 and
     // thinking on, every reply was cut off (Nov 7 2026). Thinking off, and room for the reply.
     expect(r.thinking).toEqual({ type: 'between_tools' });
-    expect(REVO_MAX_TOKENS).toBeGreaterThanOrEqual(1000);
+    // Room for a short answer's JSON (REVO-27: about 60 words), not for a long one.
+    expect(REVO_MAX_TOKENS).toBeGreaterThanOrEqual(600);
+    expect(REVO_MAX_TOKENS).toBeLessThanOrEqual(1000);
     expect(r.system).toEqual([{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]);
     expect(REVO_SYSTEM_PROMPT.length).toBeGreaterThanOrEqual(512 * 6);
   });
