@@ -10,23 +10,11 @@ appId: com.revisionbuddy.app
       CLOCK: 2026-11-03T21:41
       BOUNDARY: midnight
 
-# The button on Home, with a Day in review waiting (the dot).
-- runFlow:
-    file: ../subflows/revo-link.yaml
-    env:
-      QUERY: review=1&memory=1&day=2026-11-03
+# REVO-21: the button on Home; its first tap opens the opt-in.
 - extendedWaitUntil:
     visible:
       id: revo-button
     timeout: 15000
-- assertVisible:
-    id: revo-button-dot
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: r1-fab-home
-
-# REVO-21: the first tap opens the opt-in.
 - tapOn:
     id: revo-button
 - extendedWaitUntil:
@@ -100,6 +88,12 @@ appId: com.revisionbuddy.app
       id: revo-plan-added
     timeout: 10000
 
+# Tonight's Day in review written, and a few things Revo remembers.
+- runFlow:
+    file: ../subflows/revo-link.yaml
+    env:
+      QUERY: review=1&memory=1&day=2026-11-03
+
 # History: the conversation and the Day in review.
 - tapOn:
     id: revo-history
@@ -142,15 +136,30 @@ appId: com.revisionbuddy.app
     env:
       NAME: r10-limit
 
-# The button on Activity too.
-- swipe:
-    from:
-      id: revo-sheet-handle
-    direction: DOWN
+# Closed (a drag down halves a full sheet, a second closes it): the button on Home, its dot
+# for the Day in review not opened yet.
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500
 - extendedWaitUntil:
     visible:
-      id: revo-button
-    timeout: 5000
+      id: revo-button-dot
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r1-fab-home
+
+# The button on Activity too.
 - tapOn:
     id: open-activity
 - extendedWaitUntil:
