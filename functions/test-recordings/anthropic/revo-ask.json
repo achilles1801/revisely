@@ -1,6 +1,6 @@
 {
-  "recordedAt": null,
-  "how": "Hand-written in the Messages API response shape, not recorded yet: replace it with a real reply by running functions/scripts/record-anthropic.js with an Anthropic key (TESTING.md).",
+  "recordedAt": "2026-11-07T09:31:16.839Z",
+  "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
@@ -11,23 +11,36 @@
   },
   "status": 200,
   "body": {
-    "id": "msg_handwritten",
+    "model": "claude-sonnet-5-5",
+    "id": "msg_011CgoLNU7j4G52iEo1PeXgx",
     "type": "message",
     "role": "assistant",
-    "model": "claude-sonnet-5-5",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised on 6 of the last 7 revision days, 63 pages in all, against a plan of 10 a day. Page 589 is your one weak page in today’s set: revise it first while it is fresh.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Start today’s revision\",\"detail\":\"6 pages left today\"},\"remember\":[],\"title\":\"This week’s revision\",\"chips\":[\"Which pages are weakest?\",\"How is my pace?\"]}"
+        "text": "You've revised on five of the last six days, about 9 pages a day, and today you're already 4 pages in after 22 minutes. Saturday was the one gap, and the streak is holding at 5.\n\nToday still has 6 pages to go, starting with the one in the middle that's still weak.\n\n```json\n{\"text\":\"You revised on five of the last six days, about 9 pages a day against a plan of 10, and today you're 4 pages in already. Saturday was the only gap, and your 5-day streak is intact.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Six pages are left today, so let's carry on:\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting with the weak page 589\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"How am I doing today?\",\"Am I covering everything?\"]}\n```"
       }
     ],
+    "container": null,
     "stop_reason": "end_turn",
     "stop_sequence": null,
+    "stop_details": null,
     "usage": {
-      "input_tokens": 412,
+      "input_tokens": 312,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 1663,
-      "output_tokens": 171
-    }
+      "cache_read_input_tokens": 10177,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 310,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
   }
 }
