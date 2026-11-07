@@ -205,7 +205,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within 7 or 30
   days (a longer window never covers less); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
-  oldest, or never.
+  oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
+  page memorized today never makes its juz the one untouched longest).
 
 - **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
   opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates

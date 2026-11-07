@@ -20,19 +20,21 @@ const within = (day: string, today: string, window: number) => {
 
 // ── Coverage ─────────────────────────────────────────────────────────────
 
-/** A juz tile: revised this week, this month, over 30 days ago (or never), or not memorized. */
+/** A juz tile: revised this week, this month, over 30 days ago (or never), or not memorized (yet). */
 export type JuzState = 'week' | 'month' | 'stale' | 'none';
 export interface JuzTile {
   juz: number;
   state: JuzState;
-  /** Not memorized, with pages being learned (the tile's dot). */
+  /** Not memorized yet, with pages memorized or being learned (the tile's dot). */
   learning: boolean;
   /** Days since its least recently revised memorized page (null: one was never revised, or none memorized). */
   daysSince: number | null;
 }
 
 /**
- * The 30 juz. A juz is as recent as its least recently revised memorized page (ACT-4's "juz untouched
+ * The 30 juz. A juz is memorized once at least half its pages are; one with fewer is being learned (not
+ * memorized, with the dot), so a page memorized today never makes its juz "untouched the longest". A
+ * memorized juz is as recent as its least recently revised memorized page (ACT-4's "juz untouched
  * longest"): this week when that is within 7 days, this month within 30, otherwise (or never) stale.
  */
 export function juzTiles(memorized: Set<number>, learning: Set<number>, last: Map<number, string>, today: string): JuzTile[] {
@@ -40,8 +42,8 @@ export function juzTiles(memorized: Set<number>, learning: Set<number>, last: Ma
   for (let juz = 1; juz <= 30; juz++) {
     const pages = getPagesForJuz(juz);
     const mine = pages.filter((p) => memorized.has(p));
-    if (mine.length === 0) {
-      tiles.push({ juz, state: 'none', learning: pages.some((p) => learning.has(p)), daysSince: null });
+    if (mine.length * 2 < pages.length) {
+      tiles.push({ juz, state: 'none', learning: mine.length > 0 || pages.some((p) => learning.has(p)), daysSince: null });
       continue;
     }
     let oldest: number | null = 0;
@@ -190,7 +192,8 @@ export interface WeakSpotRow {
 
 /**
  * Memorized pages weak now (rated 1–2), or skipped at least twice in the window, as runs of pages within
- * a surah: weak ones first, then the most skipped. At most `limit` rows.
+ * a surah: the most flagged first (times rated weak and skipped in the window), then weak now, then by
+ * page. At most `limit` rows.
  */
 export function weakSpotRows(input: {
   memorized: Set<number>;
@@ -241,7 +244,9 @@ export function weakSpotRows(input: {
     run.push(p);
   }
   flush();
-  rows.sort((a, b) => Number(b.weakNow) - Number(a.weakNow) || b.skipped - a.skipped || a.pages[0] - b.pages[0]);
+  rows.sort(
+    (a, b) => b.ratedWeak + b.skipped - (a.ratedWeak + a.skipped) || Number(b.weakNow) - Number(a.weakNow) || a.pages[0] - b.pages[0],
+  );
   return rows.slice(0, input.limit ?? 5);
 }
 
@@ -347,7 +352,7 @@ export function paceView(input: {
   };
 }
 
-/** "1.8", "12": a pace to one decimal under 10, whole from there. */
+/** "1.8", "6", "12": a pace to one decimal under 10 (no ".0"), whole from there. */
 export function formatPace(minutesPerPage: number): string {
-  return minutesPerPage < 10 ? minutesPerPage.toFixed(1) : String(Math.round(minutesPerPage));
+  return minutesPerPage < 10 ? minutesPerPage.toFixed(1).replace(/\.0$/, '') : String(Math.round(minutesPerPage));
 }
