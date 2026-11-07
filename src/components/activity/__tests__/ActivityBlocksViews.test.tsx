@@ -124,11 +124,20 @@ describe('Insights (gap audit §5)', () => {
   });
 
   it('names the juz untouched the longest and plans its pages', async () => {
-    mockPages = [{ pageNumber: 590, status: 'memorized', weaknessRating: 4 }];
+    const juz30 = Array.from({ length: 23 }, (_, i) => 582 + i);
+    mockPages = juz30.map((pageNumber) => ({ pageNumber, status: 'memorized', weaknessRating: 4 }));
     render(<ActivityBlocksViews {...props} />);
     fireEvent.press(await screen.findByText('Insights'));
     expect(await screen.findByText('Juz 30, untouched the longest')).toBeTruthy();
     fireEvent.press(screen.getByTestId('insights-plan-it'));
-    expect(props.onPlanIt).toHaveBeenCalledWith([590]);
+    expect(props.onPlanIt).toHaveBeenCalledWith(juz30);
+  });
+
+  it('a juz with one page memorized is being learned, never the one untouched the longest [ACT-4]', async () => {
+    mockPages = [{ pageNumber: 590, status: 'memorized', weaknessRating: 4 }];
+    render(<ActivityBlocksViews {...props} />);
+    fireEvent.press(await screen.findByText('Insights'));
+    expect(await screen.findByLabelText('Juz 30, not memorized, learning')).toBeTruthy();
+    expect(screen.queryByTestId('insights-untouched')).toBeNull();
   });
 });
