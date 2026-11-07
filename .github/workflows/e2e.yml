@@ -84,9 +84,12 @@ permissions:
 # One run per PR: a push cancels the run of the commit before it. Elsewhere one
 # per branch and event: a push to develop cancels the run of the push before it
 # (a burst of merges is tested once, at its end), and never a full run started
-# by hand or on schedule there (a release's proof).
+# by hand or on schedule there (a release's proof). Runs by hand never cancel
+# each other (two runs of different flows on one branch did); a run by hand
+# skips its iOS jobs when the same commit's same iOS jobs are already running
+# (`changes`).
 concurrency:
-  group: e2e-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.event_name) }}
+  group: e2e-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || format('{0}-{1}', github.ref, github.event_name) }}
   cancel-in-progress: true
 
 env:
@@ -117,6 +120,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read # a run by hand looks for iOS jobs already running on its commit
     outputs:
       app: ${{ steps.diff.outputs.app }}
       ios_shards: ${{ steps.shards.outputs.ios }}
@@ -137,6 +141,10 @@ jobs:
           IOS_SET: ${{ inputs.ios }}
           ANDROID_SET: ${{ inputs.android }}
           PLATFORM: ${{ inputs.platform }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           full='[{"name":"01 02 03 08 09","flows":".maestro/flows/0[12389]-*.yaml"},{"name":"04 05 06 07 10","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/10-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
@@ -165,6 +173,22 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ] && [ -z "$IOS_SET$ANDROID_SET" ]; then
             if [ "$PLATFORM" = android ]; then ios='[]'; fi
             if [ "$PLATFORM" = ios ]; then android='[]'; fi
+          fi
+          # By hand: iOS jobs the same commit already has running (another run by hand, a
+          # PR's or develop's run, the nightly one) aren't started twice; macOS runners
+          # are five at a time.
+          if [ "$EVENT" = workflow_dispatch ] && [ "$ios" != '[]' ]; then
+            running=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=50" --jq ".workflow_runs[] | select(.id != $RUN_ID) | select(.status == \"in_progress\" or .status == \"queued\" or .status == \"waiting\") | .id" 2>/dev/null || true)
+            busy=""
+            for r in $running; do
+              busy="$busy$(gh api "repos/$REPO/actions/runs/$r/jobs?per_page=100" --jq '.jobs[] | select(.status != "completed") | .name' 2>/dev/null | grep 'iOS Simulator' || true)
+          "
+            done
+            left=$(jq -c --arg busy "$busy" '[.[] | . as $j | select(($busy | contains("iOS Simulator, " + $j.name + ")")) | not)]' <<<"$ios")
+            if [ "$left" != "$ios" ]; then
+              echo "::notice title=E2E::iOS jobs already running for $SHA are not started again: $(jq -r --argjson left "$left" '[.[] | select(. as $j | $left | index($j) | not) | .name] | join(", ")' <<<"$ios")"
+              ios="$left"
+            fi
           fi
           run_ios=true; if [ "$ios" = '[]' ]; then run_ios=false; fi
           run_android=true; if [ "$android" = '[]' ]; then run_android=false; fi
