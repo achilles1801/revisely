@@ -19,12 +19,11 @@ import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { RevoBoundary } from './RevoBoundary';
 import { REVO_BUTTON_GAP, RevoButton } from './RevoButton';
 import { RevoChat } from './RevoChat';
-import type { PickKind } from './RevoComposer';
 import { RevoHistory, RevoMemory, RevoOptIn } from './RevoPages';
-import { RevoPicker } from './RevoPicker';
+import { RevoAddSheet } from './RevoAddSheet';
 import { RevoSheetFrame } from './RevoSheetFrame';
 
-type View_ = { name: 'chat' } | { name: 'history' } | { name: 'memory' } | { name: 'optin' } | { name: 'pick'; kind: PickKind };
+type View_ = { name: 'chat' } | { name: 'history' } | { name: 'memory' } | { name: 'optin' } | { name: 'add' };
 
 /** A tap before the account's switch is read waits for it this long, then opens with what is known. */
 export const SETTINGS_WAIT_MS = 2000;
@@ -100,7 +99,7 @@ function RevoHostInner() {
   const [full, setFull] = useState(false);
   const [view, setView] = useState<View_>({ name: 'chat' });
   const [chatId, setChatId] = useState<string | null>(null);
-  const [attach, setAttach] = useState<RevoAttachment | null>(null);
+  const [attachments, setAttachments] = useState<RevoAttachment[]>([]);
   const [optInBusy, setOptInBusy] = useState(false);
   const [optInError, setOptInError] = useState<string | null>(null);
   const [reviewWaiting, setReviewWaiting] = useState<string | null>(null);
@@ -169,7 +168,7 @@ function RevoHostInner() {
         const target = request.chatId ?? (request.attach ? null : reviewWaiting);
         setChatId(target ?? null);
         setFull(target != null);
-        if (request.attach) setAttach(request.attach);
+        if (request.attach) setAttachments([request.attach]);
         if (target && target === reviewWaiting) {
           void AsyncStorage.setItem(reviewSeenKey(uid), day).catch(() => undefined);
           setReviewWaiting(null);
@@ -256,12 +255,12 @@ function RevoHostInner() {
             />
           ) : view.name === 'memory' && settings ? (
             <RevoMemory uid={uid} settings={settings} today={day} onBack={() => setView({ name: 'chat' })} />
-          ) : view.name === 'pick' ? (
-            <RevoPicker
-              kind={view.kind}
-              onBack={() => setView({ name: 'chat' })}
-              onPick={(a) => {
-                setAttach(a);
+          ) : view.name === 'add' ? (
+            <RevoAddSheet
+              initial={attachments}
+              onCancel={() => setView({ name: 'chat' })}
+              onAdd={(list) => {
+                setAttachments(list);
                 setView({ name: 'chat' });
               }}
             />
@@ -271,10 +270,10 @@ function RevoHostInner() {
               chatId={chatId}
               onChatId={setChatId}
               usage={usage}
-              attach={attach}
-              onAttach={setAttach}
-              onPick={(kind) => {
-                setView({ name: 'pick', kind });
+              attachments={attachments}
+              onAttachments={setAttachments}
+              onAdd={() => {
+                setView({ name: 'add' });
                 setFull(true);
               }}
               onHistory={() => {

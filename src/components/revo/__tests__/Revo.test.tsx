@@ -62,9 +62,19 @@ beforeEach(() => {
 });
 afterAll(() => __setRevoBackendForTests(null));
 
-function Chat({ usage = { day: DAY, count: 0 }, onAction = jest.fn(), onOff }: { usage?: { day: string; count: number }; onAction?: jest.Mock; onOff?: jest.Mock }) {
+function Chat({
+  usage = { day: DAY, count: 0 },
+  onAction = jest.fn(),
+  onOff,
+  attached = [],
+}: {
+  usage?: { day: string; count: number };
+  onAction?: jest.Mock;
+  onOff?: jest.Mock;
+  attached?: import('../../../lib/revo/types').RevoAttachment[];
+}) {
   const [chatId, setChatId] = React.useState<string | null>(null);
-  const [attach, setAttach] = React.useState<null | import('../../../lib/revo/types').RevoAttachment>(null);
+  const [attachments, setAttachments] = React.useState(attached);
   return (
     <ThemeProvider>
       <RevoChat
@@ -72,9 +82,9 @@ function Chat({ usage = { day: DAY, count: 0 }, onAction = jest.fn(), onOff }: {
         chatId={chatId}
         onChatId={setChatId}
         usage={usage}
-        attach={attach}
-        onAttach={setAttach}
-        onPick={jest.fn()}
+        attachments={attachments}
+        onAttachments={setAttachments}
+        onAdd={jest.fn()}
         onHistory={jest.fn()}
         onMemory={jest.fn()}
         onExpand={jest.fn()}
@@ -173,6 +183,52 @@ describe('Revo’s conversation', () => {
     await flush();
     expect(screen.getByTestId('revo-error')).toBeTruthy();
     expect(screen.queryByTestId('revo-typing')).toBeNull();
+  });
+
+  it('[REVO-33] several things attached go as `attachments`, each a chip on the question; one goes as `attach`', async () => {
+    const ask = jest.fn(backend.ask);
+    __setRevoBackendForTests({ ...backend, ask });
+    const juz = { kind: 'insight', label: 'Weak spots', insight: 'weakSpots' } as const;
+    const pace = { kind: 'insight', label: 'Pace', insight: 'pace' } as const;
+    render(<Chat attached={[juz, pace]} />);
+    await flush();
+    expect(screen.getAllByTestId('revo-context-chip')).toHaveLength(2);
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'What about these?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(ask.mock.calls[0][0]).toMatchObject({ attach: null, attachments: [juz, pace] });
+    // Sent: the composer is empty again.
+    expect(screen.queryAllByTestId('revo-context-remove')).toHaveLength(0);
+    render(<Chat attached={[juz]} />);
+    await flush();
+    fireEvent.changeText(screen.getAllByTestId('revo-input').at(-1)!, 'And this?');
+    await act(async () => {
+      fireEvent.press(screen.getAllByTestId('revo-send').at(-1)!);
+    });
+    await flush();
+    expect(ask.mock.calls[1][0]).toMatchObject({ attach: juz });
+    expect(ask.mock.calls[1][0]).not.toHaveProperty('attachments');
+  });
+
+  it('a chip’s × takes that one away, and a failed question brings them all back', async () => {
+    __setRevoBackendForTests({ ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('unavailable', 'busy'))) });
+    const a = { kind: 'insight', label: 'Weak spots', insight: 'weakSpots' } as const;
+    const b = { kind: 'insight', label: 'Pace', insight: 'pace' } as const;
+    const c = { kind: 'insight', label: 'Coverage', insight: 'coverage' } as const;
+    render(<Chat attached={[a, b, c]} />);
+    await flush();
+    fireEvent.press(screen.getAllByTestId('revo-context-remove')[1]);
+    expect(screen.getAllByTestId('revo-context-chip').map((x) => x.props.children)).toHaveLength(2);
+    expect(screen.queryByText('Pace')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(screen.getByText('Weak spots')).toBeTruthy();
+    expect(screen.getByText('Coverage')).toBeTruthy();
   });
 
   it('a failure says why: offline, or the server’s own reason; both can be tried again', async () => {

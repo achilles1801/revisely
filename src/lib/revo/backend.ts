@@ -34,7 +34,8 @@ export interface RevoBackend {
   watchChats(uid: string, cb: (chats: RevoChat[]) => void): () => void;
   watchMessages(uid: string, chatId: string, cb: (messages: RevoMessage[]) => void): () => void;
   watchMemory(uid: string, cb: (items: RevoMemoryItem[]) => void): () => void;
-  ask(input: { chatId: string | null; day: string; question: string; context: RevoContext; attach: RevoAttachment | null }): Promise<RevoAskResult>;
+  /** One attachment goes as `attach`; several (at most REVO_MAX_ATTACHMENTS) as `attachments`. */
+  ask(input: { chatId: string | null; day: string; question: string; context: RevoContext; attach: RevoAttachment | null; attachments?: RevoAttachment[] }): Promise<RevoAskResult>;
   dayInReview(input: { day: string; context: RevoContext }): Promise<{ chatId: string } | null>;
   setOptions(input: Partial<RevoSettings>): Promise<RevoSettings>;
   clear(what: 'memory' | 'history'): Promise<void>;
@@ -172,8 +173,8 @@ const firebaseRevo: RevoBackend = {
       (snap) =>
         cb(
           snap.docs.map((d) => {
-            // attachData (the attachment itself) stays out of the screen's state.
-            const { attachData: _a, uid: _u, ...m } = d.data() as RevoMessage & { attachData?: unknown; uid?: string };
+            // The attachments themselves (attachData, attachList) stay out of the screen's state.
+            const { attachData: _a, attachList: _l, uid: _u, ...m } = d.data() as RevoMessage & { attachData?: unknown; attachList?: unknown; uid?: string };
             return { ...m, id: d.id };
           }),
         ),
