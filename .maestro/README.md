@@ -164,6 +164,7 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 | `revisely://e2e/clock?at=2026-11-04T09:00Z` | that instant |
 | `revisely://e2e/clock?at=now` | the real clock again |
 | `revisely://e2e/network?offline=1` (`0`) | the E2E network off: the emulators unreachable (iOS) |
+| `revisely://e2e/recordings?set=activity` | the Activity mocks' recordings, written into the signed-in account's folder (`src/lib/e2e/demoRecordings.ts`; iOS takes `e2eRecordings` at launch instead: `subflows/relaunch-recordings.yaml`) |
 
 - Time runs on from there, as on a phone; timers and animations use real time.
 - The offset is kept in a file in the app's Documents: a relaunch keeps the flow's time, and
