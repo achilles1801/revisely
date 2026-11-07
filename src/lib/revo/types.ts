@@ -73,26 +73,96 @@ export interface RevoContext {
 
 export type RevoInsight = 'coverage' | 'consistency' | 'weakSpots' | 'pace';
 
+/** How often a part of the Qur'an was revised in a window: on how many days, and each memorized page's least and most. */
+export interface RevoTimes {
+  /** Revision days with at least one of its pages revised. */
+  days: number;
+  /** The fewest times any of its memorized pages was revised: how many times it was revised in full. */
+  minEach: number;
+  /** The most times any of its memorized pages was revised. */
+  maxEach: number;
+}
+
+/**
+ * Its pages on the plan over past days (today not counted), as the streak reads the plan and the
+ * credits (lib/streak): every page a day had is revised on the day, revised later (carried over),
+ * revised ahead on an earlier day, or never revised. onDay + late + ahead + skipped = pages.
+ */
+export interface RevoPlanTally {
+  /** Days that had at least one of its pages. */
+  days: number;
+  /** Its pages on those days, counted once a day. */
+  pages: number;
+  onDay: number;
+  late: number;
+  ahead: number;
+  skipped: number;
+  /** Days on which one of its pages was never revised. */
+  skippedDays: number;
+}
+
+/** What the app shows for a surah, a juz or some pages (lib/revo/facts). */
+export interface RevoPassageFacts {
+  /** In words, surah and juz first (lib/passages): "Yusuf · Juz 12–13". */
+  name: string;
+  /** Pages it spans, and of them, memorized. */
+  pages: number;
+  memorized: number;
+  /** Times revised: the last 7 and 30 revision days (today included) and every day on record. */
+  revised: { last7: RevoTimes; last30: RevoTimes; all: RevoTimes };
+  /** Days since any of its memorized pages was last revised; null when none has been. */
+  lastRevisedDaysAgo: number | null;
+  /** Its memorized page revised longest ago (daysAgo null: never revised). */
+  oldest: { name: string; page: number; daysAgo: number | null } | null;
+  /** Memorized pages never revised on record. */
+  neverRevised: number;
+  plan: { last7: RevoPlanTally; last30: RevoPlanTally };
+  /** Its memorized pages' ratings, as Insights counts them (pages revised at least once); unrated: never revised. */
+  strength: { weak: number; moderate: number; strong: number; unrated: number; average: number | null };
+  /** Runs of its weak pages (rated 1–2), weakest first: in words, the pages, the lowest rating. */
+  weakSpots: { name: string; pages: number[]; rating: number }[];
+  /** Its pages in today's revision, and of them, done. Null when today has none. */
+  today: { pages: number; done: number } | null;
+  /** The next day after today the plan has any of its pages: in how many days, and how many. */
+  next: { inDays: number; pages: number } | null;
+}
+
+/** What the app shows for one revision day (lib/revo/facts): Activity's day and, for today, Home's. */
+export interface RevoDayFacts {
+  /** 0 today, 1 yesterday. */
+  daysAgo: number;
+  /**
+   * The day's pages: carried in first (today only: past carry-overs aren't kept), then its own. Each
+   * was revised on the day, ahead on an earlier day, later (caught up), or not (yet). `done`: the day
+   * counts as done for the streak (Home's Done, today).
+   */
+  plan: { pages: number; name?: string; carried: number; onDay: number; ahead: number; late: number; notDone: number; done: boolean } | null;
+  /** Every page revised in the day's sessions; of them, for a later day (ahead) and for an earlier one (catch-up). */
+  revised: { pages: number; name?: string; forLater: number; forEarlier: number };
+  /** Minutes of the day's revision sessions; null when none recorded a length. */
+  minutes: number | null;
+  /** Minutes of timed reading; null when they couldn't be read. */
+  readMinutes: number | null;
+  memorized: { pages: number; name?: string };
+  /** Ratings given that day (each page's last), and the weak ones. */
+  ratings: { weak: number; moderate: number; strong: number; weakName?: string; weakPages: number[] };
+  /** This phone's recordings of the day; null when they couldn't be read. */
+  recordings: { count: number; minutes: number } | null;
+  /** The day's notes from the daily log, as written; null when the log couldn't be read. */
+  notes: string[] | null;
+}
+
 /** What the user adds with +: sent only with the question it was added to. */
 export type RevoAttachment =
-  | {
-      kind: 'day';
-      label: string;
-      day: string;
-      revisedPages: number[];
-      memorizedPages: number[];
-      readMinutes: number;
-      minutes: number;
-      ratings: { page: number; rating: number }[];
-    }
-  | {
-      kind: 'page';
-      label: string;
-      pages: { page: number; rating: number | null; revisions: number; lastRevised: string | null; history: { day: string; rating: number }[] }[];
-    }
-  | { kind: 'note'; label: string; day: string; text: string }
+  | { kind: 'surah'; label: string; surah: number; facts: RevoPassageFacts }
+  | { kind: 'juz'; label: string; juz: number; facts: RevoPassageFacts }
+  | { kind: 'pages'; label: string; pages: number[]; facts: RevoPassageFacts }
+  | { kind: 'revisionDay'; label: string; day: string; facts: RevoDayFacts }
   | { kind: 'recording'; label: string; day: string; of: 'revision' | 'reading'; seconds: number; pages: number[] }
   | { kind: 'insight'; label: string; insight: RevoInsight };
+
+/** At most this many things go with one question. */
+export const REVO_MAX_ATTACHMENTS = 6;
 
 export type RevoChart =
   | { kind: 'pageRatings'; title: string; pages: number[] }
@@ -121,7 +191,9 @@ export interface RevoMessage {
   chart?: RevoChart;
   action?: RevoAction;
   chips?: string[];
-  attach?: { kind: RevoAttachment['kind']; label: string };
+  /** What was attached, as chips: the first (every app version shows it), and all of them when there were several. */
+  attach?: { kind: string; label: string };
+  attachments?: { kind: string; label: string }[];
   feedback?: 'up' | 'down' | null;
   actionState?: 'added' | 'dismissed';
 }
