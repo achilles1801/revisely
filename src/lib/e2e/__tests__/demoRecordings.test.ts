@@ -13,11 +13,12 @@ describe('demo recordings (E2E)', () => {
       jest.useRealTimers();
     }
   });
-  it('draws levels from 0 to 100, with pauses', () => {
+  it('draws levels from 0 to 100, with silences long enough to show as dots', () => {
     const levels = demoLevels(42);
-    expect(levels).toHaveLength(64);
+    expect(levels).toHaveLength(96);
     expect(levels.every((l) => l >= 0 && l <= 100)).toBe(true);
-    expect(levels.filter((l) => l < 10).length).toBeGreaterThan(4);
+    // Runs of at least three quiet levels.
+    expect(levels.join(',')).toMatch(/(^|,)0,0,0(,|$)/);
     expect(demoLevels(42)).toEqual(levels);
   });
 });
