@@ -595,6 +595,11 @@ hard-coded token was deleted from the console on 2026-10-27.
     `claude-fix` starts CI on its branch, which runs it.
   - A flaky flow is fixed, not skipped (Nov 4 2026). A pass on a retry is a warning, and the job
     keeps its results (screenshots, `app.log`: the E2E build's own log, `src/lib/e2e/log.ts`).
+  - **Flakes are counted** (Nov 7 2026): every job keeps each flow's attempts (`attempts.json`,
+    artifact `e2e-<platform>-attempts-…`), and `E2E flakes` (`e2e-flakes.yml`, Mondays 14:00 UTC
+    and by hand, from `main`) comments the week's first-attempt pass rate per flow and platform,
+    worst first, on the issue "E2E flakes (weekly report)" (label `e2e-flakes`). It mentions the
+    owner only when a flow is under 95%. A flow there is fixed like a failing one.
   The app is an E2E build: `EXPO_PUBLIC_E2E=1` at bundle time loads `src/lib/e2e/` (the
   emulators, a hermetic network, the test clock `revisely://e2e/clock?at=…`); every other build
   drops it, since the bundler inlines the variable. Keep new E2E code behind that test, and check a

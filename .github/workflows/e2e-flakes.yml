@@ -1,0 +1,61 @@
+name: E2E flakes
+
+# The weekly E2E flake report (scripts/e2e/flakes.js, .maestro/README.md "Flakes").
+# A flow that fails is run once more (E2E_RETRIES in e2e.yml), and a pass on that
+# retry hides a flake. Every E2E job keeps each flow's attempts as an artifact
+# (e2e-<platform>-attempts-…, .maestro/scripts/attempts.js); on Mondays this reads
+# the last 7 days of them and comments a table on the "E2E flakes (weekly report)"
+# issue (label e2e-flakes): per flow and platform, how often the first attempt
+# passed, worst first, with why the first attempts that needed a retry failed. It
+# mentions the owner (GitHub emails it) only when a flow is under 95%.
+#
+# Scheduled runs start from main (CLAUDE.md). A pull request that changes the
+# report prints it into its job summary instead of commenting (a dry run).
+on:
+  schedule:
+    # Mondays 14:00 UTC (8 am in Chicago in winter).
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Days back to read
+        type: string
+        default: '7'
+      dry_run:
+        description: Print the report in the job summary, comment nothing
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - scripts/e2e/**
+      - .github/workflows/e2e-flakes.yml
+
+permissions:
+  contents: read
+  actions: read # the E2E jobs' artifacts
+  issues: write
+
+concurrency:
+  group: e2e-flakes-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: E2E flake report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No dependencies: Node's own fetch and zlib.
+      - name: Report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          DAYS: ${{ inputs.days || '7' }}
+          DRY: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && '--dry-run' || '' }}
+        run: node scripts/e2e/flakes.js $DRY

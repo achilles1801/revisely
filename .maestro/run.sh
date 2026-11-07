@@ -155,6 +155,11 @@ with_limit "$WARMUP_LIMIT" "$MAESTRO" --device "$DEVICE" test "$ROOT/.maestro/su
 
 failed=0
 summary="| Flow | Zone | Result | Time |\n| --- | --- | --- | --- |\n"
+# Every attempt, one line each (flow, zone, attempt, passed|failed, seconds, its folder):
+# scripts/attempts.js turns them and Maestro's reports into attempts.json, which the
+# workflow keeps for the weekly flake report (scripts/e2e/flakes.js).
+ATTEMPTS="$OUT/$PLATFORM/attempts.tsv"
+: > "$ATTEMPTS"
 for flow in "${FLOWS[@]}"; do
   name=$(basename "$flow" .yaml)
   zone=$(zone_of "$flow")
@@ -170,10 +175,13 @@ for flow in "${FLOWS[@]}"; do
     [ "$attempt" -gt 0 ] && out="$out-retry$attempt"
     rm -rf "$out" && mkdir -p "$out"
     if [ "$attempt" -gt 0 ]; then echo "▶ $name ($PLATFORM, $zone), retry $attempt"; else echo "▶ $name ($PLATFORM, $zone)"; fi
+    tried=$(date +%s)
     if run_flow "$flow" "$zone" "$out"; then
+      printf '%s\t%s\t%s\tpassed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
       result=$([ "$attempt" -eq 0 ] && echo passed || echo "passed on retry $attempt")
       break
     fi
+    printf '%s\t%s\t%s\tfailed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
     save_device_state "$out"
     # The workflow keeps the results of a job with a failed attempt (a pass on a retry too).
     touch "$out/attempt-failed"
@@ -191,6 +199,8 @@ for flow in "${FLOWS[@]}"; do
 done
 
 printf "\n$summary"
+node "$ROOT/.maestro/scripts/attempts.js" "$OUT/$PLATFORM" ||
+  echo "  couldn't write $OUT/$PLATFORM/attempts.json"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   printf "### E2E flows (%s)\n\n$summary\n" "$PLATFORM" >> "$GITHUB_STEP_SUMMARY"
 fi
