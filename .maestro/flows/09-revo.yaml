@@ -191,9 +191,11 @@ appId: com.revisionbuddy.app
     file: ../subflows/back-home.yaml
 - tapOn:
     id: open-settings
+# Centred: stopped at its first sight, the row sat behind the tab bar and the tap opened Insights.
 - scrollUntilVisible:
     element: "Theme"
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - tapOn: "Dark"
 - tapOn:
