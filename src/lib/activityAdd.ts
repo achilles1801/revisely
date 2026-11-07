@@ -15,6 +15,25 @@ export function memorizeSuggestion(readPages: number[], memorized: Set<number>):
   return [...new Set(readPages)].filter((p) => !memorized.has(p)).sort((a, b) => a - b);
 }
 
+/**
+ * A Memorized item's minutes after an add (ACT-5): the add's minutes join the day's. An add is
+ * counted once: the item keeps the time of the last add it took (`updatedAt`, ms), and an add at or
+ * before it (the same change sent again, or an older one) adds nothing.
+ */
+export function memorizedMinutesAfter(
+  prev: { minutes?: number | null; updatedAt?: unknown } | null,
+  add: { minutes?: number | null; at: number },
+): { minutes: number | null; updatedAt: number } {
+  const last = typeof prev?.updatedAt === 'number' ? prev.updatedAt : 0;
+  const had = typeof prev?.minutes === 'number' ? prev.minutes : null;
+  const fresh = add.at > last;
+  const adding = fresh && typeof add.minutes === 'number' && add.minutes > 0 ? add.minutes : 0;
+  return {
+    minutes: adding > 0 ? (had ?? 0) + adding : had,
+    updatedAt: Math.max(last, add.at),
+  };
+}
+
 /** Removing a memorization un-marks its pages (only those still marked memorized). */
 export function pagesToUnmark(entryPages: number[], memorized: Set<number>): number[] {
   return [...new Set(entryPages)].filter((p) => memorized.has(p)).sort((a, b) => a - b);

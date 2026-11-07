@@ -27,13 +27,8 @@ import { journalFirstDay, shiftDay } from '../../lib/journal';
 import { carryForTomorrow, planItAction, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
-import { ActionSheet } from '../../components/v2/ActionSheet';
-import { AddRevisedSheet } from '../../components/activity/AddRevisedSheet';
-import { AddNoteSheet } from '../../components/activity/AddNoteSheet';
-import { AddMemorizedSheet } from '../../components/activity/AddMemorizedSheet';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import { missedFromSession } from '../../lib/activityAdd';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Activity'>;
 
@@ -49,7 +44,7 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logs, pages, saveUser } = useApp();
+  const { user, logs, saveUser } = useApp();
   const { palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
@@ -79,29 +74,6 @@ export default function ActivityScreen() {
 
   const openDay = (date: string) => navigation.navigate('ActivityDay', { date });
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
-  // The + menu (C4, previewTester): one add per kind, each on its own composer tab.
-  const [addOpen, setAddOpen] = useState(false);
-  // Revised (d6): its own sheet, not the composer.
-  const [revisedOpen, setRevisedOpen] = useState(false);
-  // Memorized (d7): its own sheet, not the composer.
-  const [memorizedOpen, setMemorizedOpen] = useState(false);
-  // Note (d8): its own sheet, not the composer.
-  const [noteOpen, setNoteOpen] = useState(false);
-  // "From your session" (d5): on top when today's session missed pages it can add.
-  const todaysLog = logs.find((l) => l.date === today);
-  const missed = todaysLog
-    ? missedFromSession(todaysLog, new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)))
-    : [];
-  const addMenuActions = [
-    ...(missed.length > 0
-      ? [{ key: 'session', label: 'From your session', icon: 'sparkles-outline' as const, subtitle: `${missed.length} ${missed.length === 1 ? 'page' : 'pages'} it missed`, onPress: () => navigation.navigate('JournalEntry', { date: today, kind: 'revision' }) }]
-      : []),
-    { key: 'revision', label: 'Revised', icon: 'checkmark-circle-outline' as const, subtitle: 'Pages you revised, or missed', onPress: () => setRevisedOpen(true) },
-    { key: 'memorization', label: 'Memorized', icon: 'bookmark-outline' as const, subtitle: 'Pages you have memorized', onPress: () => setMemorizedOpen(true) },
-    { key: 'read', label: 'Read', icon: 'stopwatch-outline' as const, subtitle: 'A timed reading session', onPress: () => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read') },
-    { key: 'note', label: 'Note', icon: 'create-outline' as const, subtitle: 'Anything for the day', onPress: () => setNoteOpen(true) },
-  ];
-
   // Days with a note in the log (the flagged calendar's note dot).
   const noteDays = useMemo(
     () => new Set((journal ?? []).filter((d) => d.entries.some((n) => n.kind === 'note' && n.text.trim() !== '')).map((d) => d.date)),
@@ -118,7 +90,13 @@ export default function ActivityScreen() {
       <TopBar
         title="Activity"
         onBack={() => navigation.goBack()}
-        right={<IconButton icon="add" label={blocks ? 'Add' : 'Log today'} onPress={blocks ? () => setAddOpen(true) : logToday} size={28} />}
+        right={
+          blocks ? (
+            <IconButton icon="search" label="Search" onPress={() => navigation.navigate('ActivityAll')} size={22} />
+          ) : (
+            <IconButton icon="add" label="Log today" onPress={logToday} size={28} />
+          )
+        }
         separator
       />
       {loading ? (
@@ -144,6 +122,7 @@ export default function ActivityScreen() {
               noteDays={noteDays}
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
+              onOpenPage={(page) => (navigation.navigate as (name: string, params: object) => void)('Read', { screen: 'QuranReader', params: { pageNumber: page } })}
               onPlanIt={(weak) =>
                 planItAction(!!user?.customPlan) === 'plan-day'
                   ? navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })
@@ -162,6 +141,8 @@ export default function ActivityScreen() {
               />
             </View>
           )}
+          {!blocks ? (
+          <>
           <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
           <RecentSection
             count={recentItems.length}
@@ -179,12 +160,10 @@ export default function ActivityScreen() {
               />
             ))}
           </RecentSection>
+          </>
+          ) : null}
         </ScrollView>
       )}
-      <ActionSheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add" actions={addMenuActions} testID="activity-add-menu" />
-      <AddRevisedSheet visible={revisedOpen} onClose={() => setRevisedOpen(false)} day={today} logs={logs} />
-      <AddMemorizedSheet visible={memorizedOpen} onClose={() => setMemorizedOpen(false)} day={today} />
-      <AddNoteSheet visible={noteOpen} onClose={() => setNoteOpen(false)} day={today} />
     </TopSafeAreaView>
   );
 }

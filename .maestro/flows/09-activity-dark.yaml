@@ -1,0 +1,32 @@
+# Activity's screens in dark (the same screens as 09-activity-light.yaml), set through Settings.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/seed-activity.yaml
+# The account's new settings (the Fajr boundary, 20 pages a day) load at the next start, and the app
+# puts the mocks' recordings in place.
+- runFlow:
+    file: ../subflows/relaunch-recordings.yaml
+    env:
+      SET: activity
+- runFlow: ../subflows/backup-notice.yaml
+- tapOn:
+    id: open-settings
+# Appearance is down the page.
+- scrollUntilVisible:
+    element:
+      text: "Dark"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    text: "Dark"
+- tapOn:
+    id: back
+- runFlow:
+    file: ../subflows/activity-screens.yaml
+    env:
+      THEME: dark

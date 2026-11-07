@@ -69,7 +69,8 @@ describe('Activity day rows (ACT-6)', () => {
     const session = { id: 'r1', pages: [1, 2], durationSeconds: 600, startedAt: Date.UTC(2026, 10, 3, 9) } as never;
     const screen = render((<DayBlocks {...props} notes={[]} readings={[session]} />) as never);
     await flush();
-    const header = screen.getByLabelText('Read');
+    // The header reads its title and figure together ("Read, 2 pages").
+    const header = screen.getByLabelText('Read, 2 pages');
     expect(header.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['edit-r1', 'delete-r1']);
     fireEvent(header, 'longPress');
     expect(sheet().visible).toBe(true);

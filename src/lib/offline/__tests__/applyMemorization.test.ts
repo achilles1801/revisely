@@ -26,7 +26,10 @@ describe('removing a memorization (C4)', () => {
 
   it('pages memorized today are merged into the day’s item', async () => {
     await applyEntry('u1', { id: 'e2', at: 1, op: { kind: 'memorization.mark', day: '2026-11-05', pages: [7, 8], at: 1793800000000 } });
-    expect(mocked.addMemorizationPages).toHaveBeenCalledWith('2026-11-05', [7, 8], 1793800000000, 'u1');
+    expect(mocked.addMemorizationPages).toHaveBeenCalledWith('2026-11-05', [7, 8], 1793800000000, 'u1', null);
+    // The Memorized add sheet's minutes go with them (ACT-5).
+    await applyEntry('u1', { id: 'e3', at: 2, op: { kind: 'memorization.mark', day: '2026-11-05', pages: [9], at: 1793800060000, minutes: 25 } });
+    expect(mocked.addMemorizationPages).toHaveBeenLastCalledWith('2026-11-05', [9], 1793800060000, 'u1', 25);
   });
 
   it('un-memorized pages are removed from the items that hold them', async () => {

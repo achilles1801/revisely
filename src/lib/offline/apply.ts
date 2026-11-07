@@ -92,7 +92,7 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
     case 'memorization.delete':
       return firestoreService.deleteMemorizationItem(op.id, uid);
     case 'memorization.mark':
-      return firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid);
+      return firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid, op.minutes ?? null);
     case 'memorization.unmark':
       return firestoreService.removeMemorizationPages(op.pages, uid);
     case 'reading.add':

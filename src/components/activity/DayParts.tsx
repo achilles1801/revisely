@@ -38,36 +38,43 @@ export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; 
   );
 }
 
-/** One cell per assigned page (revised filled, skipped hollow, not reached dimmed), weak pages marked below. */
+/**
+ * One cell per assigned page (gap audit §4): revised primary, skipped hollow, not reached dimmed, a red
+ * dot under a weak page; the first and last page numbers under it. Over 30 pages, two rows.
+ */
 export function PageStrip({ cells }: { cells: StripCell[] }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   if (cells.length === 0) return null;
+  const rows = cells.length > 30 ? [cells.slice(0, Math.ceil(cells.length / 2)), cells.slice(Math.ceil(cells.length / 2))] : [cells];
+  const anyWeak = cells.some((c) => c.weak);
   return (
     <View testID="activity-page-strip">
-      <View style={styles.strip}>
-        {cells.map((c) => (
-          <View key={c.page} style={styles.stripCol}>
-            <View
-              style={[
-                styles.cell,
-                c.state === 'revised' && { backgroundColor: palette.primary },
-                c.state === 'skipped' && { borderWidth: 1.5, borderColor: palette.outline },
-                c.state === 'not-reached' && { backgroundColor: palette.track, opacity: 0.55 },
-              ]}
-            />
-            <View style={[styles.weakDot, { backgroundColor: c.weak ? palette.red : 'transparent' }]} />
-          </View>
-        ))}
-      </View>
-      <View style={styles.ends}>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>p. {cells[0].page}</Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>p. {cells[cells.length - 1].page}</Text>
+      {rows.map((row, r) => (
+        <View key={r} style={[styles.strip, r > 0 && styles.stripNext]}>
+          {row.map((c) => (
+            <View key={c.page} style={styles.stripCol}>
+              <View
+                style={[
+                  styles.cell,
+                  c.state === 'revised' && { backgroundColor: palette.primary },
+                  c.state === 'skipped' && { borderWidth: 1.5, borderColor: isDark ? palette.secondary : palette.outline },
+                  c.state === 'not-reached' && { backgroundColor: palette.track, opacity: isDark ? 0.8 : 0.55 },
+                ]}
+              />
+              {anyWeak ? <View style={[styles.weakDot, { backgroundColor: c.weak ? palette.red : 'transparent' }]} /> : null}
+            </View>
+          ))}
+        </View>
+      ))}
+      <View style={[styles.ends, { marginTop: anyWeak ? 2 : 5 }]}>
+        <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]}>p. {cells[0].page}</Text>
+        <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]}>p. {cells[cells.length - 1].page}</Text>
       </View>
     </View>
   );
 }
 
-/** "● 2 weak  ● 4 moderate  ● 12 strong" in the status colours. */
+/** "● 2 weak  ● 4 moderate  ● 12 strong" in the status colours; a count of 0 is not shown. */
 export function StrengthCounts({ counts }: { counts: Record<Strength, number> }) {
   const { palette } = useTheme();
   const items: { key: Strength; color: string; label: string }[] = [
@@ -75,39 +82,42 @@ export function StrengthCounts({ counts }: { counts: Record<Strength, number> })
     { key: 'moderate', color: palette.secondary, label: 'moderate' },
     { key: 'strong', color: palette.good, label: 'strong' },
   ];
+  const shown = items.filter((i) => counts[i.key] > 0);
+  if (shown.length === 0) return null;
   return (
     <View style={styles.counts} testID="activity-strength">
-      {items.map((i) => (
+      {shown.map((i) => (
         <View key={i.key} style={styles.count}>
           <View style={[styles.countDot, { backgroundColor: i.color }]} />
-          <Text style={[typeV2.meta, { color: palette.text }]}>
-            <Text style={{ fontWeight: '700' }}>{counts[i.key]}</Text> {i.label}
-          </Text>
+          <Text style={[typeV2.meta, styles.tabular, { color: palette.text, fontWeight: '600' }]}>{counts[i.key]}</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{i.label}</Text>
         </View>
       ))}
     </View>
   );
 }
 
-/** The window the day covers, under the blocks. */
+/** The window the day covers, last on the day (after the last block's hairline). */
 export function WindowFooter({ text }: { text: string }) {
   const { palette } = useTheme();
   return (
-    <View style={[styles.footer, { borderTopColor: palette.separator }]}>
-      <Ionicons name="moon-outline" size={14} color={palette.secondary} />
+    <View style={styles.footer} testID="activity-day-footer">
+      <Ionicons name="moon-outline" size={13} color={palette.secondary} />
       <Text style={[typeV2.meta, { color: palette.secondary, flex: 1 }]}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  strip: { flexDirection: 'row', gap: 3, marginTop: 8 },
+  strip: { flexDirection: 'row', gap: 3 },
+  stripNext: { marginTop: 6 },
   stripCol: { flex: 1, alignItems: 'center' },
-  cell: { alignSelf: 'stretch', height: 16, borderRadius: 4 },
-  weakDot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
-  ends: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  counts: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 },
-  count: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  countDot: { width: 7, height: 7, borderRadius: 4 },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  cell: { alignSelf: 'stretch', height: 20, borderRadius: 4 },
+  weakDot: { width: 5, height: 5, borderRadius: 2.5, marginTop: 4 },
+  ends: { flexDirection: 'row', justifyContent: 'space-between' },
+  tabular: { fontVariant: ['tabular-nums'] },
+  counts: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 10 },
+  count: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  countDot: { width: 7, height: 7, borderRadius: 3.5, marginRight: 2 },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14 },
 });

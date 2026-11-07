@@ -217,7 +217,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within 7 or 30
   days (a longer window never covers less); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
-  oldest, or never.
+  oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
+  page memorized today never makes its juz the one untouched longest).
 
 - **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
   opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates
@@ -227,9 +228,9 @@ How the tests are made: `tests/scenarios/README.md`.
   It never copies the session's own revised pages or minutes.
   Note opens its own sheet: its text, and an optional "Show under" choice of the day's Revised, Memorized or
   Read item (the note's tag). Add is a new note with its own id and time; an empty note cannot be added.
-  Memorized opens its own sheet: From and To, or a surah. Add marks the pages memorized (the composer's two
-  writes) and records a Memorized item for today. "From your reading" offers the pages read today that are not
-  memorized yet. The sheet has no minutes: a Memorized item carries none yet.
+  Memorized opens its own sheet: From and To, or a surah, and optional minutes. Add marks the pages memorized
+  (the composer's two writes) and records a Memorized item for today; its minutes join the day's item once (an
+  add sent again adds none). "From your reading" offers the pages read today that are not memorized yet.
 - **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
   window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
@@ -273,8 +274,9 @@ How the tests are made: `tests/scenarios/README.md`.
   is priced from its usage at the current rates (pricing.ts). A call retries only on 429 and 5xx (with the retry-after
   when short), with a timeout per attempt, and its log keeps the usage and never the content.
 
-- **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
-  what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
+- **COACH-4.** The Ask coach sheet is for previewTester accounts only. Before the first question it says what is sent and
+  asks the user to turn it on; the question then sends that one insight's totals, and nothing else. Insights no longer
+  opens it: Weak spots' Ask opens Revo with that insight attached (REVO).
 
 - **COACH-5.** The sheet shows the coach's answer and how many questions are left today; asked again the same day, it
   says the answer was kept. A refusal shows the server's reason (not available on this account, not turned on, today's

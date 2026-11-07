@@ -1,7 +1,7 @@
 // The Memorized composer's surah or juz picker (Majd, Nov 2026): a wheel of surahs or juz; "Use"
 // fills From and To with that surah's or juz's first and last page.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Sheet } from '../v2/Sheet';
 import { PillTabs } from '../v2/PillTabs';
@@ -22,12 +22,18 @@ export function RangePickerSheet({
   visible,
   onClose,
   onUse,
+  initialKind = 'surah',
 }: {
   visible: boolean;
   onClose: () => void;
   onUse: (range: { from: number; to: number }) => void;
+  /** Which wheel it opens on (Activity's Revised sheet: Surah or Juz, as its What says). */
+  initialKind?: Kind;
 }) {
-  const [kind, setKind] = useState<Kind>('surah');
+  const [kind, setKind] = useState<Kind>(initialKind);
+  useEffect(() => {
+    if (visible) setKind(initialKind);
+  }, [visible, initialKind]);
   const [index, setIndex] = useState(0);
   const surahs: WheelItem[] = useMemo(
     () =>
