@@ -1,12 +1,14 @@
 // Maestro runScript (runs in Maestro, on this computer): Revo's server side for 09-revo, against the
 // emulators, as an admin or the app would set it. The account is output.email (subflows/signup.yaml).
-//   MODE=warm    the functions emulator's workers for the Revo functions the flow waits on, before
-//                any step waits on them (no account needed). The emulator starts a worker for each
-//                function at its first call and loads our code into it: 13–17 s on a CI macOS
-//                runner (run 42358765158: the app's first revoSetOptions answered in 15.7 s and its
-//                first revoAsk in 20.7 s, for 2.1 s and 3.7 s of work), longer than a step's wait.
-//                A call without an ID token is refused (401) inside the worker and changes nothing;
-//                the worker stays up for the job's later calls (it goes only when functions/ changes)
+//   MODE=warm    the Revo functions the flow waits on, run once each before any step waits on them,
+//                as the account (a tester, Revo still off), changing nothing: revoSetOptions with no
+//                change only reads, revoDayInReview and revoAsk are refused once they have read that
+//                Revo is off. The emulator runs each function in a worker of its own, and a worker's
+//                first signed-in call is slow on a CI macOS runner: 17–22 s (run 42403200017: the
+//                app's first revoSetOptions 17.5 s, revoDayInReview 17.2 s, revoAsk 21.9 s; later
+//                calls 2–5 s), longer than a step's wait. A call without an ID token didn't help:
+//                refused before the token checks and Firestore, it left that cost to the app's call.
+//                The worker keeps it for the job's later calls (it goes only when functions/ changes)
 //   MODE=tester  marks it a previewTester (functions/scripts/set-preview-tester.js does this in
 //                production; clients can't write the field)
 //   MODE=reply   the model's next answers for this account: REPLY (its text, inside the recorded
@@ -27,17 +29,13 @@ var PROJECT = 'demo-revisely';
 var DOCS = FIRESTORE + '/v1/projects/' + PROJECT + '/databases/(default)/documents/';
 var admin = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
-/** The account's uid (every mode but warm, which runs before there is one). */
-function accountUid() {
-  var lookup = http.post(AUTH + '/identitytoolkit.googleapis.com/v1/projects/' + PROJECT + '/accounts:lookup', {
-    headers: admin,
-    body: JSON.stringify({ email: [output.email] }),
-  });
-  var users = json(lookup.body).users || [];
-  if (users.length !== 1) throw new Error('no account for ' + output.email + ' in the Auth emulator');
-  return users[0].localId;
-}
-var uid = MODE === 'warm' ? null : accountUid();
+var lookup = http.post(AUTH + '/identitytoolkit.googleapis.com/v1/projects/' + PROJECT + '/accounts:lookup', {
+  headers: admin,
+  body: JSON.stringify({ email: [output.email] }),
+});
+var users = json(lookup.body).users || [];
+if (users.length !== 1) throw new Error('no account for ' + output.email + ' in the Auth emulator');
+var uid = users[0].localId;
 
 function patch(path, fields) {
   var mask = Object.keys(fields).map(function (k) { return 'updateMask.fieldPaths=' + k; }).join('&');
@@ -62,15 +60,15 @@ function callable(name, data, nowMs) {
 }
 
 if (MODE === 'warm') {
-  ['revoSetOptions', 'revoDayInReview', 'revoAsk'].forEach(function (name) {
+  // What each answers with Revo off: the settings (200), or "Turn Revo on first." (403) once its
+  // gate has read the account (functions/src/revo/handler.ts). Anything else (not a tester, an
+  // error) fails the step.
+  [['revoSetOptions', 200], ['revoDayInReview', 403], ['revoAsk', 403]].forEach(function (call) {
     var started = Date.now();
-    var res = http.post(FUNCTIONS + '/' + PROJECT + '/us-central1/' + name, {
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: {} }),
-    });
-    // 401 is the function's own answer (onCall, no ID token): its worker is up.
-    if (res.status !== 401) throw new Error('warm ' + name + ': ' + res.status + ' ' + res.body);
-    console.log('server-revo: warm ' + name + ' in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s');
+    var res = callable(call[0], {}, Date.now());
+    var ok = res.status === call[1] && (call[1] === 200 ? (json(res.body).result || {}).optIn === false : /Turn Revo on first/.test(res.body));
+    if (!ok) throw new Error('warm ' + call[0] + ': ' + res.status + ' ' + res.body);
+    console.log('server-revo: warm ' + call[0] + ' in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s');
   });
 } else if (MODE === 'tester') {
   patch('users/' + uid, { previewTester: { booleanValue: true } });

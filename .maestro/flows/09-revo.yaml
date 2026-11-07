@@ -6,12 +6,6 @@
 # Rules (BEHAVIOUR.md): REVO-20, REVO-21, REVO-22, REVO-23, REVO-24, REVO-25
 appId: com.revisionbuddy.app
 ---
-# Revo's functions started in the emulator first: a function's first call waits for its worker to
-# start (13–17 s on a CI macOS runner), which the steps below would count against their waits.
-- runScript:
-    file: ../scripts/server-revo.js
-    env:
-      MODE: warm
 - runFlow:
     file: ../subflows/new-account.yaml
     env:
@@ -22,6 +16,13 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: tester
+# Revo's functions run once each as this account first, changing nothing: a function's first
+# signed-in call in the emulator is slow on a CI macOS runner (17–22 s), which the steps below would
+# count against their waits.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: warm
 # The mocks' history: Juz 28, 548–549 weak, today 6 of 20 (scripts/seed-revo.js).
 - runFlow: ../subflows/seed-revo.yaml
 
@@ -113,7 +114,7 @@ appId: com.revisionbuddy.app
       NAME: r5k-keyboard
 - tapOn:
     id: revo-send
-# The answer's plan card, once revoAsk has answered (about 4 s on a CI runner, its worker warm).
+# The answer's plan card, once revoAsk has answered (a few seconds on a CI runner, after the warm-up).
 - extendedWaitUntil:
     visible:
       id: revo-plan

@@ -354,11 +354,14 @@ Things that bit:
   buttons in capitals: match with `(?i)`.
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
-- A function's first call in the emulator waits for its worker to start: 13–17 s on a CI macOS
-  runner, against well under a second once it is up (run 42358765158: the app's first `revoAsk`
-  answered in 20.7 s for 3.7 s of work). A step that waits on a function's answer would count that
-  start, so a flow starts the functions it waits on first, with a call they refuse (09-revo:
-  `scripts/server-revo.js`, `MODE=warm`). A worker stays up until `functions/` changes.
+- A function's first signed-in call in the emulator is slow on a CI macOS runner: 17–22 s, against
+  2–5 s for its later calls (run 42403200017: the app's first `revoSetOptions` 17.5 s, `revoAsk`
+  21.9 s). The emulator runs each function in a worker of its own, so each pays it once. A step that
+  waits on a function's answer would count it, so a flow first calls the functions it waits on as
+  its account, in a way that changes nothing (09-revo: `scripts/server-revo.js`, `MODE=warm`, after
+  the account exists). A call without an ID token isn't enough: refused before the token checks and
+  Firestore, it starts the worker (1–3 s) and leaves the rest to the app's call. A worker stays up
+  until `functions/` changes.
 
 A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
 in `.maestro/build/results/<platform>/<flow>/`:
