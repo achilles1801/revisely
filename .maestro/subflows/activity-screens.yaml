@@ -9,6 +9,10 @@ appId: com.revisionbuddy.app
     visible:
       id: activity-blocks-views
     timeout: 20000
+# As the mock (d3): October, with the 28th picked.
+- tapOn: "Previous month"
+- tapOn:
+    id: calendar-day-2026-10-28
 - runFlow:
     file: shot.yaml
     env:
@@ -23,8 +27,11 @@ appId: com.revisionbuddy.app
     env:
       NAME: 09-overview-week-${THEME}
 - tapOn: "Month"
+# As the mock (d1): today, Tuesday 3 November. A tap picks the day; Open goes to it.
+- tapOn: "Next month"
 - tapOn:
     id: calendar-day-2026-11-03
+- tapOn: "Open"
 - extendedWaitUntil:
     visible:
       id: activity-day-v2

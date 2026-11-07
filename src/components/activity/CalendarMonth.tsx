@@ -1,5 +1,6 @@
 // The Activity calendar (gap audit §3, mock d3): a month, its four totals, the day cells, the legend, and
-// the picked day's blocks. Month only: the Week / Month row is gone (Activity spec, audit §3).
+// the picked day's blocks. The Week | Month toggle stays (Majd's decision after the mocks), in the
+// mock's ink pills. A tap on a day picks it; Open goes to the day.
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -16,8 +17,8 @@ import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 
-const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-/** Monday-first, the letters above the grid. */
+/** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export interface CalendarData {
   revised: Revised[];
@@ -163,6 +164,8 @@ export function CalendarMonth({
         </LegendItem>
       </View>
 
+      <View style={[styles.legendRule, { backgroundColor: palette.separator }]} />
+
       {/* The picked day: its date and Open, then one row per block that has something. */}
       <View style={styles.preview}>
         <View style={styles.previewHead}>
@@ -175,8 +178,8 @@ export function CalendarMonth({
         {previewRows.map((r) => (
           <View key={r.key} style={styles.previewRow}>
             {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
-            <Text style={[typeV2.name, { color: palette.text, width: 84 }]}>{r.label}</Text>
-            <Text style={[typeV2.name, { color: palette.text, flex: 1, textAlign: 'right' }]}>{r.value}</Text>
+            <Text style={[typeV2.body, { color: palette.text, width: 84 }]}>{r.label}</Text>
+            <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]}>{r.value}</Text>
           </View>
         ))}
       </View>
@@ -205,10 +208,7 @@ function DayCell({
   const isPicked = picked === day;
   return (
     <Tap
-      onPress={() => {
-        onPick(day);
-        onOpen(day);
-      }}
+      onPress={() => onPick(day)}
       accessibilityRole="button"
       accessibilityLabel={`${day}${m.ring != null ? `, revised ${Math.round(m.ring * 100)} percent` : ''}${m.memorized ? ', memorized' : ''}${m.read ? ', read' : ''}${m.note ? ', note' : ''}`}
       style={[styles.cell, isPicked && { backgroundColor: palette.bubble, borderRadius: 12 }]}
@@ -300,8 +300,12 @@ function LegendItem({ label, children }: { label: string; children: React.ReactN
   );
 }
 
+/** "Wednesday 28 October": the weekday, the day, the month (the mock's order, no comma). */
 function formatDay(day: string): string {
-  return new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+  const date = new Date(`${day}T00:00:00`);
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  return `${weekday} ${date.getDate()} ${month}`;
 }
 
 const styles = StyleSheet.create({
@@ -327,6 +331,8 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendMark: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center' },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
+  legendRule: { height: StyleSheet.hairlineWidth, marginTop: 10 },
+  tabular: { fontVariant: ['tabular-nums'] },
   preview: { paddingTop: 10, paddingHorizontal: 16 },
   previewHead: { height: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   previewDate: { fontSize: 16, lineHeight: 20, fontWeight: '600' },
