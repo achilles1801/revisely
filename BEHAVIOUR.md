@@ -274,6 +274,10 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
+- **ACT-15.** Revised pages added by hand count for the streak as any credit does (SESS-6): a day whose
+  scheduled pages are all credited to it is done, hand-added pages included, and Home shows it when it
+  next comes into view. Pages added by hand never stand for what a day had scheduled: that stays its
+  session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
 
 ## Ask coach
 
