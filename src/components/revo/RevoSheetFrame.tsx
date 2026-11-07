@@ -9,15 +9,15 @@ import { useReduceMotion } from '../../design/motion';
 import { layoutV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
 import { shouldDismiss } from '../v2/Sheet';
-import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, revoSheetFit } from '../../lib/revo/sheetFit';
+import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, keyboardOverSheet, revoSheetFit } from '../../lib/revo/sheetFit';
 
 /** Revo opens at about half the screen; a conversation, or a drag up, takes it to full height. */
 export const REVO_MEDIUM = 0.55;
 export const REVO_RADIUS = 22;
 const SPRING = { damping: 24, stiffness: 300, mass: 0.8 };
 
-/** How much of the sheet's frame the keyboard covers (keyboardCover), live, with the keyboard's own duration. */
-function useKeyboardCover(frameHeight: number): { cover: number; duration: number } {
+/** How much of the sheet's frame the keyboard covers (keyboardOverSheet, keyboardCover), live, with the keyboard's own duration. */
+function useKeyboardCover(frameHeight: number, bottomInset: number): { cover: number; duration: number } {
   const [keyboard, setKeyboard] = useState({ height: 0, duration: 0 });
   const base = useRef(frameHeight);
   if (keyboard.height === 0 && frameHeight > 0) base.current = frameHeight;
@@ -31,7 +31,8 @@ function useKeyboardCover(frameHeight: number): { cover: number; duration: numbe
     ];
     return () => subs.forEach((s) => s.remove());
   }, []);
-  return { cover: keyboardCover(keyboard.height, base.current, frameHeight), duration: keyboard.duration };
+  const height = keyboardOverSheet(keyboard.height, Platform.OS, bottomInset);
+  return { cover: keyboardCover(height, base.current, frameHeight), duration: keyboard.duration };
 }
 
 /**
@@ -71,7 +72,7 @@ export function RevoSheetFrame({
   const offset = useSharedValue(height);
   const sheetH = useSharedValue(full ? fullHeight : mediumHeight);
   const drag = useSharedValue(0);
-  const { cover, duration } = useKeyboardCover(frameHeight);
+  const { cover, duration } = useKeyboardCover(frameHeight, insets.bottom);
   // The keyboard's cover and the room above it, for the sheet's style on the UI thread.
   const lift = useSharedValue(0);
   const room = useSharedValue(frameHeight - insets.top - REVO_TOP_GAP);

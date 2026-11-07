@@ -25,3 +25,13 @@ export function revoSheetFit(o: { frameHeight: number; top: number; keyboard: nu
 export function keyboardCover(keyboardHeight: number, baseFrame: number, frame: number): number {
   return Math.max(0, keyboardHeight - Math.max(0, baseFrame - frame));
 }
+
+/**
+ * The keyboard's height over the sheet, from what React Native reports. On Android that is the IME
+ * less the navigation bar (ReactRootView), while the edge-to-edge sheet reaches down behind the bar,
+ * so the bar's inset is added back (the composer sat behind the keyboard by that much, Nov 7); iOS's
+ * height already includes the home indicator.
+ */
+export function keyboardOverSheet(reported: number, platform: string, bottomInset: number): number {
+  return reported > 0 ? reported + (platform === 'android' ? bottomInset : 0) : 0;
+}
