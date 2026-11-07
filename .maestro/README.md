@@ -174,7 +174,7 @@ about a second a job.
   everything else (the page images in the real Storage bucket, translations, the worker, push
   tokens) goes to a closed local port and fails at once. So the session shows "Couldn't load page" where the mushaf would be; the
   pages still swipe and count. NetInfo checks reachability against the Auth emulator.
-- **A fresh install is light** (`pinFreshTheme` in `src/lib/e2e/install.ts`), the theme the
+- **A fresh install is light** (`pinFreshTheme` in `src/lib/e2e/theme.ts`), the theme the
   screenshots are approved in. The app chooses once, at the first launch, and a key written
   earlier in that same launch (the store check's app config, 3 s in) made a slow Simulator's
   fresh install start dark (run 42336185779); the E2E build makes the choice before the app
