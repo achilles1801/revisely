@@ -29,6 +29,10 @@ appId: com.revisionbuddy.app
       id: juz-30-check
     direction: DOWN
     timeout: 30000
+# Juz 30 is the last row: on to the end of the list, where it sits above the count and
+# Continue. On iOS Maestro reads an element's whole frame, so a row cut off by the list's foot
+# counts as visible, and every tap on it landed on the foot instead (09 on iOS, Nov 7 2026).
+- scroll
 # The check, once the screen has its starting count ("1 of 604": in progress
 # starts from page 1), which comes when the account's pages have loaded: a juz
 # marked before then was dropped when they arrived (fixed in #216).
