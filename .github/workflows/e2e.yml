@@ -37,7 +37,10 @@ name: E2E
 #
 # Screenshots of key screens (the flows' takeScreenshot steps) are kept as an
 # artifact of every run that ran flows (e2e-<platform>-screens-…), so a change's
-# look can be checked without a simulator.
+# look can be checked without a simulator, and compared with the approved
+# baselines in .maestro/baselines/: a screen that changed fails its job, with a
+# board of it (e2e-<platform>-visual-…). An intended change is approved with
+# `node .maestro/visual/approve.mjs <run id>` in the same PR (.maestro/README.md).
 
 on:
   # From CI (ci.yml): pull requests, pushes to develop, merge groups.
@@ -419,6 +422,25 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # The screenshots against the approved baselines (.maestro/baselines/ios/,
+      # .maestro/README.md "Screenshots"): a changed screen fails the job, with a
+      # board of it in the artifact below; one with no baseline yet is only reported.
+      - name: Compare the screenshots
+        id: visual
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') }}
+        run: |
+          npm ci --prefix .maestro/visual --no-audit --no-fund --loglevel=error
+          (cd .maestro/visual && node --test --test-reporter=dot)
+          node .maestro/visual/compare.mjs ios
+
+      - name: Keep the screenshot boards
+        if: ${{ always() && steps.visual.outcome != 'skipped' && hashFiles('.maestro/build/visual/*/boards/*.png') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ios-visual-${{ strategy.job-index }}-${{ github.run_id }}
+          path: .maestro/build/visual
+          retention-days: 14
+
   android:
     name: E2E (Android emulator, ${{ matrix.shard.name }})
     needs: changes
@@ -614,6 +636,25 @@ jobs:
           name: e2e-android-screens-${{ strategy.job-index }}-${{ github.run_id }}
           path: .maestro/build/results/**/takeScreenshot/*.png
           if-no-files-found: warn
+          retention-days: 14
+
+      # The screenshots against the approved baselines (.maestro/baselines/android/,
+      # .maestro/README.md "Screenshots"): a changed screen fails the job, with a
+      # board of it in the artifact below; one with no baseline yet is only reported.
+      - name: Compare the screenshots
+        id: visual
+        if: ${{ always() && (steps.flows.outcome == 'success' || steps.flows.outcome == 'failure') }}
+        run: |
+          npm ci --prefix .maestro/visual --no-audit --no-fund --loglevel=error
+          (cd .maestro/visual && node --test --test-reporter=dot)
+          node .maestro/visual/compare.mjs android
+
+      - name: Keep the screenshot boards
+        if: ${{ always() && steps.visual.outcome != 'skipped' && hashFiles('.maestro/build/visual/*/boards/*.png') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-visual-${{ strategy.job-index }}-${{ github.run_id }}
+          path: .maestro/build/visual
           retention-days: 14
 
   # The required check: green when every platform job that had to run passed,

@@ -110,7 +110,7 @@ function render({ rows, since, until, jobs, mention = '' }) {
     return out.join('\n') + '\n';
   }
   out.push(
-    `Every E2E flow's first attempts in ${jobs} jobs (CI on pull requests and develop, nightly, by hand). A failed flow ` +
+    `Every E2E flow's first attempts in ${jobs === 1 ? 'one job' : `${jobs} jobs`} (CI on pull requests and develop, nightly, by hand). A failed flow ` +
       'is run once more (`E2E_RETRIES`), and a pass on that retry hides a flake: this counts them.',
   );
   out.push('');
