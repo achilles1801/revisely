@@ -76,4 +76,14 @@ describe('Revised add sheet (ACT-5)', () => {
     expect(queueChange).toHaveBeenCalledTimes(1);
     expect(mockUpdatePages).not.toHaveBeenCalled();
   });
+
+  it('[ACT-5] says what adding does to the day: its session’s skipped pages make it whole', async () => {
+    const log = { date: '2026-11-03', assignedPages: Array.from({ length: 20 }, (_, i) => 542 + i), pagesRevised: Array.from({ length: 20 }, (_, i) => 542 + i).filter((p) => p !== 556 && p !== 557), pagesSkipped: [556, 557] };
+    const screen = render(<AddRevisedSheet visible onClose={jest.fn()} day="2026-11-03" logs={[log]} />);
+    fireEvent.press(screen.getByTestId('add-revised-from-session'));
+    expect(screen.getByTestId('add-revised-from').props.value).toBe('556');
+    expect(screen.getByTestId('add-revised-to').props.value).toBe('557');
+    expect(screen.getByText('Adding these makes today 20 of 20.')).toBeTruthy();
+    expect(screen.getByText('At-Taghabun · 2 pages')).toBeTruthy();
+  });
 });

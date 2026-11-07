@@ -4,31 +4,28 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { buildDayView, type DayView, type RevisedBlock } from '../../lib/activityDayView';
 import { stripCells, strengthCounts } from '../../lib/activityDayParts';
 import { getFajrTimeFor } from '../../lib/fajrBoundary';
-import { ProgressRing, PageStrip, StrengthCounts, WindowFooter } from './DayParts';
-import { ThreadBranch } from './ThreadBranch';
+import { PageStrip, StrengthCounts, WindowFooter } from './DayParts';
+import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
+import { BlockMark, RevisedMark } from './BlockMark';
+import { creditLine, formatMinutesLong, formatPagesShort, windowFooter } from '../../lib/activityFormat';
+import { ayahSpan } from '../../lib/ayahSpan';
 import { RecordingsList } from '../recordings/RecordingsList';
 import { listRecordings, type RecordingMeta } from '../../lib/recordings';
-import { describePageRuns, describeSurahRuns, pageRuns } from '../../lib/pageRanges';
+import { describePageRuns, describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
 import { parseTag } from '../../lib/noteTags';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
 import { Tap } from '../v2/Tap';
 import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
 type SheetAction = ContextMenuAction;
-import { copyText } from '../../lib/clipboard';
-import { queueChange } from '../../lib/offline/queue';
-import { formatMinutes } from '../../lib/journal';
-import { Mark } from '../v2/Mark';
-import { RowText, ThreadRow } from '../v2/ThreadRow';
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
 
@@ -37,6 +34,8 @@ export const activityBlocksEnabled = (user: { previewTester?: boolean } | null |
 
 interface Props {
   day: string;
+  /** Today's revision day: a day before it "ran", today "runs" (the footer); a past day's Revised says what was left. */
+  today?: string;
   /** The day's log notes of each kind this block shows. */
   revisionNotes: JournalNote[];
   memorizationNotes: JournalNote[];
@@ -56,11 +55,20 @@ interface Props {
   onDeleteReading: (session: ReadingSession) => void;
 }
 
-/** "8:05 – 8:23 AM": from the start to the start plus the minutes; the start alone when not known. */
-const timeRange = (start: number | null | undefined, minutes: number | null) => {
+/**
+ * "8:05 – 8:23 AM": from the start to the start plus the minutes, the AM/PM said once when both
+ * share it ("11:50 AM – 12:10 PM" otherwise); the start alone when the minutes aren't known.
+ */
+export const timeRange = (start: number | null | undefined, minutes: number | null) => {
   if (start == null) return '';
   const fmt = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return minutes != null && minutes > 0 ? `${fmt(start)} – ${fmt(start + minutes * 60_000)}` : fmt(start);
+  if (minutes == null || minutes <= 0) return fmt(start);
+  const from = fmt(start);
+  const to = fmt(start + minutes * 60_000);
+  const period = /\s?([AP]M)$/i;
+  const a = from.match(period);
+  const b = to.match(period);
+  return a && b && a[1] === b[1] ? `${from.replace(period, '')} – ${to}` : `${from} – ${to}`;
 };
 
 /** "1 page", "18 pages". */
@@ -83,6 +91,7 @@ function confirmDelete(title: string, message: string, onConfirm: () => void) {
 
 export function DayBlocks({
   day,
+  today = day,
   revisionNotes,
   memorizationNotes,
   readings,
@@ -99,15 +108,6 @@ export function DayBlocks({
   const { palette } = useTheme();
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
-  const menuFor = (title: string, text: string, edit?: () => void, del?: () => void) =>
-    setMenu({
-      title,
-      actions: [
-        ...(edit ? [{ key: 'edit', label: 'Edit', icon: 'create-outline' as const, onPress: edit }] : []),
-        { key: 'copy', label: 'Copy', icon: 'copy-outline' as const, onPress: () => copyText(text) },
-        ...(del ? [{ key: 'delete', label: 'Delete', icon: 'trash-outline' as const, destructive: true, onPress: del }] : []),
-      ],
-    });
   // A block header holds a menu (Edit / Delete, confirmed where it deletes); VoiceOver offers the
   // same actions as custom actions. Sub-rows under a block have no hold and no swipe: notes are
   // edited and deleted in the daily log (Activity spec, row interactions).
@@ -149,20 +149,16 @@ export function DayBlocks({
     return from && to ? { from, to } : null;
   }, [day, user]);
   const footerText = useMemo(() => {
-    const [y, m, d] = day.split('-').map(Number);
-    const weekday = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' });
     const fmt = (x: Date) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return dayWindow
-      ? `${weekday} runs Fajr to Fajr, ${fmt(dayWindow.from)} to ${fmt(dayWindow.to)}`
-      : `${weekday} runs midnight to midnight`;
-  }, [day, dayWindow]);
+    return windowFooter(day, today, dayWindow ? { from: fmt(dayWindow.from), to: fmt(dayWindow.to) } : null);
+  }, [day, today, dayWindow]);
   const view: DayView | null = useMemo(
     () => (items ? buildDayView(day, { ...items, notes: [] }, memorizedSet) : null),
     [items, day, memorizedSet],
   );
   if (!view) return null;
 
-  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[] }[] }];
+  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[]; minutes?: number | null }[] }];
   const revised = revisedRaw;
   const doneAhead = items?.doneAhead ?? [];
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
@@ -172,7 +168,7 @@ export function DayBlocks({
     'Memorized',
     memorized.items.map((i) => ({
       key: `delete-${i.id}`,
-      label: `Delete ${describePageRuns(pageRuns(i.pages))}`,
+      label: `Delete ${formatPagesShort(i.pages)}`,
       icon: 'trash-outline' as const,
       destructive: true,
       onPress: () =>
@@ -211,12 +207,6 @@ export function DayBlocks({
       return t != null && t.kind === kind && (id === undefined || t.id === id) && targetExists(n);
     });
   const notesBlock = items == null ? notes.filter((n) => !parseTag(n.tag)) : notes.filter((n) => !targetExists(n));
-  const taggedRow = (n: JournalNote) => (
-    <View key={n.id}>
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
-      <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-    </View>
-  );
 
   const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0 || taggedTo('revision').length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0 || taggedTo('memorization').length > 0;
@@ -237,169 +227,169 @@ export function DayBlocks({
         },
       ])
     : {};
+  const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
+  const noteItem = (n: JournalNote) => (
+    <ItemLine key={n.id} icon="document-text-outline">
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Note · ${timeOf(n.at)}`}</Text>
+      <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+    </ItemLine>
+  );
+  // A hand entry (a revision or memorization line written in the log): its text, then time · minutes.
+  const handItem = (n: JournalNote) => (
+    <ItemLine
+      key={n.id}
+      icon="create-outline"
+      right={[timeOf(n.at), n.minutes != null && n.minutes > 0 ? formatMinutesLong(n.minutes) : null].filter(Boolean).join(' · ')}
+    >
+      <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+    </ItemLine>
+  );
+  const lineItem = (key: string, text: string, testID?: string) => (
+    <Text key={key} testID={testID} style={[typeV2.meta, { color: palette.secondary }]}>
+      {text}
+    </Text>
+  );
+
+  const revisedItems: React.ReactNode[] = [
+    ...(revRecs.length > 0
+      ? [<RecordingsList key="recordings" day={day} kind="revision" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />]
+      : []),
+    ...taggedTo('revision').map(noteItem),
+    ...revisionNotes.map(handItem),
+    // Pages that count for another day (AHEAD-2; a catch-up page for the day it was missed, SESS-7).
+    ...revised.credits.map((c) => lineItem(`credit-${c.countsFor}`, creditLine(day, c), 'activity-credit')),
+    ...doneAhead.map((a) => lineItem(`ahead-${a.fromDay}`, creditLine(day, a), 'activity-done-ahead')),
+  ];
+  const memorizedPages = memorized.items.flatMap((i) => i.pages);
+  const memorizedMinutes = memorized.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
+  const memorizedItems: React.ReactNode[] = [
+    ...memorized.items.flatMap((i) => taggedTo('memorization', i.id).map(noteItem)),
+    ...memorizationNotes.map(handItem),
+  ];
+  const readItemNodes: React.ReactNode[] = [
+    ...readItems.items.map((i, idx) => {
+      const session = readings.find((r) => r.id === i.id);
+      const last = idx === readItems.items.length - 1;
+      return (
+        <View key={i.id}>
+          <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel="Timed in Read. Edit pages">
+            <ItemLine icon="stopwatch-outline" right={timeRange(i.occurredAt, i.minutes)}>
+              <Text style={[typeV2.body, { color: palette.text }]}>Timed in Read</Text>
+            </ItemLine>
+          </Tap>
+          {/* Its recording hangs under it, with no line of its own. */}
+          {last && readRecs.length > 0 ? (
+            <View style={styles.underItem}>
+              <RecordingsList day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />
+            </View>
+          ) : null}
+        </View>
+      );
+    }),
+    ...(readItems.items.length === 0 && readRecs.length > 0
+      ? [<RecordingsList key="recordings" day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />]
+      : []),
+    ...readItems.items.flatMap((i) => taggedTo('read', i.id).map(noteItem)),
+  ];
+  const notesItems: React.ReactNode[] = notesBlock.map((n) => (
+    // Editing happens in the log: a note here only opens it (no swipe, no menu).
+    <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel="Daily log. Open the log">
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{timeOf(n.at)}</Text>
+      <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={4}>
+        {n.text.trim()}
+      </Text>
+    </Tap>
+  ));
+  const readPagesCount = readItems.items.reduce((n, i) => n + i.pages.length, 0);
+  // The sub-line names the assignment's surahs, first to last ("Al-Mujadila to At-Tahrim"), as it
+  // names its juz: the figure says how much of it was revised.
+  const assignedSurahs =
+    revised.assigned.length > 0
+      ? describeSurahs({ first: Math.min(...revised.assigned), last: Math.max(...revised.assigned) })
+      : surahsOf(revised.revised);
+  // A day that is over with pages left says how many, in the surahs' place (mock d2: "Juz 27 · 9 min ·
+  // 14 not revised"); today, the strip shows what is left.
+  const revisedSet = new Set(revised.revised);
+  const left = day < today ? new Set(revised.assigned.filter((p) => !revisedSet.has(p))).size : 0;
+  const revisedSubline =
+    left > 0
+      ? subline([revised.juzLabel, revised.minutes != null ? formatMinutesLong(revised.minutes) : null, `${left} not revised`])
+      : subline([revised.juzLabel, assignedSurahs, revised.minutes != null ? formatMinutesLong(revised.minutes) : null]);
+
   return (
     <>
       {hasRevised && (
-        <ThreadRow
+        <DayBlock
           mark={
-            <ProgressRing
+            <RevisedMark
               fraction={revised.assigned.length > 0 ? revised.revised.length / revised.assigned.length : 0}
               done={revised.assigned.length > 0 && revised.revised.length >= revised.assigned.length}
             />
           }
-          name="Revised"
-          {...revisedMenu}
-          figure={
+          title="Revised"
+          figure={revised.assigned.length > 0 ? `${revised.revised.length} of ${revised.assigned.length}` : undefined}
+          subline={revisedSubline}
+          summary={
             revised.assigned.length > 0 ? (
-              <Text style={[typeV2.name, { color: palette.text }]}>{`${revised.revised.length} of ${revised.assigned.length}`}</Text>
+              <>
+                <PageStrip
+                  cells={stripCells(
+                    revised.assigned,
+                    revised.revised,
+                    revised.skipped,
+                    new Set(revised.assigned.filter((p) => (ratingByPage.get(p) ?? 4) <= 2)),
+                  )}
+                />
+                <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
+              </>
             ) : undefined
           }
-          meta={subline([revised.juzLabel, surahsOf(revised.revised), revised.minutes != null ? formatMinutes(revised.minutes) : null])}
-          metaBelow
-          lineBelow
-          separator={false}
+          items={revisedItems}
+          header={revisedMenu}
           testID="activity-block-revised"
-        >
-          {revised.assigned.length > 0 && (
-            <>
-              <PageStrip
-                cells={stripCells(
-                  revised.assigned,
-                  revised.revised,
-                  revised.skipped,
-                  new Set(revised.assigned.filter((p) => (ratingByPage.get(p) ?? 4) <= 2)),
-                )}
-              />
-              <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
-            </>
-          )}
-          {revised.credits.map((c) => (
-            <RowText key={c.countsFor} secondary>
-              {`Ahead for ${c.countsFor}: ${describePageRuns(pageRuns(c.pages))}`}
-            </RowText>
-          ))}
-          {revisionNotes.length > 0 && (
-            <ThreadBranch>
-              {revisionNotes.map((n) => (
-                <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-              ))}
-            </ThreadBranch>
-          )}
-          {taggedTo('revision').length > 0 && <ThreadBranch>{taggedTo('revision').map(taggedRow)}</ThreadBranch>}
-          {doneAhead.length > 0 && (
-            <ThreadBranch>
-              {doneAhead.map((a) => (
-                <Text key={`ahead-${a.fromDay}`} testID="activity-done-ahead" style={[typeV2.meta, { color: palette.secondary }]}>
-                  {`Done ahead, from ${a.fromDay}: ${describePageRuns(pageRuns(a.pages))}`}
-                </Text>
-              ))}
-            </ThreadBranch>
-          )}
-          {revRecs.length > 0 && (
-            <ThreadBranch>
-              <RecordingsList day={day} kind="revision" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />
-            </ThreadBranch>
-          )}
-        </ThreadRow>
+        />
       )}
       {hasMemorized && (
-        <ThreadRow
-          mark={<Mark size="reply" icon="bookmark-outline" />}
-          name="Memorized"
-          {...memorizedMenu}
-          figure={
+        <DayBlock
+          mark={<BlockMark kind="memorized" />}
+          title="Memorized"
+          figure={memorized.items.length > 0 ? pagesWord(memorizedPages.length) : undefined}
+          subline={subline([ayahSpan(memorizedPages) ?? surahsOf(memorizedPages), memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null])}
+          summary={
             memorized.items.length > 0 ? (
-              <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(memorized.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
+              <View style={styles.chips}>
+                {pageRuns(memorizedPages).map((run) => (
+                  <PageChip key={`${run.first}-${run.last}`} label={formatPagesShort([run.first, run.last])} />
+                ))}
+                <Text style={[typeV2.meta, styles.chipsNote, { color: palette.secondary }]}>{`${memorizedSet.size} pages memorized in all`}</Text>
+              </View>
             ) : undefined
           }
-          meta={subline([surahsOf(memorized.items.flatMap((i) => i.pages))])}
-          metaBelow
-          lineBelow
-          separator={false}
+          items={memorizedItems}
+          header={memorizedMenu}
           testID="activity-block-memorized"
-        >
-          {memorized.items.map((i) => (
-            <View key={i.id}>
-              <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>
-              {taggedTo('memorization', i.id).length > 0 && <ThreadBranch>{taggedTo('memorization', i.id).map(taggedRow)}</ThreadBranch>}
-            </View>
-          ))}
-          {memorizationNotes.length > 0 && (
-            <ThreadBranch>
-              {memorizationNotes.map((n) => (
-                <Text key={n.id} style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-              ))}
-            </ThreadBranch>
-          )}
-        </ThreadRow>
+        />
       )}
       {(readItems.items.length > 0 || readRecs.length > 0) && (
-        <ThreadRow
-          mark={<Mark size="reply" icon="stopwatch-outline" />}
-          name="Read"
-          {...readMenu}
-          figure={
-            readItems.items.length > 0 ? (
-              <Text style={[typeV2.name, { color: palette.text }]}>{pagesWord(readItems.items.reduce((n, i) => n + i.pages.length, 0))}</Text>
-            ) : undefined
-          }
-          meta={subline([surahsOf(readItems.items.flatMap((i) => i.pages)), readMinutes > 0 ? formatMinutes(readMinutes) : null])}
-          metaBelow
-          lineBelow
-          separator={false}
+        <DayBlock
+          mark={<BlockMark kind="read" />}
+          title="Read"
+          figure={readItems.items.length > 0 ? pagesWord(readPagesCount) : undefined}
+          subline={subline([surahsOf(readItems.items.flatMap((i) => i.pages)), readMinutes > 0 ? formatMinutesLong(readMinutes) : null])}
+          items={readItemNodes}
+          header={readMenu}
           testID="activity-block-read"
-        >
-          <ThreadBranch>{readItems.items.map((i) => {
-            const session = readings.find((r) => r.id === i.id);
-            return (
-              <React.Fragment key={i.id}>
-              <Tap
-                onPress={() => session && onEditReading(session)}
-                accessibilityRole="button"
-                accessibilityLabel={`Timed session. Edit pages`}
-              >
-                <View style={styles.readHead}>
-                  <Ionicons name="stopwatch-outline" size={16} color={palette.secondary} />
-                  <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Timed in Read</Text>
-                  <Text style={[typeV2.meta, { color: palette.secondary }]}>{timeRange(i.occurredAt, i.minutes)}</Text>
-                </View>
-                {i.pages.length > 0 && <RowText secondary>{describePageRuns(pageRuns(i.pages))}</RowText>}
-              </Tap>
-              {taggedTo('read', i.id).length > 0 && <ThreadBranch>{taggedTo('read', i.id).map(taggedRow)}</ThreadBranch>}
-              </React.Fragment>
-            );
-          })}</ThreadBranch>
-          {readRecs.length > 0 && (
-            <ThreadBranch>
-              <RecordingsList day={day} kind="reading" emptyText={null} onOpen={(r) => onOpenRecording(r.id)} />
-            </ThreadBranch>
-          )}
-        </ThreadRow>
+        />
       )}
       {notesBlock.length > 0 && (
-        <ThreadRow
-          mark={<Mark size="reply" icon="create-outline" />}
-          name="Notes"
-          figure={notesBlock.length > 0 ? <Text style={[typeV2.name, { color: palette.text }]}>{notesBlock.length}</Text> : undefined}
-          lineBelow
-          separator={false}
+        <DayBlock
+          mark={<BlockMark kind="notes" />}
+          title="Notes"
+          figure={String(notesBlock.length)}
+          items={notesItems}
           testID="activity-block-notes"
-        >
-          <ThreadBranch>
-            {notesBlock.map((n) => (
-              // Editing happens in the log: a note here only opens it (no swipe, no menu).
-              <Tap
-                key={n.id}
-                onPress={onOpenLog}
-                accessibilityRole="button"
-                accessibilityLabel="Daily log. Open the log"
-              >
-                <Text style={[typeV2.meta, { color: palette.secondary }]}>{new Date(n.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
-                <RowText numberOfLines={4}>{n.text.trim()}</RowText>
-              </Tap>
-            ))}
-          </ThreadBranch>
-        </ThreadRow>
+        />
       )}
       <WindowFooter text={footerText} />
       <ContextMenu
@@ -414,5 +404,7 @@ export function DayBlocks({
 }
 
 const styles = StyleSheet.create({
-  readHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  underItem: { marginTop: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  chipsNote: { marginLeft: 4 },
 });

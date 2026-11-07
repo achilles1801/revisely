@@ -62,6 +62,7 @@ import { JournalEntry, JournalNote, ReadingSession } from '../types';
 import { journalDayFromEntries, legacyJournalNotes, LEGACY_NOTE_ID } from '../lib/journal';
 import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
+import { memorizedMinutesAfter } from '../lib/activityAdd';
 
 // ============================================================================
 // REFERENCE HELPERS
@@ -832,7 +833,7 @@ export async function getActivityItemsForDay(
   userId?: string,
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
-  memorized: { id: string; day: string; pages: number[] }[];
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Pages revised in an earlier session, credited to this day ("done ahead"). */
   doneAhead: { fromDay: string; pages: number[] }[];
@@ -857,7 +858,7 @@ export async function getActivityItemsForDay(
         minutes: x.minutes ?? null,
       };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
     doneAhead: ahead.docs
       .filter((d) => d.data().day !== day)
@@ -869,12 +870,14 @@ export async function getActivityItemsForDay(
  * Pages memorized on `day` (the memorization manager, Today): merged into that day's item, so
  * saving the same pages again changes nothing (ids come from the day).
  */
-export async function addMemorizationPages(day: string, pages: number[], at: number, userId: string): Promise<void> {
+export async function addMemorizationPages(day: string, pages: number[], at: number, userId: string, minutes: number | null = null): Promise<void> {
   const ref = doc(collection(db, 'users', userId, 'memorizations'), day);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
-    const prev = snap.exists() ? (snap.data() as { pages?: number[]; occurredAt?: number }) : null;
+    const prev = snap.exists() ? (snap.data() as { pages?: number[]; occurredAt?: number; minutes?: number | null; updatedAt?: unknown }) : null;
     const merged = [...new Set([...(prev?.pages ?? []), ...pages])].sort((a, b) => a - b);
+    // The add sheet's minutes join the day's once (ACT-5): a change sent again adds nothing.
+    const timed = memorizedMinutesAfter(prev, { minutes, at });
     tx.set(ref, {
       id: day,
       uid: userId,
@@ -882,7 +885,8 @@ export async function addMemorizationPages(day: string, pages: number[], at: num
       occurredAt: prev?.occurredAt && prev.occurredAt > 0 ? Math.min(prev.occurredAt, at) : at,
       source: 'manual',
       pages: merged,
-      minutes: null,
+      minutes: timed.minutes,
+      updatedAt: timed.updatedAt,
       recordings: [],
     });
   });
@@ -933,7 +937,7 @@ export async function getActivityItemsBetween(
   userId?: string,
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null; occurredAt: number | null }[];
-  memorized: { id: string; day: string; pages: number[] }[];
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
@@ -946,7 +950,7 @@ export async function getActivityItemsBetween(
       const occurred = x.occurredAt && typeof x.occurredAt.toMillis === 'function' ? x.occurredAt.toMillis() : typeof x.occurredAt === 'number' ? x.occurredAt : null;
       return { id: d.id, day: x.day, countsFor: x.countsFor, pages: x.pages ?? [], skipped: x.skipped ?? [], assigned: x.assigned ?? [], minutes: x.minutes ?? null, occurredAt: occurred };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] })),
+    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
   };
 }

@@ -1,5 +1,6 @@
 # The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month and
 # week, a day, the day's block menu, and Insights, each a screenshot named 09-<screen>-${THEME}.
+# The day as d1 (top, then scrolled), its menu (d10a), the + (d5) and a light day (d2).
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -40,8 +41,9 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-day-${THEME}
+# The Revised block's menu (d10a): a hold on its header.
 - longPressOn:
-    text: "Revised"
+    id: activity-block-revised-header
     optional: true
 - runFlow:
     file: shot.yaml
@@ -50,6 +52,48 @@ appId: com.revisionbuddy.app
 - tapOn:
     text: "Close menu"
     optional: true
+# The rest of the day (d1 is taller than a screen): Read, Notes and the footer.
+- scrollUntilVisible:
+    element:
+      id: activity-day-footer
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-end-${THEME}
+# The + (d5): add to today.
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-add-menu-${THEME}
+- tapOn:
+    point: "50%,12%"
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 10000
+# A light day (d2): Sunday 1 November, stopped after 6 pages.
+- tapOn:
+    id: calendar-day-2026-11-01
+- tapOn: "Open the day"
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-sunday-${THEME}
 - tapOn:
     id: back
 - extendedWaitUntil:

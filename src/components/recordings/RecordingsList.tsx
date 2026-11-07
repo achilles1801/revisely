@@ -43,6 +43,12 @@ interface RecordingsListProps {
   onOpen?: (recording: RecordingMeta) => void;
   /** Shown when the day has none; null shows nothing (inside a block, where the block says so). */
   emptyText?: string | null;
+  /**
+   * `block`: inside an Activity day block (mock d1, gap audit §4): the bubble across the column with no
+   * name line, no gutter and no "›" (Listen back is in its hold menu), the chips with the time on their
+   * right. `list` (the default): the day's own list, as before.
+   */
+  variant?: "list" | "block";
 }
 
 const KIND_LABEL: Record<RecordingKind, string> = {
@@ -66,7 +72,9 @@ export function RecordingsList({
   reloadKey,
   highlightId,
   onOpen,  emptyText,
+  variant = "list",
 }: RecordingsListProps) {
+  const block = variant === "block";
   const { palette } = useTheme();
   const haptics = useHaptics();
   const [items, setItems] = useState<RecordingMeta[]>([]);
@@ -179,7 +187,8 @@ export function RecordingsList({
             deleteLabel="Delete recording"
             testID={`recording-${r.id}`}
           >
-            <View style={styles.row}>
+            <View style={block ? styles.blockRow : styles.row}>
+              {block ? null : (
               <View
                 style={styles.head}
                 accessible
@@ -215,10 +224,14 @@ export function RecordingsList({
                   />
                 ) : null}
               </View>
-              <View style={styles.line}>
+              )}
+              <View style={block ? styles.blockLine : styles.line}>
                 <View
+                  accessible={block ? false : undefined}
+                  accessibilityLabel={block ? `${name} recording, ${time}` : undefined}
                   style={[
                     styles.bubble,
+                    block && styles.blockBubble,
                     { backgroundColor: palette.bubble },
                     highlighted && {
                       borderWidth: 1.5,
@@ -281,7 +294,7 @@ export function RecordingsList({
                     {formatRecordingTime(active ? position : r.durationMs)}
                   </Text>
                 </View>
-                {onOpen ? (
+                {onOpen && !block ? (
                   <Tap
                     onPress={() => {
                       stopPlayback();
@@ -313,7 +326,45 @@ export function RecordingsList({
                   In your backup · downloads when played
                 </Text>
               ) : null}
-              {r.pageMarks.length > 0 ? (
+              {block ? (
+                <View style={styles.blockFoot}>
+                  <View style={[styles.chips, styles.blockChips]}>
+                    {r.pageMarks.map((m) => {
+                      const current = currentPage === m.page;
+                      return (
+                        <Tap
+                          key={`${m.atMs}-${m.page}`}
+                          onPress={() => play(r, m.atMs)}
+                          style={[
+                            styles.chip,
+                            current
+                              ? { backgroundColor: palette.text, borderColor: palette.text }
+                              : { backgroundColor: palette.fill, borderColor: palette.separator },
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Play from page ${m.page}`}
+                          accessibilityState={{ selected: current }}
+                          testID={`recording-page-${r.id}-${m.page}`}
+                        >
+                          <Text
+                            style={[styles.chipText, typeV2.numeral, { color: current ? palette.bg : palette.secondary }]}
+                            maxFontSizeMultiplier={1.4}
+                          >
+                            p. {m.page}
+                          </Text>
+                        </Tap>
+                      );
+                    })}
+                  </View>
+                  <Text
+                    style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}
+                    maxFontSizeMultiplier={1.4}
+                    testID={`recording-when-${r.id}`}
+                  >
+                    {time}
+                  </Text>
+                </View>
+              ) : r.pageMarks.length > 0 ? (
                 <View style={styles.chips}>
                   {r.pageMarks.map((m) => {
                     const current = currentPage === m.page;
@@ -369,6 +420,19 @@ export function RecordingsList({
         actions={
           menuFor
             ? [
+                ...(block && onOpen
+                  ? [
+                      {
+                        key: "listen",
+                        label: "Listen back with the pages",
+                        icon: "headset-outline" as const,
+                        onPress: () => {
+                          stopPlayback();
+                          onOpen(menuFor);
+                        },
+                      },
+                    ]
+                  : []),
                 {
                   key: "delete",
                   label: "Delete recording",
@@ -441,4 +505,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   chipText: { fontSize: 13, lineHeight: 17 },
+  // The block variant (Activity's day, gap audit §4): no gutter, the bubble across the column,
+  // the chips 8 below it with the time on their right.
+  blockRow: {},
+  blockLine: { flexDirection: "row", alignItems: "center" },
+  blockBubble: { maxWidth: undefined },
+  blockFoot: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 8 },
+  blockChips: { flex: 1, marginTop: 0 },
 });
