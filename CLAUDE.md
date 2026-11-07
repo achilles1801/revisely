@@ -1134,12 +1134,22 @@ privacy draft `~/Documents/revisely-stats/coach-privacy-draft.md` § R). It supe
 app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. Rules: BEHAVIOUR.md REVO-*.
 - **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. E2E builds show it to every
   account, with an in-memory server (`lib/e2e/revoFake`, links `revisely://e2e/revo?optin=1&left=0&review=1&memory=1&day=…`).
-- **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (bottom-right, 14 above
-  the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the reader, a session or an
-  editor; hidden with the keyboard and while the sheet is up), and the sheet (`RevoSheetFrame`: about 55%,
-  a drag up or a conversation takes it to full height). The views: `RevoChat`, `RevoPages` (History, Memory,
-  the opt-in), `RevoPicker` (+). No Activity screen is edited: lists clear the button through
-  `useTabBarFootprint` (`lib/revo/presence`). Another screen opens Revo with `openRevo({ attach })` (e.g.
+- **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (a 44pt disc,
+  bottom-right, 14 above the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the
+  reader, a session or an editor; hidden with the keyboard and while the sheet is up), and the sheet
+  (`RevoSheetFrame`: about 55%, a drag up or a conversation takes it to full height). The views: `RevoChat`,
+  `RevoPages` (History, Memory, the opt-in), `RevoPicker` (+), inside `RevoBoundary` (an error in Revo says so
+  in the sheet: on build 32 an uncaught JS error can end as a native crash, REACT-NATIVE-10).
+  - **Lists clear the button** with `useRevoFootprint()` (`lib/revo/presence`): its room on the screens it
+    shows on, 0 elsewhere, added to the scroll view's bottom padding beside `useTabBarFootprint()` (which no
+    longer includes it). Home, Read, Activity (and its Day and All views) and Insights use it.
+  - **The keyboard:** the sheet sits on it and gets shorter (`lib/revo/sheetFit`), so the header and the
+    conversation stay; there is no KeyboardAvoidingView (it pushed the whole sheet up and off the top).
+  - **Colours** follow the theme and the accent: `palette.revo` (`theme/v2`) for the R, its disc, the glows
+    and the shadow; everything else is the palette's (`revoColours.test` checks the contrast).
+  - **Answers:** `callFunction` returns the callable's `{ result }`; `lib/revo/backend` reads it, checks the
+    answer's shape (`askResultOf`) and names a failure (`refusalOf`: offline, the server's reason, the limits).
+  Another screen opens Revo with `openRevo({ attach })` (e.g.
   `insightAttachment('weakSpots')` for an Insights section's "Ask Revo"); Settings → Revo AI turns it on and off.
 - **What it is told** (`lib/revo/context`): the Insights totals and today's blocks, as numbers and page numbers,
   built the way Home builds today. Attachments (`lib/revo/attachments`) go only with the question they were
@@ -1149,7 +1159,9 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
 - **Server** (`functions/src/revo/`): `revoAsk`, `revoDayInReview`, `revoSetOptions`, `revoClear`, with the
   coach's key (`ANTHROPIC_COACH_KEY`), cached system prompt, retries and ledger, on `claude-sonnet-5-5`
   (`REVO_MODEL`; the Ask coach stays on Haiku 5.5; prices per model in `coach/pricing.ts`, Sonnet 5.5's
-  caching minimum is 512 tokens). 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
+  caching minimum is 512 tokens). **Thinking is off** (`thinking: {type: "between_tools"}`; Sonnet 5.5 thinks
+  by default and its thinking counts against `max_tokens`: at 700, every reply was cut off, Nov 7 2026) with
+  `REVO_MAX_TOKENS` 1200; the log says `stop: max_tokens` when a reply is cut off anyway. 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
   question without an attachment kept for the day (free), the last 10 messages sent with a follow-up, up to
   30 memory items (`users/{uid}/revoMemory`), conversations in `users/{uid}/revoChats/{id}/messages`. The
   owner reads them and may only rate a reply, mark an action, mark a chat "plan added" and delete a memory
@@ -1167,9 +1179,13 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   `develop` (it publishes to preview at once).
 - **Dictation:** the mic opens the field with the keyboard up (the keyboard's own dictation). A mic that
   dictates by itself needs a speech module: a native build.
-- **E2E:** `.maestro/flows/09-revo.yaml` takes a screenshot of each mocked screen (`r1`…`r10`);
-  `~/Documents/revisely-today-mocks/revo/scripts/boards.py <screens folder>` puts them beside the mocks in
-  `revo/verify/`.
+- **E2E:** `.maestro/flows/09-revo.yaml` takes a screenshot of each mocked screen (`r1`…`r10`), the sheet
+  with the keyboard up (`r5k-keyboard`, asserting the header stays), then the main ones again in dark
+  (`…-dark`); `~/Documents/revisely-today-mocks/revo/scripts/boards.py <screens folder>` puts them beside the
+  mocks (light or dark) in `revo/verify/`. On iOS a control's accessibility label stands for its text (a chip
+  is "Ask: …"): match by id, and an id is a regex (no bare `?`).
+- **Scenarios:** `harness/revoServer.js` serves the callables from the functions' own code against the
+  emulators (only the model is a stand-in), so `[REVO-23]` runs the app's real requests.
 
 ## Widgets (Home Screen, Lock Screen)
 
