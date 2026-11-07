@@ -21,6 +21,7 @@ export function touchesDay(op: OutboxOp, day: string): boolean {
   switch (op.kind) {
     case 'revision.add':
       return op.item.day === day || op.item.countsFor === day;
+    case 'revision.delete':
     case 'memorization.mark':
     case 'memorization.delete':
       return op.day === day;
@@ -58,7 +59,7 @@ export function dayChangesKey(entries: readonly OutboxEntry[], day: string): str
 
 /**
  * `items` (what the server gave for `day`) with the waiting changes laid over them, oldest first:
- * a Revised item added by hand, pages memorized (merged into the day's item, as the server merges
+ * a Revised item added by hand (or deleted), pages memorized (merged into the day's item, as the server merges
  * them), a memorization removed, pages un-memorized, and timed reads added, edited or deleted.
  */
 export function overlayDayItems(items: DayItems, entries: readonly OutboxEntry[], day: string, uid: string): DayItems {
@@ -68,6 +69,8 @@ export function overlayDayItems(items: DayItems, entries: readonly OutboxEntry[]
     if (op.kind === 'revision.add' && op.item.day === day) {
       const { id, countsFor, pages, skipped, assigned, minutes } = op.item;
       revisions = [...revisions.filter((r) => r.id !== id), { id, day, countsFor, pages, skipped, assigned, minutes }];
+    } else if (op.kind === 'revision.delete' && op.day === day) {
+      revisions = revisions.filter((r) => r.id !== op.id);
     } else if (op.kind === 'memorization.mark' && op.day === day) {
       const prev = memorized.find((m) => m.id === day);
       const pages = [...new Set([...(prev?.pages ?? []), ...op.pages])].sort((a, b) => a - b);

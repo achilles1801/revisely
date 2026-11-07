@@ -278,6 +278,10 @@ How the tests are made: `tests/scenarios/README.md`.
   that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
   changes still waiting on the phone over what it read. Once the server has them, the day shows the
   server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
+- **ACT-14.** Revised pages added by hand (the day's +) are the user's own: saving, editing or deleting the
+  day's session never removes them. Each is deleted from the Revised block's menu ("Delete …, added by
+  hand"), confirmed first, as every item is (ACT-7). (Nov 7 2026: a session save deleted them, and there
+  was no way to delete one.)
 
 ## Ask coach
 
