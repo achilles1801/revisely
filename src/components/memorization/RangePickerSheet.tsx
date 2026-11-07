@@ -76,7 +76,11 @@ export function RangePickerSheet({
           }}
           testID="range-kind"
         />
-        <WheelPicker items={items} index={index} onChange={setIndex} label={kind === 'surah' ? 'Surah' : 'Juz'} testID="range-wheel" />
+        {/* A row: the wheel is `flex: 1` (its width), with its own height. In the column it had no
+            height at all (Nov 2026: Surah and Juz showed no wheel). */}
+        <View style={styles.wheelRow}>
+          <WheelPicker items={items} index={index} onChange={setIndex} label={kind === 'surah' ? 'Surah' : 'Juz'} testID="range-wheel" />
+        </View>
       </View>
     </Sheet>
   );
@@ -84,4 +88,5 @@ export function RangePickerSheet({
 
 const styles = StyleSheet.create({
   body: { gap: layoutV2.rowPad },
+  wheelRow: { flexDirection: 'row' },
 });
