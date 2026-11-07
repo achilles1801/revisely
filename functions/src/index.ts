@@ -25,6 +25,8 @@ import { checkDigestCaller, DIGEST_AUDIENCE, ledgerDayCounts, parseWeek } from '
 import { adminCoachStore } from './coach/admin';
 import { CoachError, handleAskCoach, handleSetOptIn } from './coach/handler';
 import { callCoach } from './coach/call';
+import { adminRevoStore, deleteRevoData } from './revo/admin';
+import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -48,8 +50,10 @@ const adminDb = getFirestore();
  *  6. users/{uid}/stats/* — app usage totals
  *  7. users/{uid}/_quota/* — legacy rate-limit counter docs (if any)
  *  8. users/{uid}/recordings/* — the records of backed-up recordings
- *  9. users/{uid} — user profile doc
- * 10. Firebase Auth user
+ *  9. The Ask coach's and Revo's documents (Revo's chats with their messages,
+ *     memory, cached answers and daily count)
+ * 10. users/{uid} — user profile doc
+ * 11. Firebase Auth user
  *
  * Requires App Check to prevent abuse: an attacker with a stolen ID token
  * could otherwise use this to delete arbitrary accounts they happen to control.
@@ -105,6 +109,8 @@ export const deleteUserAccount = onCall(
       }
     }
     await adminDb.doc(`coachSettings/${uid}`).delete();
+    // Revo's: chats (with every messages subcollection), memory, cached answers, the daily count.
+    await deleteRevoData(adminDb, uid, { usage: true });
 
     await userRef.delete();
 
@@ -270,6 +276,60 @@ export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, 
     if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
     logger.error('setCoachOptIn failed', err);
     throw new HttpsError('internal', 'The setting did not save. Try again.');
+  }
+});
+
+/**
+ * Revo, the in-app assistant (previewTester accounts that turned it on): 10 new questions an
+ * account a revision day, the Ask coach's monthly cap and key. See functions/src/revo/.
+ */
+function revoDeps() {
+  return {
+    store: adminRevoStore(adminDb),
+    call: (request: Parameters<typeof callCoach>[0]) => callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value() }),
+    now: () => new Date(),
+    log: (entry: Record<string, unknown>) => logger.info('revo', entry),
+  };
+}
+
+const REVO_CALL_OPTIONS = { enforceAppCheck: true, secrets: [ANTHROPIC_COACH_KEY], timeoutSeconds: 90, memory: '256MiB' as const, maxInstances: 3 };
+
+/** A RevoError as the app sees it; anything else is logged (no content) and answered as internal. */
+function revoFailure(name: string, err: unknown, message: string): HttpsError {
+  if (err instanceof RevoError) return new HttpsError(err.code, err.message, err.details);
+  logger.error(`${name} failed`, err);
+  return new HttpsError('internal', message);
+}
+
+export const revoAsk = onCall(REVO_CALL_OPTIONS, async (request) => {
+  try {
+    return await handleRevoAsk(request.auth, request.data, revoDeps());
+  } catch (err) {
+    throw revoFailure('revoAsk', err, 'Revo is unavailable. Try again.');
+  }
+});
+
+export const revoDayInReview = onCall(REVO_CALL_OPTIONS, async (request) => {
+  try {
+    return await handleDayInReview(request.auth, request.data, revoDeps());
+  } catch (err) {
+    throw revoFailure('revoDayInReview', err, 'Revo is unavailable. Try again.');
+  }
+});
+
+export const revoSetOptions = onCall({ enforceAppCheck: true, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
+  try {
+    return await handleSetOptions(request.auth, request.data, revoDeps());
+  } catch (err) {
+    throw revoFailure('revoSetOptions', err, 'The setting did not save. Try again.');
+  }
+});
+
+export const revoClear = onCall({ enforceAppCheck: true, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
+  try {
+    return await handleClear(request.auth, request.data, revoDeps());
+  } catch (err) {
+    throw revoFailure('revoClear', err, 'The delete did not finish. Try again.');
   }
 });
 
