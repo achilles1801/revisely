@@ -1,0 +1,68 @@
+# The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month and
+# week, a day, the day's block menu, and Insights, each a screenshot named 09-<screen>-${THEME}.
+# Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+# As the mock (d3): October, with the 28th picked.
+- tapOn: "Previous month"
+- tapOn:
+    id: calendar-day-2026-10-28
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-overview-month-${THEME}
+- tapOn: "Week"
+- extendedWaitUntil:
+    visible:
+      id: calendar-week
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-overview-week-${THEME}
+- tapOn: "Month"
+# As the mock (d1): today, Tuesday 3 November. A tap picks the day; Open goes to it.
+- tapOn: "Next month"
+- tapOn:
+    id: calendar-day-2026-11-03
+- tapOn: "Open the day"
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-day-${THEME}
+- longPressOn:
+    text: "Revised"
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-menu-revised-${THEME}
+- tapOn:
+    text: "Close menu"
+    optional: true
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 10000
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-${THEME}
