@@ -30,13 +30,18 @@ REPO = "achilles1801/revisely"
 MOCKS = os.path.expanduser("~/Documents/revisely-today-mocks/activity-redesign/png")
 VERIFY = os.path.expanduser("~/Documents/revisely-today-mocks/activity-redesign/verify")
 
-# Capture name (without theme) → the mock it is compared with (gap audit: 1-overview, 2-day, 3-insights).
+# Capture name (without theme) → the mock it is compared with (gap audit: 1-overview, 2-day, 3-insights),
+# and which part of it: a mock taller than the screen (d1) is cut to the screen's height, its top for
+# the first capture and its bottom for the one scrolled to the end.
 MOCK_FOR = {
-    "09-overview-month": "d3-calendar",
-    "09-overview-week": None,  # the mocks show the month only
-    "09-day": "d1-day-full",
-    "09-menu-revised": "d10a-long-press",
-    "09-insights": "d4-insights",
+    "09-overview-month": ("d3-calendar", None),
+    "09-overview-week": (None, None),  # the mocks show the month only
+    "09-day": ("d1-day-full", "top"),
+    "09-day-end": ("d1-day-full", "bottom"),
+    "09-day-sunday": ("d2-day-light", None),
+    "09-menu-revised": ("d10a-long-press", None),
+    "09-add-menu": ("d5-add-menu", None),
+    "09-insights": ("d4-insights", None),
 }
 MARGIN = 24
 TITLE_H = 44
@@ -56,12 +61,17 @@ def fit(img, height):
     return img.resize((w, height), Image.LANCZOS)
 
 
-def board(capture_path, mock_path, title, out_path):
+def board(capture_path, mock_path, title, out_path, part=None):
     cap = Image.open(capture_path).convert("RGB")
     height = 900
     left = fit(cap, height)
     if mock_path and os.path.exists(mock_path):
-        right = fit(Image.open(mock_path).convert("RGB"), height)
+        mock = Image.open(mock_path).convert("RGB")
+        # A tall mock, cut to the capture's shape (same width, so the same scale).
+        tall = round(mock.width * cap.height / cap.width)
+        if part and mock.height > tall:
+            mock = mock.crop((0, 0, mock.width, tall) if part == "top" else (0, mock.height - tall, mock.width, mock.height))
+        right = fit(mock, height)
     else:
         right = Image.new("RGB", (left.width, height), (240, 240, 240))
         ImageDraw.Draw(right).text((24, 24), "No mock for this screen", fill=(60, 60, 60))
@@ -100,10 +110,10 @@ def main():
             if not name.endswith("-" + theme):
                 continue
             screen = name[: -len(theme) - 1]
-            mock = MOCK_FOR.get(screen)
+            mock, part = MOCK_FOR.get(screen, (None, None))
             mock_path = os.path.join(MOCKS, f"{mock}-{theme}.png") if mock else None
             out = os.path.join(args.out, f"{screen}-{theme}-board.png")
-            board(path, mock_path, f"{screen} ({theme})", out)
+            board(path, mock_path, f"{screen} ({theme})", out, part)
             print(out)
 
 

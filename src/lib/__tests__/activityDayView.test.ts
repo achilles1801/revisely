@@ -35,20 +35,35 @@ describe('the Activity day view (C2)', () => {
     expect(v.blocks[0]).toMatchObject({ revised: [] });
   });
 
-  it('labels a session that covered a whole juz as “Juz X”', () => {
+  it('labels a session assigned a whole juz as “Juz X”', () => {
     const juz30 = getPagesForJuz(30);
-    expect(juzLabelFor(juz30, juz30, new Set(juz30))).toBe('Juz 30');
+    expect(juzLabelFor(juz30, new Set(juz30))).toBe('Juz 30');
   });
 
-  it('does not label a partial juz', () => {
+  it('keeps the label when some of the juz was skipped (d1: “Juz 28”, 18 of 20)', () => {
+    const juz28 = getPagesForJuz(28);
+    const v = buildDayView(
+      DAY,
+      {
+        revisions: [{ id: DAY, day: DAY, countsFor: DAY, pages: juz28.slice(2), skipped: juz28.slice(0, 2), assigned: juz28, minutes: 34 }],
+        memorized: [],
+        reads: [],
+        notes: [],
+      },
+      new Set(juz28),
+    );
+    expect((v.blocks[0] as { juzLabel: string | null }).juzLabel).toBe('Juz 28');
+  });
+
+  it('does not label an assignment of part of a juz', () => {
     const juz30 = getPagesForJuz(30);
-    expect(juzLabelFor(juz30.slice(0, 5), juz30, new Set(juz30))).toBeNull();
+    expect(juzLabelFor(juz30.slice(0, 5), new Set(juz30))).toBeNull();
   });
 
   it('a juz only counts its memorized pages', () => {
     const juz30 = getPagesForJuz(30);
     const memorized = new Set(juz30.slice(0, 3));
-    expect(juzLabelFor(juz30.slice(0, 3), juz30.slice(0, 3), memorized)).toBe('Juz 30');
+    expect(juzLabelFor(juz30.slice(0, 3), memorized)).toBe('Juz 30');
   });
 
   it('lists memorized, read and note items of the day only', () => {
