@@ -14,8 +14,10 @@
  *   request the recording was made with (`drift`), per calling account:
  *   `emulator/anthropic/accounts/<uid>/requests`. That account's `emulator/anthropic/accounts/<uid>`
  *   `mode` picks a failure instead: `rejected` (a recorded 401), `overloaded` (a 529 every attempt)
- *   or `network` (the connection fails every attempt). Per account, so tests running side by side
- *   on one emulator don't change each other's answers.
+ *   or `network` (the connection fails every attempt); its `reply` (`{ text, stopReason? }`) puts
+ *   that text in the recorded reply, for a test of how our code reads a given answer (a reply cut
+ *   off at max_tokens, a chart on a page the model wasn't given). Per account, so tests running side
+ *   by side on one emulator don't change each other's answers.
  * - **The clock.** Scenarios and E2E flows run at a test time; a phone's clock and the server's
  *   agree, so a request may carry `X-Revisely-Test-Now` (ms) and the handler's clock follows it.
  */
@@ -124,7 +126,9 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (request && (!Array.isArray(request.messages) || request.messages.length === 0 || request.messages[0].role !== 'user')) {
       problems.push('messages must start with a user turn');
     }
-    const mode = String((await account.get()).get('mode') ?? 'recorded');
+    const settings = await account.get();
+    const mode = String(settings.get('mode') ?? 'recorded');
+    const given = settings.get('reply') as { text?: unknown; stopReason?: unknown } | undefined;
     const kind = request ? kindOf(request) : null;
     const answer = kind ? recording(kind) : null;
     const drift = request && answer ? driftOf(shortRequest(request), answer.request) : [];
@@ -146,6 +150,15 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (mode === 'network') throw new TypeError('fetch failed');
     if (mode === 'overloaded') return respond(recording('error-529'));
     if (mode === 'rejected') return respond(recording('error-401'));
+    if (given && typeof given.text === 'string') {
+      // The recorded reply with the test's text in it (usage and the rest as recorded).
+      const body: Record<string, unknown> = {
+        ...(answer!.body as Record<string, unknown>),
+        content: [{ type: 'text', text: given.text }],
+        stop_reason: typeof given.stopReason === 'string' ? given.stopReason : 'end_turn',
+      };
+      return respond({ status: 200, body });
+    }
     return respond(answer!);
   };
 }

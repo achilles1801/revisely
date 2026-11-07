@@ -301,3 +301,187 @@ it('[RESET-2] [RESET-3] Reset my data and Load test scenario refuse without App 
   expect(memorized()).toBe(23);
   await app.close();
 });
+
+type RevoBackendMod = typeof import('../../../src/lib/revo/backend');
+
+/** A context as the app builds it (lib/revo/context): today 5 pages from 582, 2 done. */
+function revoContext(day: string) {
+  return {
+    totals: {
+      memorizedPages: 23,
+      revisedWithin7Days: 10,
+      revisedWithin30Days: 23,
+      daysWithSession30: 6,
+      streakDays: 2,
+      sessions30: 6,
+      weakPages: 1,
+      moderatePages: 4,
+      strongPages: 18,
+      weakRevisedLast7Days: 1,
+      pagesPerDay7: 4.1,
+      pagesPerDay30: 3.6,
+      plannedPerDay: 5,
+    },
+    today: { plannedPages: 5, revisedPages: 2, minutes: 12, memorizedPages: 0, nextPages: [584, 585, 586], weakNext: [585], done: false },
+    weakPages: [585],
+    week: [{ day, pages: 2 }],
+    localTime: '20:10',
+  };
+}
+
+/** What a refusal is, as Revo's sheet tells them apart (lib/revo/backend refusalOf). */
+async function refusal(app: OpenApp, call: () => Promise<unknown>): Promise<string> {
+  let caught: unknown = null;
+  await app.act(async () => {
+    try {
+      await withAuthRetry(call);
+    } catch (err) {
+      caught = err;
+    }
+  });
+  expect(caught).not.toBeNull();
+  return (caught as { refusal?: string }).refusal ?? `not a RevoError: ${String(caught)}`;
+}
+
+it('[REVO-1] [REVO-3] [REVO-4] [REVO-23] Revo through the app’s own backend: an answer, a follow-up, and every refusal told apart; a refused question counts nothing', async () => {
+  setZone(ZONES.chicago);
+  setNow('2031-07-08 20:10');
+  const DAY = '2031-07-08';
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  const revo = () => app.mods.require<RevoBackendMod>('src/lib/revo/backend').revoBackend();
+  const ask = (over: Record<string, unknown> = {}) =>
+    revo().ask({ chatId: null, day: DAY, question: 'How was my week?', context: revoContext(DAY), attach: null, ...over } as Parameters<ReturnType<typeof revo>['ask']>[0]);
+  const count = async () => Number((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0);
+
+  // [REVO-1] Not a tester: refused ('off'), even to turn it on.
+  expect(await refusal(app, () => revo().setOptions({ optIn: true }))).toBe('off');
+  expect(await refusal(app, () => ask())).toBe('off');
+  await app.close();
+  await markPreviewTester(uid);
+  app = await phone.open();
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  // A tester who hasn't turned it on.
+  expect(await refusal(app, () => ask())).toBe('off');
+  await app.act(async () => {
+    await expect(withAuthRetry(() => revo().setOptions({ optIn: true }))).resolves.toEqual({ optIn: true, memoryOn: true });
+  });
+
+  // An answer, then a follow-up in its conversation.
+  let first: Awaited<ReturnType<typeof ask>> | undefined;
+  await app.act(async () => {
+    first = await withAuthRetry(() => ask());
+  });
+  expect(first).toMatchObject({ question: { role: 'user', text: 'How was my week?' }, reply: { role: 'revo' }, remainingToday: 19, cached: false });
+  expect(first!.reply.text.length).toBeGreaterThan(0);
+  let second: Awaited<ReturnType<typeof ask>> | undefined;
+  await app.act(async () => {
+    second = await withAuthRetry(() => ask({ chatId: first!.chatId, question: 'And today?' }));
+  });
+  expect(second).toMatchObject({ chatId: first!.chatId, remainingToday: 18 });
+  expect(await count()).toBe(2);
+  // Kept with the account: the chat and its four messages, as the app reads them.
+  expect((await listServerDocs(`users/${uid}/revoChats/${first!.chatId}/messages`)).length).toBe(4);
+  // [REVO-23] A chat that was deleted.
+  expect(await refusal(app, () => ask({ chatId: 'gone-chat', question: 'And tomorrow?' }))).toBe('gone');
+
+  // The model busy, its key refused, the connection failing: 'unavailable', the question given back.
+  for (const mode of ['overloaded', 'rejected', 'network'] as const) {
+    await anthropicFails(uid, mode);
+    expect(await refusal(app, () => ask({ question: `A ${mode} question` }))).toBe('unavailable');
+  }
+  await anthropicFails(uid, 'recorded');
+  expect(await count()).toBe(2);
+
+  // [REVO-3] Today's 20 used: 'daily'. A day earlier than the one counted: 'clock'.
+  await setServerDoc(`revoUsage/${uid}`, { day: DAY, count: 20 });
+  expect(await refusal(app, () => ask({ question: 'One more?' }))).toBe('daily');
+  setNow('2031-07-07 20:10');
+  expect(await refusal(app, () => ask({ day: '2031-07-07', question: 'Yesterday?' }))).toBe('clock');
+  setNow('2031-07-08 20:15');
+  await setServerDoc(`revoUsage/${uid}`, { day: DAY, count: 2 });
+
+  // No App Check, and offline: refused before the server does anything.
+  failAppCheck();
+  try {
+    expect(await refusal(app, () => ask({ question: 'Without App Check?' }))).toBe('unavailable');
+  } finally {
+    failAppCheck(false);
+  }
+  await phone.goOffline();
+  expect(await refusal(app, () => ask({ question: 'Offline?' }))).toBe('offline');
+  await phone.goOnline();
+  expect(await count()).toBe(2);
+
+  // [REVO-4] The month's cap reached (another month, its ledger full): 'monthly', given back, no call.
+  setNow('2031-08-04 20:10');
+  await setServerDoc('coachLedger/2031-08', { spendUsd: 1000, month: '2031-08' });
+  const callsBefore = (await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)).length;
+  expect(await refusal(app, () => ask({ day: '2031-08-04', question: 'In August?' }))).toBe('monthly');
+  expect((await getServerDoc(`revoUsage/${uid}`))?.count).toBe(0);
+  expect((await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)).length).toBe(callsBefore);
+  await app.close();
+});
+
+it('[REVO-9] [REVO-10] [REVO-8] the Day in review once a day, skipped when capped; turning Revo off and Clear delete what they say', async () => {
+  setZone(ZONES.chicago);
+  setNow('2031-09-09 20:30');
+  const DAY = '2031-09-09';
+  const phone = new Phone('phone');
+  const app = await testerAccount(phone);
+  const uid = app.uid;
+  const revo = () => app.mods.require<RevoBackendMod>('src/lib/revo/backend').revoBackend();
+  await app.act(() => withAuthRetry(() => revo().setOptions({ optIn: true })));
+
+  // [REVO-9] Written once: the second call finds the same chat, with no second model call.
+  let review: { chatId: string } | null = null;
+  await app.act(async () => {
+    review = await withAuthRetry(() => revo().dayInReview({ day: DAY, context: revoContext(DAY) } as Parameters<ReturnType<typeof revo>['dayInReview']>[0]));
+  });
+  expect(review).toEqual({ chatId: `review-${DAY}` });
+  await app.act(async () => {
+    review = await withAuthRetry(() => revo().dayInReview({ day: DAY, context: revoContext(DAY) } as Parameters<ReturnType<typeof revo>['dayInReview']>[0]));
+  });
+  expect(review).toEqual({ chatId: `review-${DAY}` });
+  const asked = await modelRequests(uid);
+  expect(asked.map((r) => r.kind)).toEqual(['revo-review']);
+  // Not counted among the day's questions.
+  expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
+  // Nothing done that day: no review.
+  const idle = { ...revoContext('2031-09-10'), today: { plannedPages: 5, revisedPages: 0, minutes: 0, memorizedPages: 0, nextPages: [582], weakNext: [], done: false } };
+  setNow('2031-09-10 20:30');
+  await app.act(async () => {
+    review = await withAuthRetry(() => revo().dayInReview({ day: '2031-09-10', context: idle } as Parameters<ReturnType<typeof revo>['dayInReview']>[0]));
+  });
+  expect(review).toBeNull();
+  // The month's cap reached: skipped, never an error.
+  setNow('2031-10-06 20:30');
+  await setServerDoc('coachLedger/2031-10', { spendUsd: 1000, month: '2031-10' });
+  await app.act(async () => {
+    review = await withAuthRetry(() => revo().dayInReview({ day: '2031-10-06', context: revoContext('2031-10-06') } as Parameters<ReturnType<typeof revo>['dayInReview']>[0]));
+  });
+  expect(review).toBeNull();
+
+  // [REVO-8] Clear memory, then [REVO-10] Clear history: each deletes only its own.
+  setNow('2031-09-09 20:40');
+  await setServerDoc(`users/${uid}/revoMemory/m1`, { uid, text: 'Revises after Fajr', source: 'chat', day: DAY, chatId: 'c', at: 1 });
+  await app.act(() => withAuthRetry(() => revo().clear('memory')));
+  expect(await listServerDocs(`users/${uid}/revoMemory`)).toHaveLength(0);
+  expect(await getServerDoc(`users/${uid}/revoChats/review-${DAY}`)).not.toBeNull();
+  await app.act(() => withAuthRetry(() => revo().clear('history')));
+  expect(await listServerDocs(`users/${uid}/revoChats`)).toHaveLength(0);
+
+  // [REVO-10] Turning Revo off deletes its conversations and memory; the day's count stays.
+  await setServerDoc(`users/${uid}/revoMemory/m2`, { uid, text: 'Likes short plans', source: 'chat', day: DAY, chatId: 'c', at: 2 });
+  let settings: { optIn: boolean } | undefined;
+  await app.act(async () => {
+    settings = await withAuthRetry(() => revo().setOptions({ optIn: false }));
+  });
+  expect(settings).toMatchObject({ optIn: false });
+  expect(await listServerDocs(`users/${uid}/revoMemory`)).toHaveLength(0);
+  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn).toBe(false);
+  // And off means refused.
+  expect(await refusal(app, () => revo().clear('memory'))).toBe('off');
+  await app.close();
+});

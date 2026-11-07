@@ -15,6 +15,8 @@ const CLOUD = /^https:\/\/us-central1-([a-z0-9-]+)\.cloudfunctions\.net\/([A-Za-
 export interface Served {
   /** Calls the app made to this function. */
   calls: number;
+  /** What the app sent each time (the callable's `data`). */
+  sent: unknown[];
   /** What it answered each time: the callable's JSON (`{ result }` or `{ error }`), or the network error. */
   answers: Record<string, unknown>[];
 }
@@ -32,7 +34,7 @@ function state(): FunctionsNet {
 /** Calls made to `name` since the start of the file (or since `forget`). */
 export function served(name: string): Served {
   const s = state().served;
-  if (!s.has(name)) s.set(name, { calls: 0, answers: [] });
+  if (!s.has(name)) s.set(name, { calls: 0, sent: [], answers: [] });
   return s.get(name)!;
 }
 
@@ -51,6 +53,11 @@ export function installFunctionsRoute(): void {
     const [, project, name] = m;
     const record = served(name);
     record.calls += 1;
+    try {
+      record.sent.push(JSON.parse(String(init?.body ?? '{}')).data);
+    } catch {
+      record.sent.push(undefined);
+    }
     if (g.__scenarioNet && !g.__scenarioNet.online) {
       record.answers.push({ network: 'offline' });
       // What React Native's fetch throws without a connection.
