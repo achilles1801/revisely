@@ -1,6 +1,7 @@
 # Activity's screens in light, for the visual check against the mocks (gap audit). Its screenshots are
 # the run's artifacts; scripts/verify/activity-boards.py puts them beside the mocks.
-# Rules (BEHAVIOUR.md): none; this flow looks, it doesn't test the rules.
+# Rules (BEHAVIOUR.md): ACT-12 at the end (a tester's tab bar is Home and Read; Weak spots' "See all"
+# opens Pages by strength, subflows/tabs-merge-screens.yaml). The rest looks; it doesn't test the rules.
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -18,5 +19,9 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/backup-notice.yaml
 - runFlow:
     file: ../subflows/activity-screens.yaml
+    env:
+      THEME: light
+- runFlow:
+    file: ../subflows/tabs-merge-screens.yaml
     env:
       THEME: light

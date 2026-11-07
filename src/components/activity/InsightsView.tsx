@@ -50,6 +50,8 @@ export interface InsightsData {
   capacity: number;
   /** Revo's Ask on Weak spots (REVO-1: testers who can use Revo). */
   revo: boolean;
+  /** Smart Tracking: without it no page is rated, so Weak spots is hidden (ACT-12). Unset counts as on. */
+  smartTracking?: boolean;
 }
 
 export function InsightsView({
@@ -57,17 +59,22 @@ export function InsightsView({
   onReviseTomorrow,
   onPlanIt,
   onOpenPage,
+  onSeeAllPages,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
   onPlanIt: (pages: number[]) => void;
   onOpenPage: (page: number) => void;
+  /** Weak spots' "See all pages by strength": every revised page, weakest first (ACT-12). */
+  onSeeAllPages?: () => void;
 }) {
   return (
     <View testID="activity-insights">
       <Coverage data={data} onPlanIt={onPlanIt} />
       <Consistency data={data} />
-      <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} />
+      {data.smartTracking !== false ? (
+        <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
+      ) : null}
       <Memorization data={data} />
       <Pace data={data} />
     </View>
@@ -294,10 +301,12 @@ function WeakSpots({
   data,
   onReviseTomorrow,
   onOpenPage,
+  onSeeAllPages,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
   onOpenPage: (page: number) => void;
+  onSeeAllPages?: () => void;
 }) {
   const { palette } = useTheme();
   const rows = weakSpotRows({
@@ -363,6 +372,18 @@ function WeakSpots({
           testID="insights-revise-tomorrow"
         >
           <Text style={[typeV2.name, { color: palette.text }]}>{reviseFirstLabel(rows)}</Text>
+        </Tap>
+      ) : null}
+      {onSeeAllPages ? (
+        <Tap
+          onPress={onSeeAllPages}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={styles.seeAll}
+          testID="insights-see-all-pages"
+        >
+          <Text style={[typeV2.name, { color: palette.link }]}>See all pages by strength</Text>
+          <Ionicons name="chevron-forward" size={16} color={palette.link} />
         </Tap>
       ) : null}
     </Section>
@@ -480,6 +501,7 @@ const styles = StyleSheet.create({
   none: { marginTop: 12 },
   weakList: { marginTop: 4 },
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginTop: 14 },
   outlinePill: { alignSelf: 'flex-start', height: 36, borderRadius: 18, borderWidth: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   monthBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 72 + 21, marginTop: 10 },
   monthCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },

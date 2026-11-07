@@ -10,7 +10,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
 }));
 let mockPages: { pageNumber: number; status: string; weaknessRating: number }[] = [];
-jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ pages: mockPages, user: null, logs: [] }) }));
+// Smart Tracking on unless a test turns it off: Weak spots needs it (ACT-12).
+let mockUser: { smartTrackingEnabled: boolean } = { smartTrackingEnabled: true };
+jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ pages: mockPages, user: mockUser, logs: [] }) }));
 const mockPalette = new Proxy({}, { get: () => '#000000' });
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
 jest.mock('../../../services/firestoreService', () => ({
@@ -40,6 +42,7 @@ const props = { today: TODAY, noteDays: new Set<string>(), onOpenDay: jest.fn(),
 beforeEach(() => {
   jest.clearAllMocks();
   mockPages = [];
+  mockUser = { smartTrackingEnabled: true };
 });
 
 describe('the Activity calendar (gap audit §3)', () => {
@@ -157,5 +160,28 @@ describe('Insights (gap audit §5)', () => {
     fireEvent.press(await screen.findByText('Insights'));
     expect(await screen.findByLabelText('Juz 30, not memorized, learning')).toBeTruthy();
     expect(screen.queryByTestId('insights-untouched')).toBeNull();
+  });
+
+  it('Weak spots ends in "See all pages by strength", which opens every page by strength (ACT-12)', async () => {
+    const onSeeAllPages = jest.fn();
+    render(<ActivityBlocksViews {...props} onSeeAllPages={onSeeAllPages} />);
+    fireEvent.press(await screen.findByText('Insights'));
+    expect(await screen.findByText('Weak spots')).toBeTruthy();
+    fireEvent.press(screen.getByText('See all pages by strength'));
+    expect(onSeeAllPages).toHaveBeenCalledTimes(1);
+  });
+
+  it('without Smart Tracking no page is rated: no Weak spots, no Ask, no "See all"; the rest stays (ACT-12)', async () => {
+    mockUser = { smartTrackingEnabled: false };
+    mockPages = [{ pageNumber: 546, status: 'memorized', weaknessRating: 2 }];
+    render(<ActivityBlocksViews {...props} onSeeAllPages={jest.fn()} />);
+    fireEvent.press(await screen.findByText('Insights'));
+    expect(await screen.findByText('Coverage')).toBeTruthy();
+    expect(screen.getByText('Consistency')).toBeTruthy();
+    expect(screen.getByText('Memorization')).toBeTruthy();
+    expect(screen.queryByText('Weak spots')).toBeNull();
+    expect(screen.queryByText('Al-Hashr')).toBeNull();
+    expect(screen.queryByTestId('insights-see-all-pages')).toBeNull();
+    expect(screen.queryByTestId('insights-ask-revo')).toBeNull();
   });
 });

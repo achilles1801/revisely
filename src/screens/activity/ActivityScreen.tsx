@@ -123,6 +123,7 @@ export default function ActivityScreen() {
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
               onOpenPage={(page) => (navigation.navigate as (name: string, params: object) => void)('Read', { screen: 'QuranReader', params: { pageNumber: page } })}
+              onSeeAllPages={() => navigation.navigate('PagesByStrength')}
               onPlanIt={(weak) =>
                 planItAction(!!user?.customPlan) === 'plan-day'
                   ? navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })

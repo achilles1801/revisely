@@ -258,6 +258,12 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-11.** A log note tagged to one of the day's items shows under that item in Activity: a Revised,
   Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
   While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
+- **ACT-12.** Insights live in Activity (Calendar | Insights) for accounts with the new Activity (preview testers
+  while its blocks are built): their tab bar is Home and Read, with or without Smart Tracking, and there is no
+  Insights tab to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
+  no "See all"); Smart Tracking is turned on in Settings. With it, Weak spots ends in "See all pages by strength":
+  every revised page, weakest first, by page, surah or juz, filtered by juz and by strength (the Insights tab's
+  Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6 2026.)
 
 ## Ask coach
 
