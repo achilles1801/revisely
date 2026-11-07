@@ -6,6 +6,7 @@
 import { addDays, dayOf, local, setNow, setZone, MINUTE, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
+import { aheadAt, plain, startsAt } from '../harness/words';
 import { Phone, OpenApp } from '../harness/phone';
 import { getFajrTimeFor } from '../../../src/lib/fajrBoundary';
 import type { User } from '../../../src/types';
@@ -40,10 +41,8 @@ export function fajrOn(day: string, user: Pick<User, 'locationCoords' | 'fajrCal
   throw new Error(`no Fajr on ${day}`);
 }
 
-/** Home's "Starts at <surah>, p. N" for page N (and not N0, N1…). */
-export function startsAt(page: number): RegExp {
-  return new RegExp(`^Starts at .*p\\. ${page}(?!\\d)`);
-}
+/** Home's "Starts at <where page N begins>" (harness/words), for its title read with `plain`. */
+export { startsAt };
 
 /** "08:30" in the current zone, from a Date. */
 function hhmm(d: Date): string {
@@ -142,7 +141,7 @@ export function describeWeeks(names: string[]): void {
           }
           await app.untilLoaded();
           await home.ready();
-          expect({ where, title: home.title() }).toEqual({ where, title: expect.stringMatching(startsAt(expected[0])) });
+          expect({ where, title: plain(home.title()) }).toEqual({ where, title: expect.stringMatching(startsAt(expected[0])) });
 
           await reviseToday(app, home, expected);
           await app.untilSynced();
@@ -151,7 +150,7 @@ export function describeWeeks(names: string[]): void {
 
           // Done: Home offers the next revision day, which is the revision day + 1.
           const next = pagesOfPlanDay(daysBetween(start, addDays(revisionDay, 1)));
-          expect({ where, ahead: home.ahead() }).toEqual({ where, ahead: expect.stringMatching(new RegExp(`^Tomorrow starts at .*p\\. ${next[0]}\\b`)) });
+          expect({ where, ahead: plain(home.ahead()) }).toEqual({ where, ahead: expect.stringMatching(aheadAt('Tomorrow', next[0])) });
         }
         await app.close();
       });

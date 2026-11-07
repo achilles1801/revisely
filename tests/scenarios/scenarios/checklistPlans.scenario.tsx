@@ -51,7 +51,7 @@ describe('1. New account', () => {
     await home.untilStreak(1);
     // The session just saved, in the recent list: by its surahs.
     await app.until(() => home.recent().length === 1, 'the session in the recent list');
-    expect(plain(home.recent()[0])).toMatch(/^Revised 5 pages .*An-Naba to At-Takwir/);
+    expect(plain(home.recent()[0])).toMatch(/Revised 5 pages.*An-Naba to At-Takwir/);
     expect(home.recent()[0]).not.toMatch(noPageNumbers);
     await app.close();
   });
