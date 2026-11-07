@@ -18,11 +18,11 @@ appId: com.revisionbuddy.app
     id: open-settings
 - scrollUntilVisible:
     element:
-      text: Delete account
+      id: settings-delete-account
     direction: DOWN
     timeout: 20000
 - tapOn:
-    text: Delete account
+    id: settings-delete-account
 # Two confirmations (Settings), then the server deletes.
 - extendedWaitUntil:
     visible:
