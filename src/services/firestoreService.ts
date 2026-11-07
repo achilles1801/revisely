@@ -1139,7 +1139,10 @@ export async function callFunction(
 
   let appCheckToken: string | null = null;
   try {
-    const { getAppCheckToken } = await import('../lib/appCheck');
+    // Loaded when first needed (a lazy require: Jest, which runs the scenario tests, can't run a
+    // dynamic import(), so no test ever sent App Check).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getAppCheckToken } = require('../lib/appCheck') as typeof import('../lib/appCheck');
     appCheckToken = await getAppCheckToken();
   } catch {
     // App Check is best-effort — function enforces it server-side.
