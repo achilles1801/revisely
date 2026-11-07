@@ -6,7 +6,7 @@ export default {
     slug: "revision-buddy",
     owner: "achilles1802",
     scheme: "revisely",
-    version: "1.0.3",
+    version: "1.0.4",
     // A hash of the native side (see fingerprint.config.js). An update reaches only
     // binaries with the same one, so JS that needs new native code never lands on a
     // build that lacks it.
@@ -149,6 +149,9 @@ export default {
       "expo-font",
       // Android dialogs', cursor's and selection handles' colour (ink, not Material's teal).
       "./plugins/withAndroidTheme",
+      // Android Auto Backup leaves out the offline mushaf, the Arabic text and the
+      // translations (they download again; with them the app passes the 25 MB quota).
+      "./plugins/withAndroidBackupRules",
       "expo-web-browser",
       // The launch screen: the R, 200 pt wide, on black (in light and dark mode
       // alike). imageWidth needs this plugin: the top-level `splash` key shows the
