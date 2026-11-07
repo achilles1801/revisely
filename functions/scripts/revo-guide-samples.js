@@ -120,6 +120,12 @@ const doneToday = {
 // ---------------------------------------------------------------------------------------------
 
 const F = (label, re, guide = false) => ({ label, re, guide });
+/** A fact the answer must NOT say. */
+const NOT = (label, re) => ({ label, re, guide: false, not: true });
+// Every how-to answer: nothing about today's pages unless asked (the tone rule; Nov 7 eval: Q4, Q10, Q15, Q23).
+const FILLER = /today still has|still (?:have|has) \d+ pages|\d+ (?:of \d+ )?pages (?:left|to go|still|ahead)|pages (?:left|to go|still to go)(?: today)?\b|left today|with \d+ left|done so far|still waiting|you could continue/i;
+// Where the guide says it isn't possible, Revo says so plainly, not "I'm not sure".
+const UNSURE = NOT('says it plainly, not “I’m not sure” (the guide knows)', /I’m not sure|I am not sure/i);
 const SAMPLES = [
   {
     q: 'I want to revise Juz 29 backwards but I don’t see where I can do that',
@@ -129,23 +135,26 @@ const SAMPLES = [
       F('Reverse order, in a new plan', /reverse order/i, true),
       F('where: Edit schedule → Create new plan', /create new plan|edit schedule/i, true),
       F('start at Juz 29 (Today starts at)', /today starts at|start(?:s|ing)? at (?:the end of )?juz 29|juz 29/i, true),
-      F('says the whole plan goes backwards (no single-juz reverse)', /whole plan|carries on|then (?:juz 28|the juz before)|rest of|all (?:your )?memorized|not (?:just|only) (?:that|one) juz|only for the whole/i),
+      F('says the whole plan goes backwards (no single-juz reverse)', /whole plan|carries on|then (?:juz 28|the juz before)|rest of|all (?:your )?memorized|not (?:just|only) (?:that|one) juz|only for the whole|(?:just|only) one juz|one juz backwards|no way to/i),
+      UNSURE,
     ],
     screen: 'planEditor',
   },
   {
     q: 'Will I keep my streak if I revise yesterday’s stuff?',
+    aboutToday: true,
     ctx: missedYesterday,
     note: 'Majd’s second example (yesterday left at 6 of 20)',
     facts: [
       F('yes', /\byes\b|will come back|comes back|brings it back|keep(?:s)? (?:your|the) streak|restore/i),
       F('before today ends', /before today ends|until today ends|by the end of today|today’s revision day ends|before (?:fajr|midnight)|by (?:fajr|midnight)|still today|today, /i),
       F('how: Add to today', /add to today/i, true),
-      F('only yesterday’s pages count (not today’s), or two missed days break it', /yesterday’s (?:missed )?pages|only yesterday|two missed days|two days in a row|today’s own pages|still need(?:s)? today/i),
+      F('only yesterday’s pages count (not today’s), or two missed days break it', /yesterday’s (?:\w+ ){0,3}pages|only yesterday|two missed days|two days in a row|today’s own pages|still need(?:s)? today/i),
     ],
   },
   {
     q: 'I missed two days. Is my streak gone? Can I get it back?',
+    aboutToday: true,
     ctx: missedTwo,
     facts: [
       F('two missed days in a row break the streak', /two missed days|two days in a row|break|gone|can’t (?:get|bring) it back|starts again|start(?:s)? (?:a )?new/i, true),
@@ -165,6 +174,7 @@ const SAMPLES = [
   },
   {
     q: 'Can I revise tomorrow’s pages today?',
+    aboutToday: true,
     ctx: doneToday,
     facts: [
       F('yes, once today is done', /yes|once today is done|today is done|you can/i),
@@ -229,6 +239,7 @@ const SAMPLES = [
     facts: [
       F('no surah plan (pages, juz or weakest)', /no surah|not (?:as )?a (?:surah )?(?:plan|mode)|isn’t a surah|there’s no|not possible|can’t/i),
       F('closest: Edit schedule → a day → Add or remove content → Surahs, or Jump to a surah', /add or remove content|jump to/i, true),
+      UNSURE,
     ],
   },
   {
@@ -247,6 +258,9 @@ const SAMPLES = [
     facts: [
       F('no pause', /no pause|can’t pause|isn’t a pause|there’s no|not possible|no way to pause|doesn’t have a pause/i),
       F('the plan doesn’t move by itself; missed days don’t pile up', /doesn’t move|won’t move|don’t pile up|pick up|where you left|carries on/i, true),
+      F('closest: Jump to… when back', /jump to/i, true),
+      NOT('doesn’t offer rest days as a pause', /(?:^|[.!?]\s)(?![^.!?]*pause)[^.!?]*rest days?[^.!?]*(?:[.!?]|$)/i),
+      UNSURE,
     ],
   },
   {
@@ -293,7 +307,7 @@ const SAMPLES = [
   {
     q: 'Can the app follow my phone’s dark mode automatically?',
     ctx: steady,
-    facts: [F('not yet', /not yet|can’t|doesn’t|no,|isn’t/i), F('Light or Dark in Settings → Appearance', /light|dark|appearance|theme/i, true)],
+    facts: [F('not yet', /not yet|\byet\b|can’t|doesn’t|no,|isn’t|no setting|there’s no/i), F('Light or Dark in Settings → Appearance', /light|dark|appearance|theme/i, true), UNSURE],
   },
   {
     q: 'I’m a tester. How do I reset my data and start onboarding again?',
@@ -311,7 +325,7 @@ const SAMPLES = [
     q: 'Can you download the recitation so I can listen on the plane?',
     ctx: steady,
     note: 'not possible',
-    facts: [F('not possible: recitation streams', /not possible|can’t|cannot|not yet|isn’t possible|needs (?:the )?internet|streams/i), F('it needs the internet', /internet|online|connection|stream/i, true)],
+    facts: [F('not possible: recitation streams', /not possible|can’t|cannot|not yet|isn’t possible|needs (?:the )?internet|streams/i), F('it needs the internet', /internet|online|connection|stream/i, true), UNSURE],
   },
   {
     q: 'How do I rate how strong a page is?',
@@ -322,14 +336,14 @@ const SAMPLES = [
     q: 'Can I send my progress to my teacher from the app?',
     ctx: steady,
     note: 'not possible',
-    facts: [F('not possible (yet)', /not possible|can’t|cannot|not yet|isn’t (?:possible|something)|no way|I’m not sure that’s possible/i)],
+    facts: [F('not possible (yet)', /not possible|can’t|cannot|not yet|isn’t (?:possible|something)|no way|there’s no/i), UNSURE],
   },
 ];
 
 // ---------------------------------------------------------------------------------------------
 
 async function ask(s) {
-  const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attach: null, memory: [], history: [] });
+  const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [] });
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION },
@@ -367,7 +381,10 @@ function show(s, r) {
     if (chips?.length) lines.push(`> Suggestions: ${chips.map((c) => `“${c}”`).join(', ')}`);
   }
   const all = said(r.reply);
-  const results = s.facts.map((f) => ({ f, ok: f.re.test(all) }));
+  const facts = s.aboutToday
+    ? s.facts
+    : [...s.facts, NOT('no filler about today’s pages, no “start today’s revision”', FILLER)];
+  const results = facts.map((f) => ({ f, ok: f.not ? !f.re.test(all) && !(f.re === FILLER && r.reply?.action?.kind === 'startRevision') : f.re.test(all) }));
   lines.push('');
   for (const { f, ok } of results) lines.push(`- ${ok ? '✅' : '❌'} ${f.label}`);
   if (s.screen) {
@@ -388,7 +405,7 @@ function show(s, r) {
     const guide = REVO_GUIDE.replace(/'/g, '’');
     for (const s of samples) {
       validateContext(s.ctx);
-      const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attach: null, memory: [], history: [] });
+      const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [] });
       if (body.system[0].text !== REVO_SYSTEM_PROMPT) problems.push(`${s.n}: the system prompt differs`);
       if (s.facts.length === 0) problems.push(`${s.n}: no facts`);
       for (const f of s.facts) if (f.guide && !f.re.test(guide)) problems.push(`${s.n}: “${f.label}” is not in the guide`);
@@ -410,7 +427,7 @@ function show(s, r) {
     const r = await ask(s);
     const out = show(s, r);
     if (out.passed) passed++;
-    facts += s.facts.length;
+    facts += s.facts.length + (s.aboutToday ? 0 : 1);
     failedFacts += out.failed;
     if (s.screen) {
       wanted++;
@@ -431,6 +448,6 @@ function show(s, r) {
   fs.writeFileSync(OUT, [...head, ...parts].join('\n'));
   console.log(`${passed}/${samples.length} answers with every fact. Wrote ${OUT}`);
 })().catch((err) => {
-  console.error(String(err.message ?? err));
+  console.error(process.env.REVO_DEBUG ? err.stack : String(err.message ?? err));
   process.exit(1);
 });
