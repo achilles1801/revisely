@@ -60,56 +60,15 @@ appId: com.revisionbuddy.app
     env:
       SUFFIX: ""
 
-# The daily log: a Memorized entry from its pages is named by its surahs.
-- runFlow: ../subflows/open-log.yaml
-- tapOn:
-    id: pill-memorization
-- tapOn:
-    id: memorize-from
-- inputText: "562"
-- tapOn:
-    id: memorize-to
-- inputText: "564"
-- runFlow: ../subflows/keyboard-done.yaml
-- tapOn:
-    id: journal-send
-- extendedWaitUntil:
-    visible:
-      id: journal-note-.*
-      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
-    timeout: 15000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: 11-daily-log
-- runFlow: ../subflows/back-home.yaml
-
 # The same in dark: Settings → Theme → Dark.
-- tapOn:
-    id: open-settings
-- scrollUntilVisible:
-    element: "Theme"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
-- tapOn: "Dark(, selected)?"
-- tapOn:
-    id: back
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
 - runFlow:
     file: ../subflows/surah-screens.yaml
     env:
       SUFFIX: "-dark"
-- runFlow: ../subflows/open-log.yaml
-- extendedWaitUntil:
-    visible:
-      id: journal-note-.*
-      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
-    timeout: 15000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: 11-daily-log-dark
-- runFlow: ../subflows/back-home.yaml
 
 # Wednesday's session (Tomorrow starts at …), its header and end card in dark.
 - tapOn:
@@ -139,3 +98,45 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: 11-end-card-dark
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+
+# Last, as it marks pages memorized (and so changes the schedule): the daily log, where a
+# Memorized entry from its pages is named by its surahs. In dark, then in light.
+- runFlow: ../subflows/back-home.yaml
+- runFlow: ../subflows/open-log.yaml
+- tapOn:
+    id: pill-memorization
+- tapOn:
+    id: memorize-from
+- inputText: "562"
+- tapOn:
+    id: memorize-to
+- inputText: "564"
+- runFlow: ../subflows/keyboard-done.yaml
+- tapOn:
+    id: journal-send
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-daily-log-dark
+- runFlow: ../subflows/back-home.yaml
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Light
+- runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-daily-log
