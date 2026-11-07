@@ -42,6 +42,12 @@ import Animated, {
 import { useHaptics } from '../design/haptics';
 
 /** Pages past either end move this much: the iOS rubber band (c = 0.55). */
+// E2E probe (06's lost first swipe): what the tab pager sees of a touch.
+// eslint-disable-next-line no-console
+const probeTabTouch = (swipeOn: boolean) => console.log(`[e2e] probe tab pager touch down (swipe ${swipeOn ? 'ON' : 'off'})`);
+// eslint-disable-next-line no-console
+const probeTabStart = () => console.log('[e2e] probe tab pager pan STARTED');
+
 export function rubberBand(overPages: number): number {
   'worklet';
   return 1 - 1 / (overPages * 0.55 + 1);
@@ -226,11 +232,13 @@ function PagerTabs({
         .activeOffsetX([-12, 12])
         .failOffsetY([-10, 10])
         .onTouchesDown((_e, manager) => {
+          if (process.env.EXPO_PUBLIC_E2E === '1') runOnJS(probeTabTouch)(swipeOn.value);
           // Off while a screen opened from a tab is showing: it keeps its own
           // sideways gestures (the reader's page turns, the back swipe).
           if (!swipeOn.value) manager.fail();
         })
         .onStart(() => {
+          if (process.env.EXPO_PUBLIC_E2E === '1') runOnJS(probeTabStart)();
           // Take over whatever is moving, from where it is.
           cancelAnimation(position);
           start.value = position.value;

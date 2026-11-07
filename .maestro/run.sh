@@ -184,6 +184,7 @@ for flow in "${FLOWS[@]}"; do
     if [ "$attempt" -gt 0 ]; then echo "▶ $name ($PLATFORM, $zone), retry $attempt"; else echo "▶ $name ($PLATFORM, $zone)"; fi
     tried=$(date +%s)
     if run_flow "$flow" "$zone" "$out"; then
+      save_device_state "$out"; touch "$out/attempt-failed"  # PROBE: keep logcat for every attempt
       printf '%s\t%s\t%s\tpassed\t%s\t%s\n' "$name" "$zone" "$attempt" $(( $(date +%s) - tried )) "$(basename "$out")" >> "$ATTEMPTS"
       result=$([ "$attempt" -eq 0 ] && echo passed || echo "passed on retry $attempt")
       break
