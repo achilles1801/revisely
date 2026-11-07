@@ -1,0 +1,148 @@
+# Revo's Add to chat, screen by screen as the approved mocks show them (a1–a7 in
+# ~/Documents/revisely-today-mocks/revo/attach), from Revo's sheet open on its greeting with
+# nothing attached; leaves it the same way. Each screenshot is named after its mock, with SUFFIX
+# ("" in light, "-dark" in dark).
+#   env SUFFIX: "" or "-dark"
+appId: com.revisionbuddy.app
+---
+# a1: at rest, Surahs in mushaf order, a line of the account's data on each row.
+- tapOn:
+    id: revo-plus
+- extendedWaitUntil:
+    visible:
+      id: revo-add-sheet
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: revo-add-surah-1
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a1-sheet${SUFFIX}
+
+# a2: ayahs typed as people say them: those ayahs, the surah, its juz.
+- tapOn:
+    id: revo-add-search
+- inputText: "Al-Hashr 1-10"
+- extendedWaitUntil:
+    visible: "Al-Hashr, ayahs 1.10"
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a2-search${SUFFIX}
+
+# a3: a weekday: the last four.
+- tapOn:
+    id: revo-add-search-clear
+- inputText: "Tuesday"
+- extendedWaitUntil:
+    visible:
+      id: revo-add-result-0
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a3-search-day${SUFFIX}
+- tapOn:
+    id: revo-add-search-clear
+- hideKeyboard
+
+# a4: Days, October: Tue 20 added, Tue 27 previewed.
+- tapOn:
+    id: pill-days
+- tapOn:
+    id: revo-add-month-prev
+- tapOn:
+    id: revo-add-day-2026-10-20
+- tapOn:
+    id: revo-add-day
+- extendedWaitUntil:
+    visible:
+      id: revo-add-day-added-2026-10-20
+    timeout: 5000
+- tapOn:
+    id: revo-add-day-2026-10-27
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a4-days${SUFFIX}
+
+# a5: several: Tue 27 Oct, Al-Hashr and Juz 28 (Tue 20 Oct taken away again), on Juz.
+- tapOn:
+    id: revo-add-day
+- tapOn:
+    id: revo-context-remove
+    index: 0
+- tapOn:
+    id: revo-add-search
+- inputText: "Al-Hashr"
+- tapOn:
+    id: revo-add-surah-59
+- tapOn:
+    id: revo-add-search-clear
+- hideKeyboard
+- tapOn:
+    id: pill-juz
+- scrollUntilVisible:
+    element:
+      id: revo-add-juz-30
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: revo-add-juz-28
+- extendedWaitUntil:
+    visible:
+      id: revo-add-juz-28-on
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a5-multi${SUFFIX}
+
+# a6: Pages: Juz 28's grid, Al-Hashr 17–24 (548–551) picked.
+- tapOn:
+    id: pill-pages
+- tapOn:
+    id: revo-add-page-548
+- tapOn:
+    id: revo-add-page-551
+- extendedWaitUntil:
+    visible:
+      id: revo-add-pages-summary
+    timeout: 5000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a6-pages${SUFFIX}
+
+# a7: back in Revo, the three as chips above the question.
+- tapOn:
+    id: revo-add-done
+- extendedWaitUntil:
+    visible:
+      id: revo-input
+    timeout: 5000
+- tapOn:
+    id: revo-input
+- inputText: "Should I revise Al-Hashr now or later?"
+- hideKeyboard
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: a7-composer${SUFFIX}
+
+# As it was: nothing attached, nothing typed.
+- tapOn:
+    id: revo-input
+- eraseText: 60
+- hideKeyboard
+- repeat:
+    while:
+      visible:
+        id: revo-context-remove
+    times: 4
+    commands:
+      - tapOn:
+          id: revo-context-remove
