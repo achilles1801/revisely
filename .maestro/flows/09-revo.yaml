@@ -37,7 +37,9 @@ appId: com.revisionbuddy.app
 - assertVisible:
     id: revo-greeting
     text: "Salaam.* Today is .* pages, starting at p\\. .*"
-- assertVisible: "How was my week?"
+# By id: on iOS a chip's accessibility label ("Ask: How was my week?") stands for its text.
+- assertVisible:
+    id: "revo-chip-How was my week?"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -108,7 +110,8 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-history
 - extendedWaitUntil:
-    visible: "Day in review"
+    # The row's label on iOS is "Day in review, <its line>".
+    visible: "Day in review.*"
     timeout: 5000
 - runFlow:
     file: ../subflows/shot.yaml
