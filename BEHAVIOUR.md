@@ -275,6 +275,10 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
+- **ACT-13.** What the day's + adds (Revised, Memorized, a note, or the session's skipped pages) shows on
+  that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
+  changes still waiting on the phone over what it read. Once the server has them, the day shows the
+  server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
 
 ## Ask coach
 

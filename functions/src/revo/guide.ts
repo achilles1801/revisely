@@ -264,6 +264,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
   'RESET-1': 'the owner’s reset script',
   'ACT-9': 'when a day’s items load',
+  'ACT-13': 'an add from the day’s + shows there at once, offline too; nothing to ask (the + itself is in Activity’s section)',
   'COACH-1': 'the Ask coach’s limits (Revo supersedes it)',
   'COACH-2': 'what the Ask coach is sent',
   'COACH-3': 'the Ask coach’s model and key',
