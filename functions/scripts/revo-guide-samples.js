@@ -343,7 +343,7 @@ const SAMPLES = [
 // ---------------------------------------------------------------------------------------------
 
 async function ask(s) {
-  const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attach: null, memory: [], history: [] });
+  const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [] });
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION },
@@ -405,7 +405,7 @@ function show(s, r) {
     const guide = REVO_GUIDE.replace(/'/g, '’');
     for (const s of samples) {
       validateContext(s.ctx);
-      const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attach: null, memory: [], history: [] });
+      const body = buildAskRequest({ day: DAY, question: s.q, context: s.ctx, attached: [], memory: [], history: [] });
       if (body.system[0].text !== REVO_SYSTEM_PROMPT) problems.push(`${s.n}: the system prompt differs`);
       if (s.facts.length === 0) problems.push(`${s.n}: no facts`);
       for (const f of s.facts) if (f.guide && !f.re.test(guide)) problems.push(`${s.n}: “${f.label}” is not in the guide`);
@@ -448,6 +448,6 @@ function show(s, r) {
   fs.writeFileSync(OUT, [...head, ...parts].join('\n'));
   console.log(`${passed}/${samples.length} answers with every fact. Wrote ${OUT}`);
 })().catch((err) => {
-  console.error(String(err.message ?? err));
+  console.error(process.env.REVO_DEBUG ? err.stack : String(err.message ?? err));
   process.exit(1);
 });
