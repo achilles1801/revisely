@@ -32,17 +32,24 @@ interface Demo {
   pageMarks: PageMark[];
 }
 
-/** A waveform that reads like recitation: phrases of bars, with short silences (dots) between. */
-export function demoLevels(seed: number, count = 64): number[] {
+/**
+ * A waveform that reads like recitation: phrases of bars with silences between them (runs of quiet
+ * levels, long enough to show as dots: each bar is the loudest level under it).
+ */
+export function demoLevels(seed: number, count = 96): number[] {
   const out: number[] = [];
   let x = seed;
-  for (let i = 0; i < count; i++) {
-    x = (x * 9301 + 49297) % 233280;
-    const r = x / 233280;
-    const pause = i % 13 === 4 || i % 13 === 5 || i % 17 === 9;
-    out.push(pause ? 4 : Math.round(38 + r * 52));
+  // Phrase lengths and the pauses after them, as a share of the recording.
+  const shape = [[0.12, 0.06], [0.26, 0.04], [0.22, 0.03], [0.17, 0.05], [0.05, 0]];
+  for (const [phrase, pause] of shape) {
+    for (let i = 0; i < Math.round(phrase * count); i++) {
+      x = (x * 9301 + 49297) % 233280;
+      out.push(Math.round(38 + (x / 233280) * 52));
+    }
+    for (let i = 0; i < Math.round(pause * count); i++) out.push(0);
   }
-  return out;
+  while (out.length < count) out.push(40);
+  return out.slice(0, count);
 }
 
 // Times are America/Chicago's (the flows' zone): CDT until 1 November 2026, CST from then.
