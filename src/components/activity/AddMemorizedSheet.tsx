@@ -19,7 +19,7 @@ import * as firestoreService from '../../services/firestoreService';
 import { typeV2 } from '../../theme/v2';
 import type { UserPage } from '../../types';
 import { BlockMark } from './BlockMark';
-import { FormLabel, InfoLine, KeyboardDone, MinutesField, PageRangeFields, Segmented, Suggestion } from './AddSheetParts';
+import { FormLabel, InfoLine, DismissArea, MinutesField, PageRangeFields, Segmented, Suggestion } from './AddSheetParts';
 
 type What = 'pages' | 'surah';
 
@@ -143,6 +143,7 @@ export function AddMemorizedSheet({
       keyboard
       testID="add-memorized-sheet"
     >
+      <DismissArea>
       <View style={styles.body}>
         {suggestion.length > 0 && (
           <View style={styles.top}>
@@ -197,8 +198,8 @@ export function AddMemorizedSheet({
 
         <InfoLine text="Adding marks these pages memorized, so they join your revision plan. For anything else, add a note." />
       </View>
+      </DismissArea>
 
-      <KeyboardDone />
       <RangePickerSheet
         visible={pickerOpen}
         onClose={() => {
