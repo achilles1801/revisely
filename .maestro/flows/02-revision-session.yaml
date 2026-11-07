@@ -18,7 +18,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
-    text: "Page 1 · .*"
+    text: "Al.Fatihah · Juz 1 · .*"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -31,7 +31,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: today-title
-    text: "Starts at Al.Fatihah, p..1[^0-9]*"
+    text: "Starts at Al.Fatihah[^,0-9]*"
 
 # SESS-1: swiping off a page marks it revised (1, 582, 583).
 - runFlow:
@@ -51,7 +51,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at An.Nazi.at, p..584.*"
+      text: "Continue at An.Nazi.at, ayah.16[^0-9]*"
     timeout: 10000
 - assertVisible:
     id: today-summary
@@ -72,7 +72,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
-    text: "Page 584 · .*"
+    text: "An.Nazi'at.16–46 · Juz 30 · .*"
 - tapOn: "Mark current page as revised"
 - assertVisible:
     id: session-title

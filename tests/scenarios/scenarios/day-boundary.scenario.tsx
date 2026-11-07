@@ -6,6 +6,7 @@ import { CITIES, newAccount } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
 import { fajrOn, MEMORIZED, pagesOfPlanDay, PER_DAY, startsAt } from './dayWeeks';
+import { plain } from '../harness/words';
 
 describe('a session open across the boundary', () => {
   it.each([
@@ -42,7 +43,7 @@ describe('a session open across the boundary', () => {
     await app.background();
     await app.foreground();
     await home.ready();
-    expect(home.title()).toMatch(startsAt(pagesOfPlanDay(2)[0]));
+    expect(plain(home.title())).toMatch(startsAt(pagesOfPlanDay(2)[0]));
     expect(home.ahead()).toBeNull();
   });
 });
@@ -61,7 +62,7 @@ describe('a plan made between midnight and Fajr', () => {
     const home = new Home(app);
     await home.ready();
     // Still Nov 3 (before Fajr): the plan's first day, pages 1–5.
-    expect(home.title()).toMatch(startsAt(1));
+    expect(plain(home.title())).toMatch(startsAt(1));
     const session = await home.startSession();
     expect(session.pages()).toEqual(pagesOfPlanDay(0));
     await session.swipeThrough(5);
@@ -75,6 +76,6 @@ describe('a plan made between midnight and Fajr', () => {
     app = await phone.open(homeStack);
     const later = new Home(app);
     await later.ready();
-    expect(later.title()).toMatch(startsAt(pagesOfPlanDay(1)[0]));
+    expect(plain(later.title())).toMatch(startsAt(pagesOfPlanDay(1)[0]));
   });
 });

@@ -114,9 +114,9 @@ describe('[DAY-9] Activity: pages revised ahead show on the day they were revise
 });
 
 describe('Home: the line that opens the next day', () => {
-  it('starts with the lead and the first page, with a non-breaking space before the page number', () => {
+  it('starts with the lead and where the first page begins, by surah and ayah (a non-breaking space before the number)', () => {
     const line = aheadLine('Tomorrow', 4);
-    expect(line.text.startsWith('Tomorrow starts at ')).toBe(true);
-    expect(line.text).toContain(`p.${NBSP}4`);
+    expect(line.text).toBe(`Tomorrow starts at Al\u2011Baqarah, ayah${NBSP}17`);
+    expect(line.label).toBe('Tomorrow starts at Al-Baqarah, ayah 17');
   });
 });

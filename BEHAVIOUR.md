@@ -127,9 +127,10 @@ How the tests are made: `tests/scenarios/README.md`.
 ## Carrying pages over
 
 - **CARRY-1.** Pages left over from the last three revision days are offered on Home, once a day, as
-  one line above today's action with "Add to today" beneath it: "Left yesterday · Revise p. 3–5" for a
-  day started and not finished, "Missed yesterday · Revise p. 1–5" for a day with no session, and
-  "Missed 3 days · Revise pp. …" when several days come to more than one. Earlier days are not offered.
+  one line above today's action with "Add to today" beneath it: "Left yesterday · Revise Al-Baqarah
+  6–29" for a day started and not finished, "Missed yesterday · Revise Al-Fatihah to Al-Baqarah" for a
+  day with no session, and "Missed 3 days · Revise …" when several days come to more than one (the
+  pages named by their surahs, NAME-1). Earlier days are not offered.
   A page revised at any point in those days is never offered, whichever day the schedule had it on.
 - **CARRY-2.** Keep daily amount (`shift`, the default): today keeps its size. The leftovers come
   first, and the rest of the plan slides back by as many pages. With as many leftovers as today holds or
@@ -274,6 +275,10 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
+- **ACT-13.** What the day's + adds (Revised, Memorized, a note, or the session's skipped pages) shows on
+  that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
+  changes still waiting on the phone over what it read. Once the server has them, the day shows the
+  server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
 - **ACT-15.** Revised pages added by hand count for the streak as any credit does (SESS-6): a day whose
   scheduled pages are all credited to it is done, hand-added pages included, and Home shows it when it
   next comes into view. Pages added by hand never stand for what a day had scheduled: that stays its
@@ -375,7 +380,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   or the month's limit (REVO-22); offline and unanswered questions can be tried again, with what was attached. Nothing
   in Revo's sheet takes the app down: an error inside it says so in the sheet.
 
-- **REVO-24.** With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
+- **REVO-24.** A full sheet reaches up to just under the status bar, on Android as on iOS. With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
   Memory) and the conversation stay on screen, and only the composer rides up with the keyboard. Where the system has
   already made room for the keyboard (Android resizing the window), the sheet isn't lifted twice. A conversation
   showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),
@@ -441,6 +446,17 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   revision minutes, timed reading, pages marked memorized, ratings given, this phone's recordings, and its daily-log
   notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
   question's day, or whose place ("2 days ago") or figures don't match it.
+
+## Naming the Qur'an
+
+- **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers
+  (the owner, Nov 7 2026; `lib/passages`): Home's Today post ("Starts at An-Naba", "Continue at
+  Al-Hashr, ayah 17", "Tomorrow starts at …"), its catch-up line, the recent sessions and See all
+  ("Juz 28 · 41 min", "Al-Baqarah 142–176"), the session's end card ("Revision complete", "An-Naba to
+  At-Takwir", "5 pages revised today") and Keep going. Amounts are fine ("20 pages"). Page numbers
+  stay only as a quiet detail after the words (the › sheet's "… · pp. 542–561"), inside the reader
+  and the session (the printed page), and where the user chooses by page (Jump to's Page tab, From
+  and To).
 
 ## Known bugs
 

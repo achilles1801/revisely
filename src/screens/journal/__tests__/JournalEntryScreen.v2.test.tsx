@@ -686,9 +686,10 @@ describe('the Memorized suggestion (C4)', () => {
     mockService.readingsForDay.mockResolvedValue([{ id: 'r1', pages: [2, 7, 8] }]);
     await renderScreen();
     const chip = await screen.findByTestId('journal-memorize-suggestion');
+    // Named by surah and ayah, never by page number (lib/passages).
+    expect(chip).toHaveTextContent(/Read today, not memorized: Al.Baqarah.38–57/);
     fireEvent.press(chip);
-    expect(screen.getByTestId('journal-text-input').props.value).toMatch(/7/);
-    expect(screen.getByTestId('journal-text-input').props.value).not.toMatch(/\b2\b/);
+    expect(screen.getByTestId('journal-text-input').props.value).toBe('Al-Baqarah, ayahs 38–57');
   });
 
   it('no chip when everything read today is memorized already', async () => {

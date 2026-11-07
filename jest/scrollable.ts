@@ -22,3 +22,22 @@ export function touchHandlingAncestor(scrollView: Node): string | null {
   }
   return null;
 }
+
+/** A style prop as one object (arrays and nested arrays merged, falsy entries skipped). */
+function flat(style: unknown): Record<string, unknown> {
+  if (!style) return {};
+  if (Array.isArray(style)) return style.reduce<Record<string, unknown>>((acc, s) => ({ ...acc, ...flat(s) }), {});
+  return typeof style === 'object' ? (style as Record<string, unknown>) : {};
+}
+
+/**
+ * The flex direction of the nearest view laid out around `node` (its host parent): 'row' or
+ * 'column' (React Native's default). A view that is `flex: 1` (v2/WheelPicker) shares a ROW's width;
+ * in a column with no fixed height its basis of 0 collapses it to nothing, which layout tests can't
+ * see either (the Surah / Juz picker's wheel, Nov 2026).
+ */
+export function parentFlexDirection(node: Node): 'row' | 'column' {
+  let p = node.parent;
+  while (p && typeof p.type !== 'string') p = p.parent;
+  return flat(p?.props?.style).flexDirection === 'row' ? 'row' : 'column';
+}

@@ -6,6 +6,7 @@
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange } from '../harness/account';
 import { flatText, Home, homeStack } from '../harness/screens';
+import { place, plain, startsAt } from '../harness/words';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
 
@@ -47,7 +48,7 @@ describe('done for the day', () => {
     const session = await home.startSession();
     await session.swipeThrough(5);
     await session.back();
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 6(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(6)}`);
 
     const ahead = await home.openAhead();
     // As if it were Tuesday's session: Monday's pages, done, are not behind it.
@@ -61,13 +62,13 @@ describe('done for the day', () => {
     const { phone } = await account({ fajrBoundaryEnabled: true, locationCoords: CITIES.chicago });
     // Tuesday 00:30: still Monday until Fajr.
     const { app, home } = await openHome(phone, '2026-11-03 00:30');
-    expect(home.title()).toMatch(/p\. 1(?!\d)/);
+    expect(plain(home.title())).toMatch(startsAt(1));
     const session = await home.startSession();
     expect(session.pages()).toEqual(MON);
     await session.swipeThrough(5);
     await session.back();
     // Tomorrow is Tuesday (Monday + 1), not Wednesday (the calendar's tomorrow).
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 6(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(6)}`);
     const ahead = await home.openAhead();
     expect(ahead.pages()).toEqual(TUE);
     expect(ahead.canSwipeBack()).toBe(false);
@@ -91,7 +92,7 @@ describe('revised ahead', () => {
     expect(credit(app)).toEqual([{ day: '2026-11-02', revised: [...MON, 6, 7], ahead: { '2026-11-03': [6, 7] } }]);
     // Done · 7 (Monday's five and the two ahead), and tomorrow goes on from its first page not done.
     expect(home.title()).toMatch(/^Done · 7 pages/);
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 8(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(8)}`);
     const rest = await home.openAhead();
     expect(rest.pages()).toEqual([8, 9, 10]);
     expect(rest.current()).toBe(8);
@@ -107,7 +108,7 @@ describe('revised ahead', () => {
     await tue.swipeThrough(5);
     await tue.back();
     await app.untilSynced();
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 11(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(11)}`);
     const tuesday = credit(app).find((c) => c.day === '2026-11-03');
     expect(tuesday?.revised).toEqual(expect.arrayContaining([8, 9, 10]));
     await app.close();
@@ -122,7 +123,7 @@ describe('revised ahead', () => {
     await session.back();
     await app.untilSynced();
     expect(credit(app)).toEqual([{ day: '2026-11-02', revised: MON, ahead: {} }]);
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .*p\. 6(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(6)}`);
     await app.close();
   });
 });
@@ -191,7 +192,7 @@ describe('Keep going', () => {
     await session.back();
     await app.untilSynced();
     // Tomorrow (Wednesday) is done, so the line names Thursday.
-    expect(home.ahead()).toMatch(/^Thu starts at .*p\. 16(?!\d)/);
+    expect(plain(home.ahead())).toBe(`Thu starts at ${place(16)}`);
     const opened = await home.openAhead();
     expect(opened.pages()).toEqual(THU);
     await app.close();

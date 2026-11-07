@@ -117,11 +117,17 @@ export function FeedbackRow({
 }
 
 /** What the user asked: a primary bubble on the right, with what they added above it. */
-export function UserBubble({ text, attach, testID }: { text: string; attach?: { kind: string; label: string }; testID?: string }) {
+export function UserBubble({ text, attached = [], testID }: { text: string; attached?: { kind: string; label: string }[]; testID?: string }) {
   const { palette } = useTheme();
   return (
     <View style={styles.userWrap}>
-      {attach ? <ContextChip label={attach.label} kind={attach.kind} /> : null}
+      {attached.length > 0 ? (
+        <View style={styles.bubbleChips}>
+          {attached.map((a, i) => (
+            <ContextChip key={i} label={a.label} kind={a.kind} />
+          ))}
+        </View>
+      ) : null}
       <View style={[styles.userBubble, { backgroundColor: palette.primary }]} testID={testID}>
         <Text style={[styles.userText, { color: palette.onPrimary }]}>{text}</Text>
       </View>
@@ -233,6 +239,7 @@ export function Typing() {
 }
 
 const styles = StyleSheet.create({
+  bubbleChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6 },
   header: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   capsule: { height: 36, borderRadius: 18, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 4, paddingRight: 14 },
   capsuleText: { fontSize: 15, fontWeight: '600' },

@@ -6,6 +6,7 @@
 import { applyCarryOver, leftoversFor } from '../carryOver';
 import { getPagesForDay } from '../algorithm';
 import { catchUpLine } from '../todayLines';
+import { plainText } from '../passages';
 import { getRevisionDayForUser } from '../fajrBoundary';
 import type { RevisionLog, User, UserPage } from '../../types';
 
@@ -87,7 +88,7 @@ describe('missed one day (yesterday, no session)', () => {
     const got = leftoversFor(baseUser, logs, today, todaysPages, memorizedPages);
     expect(got.pages).toEqual(range(11, 15));
     expect(got.days).toEqual([{ day: '2026-11-03', ago: 1, missed: true }]);
-    expect(catchUpLine(got)?.title).toBe(`Missed yesterday · Revise p.${NBSP}11–15`);
+    expect(plainText(catchUpLine(got)!.title)).toBe('Missed yesterday · Revise Al-Baqarah 70–101');
   });
 
   it('shift: catching up puts the missed pages today, and today’s pages move to tomorrow', () => {
@@ -124,7 +125,7 @@ describe('missed three days', () => {
     expect(got.pages).toEqual(range(6, 20));
     expect(got.days.map((d) => d.ago)).toEqual([3, 2, 1]);
     expect(got.days.every((d) => d.missed)).toBe(true);
-    expect(catchUpLine(got)?.title).toBe(`Missed 3 days · Revise p.${NBSP}6–20`);
+    expect(plainText(catchUpLine(got)!.title)).toBe('Missed 3 days · Revise Al-Baqarah 30–134');
   });
 
   it('shift: the catch-up is today; today’s own pages move to the day after', () => {
@@ -155,7 +156,7 @@ describe('a partly done day', () => {
     const got = leftoversFor(baseUser, logs, today, pagesFor(baseUser, today), memorizedPages);
     expect(got.pages).toEqual([13, 14, 15]);
     expect(got.days).toEqual([{ day: '2026-11-03', ago: 1, missed: false }]);
-    expect(catchUpLine(got)?.title).toBe(`Left yesterday · Revise p.${NBSP}13–15`);
+    expect(plainText(catchUpLine(got)!.title)).toBe('Left yesterday · Revise Al-Baqarah 84–101');
   });
 });
 
@@ -188,7 +189,7 @@ describe('Fajr after midnight', () => {
     const got = leftoversFor(fajrUser, logs, revisionDay, pagesFor(fajrUser, revisionDay), memorizedPages);
     expect(got.pages).toEqual(range(6, 10));
     expect(got.days).toEqual([{ day: '2026-11-02', ago: 1, missed: true }]);
-    expect(catchUpLine(got)?.title).toBe(`Missed yesterday · Revise p.${NBSP}6–10`);
+    expect(plainText(catchUpLine(got)!.title)).toBe('Missed yesterday · Revise Al-Baqarah 30–69');
   });
 
   it('at noon the revision day is Nov 4, and yesterday is Nov 3', () => {
@@ -216,7 +217,7 @@ describe('a day before the last carry-over', () => {
     const got = leftoversFor(carried, logs, today, pagesFor(carried, today), memorizedPages);
     expect(got.pages).toEqual(range(11, 15));
     expect(got.days).toEqual([{ day: '2026-11-04', ago: 1, missed: true }]);
-    expect(catchUpLine(got)?.title).toBe(`Missed yesterday · Revise p.${NBSP}11–15`);
+    expect(plainText(catchUpLine(got)!.title)).toBe('Missed yesterday · Revise Al-Baqarah 70–101');
   });
 });
 
