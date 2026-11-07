@@ -1,7 +1,7 @@
 // The Activity revision items of the last 400 days, for the streak (C5): the Dashboard, the
 // widget and the reminders read it through here. Until it loads, callers use the session logs.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import * as firestoreService from '../services/firestoreService';
 import type { RevisionLog } from '../types';
 import { revisionItemId } from './revisionItems';
@@ -87,4 +87,26 @@ export function useActivityHistory(day: string | null, enabled: boolean, key: un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, day, key]);
   return history;
+}
+
+// The copy Home read last, shared: Revo builds its context from the same items Home's streak
+// reads (lib/todaySnapshot), without a second read of 400 days. Per account and day.
+let shared: { uid: string; day: string; items: HistoryItem[] } | null = null;
+const listeners = new Set<() => void>();
+
+export function shareActivityHistory(uid: string, day: string, items: HistoryItem[]): void {
+  shared = { uid, day, items };
+  for (const l of listeners) l();
+}
+
+/** The history Home read last for this account and day, or null (callers use the logs, as Home does). */
+export function useSharedActivityHistory(uid: string | null | undefined, day: string): HistoryItem[] | null {
+  const current = useSyncExternalStore(
+    (onChange) => {
+      listeners.add(onChange);
+      return () => void listeners.delete(onChange);
+    },
+    () => shared,
+  );
+  return current && uid && current.uid === uid && current.day === day ? current.items : null;
 }

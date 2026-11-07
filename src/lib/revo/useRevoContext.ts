@@ -1,25 +1,27 @@
 import { useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { useSharedActivityHistory } from '../activityHistory';
 import { generateDailyAssignment } from '../algorithm';
-import { ownPagesOf } from '../carryOver';
 import { getQuranData } from '../quranData';
+import { todaySnapshot } from '../todaySnapshot';
 import { buildRevoContext } from './context';
 import type { RevoContext } from './types';
 
-/** The revision day, and Revo's context built from the account's data as Home sees it now. */
+/**
+ * The revision day, and Revo's context built from the account's data as Home sees it now: the same
+ * assignment, the same snapshot (lib/todaySnapshot) and the same history Home's streak read.
+ */
 export function useRevoContext(): { day: string; context: RevoContext | null; build: () => RevoContext | null } {
   const { user, pages, logs } = useApp();
   const { day, date } = useRevisionDay(user);
-  const assignment = useMemo(() => {
-    if (!user) return [];
-    const all = generateDailyAssignment(pages, getQuranData(), user, date).pages;
-    return ownPagesOf(all, user, day);
-  }, [user, pages, date, day]);
-  const build = useCallback(
-    () => (user ? buildRevoContext({ user, pages, logs, today: day, assignment }) : null),
-    [user, pages, logs, day, assignment],
-  );
+  const history = useSharedActivityHistory(user?.id, day);
+  const assignment = useMemo(() => (user ? generateDailyAssignment(pages, getQuranData(), user, date).pages : []), [user, pages, date]);
+  const build = useCallback(() => {
+    if (!user) return null;
+    const snapshot = todaySnapshot({ user, pages, logs, day, assignment, history, now: Date.now() });
+    return buildRevoContext({ user, pages, logs, snapshot });
+  }, [user, pages, logs, day, assignment, history]);
   const context = useMemo(build, [build]);
   return { day, context, build };
 }

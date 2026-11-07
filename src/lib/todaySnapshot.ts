@@ -1,0 +1,87 @@
+// Today as Home shows it, in one place: today's pages and how far they've got, whether the day is
+// done, and the streak. Home's Today post and Revo's context are both built from this, so Revo
+// can never say something about today, the week or the streak that Home doesn't (Nov 7 2026: Revo
+// read the logs its own way and contradicted itself and Home).
+
+import type { RevisionLog, User, UserPage } from '../types';
+import { creditedOnDay, doneOnDay } from './aheadCredit';
+import { withPhoneSessions } from './activityHistory';
+import { ownPagesOf } from './carryOver';
+import { streakDetailFromLogs, type StreakDetail } from './streak';
+import { streakDetailFromItems, type HistoryItem } from './streakFromItems';
+
+export type TodayStatus = 'not_started' | 'partial' | 'completed';
+
+export interface TodaySnapshot {
+  /** The revision day. */
+  day: string;
+  /** Today's pages in the session's order, carried pages first: the list Home's lines describe. */
+  pages: number[];
+  /** Of them, the day's own pages (SESS-7: today is done when these are). */
+  own: number[];
+  /** Of them, the pages carried in from earlier days ("4 from yesterday first"). */
+  carried: number[];
+  /** Pages done for today: credited to it or revised in its sessions. Home's "Done · N". */
+  done: ReadonlySet<number>;
+  /** Today's pages done: Home's "N of total". */
+  pagesDone: number;
+  /** Not started, part done, or done (its own pages credited to it). */
+  status: TodayStatus;
+  /** Carried pages still to revise. */
+  carriedLeft: number;
+  /** The streak, and the days behind it, as Home reads it. */
+  streak: StreakDetail;
+}
+
+/** Home's status for today: done when its own pages are credited to it (SESS-7). */
+export function todayStatusOf(own: readonly number[], credited: ReadonlySet<number>): { status: TodayStatus; pagesCompleted: number } {
+  const completed = own.filter((p) => credited.has(p)).length;
+  // Pages revised today and the assignment later shrank (a custom-plan edit, an un-memorized surah):
+  // done, rather than a negative "left".
+  if (completed > 0 && completed >= own.length) return { status: 'completed', pagesCompleted: completed };
+  if (completed > 0) return { status: 'partial', pagesCompleted: completed };
+  return { status: 'not_started', pagesCompleted: 0 };
+}
+
+/** The pages carried into `day` that are among its pages. */
+export function carriedPagesOn(user: User | null, day: string, pages: readonly number[]): number[] {
+  const carry = user?.carryOver;
+  if (!carry || carry.day !== day) return [];
+  const carried = new Set(carry.pages);
+  return pages.filter((p) => carried.has(p));
+}
+
+export function todaySnapshot(input: {
+  user: User;
+  pages: readonly UserPage[];
+  logs: readonly RevisionLog[];
+  /** The revision day. */
+  day: string;
+  /** Today's assignment (generateDailyAssignment's pages), carried pages included. */
+  assignment: readonly number[];
+  /** The Activity items Home's streak reads (lib/activityHistory), or null until they've loaded. */
+  history: readonly HistoryItem[] | null;
+  now: number;
+}): TodaySnapshot {
+  const { user, pages, logs, day, assignment, history } = input;
+  const list = [...new Set(assignment)];
+  const own = ownPagesOf(list, user, day);
+  const carried = carriedPagesOn(user, day, list);
+  const done = doneOnDay(logs, day);
+  const { status } = todayStatusOf(own, creditedOnDay(logs, day));
+  // From the Activity items once they've loaded, with the phone's sessions over them; the logs until then.
+  const streak = history
+    ? streakDetailFromItems({ user, pages, items: withPhoneSessions(history, logs, input.now), today: day })
+    : streakDetailFromLogs({ user, pages, logs, today: day });
+  return {
+    day,
+    pages: list,
+    own,
+    carried,
+    done,
+    pagesDone: list.filter((p) => done.has(p)).length,
+    status,
+    carriedLeft: carried.filter((p) => !done.has(p)).length,
+    streak,
+  };
+}

@@ -352,6 +352,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   above the tab bar and the mini player. The screens it shows on end their lists with room for it
   (`useRevoFootprint`), so their last row scrolls clear of it; other screens leave none.
 
+- **REVO-26.** What Revo is told about today, the week and the streak is what Home shows, from the same snapshot
+  (`lib/todaySnapshot`): today's pages with the carried ones, how many are done ("6 of 20"), whether the day is done,
+  and the streak, with the run that can still come back when yesterday was missed (SESS-6). Each of the last 7 days
+  has the pages revised in its sessions, the pages its plan had and whether it was done, as the streak counts it.
+  Today's numbers add up: the pages revised today are today's done pages, less those done ahead on an earlier day,
+  plus the pages revised today that aren't today's. A page marked memorized counts on the revision day it was marked.
+  The server still accepts the context of an app from before this.
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an

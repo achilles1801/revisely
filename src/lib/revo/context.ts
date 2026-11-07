@@ -4,30 +4,36 @@
 
 import type { RevisionLog, User, UserPage } from '../../types';
 import { consistency, coverage, lastRevisedByPage, type Revised } from '../activityInsights';
-import { doneOnDay } from '../aheadCredit';
+import { reviewedOn } from '../aheadCredit';
+import { revisionDayOf } from '../fajrBoundary';
 import { shiftDay } from '../journal';
-import { streakReadingFromLogs } from '../streak';
+import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoContext, RevoTotals } from './types';
 
 const MAX_PAGES = 20;
 const MAX_WEAK = 30;
 
-/** Revision logs as Activity's Revised items (by the day they count for). */
-export function revisedItems(logs: readonly RevisionLog[]): Revised[] {
-  return logs
-    .filter((l) => l.pagesRevised.length > 0)
-    .map((l) => ({ day: l.date, pages: l.pagesRevised, minutes: l.durationMinutes, countsFor: l.date }));
+/** Every page a session revised: its own, ahead for later days, and catch-up pages (kept in `ahead`, SESS-7). */
+function sessionRevised(l: RevisionLog): number[] {
+  return [...new Set([...l.pagesRevised, ...Object.values(l.ahead ?? {}).flat()])];
 }
 
-/** The pages revised on `day` (any session that day). */
-function pagesOn(logs: readonly RevisionLog[], day: string): number {
-  return logs.filter((l) => l.date === day).reduce((n, l) => n + l.pagesRevised.length, 0);
+/** Revision logs as Activity's Revised items, by the day they were revised. */
+export function revisedItems(logs: readonly RevisionLog[]): Revised[] {
+  return logs
+    .map((l) => ({ day: l.date, pages: sessionRevised(l), minutes: l.durationMinutes, countsFor: l.date }))
+    .filter((r) => r.pages.length > 0);
+}
+
+/** The pages revised on `day`, in its sessions (each page once): what Revo's week and charts count. */
+export function pagesRevisedOn(logs: readonly RevisionLog[], day: string): number {
+  return reviewedOn(logs, day).size;
 }
 
 const isWeak = (p: UserPage) => p.weaknessRating <= 2;
 
-export function revoTotals(input: { user: User | null; pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string }): RevoTotals {
-  const { user, pages, logs, today } = input;
+export function revoTotals(input: { pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string; streakDays: number; plannedPerDay: number }): RevoTotals {
+  const { pages, logs, today } = input;
   const memorizedPages = pages.filter((p) => p.status === 'memorized');
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
   const revised = revisedItems(logs);
@@ -38,13 +44,12 @@ export function revoTotals(input: { user: User | null; pages: readonly UserPage[
   const r7 = within(from7);
   const r30 = within(from30);
   const weak = new Set(memorizedPages.filter(isWeak).map((p) => p.pageNumber));
-  const streakDays = user ? streakReadingFromLogs({ user, pages, logs, today }).streak : 0;
   return {
     memorizedPages: memorized.size,
     revisedWithin7Days: Math.round(coverage(memorized, last, today, 7) * memorized.size),
     revisedWithin30Days: Math.round(coverage(memorized, last, today, 30) * memorized.size),
     daysWithSession30: consistency(revised, today, 30).days,
-    streakDays,
+    streakDays: input.streakDays,
     sessions30: r30.length,
     weakPages: weak.size,
     moderatePages: memorizedPages.filter((p) => p.weaknessRating === 3).length,
@@ -52,53 +57,68 @@ export function revoTotals(input: { user: User | null; pages: readonly UserPage[
     weakRevisedLast7Days: r7.reduce((n, r) => n + r.pages.filter((p) => weak.has(p)).length, 0),
     pagesPerDay7: Math.round((r7.reduce((n, r) => n + r.pages.length, 0) / 7) * 10) / 10,
     pagesPerDay30: Math.round((r30.reduce((n, r) => n + r.pages.length, 0) / 30) * 10) / 10,
-    plannedPerDay: user?.dailyPageCapacity ?? 0,
+    plannedPerDay: input.plannedPerDay,
   };
 }
 
 export function buildRevoContext(input: {
-  user: User | null;
+  user: User;
   pages: readonly UserPage[];
   logs: readonly RevisionLog[];
-  /** The revision day, YYYY-MM-DD. */
-  today: string;
-  /** Today's own pages, in order (Home's assignment). */
-  assignment: readonly number[];
+  /** Today as Home shows it (lib/todaySnapshot): today, the week and the streak come from it. */
+  snapshot: TodaySnapshot;
   now?: Date;
 }): RevoContext {
-  const { pages, logs, today, assignment } = input;
+  const { user, pages, logs, snapshot } = input;
+  const today = snapshot.day;
   const byNumber = new Map(pages.map((p) => [p.pageNumber, p]));
-  const done = doneOnDay(logs, today);
-  const next = assignment.filter((p) => !done.has(p));
-  const revisedToday = assignment.length - next.length;
+  const list = new Set(snapshot.pages);
+  const next = snapshot.pages.filter((p) => !snapshot.done.has(p));
+  const revisedHere = reviewedOn(logs, today);
   const minutes = logs.filter((l) => l.date === today).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
-  const memorizedToday = pages.filter((p) => p.dateMemorized != null && p.dateMemorized.slice(0, 10) === today).length;
+  // The revision day each page was marked on (DAY-2), not the UTC date of the timestamp.
+  const memorizedToday = pages.filter((p) => p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), user) === today).length;
   const last = lastRevisedByPage(revisedItems(logs), today);
   const weakPages = pages
     .filter((p) => p.status === 'memorized' && isWeak(p))
     .sort((a, b) => (last.get(a.pageNumber) ?? '').localeCompare(last.get(b.pageNumber) ?? '') || a.pageNumber - b.pageNumber)
     .map((p) => p.pageNumber)
     .slice(0, MAX_WEAK);
+  const { reading, done: doneDays, scheduled } = snapshot.streak;
   const now = input.now ?? new Date();
   return {
-    totals: revoTotals(input),
+    totals: revoTotals({ pages, logs, today, streakDays: reading.streak, plannedPerDay: user.dailyPageCapacity ?? 0 }),
     today: {
-      plannedPages: assignment.length,
-      revisedPages: revisedToday,
+      plannedPages: snapshot.pages.length,
+      revisedPages: snapshot.pagesDone,
+      carriedPages: snapshot.carried.length,
+      doneEarlier: snapshot.pages.filter((p) => snapshot.done.has(p) && !revisedHere.has(p)).length,
+      otherPages: [...revisedHere].filter((p) => !list.has(p)).length,
       minutes,
       memorizedPages: memorizedToday,
       nextPages: next.slice(0, MAX_PAGES),
-      weakNext: next.filter((p) => {
-        const page = byNumber.get(p);
-        return page != null && isWeak(page);
-      }).slice(0, MAX_PAGES),
-      done: assignment.length > 0 && next.length === 0,
+      weakNext: next
+        .filter((p) => {
+          const page = byNumber.get(p);
+          return page != null && isWeak(page);
+        })
+        .slice(0, MAX_PAGES),
+      done: snapshot.status === 'completed',
     },
     weakPages,
     week: Array.from({ length: 7 }, (_, i) => {
       const day = shiftDay(today, i - 6);
-      return { day, pages: pagesOn(logs, day) };
+      // Today as Home says it; earlier days as the streak counts them.
+      return day === today
+        ? { day, pages: revisedHere.size, planned: snapshot.own.length, done: snapshot.status === 'completed' }
+        : { day, pages: pagesRevisedOn(logs, day), planned: scheduled(day).length, done: doneDays.has(day) };
     }),
+    streak: {
+      days: reading.streak,
+      atRisk: reading.grace
+        ? { previous: reading.grace.previous, yesterdayPlanned: reading.grace.progress.scheduled, yesterdayDone: reading.grace.progress.credited }
+        : null,
+    },
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }

@@ -58,13 +58,12 @@ import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
-import { applyCarryOver, leftoversFor, ownPagesOf, type Leftovers } from '../../lib/carryOver';
-import { creditedOnDay, doneOnDay, reviewPagesInOrder } from '../../lib/aheadCredit';
+import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
+import { reviewPagesInOrder } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
-import { streakReadingFromLogs } from '../../lib/streak';
-import { streakReadingFromItems, type HistoryItem } from '../../lib/streakFromItems';
-import { historyOf, withPhoneSessions } from '../../lib/activityHistory';
-import { dateToLocalISODay } from '../../lib/schedulePlans';
+import type { HistoryItem } from '../../lib/streakFromItems';
+import { loadActivityHistory, shareActivityHistory } from '../../lib/activityHistory';
+import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
@@ -163,24 +162,36 @@ export default function DashboardScreen() {
     if (assignment && assignment.pages.length > 0) prefetchPages(assignment.pages);
   }, [assignment]);
 
-  const todayStatus = useMemo(() => {
-    // Today's pages credited to today: revised today, or ahead from an earlier
-    // session (a day done ahead is done).
-    const credited = creditedOnDay(logs, revisionDay);
-    // Today is done when its OWN pages are (SESS-7): catch-up pages are credited to the days they were missed.
-    const own = user && assignment ? ownPagesOf(assignment.pages, user, revisionDay) : (assignment?.pages ?? []);
-    const totalAssigned = own.length;
-    const completed = own.filter((p) => credited.has(p)).length;
-    // If the user revised pages today and the assignment later shrank
-    // (custom-plan edit, un-memorized surah), treat that as completed
-    // rather than letting `remaining` go negative downstream.
-    if (completed > 0 && completed >= totalAssigned) {
-      return { status: 'completed' as const, pagesCompleted: completed };
-    }
-    if (completed > 0)
-      return { status: 'partial' as const, pagesCompleted: completed };
-    return { status: 'not_started' as const, pagesCompleted: 0 };
-  }, [logs, assignment, revisionDay, user]);
+  // The streak's history: the Activity items of the last 400 days (C5), read when the day or the
+  // number of sessions changes, and shared with Revo (lib/activityHistory), which builds from it too.
+  const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const to = revisionDay;
+    const uid = user.id;
+    loadActivityHistory(to)
+      .then((items) => {
+        if (cancelled) return;
+        setHistory(items);
+        shareActivityHistory(uid, to, items);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, revisionDay, logs.length]);
+
+  // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
+  // streak. Revo's context is built from the same function, so the two never disagree.
+  const snapshot = useMemo(
+    () =>
+      user && assignment
+        ? todaySnapshot({ user, pages, logs, day: revisionDay, assignment: assignment.pages, history, now: Date.now() })
+        : null,
+    [user, pages, logs, revisionDay, assignment, history],
+  );
+  const todayStatus = { status: snapshot?.status ?? ('not_started' as const) };
 
   // Done today: the next revision day, which Home's quiet line opens (#168).
   const aheadNext = useMemo(() => {
@@ -200,45 +211,14 @@ export default function DashboardScreen() {
   }, [logs, revisionDay, assignment, pages, user]);
 
   // Today's pages that came from earlier days (they come first: "4 from yesterday first").
-  const carriedPagesToday = useMemo(() => {
-    const carry = user?.carryOver;
-    if (!assignment || !carry || carry.day !== revisionDay) return [];
-    const carried = new Set(carry.pages);
-    return assignment.pages.filter((p) => carried.has(p));
-  }, [user, assignment, revisionDay]);
-  const carriedToday = carriedPagesToday.length;
+  const carriedToday = snapshot?.carried.length ?? 0;
 
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
 
   // The streak (lib/streak): the same rule and the same answer as the widget.
-  // From the Activity items (C5) once the history has loaded (400 days back); the logs until then.
-  const [history, setHistory] = useState<HistoryItem[] | null>(null);
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    const to = revisionDay;
-    const [y, m, d] = to.split('-').map(Number);
-    const from = dateToLocalISODay(new Date(y, m - 1, d - 400));
-    firestoreService
-      .getActivityItemsBetween(from, to)
-      .then((r) => {
-        if (!cancelled) setHistory(historyOf(r.revisions));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [user, revisionDay, logs.length]);
-  const streakNow = useMemo(() => {
-    if (!user) return null;
-    const today = dateToLocalISODay(revisionDate);
-    // The sessions on the phone over the server's items: a session just saved counts at once.
-    return history
-      ? streakReadingFromItems({ user, pages, items: withPhoneSessions(history, logs, Date.now()), today })
-      : streakReadingFromLogs({ user, pages, logs, today });
-  }, [history, logs, revisionDate, user, pages]);
+  const streakNow = snapshot?.streak.reading ?? null;
   const calculatedStreak = streakNow?.streak ?? 0;
 
   // Sessions
@@ -253,9 +233,9 @@ export default function DashboardScreen() {
   // Pages revised today: the Today post's page chips fill in as they're done.
   // Includes pages revised ahead for today (lib/aheadCredit).
   // Also the pages today's sessions revised ahead, so "Done" counts the whole day.
-  const donePagesToday = useMemo(() => doneOnDay(logs, revisionDay), [logs, revisionDay]);
+  const donePagesToday = useMemo(() => snapshot?.done ?? new Set<number>(), [snapshot]);
   // Carried pages still to revise: once today's own pages are done, the button goes on to them.
-  const carriedLeft = carriedPagesToday.filter((p) => !donePagesToday.has(p)).length;
+  const carriedLeft = snapshot?.carriedLeft ?? 0;
 
   const userName = greetingName(user?.name, firebaseUser?.displayName);
 

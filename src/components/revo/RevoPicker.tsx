@@ -19,6 +19,7 @@ import {
 import { pagesLabel } from '../../lib/revo/greeting';
 import type { RevoAttachment } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
+import { reviewedOn } from '../../lib/aheadCredit';
 import { Tap } from '../v2/Tap';
 import type { PickKind } from './RevoComposer';
 import { RevoSubHeader } from './RevoParts';
@@ -36,7 +37,7 @@ interface Choice {
 /** Picking what to add to a question: a list, with search for pages and surahs. */
 export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: () => void; onPick: (a: RevoAttachment) => void }) {
   const { palette } = useTheme();
-  const { logs, pages } = useApp();
+  const { logs, pages, user } = useApp();
   const { day: today, context } = useRevoContext();
   const yesterday = shiftDay(today, -1);
   const [q, setQ] = useState('');
@@ -73,8 +74,8 @@ export function RevoPicker({ kind, onBack, onPick }: { kind: PickKind; onBack: (
       return Array.from({ length: DAYS_BACK }, (_, i) => {
         const d = shiftDay(today, -i);
         const label = dayLabel(d, today, yesterday);
-        const n = logs.filter((l) => l.date === d).reduce((sum, l) => sum + l.pagesRevised.length, 0);
-        return { key: d, title: label, line: n > 0 ? `${n} ${n === 1 ? 'page' : 'pages'} revised` : 'Nothing revised', make: () => dayAttachment({ day: d, label, logs, pages }) };
+        const n = reviewedOn(logs, d).size;
+        return { key: d, title: label, line: n > 0 ? `${n} ${n === 1 ? 'page' : 'pages'} revised` : 'Nothing revised', make: () => dayAttachment({ day: d, label, logs, pages, user }) };
       });
     }
     if (kind === 'page') {

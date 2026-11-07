@@ -25,6 +25,10 @@ export interface RevoContext {
   today: {
     plannedPages: number;
     revisedPages: number;
+    /** From apps after Nov 7 2026 (lib/todaySnapshot); absent from older ones. */
+    carriedPages?: number;
+    doneEarlier?: number;
+    otherPages?: number;
     minutes: number;
     memorizedPages: number;
     nextPages: number[];
@@ -32,7 +36,10 @@ export interface RevoContext {
     done: boolean;
   };
   weakPages: number[];
-  week: { day: string; pages: number }[];
+  /** `planned` and `done` from apps after Nov 7 2026. */
+  week: { day: string; pages: number; planned?: number; done?: boolean }[];
+  /** The streak as Home shows it, from apps after Nov 7 2026. */
+  streak?: { days: number; atRisk: { previous: number; yesterdayPlanned: number; yesterdayDone: number } | null };
   localTime: string | null;
 }
 

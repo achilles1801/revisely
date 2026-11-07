@@ -17,9 +17,10 @@ const ctx = (today: Partial<RevoContext['today']>, extra: Partial<RevoContext> =
     pagesPerDay30: 17.2,
     plannedPerDay: 20,
   },
-  today: { plannedPages: 20, revisedPages: 0, minutes: 0, memorizedPages: 0, nextPages: [], weakNext: [], done: false, ...today },
+  today: { plannedPages: 20, revisedPages: 0, carriedPages: 0, doneEarlier: 0, otherPages: 0, minutes: 0, memorizedPages: 0, nextPages: [], weakNext: [], done: false, ...today },
   weakPages: [548, 549],
   week: [],
+  streak: { days: 12, atRisk: null },
   localTime: '21:41',
   ...extra,
 });

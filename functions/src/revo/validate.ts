@@ -100,7 +100,9 @@ export function validateChatId(v: unknown): string | null {
 
 export function validateContext(v: unknown): RevoContext {
   const c = obj(v, 'context');
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `streak`, `today.carriedPages`, `today.doneEarlier`, `today.otherPages`, `week[].planned` and
+  // `week[].done` come from apps after Nov 7 2026 (lib/todaySnapshot); older apps send without them.
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -108,11 +110,16 @@ export function validateContext(v: unknown): RevoContext {
   for (const k of REVO_TOTALS) totals[k] = num(t[k], 0, MAX_COUNT, `context.totals.${k}`);
 
   const d = obj(c.today, 'context.today');
-  keys(d, ['plannedPages', 'revisedPages', 'minutes', 'memorizedPages', 'nextPages', 'weakNext', 'done'], 'context.today');
+  const TODAY_REQUIRED = ['plannedPages', 'revisedPages', 'minutes', 'memorizedPages', 'nextPages', 'weakNext', 'done'];
+  keys(d, [...TODAY_REQUIRED, 'carriedPages', 'doneEarlier', 'otherPages'], 'context.today', TODAY_REQUIRED);
   if (typeof d.done !== 'boolean') fail('context.today.done');
+  const optionalCount = (v: unknown, path: string) => (v === undefined ? {} : { [path.split('.').pop()!]: int(v, 0, MAX_COUNT, path) });
   const today = {
     plannedPages: int(d.plannedPages, 0, MAX_COUNT, 'context.today.plannedPages'),
     revisedPages: int(d.revisedPages, 0, MAX_COUNT, 'context.today.revisedPages'),
+    ...optionalCount(d.carriedPages, 'context.today.carriedPages'),
+    ...optionalCount(d.doneEarlier, 'context.today.doneEarlier'),
+    ...optionalCount(d.otherPages, 'context.today.otherPages'),
     minutes: rounded(d.minutes, MAX_COUNT, 'context.today.minutes'),
     memorizedPages: int(d.memorizedPages, 0, MAX_COUNT, 'context.today.memorizedPages'),
     nextPages: pages(d.nextPages, 20, 'context.today.nextPages'),
@@ -122,14 +129,37 @@ export function validateContext(v: unknown): RevoContext {
 
   const week = list(c.week, 7, 'context.week', (x, p) => {
     const w = obj(x, p);
-    keys(w, ['day', 'pages'], p);
-    return { day: day(w.day, `${p}.day`), pages: int(w.pages, 0, MAX_COUNT, `${p}.pages`) };
+    keys(w, ['day', 'pages', 'planned', 'done'], p, ['day', 'pages']);
+    if (w.done !== undefined && typeof w.done !== 'boolean') fail(`${p}.done`);
+    return {
+      day: day(w.day, `${p}.day`),
+      pages: int(w.pages, 0, MAX_COUNT, `${p}.pages`),
+      ...(w.planned === undefined ? {} : { planned: int(w.planned, 0, MAX_COUNT, `${p}.planned`) }),
+      ...(w.done === undefined ? {} : { done: w.done as boolean }),
+    };
   });
+
+  let streak: RevoContext['streak'];
+  if (c.streak !== undefined) {
+    const s = obj(c.streak, 'context.streak');
+    keys(s, ['days', 'atRisk'], 'context.streak');
+    let atRisk: NonNullable<RevoContext['streak']>['atRisk'] = null;
+    if (s.atRisk !== null) {
+      const r = obj(s.atRisk, 'context.streak.atRisk');
+      keys(r, ['previous', 'yesterdayPlanned', 'yesterdayDone'], 'context.streak.atRisk');
+      atRisk = {
+        previous: int(r.previous, 0, MAX_COUNT, 'context.streak.atRisk.previous'),
+        yesterdayPlanned: int(r.yesterdayPlanned, 0, MAX_COUNT, 'context.streak.atRisk.yesterdayPlanned'),
+        yesterdayDone: int(r.yesterdayDone, 0, MAX_COUNT, 'context.streak.atRisk.yesterdayDone'),
+      };
+    }
+    streak = { days: int(s.days, 0, MAX_COUNT, 'context.streak.days'), atRisk };
+  }
 
   const lt = c.localTime ?? null;
   if (lt !== null && (typeof lt !== 'string' || !TIME_RE.test(lt))) fail('context.localTime');
 
-  return { totals, today, weakPages: pages(c.weakPages, 30, 'context.weakPages'), week, localTime: lt };
+  return { totals, today, weakPages: pages(c.weakPages, 30, 'context.weakPages'), week, ...(streak ? { streak } : {}), localTime: lt };
 }
 
 const ATTACH_KEYS: Record<RevoAttachment['kind'], readonly string[]> = {
