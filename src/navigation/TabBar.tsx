@@ -8,6 +8,7 @@ import { useTheme } from '../context/ThemeContext';
 import { layoutV2 } from '../theme/v2';
 import { useReduceMotion } from '../design/motion';
 import { useMiniPlayer } from '../lib/nowPlaying';
+import { REVO_BUTTON_FOOTPRINT, useRevoPresent } from '../lib/revo/presence';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../components/player/MiniPlayer';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -39,7 +40,9 @@ export function useTabBarHeight() {
  */
 export function useTabBarFootprint() {
   const { visible } = useMiniPlayer();
-  return useTabBarHeight() + (visible ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0);
+  // Revo's button sits above the bar on the main screens: room for the last row to scroll clear.
+  const revo = useRevoPresent() ? REVO_BUTTON_FOOTPRINT : 0;
+  return useTabBarHeight() + (visible ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0) + revo;
 }
 
 function isHidden(tabBarStyle: unknown): boolean {

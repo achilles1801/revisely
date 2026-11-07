@@ -1,0 +1,10 @@
+# Sets the E2E build's Revo stand-in (src/lib/e2e/revoFake.ts): QUERY is the link's query,
+# e.g. "optin=1&left=0&day=2026-11-03". Safe to send twice (the stand-in ignores repeats).
+appId: com.revisionbuddy.app
+---
+- openLink:
+    link: revisely://e2e/revo?${QUERY}
+    optional: true
+- runFlow: open-link-prompt.yaml
+- waitForAnimationToEnd:
+    timeout: 1500

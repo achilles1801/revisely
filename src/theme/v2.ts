@@ -479,3 +479,23 @@ export function mixColors(a: string, b: string, t: number): string {
   const out = [0, 1, 2].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k));
   return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 }
+
+/**
+ * Revo's mark (the assistant's button, its header capsule, the opt-in): the app icon's
+ * gradient R on a black disc lit from the top-left. The same in light and dark; the disc
+ * gets a lavender ring and an Indigo glow in dark, a soft shadow in light.
+ */
+export const revoV2 = {
+  /** The R's gradient (the app icon's Indigo → Lavender). */
+  rStart: '#624BD5',
+  rEnd: '#9789DA',
+  /** The disc's radial light, top-left to edge. */
+  discLight: '#2B2352',
+  discMid: '#0A0A12',
+  discEdge: '#000000',
+  /** Dark: the 1pt ring (at 60%) and the glow. */
+  ring: '#9789DA',
+  glow: '#624BD5',
+  /** Light: the shadow. */
+  shadow: '#14103C',
+} as const;

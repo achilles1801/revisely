@@ -1165,13 +1165,18 @@ export async function callFunction(
   if (!resp.ok) {
     const text = await resp.text();
     let message = `HTTP ${resp.status}: ${text.slice(0, 200)}`;
+    // The callable's error status (e.g. RESOURCE_EXHAUSTED) and details, for callers that tell cases apart.
+    let code: string | undefined;
+    let details: unknown;
     try {
       const parsed = JSON.parse(text);
       if (parsed?.error?.message) message = parsed.error.message;
+      if (typeof parsed?.error?.status === 'string') code = parsed.error.status;
+      details = parsed?.error?.details;
     } catch {
       // keep raw
     }
-    throw new Error(message);
+    throw Object.assign(new Error(message), { code, details, httpStatus: resp.status });
   }
   try {
     return await resp.json();
