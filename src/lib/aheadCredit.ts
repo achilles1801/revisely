@@ -42,13 +42,13 @@ export function catchUpPagesOf(log: Pick<RevisionLog, 'date' | 'ahead'>): number
 }
 
 /**
- * What finishes each day, for "is this day done": creditIndex, plus the catch-up pages each
- * session revised, on the session's own day. They stay credited to the days they were missed; on
- * the session's day they count only where they are its due pages (lib/carryOver duePagesOf: Keep
- * daily amount filled the day with them), since a day's own pages never include them.
+ * The catch-up pages each day's sessions revised, by the session's day. They are credited to the
+ * days they were missed (SESS-7); they finish the session's own day only when they are all it
+ * needs: Keep daily amount filled the day with them (lib/carryOver duePagesOf). A day with pages
+ * of its own is never finished by them, even a page that is both (a small plan wraps round).
  */
-export function dueCreditIndex(logs: readonly RevisionLog[]): CreditIndex {
-  const index = creditIndex(logs);
+export function catchUpIndex(logs: readonly RevisionLog[]): CreditIndex {
+  const index: CreditIndex = new Map();
   for (const log of logs) {
     const pages = catchUpPagesOf(log);
     if (pages.length === 0) continue;
@@ -59,9 +59,33 @@ export function dueCreditIndex(logs: readonly RevisionLog[]): CreditIndex {
   return index;
 }
 
-/** `day`'s pages in dueCreditIndex. Empty when none. */
-export function dueCreditedOnDay(logs: readonly RevisionLog[], day: string): ReadonlySet<number> {
-  return dueCreditIndex(logs).get(day) ?? new Set<number>();
+/** `day`'s pages in catchUpIndex. Empty when none. */
+export function caughtUpOnDay(logs: readonly RevisionLog[], day: string): ReadonlySet<number> {
+  return catchUpIndex(logs).get(day) ?? new Set<number>();
+}
+
+/**
+ * Whether `need` (a day's due pages) is done: every page credited to the day, or, for a day the
+ * carried pages fill, every page caught up in its sessions. Never some of each (SESS-7).
+ */
+export function needDone(
+  need: readonly number[],
+  credited: ReadonlySet<number> | undefined,
+  caughtUp: ReadonlySet<number> | undefined,
+): boolean {
+  if (need.length === 0) return false;
+  return need.every((p) => credited?.has(p)) || need.every((p) => caughtUp?.has(p));
+}
+
+/** How many of `need` are done, the way needDone counts them. */
+export function needDoneCount(
+  need: readonly number[],
+  credited: ReadonlySet<number> | undefined,
+  caughtUp: ReadonlySet<number> | undefined,
+): number {
+  const byCredit = need.filter((p) => credited?.has(p)).length;
+  const byCatchUp = need.filter((p) => caughtUp?.has(p)).length;
+  return Math.max(byCredit, byCatchUp);
 }
 
 /** The pages credited to `day` (see creditIndex). Empty when none. */

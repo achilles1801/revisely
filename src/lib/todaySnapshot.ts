@@ -4,7 +4,7 @@
 // read the logs its own way and contradicted itself and Home).
 
 import type { RevisionLog, User, UserPage } from '../types';
-import { doneOnDay, dueCreditedOnDay } from './aheadCredit';
+import { caughtUpOnDay, creditedOnDay, doneOnDay, needDoneCount } from './aheadCredit';
 import { withPhoneSessions } from './activityHistory';
 import { carryOverOn } from './algorithm';
 import { duePagesOf } from './carryOver';
@@ -38,11 +38,15 @@ export interface TodaySnapshot {
 }
 
 /**
- * Home's status for today: done when its due pages are (SESS-7). `credited` is dueCreditedOnDay:
- * today's credit, and the catch-up pages its sessions revised (they finish a day they fill).
+ * Home's status for today: done when its due pages are (SESS-7): credited to it, or, for a day the
+ * carried pages fill, caught up in its sessions (`caughtUp`, lib/aheadCredit needDone).
  */
-export function todayStatusOf(own: readonly number[], credited: ReadonlySet<number>): { status: TodayStatus; pagesCompleted: number } {
-  const completed = own.filter((p) => credited.has(p)).length;
+export function todayStatusOf(
+  own: readonly number[],
+  credited: ReadonlySet<number>,
+  caughtUp?: ReadonlySet<number>,
+): { status: TodayStatus; pagesCompleted: number } {
+  const completed = needDoneCount(own, credited, caughtUp);
   // Pages revised today and the assignment later shrank (a custom-plan edit, an un-memorized surah):
   // done, rather than a negative "left".
   if (completed > 0 && completed >= own.length) return { status: 'completed', pagesCompleted: completed };
@@ -76,7 +80,7 @@ export function todaySnapshot(input: {
   const own = duePagesOf(list, user, day);
   const carried = carriedPagesOn(user, day, list);
   const done = doneOnDay(logs, day);
-  const { status } = todayStatusOf(own, dueCreditedOnDay(logs, day));
+  const { status } = todayStatusOf(own, creditedOnDay(logs, day), caughtUpOnDay(logs, day));
   // From the Activity items once they've loaded, with the phone's sessions over them; the logs until then.
   const streak = history
     ? streakDetailFromItems({ user, pages, items: withPhoneSessions(history, logs, input.now), today: day })

@@ -4,7 +4,7 @@
 // through yesterday until today's revision day ends. Pure: the callers pass the logs and pages.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { dueCreditIndex } from './aheadCredit';
+import { catchUpIndex, creditIndex, needDone, needDoneCount } from './aheadCredit';
 import { planDuePages } from './carryOver';
 
 /** The day before an ISO day ('YYYY-MM-DD'). UTC calendar arithmetic: no daylight-saving shift. */
@@ -16,16 +16,18 @@ export function previousIsoDay(s: string): string {
 /**
  * The days whose scheduled pages are all credited to them. `credited` maps each day to the
  * pages credited to it (creditIndex); `scheduled` gives a day's pages. A day with nothing
- * scheduled never counts.
+ * scheduled never counts. `caughtUp` (catchUpIndex): a day the carried pages fill is done when
+ * its sessions have revised them all, though they are credited to the days they were missed
+ * (SESS-7, lib/aheadCredit needDone).
  */
 export function completedDays(
   credited: ReadonlyMap<string, ReadonlySet<number>>,
   scheduled: (day: string) => readonly number[],
+  caughtUp: ReadonlyMap<string, ReadonlySet<number>> = new Map(),
 ): Set<string> {
   const done = new Set<string>();
-  for (const [day, pages] of credited) {
-    const need = scheduled(day);
-    if (need.length > 0 && need.every((p) => pages.has(p))) done.add(day);
+  for (const day of new Set([...credited.keys(), ...caughtUp.keys()])) {
+    if (needDone(scheduled(day), credited.get(day), caughtUp.get(day))) done.add(day);
   }
   return done;
 }
@@ -61,7 +63,7 @@ export function streakFromLogs(input: {
     if (assigned) return assigned;
     return planDuePages(input.user, day, memorized);
   };
-  return aliveStreak(completedDays(dueCreditIndex(input.logs), scheduled), input.today);
+  return aliveStreak(completedDays(creditIndex(input.logs), scheduled, catchUpIndex(input.logs)), input.today);
 }
 
 /** A day's progress: its scheduled pages and how many are credited to it. */
@@ -87,6 +89,8 @@ export function streakReading(input: {
   onTime: ReadonlySet<string>;
   scheduled: (day: string) => readonly number[];
   credited: ReadonlyMap<string, ReadonlySet<number>>;
+  /** Catch-up pages revised in each day's sessions (completedDays): they count for a day they fill. */
+  caughtUp?: ReadonlyMap<string, ReadonlySet<number>>;
   today: string;
 }): StreakReading {
   const { done, onTime, today } = input;
@@ -107,10 +111,10 @@ export function streakReading(input: {
   const previous = runFrom(onTime, previousIsoDay(yesterday));
   if (previous === 0) return { streak: 0, grace: null };
   const need = input.scheduled(yesterday);
-  const got = input.credited.get(yesterday) ?? new Set<number>();
+  const credited = needDoneCount(need, input.credited.get(yesterday), input.caughtUp?.get(yesterday));
   return {
     streak: 0,
-    grace: { previous, progress: { scheduled: need.length, credited: need.filter((p) => got.has(p)).length } },
+    grace: { previous, progress: { scheduled: need.length, credited } },
   };
 }
 
@@ -149,10 +153,11 @@ export function streakDetailFromLogs(input: { user: User; pages: readonly UserPa
     if (assigned) return assigned;
     return planDuePages(input.user, day, memorized);
   };
-  // A day's due pages (SESS-7): credited to it, or catch-up pages revised in its session that fill it.
-  const credited = dueCreditIndex(input.logs);
-  const done = completedDays(credited, scheduled);
+  const credited = creditIndex(input.logs);
+  // A day the carried pages fill is done by its sessions' catch-up pages (SESS-7).
+  const caughtUp = catchUpIndex(input.logs);
+  const done = completedDays(credited, scheduled, caughtUp);
   // The logs alone cannot say when a page was revised. Until the items carry a time, a day counts
   // as on time when it is done (the grace rule then matches the done-day rule).
-  return { reading: streakReading({ done, onTime: done, scheduled, credited, today: input.today }), done, scheduled };
+  return { reading: streakReading({ done, onTime: done, scheduled, credited, caughtUp, today: input.today }), done, scheduled };
 }

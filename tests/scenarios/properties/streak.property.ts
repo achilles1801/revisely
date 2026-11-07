@@ -258,6 +258,16 @@ describe('the streak from items (C5)', () => {
     expect(streakReadingFromItems({ user, pages: [], items: withNext, today: '2026-11-05' }).streak).toBe(2);
   });
 
+  it('[SESS-7] a day with pages of its own is not finished by a catch-up page, even one that is also its own', () => {
+    // A small plan wraps round: page 3 is 11-02's and 11-03's. Caught up on 11-03 for 11-02, it
+    // counts for 11-02 only; 11-03 still needs its own revision of it.
+    const logs = [log('2026-11-03', [3, 4], [4], { '2026-11-02': [3] })];
+    const detail = streakDetailFromLogs({ user, pages: [], logs, today: '2026-11-03' });
+    expect(detail.done.has('2026-11-03')).toBe(false);
+    const fromItems = streakDetailFromItems({ user, pages: [], items: withPhoneSessions([], logs, dayMs('2026-11-03')), today: '2026-11-03' });
+    expect(fromItems.done.has('2026-11-03')).toBe(false);
+  });
+
   it('[SESS-6] a session at 00:30 before Fajr is still the day before (Fajr on)', () => {
     // Revision day 2026-11-03 ends at Fajr on 11-04, not at midnight: 00:30 on 11-04 is on time for it.
     const fajrUser = {

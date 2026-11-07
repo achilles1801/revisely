@@ -72,8 +72,13 @@ const leftoverCaseArb = fc
 /** The leftovers by the rule, written out from the documentation (not the code). */
 function leftoversByRule(c: { today: string; memorized: number[]; todaysPages: number[]; lookback: number; logs: RevisionLog[] }) {
   const firstDay = addDays(c.today, -c.lookback);
-  // Revised at any point in the window, whichever day it was planned for.
-  const revisedOn = (p: number) => c.logs.some((l) => l.date >= firstDay && l.date <= c.today && l.pagesRevised.includes(p));
+  // Revised at any point in the window, whichever day it was planned for. A catch-up page is
+  // revised too: it sits in its session's credit for the earlier day, not its pagesRevised (SESS-7).
+  const revisedIn = (l: RevisionLog) => [
+    ...l.pagesRevised,
+    ...Object.entries(l.ahead ?? {}).filter(([day]) => day < l.date).flatMap(([, pages]) => pages),
+  ];
+  const revisedOn = (p: number) => c.logs.some((l) => l.date >= firstDay && l.date <= c.today && revisedIn(l).includes(p));
   const credited = (p: number, day: string) =>
     c.logs.some((l) => (l.date === day && l.pagesRevised.includes(p)) || (l.ahead?.[day] ?? []).includes(p));
   const out: number[] = [];

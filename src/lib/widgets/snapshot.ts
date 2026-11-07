@@ -7,7 +7,7 @@
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
 import { generateDailyAssignment } from '../algorithm';
-import { dueCreditedOnDay, dueCreditIndex } from '../aheadCredit';
+import { catchUpIndex, caughtUpOnDay, creditedOnDay, creditIndex, needDone, needDoneCount } from '../aheadCredit';
 import { duePagesOf, planDuePages } from '../carryOver';
 import { aliveStreak, completedDays } from '../streak';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
@@ -188,7 +188,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
   // A day with a session, or whose pages were all revised ahead, is a day done.
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
-  const done = completedDays(dueCreditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? planDuePages(user, d, memorized));
+  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? planDuePages(user, d, memorized), catchUpIndex(input.logs));
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -198,13 +198,14 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const runs = pageRuns(assignment.pages);
 
     // As Home: done once every page of the day is revised, today or ahead.
-    const credited = dueCreditedOnDay(input.logs, day);
+    const credited = creditedOnDay(input.logs, day);
+    const caughtUp = caughtUpOnDay(input.logs, day);
     // The pages that finish the day (SESS-7): its own; or the carried pages, when Keep daily
     // amount filled the day with them (they still count for the days they were missed).
     const own = duePagesOf(assignment.pages, user, day);
     const total = own.length;
-    const doneHere = own.filter((p) => credited.has(p)).length;
-    const completed = total > 0 && doneHere >= total;
+    const doneHere = needDoneCount(own, credited, caughtUp);
+    const completed = needDone(own, credited, caughtUp);
 
     days.push({
       day,

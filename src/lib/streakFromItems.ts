@@ -51,6 +51,10 @@ export function streakDetailFromItems(input: {
   const own = new Map<string, HistoryItem>();
   const credited = new Map<string, Set<number>>();
   const onTime = new Map<string, Set<number>>();
+  // Catch-up pages by the day they were revised on (lib/aheadCredit catchUpIndex), and of them those
+  // revised before that day ended: a day the carried pages fill is done by them (SESS-7).
+  const caughtUp = new Map<string, Set<number>>();
+  const caughtUpOnTime = new Map<string, Set<number>>();
   const add = (map: Map<string, Set<number>>, day: string, pages: readonly number[]) => {
     const set = map.get(day) ?? new Set<number>();
     for (const p of pages) set.add(p);
@@ -61,11 +65,9 @@ export function streakDetailFromItems(input: {
     if (item.day === day) own.set(day, item);
     add(credited, day, item.pages);
     if (item.occurredAt != null && item.occurredAt < dayEndMs(day, input.user)) add(onTime, day, item.pages);
-    // Catch-up pages (credited to an earlier day) also finish the day they were revised on, where
-    // they are its due pages: Keep daily amount filled it with them (SESS-7, lib/aheadCredit dueCreditIndex).
     if (day < item.day) {
-      add(credited, item.day, item.pages);
-      if (item.occurredAt != null && item.occurredAt < dayEndMs(item.day, input.user)) add(onTime, item.day, item.pages);
+      add(caughtUp, item.day, item.pages);
+      if (item.occurredAt != null && item.occurredAt < dayEndMs(item.day, input.user)) add(caughtUpOnTime, item.day, item.pages);
     }
   }
   const scheduled = (day: string): readonly number[] => {
@@ -73,7 +75,7 @@ export function streakDetailFromItems(input: {
     if (item) return item.assigned;
     return planDuePages(input.user, day, memorized);
   };
-  const done = completedDays(credited, scheduled);
-  const early = completedDays(onTime, scheduled);
-  return { reading: streakReading({ done, onTime: early, scheduled, credited, today: input.today }), done, scheduled };
+  const done = completedDays(credited, scheduled, caughtUp);
+  const early = completedDays(onTime, scheduled, caughtUpOnTime);
+  return { reading: streakReading({ done, onTime: early, scheduled, credited, caughtUp, today: input.today }), done, scheduled };
 }
