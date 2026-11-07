@@ -1,19 +1,23 @@
-// Maestro runScript (runs in Maestro, on this computer): fills the flow's new account with a
-// fortnight of Activity history, so the Activity screens have something to show (gap audit verify
-// boards). Writes through the Auth and Firestore emulators as the emulators' admin ("Bearer owner"),
-// the way server-session.js reads them. The account is output.email (subflows/signup.yaml).
+// Maestro runScript (runs in Maestro, on this computer): fills the flow's new account with the Activity
+// history the mocks show (activity-redesign/png: d3 October, d1 Tuesday 3 November), so each screenshot
+// can be put beside its mock (scripts/verify/activity-boards.py). Writes through the Auth and Firestore
+// emulators as their admin ("Bearer owner"), as server-session.js reads them, in one commit.
+// The account is output.email (subflows/signup.yaml).
 //
-// What it writes, for the test clock's fortnight (Oct 20 – Nov 3 2026):
-//   - the account's previewTester flag (the Activity blocks are for testers);
-//   - a Revised item a day (most days; some missed, some partly done), with minutes;
-//   - a Memorized item on two days, and two timed reads;
-//   - two notes in the day's log, one tagged to that day's Revised block.
-// Memorized pages are the signup's (Al-Fatihah and Juz 30: page 1 and 582–604).
+// What it writes:
+//   - previewTester (the Activity blocks are for testers);
+//   - Juz 28's pages (542–561) memorized, with the ratings d1 shows: 548–549 weak, four moderate;
+//   - October as d3 shows it: 26 days revised (four of them partly), 9 days memorized (a page each),
+//     10 days read, 14 days with a note, and 9, 10, 17, 24 and 30 left out;
+//   - 1 and 2 November revised whole;
+//   - 3 November as d1 shows it: 18 of 20 revised (556–557 skipped), 34 minutes; a page memorized;
+//     a timed read; a note tagged to the day's Revised block.
 
 var AUTH = typeof E2E_AUTH_URL !== 'undefined' && E2E_AUTH_URL ? E2E_AUTH_URL : 'http://127.0.0.1:9099';
 var FIRESTORE = typeof E2E_FIRESTORE_URL !== 'undefined' && E2E_FIRESTORE_URL ? E2E_FIRESTORE_URL : 'http://127.0.0.1:8080';
 var PROJECT = 'demo-revisely';
 var ROOT = FIRESTORE + '/v1/projects/' + PROJECT + '/databases/(default)/documents';
+var NAME = 'projects/' + PROJECT + '/databases/(default)/documents/';
 var admin = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
 var lookup = http.post(AUTH + '/identitytoolkit.googleapis.com/v1/projects/' + PROJECT + '/accounts:lookup', {
@@ -23,7 +27,6 @@ var lookup = http.post(AUTH + '/identitytoolkit.googleapis.com/v1/projects/' + P
 var users = json(lookup.body).users || [];
 if (users.length !== 1) throw new Error('no account for ' + output.email + ' in the Auth emulator');
 var uid = users[0].localId;
-var USER = ROOT + '/users/' + uid;
 
 // Firestore's typed JSON for a plain value.
 function fv(v) {
@@ -41,105 +44,120 @@ function fv(v) {
   return { mapValue: { fields: fields } };
 }
 
-// Writes are gathered and sent as one commit at the end (the emulator's batch endpoint).
 var writes = [];
-var NAME = 'projects/' + PROJECT + '/databases/(default)/documents/';
-
-function put(path, body, mask) {
-  var w = { update: { name: NAME + path, fields: body } };
-  if (mask) w.updateMask = { fieldPaths: [mask] };
-  writes.push(w);
+/** Sets `data`'s fields on the document at `path`, leaving its other fields as they are. */
+function merge(path, data) {
+  var mask = [];
+  for (var k in data) mask.push(k);
+  writes.push({ update: { name: NAME + path, fields: fv(data).mapValue.fields }, updateMask: { fieldPaths: mask } });
+}
+/** Writes the document at `path` as `data`. */
+function set(path, data) {
+  writes.push({ update: { name: NAME + path, fields: fv(data).mapValue.fields } });
+}
+function range(from, to) {
+  var out = [];
+  for (var p = from; p <= to; p++) out.push(p);
+  return out;
+}
+function noon(day) {
+  var parts = day.split('-');
+  return Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 18, 0); // 12:00 in Chicago
 }
 
-function create(collection, id, data) {
-  writes.push({ update: { name: NAME + collection + '/' + id, fields: fv(data).mapValue.fields } });
+// 1. The tester flag.
+merge('users/' + uid, { previewTester: true });
+
+// 2. Juz 28 memorized, with d1's ratings (1–2 weak, 3 moderate, 4–5 strong).
+var JUZ28 = range(542, 561);
+var WEAK = [548, 549];
+var MODERATE = [544, 551, 553, 559];
+for (var j = 0; j < JUZ28.length; j++) {
+  var page = JUZ28[j];
+  var rating = WEAK.indexOf(page) >= 0 ? 2 : MODERATE.indexOf(page) >= 0 ? 3 : 4;
+  merge('users/' + uid + '/pages/' + page, { status: 'memorized', weaknessRating: rating, dateMemorized: '2026-09-01T12:00:00.000Z' });
 }
+// Pages to revise from: Juz 28, Al-Fatihah and Juz 30 (the signup's).
+var POOL = JUZ28.concat([1]).concat(range(582, 604));
 
-// 1. The tester flag: the Activity blocks show for previewTester accounts (activityBlocksEnabled).
-put('users/' + uid, { previewTester: { booleanValue: true } }, 'previewTester');
-
-// 2. A fortnight of Revised items. Day i of Oct 20 + i; noon UTC as the time of the session.
-var MEMORIZED = [1];
-for (var p = 582; p <= 604; p++) MEMORIZED.push(p);
-var start = Date.UTC(2026, 9, 20, 12, 0);
-var DAY_MS = 86400000;
-for (var i = 0; i < 15; i++) {
-  if (i % 5 === 4) continue; // a missed day
-  var d = new Date(start + i * DAY_MS);
-  var day = d.toISOString().slice(0, 10);
-  var assigned = [];
-  for (var a = 0; a < 10; a++) assigned.push(MEMORIZED[(i * 3 + a) % MEMORIZED.length]);
-  var revised = assigned.filter(function (page, idx) {
-    return !(i % 3 === 0 && idx >= 7); // partly done on some days: the last three skipped
+function revision(day, assigned, revised, minutes) {
+  var skipped = assigned.filter(function (p) {
+    return revised.indexOf(p) < 0;
   });
-  var skipped = assigned.filter(function (page) {
-    return revised.indexOf(page) < 0;
-  });
-  create('users/' + uid + '/revisions', day + '-s', {
-    id: day + '-s',
+  set('users/' + uid + '/revisions/' + day, {
+    id: day,
     uid: uid,
     day: day,
-    occurredAt: start + i * DAY_MS,
+    occurredAt: noon(day),
     countsFor: day,
     source: 'session',
     pages: revised,
     skipped: skipped,
     assigned: assigned,
-    minutes: 20 + (i % 15),
+    minutes: minutes,
     recordings: [],
   });
 }
-
-// 3. Memorized on two days, and two timed reads.
-create('users/' + uid + '/memorizations', '2026-10-24', {
-  id: '2026-10-24',
-  day: '2026-10-24',
-  occurredAt: Date.UTC(2026, 9, 24, 12, 0),
-  pages: [582, 583, 584],
-  source: 'manual',
-  minutes: null,
-  recordings: [],
-});
-create('users/' + uid + '/memorizations', '2026-10-30', {
-  id: '2026-10-30',
-  day: '2026-10-30',
-  occurredAt: Date.UTC(2026, 9, 30, 12, 0),
-  pages: [585, 586],
-  source: 'manual',
-  minutes: null,
-  recordings: [],
-});
-create('users/' + uid + '/reads', 'read-1027', {
-  id: 'read-1027',
-  day: '2026-10-27',
-  occurredAt: Date.UTC(2026, 9, 27, 18, 0),
-  pages: [590, 591],
-  minutes: 15,
-  source: 'automatic',
-  recordings: [],
-});
-create('users/' + uid + '/reads', 'read-1101', {
-  id: 'read-1101',
-  day: '2026-11-01',
-  occurredAt: Date.UTC(2026, 10, 1, 18, 0),
-  pages: [600],
-  minutes: 8,
-  source: 'automatic',
-  recordings: [],
-});
-
-// 4. Two notes in the day's log: one tagged to that day's Revised block (ACT-11), one plain.
-var notes = [
-  { day: '2026-11-02', id: 'note-a', text: 'Juz 30 starts to slip at the turn: read the pairs twice.', tag: 'revision:2026-11-02' },
-  { day: '2026-11-03', id: 'note-b', text: 'Ask Umm Hani about the recitation pace.', tag: null },
-];
-for (var n = 0; n < notes.length; n++) {
-  var note = notes[n];
-  var at = Date.UTC(2026, 10, n + 2, 21, 0);
-  var entry = { id: note.id, at: at, kind: 'note', text: note.text, minutes: null };
-  if (note.tag) entry.tag = note.tag;
-  create('users/' + uid + '/journal/' + note.day + '/entries', note.id, entry);
+function memorization(day, pages) {
+  set('users/' + uid + '/memorizations/' + day, {
+    id: day,
+    uid: uid,
+    day: day,
+    occurredAt: noon(day),
+    pages: pages,
+    source: 'manual',
+    minutes: null,
+    recordings: [],
+  });
 }
+function read(day, pages, minutes) {
+  set('users/' + uid + '/reads/read-' + day, {
+    id: 'read-' + day,
+    uid: uid,
+    day: day,
+    occurredAt: noon(day) + 6 * 3600000,
+    pages: pages,
+    minutes: minutes,
+    source: 'automatic',
+    recordings: [],
+  });
+}
+function note(day, id, text, at, tag) {
+  var entry = { id: id, uid: uid, day: day, at: at, kind: 'note', text: text, minutes: null };
+  if (tag) entry.tag = tag;
+  set('users/' + uid + '/journal/' + day + '/entries/' + id, entry);
+}
+
+// 3. October, as d3 shows it.
+var PARTLY = { 4: 15, 12: 17, 19: 14, 25: 13 }; // pages revised of 20
+var MISSED = [9, 10, 17, 24, 30];
+var MEMORIZED_ON = [2, 6, 8, 13, 15, 20, 22, 27, 29];
+var READ_ON = [2, 3, 9, 11, 16, 18, 23, 28, 30, 31];
+var NOTE_ON = [1, 3, 5, 7, 12, 14, 17, 19, 21, 25, 26, 28, 29, 31];
+for (var d = 1; d <= 31; d++) {
+  var day = '2026-10-' + (d < 10 ? '0' + d : String(d));
+  if (MISSED.indexOf(d) < 0) {
+    var assigned = [];
+    for (var a = 0; a < 20; a++) assigned.push(POOL[(d * 7 + a) % POOL.length]);
+    var count = PARTLY[d] || 20;
+    revision(day, assigned, assigned.slice(0, count), d === 28 ? 31 : 25 + (d % 10));
+  }
+  if (MEMORIZED_ON.indexOf(d) >= 0) memorization(day, [562 + MEMORIZED_ON.indexOf(d)]);
+  if (READ_ON.indexOf(d) >= 0) read(day, d === 28 ? range(562, 567) : [562, 563], d === 28 ? 22 : 25);
+  if (NOTE_ON.indexOf(d) >= 0) note(day, 'note-' + day, 'Read Al-Mulk twice before Fajr.', noon(day) + 3 * 3600000, null);
+}
+
+// 4. 1 and 2 November, revised whole.
+revision('2026-11-01', POOL.slice(20, 40), POOL.slice(20, 40), 28);
+revision('2026-11-02', POOL.slice(0, 20), POOL.slice(0, 20), 30);
+
+// 5. Tuesday 3 November, as d1 shows it.
+revision('2026-11-03', JUZ28, JUZ28.filter(function (p) {
+  return p !== 556 && p !== 557;
+}), 34);
+memorization('2026-11-03', [563]);
+read('2026-11-03', [564, 565], 12);
+note('2026-11-03', 'note-d1', '548–549 keep slipping at the turn. Read them twice before Fajr.', Date.UTC(2026, 10, 4, 3, 40), 'revision:2026-11-03');
 
 var commit = http.post(ROOT + ':commit', { headers: admin, body: JSON.stringify({ writes: writes }) });
 if (commit.status >= 300) throw new Error('seed commit failed: HTTP ' + commit.status + ' ' + commit.body);
