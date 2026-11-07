@@ -96,7 +96,7 @@ describe('Pages by strength (ACT-12)', () => {
     expect(screen.queryByTestId('browse-page-600')).toBeNull();
   });
 
-  it('Pages | Surahs | Juz are Activity's tabs: ink pills that hug their labels, the chosen one filled', async () => {
+  it('Pages | Surahs | Juz are Activity’s tabs: ink pills that hug their labels, the chosen one filled', async () => {
     await open();
     const palette = paletteV2(false, DEFAULT_ACCENT);
     const flat = (style: unknown) => Object.assign({}, ...[style].flat(5).filter(Boolean));
