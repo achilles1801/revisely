@@ -10,6 +10,7 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
 import { Phone, OpenApp } from '../harness/phone';
+import { aheadAt, catchUpWhat, plain } from '../harness/words';
 
 type AheadCredit = typeof import('../../../src/lib/aheadCredit');
 
@@ -51,7 +52,7 @@ describe('Keep daily amount, the missed pages filling today', () => {
   it('[CARRY-2] [SESS-7] [SESS-6] [SESS-2] a missed day added to today: today is its pages alone; revised, yesterday is back and today is done', async () => {
     const phone = await missedWednesday();
     const { app, home } = await openHome(phone, '2026-11-05 09:00');
-    expect(home.catchUp()).toBe('Missed yesterday · Revise p. 11–15');
+    expect(plain(home.catchUp())).toBe(`Missed yesterday · Revise ${catchUpWhat(pagesRange(11, 15))}`);
     // Wednesday missed after two days done: the grace.
     await home.untilStreak(2, true);
 
@@ -73,7 +74,7 @@ describe('Keep daily amount, the missed pages filling today', () => {
     // Monday, Tuesday, Wednesday (back in its grace window) and today.
     await home.untilStreak(4);
     // Today's own pages (16–20) are tomorrow's, offered ahead.
-    expect(home.ahead()).toMatch(/^Tomorrow starts at .+, p\.\s16(?!\d)/);
+    expect(plain(home.ahead())).toMatch(aheadAt('Tomorrow', 16));
     await app.close();
   });
 

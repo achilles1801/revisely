@@ -7,11 +7,11 @@ import {
   displayMs,
   elapsedMs,
   formatClock,
-  formatPageRanges,
   formatStopwatch,
   MIN_SESSION_SECONDS,
 } from '../../lib/readingTimer';
 import type { ReadingTimerMode } from '../../types';
+import { describePassage } from '../../lib/passages';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
@@ -228,9 +228,9 @@ export function TimerControls(props: TimerControlsProps) {
       : targetSeconds != null
         ? `${mode === 'countDown' ? 'remaining of ' : 'of '}${lengthLabel(Math.round(targetSeconds / 60))}`
         : (timer.pagesRevised?.length ?? 0) > 0
-          ? `Pages revised: ${formatPageRanges(timer.pagesRevised ?? [])}`
+          ? `Revised: ${describePassage(timer.pagesRevised ?? [], { form: 'short', max: 2 })}`
           : timer.pagesVisited.length > 0
-            ? `Pages opened: ${formatPageRanges(timer.pagesVisited)}`
+            ? `Opened: ${describePassage(timer.pagesVisited, { form: 'short', max: 2 })}`
             : 'Saved to Activity when you end it'
     : kind === 'stopwatch'
       ? 'Runs until you end it'

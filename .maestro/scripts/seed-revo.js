@@ -6,7 +6,7 @@
 //
 // What it writes:
 //   - Juz 28 (542–561) memorized and nothing else (the signup's Al-Fatihah and Juz 30 unmarked), 20
-//     pages a day: every day's revision is Juz 28, so today is "Continue at Al-Hashr, p. 548".
+//     pages a day: every day's revision is Juz 28, so today is "Continue at Al-Hashr, ayah 17" (page 548).
 //   - Ratings: 548–549 weak (2), 544, 551, 553 and 559 moderate (3), the rest strong (4).
 //   - A session every day from 4 October (the 31 days Revo's charts show), with 10, 11 and 17 October
 //     left out, so the streak is the 12 days from 22 October; 548–549 rated strong and moderate on

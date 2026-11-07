@@ -101,18 +101,18 @@ async function scenarioWithRevo(scenario: ScenarioId): Promise<{ app: OpenApp; p
 }
 
 /**
- * Opens Revo, adds what `pick` picks with +, asks, and returns what the app sent (after the answer
- * shows: the server took it).
+ * Opens Revo, adds what `pick` picks in Add to chat (+), asks, and returns what the app sent (after
+ * the answer shows: the server took it): `attach` for one, `attachments` for several.
  */
 async function attachAndAsk(app: OpenApp, asks: { sent: unknown[] }, pick: () => Promise<void>, question: string): Promise<Record<string, any>> {
   const before = asks.sent.length;
   await pressId(app, 'revo-button');
   await app.until(() => app.screen.queryByTestId('revo-input') != null, 'the composer');
   await pressId(app, 'revo-plus');
-  // Notes come with a day now: there is no separate Notes option.
-  expect(app.screen.queryByTestId('revo-add-note')).toBeNull();
+  await app.until(() => app.screen.queryByTestId('revo-add-sheet') != null, 'Add to chat');
   await pick();
-  await app.until(() => app.screen.queryByTestId('revo-context-chip') != null, 'the chip');
+  await pressId(app, 'revo-add-done');
+  await app.until(() => app.screen.queryAllByTestId('revo-context-chip').length > 0, 'the chips');
   const answers = app.screen.queryAllByTestId('revo-answer').length;
   await app.act(async () => {
     app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), question);
@@ -122,16 +122,19 @@ async function attachAndAsk(app: OpenApp, asks: { sent: unknown[] }, pick: () =>
   expect(app.screen.queryByTestId('revo-error')).toBeNull();
   const sent = asks.sent[asks.sent.length - 1] as Record<string, any>;
   await closeRevo(app);
-  return sent.attach;
+  return sent.attachments ?? sent.attach;
 }
 
-async function search(app: OpenApp, text: string): Promise<void> {
-  await pressId(app, 'revo-add-page');
-  await app.until(() => app.screen.queryByTestId('revo-pick-search') != null, 'the search');
+/** Types in Add to chat's search and ticks the result `row` (a surah's, a juz's, or `revo-add-result-<i>`). */
+async function search(app: OpenApp, text: string, row: string): Promise<void> {
   await app.act(async () => {
-    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-pick-search'), text);
+    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-add-search'), text);
   });
-  await pressId(app, 'revo-pick-page-0');
+  await pressId(app, row);
+  await app.until(() => app.screen.queryByTestId(`${row}-on`) != null, `${row} to be ticked`);
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-add-search'), '');
+  });
 }
 
 const DAY_MS = 86_400_000;
@@ -221,7 +224,7 @@ it('[REVO-32] Yusuf, Juz 14 and a page attached (hafiz): what Revo is sent is wh
     const today = plan.today;
 
     // Yusuf: by name.
-    const yusuf = await attachAndAsk(app, asks, () => search(app, 'Yusuf'), 'Should I revise Yusuf now or later?');
+    const yusuf = await attachAndAsk(app, asks, () => search(app, 'Yusuf', 'revo-add-surah-12'), 'Should I revise Yusuf now or later?');
     expect(yusuf).toMatchObject({ kind: 'surah', surah: 12, label: 'Yusuf' });
     const yf = yusuf.facts as RevoPassageFacts;
     expect(yf).toMatchObject({ pages: 14, ...expected(app, range(235, 248), today) });
@@ -231,7 +234,7 @@ it('[REVO-32] Yusuf, Juz 14 and a page attached (hafiz): what Revo is sent is wh
     for (const w of yf.weakSpots) expect(w.name).toMatch(/Yusuf|Hud/);
 
     // Juz 14: typed as people say it.
-    const juz = await attachAndAsk(app, asks, () => search(app, 'Juz 14'), 'How many times have I revised this juz?');
+    const juz = await attachAndAsk(app, asks, () => search(app, 'Juz 14', 'revo-add-juz-14'), 'How many times have I revised this juz?');
     expect(juz).toMatchObject({ kind: 'juz', juz: 14, label: 'Juz 14' });
     const jf = juz.facts as RevoPassageFacts;
     expect(jf).toMatchObject({ pages: 20, ...expected(app, range(262, 281), today) });
@@ -239,9 +242,25 @@ it('[REVO-32] Yusuf, Juz 14 and a page attached (hafiz): what Revo is sent is wh
     expect(jf.revised.last30.minEach).toBe(jf.revised.last30.maxEach);
 
     // A page by number.
-    const page = await attachAndAsk(app, asks, () => search(app, 'p. 288'), 'How is this page?');
+    const page = await attachAndAsk(app, asks, () => search(app, 'p. 288', 'revo-add-result-0'), 'How is this page?');
     expect(page).toMatchObject({ kind: 'pages', pages: [288] });
     expect(page.facts).toMatchObject({ pages: 1, ...expected(app, [288], today) });
+
+    // Several at once (REVO-33): Yusuf and Juz 14 chosen in one go (each search keeps what was ticked).
+    const both = await attachAndAsk(
+      app,
+      asks,
+      async () => {
+        await search(app, 'Yusuf', 'revo-add-surah-12');
+        await search(app, 'Juz 14', 'revo-add-juz-14');
+        await app.until(() => app.screen.getByTestId('revo-add-done').props.accessibilityLabel === 'Add 2', 'Add 2');
+      },
+      'Which of these needs me more?',
+    );
+    expect(both.map((a: { kind: string }) => a.kind)).toEqual(['surah', 'juz']);
+    expect(both[0].facts).toEqual(yf);
+    expect(both[1].facts).toEqual(jf);
+
 
     // Insights' Juz 14 row, as the screen shows it: its pages revised at least once and their average.
     const nav = app.mods.require<Nav>('./navRef');
@@ -279,15 +298,19 @@ it('[REVO-33] a day attached (heavy activity): its plan, sessions, minutes, read
       app,
       asks,
       async () => {
+        await pressId(app, 'pill-days');
+        // Days opens on today's month; earlier ones are a ‹ away.
+        for (let k = 0; k < 2 && app.screen.queryByTestId(`revo-add-day-${day}`) == null; k++) await pressId(app, 'revo-add-month-prev');
+        await pressId(app, `revo-add-day-${day}`);
+        // The preview says the day's notes go with it, before it is added.
+        await app.until(() => app.screen.queryByTestId('revo-add-preview-notes') != null, 'the notes row');
+        line = app.mods.rtl.within(app.screen.getByTestId('revo-add-preview-notes')).getByText(/sent with the day/).props.children as string;
         await pressId(app, 'revo-add-day');
-        await app.until(() => app.screen.queryByTestId(`revo-pick-day-${back}`) != null, 'the day rows');
-        // The row says what goes with the day before it is added.
-        line = app.screen.getByTestId(`revo-pick-day-${back}`).props.accessibilityLabel;
-        await pressId(app, `revo-pick-day-${back}`);
+        await app.until(() => app.screen.queryByTestId(`revo-add-day-added-${day}`) != null, 'the day added');
       },
       'How did this day go?',
     );
-    expect(line).toContain(`includes ${noteCount} ${noteCount === 1 ? 'note' : 'notes'}`);
+    expect(line).toBe(`${noteCount}, sent with the day`);
 
     expect(attach).toMatchObject({ kind: 'revisionDay', day });
     expect(attach.label).toContain(`· ${noteCount} ${noteCount === 1 ? 'note' : 'notes'}`);

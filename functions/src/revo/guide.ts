@@ -234,7 +234,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- For testers, off until turned on. Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
-      '- + attaches “A day” (its plan, what was done, its minutes and its daily-log notes), “A surah, juz or page” (how often it was revised, what was missed, its weak spots, when it comes up next) or “A recording” (its length and pages, never the audio) to one question; Revo answers about it from those figures. History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
+      '- + opens “Add to chat”: search a surah, a juz, ayahs, a day or a page, or pick from Surahs, Juz, Days (a month: tap a day, then “Add day”) and Pages; up to six go with one question, and a day goes with its daily-log notes. Revo answers about them from their figures (how often revised, what was missed, weak spots, what’s next; a day’s plan, minutes and notes). History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
       '- Revo can’t change anything itself: a suggestion happens only when tapped (“Add to my plan” puts pages first in tomorrow’s session; a card can also open a screen, such as Jump to… or a Settings section). It answers how-to questions from this guide. It needs the internet.',
       '- Settings → Revo AI → off deletes its conversations and memory.',
     ),
@@ -256,6 +256,9 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  // Not yet in the guide's text: its examples still show "p. 542" and change with the next
+  // recording of the Anthropic replies (a new prompt needs a new recording, TESTING.md).
+  'NAME-1': 'how the app words parts of the Qur’an (by surah and juz); the guide’s examples follow with the next recording',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',

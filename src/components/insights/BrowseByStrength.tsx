@@ -318,7 +318,9 @@ export function BrowseByStrength({
       {listRows === 0 ? (
         <QuietLine testID="browse-empty">{emptyBrowse}</QuietLine>
       ) : (
-        <View testID={`browse-${browseMode}`}>
+        // Kept as a view of its own: on iOS a wrapper with only a testID is flattened away, and E2E
+        // waits for this id (Pages by strength).
+        <View testID={`browse-${browseMode}`} collapsable={false}>
           {browseMode === 'pages' &&
             sortedPages.slice(0, limit).map((row) => {
               const t = pageRowText(

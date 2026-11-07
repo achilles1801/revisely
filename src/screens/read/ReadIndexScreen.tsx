@@ -26,6 +26,7 @@ import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
+import { ayahsInSurah, spokenText } from '../../lib/passages';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
 
@@ -193,11 +194,14 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
     : null;
   const name = display?.nameDisplay ?? `Page ${entry.pageNumber}`;
   const when = formatRelativeTime(entry.lastReadAt);
+  // The surah's ayahs on that page first, the page number a quiet detail (surahs and juz first, CLAUDE.md).
+  const ayahs = surah ? ayahsInSurah(surah.number, [entry.pageNumber]) : '';
+  const meta = [ayahs, `p. ${entry.pageNumber}`, when].filter(Boolean).join(' · ');
   return (
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, page ${entry.pageNumber}, read ${when}`}
+      accessibilityLabel={`${name}, ${spokenText(ayahs ? `${ayahs}, ` : '')}page ${entry.pageNumber}, read ${when}`}
       style={[v2.row, { borderBottomColor: palette.separator }]}
       testID={`recent-${entry.pageNumber}`}
     >
@@ -206,7 +210,7 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
         <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Page ${entry.pageNumber} · ${when}`}</Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{meta}</Text>
       </View>
       {display?.nameArabicVoweled ? (
         <Text style={[arabicV2(20), v2.arabic, { color: palette.text }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>

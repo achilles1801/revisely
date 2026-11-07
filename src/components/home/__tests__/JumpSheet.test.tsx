@@ -17,6 +17,7 @@ jest.mock('expo-haptics', () => ({
 }));
 
 import { JumpSheet, targetLabel } from '../JumpSheet';
+import { plainText } from '../../../lib/passages';
 import type { User, UserPage } from '../../../types';
 
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
@@ -52,6 +53,9 @@ function open(over: Partial<React.ComponentProps<typeof JumpSheet>> = {}) {
   return onJump;
 }
 
+/** Read the sheet's text with ordinary spaces and hyphens (lib/passages holds names together). */
+const plain = { normalizer: (t: string) => plainText(t) };
+
 describe('Jump to (sheet)', () => {
   it('lists only the juz with memorized pages, marks where today starts, and starts today at the one chosen', () => {
     const onJump = open();
@@ -61,9 +65,9 @@ describe('Jump to (sheet)', () => {
     // Today starts at page 21, in juz 1.
     expect(within(screen.getByTestId('jump-juz-1')).getByText('Today')).toBeTruthy();
     expect(within(screen.getByTestId('jump-juz-30')).queryByText('Today')).toBeNull();
-    // Part of a juz: how much of it.
-    expect(within(screen.getByTestId('jump-juz-12')).getByText('p. 225–235 · 11 of 20 pages')).toBeTruthy();
-    expect(within(screen.getByTestId('jump-juz-30')).getByText('p. 582–604')).toBeTruthy();
+    // What of each juz, by surah (never page numbers); part of a juz says how much of it.
+    expect(within(screen.getByTestId('jump-juz-12')).getByText('Hud to Yusuf · 11 of 20 pages', plain)).toBeTruthy();
+    expect(within(screen.getByTestId('jump-juz-30')).getByText('An-Naba to An-Nas', plain)).toBeTruthy();
     // Nothing chosen yet: nothing to start.
     expect(screen.getByText('Choose where to start')).toBeTruthy();
     fireEvent.press(screen.getByTestId('jump-go'));
@@ -78,6 +82,8 @@ describe('Jump to (sheet)', () => {
     const onJump = open();
     fireEvent.press(screen.getByText('Surah'));
     expect(screen.getByTestId('jump-surah-78')).toBeTruthy(); // An-Naba, juz 30
+    expect(within(screen.getByTestId('jump-surah-78')).getByText('Juz 30', plain)).toBeTruthy();
+    expect(within(screen.getByTestId('jump-surah-11')).getByText('Juz 11–12 · 11 of 15 pages', plain)).toBeTruthy();
     expect(screen.queryByTestId('jump-surah-36')).toBeNull(); // Ya-Sin, not memorized
     fireEvent.press(screen.getByTestId('jump-surah-78'));
     fireEvent.press(screen.getByTestId('jump-go'));
@@ -88,7 +94,7 @@ describe('Jump to (sheet)', () => {
     const onJump = open();
     fireEvent.press(screen.getByText('Page'));
     expect(screen.getByTestId('jump-page-wheel')).toBeTruthy();
-    expect(screen.getByTestId('jump-page-where')).toHaveTextContent('Juz 1 · Al-Baqarah · today starts here');
+    expect(screen.getByTestId('jump-page-where')).toHaveTextContent(/^Al.Baqarah, ayahs.135–141 · Juz.1 · today starts here$/);
     fireEvent.press(screen.getByTestId('jump-go'));
     expect(onJump).toHaveBeenCalledWith({ kind: 'page', page: 21 });
   });

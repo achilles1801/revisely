@@ -1,0 +1,142 @@
+# Surahs and juz first, page numbers almost never (NAME-1, the owner's rule of Nov 7 2026): every
+# screen that names part of the Qur'an, captured in light and then in dark (…-dark). Tuesday is
+# pages 1, 582–590 and Wednesday 591–600 (subflows/onboard.yaml).
+# Rules (BEHAVIOUR.md): NAME-1
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+- extendedWaitUntil:
+    visible:
+      id: today-title
+      text: "Starts at Al.Fatihah[^,0-9]*"
+    timeout: 15000
+
+# The session: its header names the page by surah (the printed number is under the page).
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: "Juz 1 · 0/10"
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: 1/10
+- runFlow: ../subflows/show-controls.yaml
+- assertVisible:
+    id: session-page
+    text: "An.Naba.1–30 · Juz 30 · .*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-session-page
+# The end card: what was revised, by surah, and Keep going by surah.
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- assertVisible: "Next: Wed · At.Tariq to At.Takathur · 10 pages"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-end-card
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: today-ahead
+      text: "Tomorrow starts at At.Tariq"
+    timeout: 15000
+
+# Home, its menu, Jump to, All activity, the schedule and the memorized pages, in light.
+- runFlow:
+    file: ../subflows/surah-screens.yaml
+    env:
+      SUFFIX: ""
+
+# The same in dark: Settings → Theme → Dark.
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/surah-screens.yaml
+    env:
+      SUFFIX: "-dark"
+
+# Wednesday's session (Tomorrow starts at …), its header and end card in dark.
+- tapOn:
+    id: today-ahead
+- runFlow: ../subflows/show-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: "Revising ahead · Wed.*"
+    timeout: 10000
+- assertVisible:
+    id: session-page
+    text: "At.Tariq to Al.A'la.15 · .*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-session-page-dark
+- runFlow:
+    file: ../subflows/swipe-pages.yaml
+    env:
+      UNTIL: end
+- runFlow:
+    file: ../subflows/end-card-is.yaml
+    env:
+      TEXT: Revision complete
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-end-card-dark
+- runFlow: ../subflows/show-controls.yaml
+- tapOn: "Back"
+
+# Last, as it marks pages memorized (and so changes the schedule): the daily log, where a
+# Memorized entry from its pages is named by its surahs. In dark, then in light.
+- runFlow: ../subflows/back-home.yaml
+- runFlow: ../subflows/open-log.yaml
+- tapOn:
+    id: pill-memorization
+- tapOn:
+    id: memorize-from
+- inputText: "562"
+- tapOn:
+    id: memorize-to
+- inputText: "564"
+- runFlow: ../subflows/keyboard-done.yaml
+- tapOn:
+    id: journal-send
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-daily-log-dark
+- runFlow: ../subflows/back-home.yaml
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Light
+- runFlow: ../subflows/open-log.yaml
+- extendedWaitUntil:
+    visible:
+      id: journal-note-.*
+      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 11-daily-log
