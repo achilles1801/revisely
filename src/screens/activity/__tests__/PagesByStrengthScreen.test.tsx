@@ -50,12 +50,12 @@ const user = {
   fajrBoundaryEnabled: false,
 } as unknown as User;
 
-const page = (pageNumber: number, weaknessRating: number, revised = true): UserPage => ({
+const page = (pageNumber: number, weaknessRating: number, revised: boolean | Date = true): UserPage => ({
   pageNumber,
   status: 'memorized',
   dateMemorized: '2025-01-01T00:00:00.000Z',
   weaknessRating,
-  lastRevisedDate: revised ? new Date(Date.now() - 3 * 86_400_000).toISOString() : null,
+  lastRevisedDate: revised === false ? null : (revised === true ? new Date(Date.now() - 3 * 86_400_000) : revised).toISOString(),
   totalRevisionCount: 3,
   skipCount: 0,
 });
@@ -113,6 +113,15 @@ describe('Pages by strength (ACT-12)', () => {
     await open();
     fireEvent.press(screen.getByTestId('browse-page-1'));
     for (const s of screen.UNSAFE_getAllByType(ScrollView)) expect(touchHandlingAncestor(s)).toBeNull();
+  });
+
+  it('a page revised today reads "revised today", never "-1d ago"; earlier ones in whole days', async () => {
+    const now = new Date();
+    mockApp.pages = [page(548, 2, now), page(549, 2)];
+    await open();
+    expect(screen.getByText('Weak · Juz 28 · revised today')).toBeTruthy();
+    expect(screen.getByText('Weak · Juz 28 · revised 3d ago')).toBeTruthy();
+    expect(screen.queryByText(/-\d+d ago/)).toBeNull();
   });
 
   it('no revised page yet: one quiet line, no list', async () => {

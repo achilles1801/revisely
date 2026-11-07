@@ -11,7 +11,8 @@ import {
   getMissedScheduledRevisions,
   INSIGHTS_MIN_SESSIONS,
 } from '../../lib/algorithm';
-import { getRevisionDateForUser } from '../../lib/fajrBoundary';
+import { getRevisionDateForUser, getRevisionDayForUser } from '../../lib/fajrBoundary';
+import { daysBetween } from '../../lib/activityHeatmap';
 import { getJuzName, getQuranData, getSurahForPage } from '../../lib/quranData';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
 import { layoutV2 } from '../../theme/v2';
@@ -61,6 +62,11 @@ export function juzMeta(juz: number, pageCount: number, avgStrength: number): st
   return `${pageCount} page${pageCount === 1 ? '' : 's'} · average ${avgStrength.toFixed(1)} · ⁨${getJuzName(juz)}⁩`;
 }
 
+/** "today", "1d ago", "12d ago": how long since a page's last revision day. */
+export function revisedAgo(days: number): string {
+  return days === 0 ? 'today' : `${days}d ago`;
+}
+
 /**
  * Every memorized page that has been revised, with its strength, how overdue it is and why it
  * would come first; and whether there are enough sessions for Insights to say anything yet.
@@ -79,12 +85,15 @@ export function usePageStrengthRows(): {
     if (!user) return [];
     // The revision day, not the calendar: between midnight and fajr it is still yesterday.
     const today = getRevisionDateForUser(user);
+    const todayDay = getRevisionDayForUser(user);
 
     return memorizedPages
       .filter((p) => p.lastRevisedDate)
       .map((page) => {
+        // Whole revision days from the one it was last revised on: a page revised this morning is
+        // 0 (today). Measuring from today's midnight made it -1 ("revised -1d ago").
         const lastRevised = new Date(page.lastRevisedDate!);
-        const daysSinceRevision = Math.floor((today.getTime() - lastRevised.getTime()) / (1000 * 60 * 60 * 24));
+        const daysSinceRevision = Math.max(0, daysBetween(getRevisionDayForUser(user, lastRevised), todayDay));
 
         let daysSinceMemorized: number | null = null;
         if (page.dateMemorized) {
@@ -105,7 +114,7 @@ export function usePageStrengthRows(): {
         } else if (daysSinceMemorized !== null && daysSinceMemorized < 30) {
           reason = 'Recently memorized — keep it fresh';
         } else {
-          reason = `Last revised ${daysSinceRevision}d ago`;
+          reason = `Last revised ${revisedAgo(daysSinceRevision)}`;
         }
 
         return {
@@ -290,7 +299,7 @@ export function BrowseByStrength({
                 number={row.pageNumber}
                 name={`Page ${row.pageNumber} · ${row.surahName}`}
                 rating={row.strength}
-                text={`${getRatingLabel(row.strength)} · Juz ${row.juzNumber} · revised ${row.daysSinceRevision}d ago`}
+                text={`${getRatingLabel(row.strength)} · Juz ${row.juzNumber} · revised ${revisedAgo(row.daysSinceRevision)}`}
                 onPress={() => onOpenPage(row.pageNumber)}
                 testID={`browse-page-${row.pageNumber}`}
               />
