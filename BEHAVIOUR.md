@@ -269,7 +269,8 @@ How the tests are made: `tests/scenarios/README.md`.
 Revo is the in-app assistant (it supersedes the Ask coach, whose rules above still hold for its own calls).
 
 - **REVO-1.** Revo is for previewTester accounts only, and off until the account turns it on (the opt-in, or Settings →
-  Revo AI). Only the functions change that switch, its memory switch and the day's count; the account reads its own.
+  Revo AI). The switch is Revo's own: turning on the Ask coach doesn't turn on Revo. Only the functions change that
+  switch, its memory switch and the day's count; the account reads its own.
 
 - **REVO-2.** Every question sends the totals behind Insights (coverage, consistency, weak spots, pace) and today's
   blocks, as numbers and page numbers. A day, a page or surah, a note or a recording goes only with the question it was
@@ -317,7 +318,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   of it is weak), with suggestions; neither is a question or a call.
 
 - **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent and what isn't; nothing is
-  sent before "Turn on Revo". The button shows on the main screens only, never in the reader or a session.
+  sent before "Turn on Revo", the Day in review included. The sheet opens on the opt-in itself, at its height; a tap
+  before the account's switch is read waits for it (up to 2 s), so an account with Revo on never sees the opt-in. The
+  button shows on the main screens only, never in the reader or a session.
 
 - **REVO-22.** When the day's questions are used, the composer is greyed and says when Revo is back (after Fajr, at
   its time, or at midnight); conversations stay in History.

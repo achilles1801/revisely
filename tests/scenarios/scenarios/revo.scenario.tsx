@@ -6,7 +6,7 @@
 import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester, serveRevo } from '../harness/admin';
+import { markPreviewTester, serveRevo, turnOnAskCoach } from '../harness/admin';
 import { Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 
@@ -209,6 +209,61 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
     await app.until(() => app.screen.queryByTestId('revo-error') != null, 'the offline note');
     expect(app.screen.getByText(/^You’re offline\. Revo needs the internet\.\s+Try again$/)).toBeTruthy();
     expect(served.calls.length).toBe(before);
+    await app.close();
+  } finally {
+    served.restore();
+  }
+});
+
+it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo still opens on its opt-in and sends nothing before it, the Day in review included; once on, a tap just after launch opens the chat', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-06 20:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  markPreviewTester(uid);
+  // Before Nov 7 2026 Revo read the Ask coach's switch: this account had Revo "on" without its opt-in.
+  turnOnAskCoach(uid);
+
+  const served = serveRevo();
+  try {
+    app = await openWithServedRevo(phone);
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    const home = new Home(app);
+    await home.ready();
+
+    // Something done today, in the evening: what the Day in review would be written from.
+    const session = await home.startSession();
+    await session.swipeThrough(2);
+    await session.back();
+    await app.untilSynced();
+    await app.idle(500);
+
+    // [REVO-21] [REVO-9] Nothing sent, and the first tap opens the opt-in.
+    expect(served.calls).toEqual([]);
+    await tap(app, 'revo-button');
+    await app.until(() => app.screen.queryByTestId('revo-optin') != null, 'the opt-in');
+    expect(served.calls).toEqual([]);
+
+    // Turned on: the evening's Day in review is asked for now, not before.
+    served.reply = () => JSON.stringify({ text: 'Two pages revised today.', chart: null, textAfter: null, action: null, remember: [], title: 'Day in review', chips: [] });
+    await tap(app, 'revo-turn-on');
+    await app.until(() => served.calls.some((c) => c.name === 'revoDayInReview'), 'the Day in review, once Revo is on');
+    expect(served.calls[0].name).toBe('revoSetOptions');
+    await app.close();
+
+    // [REVO-1] Launched again: a tap as soon as the button shows waits for the account's switch and
+    // opens the conversation (Revo is on), never the opt-in.
+    app = await openWithServedRevo(phone);
+    await tap(app, 'revo-button');
+    let sawOptIn = false;
+    await app.until(() => {
+      sawOptIn ||= app.screen.queryByTestId('revo-optin') != null;
+      return app.screen.queryByTestId('revo-history') != null;
+    }, 'the conversation');
+    expect(sawOptIn).toBe(false);
     await app.close();
   } finally {
     served.restore();

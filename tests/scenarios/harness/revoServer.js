@@ -7,6 +7,7 @@
 // `{ result }`, or `{ error: { status, message, details } }` (what index.ts's revoFailure throws).
 // Usage (harness/admin.ts):
 //   node revoServer.js <revoAsk|revoDayInReview|revoSetOptions|revoClear> <uid> '<data json>' --now <ms> [--reply '<model text>']
+//   node revoServer.js ask-coach-on <uid>     (the Ask coach's setCoachOptIn: its own optIn, not Revo's)
 const fs = require('fs');
 const path = require('path');
 const { createRequire } = require('module');
@@ -47,6 +48,12 @@ const arg = (name) => {
 (async () => {
   const [name, uid, json] = process.argv.slice(2);
   const db = admin.firestore();
+  if (name === 'ask-coach-on') {
+    const { adminCoachStore } = load(path.join(functions, 'src/coach/admin.ts'));
+    await adminCoachStore(db).setOptIn(uid, true);
+    console.log(JSON.stringify({ ok: true }));
+    return;
+  }
   const handler = load(path.join(functions, 'src/revo/handler.ts'));
   const { adminRevoStore } = load(path.join(functions, 'src/revo/admin.ts'));
   const now = Number(arg('--now') ?? Date.now());

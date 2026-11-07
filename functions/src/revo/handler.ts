@@ -71,7 +71,7 @@ export type ReserveResult = { ok: true; count: number } | { ok: false; reason: '
 
 export interface RevoStore {
   isPreviewTester(uid: string): Promise<boolean>;
-  /** coachSettings/{uid}: optIn (shared with the Ask coach), memoryOn (default true). */
+  /** coachSettings/{uid}: Revo's own switch (`revoOn`, read as optIn; the Ask coach's optIn is separate), memoryOn (default true). */
   getSettings(uid: string): Promise<RevoSettings>;
   setSettings(uid: string, patch: Partial<RevoSettings>): Promise<RevoSettings>;
   /** revoUsage/{uid}: the revision day of the count, and the count. */

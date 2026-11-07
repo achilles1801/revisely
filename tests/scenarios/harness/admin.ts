@@ -81,6 +81,12 @@ export function serveLoadTestScenario(): { calls: number; results: Record<string
   return served;
 }
 
+/** The account turns on the Ask coach (its setCoachOptIn), which is not Revo's switch. */
+export function turnOnAskCoach(uid: string): void {
+  const { execFileSync } = jest.requireActual<typeof import('child_process')>('child_process');
+  execFileSync(process.execPath, [path.join(__dirname, 'revoServer.js'), 'ask-coach-on', uid], { env: emulatorEnv(), encoding: 'utf8' });
+}
+
 /** The HTTP status firebase-functions answers a callable error with. */
 const CALLABLE_HTTP: Record<string, number> = {
   INVALID_ARGUMENT: 400,

@@ -25,6 +25,9 @@ import { RevoSheetFrame } from './RevoSheetFrame';
 
 type View_ = { name: 'chat' } | { name: 'history' } | { name: 'memory' } | { name: 'optin' } | { name: 'pick'; kind: PickKind };
 
+/** A tap before the account's switch is read waits for it this long, then opens with what is known. */
+export const SETTINGS_WAIT_MS = 2000;
+
 /** From this hour (local) the day's review is written, once, if the day had activity. */
 export const REVIEW_FROM_HOUR = 19;
 const reviewAskedKey = (uid: string, day: string) => `@revo_review_asked:${uid}:${day}`;
@@ -138,8 +141,21 @@ function RevoHostInner() {
     })();
   }, [backend, uid, settings?.optIn, day, build, route]);
 
+  // A tap before the switch is read (just after launch) waits for it, so the sheet opens on the
+  // opt-in or on the chat, never the opt-in for an account that has Revo on.
+  const waiting = useRef<{ request: RevoOpenRequest; timer: ReturnType<typeof setTimeout> } | null>(null);
   const show = useCallback(
-    (request: RevoOpenRequest = {}) => {
+    (request: RevoOpenRequest = {}, known = settings != null) => {
+      if (!known) {
+        if (waiting.current) clearTimeout(waiting.current.timer);
+        const timer = setTimeout(() => {
+          const w = waiting.current;
+          waiting.current = null;
+          if (w) showRef.current(w.request, true);
+        }, SETTINGS_WAIT_MS);
+        waiting.current = { request, timer };
+        return;
+      }
       setOptInError(null);
       if (!settings?.optIn) {
         setView({ name: 'optin' });
@@ -160,9 +176,19 @@ function RevoHostInner() {
       }
       setOpen(true);
     },
-    [settings?.optIn, reviewWaiting, uid, day],
+    [settings, reviewWaiting, uid, day],
   );
+  const showRef = useRef(show);
+  showRef.current = show;
   useEffect(() => onRevoOpen(show), [show]);
+  useEffect(() => {
+    const w = waiting.current;
+    if (!settings || !w) return;
+    clearTimeout(w.timer);
+    waiting.current = null;
+    show(w.request);
+  }, [settings, show]);
+  useEffect(() => () => waiting.current?.timer && clearTimeout(waiting.current.timer), []);
 
   const close = () => {
     setOpen(false);

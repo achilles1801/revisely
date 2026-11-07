@@ -60,6 +60,9 @@ export function RevoSheetFrame({
   useEffect(() => {
     if (visible) {
       setShown(true);
+      // It rises at the height it opens at (the opt-in and a conversation at full height), rather
+      // than coming up at the medium height and growing.
+      sheetH.value = full ? fullHeight : mediumHeight;
       drag.value = 0;
       offset.value = height;
       offset.value = withTiming(0, { duration: 260 });
