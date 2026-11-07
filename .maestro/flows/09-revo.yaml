@@ -197,7 +197,7 @@ appId: com.revisionbuddy.app
     direction: DOWN
     centerElement: true
     timeout: 20000
-- tapOn: "Dark"
+- tapOn: "Dark(, selected)?"
 - tapOn:
     id: back
 - extendedWaitUntil:
