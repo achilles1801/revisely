@@ -1,8 +1,9 @@
 // Activity's number formats (gap audit §1 H): minutes read as "8 min" and "1 h 5 min", never "8m".
 
 import { describePageRuns, pageRuns } from './pageRanges';
+import { describePassage } from './passages';
 
-/** "p. 562", "p. 548–549", "p. 540–541 and 548": the mocks' short page form (d1, d5–d7). */
+/** "p. 562", "p. 548–549": page numbers, only where the user works by page (From and To). */
 export function formatPagesShort(pages: Iterable<number>): string {
   return describePageRuns(pageRuns(pages)).replace(/^Pages? /, 'p. ');
 }
@@ -52,14 +53,15 @@ export function windowFooter(day: string, today: string, window: { from: string;
 }
 
 /**
- * Pages revised on one day that count for another (AHEAD-2, SESS-7), as a line under the Revised block:
- *  - revised here for a later day: "Ahead for Wednesday 4 November: p. 562–563";
- *  - revised here for an earlier day it was carried from: "Catch-up for Monday 2 November: p. 556–557";
- *  - revised earlier for this day: "Done ahead on Monday 2 November: p. 540–541";
- *  - revised later for this day: "Caught up on Wednesday 4 November: p. 556–557".
+ * Pages revised on one day that count for another (AHEAD-2, SESS-7), as a line under the Revised block,
+ * named by surah (Majd, Nov 7 2026):
+ *  - revised here for a later day: "Ahead for Wednesday 4 November: Al-Mulk 1–26";
+ *  - revised here for an earlier day it was carried from: "Catch-up for Monday 2 November: At-Taghabun";
+ *  - revised earlier for this day: "Done ahead on Monday 2 November: …";
+ *  - revised later for this day: "Caught up on Wednesday 4 November: …".
  */
 export function creditLine(day: string, credit: { countsFor: string; pages: number[] } | { fromDay: string; pages: number[] }): string {
-  const pages = formatPagesShort(credit.pages);
+  const pages = describePassage(credit.pages, { form: 'compact' });
   if ('countsFor' in credit) {
     return credit.countsFor > day
       ? `Ahead for ${formatDayLong(credit.countsFor)}: ${pages}`

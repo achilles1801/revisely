@@ -23,6 +23,7 @@ import {
   paceView,
   quranShare,
   reportMonth,
+  reviseFirstLabel,
   untouchedJuz,
   weakSpotRows,
   weekCircles,
@@ -30,6 +31,7 @@ import {
 } from '../../lib/insightsView';
 import { getPagesForJuz } from '../../lib/quranData';
 import { openRevo } from '../../lib/revo/open';
+import { spokenText } from '../../lib/passages';
 
 type Window = '7' | '30';
 
@@ -335,15 +337,16 @@ function WeakSpots({
               key={r.label}
               onPress={() => onOpenPage(r.pages[0])}
               accessibilityRole="button"
-              accessibilityLabel={`${r.surah}, ${r.label}. ${r.reason}. Open the page`}
+              accessibilityLabel={`${spokenText(r.label)}. ${r.reason}. Open it`}
               style={[styles.weakRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
               testID={`weak-spot-${r.pages[0]}`}
             >
               <View style={[styles.dot8, { backgroundColor: palette.red }]} />
               <View style={styles.flex}>
+                {/* The surah and ayahs first; the page only as a quiet detail (Majd, Nov 7 2026). */}
                 <Text numberOfLines={1}>
-                  <Text style={[typeV2.name, { color: palette.text }]}>{r.surah}</Text>
-                  <Text style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.label}`}</Text>
+                  <Text style={[typeV2.name, { color: palette.text }]}>{r.label}</Text>
+                  <Text style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</Text>
                 </Text>
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>{r.reason}</Text>
               </View>
@@ -359,7 +362,7 @@ function WeakSpots({
           style={[styles.outlinePill, { borderColor: palette.outline }]}
           testID="insights-revise-tomorrow"
         >
-          <Text style={[typeV2.name, { color: palette.text }]}>{`Revise ${pages.length === 1 ? 'this page' : `these ${pages.length} pages`} first tomorrow`}</Text>
+          <Text style={[typeV2.name, { color: palette.text }]}>{reviseFirstLabel(rows)}</Text>
         </Tap>
       ) : null}
     </Section>

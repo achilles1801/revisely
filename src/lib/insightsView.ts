@@ -4,6 +4,7 @@
 // Days are YYYY-MM-DD revision days; definitions follow ACT-4 (lib/activityInsights).
 
 import { getPagesForJuz, getSurahsForPage } from './quranData';
+import { describePassage, pagesNote } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
@@ -181,8 +182,10 @@ export function busiestHours(hours: number[]): string | null {
 export interface WeakSpotRow {
   surah: string;
   pages: number[];
-  /** "p. 548–549". */
+  /** By surah and ayahs (Majd, Nov 7 2026): "Al-Hashr, ayahs 17–24". */
   label: string;
+  /** The pages, as a quiet detail after it: "p. 548". */
+  pagesNote: string;
   weakNow: boolean;
   /** Times its pages were rated weak, and skipped, in the window (the most of any of its pages). */
   ratedWeak: number;
@@ -230,7 +233,8 @@ export function weakSpotRows(input: {
     rows.push({
       surah: surahOf(run[0]),
       pages: run,
-      label: run.length === 1 ? `p. ${run[0]}` : `p. ${run[0]}–${run[run.length - 1]}`,
+      label: describePassage(run),
+      pagesNote: pagesNote(run),
       weakNow,
       ratedWeak,
       skipped,
@@ -355,4 +359,13 @@ export function paceView(input: {
 /** "1.8", "6", "12": a pace to one decimal under 10 (no ".0"), whole from there. */
 export function formatPace(minutesPerPage: number): string {
   return minutesPerPage < 10 ? minutesPerPage.toFixed(1).replace(/\.0$/, '') : String(Math.round(minutesPerPage));
+}
+
+/**
+ * The weak spots' one action, by surah (Majd, Nov 7 2026): one spot names it ("Revise Al-Hashr 17–24
+ * first tomorrow"), several are "these weak spots".
+ */
+export function reviseFirstLabel(rows: { pages: number[] }[]): string {
+  if (rows.length === 1) return `Revise ${describePassage(rows[0].pages, { form: 'short', sentence: true })} first tomorrow`;
+  return 'Revise these weak spots first tomorrow';
 }
