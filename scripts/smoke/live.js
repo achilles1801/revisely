@@ -7,7 +7,11 @@
 //   3. Turns Revo on for the account (revoSetOptions; idempotent, no model call), asks revoAsk one
 //      tiny question (one real model call, counted in Revo's monthly cap), then clears the
 //      account's Revo history (revoClear), so nothing piles up.
-//   4. Fetches one block of The Clear Quran through the worker (revisely.app/api).
+//   4. Fetches one block of The Clear Quran through the worker (revisely.app/api): the block that
+//      holds 1:1, every verse in it in order, The Clear Quran's own text (checkVerseBlock). The
+//      worker keeps a block for 30 days, so most days this tests our worker and its sign-in
+//      check, not The Clear Quran's API (X-Cache in the log says which). The credit line isn't in
+//      the worker's answer: the app adds it (lib/translation creditLine; VerseSheet tests).
 // Anything but a valid answer at every step fails it, with the step and what came back (never a
 // token, a key or the account's id). With --report, a failure opens (or comments on) an issue
 // labelled live-smoke mentioning the owner, and a pass closes it.
@@ -59,7 +63,7 @@ async function request(step, url, init) {
   } catch {
     // reported below
   }
-  return { status: res.status, body, text };
+  return { status: res.status, body, text, cache: res.headers.get('X-Cache') };
 }
 
 async function signIn() {
@@ -110,6 +114,29 @@ function checkAnswer(r, question) {
   return problems;
 }
 
+// The Clear Quran marks footnotes in its text (lib/clearQuran's TAG); anything else in angle
+// brackets would show on the phone as it is.
+const FOOTNOTE = /<footnote\s+id="(\d+)"\s+number="(\d+)">(?:(\d*)<\/footnote>)?/g;
+
+/** The worker's block for 1:1 as the verse sheet would show it, else why not. Al-Fatihah has seven
+ * verses, so the block is 1:1–1:7 (blocks are 1–30, cut at the surah's end). 1:1 must be The Clear
+ * Quran's own wording ("the Most Compassionate"): its licence allows no other translation under
+ * its name (Saheeh International's 1:1 says "the Entirely Merciful"). */
+function checkVerseBlock(b) {
+  if (!b || typeof b !== 'object') return ['no block'];
+  const problems = [];
+  if (b.surah !== 1 || b.from !== 1 || b.to !== 7) problems.push(`not the block 1:1–1:7 (${b.surah}:${b.from}–${b.to})`);
+  const verses = Array.isArray(b.verses) ? b.verses : [];
+  if (verses.length !== 7) problems.push(`${verses.length} verses, not 7`);
+  verses.forEach((v, i) => {
+    if (v?.verse_key !== `1:${i + 1}`) problems.push(`verse ${i + 1} is ${v?.verse_key}`);
+    else if (!isStr(v.text)) problems.push(`${v.verse_key} has no text`);
+    else if (/[<>]/.test(v.text.replace(FOOTNOTE, ''))) problems.push(`${v.verse_key} holds markup other than footnotes`);
+  });
+  if (isStr(verses[0]?.text) && !/Most Compassionate/.test(verses[0].text)) problems.push('1:1 is not The Clear Quran’s wording');
+  return problems;
+}
+
 /** A context as the app builds it (lib/revo/context), for an account with nothing to show. */
 function smokeContext(day) {
   return {
@@ -154,11 +181,16 @@ async function run() {
   const verse = await request('worker', `${WORKER}/api/tcq/windows/1:1`, {
     headers: { Authorization: `Bearer ${auth.idToken}`, 'X-Revisely-Channel': 'production' },
   });
-  const first = verse.body?.verses?.[0];
-  if (verse.status !== 200 || first?.verse_key !== '1:1' || !isStr(first?.text)) {
-    throw new StepError('worker', `HTTP ${verse.status} ${excerpt(verse.text)}`);
-  }
-  return { ok: true, secs: Math.round((Date.now() - started) / 1000), cached: answer.cached === true, replyChars: answer.reply.text.length };
+  if (verse.status !== 200) throw new StepError('worker', `HTTP ${verse.status} ${excerpt(verse.text)}`);
+  const verseProblems = checkVerseBlock(verse.body);
+  if (verseProblems.length) throw new StepError('worker', `${verseProblems.join('; ')}: ${excerpt(verse.text)}`);
+  return {
+    ok: true,
+    secs: Math.round((Date.now() - started) / 1000),
+    cached: answer.cached === true,
+    replyChars: answer.reply.text.length,
+    workerCache: verse.cache || 'unknown',
+  };
 }
 
 async function report(outcome) {
@@ -191,7 +223,7 @@ async function main() {
   }
   if (outcome.skipped) console.log(`::notice title=Live smoke check::Skipped, ${outcome.skipped} (TESTING.md).`);
   else if (outcome.error) console.log(`::error title=Live smoke check::${outcome.error}`);
-  else console.log(`Live smoke check passed in ${outcome.secs} s (Revo answered${outcome.cached ? ' from the day’s kept answer' : ''}, ${outcome.replyChars} characters; the worker served 1:1).`);
+  else console.log(`Live smoke check passed in ${outcome.secs} s (Revo answered${outcome.cached ? ' from the day’s kept answer' : ''}, ${outcome.replyChars} characters; the worker served 1:1–1:7, X-Cache ${outcome.workerCache}${outcome.workerCache === 'MISS' ? ': from The Clear Quran’s API' : ': from its cache, so The Clear Quran’s API was not asked'}).`);
   if (process.argv.includes('--report') && !outcome.skipped) await report(outcome);
   if (outcome.error) process.exitCode = 1;
 }
@@ -203,4 +235,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { checkAnswer, excerpt, smokeContext };
+module.exports = { checkAnswer, checkVerseBlock, excerpt, smokeContext };
