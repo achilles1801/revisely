@@ -5,7 +5,7 @@
  * length) and are rounded; page numbers, ratings and counts must be whole.
  * Messages here never say "date": the app reads that word as a clock problem.
  */
-import { REVO_INSIGHTS, REVO_TOTALS, RevoAttachment, RevoContext, RevoInsight, RevoTotals } from './types';
+import { REVO_INSIGHTS, REVO_PASSAGE_KEYS, REVO_TOTALS, RevoAttachment, RevoContext, RevoInsight, RevoTotals } from './types';
 
 export class RevoInvalid extends Error {}
 
@@ -58,6 +58,20 @@ function list<T>(v: unknown, max: number, path: string, item: (x: unknown, p: st
   return v.map((x, i) => item(x, `${path}[${i}]`));
 }
 
+const MAX_PASSAGE = 160;
+const MAX_PAGE_NAME = 100;
+const MAX_PAGE_NAMES = 70;
+/** Surah names, ayah and juz numbers and joining words: letters (Latin, with transliteration marks), digits, spaces and a little punctuation. */
+const PASSAGE_RE = /^[\p{L}\p{M}0-9 '’ʿʾ.,·–—\-‑\u00A0]+$/u;
+
+/** A part of the Qur'an in words ("Al-Hashr, ayahs 1–10 · Juz 28"): one short line of plain text. */
+function passageText(v: unknown, max: number, path: string): string {
+  if (typeof v !== 'string') fail(path);
+  const t = v.trim();
+  if (t.length === 0 || t.length > max || !PASSAGE_RE.test(t)) fail(path);
+  return t;
+}
+
 function pages(v: unknown, max: number, path: string): number[] {
   return list(v, max, path, (x, p) => int(x, 1, MAX_PAGE, p));
 }
@@ -102,7 +116,7 @@ export function validateContext(v: unknown): RevoContext {
   const c = obj(v, 'context');
   // `streak`, `today.carriedPages`, `today.doneEarlier`, `today.otherPages`, `week[].planned` and
   // `week[].done` come from apps after Nov 7 2026 (lib/todaySnapshot); older apps send without them.
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'passages', 'pageNames', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -159,7 +173,38 @@ export function validateContext(v: unknown): RevoContext {
   const lt = c.localTime ?? null;
   if (lt !== null && (typeof lt !== 'string' || !TIME_RE.test(lt))) fail('context.localTime');
 
-  return { totals, today, weakPages: pages(c.weakPages, 30, 'context.weakPages'), week, ...(streak ? { streak } : {}), localTime: lt };
+  const weakPages = pages(c.weakPages, 30, 'context.weakPages');
+
+  // Names of parts of the Qur'an, as the app words them: short plain text, never instructions.
+  let passages: RevoContext['passages'];
+  if (c.passages !== undefined) {
+    const o = obj(c.passages, 'context.passages');
+    keys(o, REVO_PASSAGE_KEYS, 'context.passages', []);
+    passages = {};
+    for (const k of REVO_PASSAGE_KEYS) if (o[k] !== undefined) passages[k] = passageText(o[k], MAX_PASSAGE, `context.passages.${k}`);
+  }
+  let pageNames: RevoContext['pageNames'];
+  if (c.pageNames !== undefined) {
+    const o = obj(c.pageNames, 'context.pageNames');
+    const named = new Set([...today.nextPages, ...today.weakNext, ...weakPages].map(String));
+    if (Object.keys(o).length > MAX_PAGE_NAMES) fail('context.pageNames');
+    pageNames = {};
+    for (const [k, v] of Object.entries(o)) {
+      if (!named.has(k)) fail(`context.pageNames.${k}`);
+      pageNames[k] = passageText(v, MAX_PAGE_NAME, `context.pageNames.${k}`);
+    }
+  }
+
+  return {
+    totals,
+    today,
+    weakPages,
+    week,
+    ...(streak ? { streak } : {}),
+    ...(passages ? { passages } : {}),
+    ...(pageNames ? { pageNames } : {}),
+    localTime: lt,
+  };
 }
 
 const ATTACH_KEYS: Record<RevoAttachment['kind'], readonly string[]> = {

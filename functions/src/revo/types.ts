@@ -40,8 +40,18 @@ export interface RevoContext {
   week: { day: string; pages: number; planned?: number; done?: boolean }[];
   /** The streak as Home shows it, from apps after Nov 7 2026. */
   streak?: { days: number; atRisk: { previous: number; yesterdayPlanned: number; yesterdayDone: number } | null };
+  /**
+   * The parts of the Qur'an the context names, in words, surah and juz first (the app's
+   * lib/passages, e.g. "Al-Hashr, ayahs 1–10 · Juz 28"), from apps after Nov 7 2026.
+   */
+  passages?: Partial<Record<RevoPassageKey, string>>;
+  /** Each page the context names, in words ("Al-Hashr, ayahs 17–24 · Juz 28"), keyed by page number. */
+  pageNames?: Record<string, string>;
   localTime: string | null;
 }
+
+export const REVO_PASSAGE_KEYS = ['today', 'startsAt', 'next', 'nextAt', 'weakNext', 'weak'] as const;
+export type RevoPassageKey = (typeof REVO_PASSAGE_KEYS)[number];
 
 export const REVO_INSIGHTS = ['coverage', 'consistency', 'weakSpots', 'pace'] as const;
 export type RevoInsight = (typeof REVO_INSIGHTS)[number];

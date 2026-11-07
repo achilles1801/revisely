@@ -352,7 +352,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   above the tab bar and the mini player. The screens it shows on end their lists with room for it
   (`useRevoFootprint`), so their last row scrolls clear of it; other screens leave none.
 
-- **REVO-26.** What Revo is told about today, the week and the streak is what Home shows, from the same snapshot
+- **REVO-26.** Revo's context is built when a question is sent, from what the phone shows then (changes still on
+  their way to the server included): a Jump to, a session part done or finished, pages added to today, pages
+  revised ahead, pages marked memorized, a new or edited plan. Notes never go in it (only as an attachment the user
+  picks, REVO-2). What Revo is told about today, the week and the streak is what Home shows, from the same snapshot
   (`lib/todaySnapshot`): today's pages with the carried ones, how many are done ("6 of 20"), whether the day is done,
   and the streak, with the run that can still come back when yesterday was missed (SESS-6). Each of the last 7 days
   has the pages revised in its sessions, the pages its plan had and whether it was done, as the streak counts it.
