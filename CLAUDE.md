@@ -1197,17 +1197,23 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     answer's shape (`askResultOf`) and names a failure (`refusalOf`: offline, the server's reason, the limits).
   Another screen opens Revo with `openRevo({ attach })` (e.g.
   `insightAttachment('weakSpots')` for an Insights section's "Ask Revo"); Settings → Revo AI turns it on and off.
-- **What it is told** (`lib/revo/context`): the Insights totals and today's blocks, as numbers and page numbers,
-  built the way Home builds today. Attachments (`lib/revo/attachments`) go only with the question they were
+- **What it is told** (`lib/revo/context`): built when a question is sent, from `lib/todaySnapshot`, the same
+  snapshot Home's Today post is built from (today, the week, the streak with its grace), so it can't disagree
+  with Home (REVO-26). Parts of the Qur'an go worded surah and juz first (`lib/revo/words` over
+  `lib/passages`), with the page numbers. The server writes the context out in plain words for the model
+  (weekdays, never dates, field names or JSON). Attachments (`lib/revo/attachments`) go only with the question they were
   picked for; a recording is its length and pages, never audio. The greeting and chips are written on the
   phone (`lib/revo/greeting`), no call. Charts are named by the model and drawn from the phone's own data
   (`lib/revo/charts`); an action ("Add to my plan": tomorrow's carry, `carryForTomorrow`) waits for a tap.
+- **Tone** (REVO-27, Majd's choice, Nov 7 2026): a warm coach; the answer first, about 35 words; one next step
+  (today's while today isn't done); surahs and juz, a page number only when asked. Check a prompt change with
+  `functions/scripts/revo-tone-samples.js` (real replies, before and after, for the owner) before deploying it.
 - **Server** (`functions/src/revo/`): `revoAsk`, `revoDayInReview`, `revoSetOptions`, `revoClear`, with the
   coach's key (`ANTHROPIC_COACH_KEY`), cached system prompt, retries and ledger, on `claude-sonnet-5-5`
   (`REVO_MODEL`; the Ask coach stays on Haiku 5.5; prices per model in `coach/pricing.ts`, Sonnet 5.5's
   caching minimum is 512 tokens). **Thinking is off** (`thinking: {type: "between_tools"}`; Sonnet 5.5 thinks
   by default and its thinking counts against `max_tokens`: at 700, every reply was cut off, Nov 7 2026) with
-  `REVO_MAX_TOKENS` 1200; the log says `stop: max_tokens` when a reply is cut off anyway. 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
+  `REVO_MAX_TOKENS` 800; the log says `stop: max_tokens` when a reply is cut off anyway. 20 new questions a revision day (`revoUsage/{uid}`; an earlier day than counted is refused), a first
   question without an attachment kept for the day (free), the last 10 messages sent with a follow-up, up to
   30 memory items (`users/{uid}/revoMemory`), conversations in `users/{uid}/revoChats/{id}/messages`. The
   owner reads them and may only rate a reply, mark an action, mark a chat "plan added" and delete a memory

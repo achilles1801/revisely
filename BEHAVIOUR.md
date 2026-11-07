@@ -367,6 +367,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   plus the pages revised today that aren't today's. A page marked memorized counts on the revision day it was marked.
   The server still accepts the context of an app from before this.
 
+- **REVO-27.** Revo answers like a warm coach: the answer first in one plain sentence, about what was asked, then at
+  most one short sentence of why (about 35 words) unless asked for more, and one clear next step, in the action card
+  when there is one. Today's progress comes up only when the question is about today or today is the next step; while
+  today isn't done, the step is today's, not tomorrow's. Days are said as people say them ("today", "yesterday", "on Tuesday"), never as dates; parts of the Qur'an by
+  surah and juz ("the end of Al-Hashr", "Juz 28"), with a page number only when the user uses or asks for one, after
+  the surah. It never says the numbers disagree or corrects itself about them, and says it can't see something rather
+  than guess. The context it reads is written out in those words (no dates, field names or JSON).
+
 ## Known bugs
 
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
