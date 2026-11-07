@@ -93,7 +93,13 @@ export const SCREEN_MASKS = {
   ...Object.fromEntries(
     ['11-daily-log', '11-daily-log-dark'].map((n) => [
       n,
-      { android: [{ x: 430, y: 294, w: 230, h: 50, why: 'note time' }] },
+      {
+        android: [
+          { x: 430, y: 294, w: 230, h: 50, why: 'note time' },
+          // The To field keeps the focus after Add: its cursor blinks.
+          { x: 740, y: 660, w: 120, h: 76, why: 'text cursor' },
+        ],
+      },
     ]),
   ),
 };
