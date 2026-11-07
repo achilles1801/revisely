@@ -160,7 +160,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Reading, recitation and translations',
-    covers: ['AUDIO-1', 'AUDIO-2'],
+    covers: ['AUDIO-1', 'AUDIO-2', 'AUDIO-3'],
     routes: ['ReadIndex', 'QuranReader'],
     text: lines(
       '- Read tab → a surah, or “Recent pages” → the reader. Tap the page for the controls; swipe to turn pages; the bar at the bottom moves through the mushaf.',
@@ -168,6 +168,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The player bar: ▶ plays from this page; the reciter’s name picks the reciter; the options icon opens “Audio Options”: “Reciter”, “Playback speed” (0.25× to 2×), “From” and “To” (surah and ayah), “Play up to” (Page, Surah, Juz’ or Custom), “Repeat” (loop, or 1 to 10 times) and “Pause after each verse”. While playing: stop, speed, previous and next verse, pause.',
       '- Reciters: Al-Husary, Al-Minshawi, Abdul Basit, Alafasy, As-Sudais, Ash-Shuraim, Al-Muaiqly, Al-Ghamdi, Al-Ajamy, Ash-Shatri, Al-Hudhaify, Muhammad Ayyub, Al-Tablawi, Ad-Dossari. The reciter follows the account; speed, repeat, pause and Play up to are kept on the phone.',
       '- Recitation goes on after leaving the reader (a mini player above the tab bar: pause, ✕ to stop, › back to the reader), in the background and with the phone locked. It streams, so it needs the internet.',
+      '- The lock screen and Android’s notification have pause and play; previous and next verse too (on Android from version 1.0.4). On Android, a paused recitation’s notification can be put away with Hide on the media control (from 1.0.4; on Android 12 and earlier it can also be swiped away a minute after pausing). ▶ in the app goes on from where it paused.',
     ),
   },
   {

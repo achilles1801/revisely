@@ -18,11 +18,13 @@ struct TodayEntry: TimelineEntry {
   let state: TodayState
   let colors: ColorPair?
 
+  /// The widget gallery's example: pages 582–586 as the app names them (surahs and juz,
+  /// never page numbers; lib/passages via snapshot.ts), no-break hyphens included.
   static let sample = TodayEntry(
     date: Date(),
     state: .ready(WidgetDay(
-      day: "", startsAt: 0, endsAt: 0, title: "Pages 582–586", place: "Juz 30 · An-Naba to An-Nazi'at",
-      short: "p. 582–586", total: 5, done: 0, completed: false, streak: 7
+      day: "", startsAt: 0, endsAt: 0, title: "An\u{2011}Naba to At\u{2011}Takwir", place: "Juz 30",
+      short: "An\u{2011}Naba to At\u{2011}Takwir", total: 5, done: 0, completed: false, streak: 7
     ), next: nil),
     colors: nil
   )

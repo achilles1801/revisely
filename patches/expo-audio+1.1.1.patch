@@ -1,0 +1,619 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
+index 49a53af..0a51ff7 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
+@@ -177,8 +177,19 @@ class AudioModule : Module() {
+   override fun definition() = ModuleDefinition {
+     Name("ExpoAudio")
+ 
++    // Revisely patch (patches/expo-audio+1.1.1.patch): which of its fixes this build carries, so
++    // the app's JavaScript knows what it still has to work around. 1: the media notification's
++    // service (AudioControlsService). 2: also previous and next on it (reviselyRemoteCommand).
++    Constant("reviselyMediaControls") { 2 }
++
++    Events("reviselyRemoteCommand")
++
+     OnCreate {
+       audioManager = appContext.reactContext?.getSystemService(Context.AUDIO_SERVICE) as AudioManager
++      // Revisely patch: previous and next from the notification and the lock screen.
++      AudioControlsService.onTrackCommand = { command ->
++        sendEvent("reviselyRemoteCommand", mapOf("command" to command))
++      }
+     }
+ 
+     AsyncFunction("setAudioModeAsync") { mode: AudioMode ->
+@@ -259,6 +270,7 @@ class AudioModule : Module() {
+     }
+ 
+     OnDestroy {
++      AudioControlsService.onTrackCommand = null
+       appContext.mainQueue.launch {
+         releaseAudioFocus()
+         players.values.forEach {
+@@ -297,6 +309,12 @@ class AudioModule : Module() {
+         player.id
+       }
+ 
++      // Revisely patch: whether this player's notification and lock screen controls are still on
++      // (they go when the app's task is removed, or another player takes them).
++      Property("reviselyIsActiveForLockScreen") { player ->
++        player.isActiveForLockScreen
++      }
++
+       Property("isBuffering") { player ->
+         runOnMain {
+           player.ref.playbackState == Player.STATE_BUFFERING
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
+index 320062e..e8f405a 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
+@@ -106,6 +106,8 @@ class AudioPlayer(
+       AudioControlsService.setActivePlayer(context, this, metadata, options)
+     } else if (isActiveForLockScreen) {
+       AudioControlsService.setActivePlayer(context, null)
++      // Revisely patch: also when the service had already gone (it never starts just to clear).
++      isActiveForLockScreen = false
+     }
+   }
+ 
+@@ -119,6 +121,7 @@ class AudioPlayer(
+   fun clearLockScreenControls() {
+     if (isActiveForLockScreen) {
+       AudioControlsService.setActivePlayer(context, null)
++      isActiveForLockScreen = false
+     }
+   }
+ 
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+index 04486e2..497a2c5 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+@@ -15,8 +15,11 @@ import android.os.Bundle
+ import android.os.Handler
+ import android.os.IBinder
+ import android.os.Looper
++import android.os.SystemClock
++import android.util.Log
+ import androidx.annotation.OptIn
+ import androidx.core.app.NotificationCompat
++import androidx.media3.common.ForwardingPlayer
+ import androidx.media3.common.Player
+ import androidx.media3.common.util.UnstableApi
+ import androidx.media3.session.CommandButton
+@@ -33,6 +36,26 @@ import kotlinx.coroutines.cancel
+ import kotlinx.coroutines.launch
+ import java.net.URL
+ 
++// Revisely (patches/expo-audio+1.1.1.patch). expo-audio runs the foreground state itself, so
++// Media3 never counts its playback as ongoing. As released, 1.1.1:
++// - swiping the app away from recents made Media3 pause the player and stop the service; the
++//   paused notification posted on the way out landed after the system had removed the service's
++//   own, leaving one nobody could swipe away (NO_CLEAR), for a session that no longer existed;
++// - a destroyed service still posted (Media3's last update, its listener on the player) under a
++//   fallback id, and clearing the lock screen with no service started one with nothing to show,
++//   which Android punishes 30 s later (ForegroundServiceDidNotStartInTimeException);
++// - a paused notification stayed in the foreground for good, so it could never be swiped away;
++// - every player event posted the notification again, often enough for Android to drop posts.
++// Now one notification id; nothing is posted once the task is removed or the service is going;
++// a paused notification leaves the foreground after PAUSED_FOREGROUND_MS (it stays on show, can be
++// put away, and comes back with playback); the service is never started only to be cleared;
++// the notification is posted only when what it shows changes. Previous and next are on the
++// notification and the lock screen, and go to the app (onTrackCommand): its player holds one item.
++// Stop from a controller (Android's "Hide" on the media control) pauses, keeping the item loaded.
++//
++// SDK 54 links expo-audio as a prebuilt AAR; package.json's expo.autolinking.android
++// .buildFromSource names it so that Gradle builds this source instead. Without that entry this
++// patch does nothing.
+ @OptIn(UnstableApi::class)
+ class AudioControlsService : MediaSessionService() {
+   private val binder = AudioControlsBinder()
+@@ -43,8 +66,26 @@ class AudioControlsService : MediaSessionService() {
+   private val scope = CoroutineScope(Dispatchers.IO)
+   private var currentArtworkUrl: URL? = null
+   private var currentArtwork: Bitmap? = null
+-  private val notificationId: Int
+-    get() = currentPlayer?.hashCode() ?: CHANNEL_ID.hashCode()
++  private val mainHandler = Handler(Looper.getMainLooper())
++
++  // Whether the notification is held in the foreground (it can't be swiped away then).
++  private var isForeground = false
++
++  // Media3's last word on the foreground (playing, or paused for less than its timeout).
++  private var media3Foreground = false
++
++  // The app's task was removed, or the service is being destroyed: nothing is posted after.
++  private var isShutDown = false
++
++  // The user swiped the paused notification away: it stays away until playback goes on.
++  private var isDismissed = false
++
++  // What the notification on show was built from, so an unchanged one isn't posted again.
++  private var shownKey: List<Any?>? = null
++
++  // When an interruption (a call, another app's sound) paused playback, or 0.
++  private var interruptedAt = 0L
++  private val recheck = Runnable { refreshNotification() }
+ 
+   private var playbackListener: Player.Listener? = null
+ 
+@@ -68,10 +109,27 @@ class AudioControlsService : MediaSessionService() {
+       ACTION_SEEK_BACKWARD -> withPlayerOnAppThread { player ->
+         player.seekTo(player.currentPosition - SEEK_INTERVAL_MS)
+       }
++
++      ACTION_DISMISSED -> {
++        // Swiped away (only a notification out of the foreground can be).
++        isDismissed = true
++        shownKey = null
++        // Started only for this (the app had gone): nothing to keep running for.
++        if (mediaSession == null) stopSelf()
++        return super.onStartCommand(intent, flags, startId)
++      }
+     }
+ 
+-    // Ensure channel exists and update current notification
+-    postOrStartForegroundNotification(startInForeground = false)
++    // A start asked for before onCreate had run (the service was still going) still needs its
++    // player, and its call to startForeground.
++    pendingPlayer?.let { player ->
++      val metadata = pendingMetadata
++      val options = pendingOptions
++      clearPending()
++      setActivePlayerInternal(player, metadata, options)
++    }
++
++    refreshNotification()
+     return super.onStartCommand(intent, flags, startId)
+   }
+ 
+@@ -79,11 +137,15 @@ class AudioControlsService : MediaSessionService() {
+     super.onCreate()
+     instance = this
+     createNotificationChannelIfNeeded()
++    // Media3 keeps a paused session in the foreground for this long (10 minutes by default), and a
++    // notification in the foreground can't be swiped away.
++    setForegroundServiceTimeoutMs(PAUSED_FOREGROUND_MS)
+ 
+     pendingPlayer?.let { player ->
+-      setActivePlayerInternal(player, pendingMetadata, pendingOptions)
+-      pendingPlayer = null
+-      pendingMetadata = null
++      val metadata = pendingMetadata
++      val options = pendingOptions
++      clearPending()
++      setActivePlayerInternal(player, metadata, options)
+     }
+   }
+ 
+@@ -112,17 +174,29 @@ class AudioControlsService : MediaSessionService() {
+     )
+   }
+ 
++  private fun buildDismissIntent(): PendingIntent {
++    val intent = Intent(this, AudioControlsService::class.java).setAction(ACTION_DISMISSED)
++    return PendingIntent.getService(
++      this,
++      1,
++      intent,
++      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
++    )
++  }
++
+   private fun buildNotification(): Notification? {
+     val session = mediaSession ?: return null
+ 
+     val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+       .setSmallIcon(androidx.media3.session.R.drawable.media3_icon_circular_play)
+-      .setContentTitle(currentMetadata?.title ?: "\u200E")
++      .setContentTitle(currentMetadata?.title ?: "‎")
+       .setContentText(currentMetadata?.artist)
+       .setSubText(currentMetadata?.albumTitle)
+       .setLargeIcon(currentArtwork)
+       .setContentIntent(buildContentIntent())
++      .setDeleteIntent(buildDismissIntent())
+       .setAutoCancel(false)
++      .setOnlyAlertOnce(true)
+       .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+ 
+     // Using only session custom layout: do NOT call setShowActionsInCompactView.
+@@ -170,28 +244,98 @@ class AudioControlsService : MediaSessionService() {
+     session.setCustomLayout(customLayout)
+   }
+ 
+-  private fun postOrStartForegroundNotification(startInForeground: Boolean) {
+-    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++  // Playback is going on or about to: playing, loading, between two items (ended, still set to
++  // play), or held by an interruption that resumes it by itself (a call, another app's sound) for
++  // up to INTERRUPTION_FOREGROUND_MS: resuming from the background needs the foreground kept.
++  private fun isEngaged(): Boolean {
++    val player = currentPlayer ?: return false
++    val ref = player.ref
++    if (ref.playWhenReady && ref.playbackState != Player.STATE_IDLE) {
++      interruptedAt = 0L
++      return true
++    }
++    if (!player.isPaused) {
++      interruptedAt = 0L
++      return false
++    }
++    val now = SystemClock.elapsedRealtime()
++    if (interruptedAt == 0L) {
++      interruptedAt = now
++      mainHandler.postDelayed(recheck, INTERRUPTION_FOREGROUND_MS)
++    }
++    return now - interruptedAt < INTERRUPTION_FOREGROUND_MS
++  }
++
++  /**
++   * Shows the notification as things are now: in the foreground while playback is engaged or
++   * Media3 asks for it (`foreground`), otherwise out of it, where it can be swiped away. Posted only
++   * when what it shows changes, and never once the service is going.
++   */
++  private fun refreshNotification(foreground: Boolean = media3Foreground) {
++    if (isShutDown) return
++    val session = mediaSession ?: return
++    val engaged = isEngaged()
++    val inForeground = foreground || engaged
++    if (engaged) {
++      isDismissed = false
++    } else if (isDismissed) {
++      // Swiped away while paused (Android 14+ lets that happen in the foreground too): nothing is
++      // posted until playback goes on, and the service leaves the foreground once Media3 lets it.
++      if (!foreground && isForeground) {
++        stopForeground(STOP_FOREGROUND_REMOVE)
++        isForeground = false
++      }
++      return
++    }
++    val key = listOf(session, currentMetadata, currentArtwork, inForeground)
++    if (key == shownKey && inForeground == isForeground) return
+     val notification = buildNotification() ?: return
++    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+ 
+-    if (startInForeground) {
++    if (inForeground) {
++      if (!startInForeground(notification)) {
++        notificationManager.notify(NOTIFICATION_ID, notification)
++      }
++    } else {
++      // Let go of, then posted again: the notification stays, out of the foreground. Android 12
++      // and earlier let it be swiped away then; 13+ shows it in the media control, which "Hide"
++      // puts away (Android 15 marks every MediaStyle notification NO_CLEAR, so Clear all skips it).
++      if (isForeground) {
++        stopForeground(STOP_FOREGROUND_DETACH)
++        isForeground = false
++      }
++      notificationManager.notify(NOTIFICATION_ID, notification)
++    }
++    shownKey = key
++  }
++
++  private fun startInForeground(notification: Notification): Boolean {
++    return try {
+       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+         startForeground(
+-          notificationId,
++          NOTIFICATION_ID,
+           notification,
+           ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+         )
+       } else {
+-        startForeground(notificationId, notification)
++        startForeground(NOTIFICATION_ID, notification)
+       }
+-    } else {
+-      notificationManager.notify(notificationId, notification)
++      isForeground = true
++      true
++    } catch (e: RuntimeException) {
++      // Android 12+ refuses it from the background (ForegroundServiceStartNotAllowedException):
++      // the notification is posted as it is, and the next update tries again.
++      Log.w(TAG, "Couldn't put the media notification in the foreground", e)
++      false
+     }
+   }
+ 
+   override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+-    // Called by Media3 when the session's notification should be updated.
+-    postOrStartForegroundNotification(startInForegroundRequired)
++    // Called by Media3 when the session's notification should be updated. A session that is no
++    // longer this service's (released or replaced: its controller disconnecting) shows nothing.
++    if (session !== mediaSession) return
++    media3Foreground = startInForegroundRequired
++    refreshNotification()
+   }
+ 
+   private fun setActivePlayerInternal(
+@@ -199,6 +343,10 @@ class AudioControlsService : MediaSessionService() {
+     metadata: Metadata? = null,
+     options: AudioLockScreenOptions? = null
+   ) {
++    if (isShutDown) {
++      player?.isActiveForLockScreen = false
++      return
++    }
+     // Detach listener from previous player, clear active flag and hide
+     playbackListener?.let { listener ->
+       currentPlayer?.ref?.removeListener(listener)
+@@ -210,11 +358,12 @@ class AudioControlsService : MediaSessionService() {
+     currentPlayer = player
+     currentMetadata = metadata
+     currentOptions = options
++    isDismissed = false
+ 
+     metadata?.artworkUrl?.let {
+       loadArtworkFromUrl(it) { bitmap ->
+         currentArtwork = bitmap
+-        postOrStartForegroundNotification(startInForeground = false)
++        refreshNotification()
+       }
+     }
+     player?.isActiveForLockScreen = true
+@@ -222,33 +371,38 @@ class AudioControlsService : MediaSessionService() {
+     if (player != null) {
+       mediaSession?.release()
+ 
+-      val session = MediaSession.Builder(this, player.ref)
++      val session = MediaSession.Builder(this, TrackCommandsPlayer(player.ref))
+         .setCallback(AudioMediaSessionCallback())
+         .build()
+ 
+       addSession(session)
+       mediaSession = session
++      media3Foreground = false
+ 
+       // Set initial custom layout
+       updateSessionCustomLayout(player.ref.isPlaying)
+ 
+-      postOrStartForegroundNotification(startInForeground = true)
++      // In the foreground at once: a service started with startForegroundService must be.
++      refreshNotification(foreground = true)
+ 
+-      // Listen for playback state changes to refresh notification and update custom layout
++      // Listen for playback state changes to update the custom layout; Media3 asks for the
++      // notification itself (onUpdateNotification).
+       val listener = object : Player.Listener {
+         override fun onIsPlayingChanged(isPlaying: Boolean) {
+           updateSessionCustomLayout(isPlaying)
+-          postOrStartForegroundNotification(startInForeground = false)
++          refreshNotification()
++        }
++
++        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
++          refreshNotification()
+         }
+ 
+         override fun onPlaybackStateChanged(playbackState: Int) {
+-          postOrStartForegroundNotification(startInForeground = false)
++          refreshNotification()
+         }
+       }
+       playbackListener = listener
+       player.ref.addListener(listener)
+-      // Initial update now that session exists
+-      postOrStartForegroundNotification(startInForeground = false)
+     } else {
+       clearSessionInternal()
+     }
+@@ -262,9 +416,10 @@ class AudioControlsService : MediaSessionService() {
+     currentMetadata?.artworkUrl?.let {
+       loadArtworkFromUrl(it) { bitmap ->
+         currentArtwork = bitmap
+-        postOrStartForegroundNotification(startInForeground = false)
++        refreshNotification()
+       }
+-    } ?: postOrStartForegroundNotification(startInForeground = false)
++    }
++    refreshNotification()
+   }
+ 
+   private fun clearSessionInternal() {
+@@ -277,7 +432,61 @@ class AudioControlsService : MediaSessionService() {
+     currentMetadata = null
+     mediaSession?.release()
+     mediaSession = null
++    media3Foreground = false
++    isDismissed = false
++    shownKey = null
++    interruptedAt = 0L
++    mainHandler.removeCallbacks(recheck)
++    // Out of the foreground, and the notification gone: one detached earlier (paused) isn't the
++    // service's any more, so stopForeground alone would leave it.
+     stopForeground(STOP_FOREGROUND_REMOVE)
++    isForeground = false
++    hideNotification()
++  }
++
++  // The app's task is gone (swiped away from recents) or the service is: playback stops, and so
++  // does everything that shows it, before Media3 or the player can post again.
++  private fun shutDown() {
++    if (isShutDown) return
++    val player = currentPlayer?.ref
++    clearSessionInternal()
++    isShutDown = true
++    player?.let {
++      if (Looper.myLooper() == it.applicationLooper) {
++        it.pause()
++      } else {
++        Handler(it.applicationLooper).post { it.pause() }
++      }
++    }
++  }
++
++  // The session's player: the app's, with previous and next, which the app carries out (the player
++  // itself holds one item, so they would do nothing), and stop as pause: Android's "Hide" on a
++  // media control sends stop, which unloaded the item, so ▶ in the app then played nothing.
++  private class TrackCommandsPlayer(player: Player) : ForwardingPlayer(player) {
++    override fun stop() = pause()
++
++    override fun getAvailableCommands(): Player.Commands =
++      super.getAvailableCommands().buildUpon().addAll(*TRACK_COMMANDS).build()
++
++    override fun isCommandAvailable(command: Int): Boolean =
++      command in TRACK_COMMANDS || super.isCommandAvailable(command)
++
++    override fun seekToNext() = send(TRACK_NEXT)
++    override fun seekToNextMediaItem() = send(TRACK_NEXT)
++    override fun seekToPrevious() = send(TRACK_PREVIOUS)
++    override fun seekToPreviousMediaItem() = send(TRACK_PREVIOUS)
++
++    private fun send(command: String) {
++      onTrackCommand?.invoke(command)
++    }
++  }
++
++  override fun onTaskRemoved(rootIntent: Intent?) {
++    // Media3 would pause the player and stop the service here (it never sees expo-audio's
++    // foreground). The app's screens go with its task, and they stop the recitation anyway.
++    shutDown()
++    stopSelf()
+   }
+ 
+   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+@@ -302,13 +511,14 @@ class AudioControlsService : MediaSessionService() {
+     if (url != currentArtworkUrl) {
+       currentArtworkUrl = url
+       scope.launch {
+-        try {
++        val bitmap = try {
+           val inputStream = url.openConnection().getInputStream()
+-          val bitmap = BitmapFactory.decodeStream(inputStream)
+-          callback(bitmap)
++          BitmapFactory.decodeStream(inputStream)
+         } catch (e: Exception) {
+-          callback(null)
++          null
+         }
++        // Back on the main thread, where everything else here runs.
++        mainHandler.post { callback(bitmap) }
+       }
+     }
+   }
+@@ -316,10 +526,13 @@ class AudioControlsService : MediaSessionService() {
+   private fun hideNotification() {
+     val notificationManager: NotificationManager =
+       getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+-    notificationManager.cancel(notificationId)
++    notificationManager.cancel(NOTIFICATION_ID)
++    shownKey = null
+   }
+ 
+   override fun onDestroy() {
++    shutDown()
++    mainHandler.removeCallbacksAndMessages(null)
+     super.onDestroy()
+     instance = null
+     try {
+@@ -327,21 +540,43 @@ class AudioControlsService : MediaSessionService() {
+     } catch (e: Exception) {
+       //
+     }
+-    mediaSession?.release()
+-    currentPlayer = null
+   }
+ 
+   companion object {
++    private const val TAG = "AudioControlsService"
+     private const val CHANNEL_ID = "expo_audio_channel"
+     private const val ACTION_PLAY = "expo.modules.audio.action.PLAY"
+     private const val ACTION_PAUSE = "expo.modules.audio.action.PAUSE"
+     private const val ACTION_TOGGLE = "expo.modules.audio.action.TOGGLE"
++    private const val ACTION_DISMISSED = "expo.modules.audio.action.DISMISSED"
++
++    // One id for the notification, whatever player it shows, so it is always the one cancelled.
++    private const val NOTIFICATION_ID = 0x52564c59
++
++    // How long a paused session stays in the foreground before its notification can be swiped away.
++    const val PAUSED_FOREGROUND_MS = 60_000L
++
++    // How long playback held by an interruption stays in the foreground (Media3's own limit).
++    const val INTERRUPTION_FOREGROUND_MS = 600_000L
+ 
+     const val ACTION_SEEK_FORWARD = "expo.modules.audio.action.SEEK_FORWARD"
+     const val ACTION_SEEK_BACKWARD = "expo.modules.audio.action.SEEK_REWIND"
+ 
+     const val SEEK_INTERVAL_MS = 10000L
+ 
++    const val TRACK_NEXT = "next"
++    const val TRACK_PREVIOUS = "previous"
++    private val TRACK_COMMANDS = intArrayOf(
++      Player.COMMAND_SEEK_TO_PREVIOUS,
++      Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
++      Player.COMMAND_SEEK_TO_NEXT,
++      Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
++    )
++
++    // Previous or next pressed on the notification or the lock screen (AudioModule sends it on).
++    @Volatile
++    var onTrackCommand: ((String) -> Unit)? = null
++
+     private var pendingPlayer: AudioPlayer? = null
+     private var pendingMetadata: Metadata? = null
+     private var pendingOptions: AudioLockScreenOptions? = null
+@@ -351,6 +586,12 @@ class AudioControlsService : MediaSessionService() {
+ 
+     fun getInstance(): AudioControlsService? = instance
+ 
++    private fun clearPending() {
++      pendingPlayer = null
++      pendingMetadata = null
++      pendingOptions = null
++    }
++
+     fun setActivePlayer(
+       context: Context,
+       player: AudioPlayer?,
+@@ -360,17 +601,29 @@ class AudioControlsService : MediaSessionService() {
+       val service = getInstance()
+       if (service != null) {
+         service.setActivePlayerInternal(player, metadata, options)
+-      } else {
+-        val intent = Intent(context, AudioControlsService::class.java)
++        return
++      }
++      if (player == null) {
++        // Nothing to clear. Starting the service only to stop it would get the app killed
++        // (ForegroundServiceDidNotStartInTimeException).
++        clearPending()
++        return
++      }
++      pendingPlayer = player
++      pendingMetadata = metadata
++      pendingOptions = options
++      val intent = Intent(context, AudioControlsService::class.java)
++      try {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+           context.startForegroundService(intent)
+         } else {
+           context.startService(intent)
+         }
+-
+-        pendingPlayer = player
+-        pendingMetadata = metadata
+-        pendingOptions = options
++      } catch (e: RuntimeException) {
++        // Refused from the background (Android 12+): no lock screen controls this time.
++        Log.w(TAG, "Couldn't start the media controls service", e)
++        player.isActiveForLockScreen = false
++        clearPending()
+       }
+     }
+ 
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+index 839aaef..5303b52 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+@@ -24,11 +24,8 @@ class AudioMediaSessionCallback : MediaSession.Callback {
+             .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+             .add(Player.COMMAND_SEEK_FORWARD)
+             .add(Player.COMMAND_SEEK_BACK)
+-            // Remove track navigation commands
+-            .remove(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+-            .remove(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+-            .remove(Player.COMMAND_SEEK_TO_PREVIOUS)
+-            .remove(Player.COMMAND_SEEK_TO_NEXT)
++            // Revisely patch: track navigation stays. The session's player offers it, and the
++            // app moves to the previous or next item (AudioControlsService.onTrackCommand).
+             .build()
+         )
+         .setAvailableSessionCommands(
