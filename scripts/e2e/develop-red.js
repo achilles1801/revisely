@@ -2,11 +2,14 @@
 // E2E red on develop: a push's run or the nightly run that fails opens (or updates) one GitHub issue
 // labelled develop-red, with the failing flows, the run and each flow's first failing step; the next
 // run that is green on every platform that was red closes it (TESTING.md, .maestro/README.md).
+// The nightly Test Lab run on real Android phones (testlab.yml) reports here too, as the platform
+// `devices`: a phone whose crawl crashed or froze (ANR) is its failing "flow".
 //
 //   node scripts/e2e/develop-red.js <dir of attempts.json files>
 //
 // Environment: GITHUB_TOKEN, GITHUB_REPOSITORY; RUN_URL, SHA; MENTION (who is told when it opens);
-// IOS and ANDROID, each `<flows planned: true|false>:<job planned: true|false>:<job result>`.
+// IOS, ANDROID and DEVICES, each `<flows planned: true|false>:<job planned: true|false>:<job result>`
+// (a platform left unset keeps what the issue says).
 //
 // A platform is tested by a run when its job ran flows (a push to develop builds iOS without flows:
 // only a failed build counts there). Red: a flow failed every attempt (a pass on the retry is a
@@ -19,12 +22,12 @@ const path = require('path');
 const LABEL = 'develop-red';
 const TITLE = 'E2E is red on develop';
 const STATE = /<!-- develop-red-state (\{[\s\S]*?\}) -->/;
-const PLATFORMS = ['android', 'ios'];
-const NAMES = { android: 'Android', ios: 'iOS' };
+const PLATFORMS = ['android', 'ios', 'devices'];
+const NAMES = { android: 'Android', ios: 'iOS', devices: 'Real Android phones (Test Lab)' };
 
 /** Every attempts.json under `dir` (one per E2E job), by platform. */
 function readAttempts(dir) {
-  const out = { android: [], ios: [] };
+  const out = { android: [], ios: [], devices: [] };
   if (!dir || !fs.existsSync(dir)) return out;
   const walk = (d) =>
     fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name === 'attempts.json' ? [path.join(d, e.name)] : []));
@@ -59,7 +62,7 @@ function verdict(job, records) {
  * last, flows }) or null. Returns { state, changed, opened, closed }.
  */
 function nextState(prev, run, verdicts) {
-  const state = { android: prev?.android ?? null, ios: prev?.ios ?? null };
+  const state = { android: prev?.android ?? null, ios: prev?.ios ?? null, devices: prev?.devices ?? null };
   let changed = false;
   for (const p of PLATFORMS) {
     const v = verdicts[p];
@@ -85,12 +88,13 @@ const runLink = (r) => `[${String(r.sha ?? '').slice(0, 7) || 'run'}](${r.url})`
 
 function render(state) {
   const lines = [
-    'E2E fails on `develop` (a push\'s run or the nightly run). Each run updates this issue, and the first run that is green on every platform that was red closes it (`scripts/e2e/develop-red.js`).',
+    'E2E fails on `develop` (a push\'s run, the nightly run, or the nightly run on real phones). Each run updates this issue, and the first run that is green on every platform that was red closes it (`scripts/e2e/develop-red.js`).',
     '',
     'Fix the cause; a flaky flow is fixed too, never skipped (TESTING.md).',
   ];
   for (const p of PLATFORMS) {
     const s = state[p];
+    if (p === 'devices' && !s) continue;
     lines.push('', `## ${NAMES[p]}: ${s ? (s.red ? 'red' : 'green') : 'not run yet'}`);
     if (!s) continue;
     if (!s.red) {
@@ -121,6 +125,7 @@ async function main() {
   const verdicts = {
     android: verdict(parseJob(process.env.ANDROID), attempts.android),
     ios: verdict(parseJob(process.env.IOS), attempts.ios),
+    devices: verdict(parseJob(process.env.DEVICES), attempts.devices),
   };
   console.log(`This run: ${JSON.stringify(verdicts)}`);
   const open = (await githubApi.issuesWithLabel(LABEL, 'open')).find((i) => i.title === TITLE) ?? null;

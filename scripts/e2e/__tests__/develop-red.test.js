@@ -65,6 +65,18 @@ describe('develop-red', () => {
     expect(stateOf({ body })).toEqual(JSON.parse(JSON.stringify(state)));
   });
 
+  it('takes the nightly real-phone run as its own platform, leaving the E2E platforms as they were', () => {
+    const red = { red: true, flows: [{ flow: '09-revo', reason: 'x' }] };
+    const before = nextState(null, run(1), { android: red, ios: null }).state;
+    const phones = verdict(parseJob('true:true:failure'), [rec('devices', [flow('Galaxy S23 (Android 14)', miss('Application crashed.'))])]);
+    const after = nextState(before, run(2), { devices: phones });
+    expect(after.state.android).toEqual(before.android);
+    expect(after.state.devices).toMatchObject({ red: true, flows: [{ flow: 'Galaxy S23 (Android 14)', reason: 'Application crashed.' }] });
+    expect(render(after.state)).toContain('## Real Android phones (Test Lab): red');
+    // Not run yet: no section for it.
+    expect(render(before)).not.toContain('Real Android phones');
+  });
+
   it("reads every job's attempts.json from the downloaded artifacts", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'develop-red-'));
     fs.mkdirSync(path.join(dir, 'e2e-android-attempts-0-1-1'));
@@ -74,6 +86,6 @@ describe('develop-red', () => {
     const all = readAttempts(dir);
     expect(all.android).toHaveLength(2);
     expect(all.ios).toHaveLength(0);
-    expect(readAttempts(path.join(dir, 'missing'))).toEqual({ android: [], ios: [] });
+    expect(readAttempts(path.join(dir, 'missing'))).toEqual({ android: [], ios: [], devices: [] });
   });
 });
