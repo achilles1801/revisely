@@ -4,13 +4,17 @@ The real app on the iOS Simulator and the Android emulator, driven by Maestro, a
 emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them through
 `.github/workflows/e2e.yml`, with the sets its `plan` job picks:
 
+**The long flows gate production, not TestFlight** (Majd, Nov 7 2026): every check stays, only
+where it runs changed. A merge reaches TestFlight in minutes; every flow runs right after it, and
+nothing reaches store users without every flow passing.
+
 | When | Flows | Jobs |
 | --- | --- | --- |
-| A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
-| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms (TESTING.md, "Changing the tests themselves") |
+| A PR into `develop`, single or the top of a stack (and claude-fix's runs), a merge group | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
+| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | Android (TESTING.md, "Changing the tests themselves") |
 | A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
-| The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
-| A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
+| A push to `develop` (what just landed) | every flow; holds up nothing, a failure opens `develop-red` with its suspects | two iOS, two Android |
+| A PR into `main` (the release to production) | every flow, with the visual baselines: its `Required` gate | two iOS, two Android |
 | Every night (testing develop), by hand | every flow | two iOS, two Android |
 
 Every run that ran flows keeps their screenshots of key screens (`subflows/shot.yaml`;
@@ -27,13 +31,17 @@ that changed without its baseline being approved fails E2E (see "Screenshots" be
 - **05 (daily log):** adding, editing and deleting notes. It found two app bugs on Nov 4.
 - **06 (offline):** the phone's copy, the outbox and syncing back, where a bug would lose data.
 
-01, 03, 07, 08, 09 and 10 run before a release (the PR into `main`) and every night.
+01, 03, 07, 08, 09 and 10 run after each merge to develop, before a release (the PR into `main`)
+and every night.
 
 **Why not every flow on every PR:** a macOS runner is the scarce part, five at a time on this plan,
 and each iOS job takes 21–39 minutes of flows.
-- Nov 4–5: eight macOS jobs were wanted at once, and some waited 36 minutes for a runner.
-- So iOS runs only where a whole change is tested (the top of a stack, a release, nightly), and a
-  single PR gets the smoke set on Android, which runs on Linux.
+- Nov 4–5: eight macOS jobs were wanted at once, and some waited 36 minutes for a runner. Nov 7:
+  stack tops running every flow held the redesign and Revo's fixes for hours.
+- So a PR into develop gets the smoke set on Android, which runs on Linux. iOS and the rest run
+  after the merge, where a failure names its suspects (`develop-red`) instead of holding every
+  session's PR, and gate the release.
+- UI work still needs its screenshot boards against the mocks: run E2E by hand on the branch.
 
 **`E2E` is the workflow's last job; CI's required check, `Required`, waits for it:**
 - **Skipped flows:** its `changes` job reads the change's files (a stack's top: the whole stack's;

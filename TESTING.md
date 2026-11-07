@@ -20,7 +20,7 @@ of gap this file exists to prevent.
 | Firestore rules tests | `tests/firestore-rules` | `firestore.rules` allows and refuses exactly what it should, in the real emulator | Every push and PR |
 | **Scenario tests** | `tests/scenarios/scenarios` (`BEHAVIOUR.md`'s rules) | The app's real providers, screens and offline copy, against the Auth, Firestore, Storage and **Functions** emulators with the real rules, at a time and zone the test sets. A user's day, two phones, offline, resets, every callable the app uses | Every push and PR, four shards (`Scenarios`); `preview.yml` publishes nothing unless they pass |
 | Property tests | `tests/scenarios/properties` | The schedule, day and limit rules over thousands of generated cases | With the scenarios |
-| **E2E** | `.maestro/flows` (`.maestro/README.md`) | The release build on the iOS Simulator and the Android emulator: native modules, navigation, gestures, the keyboard, cold starts, airplane mode, against the same emulators and our functions | A single PR: the Android smoke set; the top of a stack, a PR into main, a push to develop, nightly: more (`.maestro/README.md`) |
+| **E2E** | `.maestro/flows` (`.maestro/README.md`) | The release build on the iOS Simulator and the Android emulator: native modules, navigation, gestures, the keyboard, cold starts, airplane mode, against the same emulators and our functions | A PR into develop (single or a stack's top): the Android smoke set; after each merge to develop, a PR into main (its gate) and nightly: every flow, both platforms (`.maestro/README.md`) |
 | **Live smoke check** | `scripts/smoke/live.js`, `live-smoke.yml` | Production works today: sign-in, App Check, Revo answering for real, the worker serving The Clear Quran | Daily, once its account exists (below) |
 | Real devices | `testlab.yml` (once set up) | The app on real Android phones: crashes and ANRs a simulator doesn't show | Nightly, once set up (below) |
 
@@ -120,9 +120,10 @@ it merges (`plan` in ci.yml, `.github/scripts/affected-flows.js`): #286 changed 
 passed 06 once in the smoke set, and broke 06 on develop for everyone.
 
 - **A subflow or a script under `.maestro/`, or a flow:** every flow that uses it (followed through
-  other subflows), together with the smoke set, on **both platforms, twice**, with no reruns
-  (`E2E_REPEAT=2`: every run must pass).
-- **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow, both platforms, twice.
+  other subflows), together with the smoke set, on **Android, twice**, with no reruns
+  (`E2E_REPEAT=2`: every run must pass). iOS runs every flow once it lands (Majd, Nov 7 2026: the
+  long flows gate production, not TestFlight), and a failure there opens `develop-red`.
+- **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow, Android, twice.
 - **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice.
 
 Drafts and a stack's lower layers wait until they are ready (or the top). It is slow on purpose:

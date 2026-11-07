@@ -16,21 +16,30 @@ on:
 permissions:
   contents: read
 
+# A newer push or PR update cancels the older run, except on develop: there every flow runs on both
+# platforms after each merge (an hour on iOS), and a run cancelled by the next merge would never
+# finish. So develop's runs go one at a time, the newest waiting one replacing older ones, and each
+# covers everything merged since the last one that ran.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
 
-# The one required check on develop is `Required` (the last job): it passes only
-# when every job this change needs passed. What runs where:
+# The one required check is `Required` (the last job): it passes only when every job this change
+# needs passed. The long E2E flows gate production, not TestFlight (Majd, Nov 7 2026): every check
+# stays, only where it runs changed. What runs where:
 #   - every PR, push and merge group: the fast checks (one job: secret scan,
 #     typecheck, unit, functions, rules) and the scenario suite in four shards;
 #   - E2E (e2e.yml, called below), decided by `plan`:
 #       a draft PR: none, unless it has the `e2e` label (marking it ready runs everything);
 #       a lower layer of a GitHub stack: none (the top layer tests the whole stack);
-#       the top of a stack into develop, a PR into main, a merge group: every flow, iOS and Android;
-#       a single PR into develop (or claude-fix's run by hand): the Android smoke set;
-#       a push to develop (what just landed): every Android flow, and the iOS native
-#       build kept for PRs (no iOS flows);
+#       a PR into develop, single or the top of a stack (or claude-fix's run by hand), and a
+#       merge group: the Android smoke set; a change to code flows share adds the flows using it,
+#       on Android, twice;
+#       a push to develop (what just landed): every flow, iOS and Android. It holds up nothing
+#       (Preview publishes on the scenario gate); a failure opens or updates the develop-red
+#       issue with its suspects, and Revert a suspect is ready;
+#       a PR into main (the release to production): every flow, iOS and Android, with the
+#       visual baselines;
 #     nightly and by hand: e2e.yml's own schedule and Run workflow.
 # "Bug fixes add a scenario" is its own workflow (spec.yml), so a label or title
 # edit re-runs it alone.
@@ -105,31 +114,31 @@ jobs:
               elif [ "$target" = main ]; then
                 ios=full; android=full; what="a PR into main: every flow"
               elif [ "$target" = develop ] && [ -n "$STACK_SIZE" ]; then
-                ios=full; android=full; what="the top of a stack of $STACK_SIZE into develop: every flow"
+                android=smoke; what="the top of a stack of $STACK_SIZE into develop: the Android smoke set (every flow runs once it lands)"
               elif [ "$target" = develop ]; then
-                android=smoke; what="a PR into develop: the Android smoke set"
+                android=smoke; what="a PR into develop: the Android smoke set (every flow runs once it lands)"
               else
                 what="a PR into $target: fast checks (E2E runs once it targets develop)"
               fi
               # Test the tests (not for drafts, nor a stack's lower layers, nor PRs into main,
-              # which run every flow anyway): the flows using the shared code it changed, both
-              # platforms, twice.
+              # which run every flow anyway): the flows using the shared code it changed, on
+              # Android, twice (iOS runs every flow once it lands).
               if [ "$target" = develop ] && [ "$DRAFT" != true ] && { [ -z "$STACK_SIZE" ] || [ "$STACK_POSITION" = "$STACK_SIZE" ]; }; then
                 if [ -n "$INFRA_FLOWS" ] && [ "$INFRA_FLOWS" != '[]' ]; then
-                  ios=infra; android=infra; repeat=2
+                  android=infra; repeat=2
                   # With the smoke set a single PR runs anyway (each flow once in the list).
                   only=$(jq -r --arg smoke "$(ls .maestro/flows/0[2456]-*.yaml | tr '\n' ' ')" \
                     'if . == "all" then "all" else (. + ($smoke | split(" ") | map(select(. != "")))) | unique | join(" ") end' <<<"$INFRA_FLOWS")
-                  what="$what; it changes code flows share: $only, on both platforms, twice"
+                  what="$what; it changes code flows share: $only, on Android, twice"
                 fi
                 if [ "$INFRA_SCENARIOS" = true ]; then
                   scenario_repeat=2; what="$what; it changes the scenario harness: the suite twice"
                 fi
               fi ;;
-            merge_group) ios=full; android=full; what="a merge group: every flow" ;;
+            merge_group) android=smoke; what="a merge group: the Android smoke set (every flow runs once it lands)" ;;
             push)
               if [ "$REF" = develop ]; then
-                ios=build; android=full; what="what landed on develop: every Android flow, and the iOS native build kept for PRs"
+                ios=full; android=full; what="what landed on develop: every flow, iOS and Android (it holds up nothing; a failure opens develop-red)"
               else
                 what="a push to $REF: no E2E (its PR ran it)"
               fi ;;
