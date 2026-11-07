@@ -51,7 +51,7 @@ import { UndoQueue, memorizeSuggestion, missedFromSession } from '../../lib/acti
 import { UndoToast } from '../../components/revision/UndoToast';
 import { parsePageRange } from '../../lib/memorizationLog';
 import { RangePickerSheet } from '../../components/memorization/RangePickerSheet';
-import { describePageRuns, pageRuns } from '../../lib/pageRanges';
+import { describePassage, plainText } from '../../lib/passages';
 import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
@@ -370,7 +370,8 @@ export default function JournalEntryScreen() {
       Alert.alert('Check the pages', 'Type the first and last page, as numbers from 1 to 604.');
       return;
     }
-    const rangeLabel = range ? (range.length === 1 ? `p. ${range[0]}` : `p. ${range[0]}–${range[range.length - 1]}`) : '';
+    // Named by surah and juz, not page numbers (lib/passages); stored as plain text.
+    const rangeLabel = range ? plainText(describePassage(range)) : '';
     setSaving(true);
     try {
       if (editing) {
@@ -622,7 +623,7 @@ export default function JournalEntryScreen() {
                 </Tap>
               ) : showMemorizeSuggestion ? (
                 <Tap
-                  onPress={() => setDraft({ text: describePageRuns(pageRuns(memorizeSugg)) })}
+                  onPress={() => setDraft({ text: plainText(describePassage(memorizeSugg)) })}
                   style={[v2.suggestion, { borderColor: palette.outline }]}
                   accessibilityRole="button"
                   accessibilityLabel="Fill with the pages you read today"
@@ -630,7 +631,7 @@ export default function JournalEntryScreen() {
                 >
                   <Ionicons name="sparkles-outline" size={14} color={palette.text} />
                   <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
-                    Read today, not memorized: {describePageRuns(pageRuns(memorizeSugg))}
+                    Read today, not memorized: {describePassage(memorizeSugg, { form: 'short' })}
                   </Text>
                 </Tap>
               ) : composingKind === 'note' && tagOptions.length > 0 && !editing ? (

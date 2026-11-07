@@ -224,9 +224,14 @@ describe('undo, and what the sheet shows', () => {
 
   it('where today starts, and the toast’s words', () => {
     expect(todayStartPage(baseUser, TODAY, JUZ_1_AND_30)).toBe(21);
-    expect(describeStart({ kind: 'juz', juz: 30 }, 582)).toBe('Juz 30 · p. 582');
-    expect(describeStart({ kind: 'page', page: 600 }, 600)).toBe('p. 600');
-    expect(describeStart({ kind: 'surah', surah: 78 }, 583)).toMatch(/^An-Naba.* · p\. 583$/);
+    // Surahs and juz first, never the page.
+    const plain = (t: string) => t.split('\u00A0').join(' ').split('\u2011').join('-');
+    expect(plain(describeStart({ kind: 'juz', juz: 30 }, 582))).toBe('Juz 30');
+    expect(plain(describeStart({ kind: 'juz', juz: 12 }, 225))).toBe('Juz 12 · Hud, ayah 29');
+    expect(plain(describeStart({ kind: 'page', page: 600 }, 600))).toBe("Al-'Adiyat, ayah 10");
+    expect(plain(describeStart({ kind: 'surah', surah: 78 }, 583))).toBe('An-Naba, ayah 31');
+    expect(plain(describeStart({ kind: 'surah', surah: 18 }, 293))).toBe('Al-Kahf');
+    expect(plain(describeStart({ kind: 'surah', surah: 18 }, 300))).toBe('Al-Kahf, ayah 54');
   });
 
   it('targetStart: where a cycle reads into a target, from a given place', () => {

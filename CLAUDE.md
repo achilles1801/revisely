@@ -1404,14 +1404,16 @@ classic default), and a fresh install starts in light.
     to `ActivityAll` (search, kind and date filters); none → one quiet line, no list, no
     "Earlier".
   - **Today's two lines** (`lib/todayLines`; the owner's option E, Nov 1 2026, mocks in
-    `~/Documents/revisely-today-mocks/`): "Starts at Al-Mujadila, p. 542 ›" over "20 pages · to
-    At-Tahrim · Juz 28"; in progress "Continue at <the first page not revised>, p. N ›" over a thin
-    bar and "6 of 20"; done "● Done · 20 pages" over "Adh-Dhariyat → Al-Hadid · Juz 27" (no ›, but
-    a tap still opens the menu); across the cycle's end "20 pages · then Al-Fatihah, p. 1"; carried
-    pages "20 pages · 4 from yesterday first". Pages are read in the session's order. The › sheet's
-    header holds the exact ranges. No-break spaces hold "p. 542 ›", "20 pages" and "Juz 28"
-    together and no-break hyphens hold surah names, so the › never stands alone and "Al-" never
-    ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
+    `~/Documents/revisely-today-mocks/`; page numbers replaced by surahs and ayahs on Nov 7 2026,
+    below): "Starts at Al-Mujadila ›" (or "Starts at Al-Baqarah, ayah 142 ›" when the page begins
+    mid-surah; `placeOfPage`) over "20 pages · to At-Tahrim · Juz 28"; in progress "Continue at
+    <where the first page not revised begins> ›" over a thin bar and "6 of 20"; done "● Done · 20
+    pages" over "Adh-Dhariyat → Al-Hadid · Juz 27" (no ›, but a tap still opens the menu); across
+    the cycle's end "20 pages · then Al-Fatihah"; carried pages "20 pages · 4 from yesterday first".
+    Pages are read in the session's order. The › sheet's header holds the exact ranges, the surahs
+    first and the pages as a quiet detail ("Al-Mujadila to At-Tahrim · Juz 28 · pp. 542–561").
+    No-break spaces hold "ayah 142 ›", "20 pages" and "Juz 28" together and no-break hyphens hold
+    surah names, so the › never stands alone and "Al-" never ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
     fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
@@ -1458,12 +1460,20 @@ classic default), and a fresh install starts in light.
   - `describePassage(pages, { form, juz, order, wholeJuz })`: long (rows, sentences) or short (chips,
     chart labels: "Start of Al-Baqarah"); `juz: true` adds " · Juz 28" when it helps; `order:
     'given'` keeps a session's order (the reverse plan, the cycle's end then its start).
-  - `describePageRange`, `describeSession` (SESS-5: whole juz only on the juz plan), `placeOfPage`
-    ("Starts at Al-Baqarah, ayah 142"), `pagesNote` ("p. 542") and `spokenText` (VoiceOver).
+  - `form: 'compact'` drops the word "ayahs" ("Al-Mulk 1–12", sub-lines); `describePageRange`,
+    `describeSession` (SESS-5: whole juz only on the juz plan), `placeOfPage` ("Starts at
+    Al-Baqarah, ayah 142"), `ayahsInSurah` ("Ayahs 142–252", for a row already named by its surah),
+    `pagesNote` ("p. 542") and `plainText` / `spokenText` (notifications and tests / VoiceOver).
+    The text holds names together with no-break hyphens and spaces: in tests compare `plainText`.
+  - Where it shows (NAME-1 in BEHAVIOUR.md): Home's Today post, catch-up line, recent sessions and
+    See all (`lib/activityItems`), the session's header, toast, end card and Keep going, the daily
+    log, the plan editor and schedule, the memorization manager's juz and hizb rows, Jump to, the
+    Read tab's recent pages, the widget snapshot (`lib/widgets/snapshot`). Reminders already named
+    surahs (`lib/reminders/copy`).
   - Page numbers stay only as a quiet detail after the words where they help ("Al-Mujadila ·
     p. 542"), inside the reader (the printed page is the reference there) and where the user
-    chooses by page (Jump to's Page). Amounts are fine ("20 pages"). Approved mocks that lead with
-    page numbers are overridden by this.
+    chooses by page (Jump to's Page tab, the plan's start-point Page tab, page grids, From and To).
+    Amounts are fine ("20 pages"). Approved mocks that lead with page numbers are overridden by this.
 - `theme.onAccent` is the text colour on an `accent` fill. Use it instead of `'#fff'`.
 - Following the system appearance needs `userInterfaceStyle: "automatic"` in app.config (now "light"):
   a native change for a versioned release. Until then Settings offers Light and Dark only

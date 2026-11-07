@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useApp } from '../context/AppContext';
 import { getQuranData } from '../lib/quranData';
+import { describePageRange } from '../lib/passages';
 import { logger } from '../lib/logger';
 import { RATINGS } from '../lib/ratings';
 import { useHaptics } from '../design/haptics';
@@ -77,7 +78,7 @@ export function WeaknessModal({
       visible
       onClose={onClose}
       title="Rate this page"
-      message={`Page ${pageNumber} · ${surahName}`}
+      message={`${describePageRange(pageNumber, pageNumber, { form: 'compact' })} · p. ${pageNumber}`}
       left={{ label: 'Cancel', onPress: onClose }}
       right={{ label: saving ? 'Saving…' : 'Save', onPress: handleSave, strong: true, disabled: !selectedRating || saving }}
       scroll
