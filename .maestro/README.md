@@ -203,7 +203,9 @@ about a second a job.
   starts.
 - **A status line** at the foot of every screen (`e2e-status`): the app's time, the phone's zone,
   "offline" when the E2E network switch is off, and "net down" while NetInfo sees no connection.
-  Flows read it; failure screenshots show it.
+  Flows read it; failure screenshots show it. Its accessibility label adds "· 3 to send" while the
+  app holds changes it hasn't sent, "· nothing to send" otherwise (`src/lib/e2e/outboxStatus.ts`);
+  the line on screen doesn't show it, so screenshots don't change with it.
 - Every other build drops all of it. Each use is behind `process.env.EXPO_PUBLIC_E2E === '1'`, which
   the bundler inlines (as `undefined` when unset), so the test and the `require` behind it fold away
   in release bundles. Check: `npx expo export --platform ios --clear` without the variable, then
@@ -380,6 +382,12 @@ Things that bit:
   interrupted, 12 s before the first character; the sign-up email went out malformed). A sign-up
   the app refuses fails in `subflows/signup.yaml` on its own error (`auth-error`), not later as
   SYNC-4 after a relaunch that clears it.
+- A script that writes the server as its admin (a seed) runs once the app has sent its own changes
+  (`subflows/app-sent.yaml`). The app sends from its outbox, and a change it still held went out
+  after the script's writes and over them: on iOS, run 42414536111, a failed Firestore write stream
+  kept onboarding's three changes on the phone past `seed-activity.js`; they reached the server
+  after the relaunch (onboarding's 10 pages a day over the seed's 20), and the day showed neither
+  "Juz 28" nor "From your session".
 - One-time dialogs come when the app gets there, not at a fixed step (the recording backup notice,
   `subflows/backup-notice.yaml`). Wait for them a little where they belong, and accept them.
 - A function's first signed-in call in the emulator is slow on a CI macOS runner: 17–22 s, against

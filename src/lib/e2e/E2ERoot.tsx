@@ -3,6 +3,10 @@
 // one small line at the foot of the screen with the app's time, the phone's zone
 // and the E2E network state. Flows read it (id e2e-status) to check the clock
 // took, and a failed flow's screenshots say what time the app thought it was.
+// Its accessibility label also says whether the app still holds changes to send
+// (./outboxStatus), which flows wait on before a script writes the server
+// (.maestro/subflows/app-sent.yaml); the line on screen stays as it was, so
+// screenshots don't change with it.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
@@ -12,6 +16,7 @@ import { isOffline, onNetworkChange } from './network';
 import { e2eVerse, E2EVerse, onE2EVerse } from './demoTranslations';
 import NetInfo from '@react-native-community/netinfo';
 import { paletteV2 } from '../../theme/v2';
+import { onOutboxChange, outboxText } from './outboxStatus';
 
 function zoneName(): string {
   try {
@@ -36,8 +41,12 @@ export function statusText(): string {
 
 function Status() {
   const [text, setText] = useState(statusText);
+  const [outbox, setOutbox] = useState(outboxText);
   useEffect(() => {
-    const update = () => setText(statusText());
+    const update = () => {
+      setText(statusText());
+      setOutbox(outboxText());
+    };
     const timer = setInterval(update, 1000);
     const offClock = onClockChange(update);
     const offNet = onNetworkChange(update);
@@ -45,16 +54,18 @@ function Status() {
       netInfoUp = s.isConnected !== false && s.isInternetReachable !== false;
       update();
     });
+    const offOutbox = onOutboxChange(update);
     return () => {
       clearInterval(timer);
       offClock();
       offNet();
       offNetInfo();
+      offOutbox();
     };
   }, []);
   return (
     <View pointerEvents="none" style={styles.status}>
-      <Text testID="e2e-status" style={styles.text} allowFontScaling={false}>
+      <Text testID="e2e-status" style={styles.text} allowFontScaling={false} accessibilityLabel={`${text}${outbox}`}>
         {text}
       </Text>
     </View>
