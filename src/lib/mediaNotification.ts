@@ -17,15 +17,76 @@
 //   no player it posts under a fallback id ("expo_audio_channel".hashCode() in
 //   Java), which nothing cancels either.
 //
-// Until expo-audio itself is fixed (a native change), lib/recitation works around
-// it: it frees its player rather than clearing the lock screen, dismisses any
-// media notification still on show once it has let go of the lock screen (right
-// after a stop, at launch and when the app comes back), and when the app comes
-// back pauses a recitation whose notification has lost its service. With the
-// app away React Native's timers stand still on Android, so right after a stop
-// it reads what is on show again and again for a moment instead of waiting.
+// Binaries before 1.0.4 run expo-audio as released, and lib/recitation works
+// around it: it frees its player rather than clearing the lock screen, dismisses
+// any media notification still on show once it has let go of the lock screen
+// (right after a stop, at launch and when the app comes back), and when the app
+// comes back pauses a recitation whose notification has lost its service. With
+// the app away React Native's timers stand still on Android, so right after a
+// stop it reads what is on show again and again for a moment instead of waiting.
+//
+// From 1.0.4 the binary carries the fix (patches/expo-audio+1.1.1.patch,
+// mediaControlsLevel() >= 1): nothing is posted once the service is going, a
+// paused notification can be put away (its session stays; playing again
+// brings it back), and the service is never started only to be cleared. There
+// the app skips the sweeps after a stop, and asks the player whether its
+// notification is still on instead of guessing from what is on show. Leftovers
+// from an older binary still go at launch. Level 2 adds previous and next to the
+// notification and the lock screen (onTrackCommand), as iOS has them.
 
+import { AudioModule } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
+
+/**
+ * Which fixes of Revisely's expo-audio patch this binary carries: 1 = the
+ * notification's service, 2 = also previous and next on it (1.0.4 on). 0 on
+ * older binaries, on iOS and in tests.
+ */
+export function mediaControlsLevel(): number {
+  try {
+    const level = (AudioModule as { reviselyMediaControls?: unknown } | undefined)?.reviselyMediaControls;
+    return typeof level === 'number' ? level : 0;
+  } catch {
+    return 0;
+  }
+}
+
+type RemoteCommandModule = {
+  addListener?: (event: string, listener: (e: { command?: unknown }) => void) => { remove(): void };
+};
+
+/**
+ * Previous (-1) and next (1) pressed on Android's notification or lock screen,
+ * on a binary that has them (level 2). Null where there are none to listen to.
+ */
+export function onTrackCommand(listener: (direction: 1 | -1) => void): { remove(): void } | null {
+  if (mediaControlsLevel() < 2) return null;
+  try {
+    const module = AudioModule as unknown as RemoteCommandModule | undefined;
+    return (
+      module?.addListener?.('reviselyRemoteCommand', (e) => {
+        if (e?.command === 'next') listener(1);
+        else if (e?.command === 'previous') listener(-1);
+      }) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a player's notification and lock screen controls are still on, on a
+ * binary with the fix (they go when the app's task is removed). True where the
+ * player can't say.
+ */
+export function stillOnLockScreen(player: object): boolean {
+  try {
+    const on = (player as { reviselyIsActiveForLockScreen?: unknown }).reviselyIsActiveForLockScreen;
+    return typeof on === 'boolean' ? on : true;
+  } catch {
+    return true;
+  }
+}
 
 /** Java's String.hashCode (32-bit). */
 export function javaStringHash(s: string): number {
