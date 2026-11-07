@@ -583,7 +583,8 @@ hard-coded token was deleted from the console on 2026-10-27.
   session, revise ahead, the Fajr boundary, the daily log, offline, recordings). CI calls it with
   the sets `plan` picks (see "Where the slow checks run" above): the smoke set is 02 session, 04 Fajr
   boundary, 05 daily log, 06 offline (two Android jobs side by side: 02 + 05, 04 + 06); every flow is
-  two jobs a platform. The top of a stack tests the
+  five Android jobs (two flows each, balanced by time: a full Android run takes about one job's time)
+  and two iOS jobs (macOS runners are the scarce part). The top of a stack tests the
   stack's whole change. One run per PR (a push cancels the older one); a push to develop cancels the
   run of the push before it, and never a full run started by hand. A red run on develop doesn't stop
   the preview (the scenario gate does that): fix it like any failure. iOS runners are the slow part
