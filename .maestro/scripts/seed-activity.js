@@ -121,7 +121,8 @@ merge('users/' + uid + '/pages/562', { status: 'memorized', weaknessRating: 4, d
 /**
  * One revision day. `o`: juz (one or more), revised (count of the assigned, in order, or a list),
  * skipped (pages skipped; the rest not revised were not reached), minutes, at [hour, minute],
- * weak (pages the session rated 2).
+ * weak and moderate (pages the session rated 2 and 3). The app takes each page's rating from the
+ * sessions (the last one that rated it), so the ratings the pages show come from here.
  */
 function day(dayId, o) {
   var juzList = typeof o.juz === 'number' ? [o.juz] : o.juz;
@@ -135,6 +136,7 @@ function day(dayId, o) {
   var start = local(dayId, o.at[0], o.at[1]);
   var minutes = o.minutes === undefined ? null : o.minutes;
   var weak = o.weak || [];
+  var moderate = o.moderate || [];
   set('users/' + uid + '/revisions/' + dayId, {
     id: dayId,
     uid: uid,
@@ -150,6 +152,7 @@ function day(dayId, o) {
   });
   var updates = [];
   for (var w = 0; w < weak.length; w++) updates.push({ pageNumber: weak[w], previousRating: 3, newRating: 2, changedAt: ts(start + 60000) });
+  for (var md = 0; md < moderate.length; md++) updates.push({ pageNumber: moderate[md], previousRating: 4, newRating: 3, changedAt: ts(start + 60000) });
   var end = start + (minutes || 30) * 60000;
   set('users/' + uid + '/sessions/' + dayId, {
     id: dayId,
@@ -176,7 +179,8 @@ var SEPTEMBER = [
 for (var s = 0; s < SEPTEMBER.length; s++) {
   var sd = '2026-09-' + pad(SEPTEMBER[s][0]);
   var sj = SEPTEMBER[s][1];
-  day(sd, { juz: sj, minutes: Math.round(JUZ[sj].length * (s % 2 === 0 ? 2.05 : 2.15)), at: [5, 30] });
+  // Al-Baqarah 40–41 rated weak here, outside the 30 days (Weak spots: "Weak now", no count).
+  day(sd, { juz: sj, minutes: Math.round(JUZ[sj].length * (s % 2 === 0 ? 2.05 : 2.15)), at: [5, 30], weak: sj === 2 ? [40, 41] : [] });
 }
 
 // October and November. Dawn sessions start between 5:20 and 6:05, night ones at 9:05 PM.
@@ -208,7 +212,7 @@ day('2026-10-29', { juz: 28, minutes: 36, at: [21, 5] });
 day('2026-10-31', { juz: [25, 26], minutes: 72, at: [5, 30] });
 day('2026-11-01', { juz: 27, revised: 6, minutes: 9, at: [5, 50] });
 day('2026-11-02', { juz: 27, minutes: 36, at: [5, 40] });
-day('2026-11-03', { juz: 28, skipped: [556, 557], minutes: 34, at: [21, 5], weak: [548, 549] });
+day('2026-11-03', { juz: 28, skipped: [556, 557], minutes: 34, at: [21, 5], weak: [548, 549], moderate: MODERATE });
 
 // ── Memorized items: eleven months, then October's nine pages and 3 November ──
 function memorization(dayId, pages, minutes) {
