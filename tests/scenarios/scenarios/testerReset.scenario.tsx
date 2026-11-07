@@ -1,12 +1,11 @@
 // A tester resets their own data from Settings (BEHAVIOUR.md, RESET-2): the
-// app's own lib/testerReset, calling the resetMyData function's own code
-// against the emulators (harness/testerReset.js; App Check is checked by the
-// callable and in functions' unit tests).
+// app's own lib/testerReset, calling the real resetMyData function in the
+// functions emulator (harness/functions), with App Check and Storage.
 
 import { withAuthRetry } from '../harness/authRetry';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, onboard, pagesRange } from '../harness/account';
-import { markPreviewTester, serveResetMyData } from '../harness/admin';
+import { markPreviewTester, watchFunction } from '../harness/admin';
 import { Home, homeStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
 
@@ -21,7 +20,7 @@ it('[RESET-2] a tester resets their own data: onboarding again, signed in, nothi
   await app.untilSynced();
   await app.close();
   // The owner marks the account a tester (set-preview-tester.js) while the app is closed.
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
 
   // A day revised.
   app = await phone.open(homeStack);
@@ -35,7 +34,7 @@ it('[RESET-2] a tester resets their own data: onboarding again, signed in, nothi
   expect(app.app.logs.length).toBeGreaterThan(0);
 
   // Settings → Reset my data → RESET.
-  const server = serveResetMyData();
+  const server = watchFunction('resetMyData');
   try {
     const { resetMyData } = app.mods.require<TesterReset>('src/lib/testerReset');
     let result: Awaited<ReturnType<TesterReset['resetMyData']>> | undefined;
@@ -79,7 +78,7 @@ it('[RESET-2] an account that is not a tester is refused, and keeps everything',
   setNow('2026-11-02 20:00');
   const phone = new Phone('phone');
   const app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
-  const server = serveResetMyData();
+  const server = watchFunction('resetMyData');
   const memorizedCount = () => app.app.pages.filter((p) => p.status === 'memorized').length;
   try {
     // The memorized pages reach the phone after the account itself: wait for them first.

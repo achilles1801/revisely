@@ -14,6 +14,12 @@ jest.mock('@expo/vector-icons', () => {
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 jest.mock('react-native/Libraries/AppState/AppState', () => require('./appState'));
 
+// Our Cloud Functions: the app's calls go to the functions emulator (harness/functions).
+require('./functions').installFunctionsRoute();
+// App Check: the phone's attestation (App Attest, Play Integrity) is the edge stood in for; the
+// token it hands out is one the functions emulator accepts (harness/appCheck).
+jest.mock('@react-native-firebase/app', () => require('./appCheck'), { virtual: true });
+
 // Native SDKs with no JavaScript fallback: stand-ins that do nothing.
 jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {

@@ -1,16 +1,17 @@
-// Revo in the app (REVO-20..22): a tester's Home with Revo's button; the opt-in first; the
-// greeting written from the account's own plan; the day's limit. The real providers, Home and
-// the session screen against the emulators; Revo's server is the in-memory backend
-// (lib/revo/memoryBackend), since the scenarios run no functions emulator and no model.
+// Revo in the app (REVO-20..23): a tester's Home with Revo's button; the opt-in first; the
+// greeting written from the account's own plan; the day's limit; answers, follow-ups and failures.
+// The real providers, Home and the session screen, and Revo's real backend: the app's own requests
+// to the revo* functions in the functions emulator (harness/functions). Only the model is a
+// stand-in, inside the functions: a recorded reply, or the text a test puts in it
+// (`emulator/anthropic/accounts/<uid>` `reply`, functions/src/emulator.ts).
 
 import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester, serveRevo } from '../harness/admin';
+import { markPreviewTester, watchFunction } from '../harness/admin';
+import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
-
-type MemoryBackend = ReturnType<typeof import('../../../src/lib/revo/memoryBackend').createMemoryRevoBackend>;
 
 /** Home and the session in a stack, with Revo mounted as MainNavigator mounts it. */
 function revoStack(mods: Booted): ReactElement {
@@ -52,17 +53,14 @@ function revoStack(mods: Booted): ReactElement {
   );
 }
 
-async function openWithRevo(phone: Phone): Promise<{ app: OpenApp; backend: MemoryBackend }> {
-  let backend: MemoryBackend | null = null;
-  const app = await phone.open((mods) => {
-    if (!backend) {
-      const { createMemoryRevoBackend } = mods.require<typeof import('../../../src/lib/revo/memoryBackend')>('src/lib/revo/memoryBackend');
-      backend = createMemoryRevoBackend();
-      mods.require<typeof import('../../../src/lib/revo/backend')>('src/lib/revo/backend').__setRevoBackendForTests(backend);
-    }
-    return revoStack(mods);
-  });
-  return { app, backend: backend! };
+/** What the model says next for this account: this text, in the recorded reply (functions/src/emulator.ts). */
+const modelSays = (uid: string, text: string, stopReason = 'end_turn') =>
+  setServerDoc(`emulator/anthropic/accounts/${uid}`, { reply: { text, stopReason } });
+
+/** What the model was asked for this account, oldest first. */
+async function modelRequests(uid: string) {
+  const docs = await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`);
+  return docs.sort((a, b) => Number(a.at) - Number(b.at)) as unknown as { kind: string; problems: string[]; messages: { role: string; content: string }[] }[];
 }
 
 const tap = async (app: OpenApp, testID: string) => {
@@ -80,11 +78,9 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
 
-  const opened = await openWithRevo(phone);
-  app = opened.app;
-  const backend = opened.backend;
+  app = await phone.open(revoStack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
   const home = new Home(app);
   await home.ready();
@@ -95,25 +91,28 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   expect(app.screen.getByText('Meet Revo')).toBeTruthy();
   expect(app.screen.getByText('They’re only sent when you add one to a question.')).toBeTruthy();
   await tap(app, 'revo-not-now');
-  expect(backend.state().settings.optIn).toBe(false);
+  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn ?? false).toBe(false);
   await tap(app, 'revo-button');
   await tap(app, 'revo-turn-on');
-  expect(backend.state().settings.optIn).toBe(true);
+  await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
+  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn).toBe(true);
 
   // [REVO-20] The greeting, written on the phone from today's plan (pages 1–5): no question asked.
   await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
   const greeting = String(app.screen.getByTestId('revo-greeting').props.children);
   expect(greeting).toMatch(/^Salaam( [^.]+)?\. Today is 5 pages, starting at p\. 1\. Ask me anything about your revision\.$/);
   expect(app.screen.getByTestId('revo-chip-How was my week?')).toBeTruthy();
-  expect(backend.state().usage.count).toBe(0);
+  expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
 
   // A suggestion asks it: one question counted, the answer shown.
   await tap(app, 'revo-chip-How was my week?');
   await app.until(() => app.screen.queryAllByTestId('revo-answer').length === 1, 'the answer');
-  expect(backend.state().usage).toEqual({ day: '2026-11-06', count: 1 });
+  expect(await getServerDoc(`revoUsage/${uid}`)).toMatchObject({ day: '2026-11-06', count: 1 });
+  expect((await modelRequests(uid)).map((r) => [r.kind, r.problems])).toEqual([['revo-ask', []]]);
 
   // [REVO-22] The day's questions used: the composer is greyed and says when Revo is back.
-  await app.act(async () => backend.setRemaining('2026-11-06', 0));
+  // As the server counts them (revoUsage, which the app reads and only the functions write).
+  await setServerDoc(`revoUsage/${uid}`, { day: '2026-11-06', count: 20 });
   await app.until(() => app.screen.queryByTestId('revo-limit') != null, 'the limit card');
   expect(app.screen.getByText('That’s today’s 20 questions')).toBeTruthy();
   expect(app.screen.getByText('Revo is back at midnight. Your conversations stay in History.')).toBeTruthy();
@@ -131,14 +130,6 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   await app.close();
 });
 
-/** Revo with its real backend: the app's own requests to the callables, served by the functions' code. */
-async function openWithServedRevo(phone: Phone): Promise<OpenApp> {
-  return phone.open((mods) => {
-    mods.require<typeof import('../../../src/lib/revo/backend')>('src/lib/revo/backend').__setRevoBackendForTests(null);
-    return revoStack(mods);
-  });
-}
-
 const reply = (text: string, more: Record<string, unknown> = {}) => JSON.stringify({ text, chart: null, textAfter: null, action: null, remember: [], title: 'My week', chips: ['How is my pace?'], ...more });
 
 it('[REVO-23] [REVO-3] answers come through the real callables, a first question and a follow-up; a failure says why and can be tried again', async () => {
@@ -149,11 +140,13 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
 
-  const served = serveRevo();
+  const setOptions = watchFunction('revoSetOptions');
+  const asks = watchFunction('revoAsk');
+  const reviews = watchFunction('revoDayInReview');
   try {
-    app = await openWithServedRevo(phone);
+    app = await phone.open(revoStack);
     await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
     await new Home(app).ready();
 
@@ -161,38 +154,41 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
     await tap(app, 'revo-button');
     await tap(app, 'revo-turn-on');
     await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
-    expect(served.calls.map((c) => c.name)).toEqual(['revoSetOptions']);
+    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([1, 0, 0]);
 
     // A first question: the answer the server stored shows in a new conversation.
-    served.reply = (name) => (name === 'revoAsk' ? reply('You revised steadily this week.') : undefined);
+    await modelSays(uid, reply('You revised steadily this week.'));
     await tap(app, 'revo-chip-How was my week?');
     await app.until(() => app.screen.queryByText('You revised steadily this week.') != null, 'the first answer');
-    const first = served.calls[served.calls.length - 1];
-    expect(first).toMatchObject({ name: 'revoAsk', data: { chatId: null, question: 'How was my week?' } });
+    expect(asks.sent[asks.sent.length - 1]).toMatchObject({ chatId: null, question: 'How was my week?' });
 
     // A follow-up in that conversation (the path that crashed on Nov 7 2026, REACT-NATIVE-10).
-    served.reply = () => reply('Today is 5 pages, starting at page 1.');
+    await modelSays(uid, reply('Today is 5 pages, starting at page 1.'));
     await app.act(async () => {
       app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'And today?');
     });
     await tap(app, 'revo-send');
     await app.until(() => app.screen.queryByText('Today is 5 pages, starting at page 1.') != null, 'the follow-up’s answer');
-    const followUp = served.calls[served.calls.length - 1];
-    expect(followUp.name).toBe('revoAsk');
-    expect(typeof followUp.data.chatId).toBe('string');
+    expect(typeof (asks.sent[asks.sent.length - 1] as { chatId?: unknown }).chatId).toBe('string');
+    // The model got the conversation so far, then the follow-up.
+    const followUp = (await modelRequests(uid)).pop()!;
+    expect(followUp.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(followUp.messages[2].content).toMatch(/Question: And today\?$/);
     expect(app.screen.getByText('You revised steadily this week.')).toBeTruthy();
     expect(app.screen.queryAllByTestId('revo-question')).toHaveLength(2);
     expect(app.screen.queryByTestId('revo-broken')).toBeNull();
 
     // [REVO-3] A reply cut off before its text: the server's reason, the question given back, Try again.
-    served.reply = () => '{"text": "Your weakest pa';
+    await modelSays(uid, '{"text": "Your weakest pa', 'max_tokens');
     await app.act(async () => {
       app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'Which pages are weakest?');
     });
     await tap(app, 'revo-send');
     await app.until(() => app.screen.queryByTestId('revo-error') != null, 'the failure');
     expect(app.screen.getByText(/^Revo couldn’t answer that\. Try again\.\s+Try again$/)).toBeTruthy();
-    served.reply = () => reply('Pages 3 and 4 are rated weak.');
+    // Given back: still 2 of today's questions counted.
+    expect((await getServerDoc(`revoUsage/${uid}`))?.count).toBe(2);
+    await modelSays(uid, reply('Pages 3 and 4 are rated weak.'));
     await app.act(async () => {
       app.mods.rtl.fireEvent.press(app.screen.getByText(/^\s*Try again$/));
     });
@@ -200,17 +196,21 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
     expect(app.screen.queryByTestId('revo-error')).toBeNull();
 
     // Offline: it says so, and nothing reached the server.
-    served.offline = true;
-    const before = served.calls.length;
+    await phone.goOffline();
+    const before = (await modelRequests(uid)).length;
     await app.act(async () => {
       app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'How is my pace?');
     });
     await tap(app, 'revo-send');
     await app.until(() => app.screen.queryByTestId('revo-error') != null, 'the offline note');
     expect(app.screen.getByText(/^You’re offline\. Revo needs the internet\.\s+Try again$/)).toBeTruthy();
-    expect(served.calls.length).toBe(before);
+    expect(asks.results[asks.results.length - 1]).toEqual({ network: 'offline' });
+    expect((await modelRequests(uid)).length).toBe(before);
+    await phone.goOnline();
     await app.close();
   } finally {
-    served.restore();
+    setOptions.restore();
+    asks.restore();
+    reviews.restore();
   }
 });

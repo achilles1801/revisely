@@ -1,14 +1,14 @@
 // Settings → Testing → Load test scenario (BEHAVIOUR.md, RESET-3): a tester's
 // account is reset and filled with each ready-made situation in turn, through
 // the app's own lib/testScenarios calling the loadTestScenario function's own
-// code against the emulators (harness/testerReset.js scenario). Each loaded
+// code against the emulators (the real function in the functions emulator, harness/functions). Each loaded
 // account must hold every rule that can be read off it (harness/invariants)
 // and keep its own promise (TESTING-CHECKLIST.md).
 
 import { withAuthRetry } from '../harness/authRetry';
 import { advance, MINUTE, setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester, serveLoadTestScenario } from '../harness/admin';
+import { markPreviewTester, watchFunction } from '../harness/admin';
 import { checkInvariants } from '../harness/invariants';
 import { Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
@@ -64,11 +64,11 @@ it('[RESET-3] a tester loads each test scenario in turn: every rule holds, and e
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
   app = await phone.open(homeStack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
 
-  const server = serveLoadTestScenario();
+  const server = watchFunction('loadTestScenario');
   try {
     for (const scenario of SCENARIO_IDS) {
       advance(3 * MINUTE); // past the two minutes between loads
@@ -91,7 +91,7 @@ it('[RESET-3] an account that is not a tester is refused, and keeps everything',
   const phone = new Phone('phone');
   const app = await newAccount(phone, { memorized: pagesRange(582, 590), user: { dailyPageCapacity: 3 } });
   await app.until(() => app.app.pages.filter((p) => p.status === 'memorized').length === 9, 'the 9 memorized pages');
-  const server = serveLoadTestScenario();
+  const server = watchFunction('loadTestScenario');
   try {
     const lib = app.mods.require<Lib>('src/lib/testScenarios');
     await app.act(async () => {

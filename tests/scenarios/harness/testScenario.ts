@@ -1,13 +1,12 @@
 // A tester's account with one of Settings → Testing's test scenarios loaded
 // (RESET-3), the way Majd starts each part of his test pass: the app's own
-// lib/testScenarios calls the loadTestScenario function's own code against the
-// emulators (harness/admin serveLoadTestScenario), and the phone shows the
-// scenario with no relaunch.
+// lib/testScenarios calls the real loadTestScenario function in the functions
+// emulator (harness/functions), and the phone shows the scenario with no relaunch.
 
 import { withAuthRetry } from './authRetry';
 import { setNow, setZone, ZONES } from './clock';
 import { newAccount, pagesRange } from './account';
-import { markPreviewTester, serveLoadTestScenario } from './admin';
+import { markPreviewTester } from './admin';
 import { homeStack } from './screens';
 import { OpenApp, Phone } from './phone';
 import { ScenarioId, SeedPlan, buildScenario, parseContext } from '../../../functions/src/testScenarios';
@@ -55,18 +54,13 @@ export async function scenarioPhone(
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
-  markPreviewTester(uid);
+  await markPreviewTester(uid);
   app = await phone.open(homeStack);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
   // What the phone holds before the load (a recording, say).
   if (opts.before) await opts.before(app);
-  const server = serveLoadTestScenario();
-  try {
-    const plan = await loadScenario(app, scenario);
-    return { phone, app, plan, D: plan.today };
-  } finally {
-    server.restore();
-  }
+  const plan = await loadScenario(app, scenario);
+  return { phone, app, plan, D: plan.today };
 }
 
 /** The calendar day `n` days from `day` ('YYYY-MM-DD'). */

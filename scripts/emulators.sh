@@ -4,23 +4,28 @@
 #   scripts/emulators.sh exec  <only> <project> '<command>'   # emulators:exec, then stop
 #   scripts/emulators.sh start <only> <project>               # emulators:start, until stopped
 #
-#   <only>     e.g. auth,firestore   or   firestore,storage
+#   <only>     e.g. auth,firestore   or   firestore,storage   or   auth,firestore,functions,storage
 #   <command>  run from the folder you called this from, with FIRESTORE_EMULATOR_HOST,
-#              FIREBASE_AUTH_EMULATOR_HOST and FIREBASE_STORAGE_EMULATOR_HOST set
+#              FIREBASE_AUTH_EMULATOR_HOST and FIREBASE_STORAGE_EMULATOR_HOST set, and
+#              REVISELY_FUNCTIONS_EMULATOR (host:port) when functions run
+#
+# functions: our Cloud Functions (functions/, built first), as deployed, except that inside the
+# emulator with a demo- project the Anthropic call answers with a recorded real reply and the
+# server's clock can follow the caller's test clock (functions/src/emulator.ts, TESTING.md).
 #
 # Several sessions or worktrees on one computer used to start emulators on the same
 # ports (8080, 9099, 4400, ...) and fail, or worse, run against each other's data. Every
 # script that starts emulators (the scenario and rules suites, local E2E, their CI jobs)
 # comes through here, so:
 #
-# Ports: firebase.json's by default (Firestore 8080, Auth 9099, Storage 9199, hub 4400,
-# logging 4500, Firestore websocket 9150). To run beside another worktree, give this one
-# its own set:
+# Ports: firebase.json's by default (Firestore 8080, Auth 9099, Storage 9199, Functions 5001,
+# hub 4400, logging 4500, Firestore websocket 9150). To run beside another worktree, give this
+# one its own set:
 #   REVISELY_EMU_PORT_BASE=auto   a base picked from this worktree's path (the same each time)
 #   REVISELY_EMU_PORT_BASE=21000  Firestore 21000, Auth +1, Storage +2, hub +3, logging +4,
-#                                 Firestore websocket +5
-#   REVISELY_EMU_FIRESTORE_PORT / REVISELY_EMU_AUTH_PORT / REVISELY_EMU_STORAGE_PORT
-#                                 one port each (hub and logging go beside Auth)
+#                                 Firestore websocket +5, Functions +6
+#   REVISELY_EMU_FIRESTORE_PORT / REVISELY_EMU_AUTH_PORT / REVISELY_EMU_STORAGE_PORT /
+#   REVISELY_EMU_FUNCTIONS_PORT   one port each (hub, logging and functions go beside Auth)
 #
 # Lock: one run per Firestore port, a folder in /tmp (REVISELY_EMU_LOCK_DIR) holding the
 # owner's pid. A run waits for it (REVISELY_EMU_LOCK_WAIT seconds, default 1800), takes
@@ -55,19 +60,22 @@ if [ "$BASE" = auto ]; then
 fi
 if [ -n "$BASE" ]; then
   FIRESTORE=$BASE AUTH=$((BASE + 1)) STORAGE=$((BASE + 2)) HUB=$((BASE + 3)) LOGGING=$((BASE + 4)) WEBSOCKET=$((BASE + 5))
+  FUNCTIONS=$((BASE + 6))
 else
   FIRESTORE=${REVISELY_EMU_FIRESTORE_PORT:-8080}
   AUTH=${REVISELY_EMU_AUTH_PORT:-9099}
   STORAGE=${REVISELY_EMU_STORAGE_PORT:-9199}
   if [ "$FIRESTORE" = 8080 ] && [ "$AUTH" = 9099 ]; then
-    HUB=4400 LOGGING=4500 WEBSOCKET=9150
+    HUB=4400 LOGGING=4500 WEBSOCKET=9150 FUNCTIONS=${REVISELY_EMU_FUNCTIONS_PORT:-5001}
   else
-    HUB=$((AUTH + 1)) LOGGING=$((AUTH + 2)) WEBSOCKET=$((FIRESTORE + 1070))
+    HUB=$((AUTH + 1)) LOGGING=$((AUTH + 2)) WEBSOCKET=$((FIRESTORE + 1070)) FUNCTIONS=${REVISELY_EMU_FUNCTIONS_PORT:-$((AUTH + 3))}
   fi
 fi
 PORTS="$FIRESTORE $HUB $LOGGING $WEBSOCKET"
 case ",$ONLY," in *,auth,*) PORTS="$PORTS $AUTH" ;; esac
 case ",$ONLY," in *,storage,*) PORTS="$PORTS $STORAGE" ;; esac
+WITH_FUNCTIONS=false
+case ",$ONLY," in *,functions,*) PORTS="$PORTS $FUNCTIONS"; WITH_FUNCTIONS=true ;; esac
 
 # ---- lock ----------------------------------------------------------------
 LOCK_DIR=${REVISELY_EMU_LOCK_DIR:-/tmp}
@@ -125,22 +133,40 @@ until [ -z "$(taken_ports)" ]; do
   waited=$((waited + 5))
 done
 
+# ---- functions -----------------------------------------------------------
+# The emulator runs the built functions (functions/lib), so build them first; and their one
+# secret needs a value in the emulator, which never reaches Anthropic with it (the recorded
+# replies answer instead), so a placeholder is written if there is none.
+if [ "$WITH_FUNCTIONS" = true ]; then
+  if [ ! -d "$ROOT/functions/node_modules" ]; then
+    echo "emulators: functions need their packages first: (cd functions && npm ci)" >&2
+    exit 64
+  fi
+  echo "emulators: building functions/" >&2
+  npm --prefix "$ROOT/functions" run --silent build >&2
+  [ -f "$ROOT/functions/.secret.local" ] || echo 'ANTHROPIC_COACH_KEY=emulator-only-recorded-replies' >"$ROOT/functions/.secret.local"
+  export REVISELY_FUNCTIONS_EMULATOR="127.0.0.1:$FUNCTIONS"
+fi
+
 # ---- config --------------------------------------------------------------
 # firebase.json's rules files, these ports, in a folder of our own (the CLI also
 # writes its debug logs where it runs).
 WORK=$(mktemp -d)
 CONFIG="$WORK/firebase.json"
-ROOT="$ROOT" FIRESTORE="$FIRESTORE" AUTH="$AUTH" STORAGE="$STORAGE" HUB="$HUB" LOGGING="$LOGGING" WEBSOCKET="$WEBSOCKET" \
+ROOT="$ROOT" FIRESTORE="$FIRESTORE" AUTH="$AUTH" STORAGE="$STORAGE" HUB="$HUB" LOGGING="$LOGGING" WEBSOCKET="$WEBSOCKET" FUNCTIONS="$FUNCTIONS" \
   node -e '
     const e = process.env;
     const n = (k) => Number(e[k]);
     const config = {
       firestore: { rules: `${e.ROOT}/firestore.rules`, indexes: `${e.ROOT}/firestore.indexes.json` },
       storage: { rules: `${e.ROOT}/storage.rules` },
+      // The CLI takes the source relative to the folder of the config.
+      functions: [{ source: require("path").relative(require("path").dirname(process.argv[1]), `${e.ROOT}/functions`), codebase: "default", runtime: "nodejs22" }],
       emulators: {
         auth: { host: "127.0.0.1", port: n("AUTH") },
         firestore: { host: "127.0.0.1", port: n("FIRESTORE"), websocketPort: n("WEBSOCKET") },
         storage: { host: "127.0.0.1", port: n("STORAGE") },
+        functions: { host: "127.0.0.1", port: n("FUNCTIONS") },
         hub: { host: "127.0.0.1", port: n("HUB") },
         logging: { host: "127.0.0.1", port: n("LOGGING") },
         ui: { enabled: false },
@@ -150,7 +176,7 @@ ROOT="$ROOT" FIRESTORE="$FIRESTORE" AUTH="$AUTH" STORAGE="$STORAGE" HUB="$HUB" L
     require("fs").writeFileSync(process.argv[1], JSON.stringify(config, null, 2));
   ' "$CONFIG"
 cp "$ROOT/.firebaserc" "$WORK/" 2>/dev/null || true
-echo "emulators: $ONLY on firestore $FIRESTORE, auth $AUTH, storage $STORAGE (hub $HUB)" >&2
+echo "emulators: $ONLY on firestore $FIRESTORE, auth $AUTH, storage $STORAGE, functions $FUNCTIONS (hub $HUB)" >&2
 
 cd "$WORK"
 if [ "$MODE" = exec ]; then

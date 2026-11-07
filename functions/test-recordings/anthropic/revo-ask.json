@@ -1,0 +1,33 @@
+{
+  "recordedAt": null,
+  "how": "Hand-written in the Messages API response shape, not recorded yet: replace it with a real reply by running functions/scripts/record-anthropic.js with an Anthropic key (TESTING.md).",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 1200,
+    "thinking": {
+      "type": "between_tools"
+    },
+    "systemSha256": "4607e97eae7a5d16d30cdfee34ed4468c80e4447d8b2233ab3e79681af913a3c"
+  },
+  "status": 200,
+  "body": {
+    "id": "msg_handwritten",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"text\":\"You revised on 6 of the last 7 revision days, 63 pages in all, against a plan of 10 a day. Page 589 is your one weak page in today’s set: revise it first while it is fresh.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Start today’s revision\",\"detail\":\"6 pages left today\"},\"remember\":[],\"title\":\"This week’s revision\",\"chips\":[\"Which pages are weakest?\",\"How is my pace?\"]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 412,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 1663,
+      "output_tokens": 171
+    }
+  }
+}

@@ -2,7 +2,7 @@ import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { setGlobalOptions, logger } from 'firebase-functions/v2';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import {
   AUDIENCE,
@@ -27,6 +27,7 @@ import { CoachError, handleAskCoach, handleSetOptIn } from './coach/handler';
 import { callCoach } from './coach/call';
 import { adminRevoStore, deleteRevoData } from './revo/admin';
 import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
+import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -34,6 +35,36 @@ if (getApps().length === 0) {
   initializeApp();
 }
 const adminDb = getFirestore();
+
+// The Firebase emulator with a demo project (the scenario tests and E2E; emulator.ts): Anthropic
+// answers with recorded real replies, and a request's clock may follow the caller's test clock.
+// Deployed, both are off and these are the real fetch and the real clock.
+const testing = inTestEmulator();
+const anthropicFor = (uid: string | undefined) => (testing ? recordedAnthropic(adminDb, uid) : undefined);
+
+/**
+ * The clock for one request: the real one, or (test emulator) the caller's test time, which stands
+ * for the request (a scenario's clock stands still, so a server clock running on from it would put
+ * the server ahead of the phone).
+ */
+function clockOf(raw: { headers?: Record<string, string | string[] | undefined> } | undefined): () => Date {
+  const at = testNow(raw?.headers);
+  if (at == null) return () => new Date();
+  return () => new Date(at);
+}
+
+/** The reset's store, on the request's clock. */
+function resetStoreFor(raw: { headers?: Record<string, string | string[] | undefined> } | undefined, bucket: ReturnType<ReturnType<typeof getStorage>['bucket']>) {
+  const store = adminResetStore(adminDb, bucket);
+  if (testNow(raw?.headers) != null) {
+    const now = clockOf(raw);
+    store.now = () => {
+      const ms = now().getTime();
+      return { stamp: Timestamp.fromMillis(ms), ms, iso: new Date(ms).toISOString() };
+    };
+  }
+  return store;
+}
 
 /**
  * Delete the caller's account and all their data.
@@ -135,7 +166,7 @@ export const deleteUserAccount = onCall(
 export const resetMyData = onCall(RESET_CALL_OPTIONS, async (request): Promise<ResetResult> => {
   try {
     const result = await handleResetMyData(request, {
-      store: adminResetStore(adminDb, getStorage().bucket()),
+      store: resetStoreFor(request.rawRequest, getStorage().bucket()),
       authUser: async (uid) => {
         const u = await getAuth().getUser(uid);
         return { uid: u.uid, email: u.email ?? null, displayName: u.displayName ?? null, photoURL: u.photoURL ?? null };
@@ -159,7 +190,7 @@ export const loadTestScenario = onCall(RESET_CALL_OPTIONS, async (request): Prom
   try {
     const bucket = getStorage().bucket();
     const result = await handleLoadTestScenario(request, {
-      store: adminResetStore(adminDb, bucket),
+      store: resetStoreFor(request.rawRequest, bucket),
       writer: adminScenarioWriter(adminDb, bucket),
       authUser: async (uid) => {
         const u = await getAuth().getUser(uid);
@@ -247,11 +278,14 @@ export const playBuildAvailable = onRequest(
  */
 const ANTHROPIC_COACH_KEY = defineSecret('ANTHROPIC_COACH_KEY');
 
-function coachDeps() {
+type CallerRequest = { auth?: { uid: string }; rawRequest?: { headers?: Record<string, string | string[] | undefined> } };
+
+function coachDeps(caller: CallerRequest) {
   return {
     store: adminCoachStore(adminDb),
-    call: (request: Parameters<typeof callCoach>[0]) => callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value() }),
-    now: () => new Date(),
+    call: (request: Parameters<typeof callCoach>[0]) =>
+      callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value(), fetch: anthropicFor(caller.auth?.uid) }),
+    now: clockOf(caller.rawRequest),
     log: (entry: Record<string, unknown>) => logger.info('coach', entry),
   };
 }
@@ -260,7 +294,7 @@ export const askCoach = onCall(
   { enforceAppCheck: true, secrets: [ANTHROPIC_COACH_KEY], timeoutSeconds: 90, memory: '256MiB', maxInstances: 2 },
   async (request) => {
     try {
-      return await handleAskCoach(request.auth, request.data, coachDeps());
+      return await handleAskCoach(request.auth, request.data, coachDeps(request));
     } catch (err) {
       if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
       logger.error('askCoach failed', err);
@@ -271,7 +305,7 @@ export const askCoach = onCall(
 
 export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, async (request) => {
   try {
-    return await handleSetOptIn(request.auth, request.data, coachDeps());
+    return await handleSetOptIn(request.auth, request.data, coachDeps(request));
   } catch (err) {
     if (err instanceof CoachError) throw new HttpsError(err.code, err.message);
     logger.error('setCoachOptIn failed', err);
@@ -283,11 +317,12 @@ export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, 
  * Revo, the in-app assistant (previewTester accounts that turned it on): 10 new questions an
  * account a revision day, the Ask coach's monthly cap and key. See functions/src/revo/.
  */
-function revoDeps() {
+function revoDeps(caller: CallerRequest) {
   return {
     store: adminRevoStore(adminDb),
-    call: (request: Parameters<typeof callCoach>[0]) => callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value() }),
-    now: () => new Date(),
+    call: (request: Parameters<typeof callCoach>[0]) =>
+      callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value(), fetch: anthropicFor(caller.auth?.uid) }),
+    now: clockOf(caller.rawRequest),
     log: (entry: Record<string, unknown>) => logger.info('revo', entry),
   };
 }
@@ -303,7 +338,7 @@ function revoFailure(name: string, err: unknown, message: string): HttpsError {
 
 export const revoAsk = onCall(REVO_CALL_OPTIONS, async (request) => {
   try {
-    return await handleRevoAsk(request.auth, request.data, revoDeps());
+    return await handleRevoAsk(request.auth, request.data, revoDeps(request));
   } catch (err) {
     throw revoFailure('revoAsk', err, 'Revo is unavailable. Try again.');
   }
@@ -311,7 +346,7 @@ export const revoAsk = onCall(REVO_CALL_OPTIONS, async (request) => {
 
 export const revoDayInReview = onCall(REVO_CALL_OPTIONS, async (request) => {
   try {
-    return await handleDayInReview(request.auth, request.data, revoDeps());
+    return await handleDayInReview(request.auth, request.data, revoDeps(request));
   } catch (err) {
     throw revoFailure('revoDayInReview', err, 'Revo is unavailable. Try again.');
   }
@@ -319,7 +354,7 @@ export const revoDayInReview = onCall(REVO_CALL_OPTIONS, async (request) => {
 
 export const revoSetOptions = onCall({ enforceAppCheck: true, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
   try {
-    return await handleSetOptions(request.auth, request.data, revoDeps());
+    return await handleSetOptions(request.auth, request.data, revoDeps(request));
   } catch (err) {
     throw revoFailure('revoSetOptions', err, 'The setting did not save. Try again.');
   }
@@ -327,7 +362,7 @@ export const revoSetOptions = onCall({ enforceAppCheck: true, timeoutSeconds: 60
 
 export const revoClear = onCall({ enforceAppCheck: true, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
   try {
-    return await handleClear(request.auth, request.data, revoDeps());
+    return await handleClear(request.auth, request.data, revoDeps(request));
   } catch (err) {
     throw revoFailure('revoClear', err, 'The delete did not finish. Try again.');
   }

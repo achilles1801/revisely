@@ -6,14 +6,15 @@ every push and PR (`ci.yml` → `scenarios.yml`), and `preview.yml` publishes no
 ## Running them
 
 You need Java 21. The Firebase CLI comes with this folder's packages (`firebase-tools`, pinned), so
-the emulator is the one CI runs:
+the emulator is the one CI runs. The functions emulator runs `functions/`, so it needs its packages
+too (`scripts/emulators.sh` builds it):
 
 ```bash
-cd tests/scenarios && npm ci
+cd tests/scenarios && npm ci && cd ../../functions && npm ci
 ```
 
 ```bash
-PATH="$PWD/tests/scenarios/node_modules/.bin:$PATH" scripts/emulators.sh exec auth,firestore demo-revisely 'cd tests/scenarios && npx jest --config jest.config.js --maxWorkers=4 --forceExit'
+PATH="$PWD/tests/scenarios/node_modules/.bin:$PATH" scripts/emulators.sh exec auth,firestore,functions,storage demo-revisely 'cd tests/scenarios && npx jest --config jest.config.js --maxWorkers=4 --forceExit'
 ```
 
 Run it from the repository root (`npm test` in this folder does the same, one file at a time). To run
@@ -42,7 +43,11 @@ A scenario runs the app, not a model of it:
 - **The app:** the real `AuthProvider` and `AppProvider` (with the offline copy and the outbox), and
   Home and the session screen in a real React Navigation stack.
 - **The server:** the Firebase JS SDK against the Auth and Firestore emulators, with the real
-  `firestore.rules`. Project `demo-revisely` never reaches a real Firebase project.
+  `firestore.rules`, and our Cloud Functions in the functions emulator (with Storage), called by the
+  app's own client code: the callable protocol, sign-in and App Check checks, limits, the ledger and
+  every write run as deployed. Inside the functions only Anthropic is a stand-in: a reply recorded
+  from the real API (`functions/src/emulator.ts`, `functions/test-recordings/`). Project
+  `demo-revisely` never reaches a real Firebase project.
 
 Only a phone's edges are stand-ins, in `harness/`:
 
@@ -54,10 +59,16 @@ Only a phone's edges are stand-ins, in `harness/`:
 | The disk | `fileSystem.ts`: a folder per phone. |
 | The pager | `pager.tsx`: the Qur'an page images. |
 | Native SDKs with no JS side | `firebaseSetup.ts`: Google Sign-In, Sentry, notifications. |
+| App Check's attestation (App Attest, Play Integrity) | `appCheck.ts`: a token the functions emulator accepts, or none (`failAppCheck()`). |
+| The route to our functions | `functions.ts`: the app's `cloudfunctions.net` URL goes to the emulator, refused while offline, with the scenario's clock (`X-Revisely-Test-Now`). |
+| Anthropic (inside the functions) | `functions/src/emulator.ts`: a recorded reply; per account, `emulator/anthropic/accounts/<uid>` `mode` makes it fail (`rejected`, `overloaded`, `network`). |
 
 - **Phones and launches:** a `Phone` is a device. `phone.open()` is a cold start: every module is
   loaded afresh, and only what the app saved on the phone (AsyncStorage, the disk) carries over.
 - **Two devices:** two `Phone`s signed in to one account. One app is open at a time.
+- **Server state** (`serverDocs.ts`): documents as an admin sees them, through the Firestore
+  emulator's REST API: a tester flag, today's count, a month's ledger; and what our functions wrote.
+  `watchFunction(name)` (`admin.ts`) counts the app's calls to a function and keeps its answers.
 - **Accounts** (`account.ts`) are made the way the app makes them: sign-up, then the calls the
   onboarding screens make (`newAccount(phone, { memorized, user })`).
 - **Screens** (`screens.tsx`):

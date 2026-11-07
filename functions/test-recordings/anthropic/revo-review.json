@@ -1,0 +1,33 @@
+{
+  "recordedAt": null,
+  "how": "Hand-written in the Messages API response shape, not recorded yet: replace it with a real reply by running functions/scripts/record-anthropic.js with an Anthropic key (TESTING.md).",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 1200,
+    "thinking": {
+      "type": "between_tools"
+    },
+    "systemSha256": "4607e97eae7a5d16d30cdfee34ed4468c80e4447d8b2233ab3e79681af913a3c"
+  },
+  "status": 200,
+  "body": {
+    "id": "msg_handwritten",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"text\":\"Today you revised 4 of your 10 planned pages in 22 minutes. Nothing new was memorized. Tomorrow, start with page 589, the weak one still waiting from today.\",\"chart\":null,\"textAfter\":null,\"action\":null,\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"What should I revise first?\"]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 398,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 1663,
+      "output_tokens": 92
+    }
+  }
+}

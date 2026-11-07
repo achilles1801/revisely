@@ -175,6 +175,9 @@ How the tests are made: `tests/scenarios/README.md`.
   holds for each scenario, and the phone shows it with no relaunch. No other account can, and not
   again within 2 minutes (30 a day). The Offline queue scenario holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
+- **ACCOUNT-1.** Delete account (Settings, confirmed twice) removes the account from the server with everything of it
+  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
+  the server refuses (App Check), nothing is deleted and the user stays signed in.
 - **SYNC-5.** The same day revised on two phones while both were offline keeps every page either
   phone revised, in one session for the day.
 
@@ -263,6 +266,11 @@ How the tests are made: `tests/scenarios/README.md`.
 
 - **COACH-4.** The Ask coach is offered in Insights to previewTester accounts only. Before the first question the sheet says
   what is sent and asks the user to turn it on; the question then sends that one insight's totals, and nothing else.
+
+- **COACH-5.** The sheet shows the coach's answer and how many questions are left today; asked again the same day, it
+  says the answer was kept. A refusal shows the server's reason (not available on this account, not turned on, today's
+  questions used, paused for the month, busy), and a call that fails (offline, the phone not recognised by App Check,
+  the model unavailable) shows an error. A refused or failed question is not counted.
 
 ## Revo
 
