@@ -153,7 +153,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ACT-4', 'ACT-8'],
     routes: ['Activity', 'Insights'],
     text: lines(
-      '- Testers: Activity → “Insights”. “Coverage”: the share of memorized pages revised in the last 7 and 30 days. “Consistency”: days with a revision or a read, of the last 30. “Weak spots”: pages rated weak, with “Revise these first tomorrow” and “Plan it”. “Memorized per month”. “Pace”: minutes per page over 30 days, shown from ten timed items. “Juz untouched longest”: the juz whose least recently revised page is oldest.',
+      '- Testers: Activity → “Insights”. “Coverage”: a tile per juz revised in the last “7 days” or “30 days”, the share of memorized pages, and the juz “untouched the longest” with “Plan it”. “Consistency”: days with a revision or a read, of the last 7 and in the month, and the minutes by hour. “Weak spots”: pages weak now or skipped twice in 30 days, with “Revise … first tomorrow” and “Ask” (Revo). “Memorization”: pages memorized each month. “Pace”: minutes per page, shown from ten timed items.',
       '- Strength comes from ratings: 1–2 weak, 3 moderate, 4–5 strong (an unrated revised page counts as strong). Rating needs “Smart Tracking” (Settings → Revision), then ⋯ → “Rate page strength” in a session.',
       '- With Smart Tracking on, the Insights tab in the tab bar shows Strength, “Focus” (the weakest and most overdue pages to revise first) and “Browse” (weakest first, filtered by juz or strength).',
     ),
