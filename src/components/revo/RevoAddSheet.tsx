@@ -70,6 +70,8 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
   const [keys, setKeys] = useState<AddKey[]>(() => initial.map(keyOf).filter((k): k is AddKey => k != null));
   const [tab, setTab] = useState<Tab>('surahs');
   const [q, setQ] = useState('');
+  const juzScroll = useRef<ScrollView>(null);
+  const juzScrolled = useRef(false);
   const room = REVO_MAX_ATTACHMENTS - others.length;
   const count = keys.length + others.length;
   const canAdd = keys.length < room;
@@ -244,7 +246,17 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
       ) : (
         <>
           <View style={styles.tabs}>
-            <PillTabs<Tab> options={TABS} value={tab} onChange={setTab} tone="ink" hug testID="revo-add-tabs" />
+            <PillTabs<Tab>
+              options={TABS}
+              value={tab}
+              onChange={(t) => {
+                juzScrolled.current = false;
+                setTab(t);
+              }}
+              tone="ink"
+              hug
+              testID="revo-add-tabs"
+            />
           </View>
           {tab === 'surahs' ? (
             <FlatList
@@ -258,16 +270,25 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
               testID="revo-add-surahs"
             />
           ) : tab === 'juz' ? (
-            <FlatList
-              style={styles.fill}
-              contentContainerStyle={styles.list}
-              data={JUZ}
-              keyExtractor={(n) => String(n)}
-              renderItem={({ item, index }) => juzRow(item, index === JUZ.length - 1)}
-              initialNumToRender={10}
-              keyboardShouldPersistTaps="handled"
-              testID="revo-add-juzlist"
-            />
+            // Opens on the account's own juz (today's), a few rows above it in view (mock a5).
+            <ScrollView ref={juzScroll} style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" testID="revo-add-juzlist">
+              {JUZ.map((n) => (
+                <View
+                  key={n}
+                  onLayout={
+                    n === Math.max(1, initialJuz - 3)
+                      ? (e) => {
+                          if (juzScrolled.current) return;
+                          juzScrolled.current = true;
+                          juzScroll.current?.scrollTo({ y: e.nativeEvent.layout.y, animated: false });
+                        }
+                      : undefined
+                  }
+                >
+                  {juzRow(n, n === 30)}
+                </View>
+              ))}
+            </ScrollView>
           ) : prepared ? (
             <ScrollView style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
               {tab === 'days' ? (

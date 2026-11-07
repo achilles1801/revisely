@@ -83,12 +83,12 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-add-search-clear
 - hideKeyboard
+# Juz opens on the account's own juz (28), a few rows above it in view.
 - tapOn:
     id: pill-juz
-- scrollUntilVisible:
-    element:
-      id: revo-add-juz-30
-    direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: revo-add-juz-28
     timeout: 10000
 - tapOn:
     id: revo-add-juz-28
