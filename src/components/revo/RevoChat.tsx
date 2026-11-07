@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
@@ -11,6 +11,7 @@ import { REVO_MESSAGES, RevoError, revoBackend } from '../../lib/revo/backend';
 import { revoChips, revoGreeting } from '../../lib/revo/greeting';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal } from '../../lib/revo/types';
+import { atListEnd } from '../../lib/revo/sheetFit';
 import { carryForTomorrow } from '../../lib/weakSpotActions';
 import { greetingName } from '../../lib/displayName';
 import { auth } from '../../lib/firebase';
@@ -63,6 +64,15 @@ export function RevoChat({
   const [pending, setPending] = useState<{ text: string; attach?: { kind: string; label: string } } | null>(null);
   const [refusal, setRefusal] = useState<{ kind: RevoRefusal; message: string; retry?: string } | null>(null);
   const scroll = useRef<ScrollView>(null);
+  // Whether the list shows its end. A list that gets shorter (the keyboard coming up, the sheet
+  // fitting above it) keeps its end in view, as one that grows does: its plan card was left below
+  // the list after an answer (flow 09 on Android, Nov 7 2026), as onContentSizeChange doesn't fire
+  // for a change of the list's own height.
+  const atEnd = useRef(true);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    atEnd.current = atListEnd(contentOffset.y, layoutMeasurement.height, contentSize.height);
+  };
 
   // A chat just asked in: its question and answer, shown until its stored messages arrive.
   const seeded = useRef<{ chatId: string; messages: RevoMessage[] } | null>(null);
@@ -157,6 +167,11 @@ export function RevoChat({
         // The newest message in view once it has laid out: an answer's chart and plan card grow the
         // list after it arrives, and a scroll at arrival stopped above them (flow 09 on Android).
         onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
+        onLayout={() => {
+          if (atEnd.current) scroll.current?.scrollToEnd({ animated: false });
+        }}
+        onScroll={onScroll}
+        scrollEventThrottle={64}
         testID="revo-messages"
       >
         {!chatId && greeting ? (
