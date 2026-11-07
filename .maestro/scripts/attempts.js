@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // Writes <platform results>/attempts.json from run.sh's attempts.tsv and each
 // attempt's Maestro report (report.xml, JUnit): every flow's attempts, whether
-// each passed, how long it took, and why a failed one failed. The workflow keeps
-// it (e2e-<platform>-attempts-…) for the weekly flake report (scripts/e2e/flakes.js).
+// each passed, how long it took, why a failed one failed, and the stand-ins a
+// passing one needed (a flow's "WARNING <what> - …" or "KNOWN BUG <id> - …" line:
+// a second swipe, a relaunch). The workflow keeps it (e2e-<platform>-attempts-…)
+// for the weekly flake report (scripts/e2e/flakes.js), and a stand-in shows as a
+// warning on the run, so a flow that passes only thanks to one is seen.
 //
 //   node .maestro/scripts/attempts.js .maestro/build/results/android
 
@@ -32,6 +35,20 @@ function reasonOf(folder) {
   return 'no report from Maestro (stopped at the time limit, or it crashed)';
 }
 
+/** The stand-ins an attempt needed: its flow's WARNING and KNOWN BUG lines, once each. */
+function standInsOf(folder) {
+  let log;
+  try {
+    log = fs.readFileSync(path.join(folder, 'maestro.log'), 'utf8');
+  } catch {
+    return [];
+  }
+  const found = new Set();
+  // Maestro logs the script's text ('…')} and what it printed […]: the message ends at a quote or a bracket.
+  for (const m of log.matchAll(/\b((?:WARNING|KNOWN BUG) [A-Za-z0-9-]+) - ([^\n"'\]]*)/g)) found.add(clean(`${m[1]}: ${m[2]}`));
+  return [...found].slice(0, 5);
+}
+
 function build(dir, env = process.env) {
   const platform = path.basename(dir);
   const flows = new Map();
@@ -42,6 +59,10 @@ function build(dir, env = process.env) {
     if (!flows.has(flow)) flows.set(flow, { flow, zone, attempts: [] });
     const a = { attempt: Number(attempt), passed: outcome === 'passed', secs: Number(secs) };
     if (!a.passed) a.reason = reasonOf(path.join(dir, folder));
+    else {
+      const standIns = standInsOf(path.join(dir, folder));
+      if (standIns.length) a.standIns = standIns;
+    }
     flows.get(flow).attempts.push(a);
   }
   const server = env.GITHUB_SERVER_URL || 'https://github.com';
@@ -74,6 +95,12 @@ if (require.main === module) {
   fs.writeFileSync(path.join(dir, 'attempts.json'), JSON.stringify(out, null, 2) + '\n');
   const flaky = out.flows.filter((f) => f.passed && !f.firstAttemptPassed).map((f) => f.flow);
   console.log(`attempts.json: ${out.flows.length} flows${flaky.length ? `, passed on a retry: ${flaky.join(', ')}` : ''}`);
+  for (const f of out.flows) {
+    for (const a of f.attempts.filter((x) => x.standIns)) {
+      const line = `${f.flow} passed with a stand-in: ${a.standIns.join('; ')}`;
+      console.log(process.env.GITHUB_ACTIONS ? `::warning title=E2E ${out.platform}::${line}` : `  ${line}`);
+    }
+  }
 }
 
-module.exports = { build, reasonOf };
+module.exports = { build, reasonOf, standInsOf };

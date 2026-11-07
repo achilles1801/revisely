@@ -68,20 +68,31 @@ function aggregate(records) {
       if (seen.has(once)) continue;
       seen.add(once);
       const key = `${f.flow}|${rec.platform}`;
-      if (!rows.has(key)) rows.set(key, { flow: f.flow, platform: rec.platform, runs: 0, first: 0, retry: 0, failed: 0, misses: [] });
+      if (!rows.has(key)) rows.set(key, { flow: f.flow, platform: rec.platform, runs: 0, first: 0, retry: 0, failed: 0, standIn: 0, misses: [], standIns: [] });
       const row = rows.get(key);
       row.runs++;
       const passed = f.attempts.some((a) => a.passed);
       if (f.attempts[0].passed) row.first++;
       else if (passed) row.retry++;
       else row.failed++;
+      // A pass that needed a stand-in (a second swipe, a relaunch: attempts.js) hides a flake too.
+      const helped = f.attempts.find((a) => a.passed && a.standIns?.length);
+      if (helped) {
+        row.standIn++;
+        row.standIns.push({ at: rec.at, url: rec.run?.url, branch: rec.run?.branch, reason: helped.standIns.join('; ') });
+      }
       if (!f.attempts[0].passed) {
         row.misses.push({ at: rec.at, url: rec.run?.url, branch: rec.run?.branch, reason: f.attempts[0].reason ?? '', recovered: passed });
       }
     }
   }
   return [...rows.values()]
-    .map((r) => ({ ...r, rate: r.first + r.retry > 0 ? r.first / (r.first + r.retry) : null, misses: r.misses.sort((a, b) => String(b.at).localeCompare(String(a.at))) }))
+    .map((r) => ({
+      ...r,
+      rate: r.first + r.retry > 0 ? r.first / (r.first + r.retry) : null,
+      misses: r.misses.sort((a, b) => String(b.at).localeCompare(String(a.at))),
+      standIns: r.standIns.sort((a, b) => String(b.at).localeCompare(String(a.at))),
+    }))
     .sort((a, b) => (a.rate ?? 2) - (b.rate ?? 2) || b.failed - a.failed || b.runs - a.runs || a.flow.localeCompare(b.flow) || a.platform.localeCompare(b.platform));
 }
 
@@ -114,12 +125,12 @@ function render({ rows, since, until, jobs, mention = '' }) {
       'is run once more (`E2E_RETRIES`), and a pass on that retry hides a flake: this counts them.',
   );
   out.push('');
-  out.push('| Flow | Platform | Runs | Passed first time | Passed on retry | Failed both | First-attempt pass rate |');
-  out.push('| --- | --- | --- | --- | --- | --- | --- |');
+  out.push('| Flow | Platform | Runs | Passed first time | Passed on retry | Failed both | Needed a stand-in | First-attempt pass rate |');
+  out.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const r of rows) {
     const rate = r.rate == null ? '–' : `${Math.floor(r.rate * 1000) / 10}%`;
     out.push(
-      `| ${r.flow} | ${PLATFORM[r.platform] ?? r.platform} | ${r.runs} | ${r.first} | ${r.retry} | ${r.failed} | ${flaky(r) ? `**${rate}**` : rate} |`,
+      `| ${r.flow} | ${PLATFORM[r.platform] ?? r.platform} | ${r.runs} | ${r.first} | ${r.retry} | ${r.failed} | ${r.standIn ?? 0} | ${flaky(r) ? `**${rate}**` : rate} |`,
     );
   }
   out.push('');
@@ -135,6 +146,20 @@ function render({ rows, since, until, jobs, mention = '' }) {
       out.push('');
       out.push(`**${r.flow} (${PLATFORM[r.platform] ?? r.platform})**`);
       for (const m of r.misses.filter((x) => x.recovered).slice(0, 5)) {
+        out.push(`- ${when(m.at)} · [run](${m.url}) · ${code(m.branch)} · ${code(m.reason)}`);
+      }
+    }
+  }
+  const helped = rows.filter((r) => r.standIn > 0);
+  if (helped.length) {
+    out.push('');
+    out.push('### Passes that needed a stand-in');
+    out.push('');
+    out.push("A flow's own fallback (a second swipe, a relaunch) got it through: each one is a flake to find the cause of.");
+    for (const r of helped) {
+      out.push('');
+      out.push(`**${r.flow} (${PLATFORM[r.platform] ?? r.platform})**`);
+      for (const m of r.standIns.slice(0, 5)) {
         out.push(`- ${when(m.at)} · [run](${m.url}) · ${code(m.branch)} · ${code(m.reason)}`);
       }
     }
