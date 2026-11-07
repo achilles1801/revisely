@@ -151,9 +151,12 @@ export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { fi
   const t = unfenced(raw);
   const o = jsonObject(t);
   if (!o || typeof o.text !== 'string' || o.text.trim() === '') {
-    // Not the object: plain words are the answer; a broken object keeps its text if it can.
+    // Not the object: plain words are the answer; a broken object keeps its text if it can. Plain
+    // words that name a screen still get its card (REVO-31; how-to answers came back as plain text).
     const text = t.startsWith('{') ? salvageText(t) : raw;
-    return text && text.trim() ? { text: cutText(text), remember: [] } : null;
+    if (!text || !text.trim()) return null;
+    const found = screenFromText(text);
+    return found ? { text: cutText(text), remember: [], action: found } : { text: cutText(text), remember: [] };
   }
   const out: RevoReplyParts = { text: cutText(o.text), remember: strings(o.remember, MAX_REMEMBER, MAX_FACT) };
   const chart = checkChart(o.chart, allowed);

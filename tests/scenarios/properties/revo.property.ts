@@ -703,12 +703,21 @@ describe('opening a screen (REVO-31)', () => {
     expect(said('Edit schedule can change it, but finish today first.', { kind: 'startRevision', title: 'Start', detail: '' })).toEqual({ kind: 'startRevision', title: 'Start', detail: '' });
     expect(said('You revised steadily this week; the end of Al-Hashr is weakest.')).toBeUndefined();
     expect(said('Your settings and your schedule look fine.')).toBeUndefined();
+    // A how-to answer the model wrote as plain words, with no JSON object (Nov 7 eval: Q1, Q4, Q6, Q16).
+    expect(parseReply('Not as a single option yet. Home → today’s › → Edit schedule → Create new plan.', allowed, { firstTurn: true })).toEqual({
+      text: 'Not as a single option yet. Home → today’s › → Edit schedule → Create new plan.',
+      remember: [],
+      action: { kind: 'openScreen', title: 'Your schedule', detail: '', screen: 'planEditor' },
+    });
+    expect(parseReply('Plain words.', allowed, { firstTurn: true })).toEqual({ text: 'Plain words.', remember: [] });
   });
 
   it('[REVO-31] the prompt maps each path to its screen and never has Revo claim a card it didn’t add', () => {
     expect(REVO_SYSTEM_PROMPT).toMatch(/Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo/);
     expect(REVO_SYSTEM_PROMPT).toContain('Never write that you added a shortcut or will open something');
-    expect(REVO_SYSTEM_PROMPT).toMatch(/say how: tap “Add to today” on Home/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/say how to catch up: tap “Add to today” on Home/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/those days’ pages can still be added that way \(the last three days\): always say so/);
+    expect(REVO_SYSTEM_PROMPT).toContain('It is still the one JSON object every reply is');
   });
 
   it('[REVO-31] the server stores and returns it like any action, and a follow-up shows the model what was offered', async () => {

@@ -135,7 +135,7 @@ const SAMPLES = [
       F('Reverse order, in a new plan', /reverse order/i, true),
       F('where: Edit schedule → Create new plan', /create new plan|edit schedule/i, true),
       F('start at Juz 29 (Today starts at)', /today starts at|start(?:s|ing)? at (?:the end of )?juz 29|juz 29/i, true),
-      F('says the whole plan goes backwards (no single-juz reverse)', /whole plan|carries on|then (?:juz 28|the juz before)|rest of|all (?:your )?memorized|not (?:just|only) (?:that|one) juz|only for the whole|(?:just|only) one juz|one juz backwards|no way to/i),
+      F('says the whole plan goes backwards (no single-juz reverse)', /whole plan|carries on|then (?:juz 28|the juz before)|rest of|all (?:your )?memorized|not (?:just|only) (?:that|one) juz|only for the whole|(?:just|only) one juz|one juz backwards|no way to|not as (?:a single option|such)|single option/i),
       UNSURE,
     ],
     screen: 'planEditor',

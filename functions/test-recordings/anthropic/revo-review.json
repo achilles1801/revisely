@@ -1,13 +1,13 @@
 {
   "recordedAt": "2026-11-07T09:31:19.106Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "how": "functions/scripts/record-anthropic.js, with the prompt at 0b9cc53. The request hash was then moved to the next prompt (a wording change in the guide) without recording again: record it again to match exactly.",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "e2684db4ec864c6098220f58c7ec7a96423916c3c7fe9b8ed65384b157b1e5a9"
+    "systemSha256": "ae5e816c4dfeb4b3e233a877ff11dbd0f8bc63be2282dcae131a8357e9e45f8b"
   },
   "status": 200,
   "body": {
