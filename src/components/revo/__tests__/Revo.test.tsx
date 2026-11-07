@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, DeviceEventEmitter, StyleSheet } from 'react-native';
+import { Alert, ScrollView, DeviceEventEmitter, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { __setRevoBackendForTests, RevoError, type RevoBackend } from '../../../lib/revo/backend';
@@ -85,6 +85,29 @@ function Chat({ usage = { day: DAY, count: 0 }, onAction = jest.fn(), onOff }: {
 const flush = () => act(async () => {});
 
 describe('Revo’s conversation', () => {
+  it('[REVO-24] the conversation keeps its end in view when the list gets shorter (the keyboard), unless scrolled up', async () => {
+    render(<Chat />);
+    await flush();
+    const list = screen.getByTestId('revo-messages');
+    const view = screen.UNSAFE_getAllByType(ScrollView).find((n) => n.props.testID === 'revo-messages')!.instance as {
+      scrollToEnd: (o?: { animated?: boolean }) => void;
+    };
+    const toEnd = jest.spyOn(view, 'scrollToEnd');
+    const layout = (height: number) => fireEvent(list, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height } } });
+    // At the end (as it opens): a shorter list scrolls back to its end.
+    layout(300);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
+    toEnd.mockClear();
+    // Scrolled up to read: left where it is.
+    fireEvent.scroll(list, { nativeEvent: { contentOffset: { y: 0 }, layoutMeasurement: { height: 300 }, contentSize: { height: 1000 } } });
+    layout(260);
+    expect(toEnd).not.toHaveBeenCalled();
+    // Back at the end: kept there again.
+    fireEvent.scroll(list, { nativeEvent: { contentOffset: { y: 690 }, layoutMeasurement: { height: 300 }, contentSize: { height: 1000 } } });
+    layout(240);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
+  });
+
   it('opens on the greeting from today’s data, with suggestions; nothing asked yet', async () => {
     render(<Chat />);
     await flush();

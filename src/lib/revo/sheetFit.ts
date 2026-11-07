@@ -35,3 +35,11 @@ export function keyboardCover(keyboardHeight: number, baseFrame: number, frame: 
 export function keyboardOverSheet(reported: number, platform: string, bottomInset: number): number {
   return reported > 0 ? reported + (platform === 'android' ? bottomInset : 0) : 0;
 }
+
+/** Within this of the end, a list counts as showing it (a fraction of a line, for rounding and bounce). */
+export const LIST_END_SLACK = 24;
+
+/** Whether a list scrolled to `offset`, `height` tall, with `content` of content, shows its end. */
+export function atListEnd(offset: number, height: number, content: number): boolean {
+  return offset + height >= content - LIST_END_SLACK;
+}

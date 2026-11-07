@@ -346,7 +346,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-24.** With the keyboard up, Revo's sheet sits on the keyboard and gets shorter: its header (Revo, History,
   Memory) and the conversation stay on screen, and only the composer rides up with the keyboard. Where the system has
-  already made room for the keyboard (Android resizing the window), the sheet isn't lifted twice.
+  already made room for the keyboard (Android resizing the window), the sheet isn't lifted twice. A conversation
+  showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),
+  unless the user has scrolled up to read.
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), bottom-right, 14
   above the tab bar and the mini player. The screens it shows on end their lists with room for it
