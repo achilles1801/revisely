@@ -30,3 +30,7 @@ appId: com.revisionbuddy.app
     file: ../subflows/activity-screens.yaml
     env:
       THEME: dark
+- runFlow:
+    file: ../subflows/tabs-merge-screens.yaml
+    env:
+      THEME: dark

@@ -39,12 +39,14 @@ interface Props {
   onPlanIt: (pages: number[]) => void;
   /** A weak spot's row: the reader at that page. */
   onOpenPage: (page: number) => void;
+  /** Weak spots' "See all pages by strength" (ACT-12). */
+  onSeeAllPages?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
   noteDays: Set<string>;
   onOpenDay: (day: string) => void;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages }: Props) {
   const { pages, logs, user } = useApp();
   const [view, setView] = useState<ViewKind>('calendar');
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -185,10 +187,12 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             memorizations: yearOfMemorizing,
             capacity: user?.dailyPageCapacity ?? 20,
             revo: revoAvailable(user),
+            smartTracking: user?.smartTrackingEnabled ?? false,
           }}
           onReviseTomorrow={onReviseTomorrow}
           onPlanIt={onPlanIt}
           onOpenPage={onOpenPage}
+          onSeeAllPages={onSeeAllPages}
         />
       )}
     </RNView>
