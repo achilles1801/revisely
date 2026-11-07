@@ -42,10 +42,14 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-greeting
     timeout: 10000
-- assertVisible:
-    id: revo-greeting
-    # By surah, never page numbers (lib/passages; no-break hyphens and spaces inside, so "." between words).
-    text: "Salaam.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
+# Waited for, not asserted at once: on a slow iOS runner the check ran before the greeting's text
+# was there (Nov 7 2026). By surah, never page numbers (lib/passages; no-break hyphens and spaces
+# inside, so "." between words).
+- extendedWaitUntil:
+    visible:
+      id: revo-greeting
+      text: "Salaam.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
+    timeout: 10000
 # The first suggestion is about them, by surah.
 - assertVisible:
     id: "revo-chip-Plan Al-Hashr to Al-Mumtahanah"
@@ -106,7 +110,8 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-plan
-    timeout: 15000
+    # The answer's plan card: over 15 s on a slow iOS runner with the seeded history.
+    timeout: 30000
 - assertVisible:
     id: revo-chart-pageRatings
 # The keyboard away (a tap on the chart, which is no control), as the mock shows the conversation.
@@ -280,7 +285,8 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-plan
-    timeout: 15000
+    # The answer's plan card: over 15 s on a slow iOS runner with the seeded history.
+    timeout: 30000
 - tapOn:
     id: revo-chart-pageRatings
 - runFlow:
