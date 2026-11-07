@@ -22,6 +22,7 @@ import { getPagesForJuz, getPagesForSurah, getSurah, getSurahDisplay } from './q
 import {
   calendarDaysBetween,
   getPagesScheduledForDate,
+  keepLaterCarry,
   juzKeyForPage,
   juzModeCycle,
   scheduleStartingByToday,
@@ -180,7 +181,7 @@ export function jumpTo(before: User, target: JumpTarget, ctx: JumpContext): Jump
   const memorizedSet = new Set(ctx.memorized.map((p) => p.pageNumber));
   const ownToday = ctx.logs.filter((log) => log.date === today).flatMap((log) => log.pagesRevised);
   const keep = [...new Set(ownToday)].filter((p) => memorizedSet.has(p));
-  const carryOver = { day: today, pages: keep, skip: 0 };
+  const carryOver = { day: today, pages: keep, skip: 0, ...keepLaterCarry(user, today) };
 
   return { user: { ...user, ...moved.fields, carryOver }, startPage: moved.startPage, today: moved.today };
 }

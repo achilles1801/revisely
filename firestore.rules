@@ -241,7 +241,7 @@ service cloud.firestore {
                         incomingData().carryOverMode in ['shift', 'add']) &&
                        (!hasField('carryOver') || incomingData().carryOver == null ||
                         (incomingData().carryOver is map &&
-                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip', 'source', 'from']) &&
+                         incomingData().carryOver.keys().hasOnly(['day', 'pages', 'skip', 'source', 'from', 'next']) &&
                          incomingData().carryOver.day is string &&
                          incomingData().carryOver.pages is list &&
                          incomingData().carryOver.pages.size() <= 604 &&
@@ -252,7 +252,18 @@ service cloud.firestore {
                           incomingData().carryOver.source == 'insights') &&
                          (!('from' in incomingData().carryOver) ||
                           (incomingData().carryOver.from is map &&
-                           incomingData().carryOver.from.size() <= 604)))) &&
+                           incomingData().carryOver.from.size() <= 604)) &&
+                         // The next day's pages ("Revise these first tomorrow")
+                         // held beside this day's carry (lib/weakSpotActions).
+                         (!('next' in incomingData().carryOver) ||
+                          incomingData().carryOver.next == null ||
+                          (incomingData().carryOver.next is map &&
+                           incomingData().carryOver.next.keys().hasOnly(['day', 'pages', 'source']) &&
+                           incomingData().carryOver.next.day is string &&
+                           incomingData().carryOver.next.pages is list &&
+                           incomingData().carryOver.next.pages.size() <= 604 &&
+                           (!('source' in incomingData().carryOver.next) ||
+                            incomingData().carryOver.next.source == 'insights'))))) &&
                        (!hasField('reciter') ||
                         (incomingData().reciter is string &&
                          incomingData().reciter.size() <= 60)) &&

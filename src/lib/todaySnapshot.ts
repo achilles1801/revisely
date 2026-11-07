@@ -6,6 +6,7 @@
 import type { RevisionLog, User, UserPage } from '../types';
 import { creditedOnDay, doneOnDay } from './aheadCredit';
 import { withPhoneSessions } from './activityHistory';
+import { carryOverOn } from './algorithm';
 import { ownPagesOf } from './carryOver';
 import { streakDetailFromLogs, type StreakDetail } from './streak';
 import { streakDetailFromItems, type HistoryItem } from './streakFromItems';
@@ -45,8 +46,9 @@ export function todayStatusOf(own: readonly number[], credited: ReadonlySet<numb
 
 /** The pages carried into `day` that are among its pages. */
 export function carriedPagesOn(user: User | null, day: string, pages: readonly number[]): number[] {
-  const carry = user?.carryOver;
-  if (!carry || carry.day !== day) return [];
+  // The carry for that day: today's own, or the next day's held beside it (carryOver.next).
+  const carry = carryOverOn(user, day);
+  if (!carry) return [];
   const carried = new Set(carry.pages);
   return pages.filter((p) => carried.has(p));
 }

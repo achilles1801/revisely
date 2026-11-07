@@ -241,3 +241,29 @@ describe('applyCarryOver', () => {
     expect(pagesOn(saved, 18)).toEqual([8, 9, 1]);
   });
 });
+
+describe('tomorrow’s pages beside today’s carry (carryOver.next)', () => {
+  const tomorrow = '2026-10-18';
+  const withNext: User = {
+    ...baseUser,
+    carryOver: { day: TODAY, pages: [1], skip: 0, next: { day: tomorrow, pages: [9], source: 'insights' } },
+  };
+
+  it('today reads today’s carry, tomorrow reads the one held beside it', () => {
+    expect(generateDailyAssignment(memorized, [], withNext, today).pages[0]).toBe(1);
+    expect(generateDailyAssignment(memorized, [], withNext, new Date(2026, 9, 18)).pages[0]).toBe(9);
+    expect(hasCarriedOver(withNext, TODAY)).toBe(true);
+    expect(hasCarriedOver(withNext, tomorrow)).toBe(true);
+    expect(hasCarriedOver(withNext, '2026-10-19')).toBe(false);
+  });
+
+  it('Add to today keeps the pages already put on tomorrow', () => {
+    const insightsFirst: User = { ...baseUser, carryOver: { day: tomorrow, pages: [9], skip: 0, source: 'insights' } };
+    for (const carryOverMode of ['shift', 'add'] as const) {
+      const after = applyCarryOver({ ...insightsFirst, carryOverMode }, memorized, [4], today);
+      expect(after.carryOver?.day).toBe(TODAY);
+      expect(after.carryOver?.pages).toEqual([4]);
+      expect(after.carryOver?.next).toEqual({ day: tomorrow, pages: [9], source: 'insights' });
+    }
+  });
+});
