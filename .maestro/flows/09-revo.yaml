@@ -42,7 +42,8 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: revo-greeting
-    text: "Salaam.* Today is .* pages, starting at p\\. .*"
+    # Where today starts by surah, never "p. 582" (lib/passages; no-break hyphens inside the name).
+    text: "Salaam.* Today is .* pages, starting at [^p0-9][^.]*\\..*"
 # By id: on iOS a chip's accessibility label ("Ask: How was my week?") stands for its text. The id
 # is a pattern (Maestro reads it as one), so not its "?".
 - assertVisible:
