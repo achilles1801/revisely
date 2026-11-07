@@ -1155,10 +1155,15 @@ To rotate one (or after a leak: revoke the old key in the portal first):
 Revo is the in-app AI assistant (Nov 6 2026; mocks and notes `~/Documents/revisely-today-mocks/revo/`,
 privacy draft `~/Documents/revisely-stats/coach-privacy-draft.md` § R). It supersedes the Ask coach in the
 app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. Rules: BEHAVIOUR.md REVO-*.
-- **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. E2E builds run the real
-  `revo*` functions in the functions emulator (only the model answers from a recording); `09-revo` marks
-  its account a tester, sets the model's text, the day's count and Revo off through the emulators
-  (`.maestro/scripts/server-revo.js`).
+- **Who:** previewTester accounts only (`revoAvailable`), off until the opt-in. Revo's switch is its own,
+  `coachSettings.revoOn` (the callables call it `optIn`); the Ask coach's `optIn` doesn't turn Revo on (it
+  did until Nov 7 2026, which skipped Revo's opt-in and sent a Day in review before it). For the changeover
+  the server still serves an account with `revoOn` unset and the coach's `optIn` on (apps from before #310
+  read that), and only `revoOn: false` turns it off (`functions/src/revo/settings.ts`); drop that fallback
+  once every tester has the new app. A tap before the switch is read waits for it (up to 2 s). E2E builds
+  run the real `revo*` functions in the functions emulator (only the model answers from a recording);
+  `09-revo` marks its account a tester, sets the model's text, the day's count and Revo off through the
+  emulators (`.maestro/scripts/server-revo.js`).
 - **App:** `components/revo/RevoHost` is mounted once in `MainNavigator`: the button (a 44pt disc,
   bottom-right, 14 above the tab bar and the mini player) on the routes in `REVO_BUTTON_ROUTES` (never the
   reader, a session or an editor; hidden with the keyboard and while the sheet is up), and the sheet

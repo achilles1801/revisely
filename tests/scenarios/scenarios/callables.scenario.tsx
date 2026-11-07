@@ -480,7 +480,7 @@ it('[REVO-9] [REVO-10] [REVO-8] the Day in review once a day, skipped when cappe
   });
   expect(settings).toMatchObject({ optIn: false });
   expect(await listServerDocs(`users/${uid}/revoMemory`)).toHaveLength(0);
-  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn).toBe(false);
+  expect((await getServerDoc(`coachSettings/${uid}`))?.revoOn).toBe(false);
   // And off means refused.
   expect(await refusal(app, () => revo().clear('memory'))).toBe('off');
   await app.close();

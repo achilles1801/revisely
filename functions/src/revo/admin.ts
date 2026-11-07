@@ -2,7 +2,7 @@
  * Revo's Firestore store (firebase-admin). Only these functions write Revo's documents; the
  * rules let the owner read them and change only a few fields (firestore.rules).
  *   users/{uid}.previewTester                      read: the tester gate
- *   coachSettings/{uid}                            optIn (shared with the Ask coach), memoryOn
+ *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn; optIn is the Ask coach's
  *   revoUsage/{uid}                                { uid, day, count }: questions on that revision day
  *   users/{uid}/revoChats/{chatId}                 { uid, kind, title, day, createdAt, updatedAt, turns, meta? }
  *   users/{uid}/revoChats/{chatId}/messages/{id}   the message, uid, and attachData on a user message
@@ -13,6 +13,7 @@
 import { FieldValue, Firestore } from 'firebase-admin/firestore';
 import { adminCoachStore } from '../coach/admin';
 import type { RevoStore } from './handler';
+import { REVO_ON, revoSettingsOf } from './settings';
 import type { CachedAnswer, RevoChat, RevoMemoryItem, StoredMessage } from './types';
 
 const chatsOf = (db: Firestore, uid: string) => db.collection(`users/${uid}/revoChats`);
@@ -92,12 +93,15 @@ export function adminRevoStore(db: Firestore): RevoStore {
     },
     async getSettings(uid) {
       const snap = await settingsRef(uid).get();
-      return { optIn: snap.get('optIn') === true, memoryOn: snap.get('memoryOn') !== false };
+      return revoSettingsOf((f) => snap.get(f));
     },
     async setSettings(uid, patch) {
-      await settingsRef(uid).set({ ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      const fields: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
+      if (patch.optIn !== undefined) fields[REVO_ON] = patch.optIn;
+      if (patch.memoryOn !== undefined) fields.memoryOn = patch.memoryOn;
+      await settingsRef(uid).set(fields, { merge: true });
       const snap = await settingsRef(uid).get();
-      return { optIn: snap.get('optIn') === true, memoryOn: snap.get('memoryOn') !== false };
+      return revoSettingsOf((f) => snap.get(f));
     },
     async getUsage(uid) {
       const snap = await usageRef(uid).get();

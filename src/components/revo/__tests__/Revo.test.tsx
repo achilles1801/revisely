@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 afterAll(() => __setRevoBackendForTests(null));
 
-function Chat({ usage = { day: DAY, count: 0 }, onAction = jest.fn() }: { usage?: { day: string; count: number }; onAction?: jest.Mock }) {
+function Chat({ usage = { day: DAY, count: 0 }, onAction = jest.fn(), onOff }: { usage?: { day: string; count: number }; onAction?: jest.Mock; onOff?: jest.Mock }) {
   const [chatId, setChatId] = React.useState<string | null>(null);
   const [attach, setAttach] = React.useState<null | import('../../../lib/revo/types').RevoAttachment>(null);
   return (
@@ -75,6 +75,7 @@ function Chat({ usage = { day: DAY, count: 0 }, onAction = jest.fn() }: { usage?
         onMemory={jest.fn()}
         onExpand={jest.fn()}
         onAction={onAction}
+        onOff={onOff}
       />
     </ThemeProvider>
   );
@@ -168,6 +169,20 @@ describe('Revo’s conversation', () => {
     });
     await flush();
     expect(screen.getByText(/^Revo didn’t answer in time\. Try again\.\s+Try again$/)).toBeTruthy();
+  });
+
+  it('Revo off on the server (turned off elsewhere): the sheet goes to the opt-in, not a dead end', async () => {
+    const off: RevoBackend = { ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('off', 'Turn Revo on first.'))) };
+    __setRevoBackendForTests(off);
+    const onOff = jest.fn();
+    render(<Chat onOff={onOff} />);
+    await flush();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(onOff).toHaveBeenCalledTimes(1);
   });
 
   it('a follow-up’s answer joins the conversation; the first one shows before the chat is read back', async () => {

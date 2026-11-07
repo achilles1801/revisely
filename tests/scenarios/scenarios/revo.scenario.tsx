@@ -9,6 +9,7 @@ import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester, watchFunction } from '../harness/admin';
+import { withAuthRetry } from '../harness/authRetry';
 import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
@@ -91,11 +92,13 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   expect(app.screen.getByText('Meet Revo')).toBeTruthy();
   expect(app.screen.getByText('They’re only sent when you add one to a question.')).toBeTruthy();
   await tap(app, 'revo-not-now');
-  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn ?? false).toBe(false);
+  expect((await getServerDoc(`coachSettings/${uid}`))?.revoOn ?? false).toBe(false);
   await tap(app, 'revo-button');
   await tap(app, 'revo-turn-on');
   await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
-  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn).toBe(true);
+  // [REVO-1] Revo's own switch; the Ask coach's is left alone.
+  expect(await getServerDoc(`coachSettings/${uid}`)).toMatchObject({ revoOn: true });
+  expect((await getServerDoc(`coachSettings/${uid}`))?.optIn).toBeUndefined();
 
   // [REVO-20] The greeting, written on the phone from today's plan (pages 1–5): no question asked.
   await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
@@ -207,6 +210,100 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
     expect(asks.results[asks.results.length - 1]).toEqual({ network: 'offline' });
     expect((await modelRequests(uid)).length).toBe(before);
     await phone.goOnline();
+    await app.close();
+  } finally {
+    setOptions.restore();
+    asks.restore();
+    reviews.restore();
+  }
+});
+
+type RevoBackendMod = typeof import('../../../src/lib/revo/backend');
+
+/** What a Revo call through the app's backend is refused with ('off', 'daily', …). */
+async function refusal(app: OpenApp, call: () => Promise<unknown>): Promise<string> {
+  let caught: unknown = null;
+  await app.act(async () => {
+    try {
+      await withAuthRetry(call);
+    } catch (err) {
+      caught = err;
+    }
+  });
+  expect(caught).not.toBeNull();
+  return (caught as { refusal?: string }).refusal ?? `not a RevoError: ${String(caught)}`;
+}
+
+it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo still opens on its opt-in and sends nothing before it, the Day in review included; once on, a tap just after launch opens the chat', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-06 20:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  const revo = () => app.mods.require<RevoBackendMod>('src/lib/revo/backend').revoBackend();
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+  // Before Nov 7 2026 Revo read the Ask coach's switch (as setCoachOptIn writes it): this account had
+  // Revo "on" without ever seeing Revo's opt-in.
+  await setServerDoc(`coachSettings/${uid}`, { optIn: true });
+
+  const setOptions = watchFunction('revoSetOptions');
+  const asks = watchFunction('revoAsk');
+  const reviews = watchFunction('revoDayInReview');
+  try {
+    app = await phone.open(revoStack);
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    // [REVO-1] The changeover: the server still serves that account (an app from before #310 reads
+    // the coach's switch and shows it Revo) until Revo's own switch is set.
+    const clears = watchFunction('revoClear');
+    await app.act(async () => {
+      await withAuthRetry(() => revo().clear('memory'));
+    });
+    expect(clears.results).toEqual([{ result: { deleted: 0 } }]);
+    clears.restore();
+
+    const home = new Home(app);
+    await home.ready();
+
+    // Something done today, in the evening: what the Day in review would be written from.
+    const session = await home.startSession();
+    await session.swipeThrough(2);
+    await session.back();
+    await app.untilSynced();
+    await app.idle(500);
+
+    // [REVO-21] [REVO-9] Nothing sent, and the first tap opens the opt-in.
+    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([0, 0, 0]);
+    await tap(app, 'revo-button');
+    await app.until(() => app.screen.queryByTestId('revo-optin') != null, 'the opt-in');
+    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([0, 0, 0]);
+
+    // Turned on: the evening's Day in review is asked for now, not before.
+    await modelSays(uid, reply('Two pages revised today.', { title: 'Day in review', chips: [] }));
+    await tap(app, 'revo-turn-on');
+    await app.until(() => reviews.calls > 0, 'the Day in review, once Revo is on');
+    expect(setOptions.sent).toEqual([{ optIn: true }]);
+    expect(await getServerDoc(`coachSettings/${uid}`)).toMatchObject({ revoOn: true, optIn: true });
+    await app.close();
+
+    // [REVO-1] Launched again: a tap as soon as the button shows waits for the account's switch and
+    // opens the conversation (Revo is on), never the opt-in.
+    app = await phone.open(revoStack);
+    await tap(app, 'revo-button');
+    let sawOptIn = false;
+    await app.until(() => {
+      sawOptIn ||= app.screen.queryByTestId('revo-optin') != null;
+      return app.screen.queryByTestId('revo-history') != null;
+    }, 'the conversation');
+    expect(sawOptIn).toBe(false);
+
+    // [REVO-1] Turned off with Revo's own switch: off on the server too, whatever the coach's says.
+    await app.act(async () => {
+      await withAuthRetry(() => revo().setOptions({ optIn: false }));
+    });
+    expect(await getServerDoc(`coachSettings/${uid}`)).toMatchObject({ revoOn: false, optIn: true });
+    expect(await refusal(app, () => revo().clear('memory'))).toBe('off');
     await app.close();
   } finally {
     setOptions.restore();
