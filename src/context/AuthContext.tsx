@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { clearAccount } from '../lib/offline/accountCache';
 import { clearOutbox } from '../lib/offline/outbox';
+import { settleWithin } from '../lib/timeLimit';
 
 /**
  * How long Firebase Auth may take to check its saved sign-in before the app
@@ -27,6 +28,15 @@ import { clearOutbox } from '../lib/offline/outbox';
  * connection it waits for the server (up to 30 s) before it says anything.
  */
 export const AUTH_GRACE_MS = 1_500;
+
+/**
+ * Delete account always ends (BEHAVIOUR.md ACCOUNT-3): the server's call is limited
+ * in firestoreService.deleteAccount, and each step on the phone by these. Stopping the
+ * backup waits up to 10 s itself (recordingBackupController.stopBackup).
+ */
+const STOP_BACKUP_LIMIT_MS = 12_000;
+/** Deleting the phone's copy, and signing out, once the server has deleted the account. */
+const CLEANUP_STEP_LIMIT_MS = 5_000;
 
 /**
  * The uid of the sign-in Firebase Auth saved on this phone (its own
@@ -234,20 +244,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Every wait in here is limited, so the spinner always ends (ACCOUNT-3).
   const deleteAccount = async () => {
     setIsLoading(true);
     setError(null);
     const uid = getAuth().currentUser?.uid;
-    // No upload may land after the server deletes the backup.
-    await stopBackup();
     try {
-      await firestoreService.deleteAccount();
+      // No upload may land after the server deletes the backup.
+      if ((await settleWithin(stopBackup(), STOP_BACKUP_LIMIT_MS)) === 'timed-out') {
+        logger.warn('Stopping the backup took too long; deleting anyway');
+      }
+      try {
+        await firestoreService.deleteAccount();
+      } catch (err: any) {
+        resumeBackup();
+        setError(getErrorMessage(err.code) || err?.message || 'Failed to delete account.');
+        throw err;
+      }
+      // The account is gone from the server. Nothing below can undo that, or keep
+      // the user waiting.
       discardStoppedBackup();
-      // The account is gone: so are its copy and its unsent changes here.
+      // Its copy and its unsent changes here go too.
       if (uid) {
-        await Promise.all([clearAccount(uid), clearOutbox(uid)]).catch((err) =>
-          logger.warn('Could not delete the account copy', err),
-        );
+        const copy = await settleWithin(Promise.all([clearAccount(uid), clearOutbox(uid)]), CLEANUP_STEP_LIMIT_MS);
+        if (copy !== 'done') logger.warn(`Could not delete the account copy (${copy})`);
       }
       // The server deleted the account's backup; this removes the recordings on
       // this phone, and the backup deletions still queued here.
@@ -256,17 +276,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .then(() => forgetCloudDeletes(uid))
           .catch((err) => logger.warn('Could not delete recordings', err));
       }
-      // signOutUser is implicit — Firebase Auth user is gone, onAuthStateChanged
-      // fires with null. We sign out locally to be sure.
-      try {
-        await logoutUser();
-      } catch {
-        // Already signed out by the delete call.
+      // Firebase Auth signs out by itself once it notices; this makes it now.
+      // If it can't in time, the phone shows the account signed out anyway.
+      const signedOut = await settleWithin(logoutUser(), CLEANUP_STEP_LIMIT_MS);
+      if (signedOut !== 'done') {
+        setFirebaseUser(null);
+        setProvisionalUid(null);
       }
-    } catch (err: any) {
-      resumeBackup();
-      setError(getErrorMessage(err.code) || err?.message || 'Failed to delete account.');
-      throw err;
     } finally {
       setIsLoading(false);
     }
