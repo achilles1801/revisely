@@ -87,6 +87,9 @@ Only a phone's edges are stand-ins, in `harness/`:
    - Make the account, then do what the user does.
 3. Expect what the user would see or what is saved. Work the expected pages out by hand from the plan
    (see `dayWeeks.ts`), not with the app's scheduling code, or the test can only agree with it.
+   Wait (`app.until`) for each thing you read, never for one as a sign the rest has come: a server
+   change to several documents reaches the phone in more than one snapshot, and the last one written
+   can come later. That's why `loadScenario` waits for the plan as well as the pages and sessions.
 4. A bug fix: the scenario must fail without the fix. Check it does before committing the fix.
 
 **A rule that is broken now** gets an `it.failing('KNOWN BUG: …')` test, a comment with the cause, and

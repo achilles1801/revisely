@@ -12,7 +12,8 @@ import { markPreviewTester, watchFunction } from '../harness/admin';
 import { checkInvariants } from '../harness/invariants';
 import { Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
-import { SCENARIO_IDS, ScenarioId, SeedPlan, buildScenario, parseContext } from '../../../functions/src/testScenarios';
+import { loadScenario } from '../harness/testScenario';
+import { SCENARIO_IDS, ScenarioId, SeedPlan } from '../../../functions/src/testScenarios';
 
 type Lib = typeof import('../../../src/lib/testScenarios');
 type AheadCredit = typeof import('../../../src/lib/aheadCredit');
@@ -31,52 +32,6 @@ const localDate = (day: string) => {
   return new Date(y, m - 1, d);
 };
 
-/**
- * Whether the phone shows the scenario's plan: the user document's schedule fields, which the
- * server writes last (after the pages and sessions). Two scenarios can memorize the same pages, so
- * the pages and sessions alone came in first: RESET-3 then checked "beginner"'s sessions against
- * "new"'s plan, which starts today (SCHED-5, #400's CI).
- */
-function planShown(user: Record<string, unknown> | null | undefined, want: Record<string, unknown>): boolean {
-  if (!user) return false;
-  for (const key of ['scheduleMode', 'dailyPageCapacity', 'dailyJuzCount', 'scheduleAnchorDate', 'fajrBoundaryEnabled', 'smartTrackingEnabled']) {
-    if (key in want && user[key] !== want[key]) return false;
-  }
-  if ('customPlan' in want) {
-    const plan = want.customPlan as { cycleStartDate: string; direction: string } | null;
-    const shown = user.customPlan as { days?: unknown[]; cycleStartDate?: string; direction?: string } | null | undefined;
-    if (plan === null) return !shown || !shown.days?.length;
-    return shown?.cycleStartDate === plan.cycleStartDate && shown?.direction === plan.direction;
-  }
-  return true;
-}
-
-/** Loads `scenario` the way Settings does, and waits for the phone to show it. */
-async function load(app: OpenApp, scenario: ScenarioId): Promise<SeedPlan> {
-  const lib = app.mods.require<Lib>('src/lib/testScenarios');
-  const user = app.app.user;
-  // The plan the server builds, from what the phone sends (the clock doesn't move meanwhile).
-  const sent = lib.buildSeedContext(scenario, user, new Date());
-  const plan = buildScenario(scenario, parseContext(sent, Date.now(), scenario), app.uid);
-  await app.act(() => withAuthRetry(() => lib.loadTestScenario(scenario, user)));
-  const dates = plan.sessions.map((s) => s.date).join();
-  await app.until(
-    () =>
-      planShown(app.app.user as unknown as Record<string, unknown> | null, plan.user) &&
-      app.app.onboardingComplete &&
-      app.app.pages.filter((p) => p.status === 'memorized').length === plan.pages.length &&
-      [...app.app.logs]
-        .map((l) => l.date)
-        .filter((d) => !(scenario === 'offline-queue' && d === plan.today))
-        .sort()
-        .join() === dates,
-    `the phone to show the ${scenario} scenario`,
-    60_000,
-  );
-  await app.untilSynced().catch(() => undefined);
-  return plan;
-}
-
 it('[RESET-3] a tester loads each test scenario in turn: every rule holds, and each keeps its promise', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-05 12:00');
@@ -93,7 +48,7 @@ it('[RESET-3] a tester loads each test scenario in turn: every rule holds, and e
   try {
     for (const scenario of SCENARIO_IDS) {
       advance(3 * MINUTE); // past the two minutes between loads
-      const plan = await load(app, scenario);
+      const plan = await loadScenario(app, scenario);
       const answer = server.results[server.results.length - 1] as { result?: { scenario: string; today: string } };
       expect(answer.result).toMatchObject({ scenario, today: plan.today });
       expect(app.app.user?.previewTester).toBe(true);
