@@ -262,6 +262,8 @@ describe('juz map', () => {
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     expect(text('revo-chart-juzMap-title')).toBe('Juz 1 · not memorized');
     expect(screen.queryByTestId('revo-chart-juzMap-revise')).toBeNull();
+    // Nothing rated in it: no strip (its first surah's name would label one).
+    expect(screen.queryByText('Al-Fatihah', { includeHiddenElements: true, normalizer: plainText })).toBeNull();
     expect(screen.getByTestId('revo-chart-juzMap-reader')).toBeTruthy();
     // Juz 30 is being learned.
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
