@@ -1,5 +1,5 @@
 import { plainText } from '../../passages';
-import { contextWords, juzOf, passageShort } from '../words';
+import { contextWords, juzOf, memorizedWords, passageShort } from '../words';
 
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 // What the server takes (functions/src/revo/validate.ts passageText).
@@ -59,5 +59,14 @@ describe('Revo’s words for a partly memorized page (MEM-4)', () => {
     expect(w.passages.nextAt).toBe('An-Nas');
     expect(w.pageNames['604']).toBe('An-Nas · Juz 30');
     expect(w.passages.today).toMatch(SERVER);
+  });
+});
+
+describe('what was memorized today, for Revo (MEM-1)', () => {
+  it('[REVO-27] by surah and ayah, as plain text the server takes; nothing for none', () => {
+    const ayahs = Array.from({ length: 20 }, (_, i) => 67001 + i);
+    expect(memorizedWords(ayahs)).toBe('Al-Mulk, ayahs 1–20');
+    expect(memorizedWords(ayahs)).toMatch(SERVER);
+    expect(memorizedWords([])).toBeNull();
   });
 });

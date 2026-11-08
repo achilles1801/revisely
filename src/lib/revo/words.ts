@@ -3,7 +3,7 @@
 // rest of the app word them the same way.
 
 import { getJuzForPage } from '../quranData';
-import { describePassage, describePagesToRevise, placeOfPageToRevise, plainText, type PartialPages, type PassageOptions } from '../passages';
+import { describeAyahs, describePassage, describePagesToRevise, placeOfPageToRevise, plainText, type PartialPages, type PassageOptions } from '../passages';
 
 /** For labels (a chip, a chart's row, a picker row): "Al-Hashr 17–24", "Juz 28", "Al-Hashr to Al-Mumtahanah". */
 export function passageShort(pages: readonly number[]): string {
@@ -44,6 +44,11 @@ export interface ContextWords {
  * The parts of the Qur'an Revo's context names, worded for the model (plain text): today's pages and
  * where they start, what's next and where it starts, the weak ones, and each page on its own.
  */
+/** Ayahs memorized, in words for the context (MEM-1): "Al-Mulk, ayahs 1–20". Null for none. */
+export function memorizedWords(ayahs: readonly number[]): string | null {
+  return fit(describeAyahs(ayahs, { juz: false }), MAX_PASSAGE) || null;
+}
+
 export function contextWords(
   input: { today: readonly number[]; next: readonly number[]; weakNext: readonly number[]; weak: readonly number[] },
   /** The partly memorized pages and their memorized ayahs: named by those (MEM-4). */
