@@ -18,6 +18,13 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: tester
+# A tester's tab bar is Home and Read (ACT-12). Until the app has heard it, Read sits in the middle of
+# three tabs: a tap there as the bar went to two landed on Read, and nothing opened (iOS, #328's run
+# 42515289141).
+- extendedWaitUntil:
+    notVisible:
+      id: tab-Insights
+    timeout: 20000
 
 # The reader at Al-Mulk (page 562): Read → the surah's row.
 - tapOn:
