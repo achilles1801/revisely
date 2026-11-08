@@ -1,0 +1,135 @@
+import { juzOfPages, juzSheetModel, type JuzSheetPage } from '../juzSheet';
+import { plainText } from '../passages';
+
+const TODAY = '2026-11-03';
+// Juz 28 is pages 542–561 (Al-Mujadila to At-Tahrim).
+const JUZ28 = Array.from({ length: 20 }, (_, i) => 542 + i);
+const page = (pageNumber: number, extra: Partial<JuzSheetPage> = {}): JuzSheetPage => ({
+  pageNumber,
+  status: 'memorized',
+  weaknessRating: 4,
+  lastRevisedDate: null,
+  skipCount: 0,
+  ...extra,
+});
+
+describe('the juz sheet', () => {
+  it('names the juz by its surahs, and its strip’s ends', () => {
+    const m = juzSheetModel({ juz: 28, today: TODAY, pages: JUZ28.map((p) => page(p)), revised: [], windowDays: 30, smartTracking: false });
+    expect(m.title).toBe('Juz 28');
+    expect(plainText(m.subtitle)).toBe('Al-Mujadila to At-Tahrim');
+    expect(m.ends.map(plainText)).toEqual(['Al-Mujadila', 'At-Tahrim']);
+    expect(m.cells).toHaveLength(20);
+    expect(m.surahs.map((s) => plainText(s.name))[0]).toBe('Al-Mujadila');
+    expect(m.surahs.map((s) => plainText(s.name)).slice(-1)).toEqual(['At-Tahrim']);
+  });
+
+  describe('without Smart Tracking: recency, never strength (ACT-19)', () => {
+    const revised = [
+      { countsFor: '2026-11-03', pages: JUZ28 },
+      { countsFor: '2026-10-25', pages: JUZ28.slice(0, 10) },
+      { countsFor: '2026-10-12', pages: JUZ28.slice(0, 4) },
+      // Before the window: counts for when it was last revised, not for the times.
+      { countsFor: '2026-09-01', pages: JUZ28 },
+    ];
+    const m = juzSheetModel({
+      juz: 28,
+      today: TODAY,
+      // Even a page rated weak shows no strength.
+      pages: JUZ28.map((p) => page(p, { weaknessRating: p === 546 ? 1 : 4 })),
+      revised,
+      windowDays: 30,
+      smartTracking: false,
+    });
+
+    it('when it was last revised, and how many days in the window', () => {
+      expect(m.headline).toBe('Revised today');
+      expect(m.times).toBe('3 times in 30 days');
+      expect(m.stale).toBe(false);
+    });
+
+    it('cells and counts by recency', () => {
+      expect(m.cells.every((c) => c.state === 'week')).toBe(true);
+      expect(m.counts).toEqual([{ state: 'week', n: 20 }]);
+      expect(m.cells.some((c) => ['weak', 'moderate', 'strong'].includes(c.state))).toBe(false);
+    });
+
+    it('each surah: how long ago, and how often', () => {
+      const mujadila = m.surahs[0];
+      expect(mujadila.text).toBe('Today · 3 times');
+      expect(m.surahs.slice(-1)[0].text).toBe('Today · 1 time');
+      expect(m.surahs.some((s) => /weak|moderate|strong/i.test(s.text))).toBe(false);
+    });
+
+    it('a stale juz says how long, and is stale', () => {
+      const old = juzSheetModel({
+        juz: 28,
+        today: TODAY,
+        pages: JUZ28.map((p) => page(p, { lastRevisedDate: '2026-09-23' })),
+        revised: [],
+        windowDays: 30,
+        smartTracking: false,
+      });
+      expect(old.headline).toBe('Last revised 41 days ago');
+      expect(old.times).toBe('0 times in 30 days');
+      expect(old.stale).toBe(true);
+      expect(old.surahs[0]).toMatchObject({ text: '41 days ago', alert: true, state: 'older' });
+    });
+
+    it('never revised: not revised yet, and stale', () => {
+      const never = juzSheetModel({ juz: 28, today: TODAY, pages: JUZ28.map((p) => page(p)), revised: [], windowDays: 30, smartTracking: false });
+      expect(never.headline).toBe('Not revised yet');
+      expect(never.stale).toBe(true);
+      expect(never.surahs[0].text).toBe('Not revised yet');
+    });
+  });
+
+  describe('with Smart Tracking: strength (ACT-8)', () => {
+    // 546 weak (Al-Hashr), 550 moderate (Al-Mumtahanah), the rest strong; At-Tahrim skipped 3 times.
+    const pages = JUZ28.map((p) =>
+      page(p, { weaknessRating: p === 546 ? 2 : p === 550 ? 3 : 5, skipCount: p === 561 ? 3 : 0 }),
+    );
+    const m = juzSheetModel({ juz: 28, today: TODAY, pages, revised: [{ countsFor: TODAY, pages: JUZ28 }], windowDays: 30, smartTracking: true });
+
+    it('counts and cells by strength', () => {
+      expect(m.counts).toEqual([
+        { state: 'weak', n: 1 },
+        { state: 'moderate', n: 1 },
+        { state: 'strong', n: 18 },
+      ]);
+      expect(m.cells.find((c) => c.page === 546)?.state).toBe('weak');
+    });
+
+    it('a surah names its weakest ayahs; a strong one says how often it was skipped', () => {
+      const hashr = m.surahs.find((s) => plainText(s.name) === 'Al-Hashr')!;
+      expect(hashr.text).toMatch(/^Ayahs \d+–\d+ weak$/);
+      expect(hashr.alert).toBe(true);
+      const mumtahanah = m.surahs.find((s) => plainText(s.name) === 'Al-Mumtahanah')!;
+      expect(mumtahanah.text).toMatch(/^Ayahs \d+–\d+ moderate$/);
+      expect(m.surahs.slice(-1)[0].text).toBe('Strong · skipped 3 times');
+    });
+  });
+
+  it('a juz not memorized: says so, with its pages being learned kept for their own look', () => {
+    const m = juzSheetModel({
+      juz: 28,
+      today: TODAY,
+      pages: JUZ28.map((p) => page(p, { status: p < 545 ? 'in_progress' : 'not_memorized' })),
+      revised: [],
+      windowDays: 30,
+      smartTracking: false,
+    });
+    expect(m.headline).toBe('Not memorized yet');
+    expect(m.times).toBe('');
+    expect(m.stale).toBe(false);
+    expect(m.learning).toEqual([542, 543, 544]);
+    expect(m.cells[0].state).toBe('learning');
+    expect(m.counts).toEqual([]);
+    expect(m.surahs[0]).toMatchObject({ text: 'Not memorized', state: 'learning' });
+  });
+
+  it('juzOfPages: the juz most of a day’s pages are in', () => {
+    expect(juzOfPages([540, 541, 542, 543, 544])).toBe(28);
+    expect(juzOfPages([])).toBeNull();
+  });
+});

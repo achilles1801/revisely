@@ -50,6 +50,10 @@ MOCK_FOR = {
     "09-add-memorized": ("d7-add-memorized", None),
     "09-add-note": ("d8-add-note", None),
     "09-insights": ("d4-insights", "top"),
+    # The juz sheet's mocks are in activity-interactive (i5); i6 exists only in Crimson.
+    "09-juz-sheet": ("../../activity-interactive/png/i5-juz-sheet", None),
+    "09-juz-stale": (None, None),
+    "09-juz-day": ("../../activity-interactive/png/i5-juz-sheet", None),
     # The flow scrolls Revo's Ask (Weak spots' title row) to about 371pt down the screen; d4 has it 871pt down, so the crop is centred on 937.
     "09-insights-weak": ("d4-insights", ("center", 937)),
     "09-insights-end": ("d4-insights", "bottom"),
