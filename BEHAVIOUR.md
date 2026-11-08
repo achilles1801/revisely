@@ -379,8 +379,15 @@ How the tests are made: `tests/scenarios/README.md`.
   of any: nothing shifts, whatever Keep daily amount says, and tomorrow is done (for the streak and Home's
   Done) when its own pages are, with or without them. The session labels them From Insights, and Home says
   "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
-  with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026:
-  "the buttons on the activity screen don't work": they saved, silently.)
+  with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button
+  becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026: "the buttons on the activity
+  screen don't work": they saved, silently.)
+  They never stop the catch-up (CARRY-1): on their day, the leftovers of the days before are offered as
+  on any other, and Add to today puts them after the pages from Insights, each credited to the day it was
+  missed (SESS-7). The pages from Insights stay labelled and stay extra, even when the leftovers fill the
+  day, and Home names both ("2 from Insights, 5 from yesterday first"). (Before Nov 8 2026 they blocked it:
+  no catch-up was offered that day.)
+
 ## Ask coach
 
 - **COACH-1.** The coach answers only a previewTester account that has opted in. One answer is kept per insight and

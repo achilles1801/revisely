@@ -77,3 +77,45 @@ it('[CARRY-2] [CARRY-1] "Revise these first tomorrow" first, then Add to today: 
   expect(carry.next).toEqual({ day: addDays(D, 1), pages: [600, 601], source: 'insights' });
   await app.close();
 });
+
+// The day the Insights pages are due, Home offered no catch-up: one carry per day, and the Insights
+// pages counted as today's, so the leftovers of the days before couldn't be added (Nov 8 2026). They
+// are offered as on any day, and Add to today puts them after the Insights pages, each credited to the
+// day it was missed (SESS-7); the Insights pages stay labelled and stay extra (ACT-24).
+it('[ACT-24] [CARRY-1] [SESS-7] The day the Insights pages are due, the leftovers before it are still offered; Add to today puts them after the Insights pages, each credited to its own day', async () => {
+  const { phone, app, D } = await scenarioPhone('partial-today');
+  const home = new Home(app);
+  await home.ready();
+  await reviseFirstTomorrow(app, D, [600, 601]);
+  await app.close();
+
+  // Tomorrow: two pages left from the day before yesterday (585–586) and three from yesterday (589–591).
+  setNow('2026-11-06 12:00');
+  const next = await phone.open(homeStack);
+  const tomorrow = new Home(next);
+  await tomorrow.ready();
+  expect(plain(tomorrow.catchUp() ?? '')).toMatch(/ · Revise /);
+  await tomorrow.tap('today-carry-over');
+  await next.until(() => tomorrow.catchUp() == null, 'the leftovers to be added');
+  await next.untilSynced();
+
+  const carry = next.app.user!.carryOver!;
+  const T = addDays(D, 1);
+  expect(carry.day).toBe(T);
+  expect(carry.pages).toEqual([600, 601, 585, 586, 589, 590, 591]);
+  expect(carry.source).toBe('insights');
+  // Only the leftovers have a day they were missed; the Insights pages have none.
+  expect(carry.from).toEqual({ 585: addDays(D, -1), 586: addDays(D, -1), 589: D, 590: D, 591: D });
+  expect(plain(tomorrow.detail() ?? '')).toMatch(/ 2 from Insights, 5 from yesterday first$/);
+
+  const session = await tomorrow.startSession();
+  expect(session.pages()).toEqual([600, 601, 585, 586, 589, 590, 591]);
+  expect(next.screen.queryByTestId('session-from-insights')).not.toBeNull();
+  await session.swipeThrough(7);
+  await session.back();
+  await next.untilSynced();
+  expect(creditedTo(next, addDays(D, -1))).toEqual(pagesRange(582, 586));
+  expect(creditedTo(next, D)).toEqual(pagesRange(587, 591));
+  expect(creditedTo(next, T)).toEqual([600, 601]);
+  await next.close();
+});

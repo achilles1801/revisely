@@ -7,7 +7,7 @@ import type { RevisionLog, User, UserPage } from '../types';
 import { caughtUpOnDay, creditedOnDay, doneOnDay, needDoneCount } from './aheadCredit';
 import { handLogsOf, withPhoneSessions } from './activityHistory';
 import { carryOverOn } from './algorithm';
-import { duePagesOf } from './carryOver';
+import { duePagesOf, insightsPagesOn } from './carryOver';
 import { streakDetailFromLogs, type StreakDetail } from './streak';
 import { streakDetailFromItems, type HistoryItem } from './streakFromItems';
 
@@ -33,8 +33,8 @@ export interface TodaySnapshot {
   status: TodayStatus;
   /** Carried pages still to revise. */
   carriedLeft: number;
-  /** The carried pages were put there by Insights ("Revise these first tomorrow"), not left over. */
-  carriedFromInsights: boolean;
+  /** How many of the carried pages Insights put there ("Revise these first tomorrow"); the rest are leftovers. */
+  carriedInsights: number;
   /** The streak, and the days behind it, as Home reads it. */
   streak: StreakDetail;
 }
@@ -81,6 +81,7 @@ export function todaySnapshot(input: {
   const list = [...new Set(assignment)];
   const own = duePagesOf(list, user, day);
   const carried = carriedPagesOn(user, day, list);
+  const insights = insightsPagesOn(user, day);
   // Pages logged by hand for today count as its sessions' do (ACT-15), once each.
   const counted = history ? [...logs, ...handLogsOf(history)] : logs;
   const done = doneOnDay(counted, day);
@@ -98,7 +99,7 @@ export function todaySnapshot(input: {
     pagesDone: list.filter((p) => done.has(p)).length,
     status,
     carriedLeft: carried.filter((p) => !done.has(p)).length,
-    carriedFromInsights: carryOverOn(user, day)?.source === 'insights',
+    carriedInsights: carried.filter((p) => insights.has(p)).length,
     streak,
   };
 }
