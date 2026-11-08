@@ -345,6 +345,8 @@ describe('weeks grid', () => {
   it('a weekday’s letter picks its column: how many were missed, and which', async () => {
     await grid();
     expect(screen.getAllByTestId('revo-chart-week-day')).toHaveLength(28);
+    // Nov 4–6 have no plan here: the legend says what those cells are.
+    expect(screen.getByText('No plan', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByTestId('revo-chart-weeks-col-2'));
     expect(text('revo-chart-weeks-title')).toBe('Tuesdays · 1 missed of 1');
     expect(text('revo-chart-weeks-line')).toBe('Missed 3 Nov');
