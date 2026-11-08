@@ -279,5 +279,6 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 }
 
 const styles = StyleSheet.create({
-  switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  // The range chip wraps under the tabs when the row can't hold all three (large text, an SE).
+  switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 8 },
 });
