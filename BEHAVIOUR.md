@@ -189,6 +189,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACCOUNT-1.** Delete account (Settings, confirmed twice) removes the account from the server with everything of it
   (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
   the server refuses (App Check), nothing is deleted and the user stays signed in.
+- **ACCOUNT-3.** Delete account always ends, in "Account deleted" (signed out) or an error with Try again: never an
+  endless spinner. The app waits for the server at most 30 seconds. With no answer (lost, or offline), it asks whether
+  the account still exists: gone, it is deleted; there, or no way to tell, the error says the account may not be deleted
+  and to try again. A Try again after the server had deleted it ends in "Account deleted". Once the server has deleted
+  it, nothing on the phone (its copy, signing out) keeps the spinner up more than a few seconds.
 - **ACCOUNT-2.** A sign-up or sign-in that fails (an address already registered, a wrong password, Google or Apple
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
@@ -229,17 +234,17 @@ How the tests are made: `tests/scenarios/README.md`.
   oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
   page memorized today never makes its juz the one untouched longest).
 
-- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
-  opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates
-  those pages 2, 3 or 4 (ACT-8's bins), written as each page's weakness rating. Adding it queues one manual
-  Revised item for today; it counts toward today's Revised block and carries no plan assignment. "From your
-  session" offers only the pages the session missed: its skipped pages not revised, among the memorized ones.
-  It never copies the session's own revised pages or minutes.
-  Note opens its own sheet: its text, and an optional "Show under" choice of the day's Revised, Memorized or
-  Read item (the note's tag). Add is a new note with its own id and time; an empty note cannot be added.
-  Memorized opens its own sheet: From and To, or a surah, and optional minutes. Add marks the pages memorized
-  (the composer's two writes) and records a Memorized item for today; its minutes join the day's item once (an
-  add sent again adds none). "From your reading" offers the pages read today that are not memorized yet.
+- **ACT-5.** The day's + offers, for today and yesterday, Revised elsewhere, Memorized and Note (Majd, Nov 7
+  2026: "yes trim it"). There is no Read (the reader logs reading by itself) and no free choice of pages to
+  mark revised. Revised elsewhere lists the day's scheduled pages (its session's assignment, or the plan's)
+  that are memorized and not revised for it yet, each ticked; untick the ones not done, and Add logs the
+  rest for that day by hand, with no strength and no minutes. A page already revised for the day is never
+  offered again; with none left it says so. Memorized opens its own sheet: From and To, or a surah, and
+  optional minutes. Add marks the pages memorized (the composer's two writes) and records a Memorized item
+  for that day, dated that day; its minutes join the day's item once (an add sent again adds none). "From
+  your reading" offers the pages read that day that are not memorized yet. Note opens its own sheet: its
+  text, and an optional "Show under" choice of the day's Revised, Memorized or Read item (the note's tag).
+  Add is a new note with its own id and time; an empty note cannot be added.
 - **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
   window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
@@ -275,10 +280,28 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
-- **ACT-13.** What the day's + adds (Revised, Memorized, a note, or the session's skipped pages) shows on
+- **ACT-13.** What the day's + adds (pages revised elsewhere, Memorized, a note) shows on
   that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
   changes still waiting on the phone over what it read. Once the server has them, the day shows the
   server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
+- **ACT-14.** Revised pages added by hand (the day's +) are the user's own: saving, editing or deleting the
+  day's session never removes them. Each is deleted from the Revised block's menu ("Delete …, added by
+  hand"), confirmed first, as every item is (ACT-7). (Nov 7 2026: a session save deleted them, and there
+  was no way to delete one.)
+- **ACT-15.** Pages logged as revised elsewhere count as a session's pages do: for the streak (SESS-6: a day
+  whose scheduled pages are all credited to it is done, and a day restored within its grace window counts on
+  time), on Home's today ("N of 20", Done) and in its catch-up offer (a day's pages logged are not left
+  over). Home shows them when it next comes into view, offline too. A page counts once a day, whether a
+  session or a log revised it. Pages logged by hand never stand for what a day had scheduled: that stays
+  its session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
+- **ACT-17.** A day before yesterday offers only a note: its + opens the Note sheet at once, so old history
+  and streaks can't be rewritten. What is already logged there can still be seen and deleted. (Majd,
+  Nov 7 2026.)
+- **ACT-16.** Pages logged as revised elsewhere are revised that day: they count in each page's last revised
+  day and number of revisions (and clear its skips) as a session's pages do, at once and after every
+  launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
+  no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
+  pages were re-derived from sessions alone.)
 
 ## Ask coach
 
@@ -475,6 +498,7 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | CARRY-2, SESS-7, SESS-2 | Keep daily amount with as many leftovers as today holds or more made today the leftovers alone, with no pages of its own: once they were all revised, Home still said "Continue at … 6 of 6", never Done, and today never counted for the streak. | A day the carried pages fill is finished by them (`duePagesOf`, `src/lib/carryOver.ts`): they are its session's assignment, and its session revising them finishes it while they stay credited to the days they were missed (`needDone`, `src/lib/aheadCredit.ts`). |
 | SESS-6, CARRY-2 | A day missed entirely, added to today with Keep daily amount and revised, didn't come back: with no session of its own, the streak read it from the plan the carry had moved, which gave it other pages. | A day the last carry took pages from is read from the carry (`planDuePages`, `src/lib/carryOver.ts`). |
 | SESS-6 | A streak brought back in the grace window lasted a day: the next morning it fell back (6 to 1), because the run behind yesterday counted only days done on their own day. | A day restored in its grace window counts as on time from then on (`graceEndMs`, `src/lib/streakFromItems.ts`). |
+| ACCOUNT-3 | Delete account could stay on the spinner for good (Android E2E, Nov 7 2026): the server deleted the account in a second, its answer never reached the phone, and the call had no time limit, nor had the steps after it. | `deleteUserAccount` gets 30 s (`callFunction`'s `timeoutMs`), then Auth is asked whether the account still exists (`src/services/firestoreService.ts`); each later step has its own limit (`src/context/AuthContext.tsx`); Settings offers Try again. |
 | ACCOUNT-2 | A sign-up or sign-in that failed emptied the form: the attempt showed the launch spinner in place of the sign-in screen, so a failure mounted it again from scratch, back on "Sign in" with only the error left. | An attempt has its own flag (`isSigningIn`, `src/context/AuthContext.tsx`); the screen stays and shows it on its button. |
 | SESS-7 | A session's first save holding catch-up pages alone lost their credit: the empty session was written without it. | `mergeSessionAdd` keeps it (`src/lib/offline/ops.ts`). |
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |

@@ -14,7 +14,7 @@ jest.mock('../../../src/context/AppContext', () => ({
 jest.mock('../../../src/context/ThemeContext', () => ({
   useTheme: () => ({ palette: new Proxy({}, { get: () => '#000000' }), theme: new Proxy({}, { get: () => '#000000' }) }),
 }));
-jest.mock('../../../src/lib/offline/queue', () => ({ queueChange: jest.fn(async () => undefined) }));
+jest.mock('../../../src/lib/offline/queue', () => ({ queueChange: jest.fn(async () => undefined), currentAccount: () => null }));
 jest.mock('../../../src/services/firestoreService', () => ({ getReadingSessionsForDay: jest.fn(async () => []) }));
 jest.mock('../../../src/components/memorization/RangePickerSheet', () => ({ RangePickerSheet: () => null }));
 jest.mock('../../../src/components/v2/Sheet', () => {

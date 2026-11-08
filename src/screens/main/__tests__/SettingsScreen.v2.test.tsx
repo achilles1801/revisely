@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Alert, AlertButton, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -42,8 +42,13 @@ const mockSaveUser = jest.fn(async () => undefined);
 jest.mock('../../../context/AppContext', () => ({
   useApp: () => ({ user: mockUser, saveUser: mockSaveUser, resetOnboarding: jest.fn() }),
 }));
+const mockDeleteAccount = jest.fn(async () => undefined);
 jest.mock('../../../context/AuthContext', () => ({
-  useAuth: () => ({ firebaseUser: { uid: 'u1', email: 'majd@example.com' }, signOutUser: jest.fn(), deleteAccount: jest.fn() }),
+  useAuth: () => ({
+    firebaseUser: { uid: 'u1', email: 'majd@example.com' },
+    signOutUser: jest.fn(),
+    deleteAccount: () => mockDeleteAccount(),
+  }),
 }));
 const mockSubmitFeedback = jest.fn(async () => undefined);
 jest.mock('../../../services/firestoreService', () => ({
@@ -330,5 +335,43 @@ describe('Settings: Load test scenario (testers)', () => {
     });
     expect(screen.getByTestId('test-scenario-hafiz')).toBeTruthy();
     expect(screen.getByTestId('test-scenario-confirm').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe('[ACCOUNT-3] Delete account', () => {
+  /** The buttons of the last alert with this title. */
+  const alertButtons = (alert: jest.SpyInstance, title: string): AlertButton[] => {
+    const call = [...alert.mock.calls].reverse().find((c) => c[0] === title);
+    if (!call) throw new Error(`no "${title}" alert`);
+    return call[2] ?? [];
+  };
+  const press = async (alert: jest.SpyInstance, title: string, button: string) => {
+    const b = alertButtons(alert, title).find((x) => x.text === button);
+    if (!b?.onPress) throw new Error(`no "${button}" on "${title}"`);
+    await act(async () => {
+      b.onPress!();
+    });
+  };
+
+  it('confirmed twice, it deletes; a failure says why and offers Try again, which deletes', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockDeleteAccount.mockRejectedValueOnce(
+      Object.assign(new Error("The server didn't answer in time, so your account may not be deleted. Check your connection and try again."), {
+        code: 'deadline-exceeded',
+      }),
+    );
+    await renderV2();
+    fireEvent.press(screen.getByText('Delete account'));
+    await press(alert, 'Delete account?', 'Delete');
+    await press(alert, 'Are you absolutely sure?', 'I understand, delete');
+    expect(mockDeleteAccount).toHaveBeenCalledTimes(1);
+
+    const failed = alert.mock.calls.find((c) => c[0] === 'Could not delete account');
+    expect(failed?.[1]).toMatch(/didn't answer in time/);
+    expect(alertButtons(alert, 'Could not delete account').map((b) => b.text)).toEqual(['Cancel', 'Try again']);
+    await press(alert, 'Could not delete account', 'Try again');
+    expect(mockDeleteAccount).toHaveBeenCalledTimes(2);
+    expect(alert).toHaveBeenLastCalledWith('Account deleted', 'Your account and data have been removed.');
+    alert.mockRestore();
   });
 });
