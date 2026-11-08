@@ -241,8 +241,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-3.** The calendar's day shows the share of the day's assigned pages revised (a ring), and a dot for a
   memorized item, a read item and a note on that day. A month steps with ‹ ›. Shown to preview testers while
   the Activity blocks are built.
-- **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within 7 or 30
-  days (a longer window never covers less); consistency is the days with a revision or a read; pace is shown
+- **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within the range
+  (ACT-22; a longer range never covers less, and it never shows 100% while a page is left); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
   oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
   page memorized today never makes its juz the one untouched longest).
@@ -341,6 +341,14 @@ How the tests are made: `tests/scenarios/README.md`.
   skipped 3 times"), recency without it ("3 days ago · 4 times"; ACT-19). A page, a row and Open in the
   reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
   (Majd, Nov 7 2026: "not being able to click on anything in coverage"; mocks i5 and i6.)
+- **ACT-22.** Insights read one range for the whole tab: 7 days, 30 days (at first) or 3 months, from a chip at
+  the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the three; the choice is
+  kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
+  "+N" and Pace (against the same length before it) follow it, and so does the juz sheet's "times"; the juz
+  tiles always show where each juz stands now. A range longer than the account counts from its first day
+  ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
+  is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). (Majd, Nov 7 2026: "why is
+  insights restricted to just the last 30 days?"; mocks i1 and i2.)
 
 ## Ask coach
 

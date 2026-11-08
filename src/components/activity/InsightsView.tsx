@@ -7,7 +7,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
-import { PillTabs } from '../v2/PillTabs';
 import { typeV2 } from '../../theme/v2';
 import { lastRevisedByPage } from '../../lib/activityInsights';
 import {
@@ -33,15 +32,23 @@ import { getPagesForJuz } from '../../lib/quranData';
 import { openRevo } from '../../lib/revo/open';
 import { spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
-
-type Window = '7' | '30';
+import {
+  activeDays,
+  beforeWords,
+  coveragePercent,
+  memorizedIn,
+  missedPattern,
+  rangeWords,
+  weeksGrid,
+  type InsightsRange,
+} from '../../lib/insightsRange';
 
 export interface InsightsData {
   today: string;
   memorized: Set<number>;
   learning: Set<number>;
   rating: (page: number) => number | undefined;
-  /** Times each page was rated weak in 30 days (lib/insightsView ratedWeakCounts). */
+  /** Times each page was rated weak in the range (lib/insightsView ratedWeakCounts). */
   ratedWeak: Map<number, number>;
   revised: { day: string; countsFor: string; pages: number[]; skipped: number[]; minutes: number | null; occurredAt: number | null }[];
   read: { day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
@@ -53,6 +60,10 @@ export interface InsightsData {
   revo: boolean;
   /** Smart Tracking: without it no page is rated, so Weak spots is hidden (ACT-12). Unset counts as on. */
   smartTracking?: boolean;
+  /** The range every section reads (ACT-22): 7 days, 30 days (unset) or 3 months. */
+  range?: InsightsRange;
+  /** The account's first day: a range longer than the account counts from it. */
+  firstDay?: string | null;
 }
 
 export function InsightsView({
@@ -91,7 +102,7 @@ export function InsightsView({
       <Memorization data={data} />
       <Pace data={data} />
       {juzUsed ? (
-        <JuzSheet juz={juz} onClose={() => setJuz(null)} today={data.today} revised={data.revised} onOpenPage={onOpenPage} onPlanIt={onPlanIt} />
+        <JuzSheet juz={juz} onClose={() => setJuz(null)} today={data.today} revised={data.revised} windowDays={data.range ?? 30} onOpenPage={onOpenPage} onPlanIt={onPlanIt} />
       ) : null}
     </View>
   );
@@ -145,12 +156,12 @@ function Figure({ value, text, right }: { value: string; text: string; right?: R
 
 function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt: (pages: number[]) => void; onOpenJuz: (juz: number) => void }) {
   const { palette } = useTheme();
-  const [window, setWindow] = useState<Window>('30');
+  const days = data.range ?? 30;
   const last = useMemo(() => lastRevisedByPage(data.revised, data.today), [data.revised, data.today]);
   const tiles = useMemo(() => juzTiles(data.memorized, data.learning, last, data.today), [data.memorized, data.learning, last, data.today]);
-  const days = Number(window);
   const count = coverageCount(data.memorized, last, data.today, days);
-  const pct = count.of > 0 ? Math.round((count.revised / count.of) * 100) : 0;
+  // Never 100% while a page is left (at 3 months, 304 of 305 rounded up).
+  const pct = coveragePercent(count.revised, count.of);
   const untouched = untouchedJuz(tiles);
   const tile = (t: JuzTile) => {
     const look =
@@ -195,23 +206,9 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
       first
       title="Coverage"
       detail="Which juz you've revised lately"
-      right={
-        <PillTabs<Window>
-          options={[
-            { value: '7', label: '7 days' },
-            { value: '30', label: '30 days' },
-          ]}
-          value={window}
-          onChange={setWindow}
-          tone="ink"
-          hug
-          compact
-          testID="coverage-window"
-        />
-      }
       testID="insights-coverage"
     >
-      <Figure value={`${pct}%`} text={`${count.revised} of ${count.of} memorized pages in ${days} days`} />
+      <Figure value={`${pct}%`} text={`${count.revised} of ${count.of} memorized pages in ${rangeWords(days)}`} />
       <View style={styles.tiles}>
         {[0, 1, 2].map((row) => (
           <View key={row} style={styles.tileRow}>
@@ -273,16 +270,50 @@ function Consistency({ data }: { data: InsightsData }) {
   const { palette } = useTheme();
   // ACT-4: a day counts with a revision or a read.
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
+  const range = data.range ?? 30;
   const week = weekCircles(active, data.today);
   const month = reportMonth(data.today);
   const m = monthCount(active, month, data.today);
-  const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, 30), [data.revised, data.read, data.today]);
+  const inRange = activeDays(active, data.today, range, data.firstDay);
+  // 3 months: a weeks grid by weekday and the missed days' pattern; 7 and 30 days: the week's circles.
+  const grid = range === 90 ? weeksGrid(active, data.today, 13, data.firstDay) : null;
+  const pattern = range === 90 ? missedPattern(active, data.today, range, data.firstDay) : null;
+  const figureText =
+    range === 7
+      ? `of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`
+      : inRange.sinceStart
+        ? `of ${inRange.of} days since you started`
+        : `of the last ${inRange.of} days`;
+  const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, range), [data.revised, data.read, data.today, range]);
   const busiest = busiestHours(hours);
   const max = Math.max(1, ...hours);
 
   return (
     <Section title="Consistency" detail="How often, and when" testID="insights-consistency">
-      <Figure value={String(week.filter((d) => d.done).length)} text={`of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`} />
+      <Figure value={String(range === 7 ? week.filter((d) => d.done).length : inRange.done)} text={figureText} />
+      {grid ? (
+        <View style={styles.grid} testID="insights-weeks-grid">
+          {grid.map((col) => (
+            <View key={col[0].day} style={styles.gridCol}>
+              {col.map((c) => (
+                <View
+                  key={c.day}
+                  style={[
+                    styles.gridCell,
+                    c.state === 'done'
+                      ? { backgroundColor: palette.primary }
+                      : c.state === 'missed'
+                        ? { borderWidth: 1, borderColor: palette.outline }
+                        : null,
+                  ]}
+                  accessible={c.state === 'done' || c.state === 'missed'}
+                  accessibilityLabel={`${c.day}, ${c.state === 'done' ? 'revised or read' : 'missed'}`}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      ) : (
       <View style={styles.circles}>
         {week.map((d) => (
           <View key={d.day} style={styles.circleCol} accessible accessibilityLabel={`${d.day}, ${d.done ? 'revised or read' : 'missed'}`}>
@@ -293,10 +324,16 @@ function Consistency({ data }: { data: InsightsData }) {
           </View>
         ))}
       </View>
+      )}
+      {pattern ? (
+        <Text style={[typeV2.meta, styles.pattern, { color: palette.secondary }]} testID="insights-pattern">
+          {pattern}
+        </Text>
+      ) : null}
       {busiest ? (
         <View style={styles.hoursBlock} testID="insights-hours">
           <Text style={[typeV2.name, { color: palette.text }]}>{busiest}</Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>Minutes by hour, last 30 days</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Minutes by hour, last ${rangeWords(range)}`}</Text>
           <View style={styles.hourBars}>
             {hours.map((v, h) => (
               <View
@@ -365,12 +402,14 @@ function WeakSpots({
     ratedWeak: data.ratedWeak,
     revisions: data.revised.filter((r) => r.day === r.countsFor),
     today: data.today,
+    window: data.range ?? 30,
+    windowWords: rangeWords(data.range ?? 30),
   });
   const pages = rows.flatMap((r) => r.pages);
   return (
     <Section
       title="Weak spots"
-      detail="Weak now, or skipped most in 30 days"
+      detail={`Weak now, or skipped most in ${rangeWords(data.range ?? 30)}`}
       right={
         data.revo ? (
           <Tap
@@ -448,7 +487,9 @@ function Memorization({ data }: { data: InsightsData }) {
   const { palette } = useTheme();
   const month = reportMonth(data.today);
   const months = useMemo(() => memorizationMonths(data.memorizations, month), [data.memorizations, month]);
-  const thisMonth = months[months.length - 1].pages;
+  const range = data.range ?? 30;
+  // The figure follows the range ("+9 in 30 days"); the twelve months of bars stay.
+  const added = memorizedIn(data.memorizations, data.today, range);
   const top = Math.max(10, ...months.map((m) => m.pages));
   const share = quranShare(data.memorized.size);
   return (
@@ -456,7 +497,7 @@ function Memorization({ data }: { data: InsightsData }) {
       <Figure
         value={String(data.memorized.size)}
         text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
-        right={thisMonth > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${thisMonth} in ${monthName(month)}`}</Text> : undefined}
+        right={added > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${added} in ${rangeWords(range)}`}</Text> : undefined}
       />
       <View style={styles.monthBars}>
         {months.map((m, i) => {
@@ -484,15 +525,16 @@ function Memorization({ data }: { data: InsightsData }) {
 
 function Pace({ data }: { data: InsightsData }) {
   const { palette } = useTheme();
-  const p = paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity });
+  const range = data.range ?? 30;
+  const p = paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: range });
   // Hidden under ten items with minutes (ACT-4).
   if (!p) return null;
   const change =
     p.before == null
       ? null
       : Math.abs(p.perPage - p.before) < 0.05
-        ? 'The same as the month before'
-        : `${p.perPage < p.before ? 'Down' : 'Up'} from ${formatPace(p.before)} the month before`;
+        ? `The same as ${beforeWords(range)}`
+        : `${p.perPage < p.before ? 'Down' : 'Up'} from ${formatPace(p.before)} ${beforeWords(range)}`;
   return (
     <Section title="Pace" detail="Minutes per page" testID="insights-pace">
       <View style={styles.paceTiles}>
@@ -501,7 +543,7 @@ function Pace({ data }: { data: InsightsData }) {
             <Text style={[styles.paceNumber, { color: palette.text }]}>{formatPace(p.perPage)}</Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]}>min a page</Text>
           </View>
-          <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{['Revising, last 30 days.', change].filter(Boolean).join(' ')}</Text>
+          <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[`Revising, last ${rangeWords(range)}.`, change].filter(Boolean).join(' ')}</Text>
         </View>
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
@@ -542,6 +584,10 @@ const styles = StyleSheet.create({
   untouchedMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot8: { width: 8, height: 8, borderRadius: 4 },
   circles: { flexDirection: 'row', marginTop: 12 },
+  grid: { flexDirection: 'row', gap: 4, marginTop: 12 },
+  gridCol: { flex: 1, gap: 4 },
+  gridCell: { aspectRatio: 1, borderRadius: 4 },
+  pattern: { marginTop: 10 },
   circleCol: { flex: 1, alignItems: 'center' },
   circle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   letter: { marginTop: 5 },

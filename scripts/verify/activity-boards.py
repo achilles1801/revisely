@@ -54,6 +54,8 @@ MOCK_FOR = {
     "09-juz-sheet": ("../../activity-interactive/png/i5-juz-sheet", None),
     "09-juz-stale": (None, None),
     "09-juz-day": ("../../activity-interactive/png/i5-juz-sheet", None),
+    "09-insights-range-menu": ("../../activity-interactive/png/i2-range-sheet", None),
+    "09-insights-3-months": ("../../activity-interactive/png/i1-range-chip", None),
     # The flow scrolls Revo's Ask (Weak spots' title row) to about 371pt down the screen; d4 has it 871pt down, so the crop is centred on 937.
     "09-insights-weak": ("d4-insights", ("center", 937)),
     "09-insights-end": ("d4-insights", "bottom"),

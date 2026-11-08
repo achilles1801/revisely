@@ -3,7 +3,8 @@
 # strip in the reader, its juz (from the Revised header), the day's block menus (Revised, d10a;
 # Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
 # (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
-# from the untouched row, i5 and i6; Weak spots; the end). Each is a screenshot named 09-<screen>-${THEME}.
+# from the untouched row, i5 and i6; the range's menu and 3 months, i1 and i2; Weak spots; the end). Each
+# is a screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -337,6 +338,40 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     notVisible:
       id: juz-sheet-strip
+    timeout: 10000
+# The range (ACT-22; mocks i1, i2): the chip's menu, then 3 months, then back to 30 days for the rest.
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-90
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-range-menu-${THEME}
+- tapOn:
+    id: sheet-action-range-90
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages in 3 months"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-3-months-${THEME}
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-30
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-30
+- extendedWaitUntil:
+    visible:
+      text: ".*memorized pages in 30 days"
     timeout: 10000
 # Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
 - scrollUntilVisible:
