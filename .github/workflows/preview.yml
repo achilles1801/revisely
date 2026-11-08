@@ -29,13 +29,17 @@ name: Preview
 #
 # Two halves, one file. A push runs the testing half (gate, scenarios); once it passes, it starts
 # this workflow again by hand (workflow_dispatch) with `publish` = the commit it tested, which runs
-# the publishing half (fingerprint, builds, update). A newer push cancels an older run's testing
-# half: its tree holds everything the older one does, and it is tested and published in its turn.
-# Publishing runs are one at a time (eas-preview) and never cancelled, so updates go out in order
-# and a native build is never started twice. Before (Nov 7 2026) the whole run held eas-preview, and
-# in a burst of merges each push waited for every older push's scenario run first: 19–24 minutes
-# from a merge to its update instead of 5–15. One file because GitHub dispatches only workflows
-# that are on the default branch (main) already.
+# the publishing half (fingerprint, builds, update). Testing runs go one at a time per branch and
+# are never cancelled once started: a push that comes meanwhile waits, and a newer push takes the
+# waiting one's place before it starts (GitHub keeps one waiting run per concurrency group). So in a
+# burst of merges each finished run publishes, and the newest push is always the next one tested:
+# its tree holds everything the skipped ones do. Until Nov 8 2026 a newer push cancelled the running
+# test instead, and a burst (7 merges in 30 minutes) cancelled every run: nothing reached testers
+# for hours. Publishing runs are one at a time (eas-preview) and never cancelled, so updates go out
+# in order and a native build is never started twice. Before (Nov 7 2026) the whole run held
+# eas-preview, and in a burst of merges each push waited for every older push's scenario run first:
+# 19–24 minutes from a merge to its update instead of 5–15. One file because GitHub dispatches only
+# workflows that are on the default branch (main) already.
 #
 # The publishing half checks for itself that the scenario suite passed on the commit's tree, and
 # that the commit is on the branch, so a run by hand can't skip the gate. `dry_run` (by hand) goes
@@ -73,10 +77,11 @@ on:
         type: boolean
         default: false
 
-# Testing: per branch, a newer run cancels an older one. Publishing: one at a time, never cancelled.
+# Testing: one at a time per branch, and a started run finishes (a newer push replaces only a run
+# still waiting). Publishing: one at a time, never cancelled.
 concurrency:
   group: ${{ inputs.publish && (inputs.dry_run && 'eas-preview-dry-run' || 'eas-preview') || format('preview-tests-{0}{1}', github.ref, inputs.dry_run && '-dry-run' || '') }}
-  cancel-in-progress: ${{ !inputs.publish }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
