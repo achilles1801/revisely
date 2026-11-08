@@ -1,0 +1,13 @@
+# On an open day with a note: the note opens the day's log (a note row is a button to it). A day
+# without a note has no way into its log; add one first (add-day-note.yaml).
+appId: com.revisionbuddy.app
+---
+- scrollUntilVisible:
+    element: "Daily log. Open the log"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Daily log. Open the log"
+- extendedWaitUntil:
+    visible:
+      id: journal-composer
+    timeout: 15000

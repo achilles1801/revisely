@@ -123,10 +123,6 @@ export const PENDING = [
     reason: 'Activity (Overview, Day, Insights) is being rebuilt',
   },
   {
-    pattern: /smart-preview/i,
-    reason: 'Insights (Smart Tracking) is being merged into Activity',
-  },
-  {
     // Every Revo screen in every variant (VARIANTS below): r4-sheet, r4-sheet-dark,
     // r4-sheet-crimson, … r4-sheet-jade-dark. Each is approved once its board matches
     // that variant's mock.

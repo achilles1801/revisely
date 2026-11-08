@@ -1,0 +1,22 @@
+# Home → Activity → today: the day's blocks. Activity opens on today's month with today picked, and
+# the preview's date opens it (ACT-18).
+appId: com.revisionbuddy.app
+---
+# Right after a relaunch the first tap can be lost (CI): tapped again until
+# Activity shows.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          id: open-activity
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: activity-blocks-views
+          timeout: 10000
+- tapOn:
+    id: preview-open
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000

@@ -98,7 +98,6 @@ test('findCaptures takes the last attempt that took the screenshot', () => {
 
 test('screens being redesigned have no baseline on purpose', () => {
   assert.match(pendingReason('07-activity-recording'), /Activity/);
-  assert.match(pendingReason('02-smart-preview'), /Insights/);
   assert.match(pendingReason('r4-sheet'), /Revo/);
   assert.equal(pendingReason('02-home-done'), null);
 });

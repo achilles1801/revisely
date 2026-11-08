@@ -1,19 +1,6 @@
-# Home → Activity → Log today: the daily log for today.
+# Home → Activity → today → its note → the daily log. Today needs a note: the log opens from one
+# (the old Activity's "Log today" went with it; add-day-note.yaml adds one).
 appId: com.revisionbuddy.app
 ---
-# Right after a relaunch the first tap can be lost (CI): tapped again until
-# Activity shows.
-- retry:
-    maxRetries: 2
-    commands:
-      - tapOn:
-          id: open-activity
-          optional: true
-      - extendedWaitUntil:
-          visible: "Log today"
-          timeout: 10000
-- tapOn: "Log today"
-- extendedWaitUntil:
-    visible:
-      id: journal-composer
-    timeout: 15000
+- runFlow: open-day.yaml
+- runFlow: day-log.yaml
