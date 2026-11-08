@@ -31,7 +31,15 @@ import { Directory, File, Paths } from 'expo-file-system';
 import RecitationAudio from '../../modules/recitation-audio';
 import { logger } from './logger';
 import { getClearQuranVerse, peekClearQuranVerse, prefetchClearQuran, prefetchClearQuranAround } from './clearQuran';
-import { getSaheehVerse, peekSaheehVerse, prefetchSaheeh, SAHEEH_BYTES, SAHEEH_KEY, SAHEEH_PAGE_URL } from './saheeh';
+import {
+  getSaheehVerse,
+  hasSaheehSura,
+  peekSaheehVerse,
+  prefetchSaheeh,
+  SAHEEH_BYTES,
+  SAHEEH_KEY,
+  SAHEEH_PAGE_URL,
+} from './saheeh';
 import { QURANENC_CATALOGUE, QuranEncEntry, quranEncPageUrl, quranEncStore, QuranEncVerse } from './quranenc';
 import { languageName } from './translationLanguages';
 import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
@@ -535,8 +543,31 @@ function peekQuranEncVerse(t: TranslationInfo, sura: number, ayah: number): Qura
 
 /** This verse's sura of a QuranEnc translation is on the phone (or in memory): it shows offline. */
 export function hasTranslationSura(t: TranslationInfo, sura: number): boolean {
+  if (t.id === DEFAULT_TRANSLATION_ID) return hasSaheehSura(sura);
   if (t.source !== 'quranenc' || !t.key) return false;
   return quranEncStore(t.key)?.hasSura(sura) ?? false;
+}
+
+/**
+ * Offline, a translation the user can read this sura in instead (TRANS-7): one in the same language
+ * first, then Saheeh International, then any other they are offered; null if none is on the phone.
+ */
+export function fallbackTranslation(
+  current: TranslationInfo,
+  sura: number,
+  offered: TranslationInfo[],
+  has: (t: TranslationInfo, sura: number) => boolean = hasTranslationSura,
+): TranslationInfo | null {
+  const others = offered.filter((t) => t.id !== current.id && t.source === 'quranenc');
+  const sameLanguage = others.filter((t) => t.languageCode === current.languageCode && t.id !== DEFAULT_TRANSLATION_ID);
+  const saheeh = others.filter((t) => t.id === DEFAULT_TRANSLATION_ID);
+  const rest = others.filter((t) => !sameLanguage.includes(t) && !saheeh.includes(t));
+  return [...sameLanguage, ...saheeh, ...rest].find((t) => has(t, sura)) ?? null;
+}
+
+/** How a translation is named where its language isn't said around it: "Rachid Maach (French)". */
+export function nameWithLanguage(t: TranslationInfo): string {
+  return t.testersOnly ? `${t.name} (${t.language})` : t.name;
 }
 
 /** A verse's Arabic (Uthmani), exactly as the verse sheet shows it. */

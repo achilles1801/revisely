@@ -5,7 +5,9 @@
 // netinfo harness) it fails as React Native's fetch does.
 //
 // To record more: curl the same URL into the fixtures folder (the list keeps only the fields the app
-// reads).
+// reads). A whole translation for a download is too big to record: `serveWhole(key)` makes QuranEnc
+// answer every sura of it, recorded where there is a recording and otherwise "<key> <sura>:<ayah>"
+// for each verse, in QuranEnc's shape; `failSura` makes one sura fail (503) until `healSura`.
 import fs from 'fs';
 import path from 'path';
 
@@ -18,10 +20,40 @@ interface StandIn {
   requests: string[];
   /** Versions the list says, over the recorded ones (a new version published). */
   versions: Map<string, string>;
+  /** Translations QuranEnc answers every sura of (serveWhole). */
+  whole: Set<string>;
+  /** "key/sura" that answer 503. */
+  failing: Set<string>;
+  /** Milliseconds each answer takes (0: at once). */
+  delayMs: number;
 }
 
 const g = globalThis as unknown as { __scenarioQuranEnc?: StandIn; __scenarioNet?: { online: boolean } };
-export const quranEnc: StandIn = (g.__scenarioQuranEnc ??= { requests: [], versions: new Map() });
+export const quranEnc: StandIn = (g.__scenarioQuranEnc ??= {
+  requests: [],
+  versions: new Map(),
+  whole: new Set(),
+  failing: new Set(),
+  delayMs: 0,
+});
+
+/** Each answer takes `ms` (a slow connection: time to stop a download midway). */
+export function slowDown(ms: number): void {
+  quranEnc.delayMs = ms;
+}
+
+/** QuranEnc answers every sura of `key` (a download). */
+export function serveWhole(key: string): void {
+  quranEnc.whole.add(key);
+}
+
+export function failSura(key: string, sura: number): void {
+  quranEnc.failing.add(`${key}/${sura}`);
+}
+
+export function healSura(key: string, sura: number): void {
+  quranEnc.failing.delete(`${key}/${sura}`);
+}
 
 /** QuranEnc's list says `key` is now at `version`. */
 export function publishVersion(key: string, version: string): void {
@@ -36,6 +68,25 @@ export function requestsTo(part: string): string[] {
 export function resetQuranEnc(): void {
   quranEnc.requests.length = 0;
   quranEnc.versions.clear();
+  quranEnc.whole.clear();
+  quranEnc.failing.clear();
+  quranEnc.delayMs = 0;
+}
+
+/** A sura in QuranEnc's shape, its text made up: "<key> <sura>:<ayah>". */
+function madeUpSura(key: string, sura: number): unknown {
+  const { getSurahDisplay } = require('../../../src/lib/quranData') as typeof import('../../../src/lib/quranData');
+  const count = getSurahDisplay(sura)?.ayahCount ?? 0;
+  return {
+    result: Array.from({ length: count }, (_, i) => ({
+      id: String(i + 1),
+      sura: String(sura),
+      aya: String(i + 1),
+      arabic_text: '',
+      translation: `${key} ${sura}:${i + 1}`,
+      footnotes: '',
+    })),
+  };
 }
 
 function answer(status: number, body: unknown): Response {
@@ -57,8 +108,13 @@ function serveQuranEnc(route: string): Response {
     });
   }
   const sura = /^translation\/sura\/([a-z0-9_]+)\/(\d+)$/.exec(route);
+  if (sura && quranEnc.failing.has(`${sura[1]}/${Number(sura[2])}`)) return answer(503, { error: 'Unavailable' });
   const body = sura ? recorded(`sura/${sura[1]}/${sura[2]}.json`) : undefined;
-  return body ? answer(200, body) : answer(404, { error: 'Not recorded' });
+  if (body) return answer(200, body);
+  if (sura && quranEnc.whole.has(sura[1]) && Number(sura[2]) >= 1 && Number(sura[2]) <= 114) {
+    return answer(200, madeUpSura(sura[1], Number(sura[2])));
+  }
+  return answer(404, { error: 'Not recorded' });
 }
 
 function serveAlQuran(route: string): Response {
@@ -79,6 +135,7 @@ export function installQuranEnc(): void {
     quranEnc.requests.push(url);
     // What React Native's fetch throws without a connection.
     if (g.__scenarioNet && !g.__scenarioNet.online) throw new TypeError('Network request failed');
+    if (quranEnc.delayMs > 0) await new Promise((r) => setTimeout(r, quranEnc.delayMs));
     return qe ? serveQuranEnc(qe[1]) : serveAlQuran(aq![1]);
   }) as typeof fetch;
   (routed as { __scenarioQuranEnc?: boolean }).__scenarioQuranEnc = true;

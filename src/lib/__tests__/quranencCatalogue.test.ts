@@ -6,6 +6,8 @@ import { LANGUAGES, languageName } from '../translationLanguages';
 import {
   ALL_TRANSLATIONS,
   creditLine,
+  fallbackTranslation,
+  nameWithLanguage,
   offeredTranslations,
   QURANENC_TRANSLATIONS,
   quranEncTranslationId,
@@ -92,9 +94,9 @@ describe('what the picker offers', () => {
     expect(offeredTranslations(true)).toHaveLength(TRANSLATIONS.length + QURANENC_TRANSLATIONS.length);
   });
 
-  it('the one in use first, then each language by its English name', () => {
-    const sections = pickerSections(offeredTranslations(true), '', 'qe.urdu_junagarhi');
-    expect(sections[0]).toMatchObject({ key: 'chosen', title: 'In use' });
+  it('Selected first, then each language by its English name', () => {
+    const sections = pickerSections(offeredTranslations(true), '', { chosenId: 'qe.urdu_junagarhi' });
+    expect(sections[0]).toMatchObject({ key: 'selected', title: 'Selected' });
     expect(sections[0].data.map((t) => t.id)).toEqual(['qe.urdu_junagarhi']);
     const titles = sections.slice(1).map((s) => s.title);
     expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
@@ -111,8 +113,77 @@ describe('what the picker offers', () => {
     expect(matchesQuery(french, 'french maach')).toBe(true);
     expect(matchesQuery(french, 'french junagarhi')).toBe(false);
     expect(matchesQuery(resolveTranslation('qe.urdu_junagarhi'), 'اردو')).toBe(true);
-    const found = pickerSections(offeredTranslations(true), 'türkçe', 'en.sahih');
+    const found = pickerSections(offeredTranslations(true), 'türkçe', { chosenId: 'en.sahih' });
     expect(found.map((s) => s.key)).toEqual(['tr']);
-    expect(pickerSections(offeredTranslations(true), 'nothing like this', 'en.sahih')).toEqual([]);
+    expect(pickerSections(offeredTranslations(true), 'nothing like this', { chosenId: 'en.sahih' })).toEqual([]);
+  });
+});
+
+describe('offline, the translation offered instead (TRANS-7)', () => {
+  const offered = offeredTranslations(true);
+  const id = (t: { id: string } | null) => t?.id ?? null;
+  const on = (...ids: string[]) => (t: { id: string }) => ids.includes(t.id);
+
+  it('the same language first, then Saheeh International, then any other on the phone', () => {
+    const turkish = resolveTranslation('qe.turkish_shaban');
+    expect(id(fallbackTranslation(turkish, 2, offered, on('qe.turkish_rwwad', 'en.sahih', 'qe.french_rashid')))).toBe('qe.turkish_rwwad');
+    expect(id(fallbackTranslation(turkish, 2, offered, on('en.sahih', 'qe.french_rashid')))).toBe('en.sahih');
+    expect(id(fallbackTranslation(turkish, 2, offered, on('qe.french_rashid')))).toBe('qe.french_rashid');
+    expect(fallbackTranslation(turkish, 2, offered, on())).toBeNull();
+  });
+
+  it('never itself, and never The Clear Quran® (it can’t be on the phone whole)', () => {
+    const saheeh = resolveTranslation('en.sahih');
+    expect(fallbackTranslation(saheeh, 2, offered, on('en.sahih', 'en.khattab'))).toBeNull();
+  });
+
+  it('everyone else is offered Saheeh International only', () => {
+    const tcq = resolveTranslation('en.khattab');
+    expect(id(fallbackTranslation(tcq, 2, offeredTranslations(false), on('en.sahih', 'qe.french_rashid')))).toBe('en.sahih');
+  });
+
+  it('named with its language where the sheet doesn’t say it', () => {
+    expect(nameWithLanguage(resolveTranslation('qe.french_rashid'))).toBe('Rachid Maach (French)');
+    expect(nameWithLanguage(resolveTranslation('en.sahih'))).toBe('Saheeh International');
+  });
+});
+
+describe('favorites and downloads in the picker (TRANS-8)', () => {
+  const all = offeredTranslations(true);
+  const keys = (sections: { key: string; data: { id: string }[] }[]) => sections.map((s) => [s.key, s.data.map((t) => t.id)]);
+
+  it('Selected, Favorites in the order starred, Downloaded, then languages; each translation once', () => {
+    const sections = pickerSections(all, '', {
+      chosenId: 'qe.urdu_junagarhi',
+      favorites: ['qe.french_rashid', 'qe.urdu_junagarhi', 'qe.turkish_shaban'],
+      downloaded: (t) => t.id === 'qe.hindi_omari' || t.id === 'qe.turkish_shaban',
+    });
+    expect(keys(sections).slice(0, 3)).toEqual([
+      ['selected', ['qe.urdu_junagarhi']],
+      ['favorites', ['qe.french_rashid', 'qe.turkish_shaban']],
+      ['downloaded', ['qe.hindi_omari']],
+    ]);
+    const ids = sections.flatMap((s) => s.data.map((t) => t.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(all.length);
+  });
+
+  it('Edit: every favorite in its order (the one in use too), and the downloads that can be deleted', () => {
+    const sections = pickerSections(all, '', {
+      chosenId: 'qe.urdu_junagarhi',
+      favorites: ['qe.urdu_junagarhi', 'qe.french_rashid'],
+      downloaded: (t) => t.id === 'en.sahih' || t.id === 'qe.hindi_omari',
+      removable: (t) => t.id !== 'en.sahih',
+      editing: true,
+    });
+    expect(keys(sections)).toEqual([
+      ['favorites', ['qe.urdu_junagarhi', 'qe.french_rashid']],
+      ['downloaded', ['qe.hindi_omari']],
+    ]);
+  });
+
+  it('a search filters every group', () => {
+    const sections = pickerSections(all, 'rashid', { chosenId: 'en.sahih', favorites: ['qe.french_rashid', 'qe.urdu_junagarhi'] });
+    expect(keys(sections)).toEqual([['favorites', ['qe.french_rashid']]]);
   });
 });

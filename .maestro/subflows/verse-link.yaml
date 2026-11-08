@@ -2,10 +2,11 @@
 # which also wrote the recorded translations to the phone), waiting for that translation's credit.
 #   env T:      a translation id (en.sahih, qe.urdu_junagarhi)
 #   env CREDIT: a pattern for the start of its credit
+#   env THEME:  light or dark
 appId: com.revisionbuddy.app
 ---
 - openLink:
-    link: revisely://e2e/verse?ref=112:2&t=${T}
+    link: revisely://e2e/verse?ref=112:2&t=${T}&theme=${THEME}
     optional: true
 # iOS asks "Open in “Revisely”?" the first time, on a slow simulator many seconds later; a link that
 # didn't get there is sent again.
@@ -27,7 +28,7 @@ appId: com.revisionbuddy.app
               text: "${CREDIT}"
           commands:
             - openLink:
-                link: revisely://e2e/verse?ref=112:2&t=${T}
+                link: revisely://e2e/verse?ref=112:2&t=${T}&theme=${THEME}
                 optional: true
 - assertVisible:
     id: verse-translation

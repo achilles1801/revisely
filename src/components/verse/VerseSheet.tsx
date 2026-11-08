@@ -29,8 +29,11 @@ import {
   creditLine,
   DEFAULT_TRANSLATION_ID,
   getVerseText,
+  fallbackTranslation,
   hasArabicForPage,
+  hasTranslationSura,
   isTranslationAvailable,
+  nameWithLanguage,
   offeredTranslations,
   pickerTitle,
   CLEAR_QURAN_ID,
@@ -56,6 +59,8 @@ interface VerseSheetProps {
   onChangeTranslation: (id: string) => void;
   /** A previewTester account: the picker offers every translation (lib/translation offeredTranslations). */
   tester?: boolean;
+  /** The account: the picker's favorites are kept on the phone for each. */
+  accountId?: string;
   /** Reciter and style for Play ('<reciter>:<style>'). */
   reciter: string | undefined;
   onChangeReciter: (choice: string) => void;
@@ -136,6 +141,7 @@ export function VerseSheet({
   translationId,
   onChangeTranslation,
   tester = false,
+  accountId,
   reciter,
   onChangeReciter,
   onNavigate,
@@ -299,11 +305,17 @@ export function VerseSheet({
   const prev = verse ? previousVerse(verse) : null;
   const next = verse ? nextVerse(verse) : null;
   failedRef.current = view.status === 'error';
-  // Offline, with this page's Arabic here: The Clear Quran® is what's missing,
-  // and Saheeh International can show the verse if its sura is here too.
+  // Offline, with this page's Arabic here: the translation is what's missing, and another one on the
+  // phone can show the verse (TRANS-7): the same language first, then Saheeh International.
   const offline = view.status === 'error' && knownOffline();
   const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
-  const saheehHere = arabicHere && !!verse && hasSaheehSura(verse.sura);
+  const alternative =
+    arabicHere && verse
+      ? fallbackTranslation(translation, verse.sura, offeredTranslations(tester), (t, sura) =>
+          t.id === DEFAULT_TRANSLATION_ID ? hasSaheehSura(sura) : hasTranslationSura(t, sura),
+        )
+      : null;
+  const notDownloaded = arabicHere && translation.source === 'quranenc' && translation.id !== DEFAULT_TRANSLATION_ID;
   // Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko: the translation reads right to left.
   const rtl = translation.direction === 'rtl';
 
@@ -425,6 +437,7 @@ export function VerseSheet({
                   <TranslationPicker
                     translations={offeredTranslations(tester)}
                     chosenId={translation.id}
+                    accountId={accountId}
                     onChoose={(id) => {
                       onChangeTranslation(id);
                       setMenu('closed');
@@ -546,9 +559,21 @@ export function VerseSheet({
                         The Clear Quran® needs the internet
                       </Text>
                       <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
-                        {saheehHere
-                          ? 'Saheeh International is available offline.'
+                        {alternative
+                          ? `${nameWithLanguage(alternative)} is available offline.`
                           : "Verses you've read before show offline. Try again once you're online."}
+                      </Text>
+                    </>
+                  ) : notDownloaded ? (
+                    // A QuranEnc translation with this sura not on the phone (TRANS-7).
+                    <>
+                      <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
+                        This translation isn't downloaded
+                      </Text>
+                      <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
+                        {alternative
+                          ? `${nameWithLanguage(alternative)} is available offline.`
+                          : 'Download it from Select translation to read it offline.'}
                       </Text>
                     </>
                   ) : offline ? (
@@ -569,12 +594,12 @@ export function VerseSheet({
                     </Text>
                   )}
                   <View style={styles.errorActions}>
-                    {translation.id === CLEAR_QURAN_ID && saheehHere && (
+                    {alternative && (
                       <PillButton
-                        title="Show Saheeh International"
+                        title={`Show ${nameWithLanguage(alternative)}`}
                         variant="outline"
-                        onPress={() => onChangeTranslation(DEFAULT_TRANSLATION_ID)}
-                        testID="verse-use-saheeh"
+                        onPress={() => onChangeTranslation(alternative.id)}
+                        testID={alternative.id === DEFAULT_TRANSLATION_ID ? 'verse-use-saheeh' : 'verse-use-offline'}
                       />
                     )}
                     <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />

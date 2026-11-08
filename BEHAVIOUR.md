@@ -250,10 +250,23 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **TRANS-4.** A QuranEnc translation stays at QuranEnc's latest version. Its list is read at most once a
   day, and one request answers for every translation. A sura kept from an older version is fetched again
   when it is read, and shows with its own version until then.
-- **TRANS-5.** Testers choose from every translation in QuranEnc's list (76, in 56 languages, Nov 2026):
-  the one in use first, then each language by its English name with its own name beside it. A search
-  finds a language, in English or its own name (accents aside), or a translator. Everyone else chooses
-  Saheeh International or The Clear Quran®, as before.
+- **TRANS-5.** Testers choose from every translation in QuranEnc's list (76, in 56 languages, Nov 2026).
+  The picker lists Selected (the one in use), Favorites, Downloaded, then each language by its English
+  name with its own name beside it, each translation once. A search over every group finds a language,
+  in English or its own name (accents aside), or a translator. Everyone else chooses Saheeh
+  International or The Clear Quran®, as before.
+- **TRANS-6.** A tester can download a whole QuranEnc translation from the picker, on any connection:
+  its size shows before ("1.2 MB"), its progress while it downloads ("Downloading… 40%"), and it can be
+  stopped, carrying on later from where it stopped. Once every sura is on the phone it reads "On this
+  phone" and is listed under Downloaded; Remove, after a confirmation, deletes it. A download that fails
+  says so and keeps what came. Saheeh International comes and goes with the offline mushaf, as before.
+- **TRANS-7.** Offline, a verse in a translation that isn't on the phone says so ("This translation isn't
+  downloaded"; The Clear Quran® "needs the internet") and offers a translation of that sura that is on
+  the phone: one in the same language first, then Saheeh International, then any other. A verse whose
+  Arabic isn't on the phone either says it shows once back online. Back online, it loads by itself.
+- **TRANS-8.** A tester stars translations to keep them under Favorites, below Selected, in the order
+  starred. Edit moves a favorite up or down or takes its star away, and deletes downloads (after a
+  confirmation). Favorites are kept on the phone for each account.
 
 ## Activity
 
