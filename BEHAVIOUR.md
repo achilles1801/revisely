@@ -400,8 +400,8 @@ How the tests are made: `tests/scenarios/README.md`.
 
 Revo is the in-app assistant (it supersedes the Ask coach, whose rules above still hold for its own calls).
 
-- **REVO-1.** Revo is for previewTester accounts only, and off until the account turns it on (the opt-in, or Settings →
-  Revo AI). The switch is Revo's own: turning on the Ask coach doesn't turn on Revo. Only the functions change that
+- **REVO-1.** Revo is for the accounts its release switch opens it to (REVO-37: previewTester accounts until the
+  production release), and off until the account turns it on (the opt-in, or Settings → Revo AI). The switch is Revo's own: turning on the Ask coach doesn't turn on Revo. Only the functions change that
   switch, its memory switch and the day's count; the account reads its own. During the changeover the server also
   serves an account that never set Revo's switch but has the coach's on (apps from before it read that one); only
   Revo's own switch turned off stops it.
@@ -421,7 +421,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   sets another (0 to $1,000, `functions/scripts/set-coach-cap.js`), read again within a minute, with no deploy. A
   question that would pass it is refused as `monthly`, makes no call and is given back; the real cost replaces each
   call's reserve, at the call's model's prices (Revo: claude-sonnet-5-5; the Ask coach: claude-haiku-5-5). The
-  config is set to $150 (Nov 7 2026), within the $200 of API credit a month that only Revisely uses.
+  config is set to $150 (Nov 7 2026), within the $200 of API credit a month that only Revisely uses. One UTC day may
+  spend at most a tenth of the month's cap on Revo (`config/coach.dailyCapUsd` sets another, 0 to the monthly cap):
+  past it a question is refused as `resting`, saying in hours when Revo is back (the next UTC midnight), makes no call
+  and is given back, and no Day in review is written, so a burst can't use up the month. A refusal that isn't one of
+  ours (the platform turning a call away) says Revo is busy, never that the day's questions are used.
 
 - **REVO-5.** A first question with nothing attached is kept for the revision day: the same question again (case and
   spaces aside) opens a new conversation with the same answer, with no call and nothing counted. A question with an
@@ -561,6 +565,16 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   about strength is still offered (asked why a part keeps slipping, a timeline of it). The server reads the
   setting from the account: Revo isn't told ratings or weak pages, and a ratings chart or a weak or strength column
   in its reply is dropped.
+
+- **REVO-37.** Who has Revo is one switch, `config/app.revo` (`functions/scripts/set-app-config.js --revo`), read by
+  the functions and the app: `testers` (or unset, or anything else) opens it to previewTester accounts only;
+  `everyone`, to every signed-in account, with no new build (set at the production release); `off`, to nobody,
+  testers included (an emergency). The functions apply a change within a minute. The app reads it when Revo is
+  first needed and back in front after 10 minutes, keeps the last value on the phone (testers until it has read
+  one), and reads it again at once when the server refuses Revo as paused or not open to the account; the button,
+  Settings → Revo AI and every "Ask Revo" follow it. Such a refusal is said in the sheet as it is, never as the
+  opt-in. Turning Revo off, turning memory off and deleting conversations or memory stay open to every account,
+  whatever the switch.
 
 ## Memorizing
 

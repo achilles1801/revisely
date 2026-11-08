@@ -58,6 +58,7 @@ export const REVO_MESSAGES = {
   unavailable: 'Revo couldn’t answer. Try again.',
   offline: 'You’re offline. Revo needs the internet.',
   signIn: 'Revo couldn’t check your sign-in. Try again.',
+  busy: 'Revo is busy. Try again in a moment.',
 } as const;
 
 /** A failure of the connection itself (fetch, or Auth refreshing the token), not an answer. */
@@ -79,9 +80,15 @@ export function refusalOf(err: unknown): RevoError {
   const fromServer = typeof e?.code === 'string' && typeof e?.message === 'string' && e.message.length > 0 && e.message.length <= 160;
   const message = fromServer ? e!.message! : REVO_MESSAGES.unavailable;
   switch (e?.code) {
-    case 'RESOURCE_EXHAUSTED':
-      return new RevoError(e.details?.reason === 'monthly' ? 'monthly' : 'daily', message);
+    case 'RESOURCE_EXHAUSTED': {
+      const reason = e.details?.reason;
+      if (reason === 'monthly' || reason === 'resting' || reason === 'daily') return new RevoError(reason, message);
+      // Not one of ours: the platform turning a call away (every instance busy).
+      return new RevoError('unavailable', REVO_MESSAGES.busy);
+    }
     case 'PERMISSION_DENIED':
+      // Off for everyone, or not open to this account (REVO-37): said as it is, never the opt-in.
+      if (e.details?.reason === 'paused' || e.details?.reason === 'access') return new RevoError('paused', message);
       return new RevoError('off', message);
     case 'NOT_FOUND':
       return new RevoError('gone', message);

@@ -17,6 +17,7 @@ import { greetingName } from '../../lib/displayName';
 import { auth } from '../../lib/firebase';
 import { ChartCard, PlanCard } from './RevoCards';
 import { knownAction } from '../../lib/revo/screens';
+import { refreshRevoRelease } from '../../lib/revo/release';
 import { RevoComposer } from './RevoComposer';
 import { Chips, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
 
@@ -101,6 +102,7 @@ export function RevoChat({
   const usedToday = usage.day === day ? usage.count : 0;
   const left = Math.max(0, REVO_DAILY_QUESTIONS - usedToday);
   const capped = refusal?.kind === 'monthly';
+  const resting = refusal?.kind === 'resting';
   const outOfQuestions = left === 0 || refusal?.kind === 'daily';
   const back = revoBackAt(user, new Date());
   const name = greetingName(user?.name, auth.currentUser?.displayName ?? null) || null;
@@ -144,6 +146,8 @@ export function RevoChat({
       setRefusal({ kind: e.refusal, message: e.message, retry });
       // Off on the server (turned off on another phone, or not on yet): the opt-in, not a dead end.
       if (e.refusal === 'off' && onOff) onOff();
+      // Paused, or no longer open to this account (REVO-37): the switch is read again, so the button goes.
+      if (e.refusal === 'paused') void refreshRevoRelease(true);
       if (sent.length > 0) onAttachments(sent);
     } finally {
       setPending(null);
@@ -253,7 +257,7 @@ export function RevoChat({
             <Typing />
           </>
         ) : null}
-        {refusal && refusal.kind !== 'daily' && refusal.kind !== 'monthly' ? (
+        {refusal && refusal.kind !== 'daily' && refusal.kind !== 'monthly' && refusal.kind !== 'resting' ? (
           <Text style={[styles.error, { color: palette.secondary }]} testID="revo-error" accessibilityLiveRegion="polite">
             {refusalText(refusal)}
             {refusal.retry ? (
@@ -267,6 +271,8 @@ export function RevoChat({
       <View style={[styles.gutter, styles.foot]}>
         {capped ? (
           <LimitCard title="Revo is resting" body="Revo has reached this month’s limit for everyone. It’s back next month. Your conversations stay in History." />
+        ) : resting ? (
+          <LimitCard title="Revo is resting" body={`${refusal?.message ?? ''} Your conversations stay in History.`} />
         ) : outOfQuestions ? (
           <LimitCard title={`That’s today’s ${REVO_DAILY_QUESTIONS} questions`} body={`${back.long} Your conversations stay in History.`} />
         ) : (
@@ -277,8 +283,8 @@ export function RevoChat({
           onAdd={onAdd}
           attachments={attachments}
           onRemoveAttach={(i) => onAttachments(attachments.filter((_, j) => j !== i))}
-          disabled={outOfQuestions || capped}
-          disabledText={capped ? 'Back next month' : back.short}
+          disabled={outOfQuestions || capped || resting}
+          disabledText={capped ? 'Back next month' : resting ? 'Back later' : back.short}
           busy={pending != null}
           onFocus={onExpand}
         />

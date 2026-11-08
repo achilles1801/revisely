@@ -7,14 +7,30 @@
  *   coachUsage/{uid__day}            questions asked that UTC day
  *   coachLedger/{YYYY-MM}            spend (dollars) and token totals for the month; no content
  *   coachLedgerDay/{YYYY-MM-DD}      the same totals for one day (the weekly digest reads them)
- *   config/coach                     monthlyCapUsd: the monthly cap (set-coach-cap.js); server only
+ *   config/coach                     monthlyCapUsd, dailyCapUsd: the caps (set-coach-cap.js); server only
  */
 import { FieldValue, Firestore } from 'firebase-admin/firestore';
-import { CallLedger, CoachStore, monthlyCapFrom } from './handler';
+import { CallLedger, CoachStore, dailyCapFrom, monthlyCapFrom } from './handler';
 
-/** How long a read of the cap is used before reading it again (a change applies within this). */
+/** How long a read of the caps is used before reading them again (a change applies within this). */
 const CAP_CACHE_MS = 60_000;
-let capCache: { value: number; until: number } | null = null;
+let capCache: { monthly: number; daily: number; until: number } | null = null;
+
+/** config/coach's caps, read at most once a minute: the month's, and one UTC day's (Revo's, REVO-4). */
+export async function coachCaps(db: Firestore): Promise<{ monthly: number; daily: number }> {
+  if (capCache && Date.now() < capCache.until) return capCache;
+  const snap = await db.doc('config/coach').get();
+  const monthly = monthlyCapFrom(snap.get('monthlyCapUsd'));
+  const daily = dailyCapFrom(snap.get('dailyCapUsd'), monthly);
+  capCache = { monthly, daily, until: Date.now() + CAP_CACHE_MS };
+  return capCache;
+}
+
+/** What one UTC day has spent (coachLedgerDay/{day}: settled calls, both models). */
+export async function spentOn(db: Firestore, day: string): Promise<number> {
+  const spent = (await db.doc(`coachLedgerDay/${day}`).get()).get('spendUsd');
+  return typeof spent === 'number' && Number.isFinite(spent) ? spent : 0;
+}
 import { CoachInsight } from './prompt';
 
 export function adminCoachStore(db: Firestore): CoachStore {
@@ -63,11 +79,7 @@ export function adminCoachStore(db: Firestore): CoachStore {
       return (snap.get('count') as number | undefined) ?? 0;
     },
     async monthlyCapUsd() {
-      if (capCache && Date.now() < capCache.until) return capCache.value;
-      const snap = await db.doc('config/coach').get();
-      const value = monthlyCapFrom(snap.get('monthlyCapUsd'));
-      capCache = { value, until: Date.now() + CAP_CACHE_MS };
-      return value;
+      return (await coachCaps(db)).monthly;
     },
     async reserveSpend(month, amount, cap) {
       return db.runTransaction(async (tx) => {

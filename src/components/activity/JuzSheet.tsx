@@ -13,7 +13,7 @@ import * as firestoreService from '../../services/firestoreService';
 import { juzSheetModel, type JuzCellState } from '../../lib/juzSheet';
 import { shiftDay } from '../../lib/journal';
 import { describePassage, spokenText } from '../../lib/passages';
-import { revoAvailable } from '../../lib/revo/availability';
+import { useRevoAvailable } from '../../lib/revo/availability';
 import { openRevo } from '../../lib/revo/open';
 import { prepare } from '../../lib/revo/facts';
 import { juzAttachment } from '../../lib/revo/attachments';
@@ -78,6 +78,7 @@ export function JuzSheet({
 }) {
   const { palette } = useTheme();
   const { pages, user } = useApp();
+  const revoOpen = useRevoAvailable(user);
   // The juz stays while the sheet slides away.
   const [shown, setShown] = useState<number | null>(juz);
   useEffect(() => {
@@ -119,7 +120,7 @@ export function JuzSheet({
   };
   const revo = useRevoContext();
   const ask =
-    model && revoAvailable(user)
+    model && revoOpen
       ? () => {
           const src = revo.sources();
           if (!src) return;

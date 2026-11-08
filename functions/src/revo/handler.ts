@@ -1,15 +1,18 @@
 /**
  * Revo, the in-app assistant: questions about the user's own revision, a chat at a time.
- * Only previewTester accounts that turned it on. At most REVO_DAILY_QUESTIONS new questions an
- * account a revision day; the monthly cap and ledger are the Ask coach's (shared). A first
- * question with no attachment is cached for the day. Storage and the model call are injected,
- * so this runs in tests. Logs keep counts and tokens, never content.
+ * Only accounts the release opens it to (config/app.revo: testers, everyone or off; release.ts,
+ * REVO-37) that turned it on. At most REVO_DAILY_QUESTIONS new questions an account a revision
+ * day; the monthly cap and ledger are the Ask coach's (shared), and one UTC day may spend only
+ * part of the month (config/coach.dailyCapUsd). A first question with no attachment is cached for
+ * the day. Storage and the model call are injected, so this runs in tests. Logs keep counts and
+ * tokens, never content.
  */
 import { createHash } from 'crypto';
 import { CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
 import { CallLedger, MONTHLY_CAP_USD, ledgerOf } from '../coach/handler';
 import { REVO_MODEL, costUsd, worstCaseCostUsd } from '../coach/pricing';
 import { REVO_HISTORY, REVO_MAX_TOKENS, buildAskRequest, buildReviewRequest } from './prompt';
+import { RevoRelease, revoAllowed } from './release';
 import { parseReply } from './reply';
 import {
   CachedAnswer,
@@ -41,7 +44,12 @@ export const REVIEW_TITLE = 'Day in review';
 export const REVIEW_MESSAGE_ID = 'review';
 
 export type RevoErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found' | 'resource-exhausted' | 'unavailable';
-export type RevoReason = 'daily' | 'monthly' | 'clock';
+/**
+ * Why a call was refused, for the app: the limits (daily, monthly, resting: the day's share of the
+ * month is spent), the phone's clock, and who has Revo (paused: off for everyone; access: not open
+ * to this account). Apps before REVO-37 read the last two as Revo being off on the account.
+ */
+export type RevoReason = 'daily' | 'monthly' | 'resting' | 'clock' | 'paused' | 'access';
 
 export class RevoError extends Error {
   constructor(
@@ -56,12 +64,18 @@ export class RevoError extends Error {
 export const MESSAGES = {
   signIn: 'Sign in to use Revo.',
   notTester: 'Revo isn’t available on this account yet.',
+  paused: 'Revo is paused for now. Try again later.',
   notOn: 'Turn Revo on first.',
   clock: 'Check the date and time on your phone.',
   behind: 'Your phone’s date is behind.',
   chatGone: 'This chat was deleted.',
   daily: `You’ve asked Revo ${REVO_DAILY_QUESTIONS} questions today. Ask again tomorrow.`,
   monthly: 'Revo is paused until next month.',
+  /** One UTC day's share of the month is spent: back at the next UTC midnight. */
+  resting: (now: Date) => {
+    const hours = Math.max(1, Math.ceil((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) - now.getTime()) / 3_600_000));
+    return `Revo has reached today’s limit for everyone. It’s back in about ${hours === 1 ? 'an hour' : `${hours} hours`}.`;
+  },
   timeout: 'Revo didn’t answer in time. Try again.',
   busy: 'Revo is busy. Try again in a moment.',
   noAnswer: 'Revo couldn’t answer that. Try again.',
@@ -70,6 +84,8 @@ export const MESSAGES = {
 export type ReserveResult = { ok: true; count: number } | { ok: false; reason: 'daily' | 'behind' };
 
 export interface RevoStore {
+  /** config/app.revo: who has Revo (REVO-37). Left out (an older store), 'testers'. */
+  release?(): Promise<RevoRelease>;
   isPreviewTester(uid: string): Promise<boolean>;
   /**
    * users/{uid}.smartTrackingEnabled, as the app reads it: off unless turned on (REVO-36). Left out
@@ -92,6 +108,10 @@ export interface RevoStore {
   reserveSpend(month: string, amount: number, cap: number): Promise<boolean>;
   /** The shared monthly cap (config/coach.monthlyCapUsd); MONTHLY_CAP_USD when unset. */
   monthlyCapUsd?(): Promise<number>;
+  /** What one UTC day may spend (config/coach.dailyCapUsd; DAILY_CAP_SHARE of the month when unset). Left out, no daily cap. */
+  dailyCapUsd?(): Promise<number>;
+  /** What a UTC day has spent so far (coachLedgerDay/{day}, settled calls). */
+  spentOn?(day: string): Promise<number>;
   settleSpend(month: string, reserved: number, actual: number, usage: CallLedger, day: string): Promise<void>;
   getChat(uid: string, chatId: string): Promise<RevoChat | null>;
   getMessage(uid: string, chatId: string, id: string): Promise<StoredMessage | null>;
@@ -195,12 +215,21 @@ function revisionDay(v: unknown, now: Date): string {
   return v;
 }
 
-async function gate(auth: { uid: string } | undefined, deps: RevoDeps, needOptIn: boolean): Promise<{ uid: string; settings: RevoSettings }> {
+/** The caller, when the release opens Revo to them (REVO-1, REVO-37); whether they are a tester. */
+async function access(auth: { uid: string } | undefined, deps: RevoDeps): Promise<{ uid: string; tester: boolean }> {
   if (!auth?.uid) throw new RevoError('unauthenticated', MESSAGES.signIn);
-  if (!(await deps.store.isPreviewTester(auth.uid))) throw new RevoError('permission-denied', MESSAGES.notTester);
-  const settings = await deps.store.getSettings(auth.uid);
+  const release = (await deps.store.release?.()) ?? 'testers';
+  if (release === 'off') throw new RevoError('permission-denied', MESSAGES.paused, { reason: 'paused' });
+  const tester = await deps.store.isPreviewTester(auth.uid);
+  if (!revoAllowed(release, tester)) throw new RevoError('permission-denied', MESSAGES.notTester, { reason: 'access' });
+  return { uid: auth.uid, tester };
+}
+
+async function gate(auth: { uid: string } | undefined, deps: RevoDeps, needOptIn: boolean): Promise<{ uid: string; tester: boolean; settings: RevoSettings }> {
+  const { uid, tester } = await access(auth, deps);
+  const settings = await deps.store.getSettings(uid);
   if (needOptIn && !settings.optIn) throw new RevoError('permission-denied', MESSAGES.notOn);
-  return { uid: auth.uid, settings };
+  return { uid, tester, settings };
 }
 
 /** The memory after adding `facts` (deduplicated by normalized text; at the cap the oldest go). */
@@ -232,18 +261,26 @@ function callFailure(err: unknown): RevoError {
 const NO_USAGE: CallLedger = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
 /**
- * One model call against the shared monthly cap: reserves the worst case, calls, settles the real
- * cost. 'capped' when the reserve doesn't fit; throws a RevoError when the call fails (the
- * reserve is given back).
+ * One model call against the shared caps: reserves the worst case, calls, settles the real cost.
+ * 'resting' when the UTC day's share of the month is spent, 'capped' when the month's reserve
+ * doesn't fit; throws a RevoError when the call fails (the reserve is given back).
  */
 async function metered(
   deps: RevoDeps,
   request: MessagesRequest,
   event: string,
-): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number } | 'capped'> {
+): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number } | 'capped' | 'resting'> {
   const today = utcDay(deps.now());
   const month = today.slice(0, 7);
   const reserved = worstCaseCostUsd(JSON.stringify(request).length, REVO_MAX_TOKENS, REVO_MODEL);
+  // The day's share first (settled spend: calls in flight can pass it by their reserves, no more).
+  if (deps.store.dailyCapUsd && deps.store.spentOn) {
+    const [daily, spent] = await Promise.all([deps.store.dailyCapUsd(), deps.store.spentOn(today)]);
+    if (spent + reserved > daily) {
+      deps.log({ event: 'resting' });
+      return 'resting';
+    }
+  }
   const cap = (await deps.store.monthlyCapUsd?.()) ?? MONTHLY_CAP_USD;
   if (!(await deps.store.reserveSpend(month, reserved, cap))) {
     deps.log({ event: 'capped' });
@@ -375,6 +412,10 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
     await deps.store.releaseQuestion(uid, day);
     throw new RevoError('resource-exhausted', MESSAGES.monthly, { reason: 'monthly' });
   }
+  if (result === 'resting') {
+    await deps.store.releaseQuestion(uid, day);
+    throw new RevoError('resource-exhausted', MESSAGES.resting(deps.now()), { reason: 'resting' });
+  }
 
   const allowed = new Set([...contextPages(context), ...attached.flatMap(attachmentPages), ...history.flatMap((m) => attachmentsOf(m).flatMap(attachmentPages))]);
   const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking });
@@ -427,7 +468,7 @@ async function existingReview(deps: RevoDeps, uid: string, chat: RevoChat): Prom
   return m ? { chat, reply: publicMessage(m) } : { none: true };
 }
 
-/** Once per account and revision day; not counted against the day's questions; none when capped. */
+/** Once per account and revision day; not counted against the day's questions; none when capped or resting. */
 export async function handleDayInReview(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoReviewResult> {
   const { uid, settings } = await gate(auth, deps, true);
   const smartTracking = await smartTrackingOf(deps, uid);
@@ -444,7 +485,7 @@ export async function handleDayInReview(auth: { uid: string } | undefined, data:
 
   const memory = settings.memoryOn ? (await deps.store.listMemory(uid, REVO_MEMORY_CAP * 2)).slice(0, REVO_MEMORY_CAP) : [];
   const result = await metered(deps, buildReviewRequest({ day, context, memory: memory.map((m) => m.text), smartTracking }), 'review');
-  if (result === 'capped') return { none: true };
+  if (result === 'capped' || result === 'resting') return { none: true };
   const parts = parseReply(result.reply.text, new Set(contextPages(context)), { firstTurn: false, smartTracking });
   if (!parts) {
     deps.log({ event: 'failed', code: 'no-text' });
@@ -465,9 +506,13 @@ export async function handleDayInReview(auth: { uid: string } | undefined, data:
   return { chat, reply: publicMessage(message) };
 }
 
-/** Revo on or off, and memory on or off (testers; no opt-in needed). Off deletes the account's Revo history, memory and cached answers. */
+/**
+ * Revo on or off, and memory on or off (no opt-in needed). Off deletes the account's Revo history,
+ * memory and cached answers. Turning something on needs the release to open Revo to the account;
+ * turning off (and so deleting) is always the account's to do, even while Revo is paused (REVO-37).
+ */
 export async function handleSetOptions(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoSettings> {
-  const { uid, settings } = await gate(auth, deps, false);
+  if (!auth?.uid) throw new RevoError('unauthenticated', MESSAGES.signIn);
   const b = body(data ?? {}, ['optIn', 'memoryOn']);
   const patch: Partial<RevoSettings> = {};
   for (const k of ['optIn', 'memoryOn'] as const) {
@@ -475,6 +520,8 @@ export async function handleSetOptions(auth: { uid: string } | undefined, data: 
     if (typeof b[k] !== 'boolean') throw new RevoError('invalid-argument', `${k} must be true or false.`);
     patch[k] = b[k] as boolean;
   }
+  const turnsOn = patch.optIn === true || patch.memoryOn === true;
+  const { uid, settings } = turnsOn ? await gate(auth, deps, false) : { uid: auth.uid, settings: await deps.store.getSettings(auth.uid) };
   if (Object.keys(patch).length === 0) return settings;
   const next = await deps.store.setSettings(uid, patch);
   if (patch.optIn === false) {
@@ -485,9 +532,10 @@ export async function handleSetOptions(auth: { uid: string } | undefined, data: 
   return next;
 }
 
-/** Deletes every memory item, or every chat with its messages (and the cached answers). */
+/** Deletes every memory item, or every chat with its messages (and the cached answers): always the account's to do (REVO-37). */
 export async function handleClear(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<{ deleted: number }> {
-  const { uid } = await gate(auth, deps, true);
+  if (!auth?.uid) throw new RevoError('unauthenticated', MESSAGES.signIn);
+  const uid = auth.uid;
   const what = body(data, ['what']).what;
   if (what !== 'memory' && what !== 'history') throw new RevoError('invalid-argument', 'what must be memory or history.');
   const deleted = what === 'memory' ? await deps.store.deleteMemory(uid) : await deps.store.deleteHistory(uid);
