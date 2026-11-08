@@ -250,6 +250,9 @@ function pageFields(p: UserPage): PageFields {
     weaknessRating: p.weaknessRating as WeaknessRating,
     totalRevisionCount: p.totalRevisionCount,
     skipCount: p.skipCount,
+    // A partly memorized page's ayahs (MEM-1). Every other page has none, so a page that never had
+    // any is never written with them, and one that completes has them cleared.
+    verses: p.status === 'in_progress' && p.verses && p.verses.length > 0 ? p.verses : null,
   };
 }
 

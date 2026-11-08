@@ -64,6 +64,7 @@ import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
 import { isDeadlineError, withTimeLimit } from '../lib/timeLimit';
 import { memorizedMinutesAfter } from '../lib/activityAdd';
+import { ayahsOfPages, pageOfAyah, sortedAyahs } from '../lib/ayahKeys';
 
 // ============================================================================
 // REFERENCE HELPERS
@@ -843,7 +844,7 @@ export async function getActivityItemsForDay(
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
   /** `updatedAt`: when the item last took minutes from an add (ms), so the same add is never counted twice. */
-  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null }[];
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null; verses?: number[] }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Pages revised in an earlier session, credited to this day ("done ahead"). */
   doneAhead: { fromDay: string; pages: number[] }[];
@@ -874,6 +875,8 @@ export async function getActivityItemsForDay(
       pages: d.data().pages ?? [],
       minutes: d.data().minutes ?? null,
       updatedAt: typeof d.data().updatedAt === 'number' ? d.data().updatedAt : null,
+      // Added by the ayah: its ayahs (MEM-2).
+      ...(Array.isArray(d.data().verses) ? { verses: d.data().verses as number[] } : {}),
     })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
     doneAhead: ahead.docs
@@ -886,14 +889,28 @@ export async function getActivityItemsForDay(
  * Pages memorized on `day` (the memorization manager, Today): merged into that day's item, so
  * saving the same pages again changes nothing (ids come from the day).
  */
-export async function addMemorizationPages(day: string, pages: number[], at: number, userId: string, minutes: number | null = null): Promise<void> {
+export async function addMemorizationPages(
+  day: string,
+  pages: number[],
+  at: number,
+  userId: string,
+  minutes: number | null = null,
+  /** Added by the ayah (MEM-1): the ayahs, merged into the item's. */
+  verses?: number[],
+): Promise<void> {
   const ref = doc(collection(db, 'users', userId, 'memorizations'), day);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
-    const prev = snap.exists() ? (snap.data() as { pages?: number[]; occurredAt?: number; minutes?: number | null; updatedAt?: unknown }) : null;
+    const prev = snap.exists()
+      ? (snap.data() as { pages?: number[]; occurredAt?: number; minutes?: number | null; updatedAt?: unknown; verses?: number[] })
+      : null;
     const merged = [...new Set([...(prev?.pages ?? []), ...pages])].sort((a, b) => a - b);
     // The add sheet's minutes join the day's once (ACT-5): a change sent again adds nothing.
     const timed = memorizedMinutesAfter(prev, { minutes, at });
+    // An item keeps every ayah it was given by the ayah; whole pages added beside them bring their
+    // own, so the item counts by its ayahs alone (lib/memorizedAyahs memorizedItemShare).
+    const byAyah = (verses && verses.length > 0) || (prev?.verses && prev.verses.length > 0);
+    const ayahs = byAyah ? sortedAyahs([...(prev?.verses ?? []), ...(verses ?? []), ...(verses && verses.length > 0 ? [] : ayahsOfPages(pages))]) : null;
     tx.set(ref, {
       id: day,
       uid: userId,
@@ -904,21 +921,27 @@ export async function addMemorizationPages(day: string, pages: number[], at: num
       minutes: timed.minutes,
       updatedAt: timed.updatedAt,
       recordings: [],
+      ...(ayahs ? { verses: ayahs } : {}),
     });
   });
 }
 
 /** Pages un-memorized: removed from every item that holds them; an item left empty is removed. */
-export async function removeMemorizationPages(pages: number[], userId: string): Promise<void> {
+export async function removeMemorizationPages(pages: number[], userId: string, verses?: number[]): Promise<void> {
   const drop = new Set(pages);
+  const dropAyahs = new Set(verses ?? []);
   const snap = await getDocs(collection(db, 'users', userId, 'memorizations'));
   await Promise.all(
     snap.docs.map(async (d) => {
       const current: number[] = d.data().pages ?? [];
+      const ayahs: number[] | undefined = Array.isArray(d.data().verses) ? d.data().verses : undefined;
       const rest = current.filter((p) => !drop.has(p));
-      if (rest.length === current.length) return;
-      if (rest.length === 0) await deleteDoc(d.ref);
-      else await updateDoc(d.ref, { pages: rest });
+      // Ayahs taken off go from an item's ayahs (MEM-3), and with them those of pages un-memorized.
+      const restAyahs = ayahs?.filter((k) => !dropAyahs.has(k) && !drop.has(pageOfAyah(k)));
+      const ayahsChanged = ayahs != null && restAyahs != null && restAyahs.length !== ayahs.length;
+      if (rest.length === current.length && !ayahsChanged) return;
+      if (rest.length === 0 || (ayahs != null && restAyahs != null && restAyahs.length === 0)) await deleteDoc(d.ref);
+      else await updateDoc(d.ref, { pages: rest, ...(ayahsChanged ? { verses: restAyahs } : {}) });
     }),
   );
 }
