@@ -1,6 +1,6 @@
 // The pieces of Activity's add sheets (mocks d5–d8), as the mocks draw them: a section label, the
-// segmented What, a page range, the minutes field, a suggestion from the day, the strength choice, a
-// tag chip and the closing info line. Each sheet (Revised, Memorized, Note) puts its own together.
+// segmented What, a page range, the minutes field, a suggestion from the day, a tag chip and the
+// closing info line. Each sheet (Memorized, Note, Revised elsewhere) puts its own together.
 
 import React from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -200,80 +200,6 @@ export function Suggestion({
   );
 }
 
-/** A suggestion as one line ("From your session: the 2 pages it skipped", then Use or Undo). */
-export function SuggestionLine({
-  label,
-  text,
-  action,
-  onPress,
-  accessibilityLabel,
-  testID,
-}: {
-  label: string;
-  text: string;
-  action: string;
-  onPress: () => void;
-  accessibilityLabel: string;
-  testID?: string;
-}) {
-  const { palette } = useTheme();
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={[styles.suggestionLine, { backgroundColor: palette.accentSubtle }]}
-      testID={testID}
-    >
-      <Ionicons name="sparkles" size={16} color={palette.subtleText} />
-      <Text style={[typeV2.meta, styles.flex, { color: palette.subtleText }]} maxFontSizeMultiplier={MAX_SCALE}>
-        <Text style={styles.bold}>{label}</Text> {text}
-      </Text>
-      <Text style={[typeV2.meta, styles.strong, { color: palette.subtleText }]} maxFontSizeMultiplier={MAX_SCALE}>
-        {action}
-      </Text>
-    </Tap>
-  );
-}
-
-export type Strength = 'weak' | 'moderate' | 'strong';
-
-/** Weak, Moderate, Strong: outline pills with their dot; the chosen one in ink. */
-export function StrengthChoice({ value, onChange }: { value: Strength | null; onChange: (v: Strength | null) => void }) {
-  const { palette } = useTheme();
-  const options: { key: Strength; label: string; dot: string }[] = [
-    { key: 'weak', label: 'Weak', dot: palette.red },
-    { key: 'moderate', label: 'Moderate', dot: palette.secondary },
-    { key: 'strong', label: 'Strong', dot: palette.good },
-  ];
-  return (
-    <View style={styles.choices}>
-      {options.map((o) => {
-        const on = value === o.key;
-        return (
-          <Tap
-            key={o.key}
-            testID={`add-revised-strength-${o.key}`}
-            onPress={() => {
-              Keyboard.dismiss();
-              onChange(on ? null : o.key);
-            }}
-            accessibilityRole="button"
-            accessibilityState={{ selected: on }}
-            accessibilityLabel={o.label}
-            style={[styles.choice, on ? { backgroundColor: palette.text } : { borderWidth: 1, borderColor: palette.outline }]}
-          >
-            <View style={[styles.choiceDot, { backgroundColor: o.dot }]} />
-            <Text style={[typeV2.name, { color: on ? palette.bg : palette.text }]} maxFontSizeMultiplier={MAX_SCALE}>
-              {o.label}
-            </Text>
-          </Tap>
-        );
-      })}
-    </View>
-  );
-}
-
 /** A note's "Show under" choice: the block's icon and name, in ink when chosen. */
 export function TagChip({
   kind,
@@ -323,7 +249,6 @@ export function InfoLine({ text, testID }: { text: string; testID?: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   strong: { fontWeight: '600' },
-  bold: { fontWeight: '700' },
   label: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 8, marginHorizontal: 2 },
   labelText: { fontWeight: '600' },
   segment: { flexDirection: 'row', padding: 2, borderRadius: 11 },
@@ -336,10 +261,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, padding: 0, fontSize: 16, fontVariant: ['tabular-nums'] },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 14, paddingRight: 12, borderRadius: 16 },
   suggestionPill: { height: 32, paddingHorizontal: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  suggestionLine: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14 },
-  choices: { flexDirection: 'row', gap: 8 },
-  choice: { flex: 1, height: 38, borderRadius: 19, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  choiceDot: { width: 7, height: 7, borderRadius: 3.5 },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: 14 },
   info: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 18 },
   infoIcon: { marginTop: 1 },

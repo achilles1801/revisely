@@ -84,9 +84,12 @@ export function buildDayView(
 ): DayView {
   const own = input.revisions.filter((r) => r.day === day && r.countsFor === day);
   const credits = input.revisions.filter((r) => r.day === day && r.countsFor !== day && r.pages.length > 0);
-  const revised = own.flatMap((r) => r.pages);
-  const assigned = own.flatMap((r) => r.assigned);
-  const skipped = own.flatMap((r) => r.skipped);
+  // A page counts once, whichever items hold it (the session's and those added by hand): pages added
+  // twice read "22 of 20" (Nov 2026).
+  const unique = (pages: number[]) => [...new Set(pages)];
+  const revised = unique(own.flatMap((r) => r.pages));
+  const assigned = unique(own.flatMap((r) => r.assigned));
+  const skipped = unique(own.flatMap((r) => r.skipped));
   const revisedBlock: RevisedBlock = {
     kind: 'revised',
     revised,

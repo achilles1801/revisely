@@ -8,6 +8,7 @@ import { catchUpPagesOf } from './aheadCredit';
 import { revisionItemId } from './revisionItems';
 import { dateToLocalISODay } from './schedulePlans';
 import type { HistoryItem } from './streakFromItems';
+import type { OutboxEntry } from './offline/ops';
 
 export const HISTORY_DAYS = 400;
 
@@ -119,4 +120,46 @@ export function useSharedActivityHistory(uid: string | null | undefined, day: st
     () => shared,
   );
   return current && uid && current.uid === uid && current.day === day ? current.items : null;
+}
+
+/** Whether a history item is pages logged by hand (Activity's + → Revised elsewhere). */
+export const isHandLogged = (x: HistoryItem): boolean => x.id?.startsWith('manual-') === true;
+
+/**
+ * Pages logged by hand, one log per day they count for, for what reads session logs: Home's today
+ * (N of total, Done) and its catch-up offer (ACT-15). A page counts once a day, whatever logged it.
+ * No assignment: a day keeps its session's or the plan's.
+ */
+export function handLogsOf(history: readonly HistoryItem[] | null | undefined): RevisionLog[] {
+  const byDay = new Map<string, Set<number>>();
+  for (const x of history ?? []) {
+    if (!isHandLogged(x)) continue;
+    const set = byDay.get(x.countsFor) ?? new Set<number>();
+    for (const p of x.pages) set.add(p);
+    byDay.set(x.countsFor, set);
+  }
+  return [...byDay].map(([day, pages]) => ({
+    id: `hand-${day}`,
+    date: day,
+    pagesRevised: [...pages].sort((a, b) => a - b),
+    pagesSkipped: [],
+    weaknessUpdates: [],
+    durationMinutes: null,
+  }));
+}
+
+/** The history with pages logged by hand that are still waiting on the phone (or deleted there) laid over it. */
+export function withPendingHandLogs(history: readonly HistoryItem[] | null, entries: readonly OutboxEntry[]): HistoryItem[] | null {
+  if (!history) return null;
+  let out = [...history];
+  for (const e of entries) {
+    const op = e.op;
+    if (op.kind === 'revision.add') {
+      const { id, day, countsFor, pages, assigned, occurredAt } = op.item;
+      if (!out.some((x) => x.id === id)) out = [...out, { id, day, countsFor, pages, assigned, occurredAt }];
+    } else if (op.kind === 'revision.delete') {
+      out = out.filter((x) => x.id !== op.id);
+    }
+  }
+  return out;
 }
