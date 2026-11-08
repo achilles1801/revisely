@@ -39,3 +39,30 @@ export function weekTitle(start: string): string {
 }
 
 export { weekStart };
+
+/** Where the calendar stands: the month shown and the week shown (each kept while the other span shows). */
+export interface CalendarPeriod {
+  month: string;
+  week: string;
+}
+
+/**
+ * The period to show after switching to `next`, so the switch keeps you where you were: the picked day
+ * when it is on screen, else today when it is, else the middle of what was shown (a week's Wednesday,
+ * whose month holds most of it; a month's first day).
+ */
+export function periodForSpan(
+  next: CalendarSpan,
+  { span, month, week, picked, today }: CalendarPeriod & { span: CalendarSpan; picked: string | null; today: string },
+): CalendarPeriod {
+  if (next === span) return { month, week };
+  const shown = span === 'week' ? weekDays(week) : null;
+  const onScreen = (d: string | null): d is string => d != null && (shown ? shown.includes(d) : d.startsWith(`${month}-`));
+  const anchor = onScreen(picked) ? picked : onScreen(today) ? today : shown ? shown[3] : `${month}-01`;
+  return next === 'week' ? { month, week: weekStart(anchor) } : { month: anchor.slice(0, 7), week };
+}
+
+/** Whether the calendar shows today's month (or week): when it doesn't, Today brings it back. */
+export function showsToday(span: CalendarSpan, { month, week }: CalendarPeriod, today: string): boolean {
+  return span === 'week' ? week === weekStart(today) : month === today.slice(0, 7);
+}

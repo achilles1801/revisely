@@ -315,6 +315,12 @@ How the tests are made: `tests/scenarios/README.md`.
   launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
   no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
   pages were re-derived from sessions alone.)
+- **ACT-18.** Activity has two tabs, Overview and Insights. Overview's calendar shows a month or a week:
+  a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
+  the picked day (or else today) on screen. When the calendar shows another month or week than today's,
+  Today, beside the arrows, brings back today's with today picked. The picked day's whole preview opens
+  that day: its date, Open and each of its rows. (Majd, Nov 8 2026: Week and Month as a second row of
+  pills was "a whole tab just to show weeks instead of month"; Open alone was easy to miss.)
 
 ## Ask coach
 

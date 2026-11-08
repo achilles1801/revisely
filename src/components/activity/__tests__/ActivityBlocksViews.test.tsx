@@ -1,8 +1,9 @@
 // The Activity calendar (gap audit §3) and Insights (§5): the Overview | Insights tabs, the month with its totals and
-// stepping, and the Week | Month toggle (kept: Majd, Nov 2026).
+// stepping, and Week | Month as a chip beside the title (Majd, Nov 8 2026: not a second row of tabs; ACT-18).
 import React from 'react';
-import { Dimensions, Text } from 'react-native';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Dimensions, Modal, Text } from 'react-native';
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityBlocksViews } from '../ActivityBlocksViews';
 import { plainText } from '../../../lib/passages';
 
@@ -37,6 +38,15 @@ jest.mock('../useActivityReload', () => {
 });
 jest.mock('../DayParts', () => ({ ProgressRing: () => null }));
 
+const METRICS = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };
+// The calendar holds a sheet (Week | Month), which reads the safe area.
+const render = (ui: React.ReactElement) => rtlRender(<SafeAreaProvider initialMetrics={METRICS}>{ui}</SafeAreaProvider>);
+// An ActionSheet's action runs once it has gone (iOS: the Modal's onDismiss).
+const closeSheets = () =>
+  act(() => {
+    screen.UNSAFE_getAllByType(Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
+  });
+
 const TODAY = '2026-11-05';
 const props = { today: TODAY, noteDays: new Set<string>(), onOpenDay: jest.fn(), onReviseTomorrow: jest.fn(), onPlanIt: jest.fn(), onOpenPage: jest.fn() };
 
@@ -47,20 +57,39 @@ beforeEach(() => {
 });
 
 describe('the Activity calendar (gap audit §3)', () => {
-  it('shows the Overview and Insights tabs, and the Week | Month toggle (Majd, Nov 2026)', async () => {
+  it('shows the Overview and Insights tabs only; Week | Month is a chip beside the title (Majd, Nov 8 2026)', async () => {
     render(<ActivityBlocksViews {...props} />);
     expect(await screen.findByTestId('calendar-month')).toBeTruthy();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
     expect(screen.getByText('Overview')).toBeTruthy();
     expect(screen.getByText('Insights')).toBeTruthy();
-    expect(screen.getByText('Week')).toBeTruthy();
-    expect(screen.getByText('Month')).toBeTruthy();
+    expect(screen.getByLabelText('Month view')).toBeTruthy();
+    expect(screen.queryByTestId('pill-week')).toBeNull();
   });
 
-  it('Week shows the seven days of the week, each with its summary', async () => {
+  it('Week (from the chip’s menu) shows the seven days of the week, each with its summary', async () => {
+    const storage = jest.requireMock('@react-native-async-storage/async-storage') as { setItem: jest.Mock };
     render(<ActivityBlocksViews {...props} />);
-    fireEvent.press(await screen.findByText('Week'));
+    fireEvent.press(await screen.findByTestId('calendar-span'));
+    expect(await screen.findByText('Show the calendar by')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('sheet-action-week'));
+    closeSheets();
     expect(await screen.findByTestId('calendar-week')).toBeTruthy();
     expect(screen.getAllByText('Nothing logged')).toHaveLength(7);
+    expect(screen.getByLabelText('Week view')).toBeTruthy();
+    expect(screen.getByLabelText('Previous week')).toBeTruthy();
+    expect(storage.setItem).toHaveBeenCalledWith('activity.calendarSpan', 'week');
+  });
+
+  it('Today shows only away from today’s month, and brings it back', async () => {
+    render(<ActivityBlocksViews {...props} />);
+    await screen.findByText('November 2026');
+    expect(screen.queryByLabelText('Today')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Next month'));
+    expect(await screen.findByText('December 2026')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Today'));
+    expect(await screen.findByText('November 2026')).toBeTruthy();
+    expect(screen.queryByLabelText('Today')).toBeNull();
   });
 
   it('shows the month’s title and its four totals', async () => {
@@ -91,11 +120,12 @@ describe('the Activity calendar (gap audit §3)', () => {
   // other (iOS, Nov 2026): the date gives way, the preview's chrome stops at 1.4×, rows may grow.
   it('the picked day’s preview keeps Open on screen at the largest text', async () => {
     render(<ActivityBlocksViews {...props} />);
-    const open = await screen.findByLabelText('Open the day');
+    await screen.findByLabelText('Open the day');
     expect(screen.getByText('Open').props.maxFontSizeMultiplier).toBe(1.4);
-    const head = open.parent?.parent as { props: { style: unknown } } | undefined;
     const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
-    expect(flat(head?.props.style).height).toBeUndefined();
+    const head = screen.getByTestId('preview-open');
+    expect(flat(head.props.style).height).toBeUndefined();
+    expect(flat(head.props.style).minHeight).toBeGreaterThan(0);
     const date = screen.getByTestId('preview-date');
     expect(date.props.maxFontSizeMultiplier).toBe(1.4);
     expect(flat(date.props.style).flexShrink).toBe(1);
@@ -129,11 +159,22 @@ describe('the Activity calendar (gap audit §3)', () => {
       atScale(3.1);
       render(<ActivityBlocksViews {...props} />);
       await screen.findByText('November 2026');
-      for (const id of ['pill-calendar', 'pill-insights', 'pill-week', 'pill-month']) {
+      for (const id of ['pill-calendar', 'pill-insights', 'calendar-span']) {
         const style = flat(screen.getByTestId(id).props.style);
         expect(style.height).toBeUndefined();
         expect(style.minHeight).toBeGreaterThan(0);
       }
+    });
+
+    it('Today and the arrows take a line of their own; at the default size the header is one line', async () => {
+      atScale(3.1);
+      const big = render(<ActivityBlocksViews {...props} />);
+      expect(flat((await screen.findByTestId('calendar-head')).props.style).flexWrap).toBe('wrap');
+      big.unmount();
+      dims.mockRestore();
+      atScale(1);
+      render(<ActivityBlocksViews {...props} />);
+      expect(flat((await screen.findByTestId('calendar-head')).props.style).flexWrap).toBeUndefined();
     });
 
     it('the title gives way to the chevrons and shrinks to fit', async () => {
@@ -142,7 +183,7 @@ describe('the Activity calendar (gap audit §3)', () => {
       const title = await screen.findByTestId('calendar-month-title');
       expect(title.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
       expect(flat(title.props.style).flexShrink).toBe(1);
-      expect(flat((title.parent?.parent as { props: { style: unknown } }).props.style).height).toBeUndefined();
+      expect(flat(screen.getByTestId('calendar-head').props.style).height).toBeUndefined();
     });
 
     it('the totals go two by two, their values on one line, shrinking to fit', async () => {

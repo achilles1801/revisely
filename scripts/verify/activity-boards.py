@@ -36,6 +36,7 @@ VERIFY = os.path.expanduser("~/Documents/revisely-today-mocks/activity-redesign/
 # (pt down the mock) for one scrolled to an element in the middle.
 MOCK_FOR = {
     "09-overview-month": ("d3-calendar", None),
+    "09-overview-span-menu": (None, None),  # Week | Month as a chip (ACT-18, Nov 8 2026): no mock
     "09-overview-week": (None, None),  # the mocks show the month only
     "09-day": ("d1-day-full", "top"),
     "09-day-end": ("d1-day-full", "bottom"),
