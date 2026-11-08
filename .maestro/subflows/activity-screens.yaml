@@ -1,8 +1,9 @@
 # The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month (with
 # Today, since October isn't today's month), its Week | Month menu and the week; a day, a page of its
-# strip in the reader, the day's block menus (Revised, d10a; Memorized, whose Edit opens the memorized
-# pages), the + (d5), its Revised, Memorized and Note sheets (d6–d8), the day's end, a light day (d2),
-# and Insights (d4: top, Weak spots, the end). Each is a screenshot named 09-<screen>-${THEME}.
+# strip in the reader, its juz (from the Revised header), the day's block menus (Revised, d10a;
+# Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
+# (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
+# from the untouched row, i5 and i6; Weak spots; the end). Each is a screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -111,6 +112,24 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: activity-day-v2
+    timeout: 10000
+# The Revised block's header opens its juz (ACT-21): Juz 28. The seed has Smart Tracking on, so it shows
+# strength, as mock i5 does.
+- tapOn:
+    id: activity-block-revised-header
+- extendedWaitUntil:
+    visible:
+      id: juz-sheet-strip
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-juz-day-${THEME}
+- tapOn: "Close"
+- extendedWaitUntil:
+    notVisible:
+      id: juz-sheet-strip
     timeout: 10000
 # The Revised block's menu (d10a): a hold on its header.
 - longPressOn:
@@ -286,6 +305,39 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-${THEME}
+# A Coverage tile opens its juz (mock i5), and the untouched row the stale one (i6), ACT-21.
+- tapOn:
+    id: juz-tile-28
+- extendedWaitUntil:
+    visible:
+      id: juz-sheet-strip
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-juz-sheet-${THEME}
+- tapOn: "Close"
+- extendedWaitUntil:
+    notVisible:
+      id: juz-sheet-strip
+    timeout: 10000
+- tapOn:
+    id: insights-untouched
+- extendedWaitUntil:
+    visible:
+      id: juz-sheet-plan-it
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-juz-stale-${THEME}
+- tapOn: "Close"
+- extendedWaitUntil:
+    notVisible:
+      id: juz-sheet-strip
+    timeout: 10000
 # Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
 - scrollUntilVisible:
     element:

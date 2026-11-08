@@ -32,6 +32,7 @@ import {
 import { getPagesForJuz } from '../../lib/quranData';
 import { openRevo } from '../../lib/revo/open';
 import { spokenText } from '../../lib/passages';
+import { JuzSheet } from './JuzSheet';
 
 type Window = '7' | '30';
 
@@ -71,9 +72,16 @@ export function InsightsView({
   /** Smart Tracking off: the line in Weak spots' place, to Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
 }) {
+  // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
+  const [juz, setJuz] = useState<number | null>(null);
+  const [juzUsed, setJuzUsed] = useState(false);
+  const openJuz = (n: number) => {
+    setJuzUsed(true);
+    setJuz(n);
+  };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} />
+      <Coverage data={data} onPlanIt={onPlanIt} onOpenJuz={openJuz} />
       <Consistency data={data} />
       {data.smartTracking !== false ? (
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
@@ -82,6 +90,9 @@ export function InsightsView({
       ) : null}
       <Memorization data={data} />
       <Pace data={data} />
+      {juzUsed ? (
+        <JuzSheet juz={juz} onClose={() => setJuz(null)} today={data.today} revised={data.revised} onOpenPage={onOpenPage} onPlanIt={onPlanIt} />
+      ) : null}
     </View>
   );
 }
@@ -132,7 +143,7 @@ function Figure({ value, text, right }: { value: string; text: string; right?: R
 
 // ── Coverage ─────────────────────────────────────────────────────────────
 
-function Coverage({ data, onPlanIt }: { data: InsightsData; onPlanIt: (pages: number[]) => void }) {
+function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt: (pages: number[]) => void; onOpenJuz: (juz: number) => void }) {
   const { palette } = useTheme();
   const [window, setWindow] = useState<Window>('30');
   const last = useMemo(() => lastRevisedByPage(data.revised, data.today), [data.revised, data.today]);
@@ -156,17 +167,20 @@ function Coverage({ data, onPlanIt }: { data: InsightsData; onPlanIt: (pages: nu
         : t.state === 'stale'
           ? `Juz ${t.juz}, ${t.daysSince == null ? 'never revised' : `revised ${t.daysSince} days ago`}`
           : `Juz ${t.juz}, revised this ${t.state}`;
+    // Each tile opens its juz (ACT-21).
     return (
-      <View
+      <Tap
         key={t.juz}
+        onPress={() => onOpenJuz(t.juz)}
         style={[styles.tile, look.backgroundColor ? { backgroundColor: look.backgroundColor } : null, look.borderWidth ? { borderWidth: look.borderWidth, borderColor: look.borderColor } : null]}
-        accessible
+        accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityHint={`Opens Juz ${t.juz}`}
         testID={`juz-tile-${t.juz}`}
       >
         <Text style={[styles.tileText, { color: look.color, opacity: 'dim' in look ? 0.7 : 1 }]}>{t.juz}</Text>
         {t.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
-      </View>
+      </Tap>
     );
   };
   const legend: { key: string; label: string; swatch: object }[] = [
@@ -216,7 +230,15 @@ function Coverage({ data, onPlanIt }: { data: InsightsData; onPlanIt: (pages: nu
         ))}
       </View>
       {untouched ? (
-        <View style={[styles.untouched, { backgroundColor: palette.bubble }]} testID="insights-untouched">
+        <View style={[styles.untouched, { backgroundColor: palette.bubble }]}>
+          {/* The row opens its juz (ACT-21); Plan it stays its own button. */}
+          <Tap
+            onPress={() => onOpenJuz(untouched.first.juz)}
+            accessibilityRole="button"
+            accessibilityHint={`Opens Juz ${untouched.first.juz}`}
+            style={styles.untouchedMain}
+            testID="insights-untouched"
+          >
           <View style={[styles.dot8, { backgroundColor: palette.red }]} />
           <View style={styles.flex}>
             <Text style={[typeV2.name, { color: palette.text }]}>{`Juz ${untouched.first.juz}, untouched the longest`}</Text>
@@ -229,6 +251,7 @@ function Coverage({ data, onPlanIt }: { data: InsightsData; onPlanIt: (pages: nu
                 .join(' · ')}
             </Text>
           </View>
+          </Tap>
           <Tap
             onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
             accessibilityRole="button"
@@ -516,6 +539,7 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   swatch: { width: 10, height: 10, borderRadius: 3 },
   untouched: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginTop: 14 },
+  untouchedMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot8: { width: 8, height: 8, borderRadius: 4 },
   circles: { flexDirection: 'row', marginTop: 12 },
   circleCol: { flex: 1, alignItems: 'center' },

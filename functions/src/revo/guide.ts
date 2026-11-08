@@ -289,6 +289,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ACT-18': 'the guide’s words are in Revo’s system prompt, so its lines on the interactive Activity (Week | Month as a chip, Today, the picked day opening the day) come with the next recording of Revo’s replies (functions/scripts/record-anthropic.js)',
   'ACT-19': 'no strength shown without Smart Tracking (ACT-18’s note: with the next recording)',
   'ACT-20': 'the day’s page strip opening the reader (ACT-18’s note: with the next recording)',
+  'ACT-21': 'the juz sheet from a Coverage tile, the untouched row or a day’s Revised block (ACT-18’s note: with the next recording)',
 };
 
 /** The guide as Revo reads it. */
