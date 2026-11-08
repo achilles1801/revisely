@@ -15,6 +15,13 @@ describe('the day’s items with the waiting changes over them (ACT-13)', () => 
     expect(overlayDayItems(empty, [entry('a', { kind: 'revision.add', item })], '2026-11-04', UID)).toBe(empty);
   });
 
+  it('[ACT-14] a hand-added Revised item deleted leaves the day at once', () => {
+    const item = manualRevisionItem({ uid: UID, day: DAY, now: 5, pages: [9, 10], minutes: null });
+    const out = overlayDayItems(empty, [entry('a', { kind: 'revision.add', item }), entry('b', { kind: 'revision.delete', day: DAY, id: item.id })], DAY, UID);
+    expect(out.revisions).toEqual([]);
+    expect(touchesDay({ kind: 'revision.delete', day: DAY, id: item.id }, DAY)).toBe(true);
+  });
+
   it('[ACT-13] pages memorized join the day’s item (pages merged, minutes added)', () => {
     const base: DayItems = { ...empty, memorized: [{ id: DAY, day: DAY, pages: [562], minutes: 25 }] };
     const out = overlayDayItems(base, [entry('a', { kind: 'memorization.mark', day: DAY, pages: [563, 562], at: 9, minutes: 10 })], DAY, UID);

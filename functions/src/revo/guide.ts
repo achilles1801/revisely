@@ -139,7 +139,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Activity and the daily log',
-    covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
+    covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'ACT-14', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
     routes: ['Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'ListenBack'],
     text: lines(
       '- Activity (Home’s pulse icon, or Settings → Activity → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings, recordings, memorized pages and notes.',

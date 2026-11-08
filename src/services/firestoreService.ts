@@ -579,10 +579,18 @@ export async function addRevisionItem(item: RevisionItem, userId?: string): Prom
   await setDoc(doc(collection(db, 'users', uid, 'revisions'), item.id), item);
 }
 
+/** Deletes a Revised item added by hand (the day's Revised block, ACT-7). */
+export async function deleteRevisionItem(id: string, userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  await deleteDoc(doc(collection(db, 'users', uid, 'revisions'), id));
+}
+
 /**
- * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
- * written, and any other item of that day is deleted (an edit that dropped an
- * ahead credit, or a deleted session). Items of other days are not touched.
+ * Makes a day's session items (users/{uid}/revisions) exactly `items`: each is
+ * written, and any other session item of that day is deleted (an edit that
+ * dropped an ahead credit, or a deleted session). Items added by hand
+ * (source 'manual') are the user's own and stay (ACT-14: a session save deleted
+ * them, Nov 2026). Items of other days are not touched.
  */
 export async function replaceRevisionItems(day: string, items: RevisionItem[], userId?: string): Promise<void> {
   const uid = userId || getCurrentUserId();
@@ -591,7 +599,7 @@ export async function replaceRevisionItems(day: string, items: RevisionItem[], u
   const keep = new Set(items.map((i) => i.id));
   const batch = writeBatch(db);
   for (const item of items) batch.set(doc(itemsRef, item.id), item);
-  for (const d of existing.docs) if (!keep.has(d.id)) batch.delete(d.ref);
+  for (const d of existing.docs) if (!keep.has(d.id) && d.data().source !== 'manual') batch.delete(d.ref);
   await batch.commit();
 }
 

@@ -48,3 +48,8 @@ export function manualRevisionItem(input: {
     recordings: [],
   };
 }
+
+/** Whether a Revised item was added by hand (its id, as manualRevisionId makes it). */
+export function isManualRevisionId(id: string): boolean {
+  return id.startsWith('manual-');
+}
