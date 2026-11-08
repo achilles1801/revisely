@@ -201,6 +201,8 @@ def main():
             truth = json.loads((bench / 'items' / f.name).read_text())
             group = tuple(truth[k] for k in keys)
             rows[group].append((truth, res))
+            if len(keys) > 1:
+                rows[(group[0],) + ('all',) * (len(keys) - 1)].append((truth, res))
             rows[('all',) * len(keys)].append((truth, res))
         report[name] = {'/'.join(g): aggregate(r) for g, r in sorted(rows.items())}
         print(f'\n== {name}')
