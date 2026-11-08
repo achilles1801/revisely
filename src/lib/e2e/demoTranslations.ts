@@ -10,6 +10,7 @@
 // the real verse sheet over whatever shows (E2ERoot), as a tester, on a verse and a translation:
 //
 //   revisely://e2e/verse?ref=112:2&t=qe.urdu_junagarhi   (t optional: Saheeh International)
+//   …&theme=dark   (or light: the theme it opens in, kept as ThemeContext keeps it)
 //   revisely://e2e/verse?close=1
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -58,6 +59,7 @@ export interface E2EVerse {
   sura: number;
   ayah: number;
   translationId?: string;
+  theme?: 'light' | 'dark';
 }
 
 let current: E2EVerse | null = null;
@@ -98,7 +100,20 @@ export function handleVerseLink(url: string): boolean {
   const { pageOfVerse } = require('../verses') as typeof import('../verses');
   const sura = Number(ref[1]);
   const ayah = Number(ref[2]);
-  setVerse({ page: pageOfVerse({ sura, ayah }), sura, ayah, translationId: params.get('t') || undefined });
+  const asked = params.get('theme');
+  const theme = asked === 'dark' || asked === 'light' ? asked : undefined;
+  const open = () =>
+    setVerse({ page: pageOfVerse({ sura, ayah }), sura, ayah, translationId: params.get('t') || undefined, theme });
+  if (!theme) {
+    open();
+    return true;
+  }
+  // Saved where ThemeContext reads it; the overlay's providers start again in it (E2ERoot).
+  const AsyncStorage = (require('@react-native-async-storage/async-storage') as typeof import('@react-native-async-storage/async-storage')).default;
+  const { THEME_KEY } = require('./theme') as typeof import('./theme');
+  AsyncStorage.setItem(THEME_KEY, theme)
+    .catch(() => undefined)
+    .then(open);
   // eslint-disable-next-line no-console
   console.log(`[e2e] verse ${sura}:${ayah} ${params.get('t') ?? ''}`);
   return true;

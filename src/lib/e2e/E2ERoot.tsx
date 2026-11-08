@@ -89,13 +89,19 @@ function VerseOverlay() {
     // Over the whole window, so the provider measures the window's insets: laid out after the app, it
     // had no height and gave a top inset of 0, and the expanded sheet ran up under iOS's status bar
     // (only here; the reader's sheet has the app's provider, at the root).
-    <SafeAreaProvider initialMetrics={initialWindowMetrics} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <SafeAreaProvider
+      key={verse.theme ?? 'as-saved'}
+      initialMetrics={initialWindowMetrics}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="box-none"
+    >
       <DesignProvider>
         <ThemeProvider>
           <VerseSheet
             verse={verse}
             translationId={translationId}
             tester
+            accountId="e2e-verse"
             onChangeTranslation={setTranslationId}
             reciter={undefined}
             onChangeReciter={() => undefined}

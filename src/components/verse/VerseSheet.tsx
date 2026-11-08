@@ -59,6 +59,8 @@ interface VerseSheetProps {
   onChangeTranslation: (id: string) => void;
   /** A previewTester account: the picker offers every translation (lib/translation offeredTranslations). */
   tester?: boolean;
+  /** The account: the picker's favorites are kept on the phone for each. */
+  accountId?: string;
   /** Reciter and style for Play ('<reciter>:<style>'). */
   reciter: string | undefined;
   onChangeReciter: (choice: string) => void;
@@ -139,6 +141,7 @@ export function VerseSheet({
   translationId,
   onChangeTranslation,
   tester = false,
+  accountId,
   reciter,
   onChangeReciter,
   onNavigate,
@@ -434,6 +437,7 @@ export function VerseSheet({
                   <TranslationPicker
                     translations={offeredTranslations(tester)}
                     chosenId={translation.id}
+                    accountId={accountId}
                     onChoose={(id) => {
                       onChangeTranslation(id);
                       setMenu('closed');

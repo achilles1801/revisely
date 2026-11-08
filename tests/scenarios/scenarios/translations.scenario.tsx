@@ -27,6 +27,8 @@ import { ThemeProvider } from '../../../src/context/ThemeContext';
 import { DesignProvider } from '../../../src/design/DesignContext';
 import { __resetQuranEncForTests, quranEncStore } from '../../../src/lib/quranenc';
 import { __resetDownloadsForTests } from '../../../src/lib/translationDownloads';
+import { __resetFavoritesForTests } from '../../../src/lib/translationFavorites';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pageOfVerse } from '../../../src/lib/verses';
 import { __resetNetworkStateForTests, setNetworkState } from '../../../src/lib/networkState';
 import NetInfo from '@react-native-community/netinfo';
@@ -74,7 +76,12 @@ async function until(check: () => boolean, what: string): Promise<void> {
 }
 
 /** The verse sheet on a verse (Al-Ikhlas 2), as the reader opens it, its translation chosen by the user. */
-function openSheet(initial: string, tester: boolean, start: { page: number; sura: number; ayah: number } = VERSE) {
+function openSheet(
+  initial: string,
+  tester: boolean,
+  start: { page: number; sura: number; ayah: number } = VERSE,
+  accountId = 'account-a',
+) {
   const chosen: string[] = [];
   function Reader() {
     const [id, setId] = useState(initial);
@@ -86,6 +93,7 @@ function openSheet(initial: string, tester: boolean, start: { page: number; sura
             verse={verse}
             translationId={id}
             tester={tester}
+            accountId={accountId}
             onChangeTranslation={(next: string) => {
               chosen.push(next);
               setId(next);
@@ -99,8 +107,8 @@ function openSheet(initial: string, tester: boolean, start: { page: number; sura
       </ThemeProvider>
     );
   }
-  render(<Reader />);
-  return { chosen };
+  const view = render(<Reader />);
+  return { chosen, unmount: view.unmount };
 }
 
 const shown = () => screen.queryByTestId('verse-translation');
@@ -115,6 +123,7 @@ beforeEach(() => {
   // A new phone: nothing of the last one's translations in memory either.
   __resetQuranEncForTests();
   __resetDownloadsForTests();
+  __resetFavoritesForTests();
   setOnline(true);
   __resetNetworkStateForTests();
   // What the app's MushafOfflineController does with NetInfo: the connection the verse sheet reads.
@@ -252,8 +261,8 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
     fireEvent.press(screen.getByLabelText('More'));
     fireEvent.press(screen.getByLabelText(/^Select translation/));
     expect(screen.getByTestId('translation-picker')).toBeTruthy();
-    // The one in use first, then the languages with their own names.
-    expect(textOf(screen.getByTestId('translation-section-chosen') as never)).toBe('In use');
+    // Selected first, then the languages with their own names.
+    expect(textOf(screen.getByTestId('translation-section-selected') as never)).toBe('Selected');
     expect(textOf(screen.getByTestId('translation-section-am') as never)).toBe('Amharic · ⁨አማርኛ⁩');
     fireEvent.changeText(screen.getByTestId('translation-search'), 'turk');
     expect(textOf(screen.getByTestId('translation-section-tr') as never)).toBe('Turkish · ⁨Türkçe⁩');
@@ -303,11 +312,11 @@ describe('downloading a translation (TRANS-6)', () => {
     expect(quranEncStore('french_rashid')!.surasOnPhone()).toBe(114);
     // Each sura once: Al-Ikhlas came with the verse, the 113 others with the download.
     expect(requestsTo('sura/french_rashid/')).toHaveLength(114);
-    // In use stays first; another search shows it under Downloaded once it isn't in use.
+    // Selected stays first; it shows under Downloaded once another is selected.
     // Chosen again: the picker closes.
     fireEvent.press(screen.getByTestId(`translation-row-${FRENCH}`));
     openPicker('');
-    expect(screen.queryByTestId('translation-section-downloaded')).toBeNull(); // in use, not listed twice
+    expect(screen.queryByTestId('translation-section-downloaded')).toBeNull(); // selected, not listed twice
     fireEvent.changeText(screen.getByTestId('translation-search'), 'saheeh');
     fireEvent.press(screen.getByTestId('translation-row-en.sahih'));
     await until(() => shown() != null, 'Saheeh');
@@ -423,6 +432,91 @@ describe('offline, a translation not on the phone (TRANS-7)', () => {
     await until(() => screen.queryByTestId('verse-error') != null, 'the error');
     expect(screen.getByText("This verse isn't downloaded yet. It shows when you're back online.")).toBeTruthy();
     expect(screen.queryByText(/^Show /)).toBeNull();
+  });
+});
+
+describe('favorite translations (TRANS-8)', () => {
+  beforeEach(() => AsyncStorage.clear());
+
+  /** The rows of a group, in order, as the list shows them. */
+  function rowsOf(section: string): string[] {
+    const all = screen.getAllByTestId(/^translation-(section|row)-/).map((n) => n.props.testID as string);
+    const start = all.indexOf(`translation-section-${section}`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const out: string[] = [];
+    for (const id of all.slice(start + 1)) {
+      if (id.startsWith('translation-section-')) break;
+      if (!out.includes(id)) out.push(id.replace('translation-row-', ''));
+    }
+    return out;
+  }
+  async function star(search: string, id: string): Promise<void> {
+    fireEvent.changeText(screen.getByTestId('translation-search'), search);
+    fireEvent.press(screen.getByTestId(`translation-star-${id}`));
+    await until(() => screen.queryByTestId(`translation-star-${id}`)?.props.accessibilityState?.selected === true, `${id} starred`);
+  }
+
+  it('[TRANS-8] starred, they are listed under Selected in the order starred, and kept for that account', async () => {
+    const first = openSheet(URDU, true);
+    await until(() => shown() != null, 'the translation');
+    openPicker('');
+    await star('rashid', FRENCH);
+    await star('shaban', 'qe.turkish_shaban');
+    fireEvent.changeText(screen.getByTestId('translation-search'), '');
+    expect(rowsOf('selected')).toEqual([URDU]);
+    expect(rowsOf('favorites')).toEqual([FRENCH, 'qe.turkish_shaban']);
+    first.unmount();
+
+    // A later launch, the same account: still there. Another account on this phone: none.
+    __resetFavoritesForTests();
+    const again = openSheet(URDU, true);
+    await until(() => shown() != null, 'the translation');
+    openPicker('');
+    await until(() => screen.queryByTestId('translation-section-favorites') != null, 'the favorites');
+    expect(rowsOf('favorites')).toEqual([FRENCH, 'qe.turkish_shaban']);
+    again.unmount();
+    openSheet(URDU, true, VERSE, 'account-b');
+    await until(() => shown() != null, 'the translation');
+    openPicker('');
+    await settle();
+    expect(screen.queryByTestId('translation-section-favorites')).toBeNull();
+  });
+
+  it('[TRANS-8] Edit moves a favorite up, takes a star away, and deletes a download after asking', async () => {
+    serveWhole('hindi_omari');
+    openSheet(URDU, true);
+    await until(() => shown() != null, 'the translation');
+    openPicker('omari');
+    fireEvent.press(screen.getByTestId('translation-download-qe.hindi_omari'));
+    await until(() => (screen.queryByTestId('translation-status-qe.hindi_omari') ? status('qe.hindi_omari').startsWith('On this phone') : false), 'the download');
+    await star('rashid', FRENCH);
+    await star('shaban', 'qe.turkish_shaban');
+    fireEvent.changeText(screen.getByTestId('translation-search'), '');
+
+    fireEvent.press(screen.getByTestId('translation-edit'));
+    expect(rowsOf('favorites')).toEqual([FRENCH, 'qe.turkish_shaban']);
+    expect(rowsOf('downloaded')).toEqual(['qe.hindi_omari']);
+    // Only what can be edited: no language groups, no star or download buttons.
+    expect(screen.queryByTestId('translation-section-tr')).toBeNull();
+    expect(screen.queryByTestId(`translation-star-${FRENCH}`)).toBeNull();
+    expect(screen.getByTestId(`translation-up-${FRENCH}`).props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(screen.getByTestId('translation-up-qe.turkish_shaban'));
+    await until(() => rowsOf('favorites')[0] === 'qe.turkish_shaban', 'the move');
+    fireEvent.press(screen.getByTestId(`translation-unstar-${FRENCH}`));
+    await until(() => rowsOf('favorites').length === 1, 'the star taken away');
+
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    fireEvent.press(screen.getByTestId('translation-remove-qe.hindi_omari'));
+    expect(alert).toHaveBeenCalledWith('Remove Azizul Haq Al-Omari?', expect.any(String), expect.any(Array));
+    alert.mockRestore();
+    await until(() => screen.queryByTestId('translation-section-downloaded') == null, 'the download deleted');
+
+    fireEvent.press(screen.getByTestId('translation-edit'));
+    expect(rowsOf('favorites')).toEqual(['qe.turkish_shaban']);
+    expect(screen.queryByTestId('translation-section-downloaded')).toBeNull();
   });
 });
 

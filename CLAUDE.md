@@ -489,6 +489,9 @@ translations matched to a source, is `~/Documents/revisely-translations/inventor
   sura shown and QuranEnc.com (TRANS-2). Right-to-left languages read right to left (TRANS-3).
 - **Who:** testers get the picker of every translation (`offeredTranslations`, TRANS-5); everyone else
   keeps Saheeh International and The Clear Quran®.
+- **The picker** (Majd's design, Nov 8 2026): Translations and Edit, a search over every group, then
+  Selected, Favorites (starred, in that order; `lib/translationFavorites`, on the phone per account,
+  TRANS-8), Downloaded, and every language. Edit moves or unstars favorites and deletes downloads.
 - **Downloads** (`lib/translationDownloads`, TRANS-6): a picker row shows its size, downloads the whole
   translation on any connection (one tap, a few MB; stoppable, carries on), and the bin removes it.
   Saheeh International stays with the offline mushaf. Offline, a translation not on the phone offers

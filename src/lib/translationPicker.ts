@@ -1,16 +1,16 @@
-// What the translation picker lists: the translation in use first, then the ones downloaded to the
-// phone, then every language (by its English name) with its other translations. A search keeps the
-// translations whose language (in English or its own name), translator or credit has every word
-// typed, accents and case aside.
+// What the translation picker lists: the translation in use (Selected), the favorites in the order
+// starred, the ones downloaded to the phone, then every language (by its English name) with its other
+// translations. A search keeps the translations whose language (in English or its own name),
+// translator or credit has every word typed, accents and case aside.
 
 import { languageName } from './translationLanguages';
 import type { TranslationInfo } from './translation';
 import type { DownloadStatus } from './translationDownloads';
 
 export interface PickerSection {
-  /** "chosen", "downloaded", or the language's code. */
+  /** "selected", "favorites", "downloaded", or the language's code. */
   key: string;
-  /** "In use", "Downloaded", or the language's English name. */
+  /** "Selected", "Favorites", "Downloaded", or the language's English name. */
   title: string;
   /** The language's own name, when it differs from the title. */
   native?: string;
@@ -38,23 +38,48 @@ export function matchesQuery(t: TranslationInfo, query: string): boolean {
   return words.every((w) => hay.includes(w));
 }
 
-export function pickerSections(
-  list: TranslationInfo[],
-  query: string,
-  chosenId: string,
-  downloaded: (t: TranslationInfo) => boolean = () => false,
-): PickerSection[] {
+export interface PickerOptions {
+  /** The translation in use. */
+  chosenId: string;
+  /** Whole on the phone. */
+  downloaded?: (t: TranslationInfo) => boolean;
+  /** Can be removed here (not Saheeh International: it goes with the offline mushaf). */
+  removable?: (t: TranslationInfo) => boolean;
+  /** Favorite ids, in the order starred. */
+  favorites?: string[];
+  /** Edit: only the favorites (to reorder or unstar) and the downloads (to delete). */
+  editing?: boolean;
+}
+
+const byName = (a: TranslationInfo, b: TranslationInfo) => a.name.localeCompare(b.name);
+
+/**
+ * The picker's groups (TRANS-5, TRANS-8): Selected, Favorites in the order starred, Downloaded, then
+ * every language by its English name; each translation once. In Edit, the favorites (the one in use
+ * too) and the downloads that can be deleted. A search filters every group.
+ */
+export function pickerSections(list: TranslationInfo[], query: string, opts: PickerOptions): PickerSection[] {
+  const { chosenId, downloaded = () => false, removable = () => true, favorites = [], editing = false } = opts;
   const shown = list.filter((t) => matchesQuery(t, query));
+  const starred = favorites.map((id) => shown.find((t) => t.id === id)).filter((t): t is TranslationInfo => !!t);
   const sections: PickerSection[] = [];
-  const chosen = shown.find((t) => t.id === chosenId);
-  if (chosen) sections.push({ key: 'chosen', title: 'In use', data: [chosen] });
-  const onPhone = shown.filter((t) => t.id !== chosenId && downloaded(t));
-  if (onPhone.length > 0) {
-    sections.push({ key: 'downloaded', title: 'Downloaded', data: onPhone.sort((a, b) => a.name.localeCompare(b.name)) });
+  if (editing) {
+    if (starred.length > 0) sections.push({ key: 'favorites', title: 'Favorites', data: starred });
+    const onPhone = shown.filter((t) => downloaded(t) && removable(t)).sort(byName);
+    if (onPhone.length > 0) sections.push({ key: 'downloaded', title: 'Downloaded', data: onPhone });
+    return sections;
   }
+  const chosen = shown.find((t) => t.id === chosenId);
+  if (chosen) sections.push({ key: 'selected', title: 'Selected', data: [chosen] });
+  const favs = starred.filter((t) => t.id !== chosenId);
+  if (favs.length > 0) sections.push({ key: 'favorites', title: 'Favorites', data: favs });
+  const listed = new Set([chosenId, ...favs.map((t) => t.id)]);
+  const onPhone = shown.filter((t) => !listed.has(t.id) && downloaded(t)).sort(byName);
+  if (onPhone.length > 0) sections.push({ key: 'downloaded', title: 'Downloaded', data: onPhone });
+  onPhone.forEach((t) => listed.add(t.id));
   const byLanguage = new Map<string, TranslationInfo[]>();
   for (const t of shown) {
-    if (t.id === chosenId || onPhone.includes(t)) continue;
+    if (listed.has(t.id)) continue;
     const group = byLanguage.get(t.languageCode) ?? [];
     group.push(t);
     byLanguage.set(t.languageCode, group);
@@ -66,7 +91,7 @@ export function pickerSections(
       key: code,
       title: lang.name,
       ...(lang.native !== lang.name ? { native: lang.native } : {}),
-      data: byLanguage.get(code)!.sort((a, b) => a.name.localeCompare(b.name)),
+      data: byLanguage.get(code)!.sort(byName),
     });
   }
   return sections;
