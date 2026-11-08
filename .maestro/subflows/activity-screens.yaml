@@ -1,7 +1,8 @@
 # The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month (with
-# Today, since October isn't today's month), its Week | Month menu and the week, a day, the day's block menu, the add sheets and Insights, each a screenshot named
-# 09-<screen>-${THEME}. The day as d1 (top, then scrolled), its menu (d10a), the + (d5), its Revised,
-# Memorized and Note sheets (d6–d8), a light day (d2), and Insights (d4: top, Weak spots, the end).
+# Today, since October isn't today's month), its Week | Month menu and the week; a day, a page of its
+# strip in the reader, the day's block menus (Revised, d10a; Memorized, whose Edit opens the memorized
+# pages), the + (d5), its Revised, Memorized and Note sheets (d6–d8), the day's end, a light day (d2),
+# and Insights (d4: top, Weak spots, the end). Each is a screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
