@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Does Revo still answer with its JSON object, and pick a fitting chart, now that it has six chart
- * kinds? Eight chart-shaped questions, each asked a few times of the real model with this
+ * Does Revo still answer with its JSON object, and pick a fitting chart, now that it has seven chart
+ * kinds? Nine chart-shaped questions, each asked a few times of the real model with this
  * checkout's prompt, against a made-up tester account (no user's data). Counts the replies that are
  * the one JSON object, those wrapped in a fence or words, and those in plain prose (no chart, no
  * action, no chips), and which chart each picks. Exits 1 if any reply isn't the bare JSON object.
@@ -11,7 +11,7 @@
  *     [--times 3] [--out <file.md>] [--dry]
  *
  * The key is read from the environment, sent only to api.anthropic.com, and never written or
- * printed. 24 requests to claude-sonnet-5-5 by default (the system prompt cached after the first):
+ * printed. 27 requests to claude-sonnet-5-5 by default (the system prompt cached after the first):
  * a few cents.
  */
 const fs = require('fs');
@@ -95,6 +95,7 @@ const SAMPLES = [
   { q: 'Which days do I usually miss?', fits: ['weeks'] },
   { q: 'Compare Juz 26, 27 and 28.', fits: ['table'] },
   { q: 'Why do the end of Al-Hashr and the start of Al-Mumtahanah keep slipping?', fits: ['pageRatings', 'timeline'] },
+  { q: 'How much have I memorized this year?', fits: ['memorized'] },
 ];
 
 const request = (q) => buildAskRequest({ day: DAY, question: q, context, attach: null, attached: [], memory: [], history: [] });
@@ -135,7 +136,7 @@ async function ask(q) {
 
 const describe = (c) => {
   if (!c) return 'none';
-  const extra = c.kind === 'dailyPages' ? ` ${c.days}d` : c.kind === 'timeline' ? ` ${c.surah ? `surah ${c.surah}` : `juz ${c.juz}`} ${c.days}d` : c.kind === 'weeks' ? ` ${c.weeks}w` : c.kind === 'table' ? ` ${c.juz ? `juz ${c.juz.join(',')}` : `surahs ${c.surahs.join(',')}`} [${c.columns.join(',')}]` : c.kind === 'pageRatings' ? ` ${c.pages.join(',')}` : '';
+  const extra = c.kind === 'memorized' ? ` ${c.months}m` : c.kind === 'dailyPages' ? ` ${c.days}d` : c.kind === 'timeline' ? ` ${c.surah ? `surah ${c.surah}` : `juz ${c.juz}`} ${c.days}d` : c.kind === 'weeks' ? ` ${c.weeks}w` : c.kind === 'table' ? ` ${c.juz ? `juz ${c.juz.join(',')}` : `surahs ${c.surahs.join(',')}`} [${c.columns.join(',')}]` : c.kind === 'pageRatings' ? ` ${c.pages.join(',')}` : '';
   return `${c.kind}${extra}`;
 };
 

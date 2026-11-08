@@ -6,6 +6,7 @@
  */
 import { screenFromText } from './screenText';
 import {
+  REVO_MEMORIZED_MONTHS,
   REVO_SCREENS,
   REVO_SETTINGS_SECTIONS,
   REVO_TABLE_COLUMNS,
@@ -85,6 +86,10 @@ export function checkNewChart(v: unknown): RevoNewChart | null {
   }
   if (v.kind === 'weeks') return wholeIn(v.weeks, REVO_WEEKS.min, REVO_WEEKS.max) ? { kind: 'weeks', title, weeks: v.weeks } : null;
   if (v.kind === 'table') return checkTable(v, title);
+  if (v.kind === 'memorized') {
+    const months = REVO_MEMORIZED_MONTHS.find((m) => m === v.months);
+    return months ? { kind: 'memorized', title, months } : null;
+  }
   return null;
 }
 

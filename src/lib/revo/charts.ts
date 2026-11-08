@@ -10,9 +10,10 @@ import { reviewedOn } from '../aheadCredit';
 import { formatDayLong, formatMinutesLong } from '../activityFormat';
 import { weekStart } from '../activityHeatmap';
 import { lastRevisedByPage } from '../activityInsights';
-import { juzTiles, type JuzTile } from '../insightsView';
+import { juzTiles, memorizationMonths, monthName, type JuzTile } from '../insightsView';
+import { ayahsOfPages } from '../ayahKeys';
 import { shiftDay } from '../journal';
-import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, NBSP, pagesNote, surahName } from '../passages';
+import { describeAyahs, describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, NBSP, pagesNote, surahName } from '../passages';
 import { getJuzRange, getSurah } from '../quranData';
 import { revisedItems } from './context';
 import type { FactSources } from './facts';
@@ -48,6 +49,7 @@ export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
     const colsOk = Array.isArray(c.columns) && c.columns.length >= 1 && c.columns.length <= 3 && c.columns.every((k) => k in TABLE_HEADS);
     return one && rowsOk && colsOk;
   }
+  if (c.kind === 'memorized') return c.months === 6 || c.months === 12;
   return false;
 }
 
@@ -582,6 +584,48 @@ export function sortRows(rows: readonly TableRow[], col: RevoTableColumn, worstF
       return a.k === b.k ? a.i - b.i : (a.k - b.k) * dir;
     })
     .map((x) => x.r);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Memorized by month
+// ---------------------------------------------------------------------------------------------
+
+/** A day's memorization record, as Insights loads them (firestoreService getMemorizationsBetween). */
+export interface MemorizedDay {
+  day: string;
+  pages: number[];
+}
+
+/** Pages memorized in each of the last `months` months, oldest first: Insights' own count (memorizationMonths). */
+export function memorizedMonthsData(items: readonly MemorizedDay[], today: string, months: 6 | 12): { month: string; pages: number }[] {
+  return memorizationMonths([...items], today.slice(0, 7)).slice(-months);
+}
+
+/** Some pages named by their ayahs, the memorization model's way (lib/passages describeAyahs): "Al-Ma'idah 32–82". */
+const ayahWords = (pages: readonly number[]) => describeAyahs(ayahsOfPages(pages), { form: 'compact' });
+
+/** A month's days that memorized something, oldest first: each named by its ayahs. */
+export function monthDays(items: readonly MemorizedDay[], month: string): { day: string; name: string; pages: number }[] {
+  const byDay = new Map<string, Set<number>>();
+  for (const i of items) {
+    if (i.day.slice(0, 7) !== month) continue;
+    const set = byDay.get(i.day) ?? new Set<number>();
+    for (const p of i.pages) set.add(p);
+    byDay.set(i.day, set);
+  }
+  return [...byDay]
+    .filter(([, pages]) => pages.size > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, pages]) => ({ day, name: ayahWords([...pages]), pages: pages.size }));
+}
+
+/** A picked month: "October · 9 pages", "Al-Ma'idah 32–82" (or that nothing was memorized). */
+export function monthReadout(bar: { month: string; pages: number }, items: readonly MemorizedDay[]): { title: string; line: string } {
+  const pages = [...new Set(items.filter((i) => i.day.slice(0, 7) === bar.month).flatMap((i) => i.pages))];
+  return {
+    title: `${monthName(bar.month)} · ${plural(bar.pages, 'page')}`,
+    line: pages.length > 0 ? ayahWords(pages) : `Nothing memorized in ${monthName(bar.month)}`,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------

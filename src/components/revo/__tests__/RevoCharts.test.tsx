@@ -10,6 +10,7 @@ import { plainText } from '../../../lib/passages';
 import type { RevisionLog, UserPage } from '../../../types';
 import { DailyPagesChart } from '../charts/DailyPagesChart';
 import { JuzMapChart } from '../charts/JuzMapChart';
+import { MemorizedChart } from '../charts/MemorizedChart';
 import { PageRatingsChart } from '../charts/PageRatingsChart';
 import { TimelineChart } from '../charts/TimelineChart';
 import { WeeksChart } from '../charts/WeeksChart';
@@ -443,6 +444,45 @@ describe('table', () => {
     fireEvent.press(screen.getByTestId('revo-chart-table-row-26'));
     expect(screen.getByTestId('revo-chart-table-reader')).toBeTruthy();
     expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
+  });
+});
+
+describe('memorized by month', () => {
+  const records = [
+    { day: '2026-10-06', pages: [113, 114] },
+    { day: '2026-10-13', pages: [115, 116] },
+    { day: '2026-03-04', pages: [102, 103, 104, 105] },
+  ];
+  const onOpenDay = jest.fn();
+
+  it('loads the records, then a tap picks a month: its pages by their ayahs, and its days to open', async () => {
+    const load = jest.fn(async () => records);
+    await mount(<MemorizedChart title="Pages memorized" months={12} today={TODAY} onOpenDay={onOpenDay} load={load} />, 'revo-chart-memorized-plot');
+    expect(load).toHaveBeenCalledWith('2025-10-03', TODAY);
+    expect(text('revo-chart-memorized-line')).toBe('8 pages in 12 months · tap a month to see it');
+    expect(screen.getAllByTestId('revo-chart-month')).toHaveLength(12);
+    // October is the 11th of 12 bars (December to November).
+    layout('revo-chart-memorized-plot', 360, 120);
+    tap('revo-chart-memorized-plot-tap', 10.5 * 30);
+    expect(text('revo-chart-memorized-title')).toBe('October · 4 pages');
+    expect(text('revo-chart-memorized-line')).toBe("Al-Ma'idah 32–50");
+    fireEvent.press(screen.getByTestId('revo-chart-memorized-day-2026-10-13'));
+    expect(onOpenDay).toHaveBeenCalledWith('2026-10-13');
+    // A month with nothing: it says so.
+    fireEvent(screen.getByTestId('revo-chart-memorized-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-memorized-title')).toBe('November · 0 pages');
+    expect(text('revo-chart-memorized-line')).toBe('Nothing memorized in November');
+    expect(screen.queryByTestId('revo-chart-memorized-days')).toBeNull();
+  });
+
+  it('says it is loading, and says so if the records can’t be read', async () => {
+    let fail: (e: Error) => void = () => undefined;
+    const load = () => new Promise<never>((_, reject) => (fail = reject));
+    await mount(<MemorizedChart title="Pages memorized" months={6} today={TODAY} load={load} />, 'revo-chart-memorized');
+    expect(text('revo-chart-memorized-line')).toBe('Loading…');
+    expect(screen.queryByTestId('revo-chart-memorized-plot')).toBeNull();
+    await act(async () => fail(new Error('offline')));
+    expect(text('revo-chart-memorized-line')).toBe('Couldn’t load your memorization');
   });
 });
 

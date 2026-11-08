@@ -547,8 +547,12 @@ describe('the reply (REVO-7)', () => {
     expect(parseReply(JSON.stringify({ text: 'Juz 28.', chart: table }), allowed, { firstTurn: false })!.visual).toEqual(table);
     const surahs = { kind: 'table', title: 'Three surahs', surahs: [59, 60, 61], columns: ['strength', 'times30', 'memorized'] };
     expect(parseReply(JSON.stringify({ text: 'x', chart: surahs }), allowed, { firstTurn: false })!.visual).toEqual(surahs);
+    // Memorized by month: 6 or 12 months.
+    expect(parseReply(JSON.stringify({ text: '65 pages this year.', chart: { kind: 'memorized', title: 'Pages memorized', months: 12 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'memorized', title: 'Pages memorized', months: 12 });
     // Anything wrong with it drops the chart and keeps the answer.
     for (const bad of [
+      { kind: 'memorized', title: 'Three months', months: 3 },
+      { kind: 'memorized', title: 'No months' },
       { kind: 'table', title: 'One row', juz: [28], columns: ['weak'] },
       { kind: 'table', title: 'Nine rows', juz: [20, 21, 22, 23, 24, 25, 26, 27, 28], columns: ['weak'] },
       { kind: 'table', title: 'Twice', juz: [28, 28], columns: ['weak'] },
@@ -587,7 +591,7 @@ describe('the reply (REVO-7)', () => {
   });
 
   it('[REVO-7] the prompt names every chart kind and when to use it; a newer chart shows in the history as a short note', () => {
-    for (const kind of ['dailyPages', 'pageRatings', 'juzMap', 'timeline', 'weeks', 'table']) expect(REVO_SYSTEM_PROMPT).toContain(`"${kind}"`);
+    for (const kind of ['dailyPages', 'pageRatings', 'juzMap', 'timeline', 'weeks', 'table', 'memorized']) expect(REVO_SYSTEM_PROMPT).toContain(`"${kind}"`);
     // The one-object rule is the prompt's last word (Nov 8 2026: a longer chart list left "How was my week?" in plain prose).
     expect(REVO_SYSTEM_PROMPT.trim().split('\n').pop()).toMatch(/^Every reply is that one JSON object/);
     const said = (visual: StoredMessage['visual']) => historyTurn({ id: 'm', uid: 'u', role: 'revo', text: 'Here.', at: 1, visual }).content;
@@ -595,6 +599,7 @@ describe('the reply (REVO-7)', () => {
     expect(said({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 })).toContain('[chart: revisions of surah 59, last 90 days]');
     expect(said({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 })).toContain('[chart: revisions of juz 4, last 365 days]');
     expect(said({ kind: 'weeks', title: 'Weeks', weeks: 8 })).toContain('[chart: days done or missed, last 8 weeks]');
+    expect(said({ kind: 'memorized', title: 'Pages memorized', months: 12 })).toContain('[chart: pages memorized each month, last 12 months]');
     expect(said({ kind: 'table', title: 'Juz', juz: [26, 27], columns: ['lastRevised', 'weak'] })).toContain('[chart: table of juz 26, 27: lastRevised, weak]');
   });
 

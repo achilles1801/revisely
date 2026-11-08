@@ -10,6 +10,7 @@ import type { RevoAction, RevoVisual } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
 import { DailyPagesChart } from './charts/DailyPagesChart';
 import { JuzMapChart } from './charts/JuzMapChart';
+import { MemorizedChart } from './charts/MemorizedChart';
 import { PageRatingsChart } from './charts/PageRatingsChart';
 import { TableChart } from './charts/TableChart';
 import { TimelineChart } from './charts/TimelineChart';
@@ -46,6 +47,9 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
   const passage = useMemo(() => (chart.kind === 'timeline' && knownChart(chart) ? passagePagesOf(chart) : []), [chart]);
   const rows = useMemo(() => (chart.kind === 'table' && knownChart(chart) && reads ? tableRows(chart, reads.passage) : null), [chart, reads]);
   if (!knownChart(chart)) return null;
+  if (chart.kind === 'memorized') {
+    return <MemorizedChart title={chart.title} months={chart.months} today={day} onOpenDay={handlers.onOpenDay} />;
+  }
   if (chart.kind === 'juzMap') {
     return <JuzMapChart title={chart.title} today={day} logs={logs} userPages={pages} preview={reads?.preview} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
   }
