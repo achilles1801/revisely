@@ -102,10 +102,13 @@ appId: com.revisionbuddy.app
 # Settings → Support → Help buttons: off; turned on, the ? is back on Home.
 - tapOn:
     id: open-settings
+# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap (the
+# first run, Nov 8 2026, tapped Read instead).
 - scrollUntilVisible:
     element:
       id: settings-help-buttons
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - tapOn:
     id: settings-help-buttons
