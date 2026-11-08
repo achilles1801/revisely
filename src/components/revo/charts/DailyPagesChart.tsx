@@ -84,10 +84,11 @@ export function DailyPagesChart({
               <DetailTitle text={detail.passage} testID={`${testID}-passage`} />
             ) : null}
             {detail.planned ? <DetailLine text="Planned, not revised" /> : null}
-            {detail.strip.length > 0 ? (
+            {/* A day with no ratings has nothing for the strip to say: the passage names it. */}
+            {detail.strip.some((s) => s.band) ? (
               <>
                 <RatingStrip cells={detail.strip.map((s) => s.band)} first={detail.first} last={detail.last} />
-                {detail.strip.some((s) => s.band) ? <RatingCounts counts={detail.counts} /> : null}
+                <RatingCounts counts={detail.counts} />
               </>
             ) : null}
             {onOpenDay ? <ChartButtons openDay={() => onOpenDay(bar.day)} testID={testID} /> : null}

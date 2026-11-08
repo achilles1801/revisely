@@ -101,6 +101,15 @@ describe('pages per day', () => {
     expect(screen.queryByTestId('revo-chart-dailyPages-detail')).toBeNull();
   });
 
+  it('a day with no ratings shows no strip: the passage names it', async () => {
+    await week();
+    layout('revo-chart-dailyPages-plot', 350, 130);
+    tap('revo-chart-dailyPages-plot-tap', 70);
+    expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
+    expect(screen.getByTestId('revo-chart-dailyPages-passage')).toBeTruthy();
+    expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
+  });
+
   it('tapping the picked day again puts it back', async () => {
     await week();
     layout('revo-chart-dailyPages-plot', 350, 130);
@@ -164,7 +173,7 @@ describe('page ratings', () => {
           pages={[583, 584]}
           today={TODAY}
           logs={logs}
-          userPages={[page(583, { weaknessRating: 1, lastRevisedDate: '2026-11-06' }), page(584)]}
+          userPages={[page(583, { weaknessRating: 1, lastRevisedDate: '2026-11-06T09:00:00.000Z' }), page(584)]}
           onReviseFirst={onReviseFirst}
           onOpenPage={onOpenPage}
         />,
