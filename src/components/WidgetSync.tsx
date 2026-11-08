@@ -18,6 +18,7 @@ import { prayerTimesEnabled } from '../lib/prayer/status';
 import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
 import { parseWidgetLink, requestPrayerSheet, type WidgetLink } from '../lib/widgets/links';
 import { navigationRef } from '../navigation/navigationRef';
+import { useWhatsNewShowing } from '../lib/whatsNew/state';
 
 /**
  * Keeps the Home and Lock Screen widgets (targets/widget) current, and opens
@@ -114,7 +115,9 @@ export function WidgetSync() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, signedIn, loading, ownUser, onboardingComplete, pages, logs, history, accent, day, foreground, qiblaFrom, prayerKey]);
 
-  useWidgetLinks(signedIn && !loading && !!ownUser && onboardingComplete);
+  // A link opened at launch waits for "What's new" to finish (NEW-4): the main screens aren't up.
+  const whatsNewShowing = useWhatsNewShowing();
+  useWidgetLinks(signedIn && !loading && !!ownUser && onboardingComplete && !whatsNewShowing);
   return null;
 }
 

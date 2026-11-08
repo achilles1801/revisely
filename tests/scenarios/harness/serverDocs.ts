@@ -44,6 +44,13 @@ export async function setServerDoc(path: string, data: Record<string, Plain>): P
   if (!res.ok) throw new Error(`set ${path}: ${res.status} ${await res.text()}`);
 }
 
+/** Deletes top-level fields of the document, as the admin SDK's FieldValue.delete() does. */
+export async function deleteServerFields(path: string, names: string[]): Promise<void> {
+  const mask = names.map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const res = await fetch(`${BASE}/${path}?${mask}`, { method: 'PATCH', headers: HEADERS, body: JSON.stringify({ fields: {} }) });
+  if (!res.ok) throw new Error(`delete fields of ${path}: ${res.status} ${await res.text()}`);
+}
+
 export async function getServerDoc(path: string): Promise<Record<string, Plain> | null> {
   const res = await fetch(`${BASE}/${path}`, { headers: HEADERS });
   if (res.status === 404) return null;

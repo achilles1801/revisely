@@ -73,6 +73,9 @@ import { shareIcon } from '../../lib/platformUi';
 import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
 import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
 import { showsResetMyData } from '../../lib/testerReset';
+import { replayOffered } from '../../lib/whatsNew/due';
+import { setForcedAtLaunch, useWhatsNewSaved } from '../../lib/whatsNew/state';
+import { WhatsNewReplay } from '../../components/whatsNew/WhatsNewReplay';
 import { useRevoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { openRevo } from '../../lib/revo/open';
@@ -270,6 +273,9 @@ export default function SettingsScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [resetSheet, setResetSheet] = useState(false);
   const [scenarioSheet, setScenarioSheet] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  // Show What's new at launch (testers): kept on the phone, from the next launch.
+  const whatsNewSaved = useWhatsNewSaved(showsResetMyData(user) ? firebaseUser?.uid : null);
   const syncHeld = useSyncHeld(firebaseUser?.uid);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -953,6 +959,14 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="About">
+          {replayOffered(user) ? (
+            <Row
+              icon="sparkles-outline"
+              label="What’s new"
+              onPress={() => setWhatsNewOpen(true)}
+              testID="settings-whats-new"
+            />
+          ) : null}
           <Row
             icon="document-text-outline"
             label="Privacy Policy"
@@ -978,6 +992,19 @@ export default function SettingsScreen() {
                 testID="settings-reset-data"
               />
             </View>
+            <Row
+              icon="sparkles-outline"
+              label="Show What’s new at launch"
+              subtitle="As App Store users will see it after the update"
+              rightSlot={
+                <SettingSwitch
+                  value={whatsNewSaved?.forced === true}
+                  onValueChange={(on) => firebaseUser && setForcedAtLaunch(firebaseUser.uid, on)}
+                  accessibilityLabel="Show What’s new at launch"
+                  testID="settings-whats-new-launch"
+                />
+              }
+            />
             {showsTestScenarios(user) && (
               <View testID="test-scenario-row">
                 <Row
@@ -1046,6 +1073,7 @@ export default function SettingsScreen() {
         testID="speech-model-delete-menu"
       />
       <MushafPickerSheet visible={mushafPicker} onClose={() => setMushafPicker(false)} />
+      {replayOffered(user) ? <WhatsNewReplay visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} /> : null}
       {showsResetMyData(user) ? <ResetDataSheet visible={resetSheet} onClose={() => setResetSheet(false)} /> : null}
       {showsTestScenarios(user) ? (
         <TestScenarioSheet visible={scenarioSheet} onClose={() => setScenarioSheet(false)} />

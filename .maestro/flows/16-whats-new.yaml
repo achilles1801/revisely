@@ -1,0 +1,147 @@
+# "What's new" for a previewTester account (marked one through the emulator, as the owner's script
+# does). The release ships switched off, so this is the testers' way in, which runs the same screen:
+# Settings → About → What's new replays the cards with a ✕; Settings → Testing → Show What's new at
+# launch runs it from the next launch as App Store users will see it. It resumes on the card it was
+# left on after a relaunch, Android's back goes to the card before, and after Done it doesn't come back.
+# Screenshots: the replay, each card of the run, Home after (w1–w7).
+# Rules (BEHAVIOUR.md): NEW-2, NEW-3
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T19:00
+      BOUNDARY: midnight
+# A tester (the replay and the run at launch are theirs until the release): the app sees it when its
+# user document changes.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+
+# NEW-3: Settings → About → What's new, with a ✕.
+- tapOn:
+    id: open-settings
+# Centred: at the screen's foot a row can sit under the tab bar, which takes the tap.
+- scrollUntilVisible:
+    element:
+      id: settings-whats-new
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: settings-whats-new
+- extendedWaitUntil:
+    visible:
+      id: whats-new-replay
+    timeout: 10000
+- assertVisible: "Your days, in Activity"
+- assertVisible:
+    id: whats-new-close
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w1-replay
+- tapOn:
+    id: whats-new-next
+- assertVisible: "Revised elsewhere?"
+- tapOn:
+    id: whats-new-close
+- extendedWaitUntil:
+    notVisible:
+      id: whats-new-replay
+    timeout: 10000
+
+# NEW-3: Testing → Show What's new at launch, from the next launch.
+- scrollUntilVisible:
+    element:
+      id: settings-whats-new-launch
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: settings-whats-new-launch
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: whats-new-forced
+    timeout: 20000
+# NEW-2: required, so no ✕; one Next a card.
+- assertNotVisible:
+    id: whats-new-close
+- assertVisible: "Your days, in Activity"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w2-activity
+- tapOn:
+    id: whats-new-next
+- assertVisible: "Revised elsewhere?"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w3-elsewhere
+# Android's back goes to the card before.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+      - assertVisible: "Your days, in Activity"
+      - tapOn:
+          id: whats-new-next
+      - assertVisible: "Revised elsewhere?"
+- tapOn:
+    id: whats-new-next
+- assertVisible: "Memorize by the ayah"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w4-ayah
+
+# NEW-2: leaving part way reopens it on the card it was on.
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: whats-new-forced
+    timeout: 20000
+- assertVisible: "Memorize by the ayah"
+- tapOn:
+    id: whats-new-next
+- assertVisible: "Meet Revo"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w5-revo
+- tapOn:
+    id: whats-new-next
+- assertVisible: "Also new"
+- assertVisible:
+    id: whats-new-row-offline
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w6-also-new
+- tapOn:
+    id: whats-new-done
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w7-home-after
+
+# Done turned the switch off: the next launch goes straight to Home.
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- assertNotVisible:
+    id: whats-new-forced

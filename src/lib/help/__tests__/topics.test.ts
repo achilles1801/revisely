@@ -10,58 +10,17 @@
 // It also checks that the {{labels}} a topic quotes are text the app shows, and the help's own rules:
 // at most four topics a screen, no page numbers (NAME-1), nothing about ratings with Smart Tracking off.
 
-import { createHash } from 'crypto';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { HELP, HELP_INLINE_ICONS, helpTextParts, MAX_TOPICS, topicsFor, type HelpScreen } from '../topics';
+import { appSource, readRepo, ruleHash as hash, ruleTexts } from '../../../../jest/behaviourRules';
 
-const ROOT = join(__dirname, '../../../..');
 const REVIEWED = join(__dirname, '../reviewed.json');
-const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
-
-/** Each rule's text: its bullet and the indented lines under it, whitespace folded (re-wrapping isn't a change). */
-export function ruleTexts(spec: string): Map<string, string> {
-  const rules = new Map<string, string>();
-  let id: string | null = null;
-  let lines: string[] = [];
-  const flush = () => {
-    if (id) rules.set(id, lines.join(' ').replace(/\s+/g, ' ').trim());
-    id = null;
-    lines = [];
-  };
-  for (const line of spec.split('\n')) {
-    const start = /^- \*\*([A-Z]+-\d+)\.\*\*/.exec(line);
-    if (start) {
-      flush();
-      id = start[1];
-      lines = [line];
-    } else if (id && /^\s+\S/.test(line)) {
-      lines.push(line);
-    } else {
-      flush();
-    }
-  }
-  flush();
-  return rules;
-}
-
-const hash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16);
+const read = readRepo;
 
 const rules = ruleTexts(read('BEHAVIOUR.md'));
 const screens = Object.keys(HELP) as HelpScreen[];
 const topics = screens.flatMap((s) => HELP[s].topics.map((t) => ({ screen: s, ...t })));
-
-/** The app's source, comments and the help itself left out: a label must be text the app shows. */
-function appSource(): string {
-  const walk = (dir: string): string[] =>
-    readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
-      const p = `${dir}/${e.name}`;
-      if (e.isDirectory()) return e.name === '__tests__' || p === 'src/lib/help' ? [] : walk(p);
-      return /\.tsx?$/.test(e.name) ? [p] : [];
-    });
-  const uncommented = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
-  return walk('src').map((f) => uncommented(read(f))).join('\n');
-}
 
 describe('the help reads BEHAVIOUR.md', () => {
   it('finds the rules and their text', () => {

@@ -8,6 +8,8 @@ import { MainNavigator } from './MainNavigator';
 import { navigationRef } from './navigationRef';
 import AuthScreen from '../screens/auth/AuthScreen';
 import { ConnectToSetUp } from '../components/offline/ConnectToSetUp';
+import { WhatsNewScreen } from '../components/whatsNew/WhatsNewScreen';
+import { useWhatsNewDue } from '../components/whatsNew/useWhatsNewDue';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 export function RootNavigator() {
@@ -17,6 +19,8 @@ export function RootNavigator() {
   // with that account's copy on the phone (AppProvider).
   const signedIn = isAuthenticated || !!provisionalUid;
   const { theme, isDark, palette } = useTheme();
+  // "What's new" opens before Home for an account set up before the release (NEW-1, NEW-4).
+  const whatsNew = useWhatsNewDue();
 
   // Nav theme bg is transparent so the flat ground shows through every screen.
   const navigationTheme = {
@@ -45,7 +49,14 @@ export function RootNavigator() {
   const content = !signedIn ? (
     <AuthScreen />
   ) : onboardingComplete ? (
-    <MainNavigator />
+    whatsNew === 'wait' ? (
+      // A moment while the phone's copy is read (the card to resume on, the switch).
+      <View style={{ flex: 1, backgroundColor: palette.bg }} testID="whats-new-wait" />
+    ) : whatsNew ? (
+      <WhatsNewScreen mode={whatsNew} />
+    ) : (
+      <MainNavigator />
+    )
   ) : (
     <OnboardingNavigator />
   );

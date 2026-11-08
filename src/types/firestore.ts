@@ -190,6 +190,8 @@ export interface FirestoreUser {
   carryOverMode?: 'shift' | 'add';
   /** The new design's accent; unset = Indigo. */
   accent?: 'indigo' | 'crimson' | 'jade';
+  /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
+  whatsNewSeen?: string;
   /** Pages carried into one revision day (see User.carryOver). */
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
   carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
@@ -249,6 +251,8 @@ export interface UpdateUserInput {
   carryOverMode?: 'shift' | 'add';
   /** The new design's accent; unset = Indigo. */
   accent?: 'indigo' | 'crimson' | 'jade';
+  /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
+  whatsNewSeen?: string;
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
   carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
   scheduleShiftPages?: number;

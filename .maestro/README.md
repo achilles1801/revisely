@@ -92,6 +92,7 @@ rules it covers in its first lines; recordings have no rule there yet.
 | `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
 | `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). In the first job: after 04 the Android emulator has a location, and Home a prayer line | NAME-1 |
 | `14-help` | A tester: Home's ? opens How Home works, closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
+| `16-whats-new` | A tester: Settings → About → What's new replays the cards with a ✕; Testing → Show What's new at launch runs them after a cold start, no ✕, Android's back to the card before; a relaunch part way reopens the card it was on; after Done it doesn't come back. In the first job | NEW-2, NEW-3 |
 
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
 memorized (24 pages) and 10 pages a day, so the days are 1, 582–590 | 591–600 | 601–604, 1, 582–586.

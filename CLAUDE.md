@@ -144,6 +144,39 @@ file is the release mechanics and the traps behind them.
     itself. Its URL is in `android-build.yml`.
   - The rule (`match /config/app`: anyone reads, no client writes) went live on 2026-11-03.
 
+## What's new (after an update)
+
+A short walkthrough after the update (Majd, Nov 8 2026; mocks `~/Documents/revisely-today-mocks/whats-new/`).
+BEHAVIOUR.md NEW-1 to NEW-4.
+- **Who sees it:** an account set up before the release (no `whatsNewSeen` on its user document, or an
+  earlier release's) sees it once, before Home, when the release is switched on.
+  - Done writes `whatsNewSeen` = the release id. Onboarding writes it too, so new accounts never see it.
+  - Required: no skip or close. It resumes on the card left, kept on the phone (`lib/whatsNew/state`).
+  - Each card shows only to accounts that have its feature (`components/whatsNew/needs`: each feature's own gate).
+- **The cards** live in `src/lib/help/whatsNew.ts` (`RELEASES`; the last is current) and are help text: the
+  help's drift check covers them (`whatsNewReviewed.json`, `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`).
+  A release with `live: true` that needs a feature still for testers fails `whatsNew.test.ts`.
+- **Ships dark.** A release's entry has `live: false` until the PR that makes its features public flips it
+  (one line). Production gets JavaScript only through Promote, so App Store users get the cards in the
+  same update as the features.
+- **Testers before that:** Settings → About → What's new (a replay with ✕, nothing kept) and Settings →
+  Testing → Show What's new at launch (from the next launch, as App Store users will see it; Done turns it
+  off and writes nothing to the account).
+- **Kill switch:** `config/app.whatsNewOff`.
+  `cd functions && GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-app-config.js --whats-new off`
+  (`on` to undo). Phones read it at launch and back in front after 10 minutes.
+- **Never shown:** `seed-reviewer.js` and `seed-screenshots.js` write `whatsNewSeen: 'all'` (`SEEN_ALL`),
+  so App Review and the screenshots skip it. A mark the app doesn't know counts as seen (a later release's).
+- **Nothing opens over it:** it replaces the main screens in RootNavigator.
+  - Home's update and store sheets and Revo wait for Home.
+  - WidgetSync holds a widget's link until Done.
+  - `lib/updates/busy` sees no main screen, so no update restarts the app under it.
+- **The next release:** add an entry to `RELEASES` (a new id, its own cards, `live: false`) and leave the
+  old one. Only the current release shows or replays.
+- `whatsNewSeen` is in the user document's allowlist (`firestore.rules`, #439). The rules must be live
+  before app code that writes it reaches develop: onboarding's write would be refused, and with it
+  `onboardingComplete`.
+
 ## Health (Sentry → GitHub → Claude)
 
 - Every launch is a Sentry session labelled with the JavaScript it ran (`src/lib/releaseInfo.ts`):

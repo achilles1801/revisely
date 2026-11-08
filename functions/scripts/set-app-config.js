@@ -25,6 +25,11 @@
  *                                after 10 minutes, or at once when the server
  *                                refuses Revo. Turning Revo off and deleting its
  *                                data stay open to every account.
+ *   whatsNewOff                  The "What's new" kill switch (src/lib/whatsNew/
+ *                                killSwitch.ts): true stops the walkthrough after
+ *                                the update for everyone, without an update, in
+ *                                case a card turns out wrong. Phones read it at
+ *                                launch and back in front after 10 minutes.
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
@@ -35,6 +40,8 @@
  *   ... node scripts/set-app-config.js --revo everyone           # Revo for every account
  *   ... node scripts/set-app-config.js --revo off                # Revo paused for everyone
  *   ... node scripts/set-app-config.js --revo testers            # back to testers only
+ *   ... node scripts/set-app-config.js --whats-new off           # stop the What's new walkthrough
+ *   ... node scripts/set-app-config.js --whats-new on            # let it show again
  *
  * A minimum above what the store has now is refused without --force: the app
  * would ignore it until the store caught up, then block everyone below it at once.
@@ -45,6 +52,7 @@ const admin = require('firebase-admin');
 const BUNDLE_ID = 'com.revisionbuddy.app';
 const VERSION = /^\d{1,4}(\.\d{1,4}){0,3}$/;
 const REVO = ['testers', 'everyone', 'off'];
+const WHATS_NEW = ['on', 'off'];
 
 function compare(a, b) {
   const pa = a.split('.').map(Number);
@@ -72,6 +80,11 @@ function parseArgs(argv) {
       if (!REVO.includes(v)) throw new Error(`--revo needs one of ${REVO.join(', ')} (got ${v ?? 'nothing'})`);
       opts.revo = v;
     }
+    else if (a === '--whats-new') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--whats-new needs on or off (got ${v ?? 'nothing'})`);
+      opts.whatsNew = v;
+    }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
     else if (flags[a]) {
@@ -97,7 +110,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--whats-new on|off] [--force]',
     );
     process.exit(1);
   }
@@ -122,6 +135,7 @@ async function main() {
           latest: data.latest || {},
           testing: testing ? { android: { version: testing.version, code: testing.code } } : {},
           revo: REVO.includes(data.revo) ? data.revo : 'testers (unset)',
+          whatsNew: data.whatsNewOff === true ? 'off' : 'on',
         },
         null,
         2,
@@ -129,7 +143,7 @@ async function main() {
     );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
-  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo;
+  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.whatsNew;
   if (opts.show || !changes) {
     show(current);
     return;
@@ -162,6 +176,7 @@ async function main() {
     update['latest.androidCode'] = opts.latestAndroidCode || FieldValue.delete();
   }
   if (opts.revo) update.revo = opts.revo;
+  if (opts.whatsNew) update.whatsNewOff = opts.whatsNew === 'off' ? true : FieldValue.delete();
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
     process.exit(1);

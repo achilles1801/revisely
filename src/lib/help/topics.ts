@@ -56,6 +56,7 @@ export const HELP_INLINE_ICONS: Readonly<Record<string, HelpIcon>> = {
   mic: 'mic-outline',
   timer: 'stopwatch-outline',
   plus: 'add',
+  help: 'help-circle-outline',
 };
 
 export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
@@ -369,6 +370,6 @@ export function helpTextParts(text: string): HelpTextPart[] {
 
 /** A topic's text as read aloud (VoiceOver) and in tests: labels as words, icons by their button's name. */
 export function helpPlainText(text: string): string {
-  const spoken: Record<string, string> = { check: '✓', more: '⋯', eye: 'the eye', play: '▶', options: 'Audio Options', mic: 'the microphone', timer: 'the timer', plus: '+' };
+  const spoken: Record<string, string> = { check: '✓', more: '⋯', eye: 'the eye', play: '▶', options: 'Audio Options', mic: 'the microphone', timer: 'the timer', plus: '+', help: '?' };
   return text.replace(/\{\{(.+?)\}\}/g, '$1').replace(/\[\[([a-z]+)\]\]/g, (_, n: string) => spoken[n] ?? n);
 }

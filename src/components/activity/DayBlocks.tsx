@@ -58,8 +58,8 @@ const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead
 /** The day's blocks, by the names Overview's preview rows use for them. */
 export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes';
 
-/** Whether the Activity blocks show (the preview testers, while C2 is built). */
-export const activityBlocksEnabled = (user: { previewTester?: boolean } | null | undefined) => user?.previewTester === true;
+/** Whether the Activity blocks show (the preview testers, while C2 is built): lib/activityBlocks. */
+export { activityBlocksEnabled } from '../../lib/activityBlocks';
 
 interface Props {
   day: string;
