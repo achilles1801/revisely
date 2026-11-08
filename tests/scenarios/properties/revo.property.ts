@@ -812,6 +812,9 @@ describe('how the app works: the guide (REVO-30)', () => {
   it('[REVO-30] it answers the owner’s questions and says what isn’t possible, with the closest way', () => {
     // "I want to revise Juz 29 backwards but I don't see where I can do that."
     expect(REVO_GUIDE).toMatch(/Revising one juz backwards[^\n]*“Reverse order” on[^\n]*“Today starts at”/);
+    // …and that the closest way turns the whole plan backwards, which Revo is told to say (Nov 8 2026 eval).
+    expect(REVO_GUIDE).toMatch(/Revising one juz backwards[^\n]*turns the whole plan backwards/);
+    expect(REVO_SYSTEM_PROMPT).toContain('When that way changes more than they asked for (the whole plan, for one juz), say so in a few words.');
     // "Will I keep my streak if I revise yesterday's stuff?"
     const streak = GUIDE_SECTIONS.find((s) => s.covers.includes('SESS-6'))!.text;
     expect(streak).toMatch(/Revising yesterday’s missed pages before today ends brings it back at once/);
