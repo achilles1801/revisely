@@ -13,12 +13,13 @@ import { setPhoneFolder } from '../harness/fileSystem';
 import {
   failSura,
   healSura,
+  holdFrom,
   installQuranEnc,
   publishVersion,
+  releaseHeld,
   requestsTo,
   resetQuranEnc,
   serveWhole,
-  slowDown,
 } from '../harness/quranenc';
 import { setOnline } from '../harness/netinfo';
 import { Alert } from 'react-native';
@@ -299,14 +300,17 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
 describe('downloading a translation (TRANS-6)', () => {
   it('[TRANS-6] its size before, its progress while it comes, then on the phone, under Downloaded, and read offline', async () => {
     serveWhole('french_rashid');
-    slowDown(4);
     openSheet(FRENCH, true);
     await until(() => shown() != null, 'the translation');
+    // From here the connection stalls at sura 57: the download stands midway until released.
+    holdFrom('french_rashid', 57);
     openPicker('rashid');
     // Al-Ikhlas was kept as it was read; the rest is its size.
     expect(status(FRENCH)).toMatch(/^1 of 114 suras on this phone · 1\.[0-9]\u00A0MB$/);
     fireEvent.press(screen.getByTestId(`translation-download-${FRENCH}`));
-    await until(() => /^Downloading… [1-9]/.test(status(FRENCH)), 'its progress');
+    // Suras 1–56 and Al-Ikhlas: 57 of 114.
+    await until(() => status(FRENCH) === 'Downloading… 50%', 'its progress');
+    releaseHeld();
     await until(() => status(FRENCH).startsWith('On this phone'), 'the whole translation');
     expect(status(FRENCH)).toMatch(/^On this phone · 1\.[0-9]\u00A0MB$/);
     expect(quranEncStore('french_rashid')!.surasOnPhone()).toBe(114);
@@ -332,21 +336,24 @@ describe('downloading a translation (TRANS-6)', () => {
 
   it('[TRANS-6] stopped midway, it keeps what came and carries on from there', async () => {
     serveWhole('french_rashid');
-    slowDown(6);
     openSheet(FRENCH, true);
     await until(() => shown() != null, 'the translation');
+    holdFrom('french_rashid', 57);
     openPicker('rashid');
     fireEvent.press(screen.getByTestId(`translation-download-${FRENCH}`));
-    await until(() => /^Downloading… ([2-9]|[1-9][0-9])%/.test(status(FRENCH)), 'some suras');
+    await until(() => status(FRENCH) === 'Downloading… 50%', 'some suras');
+    // Stopped while suras are on their way: those land, and nothing more is asked for.
     fireEvent.press(screen.getByTestId(`translation-stop-${FRENCH}`));
+    releaseHeld();
     await until(() => / of 114 suras on this phone/.test(status(FRENCH)), 'the stop');
     const kept = quranEncStore('french_rashid')!.surasOnPhone();
-    expect(kept).toBeGreaterThan(2);
+    expect(kept).toBeGreaterThanOrEqual(57);
     expect(kept).toBeLessThan(114);
+    expect(status(FRENCH)).toMatch(new RegExp(`^${kept} of 114 suras on this phone`));
     fireEvent.press(screen.getByTestId(`translation-download-${FRENCH}`));
     await until(() => status(FRENCH).startsWith('On this phone'), 'the rest');
-    // Nothing fetched twice (a sura in flight at the stop may come once more).
-    expect(requestsTo('sura/french_rashid/').length).toBeLessThanOrEqual(116);
+    // Nothing fetched twice.
+    expect(requestsTo('sura/french_rashid/')).toHaveLength(114);
   });
 
   it('[TRANS-6] a download that fails says so and keeps what came; tried again, it finishes', async () => {

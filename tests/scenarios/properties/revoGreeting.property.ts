@@ -42,7 +42,7 @@ describe('a day with nothing left to revise (REVO-20, REVO-35)', () => {
     const c = context({});
     const said = plainText(revoGreeting('Majd', c));
     expect(said).not.toMatch(EMPTY_PASSAGE);
-    expect(said).toBe('Salaam Majd. Today’s 28 pages are done. That’s a 4-day streak. Ask me anything about your revision.');
+    expect(said).toBe('Assalamu alaikum, Majd. Today’s 28 pages are done. That’s a 4-day streak. Ask me anything about your revision.');
     expect(greetingState(c)).toBe('done');
     expect(revoChips(c)).toContain('What should I revise next?');
   });

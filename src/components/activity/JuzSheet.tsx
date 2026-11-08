@@ -133,7 +133,8 @@ export function JuzSheet({
           const src = revo.sources();
           // Without the account's figures yet, Revo still opens (the juz isn't attached): never a dead tap.
           const attach = src ? juzAttachment(model.juz, prepare(src)) : undefined;
-          closeThen(() => openRevo(attach ? { attach } : {}));
+          const place = { kind: 'juz' as const, juz: model.juz };
+          closeThen(() => openRevo(attach ? { attach, place } : { place }));
         }
       : null;
 

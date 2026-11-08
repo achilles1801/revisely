@@ -358,7 +358,7 @@ async function smartTrackingOf(deps: RevoDeps, uid: string): Promise<boolean> {
 }
 
 export async function handleRevoAsk(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoAskResult> {
-  const { uid, settings } = await gate(auth, deps, true);
+  const { uid, tester, settings } = await gate(auth, deps, true);
   const smartTracking = await smartTrackingOf(deps, uid);
   const b = body(data, ['chatId', 'day', 'question', 'context', 'attach', 'attachments']);
   const started = deps.now();
@@ -400,7 +400,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
     throw new RevoError('resource-exhausted', MESSAGES.daily, { reason: 'daily' });
   }
 
-  const request = buildAskRequest({ day, question, context, attached, memory: memory.map((m) => m.text), history, chat, smartTracking });
+  const request = buildAskRequest({ day, question, context, attached, memory: memory.map((m) => m.text), history, chat, smartTracking, tester });
   let result: Awaited<ReturnType<typeof metered>>;
   try {
     result = await metered(deps, request, 'answer');
@@ -470,7 +470,7 @@ async function existingReview(deps: RevoDeps, uid: string, chat: RevoChat): Prom
 
 /** Once per account and revision day; not counted against the day's questions; none when capped or resting. */
 export async function handleDayInReview(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoReviewResult> {
-  const { uid, settings } = await gate(auth, deps, true);
+  const { uid, tester, settings } = await gate(auth, deps, true);
   const smartTracking = await smartTrackingOf(deps, uid);
   const b = body(data, ['day', 'context']);
   const now = deps.now();
@@ -484,7 +484,7 @@ export async function handleDayInReview(auth: { uid: string } | undefined, data:
   if (t.revisedPages === 0 && t.memorizedPages === 0 && t.minutes === 0) return { none: true };
 
   const memory = settings.memoryOn ? (await deps.store.listMemory(uid, REVO_MEMORY_CAP * 2)).slice(0, REVO_MEMORY_CAP) : [];
-  const result = await metered(deps, buildReviewRequest({ day, context, memory: memory.map((m) => m.text), smartTracking }), 'review');
+  const result = await metered(deps, buildReviewRequest({ day, context, memory: memory.map((m) => m.text), smartTracking, tester }), 'review');
   if (result === 'capped' || result === 'resting') return { none: true };
   const parts = parseReply(result.reply.text, new Set(contextPages(context)), { firstTurn: false, smartTracking });
   if (!parts) {

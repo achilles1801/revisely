@@ -32,8 +32,13 @@ appId: com.revisionbuddy.app
       id: help-sheet-home
     timeout: 10000
 - assertVisible: "How Home works"
-- assertVisible: "Missed days"
-- assertVisible: "Streak"
+# A topic is one element (iOS reads it whole), so by id: its label starts with its title.
+- assertVisible:
+    id: help-topic-home.missed
+    text: "Missed days, .*"
+- assertVisible:
+    id: help-topic-home.streak
+    text: "Streak, .*"
 - assertVisible:
     id: help-ask-revo
 - assertVisible:

@@ -7,7 +7,10 @@
 // To record more: curl the same URL into the fixtures folder (the list keeps only the fields the app
 // reads). A whole translation for a download is too big to record: `serveWhole(key)` makes QuranEnc
 // answer every sura of it, recorded where there is a recording and otherwise "<key> <sura>:<ayah>"
-// for each verse, in QuranEnc's shape; `failSura` makes one sura fail (503) until `healSura`.
+// for each verse, in QuranEnc's shape; `failSura` makes one sura fail (503) until `healSura`;
+// `holdFrom` stalls the connection at a sura until `releaseHeld`, so a test sees a download midway
+// at a point it knows (a delay instead raced the test: on a slow runner the download ended between
+// two looks).
 import fs from 'fs';
 import path from 'path';
 
@@ -24,8 +27,10 @@ interface StandIn {
   whole: Set<string>;
   /** "key/sura" that answer 503. */
   failing: Set<string>;
-  /** Milliseconds each answer takes (0: at once). */
-  delayMs: number;
+  /** Per translation, the first sura whose request waits for releaseHeld (a stalled connection). */
+  holdFrom: Map<string, number>;
+  /** Requests waiting: each is let through (true) or fails as offline (false). */
+  held: ((through: boolean) => void)[];
 }
 
 const g = globalThis as unknown as { __scenarioQuranEnc?: StandIn; __scenarioNet?: { online: boolean } };
@@ -34,12 +39,22 @@ export const quranEnc: StandIn = (g.__scenarioQuranEnc ??= {
   versions: new Map(),
   whole: new Set(),
   failing: new Set(),
-  delayMs: 0,
+  holdFrom: new Map(),
+  held: [],
 });
 
-/** Each answer takes `ms` (a slow connection: time to stop a download midway). */
-export function slowDown(ms: number): void {
-  quranEnc.delayMs = ms;
+/**
+ * Every request for a sura of `key` from `sura` on waits until releaseHeld(): a download gets the
+ * suras before it and then stands still there, however fast or slow the machine.
+ */
+export function holdFrom(key: string, sura: number): void {
+  quranEnc.holdFrom.set(key, sura);
+}
+
+/** Lets the held requests through, and holds nothing more. */
+export function releaseHeld(): void {
+  quranEnc.holdFrom.clear();
+  quranEnc.held.splice(0).forEach((go) => go(true));
 }
 
 /** QuranEnc answers every sura of `key` (a download). */
@@ -70,7 +85,16 @@ export function resetQuranEnc(): void {
   quranEnc.versions.clear();
   quranEnc.whole.clear();
   quranEnc.failing.clear();
-  quranEnc.delayMs = 0;
+  quranEnc.holdFrom.clear();
+  // A test that ended with requests held: they fail, so nothing of it lands in the next test.
+  quranEnc.held.splice(0).forEach((go) => go(false));
+}
+
+/** Whether a request (its route under /api/v1/) waits for releaseHeld. */
+function isHeld(route: string): boolean {
+  const sura = /^translation\/sura\/([a-z0-9_]+)\/(\d+)$/.exec(route);
+  const from = sura ? quranEnc.holdFrom.get(sura[1]) : undefined;
+  return from != null && Number(sura![2]) >= from;
 }
 
 /** A sura in QuranEnc's shape, its text made up: "<key> <sura>:<ayah>". */
@@ -135,7 +159,10 @@ export function installQuranEnc(): void {
     quranEnc.requests.push(url);
     // What React Native's fetch throws without a connection.
     if (g.__scenarioNet && !g.__scenarioNet.online) throw new TypeError('Network request failed');
-    if (quranEnc.delayMs > 0) await new Promise((r) => setTimeout(r, quranEnc.delayMs));
+    if (qe && isHeld(qe[1])) {
+      const through = await new Promise<boolean>((go) => quranEnc.held.push(go));
+      if (!through) throw new TypeError('Network request failed');
+    }
     return qe ? serveQuranEnc(qe[1]) : serveAlQuran(aq![1]);
   }) as typeof fetch;
   (routed as { __scenarioQuranEnc?: boolean }).__scenarioQuranEnc = true;

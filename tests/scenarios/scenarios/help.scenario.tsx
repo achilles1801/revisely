@@ -100,6 +100,11 @@ describe('the help on Home', () => {
     expect(app.screen.queryByText('How Home works')).not.toBeNull();
     const topics = app.screen.queryAllByTestId(/^help-topic-/).map((t) => t.props.testID);
     expect(topics).toEqual(['help-topic-home.today', 'help-topic-home.missed', 'help-topic-home.streak', 'help-topic-home.memorized']);
+    // Each topic is one element for VoiceOver and TalkBack: its title, then its words, and no icon
+    // glyph (iOS read the mark's font character first: "\uf539, Missed days, …").
+    const labels = app.screen.queryAllByTestId(/^help-topic-/).map((t) => String(t.props.accessibilityLabel));
+    expect(labels.map((l) => l.split(', ')[0])).toEqual(['Today', 'Missed days', 'Streak', 'Memorized']);
+    expect(labels.filter((l) => /[\uE000-\uF8FF]/.test(l))).toEqual([]);
     const text = flatText(app.screen.getByTestId('help-sheet-home'));
     // The labels it names are the ones Home shows; no page numbers (NAME-1).
     expect(text).toContain('Jump to…');
@@ -191,7 +196,7 @@ async function sessionHelp(app: OpenApp, home: Home): Promise<void> {
 }
 
 describe('the help follows Smart Tracking', () => {
-  it('[HELP-1] [HELP-3] a session’s ⋯ → How a session works: with Smart Tracking off, nothing about rating', async () => {
+  it('[HELP-1] [HELP-3] [REVO-25] a session’s ⋯ → How a session works: with Smart Tracking off, nothing about rating; no Ask Revo (no Revo in a session)', async () => {
     const phone = await account(true, false);
     const { app, home } = await openHome(phone, true);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
@@ -200,6 +205,9 @@ describe('the help follows Smart Tracking', () => {
     expect(ids).toEqual(expect.arrayContaining(['session.marking', 'session.stopping']));
     expect(ids).not.toContain('session.rating');
     expect(flatText(app.screen.getByTestId('help-sheet-session'))).not.toMatch(/\b(rate|rated|rating|weak|strong|strength)\b/i);
+    // A tester has Revo (Home's help offers it), but not in a session (Majd, Nov 8 2026).
+    expect(app.screen.queryByTestId('help-hide')).not.toBeNull();
+    expect(app.screen.queryByTestId('help-ask-revo')).toBeNull();
     await app.close();
   });
 

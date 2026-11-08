@@ -46,7 +46,14 @@ function TopicText({ text }: { text: string }) {
 function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
   const { palette } = useTheme();
   return (
-    <View style={styles.topic} testID={`help-topic-${topic.id}`} accessible>
+    // One element for VoiceOver and TalkBack: the title, then the words. Its own label, since iOS
+    // otherwise built one from every text inside, the mark's icon glyph first ("\uf539, Missed days").
+    <View
+      style={styles.topic}
+      testID={`help-topic-${topic.id}`}
+      accessible
+      accessibilityLabel={`${topic.title}, ${helpPlainText(topic.text)}`}
+    >
       {marks ? (
         <View style={[styles.mark, { backgroundColor: palette.fill }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Ionicons name={topic.icon} size={16} color={palette.text} />
@@ -60,9 +67,12 @@ function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
   );
 }
 
+/** Help sheets with no "Ask Revo": the reader (the Read tab) and a session (Majd, Nov 8 2026; REVO-25). */
+export const NO_REVO: ReadonlySet<HelpScreen> = new Set<HelpScreen>(['reader', 'session']);
+
 /**
- * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (while Revo is on for the account; nothing is
- * counted until a question is sent) and "Hide help buttons" (HELP-2), and Done. Both actions run once
+ * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (while Revo is on for the account, but never in
+ * the reader's or a session's help; nothing is counted until a question is sent) and "Hide help buttons" (HELP-2), and Done. Both actions run once
  * the sheet has gone. The topics follow Smart Tracking (HELP-3). Topic text is reading text: it grows
  * all the way with Dynamic Type and the sheet scrolls; the title and the two actions stop at 1.4×.
  */
@@ -88,7 +98,8 @@ export function HelpSheet({
   const entry = HELP[screen];
   const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true, recite });
   // Revo is on for this account (RevoHost is mounted): it follows Revo's own switch, whoever that opens it to.
-  const revo = useRevoPresent();
+  // Never in the reader's or a session's help: there is no Revo there (REVO-25).
+  const revo = useRevoPresent() && !NO_REVO.has(screen);
   const marks = fontScale <= MARKS_UP_TO;
 
   const after = (action: 'revo' | 'hide') => {
