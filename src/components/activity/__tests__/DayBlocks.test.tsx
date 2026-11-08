@@ -105,6 +105,23 @@ describe('the blocks as mock d1 and d2 read them', () => {
     expect(screen.queryByText(/p\. 562|Page 562/)).toBeNull();
   });
 
+  it('[REC-2] a timed sitting is named by the pages it held; one with no pages, "Timed in Read"', async () => {
+    const at = new Date(2026, 10, 3, 7, 42).getTime();
+    items.mockResolvedValueOnce({
+      revisions: [],
+      memorized: [],
+      reads: [
+        { id: 'r1', day: '2026-11-03', pages: [562, 563], minutes: 41, occurredAt: at },
+        { id: 'r2', day: '2026-11-03', pages: [], minutes: 10, occurredAt: at + 3_600_000 },
+      ],
+      doneAhead: [],
+    });
+    render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
+    expect(await screen.findByText('Al-Mulk, ayahs 1–26', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText('Timed in Read')).toBeTruthy();
+    expect(screen.getByText('2 pages')).toBeTruthy();
+  });
+
   it('pages credited to other days read with their dates, and a catch-up never as ahead [SESS-7]', async () => {
     items.mockResolvedValueOnce({
       revisions: [
@@ -122,7 +139,7 @@ describe('the blocks as mock d1 and d2 read them', () => {
     expect(screen.queryByText(/\d{4}-\d{2}-\d{2}/)).toBeNull();
   });
 
-  it('a day that is over says what was left, and "ran" (mock d2)', async () => {
+  it('a day that is over says what was left (mock d2)', async () => {
     items.mockResolvedValueOnce({
       revisions: [{ id: '2026-11-01', day: '2026-11-01', countsFor: '2026-11-01', pages: assigned.slice(0, 6), skipped: [], assigned, minutes: 9 }],
       memorized: [],
@@ -131,10 +148,12 @@ describe('the blocks as mock d1 and d2 read them', () => {
     });
     render(<DayBlocks {...base} day="2026-11-01" today="2026-11-03" />);
     expect(await screen.findByText(/9 min · 14 not revised$/)).toBeTruthy();
-    expect(screen.getByText('Sunday ran midnight to midnight')).toBeTruthy();
+    expect(screen.getByText('Sunday: midnight to midnight')).toBeTruthy();
+    // Chrome: capped at 1.4× (it ran to four lines at the largest text).
+    expect(screen.getByText('Sunday: midnight to midnight').props.maxFontSizeMultiplier).toBe(1.4);
   });
 
-  it('today keeps its surahs and "runs" (mock d1)', async () => {
+  it('today keeps its surahs (mock d1)', async () => {
     items.mockResolvedValueOnce({
       revisions: [{ id: '2026-11-01', day: '2026-11-01', countsFor: '2026-11-01', pages: assigned.slice(0, 6), skipped: [], assigned, minutes: 9 }],
       memorized: [],
@@ -143,6 +162,6 @@ describe('the blocks as mock d1 and d2 read them', () => {
     });
     render(<DayBlocks {...base} day="2026-11-01" today="2026-11-01" />);
     expect(await screen.findByText(/Adh.Dhariyat to Al.Hadid · 9 min$/)).toBeTruthy();
-    expect(screen.getByText('Sunday runs midnight to midnight')).toBeTruthy();
+    expect(screen.getByText('Sunday: midnight to midnight')).toBeTruthy();
   });
 });

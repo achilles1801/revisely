@@ -8,6 +8,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
+import { Tap } from '../v2/Tap';
+import { describePassage, pageRunEnds, spokenText } from '../../lib/passages';
 import type { StripCell, Strength } from '../../lib/activityDayParts';
 
 /** The Revised mark: a ring filled to the share revised; a check when done. */
@@ -38,21 +40,35 @@ export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; 
   );
 }
 
+const CELL_STATE: Record<StripCell['state'], string> = { revised: 'revised', skipped: 'skipped', 'not-reached': 'not reached' };
+
 /**
  * One cell per assigned page (gap audit §4): revised primary, skipped hollow, not reached dimmed, a red
- * dot under a weak page; the first and last page numbers under it. Over 30 pages, two rows.
+ * dot under a weak page (only with Smart Tracking: ACT-19); the surahs it starts and ends in under it
+ * (NAME-1). Over 30 pages, two rows. A tap on a page opens it in the reader (ACT-20; Majd, Nov 8 2026).
  */
-export function PageStrip({ cells }: { cells: StripCell[] }) {
+export function PageStrip({ cells, onOpenPage }: { cells: StripCell[]; onOpenPage?: (page: number) => void }) {
   const { palette, isDark } = useTheme();
   if (cells.length === 0) return null;
   const rows = cells.length > 30 ? [cells.slice(0, Math.ceil(cells.length / 2)), cells.slice(Math.ceil(cells.length / 2))] : [cells];
   const anyWeak = cells.some((c) => c.weak);
+  const [start, end] = pageRunEnds(cells[0].page, cells[cells.length - 1].page);
   return (
     <View testID="activity-page-strip">
       {rows.map((row, r) => (
         <View key={r} style={[styles.strip, r > 0 && styles.stripNext]}>
           {row.map((c) => (
-            <View key={c.page} style={styles.stripCol}>
+            <Tap
+              key={c.page}
+              onPress={onOpenPage ? () => onOpenPage(c.page) : undefined}
+              disabled={!onOpenPage}
+              accessibilityRole="button"
+              accessibilityLabel={`${spokenText(describePassage([c.page]))}, ${CELL_STATE[c.state]}${c.weak ? ', weak' : ''}`}
+              accessibilityHint={onOpenPage ? 'Opens in the reader' : undefined}
+              hitSlop={{ top: 8, bottom: 8 }}
+              style={styles.stripCol}
+              testID={`strip-page-${c.page}`}
+            >
               <View
                 style={[
                   styles.cell,
@@ -61,16 +77,33 @@ export function PageStrip({ cells }: { cells: StripCell[] }) {
                   c.state === 'not-reached' && { backgroundColor: palette.track, opacity: isDark ? 0.8 : 0.55 },
                 ]}
               />
-              {anyWeak ? <View style={[styles.weakDot, { backgroundColor: c.weak ? palette.red : 'transparent' }]} /> : null}
-            </View>
+              {anyWeak ? (
+                <View style={[styles.weakDot, { backgroundColor: c.weak ? palette.red : 'transparent' }]} testID={c.weak ? `strip-weak-${c.page}` : undefined} />
+              ) : null}
+            </Tap>
           ))}
         </View>
       ))}
       <View style={[styles.ends, { marginTop: anyWeak ? 2 : 5 }]}>
-        <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]}>p. {cells[0].page}</Text>
-        <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]}>p. {cells[cells.length - 1].page}</Text>
+        <Text style={[typeV2.meta, styles.end, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4} testID="strip-start">
+          {start}
+        </Text>
+        <Text style={[typeV2.meta, styles.end, styles.endRight, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4} testID="strip-end">
+          {end}
+        </Text>
       </View>
     </View>
+  );
+}
+
+/** Without Smart Tracking, in strength's place: what the strip shows, in words ("18 revised · 2 skipped"). */
+export function StripSummary({ text }: { text: string }) {
+  const { palette } = useTheme();
+  if (!text) return null;
+  return (
+    <Text style={[typeV2.meta, styles.summary, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="activity-strip-summary">
+      {text}
+    </Text>
   );
 }
 
@@ -103,7 +136,10 @@ export function WindowFooter({ text }: { text: string }) {
   return (
     <View style={styles.footer} testID="activity-day-footer">
       <Ionicons name="moon-outline" size={13} color={palette.secondary} />
-      <Text style={[typeV2.meta, { color: palette.secondary, flex: 1 }]}>{text}</Text>
+      {/* Chrome: it stops growing at 1.4× (it ran to four lines at the largest text). */}
+      <Text style={[typeV2.meta, { color: palette.secondary, flex: 1 }]} maxFontSizeMultiplier={1.4}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -114,7 +150,10 @@ const styles = StyleSheet.create({
   stripCol: { flex: 1, alignItems: 'center' },
   cell: { alignSelf: 'stretch', height: 20, borderRadius: 4 },
   weakDot: { width: 5, height: 5, borderRadius: 2.5, marginTop: 4 },
-  ends: { flexDirection: 'row', justifyContent: 'space-between' },
+  ends: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  end: { flexShrink: 1 },
+  endRight: { textAlign: 'right' },
+  summary: { marginTop: 10 },
   tabular: { fontVariant: ['tabular-nums'] },
   counts: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 10 },
   count: { flexDirection: 'row', alignItems: 'center', gap: 4 },

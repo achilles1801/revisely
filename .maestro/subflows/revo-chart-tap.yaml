@@ -1,0 +1,16 @@
+# Taps a chart's part in Revo's chat (the plot, a weekday, a table's heading or row), first
+# scrolling it whole into view. With the keyboard still up after a question (iOS keeps it), the
+# chat sits at its end and a chart's middle can be above the list, under the header; a tap there
+# misses (iOS run 42437606335, Nov 8 2026). The tap also puts the keyboard away.
+#   env ID: the element's id
+appId: com.revisionbuddy.app
+---
+- scrollUntilVisible:
+    element:
+      id: ${ID}
+    direction: UP
+    centerElement: true
+    visibilityPercentage: 100
+    timeout: 10000
+- tapOn:
+    id: ${ID}

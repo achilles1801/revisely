@@ -59,6 +59,8 @@ import { previousIsoDay } from '../../lib/streak';
 import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
 import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { carryForTomorrow, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
+import { shiftDay } from '../../lib/journal';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'ActivityDay'>;
@@ -109,9 +111,10 @@ export default function ActivityDayScreen() {
   const route = useRoute<ScreenRoute>();
   const date = route.params.date;
   const focusRecordingId = route.params.focusRecordingId;
+  const focusBlock = route.params.focusBlock;
   const scrollRef = useRef<ScrollView>(null);
   const scrolledToRecordingRef = useRef(false);
-  const { user, logs, updateLog, deleteLog, pages, updatePages } = useApp();
+  const { user, logs, updateLog, deleteLog, pages, updatePages, saveUser } = useApp();
   const { theme, palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
@@ -436,8 +439,20 @@ export default function ActivityDayScreen() {
                 void deleteLog(log.id);
               }}
               onDeleteMemorized={onDeleteMemorized}
+              onEditMemorized={(focusPages) => navigation.navigate('Memorization', { edit: true, focusPages })}
+              // The reader over the day, so back returns here (ACT-20).
+              onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
+              // Opened at a block (ACT-18): scrolled to it once it is laid out.
+              focusBlock={focusBlock}
+              onFocusBlockLayout={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true })}
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
               onDeleteReading={removeReading}
+              // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.
+              onReviseTomorrow={(memorizedToday) => {
+                if (user) void saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(today, 1), memorizedToday, user.carryOver) });
+              }}
+              onEditSchedule={() => navigation.navigate('PlanEdit')}
+              onAddToPlan={(memorizedToday) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: memorizedToday })}
             />
           )}
           {replies.map((r, i) => {

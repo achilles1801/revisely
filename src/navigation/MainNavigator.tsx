@@ -51,8 +51,9 @@ export type HomeStackParamList = {
   ActiveRevision: { aheadDay?: string } | undefined;
   // section: scroll to that section (Revo's openScreen, REVO-31).
   Settings: { section?: RevoSettingsSection } | undefined;
-  // edit: open with the pages ready to edit (Home's Memorized line).
-  Memorization: { edit?: boolean } | undefined;
+  // edit: open with the pages ready to edit (Home's Memorized line). focusPages: open at those pages
+  // (Activity's Memorized → Edit): their surah open and scrolled to, the pages ringed.
+  Memorization: { edit?: boolean; focusPages?: number[] } | undefined;
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
   // merge the day-level edit into its in-memory days[] without round-tripping
   // through a context or store.
@@ -61,8 +62,12 @@ export type HomeStackParamList = {
   // Revision sessions, timed sessions and the daily log, day by day.
   Activity: undefined;
   // date is a revision day, YYYY-MM-DD.
-  /** focusRecordingId: scroll to that recording and highlight it. */
-  ActivityDay: { date: string; focusRecordingId?: string };
+  /** focusRecordingId: scroll to that recording and highlight it. focusBlock: scroll to that block
+   *  (a row of Overview's picked day, ACT-18). */
+  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' };
+  // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
+  // opened (ACT-20), unlike the Read tab's reader.
+  QuranReader: { pageNumber: number };
   // A recording played over the pages it was recorded on, from fromMs (ms
   // into it; default the start).
   ListenBack: { recordingId: string; fromMs?: number };
@@ -124,6 +129,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
       <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
+      <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </HomeStack.Navigator>
   );
 }

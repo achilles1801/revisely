@@ -140,6 +140,52 @@ export function SwipeRow({
   );
 }
 
+/**
+ * A row that opens its menu on a press and hold, with no swipe: the same hold as SwipeRow's (450 ms,
+ * the finger still), for rows whose menu holds the delete (Majd, Nov 8 2026: a recording's swipe to
+ * delete was "very ugly"; its hold and menu stay). VoiceOver gets `actions` in place of the hold.
+ */
+export function HoldRow({
+  children,
+  onHold,
+  actions = [],
+  accessibilityLabel,
+  accessible = true,
+  testID,
+}: {
+  children: React.ReactNode;
+  onHold: () => void;
+  actions?: RowAction[];
+  accessibilityLabel?: string;
+  /** Off when the row holds its own buttons (they need VoiceOver's focus). */
+  accessible?: boolean;
+  testID?: string;
+}) {
+  const gesture = useMemo(() => {
+    const openMenu = () => onHold();
+    const hold = Gesture.LongPress()
+      .minDuration(HOLD_MS)
+      .maxDistance(10)
+      .onStart(() => {
+        runOnJS(openMenu)();
+      });
+    return testID ? hold.withTestId(`${testID}-hold`) : hold;
+  }, [onHold, testID]);
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        testID={testID}
+        accessible={accessible}
+        accessibilityLabel={accessible ? accessibilityLabel : undefined}
+        accessibilityActions={accessible && actions.length > 0 ? actions.map((a) => ({ name: a.name, label: a.label })) : undefined}
+        onAccessibilityAction={accessible ? (e) => actions.find((a) => a.name === e.nativeEvent.actionName)?.onPress() : undefined}
+      >
+        {children}
+      </View>
+    </GestureDetector>
+  );
+}
+
 const styles = StyleSheet.create({
   action: {
     width: SWIPE_ACTION_WIDTH,

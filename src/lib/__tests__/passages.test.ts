@@ -7,6 +7,7 @@ import {
   lastVerseOfPage,
   NBHY,
   NBSP,
+  pageRunEnds,
   pagesNote,
   placeOfPage,
   plainText,
@@ -361,5 +362,20 @@ describe('text for the screen, for notifications and for VoiceOver', () => {
       expect(surahName(s).length).toBeGreaterThan(0);
       expect(getSurahDisplay(s)?.ayahCount).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('pageRunEnds: a strip’s two labels (Activity’s day, ACT-20)', () => {
+  it('the surahs a run starts and ends in', () => {
+    expect(pageRunEnds(542, 561).map(plainText)).toEqual(['Al-Mujadila', 'At-Tahrim']);
+  });
+  it('inside one surah, its first and last ayahs', () => {
+    const [a, b] = pageRunEnds(23, 25).map(plainText);
+    expect(a).toMatch(/^Al-Baqarah \d+$/);
+    expect(b).toMatch(/^Al-Baqarah \d+$/);
+    expect(Number(a.split(' ')[1])).toBeLessThan(Number(b.split(' ')[1]));
+  });
+  it('nothing for a page out of range', () => {
+    expect(pageRunEnds(0, 700)).toEqual(['', '']);
   });
 });

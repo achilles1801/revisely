@@ -65,7 +65,7 @@ export interface RevoContext {
    * The parts of the Qur'an named above, in words, surah and juz first (lib/revo/words over
    * lib/passages): today's pages and where they start, what's next and where it starts, the weak ones.
    */
-  passages: { today?: string; startsAt?: string; next?: string; nextAt?: string; weakNext?: string; weak?: string };
+  passages: { today?: string; startsAt?: string; next?: string; nextAt?: string; weakNext?: string; weak?: string; memorizedToday?: string };
   /** Each page named above, in words ("Al-Hashr, ayahs 17–24 · Juz 28"), by page number. */
   pageNames: Record<string, string>;
   localTime: string | null;

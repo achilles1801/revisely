@@ -231,7 +231,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Revo itself',
-    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33'],
+    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33', 'REVO-34', 'REVO-35'],
     routes: ['Settings'],
     text: lines(
       '- For testers, off until turned on. Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
@@ -276,11 +276,19 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-25': 'the button’s size and the room lists leave for it',
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
-  'MEM-1': 'memorizing by the ayah: no one can save ayahs yet; the Day’s Add to memorized brings it, with its own section here',
-  'MEM-2': 'a partly memorized page’s share in the %: nothing to ask until ayahs can be saved (MEM-1)',
-  'MEM-3': 'taking ayahs off the memorized: nothing to ask until ayahs can be saved (MEM-1)',
-  'MEM-6': 'the schedule editor’s Not in your plan (testers); the guide’s words are in Revo’s system prompt, so it comes with the next recording of Revo’s replies',
-  'MEM-4': 'a partly memorized page in the revision cycle: nothing to ask until ayahs can be saved (MEM-1)',
+  // Memorizing by the ayah and the reader's sittings (testers):
+  'MEM-1': 'the guide’s words are in Revo’s system prompt, so its section on memorizing by the ayah comes with the next recording of Revo’s replies (functions/scripts/record-anthropic.js)',
+  'MEM-2': 'a partly memorized page’s share in the % (MEM-1’s section)',
+  'MEM-3': 'taking ayahs off the memorized (MEM-1’s section)',
+  'MEM-4': 'a partly memorized page in the revision cycle (MEM-1’s section)',
+  'MEM-5': 'the Day’s Add to memorized from a sitting (MEM-1’s section)',
+  'MEM-6': 'the schedule editor’s Not in your plan (MEM-1’s section)',
+  'REC-1': 'the reader’s End also stopping its recording, and its one note (MEM-1’s section)',
+  'REC-2': 'a sitting saved with the pages it held (MEM-1’s section)',
+  // The interactive Activity (testers):
+  'ACT-18': 'the guide’s words are in Revo’s system prompt, so its lines on the interactive Activity (Week | Month as a chip, Today, the picked day opening the day) come with the next recording of Revo’s replies (functions/scripts/record-anthropic.js)',
+  'ACT-19': 'no strength shown without Smart Tracking (ACT-18’s note: with the next recording)',
+  'ACT-20': 'the day’s page strip opening the reader (ACT-18’s note: with the next recording)',
 };
 
 /** The guide as Revo reads it. */

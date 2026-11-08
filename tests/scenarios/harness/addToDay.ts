@@ -66,6 +66,8 @@ export class AddToDay {
   async memorized(from: number, to: number): Promise<void> {
     await this.open();
     await this.choose('memorized');
+    // The sheet opens on Ayahs (MEM-1); pages are its Whole pages tab.
+    await this.press('add-memorized-tab-pages');
     await this.type('add-memorized-from', String(from));
     await this.type('add-memorized-to', String(to));
     await this.add('memorized');

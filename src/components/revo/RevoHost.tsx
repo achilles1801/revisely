@@ -11,6 +11,7 @@ import { useMiniPlayer } from '../../lib/nowPlaying';
 import { REVO_BUTTON_ROUTES, revoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
+import { greetingState, nextOpens, type GreetingOpens } from '../../lib/revo/greeting';
 import { onRevoOpen, type RevoOpenRequest } from '../../lib/revo/open';
 import { openScreen } from '../../lib/revo/screens';
 import { setRevoButtonRoute, setRevoPresent } from '../../lib/revo/presence';
@@ -32,6 +33,8 @@ export const SETTINGS_WAIT_MS = 2000;
 export const REVIEW_FROM_HOUR = 19;
 const reviewAskedKey = (uid: string, day: string) => `@revo_review_asked:${uid}:${day}`;
 const reviewSeenKey = (uid: string) => `@revo_review_seen:${uid}`;
+/** How many times today's greeting has opened, and in which state (lib/revo/greeting nextOpens). */
+const greetingOpensKey = (uid: string) => `@revo_greeting_opens:${uid}`;
 
 /** The focused route's name, following navigation. */
 function useRouteName(): string | null {
@@ -69,9 +72,10 @@ function useKeyboardUp(): boolean {
 
 /**
  * Revo in the app (previewTester accounts): its button on the main screens and its sheet. The
- * first tap opens the opt-in; after that, a conversation (a new one, or the Day in review that
- * the button's dot points to). Each evening with something done, the day's review is written
- * once (it never counts toward the day's questions).
+ * first tap opens the opt-in; after that, every open is a new conversation on a greeting written
+ * then (REVO-34). An earlier one shows only when picked: in History, or today's Day in review from
+ * its row under the greeting, which the button's dot points to until it is opened. Each evening
+ * with something done, the day's review is written once (it never counts toward the day's questions).
  */
 export function RevoHost() {
   const { user } = useApp();
@@ -104,28 +108,104 @@ function RevoHostInner() {
   const fullBeforeAdd = useRef(false);
   const [optInBusy, setOptInBusy] = useState(false);
   const [optInError, setOptInError] = useState<string | null>(null);
-  const [reviewWaiting, setReviewWaiting] = useState<string | null>(null);
 
   useEffect(() => (uid ? backend.watchSettings(uid, setSettings) : undefined), [backend, uid]);
   useEffect(() => (uid ? backend.watchUsage(uid, setUsage) : undefined), [backend, uid]);
 
-  // Today's review: is there one the user hasn't opened?
-  const checkReview = useCallback(async () => {
-    if (!uid || !settings?.optIn) return setReviewWaiting(null);
-    const seen = await AsyncStorage.getItem(reviewSeenKey(uid)).catch(() => null);
-    const id = `review-${day}`;
-    const unsub = backend.watchMessages(uid, id, (messages) => {
-      setReviewWaiting(messages.length > 0 && seen !== day ? id : null);
-    });
-    return unsub;
-  }, [backend, uid, settings?.optIn, day]);
+  // Today's review, and whether the user has opened it: when its first message was written, while
+  // it hasn't been. The day it was last opened is state, so a later write to the review (a
+  // follow-up asked in it) can't offer it again; before Nov 7 2026 a listener kept the day it had
+  // read at its start and put the review back on the button after every change to it.
+  const reviewId = `review-${day}`;
+  const [reviewAt, setReviewAt] = useState<number | null>(null);
+  const [seenDay, setSeenDay] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    let unsub: (() => void) | void;
-    void checkReview().then((u) => {
-      unsub = u;
-    });
-    return () => unsub?.();
-  }, [checkReview]);
+    let live = true;
+    setSeenDay(undefined);
+    if (uid) {
+      void AsyncStorage.getItem(reviewSeenKey(uid))
+        .catch(() => null)
+        .then((seen) => live && setSeenDay(seen));
+    }
+    return () => {
+      live = false;
+    };
+  }, [uid]);
+  useEffect(() => {
+    setReviewAt(null);
+    if (!uid || !settings?.optIn) return;
+    return backend.watchMessages(uid, reviewId, (messages) => setReviewAt(messages[0]?.at ?? null));
+  }, [backend, uid, settings?.optIn, reviewId]);
+  const reviewWaiting = reviewAt != null && seenDay !== undefined && seenDay !== day;
+  const markReviewSeen = useCallback(() => {
+    setSeenDay(day);
+    void AsyncStorage.setItem(reviewSeenKey(uid), day).catch(() => undefined);
+  }, [uid, day]);
+  // Each new conversation counts one open of today's greeting in the state the day is in, kept on
+  // the phone so a restart doesn't say "done" again (REVO-35).
+  const opens = useRef<GreetingOpens | null>(null);
+  const [opening, setOpening] = useState<GreetingOpens | null>(null);
+  useEffect(() => {
+    let live = true;
+    if (uid) {
+      void AsyncStorage.getItem(greetingOpensKey(uid))
+        .catch(() => null)
+        .then((raw) => {
+          if (!live || opens.current) return;
+          try {
+            const rec = raw ? (JSON.parse(raw) as GreetingOpens) : null;
+            if (rec && typeof rec.day === 'string' && typeof rec.state === 'string' && Number.isInteger(rec.n)) opens.current = rec;
+          } catch {
+            // A record that can't be read starts again.
+          }
+        });
+    }
+    return () => {
+      live = false;
+    };
+  }, [uid]);
+  const countOpen = useCallback(() => {
+    const ctx = build();
+    if (!ctx) return setOpening(null);
+    const rec = nextOpens(opens.current, day, greetingState(ctx));
+    opens.current = rec;
+    setOpening(rec);
+    void AsyncStorage.setItem(greetingOpensKey(uid), JSON.stringify(rec)).catch(() => undefined);
+  }, [build, day, uid]);
+  // Revo turned off (here, in Settings or on another phone): turned on again, it starts afresh.
+  useEffect(() => {
+    if (!uid || settings == null || settings.optIn) return;
+    opens.current = null;
+    void AsyncStorage.removeItem(greetingOpensKey(uid)).catch(() => undefined);
+  }, [uid, settings]);
+
+  // Today's review as it was when this conversation opened: a review written while the sheet is up
+  // waits for the next open (its dot) rather than appearing under the greeting being read.
+  const [reviewOffer, setReviewOffer] = useState<number | null>(null);
+  const reviewNow = useRef<number | null>(null);
+  reviewNow.current = reviewWaiting ? reviewAt : null;
+
+  /** A new conversation: the greeting, written now (REVO-34). */
+  const startFresh = useCallback(() => {
+    setView({ name: 'chat' });
+    setChatId(null);
+    setReviewOffer(reviewNow.current);
+    countOpen();
+  }, [countOpen]);
+
+  // A conversation the user picked: its messages, at full height; today's review is then opened.
+  const openChat = useCallback(
+    (id: string) => {
+      setChatId(id);
+      setView({ name: 'chat' });
+      setFull(true);
+      if (id === reviewId) {
+        markReviewSeen();
+        setReviewOffer(null);
+      }
+    },
+    [reviewId, markReviewSeen],
+  );
 
   // In the evening, write today's review once (if the day had activity).
   const askedRef = useRef<string | null>(null);
@@ -165,20 +245,17 @@ function RevoHostInner() {
       } else if (request.view === 'memory') {
         setView({ name: 'memory' });
         setFull(true);
+      } else if (request.chatId) {
+        openChat(request.chatId);
       } else {
-        setView({ name: 'chat' });
-        const target = request.chatId ?? (request.attach ? null : reviewWaiting);
-        setChatId(target ?? null);
-        setFull(target != null);
+        // A new conversation, its greeting written now (REVO-34), whatever was open before.
+        startFresh();
+        setFull(false);
         if (request.attach) setAttachments([request.attach]);
-        if (target && target === reviewWaiting) {
-          void AsyncStorage.setItem(reviewSeenKey(uid), day).catch(() => undefined);
-          setReviewWaiting(null);
-        }
       }
       setOpen(true);
     },
-    [settings, reviewWaiting, uid, day],
+    [settings, openChat, startFresh],
   );
   const showRef = useRef(show);
   showRef.current = show;
@@ -204,8 +281,7 @@ function RevoHostInner() {
       // The server's answer is the switch now: the account's settings follow a moment later, and a
       // sheet closed and opened again before they do must open the chat, not the opt-in again.
       setSettings(await backend.setOptions({ optIn: true }));
-      setView({ name: 'chat' });
-      setChatId(null);
+      startFresh();
       setFull(false);
     } catch (err) {
       setOptInError((err as Error)?.message ?? 'Revo isn’t available on this account.');
@@ -236,7 +312,7 @@ function RevoHostInner() {
 
   return (
     <>
-      {buttonShown ? <RevoButton bottom={bottom} dot={reviewWaiting != null} onPress={() => show()} /> : null}
+      {buttonShown ? <RevoButton bottom={bottom} dot={reviewWaiting} onPress={() => show()} /> : null}
       <RevoSheetFrame visible={open} onClose={close} full={full} onFullChange={setFull}>
         <RevoBoundary resetKey={open}>
           {view.name === 'optin' ? (
@@ -245,15 +321,8 @@ function RevoHostInner() {
             <RevoHistory
               uid={uid}
               onBack={() => setView({ name: 'chat' })}
-              onOpen={(id) => {
-                setChatId(id);
-                setView({ name: 'chat' });
-                setFull(true);
-              }}
-              onNew={() => {
-                setChatId(null);
-                setView({ name: 'chat' });
-              }}
+              onOpen={openChat}
+              onNew={startFresh}
             />
           ) : view.name === 'memory' && settings ? (
             <RevoMemory uid={uid} settings={settings} today={day} onBack={() => setView({ name: 'chat' })} />
@@ -301,6 +370,9 @@ function RevoHostInner() {
                 setView({ name: 'optin' });
                 setFull(true);
               }}
+              review={reviewWaiting && reviewOffer != null ? { at: reviewOffer } : null}
+              opening={opening}
+              onOpenReview={() => openChat(reviewId)}
             />
           )}
         </RevoBoundary>

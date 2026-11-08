@@ -213,6 +213,19 @@ How the tests are made: `tests/scenarios/README.md`.
   closed) while a recording plays, it stops and its player is freed: nothing plays on with nothing
   on screen to stop it.
 
+## The reader
+
+- **REC-1.** A sitting in the reader (testers): ending the timer while a recording runs, or is paused,
+  ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
+  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
+  place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
+  it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
+  named. Stopping only the recording leaves the timer running.
+- **REC-2.** A sitting in the reader (testers) is saved with the pages it held, so the Day's Read block
+  counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
+  Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
+  pages known reads "Timed in Read".
+
 ## Activity
 
 - **ACT-1.** A memorized page is filed under the same revision day as everything else in Activity: the
@@ -249,7 +262,10 @@ How the tests are made: `tests/scenarios/README.md`.
   window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
   header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
-  VoiceOver offers the same actions as custom actions on the header.
+  A Memorized entry's menu is exactly Edit and Delete (each named when the day has several entries); Edit opens
+  the memorized pages ready to edit, at that entry: its surah open and scrolled to, its pages ringed. A
+  recording has no swipe either: a hold opens its menu (Listen back, Delete). (Majd, Nov 8 2026.)
+  VoiceOver offers the same actions as custom actions on the header (a recording's Delete, on its play button).
   The menu is the iOS-style long-press menu: a preview of the held item (its label and text) with its actions
   beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
   The daily log's note menu is the same menu (Edit, and Copy when the note has text).
@@ -302,6 +318,22 @@ How the tests are made: `tests/scenarios/README.md`.
   launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
   no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
   pages were re-derived from sessions alone.)
+- **ACT-18.** Activity has two tabs, Overview and Insights. Overview's calendar shows a month or a week:
+  a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
+  the picked day (or else today) on screen. When the calendar shows another month or week than today's,
+  Today, beside the arrows, brings back today's with today picked. The picked day's whole preview opens
+  that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
+  that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
+  weeks instead of month"; Open alone was easy to miss.)
+- **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
+  strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
+  stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
+  strength shows as before (ACT-8). (Majd, Nov 8 2026: the strength displays mean nothing without it.)
+- **ACT-20.** A day's Revised block has a strip of the day's assigned pages, each revised, skipped or not
+  reached. Its ends are named by surah (NAME-1), and the line under it gives the pages' strength with
+  Smart Tracking, or else what the strip shows ("18 revised · 2 skipped"). A tap on a page opens it in the
+  reader over the day, and back returns to the day; a weak spot in Insights opens the reader the same way.
+  (Majd, Nov 8 2026: "you'd think u can atleast click on it".)
 
 ## Ask coach
 
@@ -376,16 +408,34 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-9.** The Day in review is written at most once a revision day, from the evening, on a day with something
   done; it never counts toward the day's questions and is skipped (never an error) when the month's cap is reached.
-  The button's dot shows until it is opened. It is covered by Revo's opt-in.
+  The button's dot shows until it is opened (from its row under Revo's greeting, or from History; REVO-34). It is
+  covered by Revo's opt-in.
 
 - **REVO-10.** Conversations are kept with the account: a follow-up sends the conversation's last 10 messages with what
   was attached to them. The app reads its own conversations and memory and can't create them. Turning Revo off deletes
   its conversations, memory and kept answers (the day's count stays); deleting the account deletes all of it.
 
-- **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and which
-  of it is weak), with suggestions; neither is a question or a call. Its own words name parts of the Qur'an by surah
-  and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
+- **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and,
+  with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Its own words name
+  parts of the Qur'an by surah and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
   The context also carries each part it names in those words, for Revo's answers (REVO-27).
+
+- **REVO-34.** Each time Revo's sheet opens (its button, or another screen opening it), it opens on a new
+  conversation with a greeting written from what the phone shows at that moment (REVO-20): after a session, pages
+  added or revised, today finished, or the revision day starting again at Fajr or midnight, the next open says so.
+  A conversation from earlier shows only when the user picks it: in History, or, while today's Day in review hasn't
+  been opened, from its row under the greeting (it was written earlier and may no longer be true). Once the review
+  is opened, from either, its dot and its row go for good, a follow-up asked in it included.
+
+- **REVO-35.** The greeting doesn't repeat itself. The phone counts, per account and across restarts, the day's
+  opens of a new conversation in the state today is in (not started or how many pages done, done, nothing planned).
+  Today done: the first open after it says so, with Home's "Done · N" count and the streak; later opens lead with one
+  thing from the account's own data instead, in turn, so two opens in a row differ: where the next revision day
+  starts (as Home's "Tomorrow starts at …"), the weak part left longest (with Smart Tracking on: without it nothing
+  is said about strength), the week's pages, the share of the Quran memorized. Not done: the greeting always says where today stands and what is next, and a second open with nothing
+  changed follows that with the week, the share memorized or the streak, in turn, instead of the same offer. Nothing
+  planned works like done. The first suggestion follows what the greeting leads with. All of it is written on the
+  phone: no call, nothing counted.
 
 - **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent and what isn't; nothing is
   sent before "Turn on Revo", the Day in review included. The sheet opens on the opt-in itself, at its height; a tap
@@ -488,6 +538,16 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   short surah, or a surah's end that shares its page, is revised before the rest of the page is learned.
   Home, the widget and Revo name it by its memorized ayahs: with only An-Nas memorized on the Qur'an's
   last page, the day "Starts at An-Nas", not Al-Ikhlas.
+- **MEM-5.** On a day in Activity (testers), a sitting from the reader whose pages aren't all memorized
+  offers Add to memorized. The Memorized sheet opens on Ayahs, From and To never outside the pages the
+  sitting held. From starts at the first ayah not yet memorized there, To at the end of those pages, and
+  the sitting's minutes come with it. Whole pages and Surah are its other tabs.
+  - After adding, the sitting stands under Memorized. The block counts in ayahs when part of a page was
+    memorized ("20 ayahs"), and says what finishes the page ("Al-Mulk 21–26 finishes the page").
+  - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).
+  - Memorized today, the block says where the pages stand in the plan. On an automatic plan it says when
+    they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
+    add new pages by itself, it offers Add to your plan (tomorrow's day of it).
 
 - **MEM-6.** The schedule editor (testers) lists, under "Not in your plan", the memorized and partly
   memorized pages a custom plan doesn't hold, named by their ayahs. A custom plan never adds new pages by

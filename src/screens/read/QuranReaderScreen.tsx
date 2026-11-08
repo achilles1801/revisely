@@ -33,6 +33,7 @@ import {
 import { appendReadingHistory } from '../../lib/readingHistory';
 import { firstSurahOnPage } from '../../lib/verses';
 import { useMushafEdition } from '../../lib/mushafEdition';
+import { sittingSavedText } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
@@ -65,12 +66,36 @@ export default function QuranReaderScreen() {
   const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
     null,
   );
+  // A sitting (REC-1, testers): ending the timer ends a recording running with it, and one note
+  // says what was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
+  const sittings = user?.previewTester === true;
+  const endingSitting = useRef(false);
+  const [sittingSaved, setSittingSaved] = useState<{ day: string; text: string } | null>(null);
   const recorder = useVoiceRecorder({
     kind: 'reading',
     day: today,
     currentPage,
-    onFinished: setSavedRecording,
+    // Ended with the timer, the recording is told about in the sitting's note, not its own.
+    onFinished: (info) => {
+      if (!endingSitting.current) setSavedRecording(info);
+    },
   });
+  const recordingOn = recorder.phase === 'recording' || recorder.phase === 'paused';
+  const endRecordingWithTimer = useCallback(async () => {
+    endingSitting.current = true;
+    try {
+      await recorder.finish();
+    } finally {
+      endingSitting.current = false;
+    }
+  }, [recorder]);
+  const onSittingSaved = useCallback(
+    (day: string, seconds: number, ended: { pages: number[] }) => {
+      setSavedRecording(null);
+      setSittingSaved({ day, text: sittingSavedText({ day, today: today ?? day, pages: ended.pages, seconds }) });
+    },
+    [today],
+  );
 
   // Opened again with another page while already open (e.g. the Friday
   // Al-Kahf card): the stack updates this screen's params instead of pushing.
@@ -171,7 +196,7 @@ export default function QuranReaderScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} />
+            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
             <View style={styles.titleCol}>
               <SurahName surah={firstSurah} palette={palette} />
               <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
@@ -192,7 +217,13 @@ export default function QuranReaderScreen() {
               surface={{ background: palette.control, border: palette.divider }}
               recording={recordingLive}
               record={<RecordButton recorder={recorder} crowded={timer != null} />}
-              timer={<TimerChip compact={compact} />}
+              timer={
+                <TimerChip
+                  compact={compact}
+                  onSaved={sittings ? onSittingSaved : undefined}
+                  beforeEnd={sittings && recordingOn ? endRecordingWithTimer : undefined}
+                />
+              }
             />
           </View>
         }
@@ -237,6 +268,20 @@ export default function QuranReaderScreen() {
         }}
         onDismiss={() => setSavedRecording(null)}
         // At the bottom of the room under the page, never over the text.
+        bottomInset={insets.bottom - spacing.sm}
+      />
+
+      <UndoToast
+        visible={!!sittingSaved}
+        message={sittingSaved?.text ?? ''}
+        actionLabel="View"
+        duration={6000}
+        onUndo={() => {
+          const saved = sittingSaved;
+          setSittingSaved(null);
+          if (saved) navigateToActivityDay(saved.day);
+        }}
+        onDismiss={() => setSittingSaved(null)}
         bottomInset={insets.bottom - spacing.sm}
       />
 

@@ -9,8 +9,8 @@ import { revisionDayOf } from '../fajrBoundary';
 import { shiftDay } from '../journal';
 import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoContext, RevoTotals } from './types';
-import { contextWords } from './words';
-import { isRevisable, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
+import { contextWords, memorizedWords } from './words';
+import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 const MAX_PAGES = 20;
 const MAX_WEAK = 30;
@@ -81,9 +81,12 @@ export function buildRevoContext(input: {
   const revisedHere = reviewedOn(logs, today);
   const minutes = logs.filter((l) => l.date === today).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
   // The revision day each page was marked on (DAY-2), not the UTC date of the timestamp.
-  const memorizedToday = pages.filter(
+  const memorizedTodayPages = pages.filter(
     (p) => isRevisable(p) && p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), user) === today,
-  ).length;
+  );
+  const memorizedToday = memorizedTodayPages.length;
+  // What was added, by surah and ayah (MEM-1): "Al-Mulk, ayahs 1–20".
+  const memorizedTodayWords = memorizedToday > 0 ? memorizedWords(memorizedAyahs(memorizedTodayPages)) : null;
   const last = lastRevisedByPage(revisedItems(logs), today);
   const weakPages = pages
     .filter((p) => isRevisable(p) && isWeak(p))
@@ -129,7 +132,7 @@ export function buildRevoContext(input: {
         ? { previous: reading.grace.previous, yesterdayPlanned: reading.grace.progress.scheduled, yesterdayDone: reading.grace.progress.credited }
         : null,
     },
-    passages: words.passages,
+    passages: memorizedTodayWords ? { ...words.passages, memorizedToday: memorizedTodayWords } : words.passages,
     pageNames: words.pageNames,
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };

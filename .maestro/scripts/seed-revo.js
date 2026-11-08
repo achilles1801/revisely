@@ -81,7 +81,9 @@ function ratingOf(page) {
 }
 
 // 1. Twenty pages a day.
-merge('users/' + uid, { dailyPageCapacity: 20 });
+// The mocks' account rates its pages (548–549 weak), so it has Smart Tracking on: without it Revo
+// says nothing about strength (REVO-35).
+merge('users/' + uid, { dailyPageCapacity: 20, smartTrackingEnabled: true });
 
 // 2. Juz 28 memorized with its ratings; the signup's pages unmarked.
 var TODAY = '2026-11-03';

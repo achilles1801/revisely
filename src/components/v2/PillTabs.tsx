@@ -61,7 +61,10 @@ export function PillTabs<T extends string>({
               ]}
               testID={`pill-${o.value}`}
             >
-              <Text style={[typeV2.name, { color: selected ? palette.bg : palette.text }]}>{o.label}</Text>
+              {/* Chrome: stops growing at 1.4×, as PillButton's label does (the default tone). */}
+              <Text style={[typeV2.name, { color: selected ? palette.bg : palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                {o.label}
+              </Text>
             </Tap>
           );
         })}
@@ -100,6 +103,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8 },
   hug: { alignItems: 'flex-start' },
   pill: { flex: 1 },
-  ink: { height: 32, borderRadius: 16, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
-  compact: { height: 28, borderRadius: 14, paddingHorizontal: 11 },
+  ink: { minHeight: 32, borderRadius: 16, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  compact: { minHeight: 28, borderRadius: 14, paddingHorizontal: 11 },
 });

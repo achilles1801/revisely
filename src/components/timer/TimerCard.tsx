@@ -79,6 +79,8 @@ export function TimerCard({
   onClose,
   onHidden,
   onOpenQuran,
+  onSaved,
+  beforeEnd,
 }: {
   visible: boolean;
   origin: Frame | null;
@@ -87,6 +89,10 @@ export function TimerCard({
   onHidden?: () => void;
   /** "Open the Quran" in the controls; omitted where the Quran is already open. */
   onOpenQuran?: () => void;
+  /** A session was saved (TimerControls); by default the "Session saved" alert. The reader says it its own way (REC-1). */
+  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  /** Runs before End finishes the session (TimerControls): the reader stops its recording (REC-1). */
+  beforeEnd?: () => Promise<void>;
 }) {
   const { palette, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -245,7 +251,8 @@ export function TimerCard({
               <TimerControls
                 visible={visible}
                 onClose={onClose}
-                onSaved={(date, seconds) => alertSessionSaved(date, seconds)}
+                onSaved={onSaved ?? ((date, seconds) => alertSessionSaved(date, seconds))}
+                beforeEnd={beforeEnd}
                 onOpenQuran={onOpenQuran}
               />
             </Reanimated.View>

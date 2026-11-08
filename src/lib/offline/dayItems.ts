@@ -5,10 +5,11 @@
 import { readItemFor } from '../readItems';
 import { memorizedMinutesAfter } from '../activityAdd';
 import type { OutboxEntry, OutboxOp } from './ops';
+import { ayahsOfPages, pageOfAyah, sortedAyahs } from '../ayahKeys';
 
 export interface DayItems {
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
-  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null }[];
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null; verses?: number[] }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   doneAhead: { fromDay: string; pages: number[] }[];
 }
@@ -103,14 +104,26 @@ export function overlayDayItems(items: DayItems, entries: readonly OutboxEntry[]
       // Minutes join once, as the server joins them (ACT-5): laid over a copy that has them already
       // (a change the server has taken), they add nothing.
       const timed = memorizedMinutesAfter(prev ?? null, { minutes: op.minutes ?? null, at: op.at });
-      memorized = [...memorized.filter((m) => m.id !== day), { id: day, day, pages, minutes: timed.minutes, updatedAt: timed.updatedAt }];
+      // Ayahs merge as the server merges them (firestoreService.addMemorizationPages).
+      const byAyah = (op.verses && op.verses.length > 0) || (prev?.verses && prev.verses.length > 0);
+      const verses = byAyah
+        ? sortedAyahs([...(prev?.verses ?? []), ...(op.verses ?? []), ...(op.verses && op.verses.length > 0 ? [] : ayahsOfPages(op.pages))])
+        : undefined;
+      memorized = [
+        ...memorized.filter((m) => m.id !== day),
+        { id: day, day, pages, minutes: timed.minutes, updatedAt: timed.updatedAt, ...(verses ? { verses } : {}) },
+      ];
     } else if (op.kind === 'memorization.delete' && op.day === day) {
       memorized = memorized.filter((m) => m.id !== op.id);
     } else if (op.kind === 'memorization.unmark') {
       const drop = new Set(op.pages);
+      const dropAyahs = new Set(op.verses ?? []);
       memorized = memorized
-        .map((m) => ({ ...m, pages: m.pages.filter((p) => !drop.has(p)) }))
-        .filter((m) => m.pages.length > 0);
+        .map((m) => {
+          const verses = m.verses?.filter((k) => !dropAyahs.has(k) && !drop.has(pageOfAyah(k)));
+          return { ...m, pages: m.pages.filter((p) => !drop.has(p)), ...(verses ? { verses } : {}) };
+        })
+        .filter((m) => m.pages.length > 0 && (m.verses == null || m.verses.length > 0));
     } else if (op.kind === 'reading.add' && op.session.date === day) {
       const r = readItemFor(op.id, uid, op.session);
       reads = [...reads.filter((x) => x.id !== op.id), { id: r.id, day: r.day, pages: r.pages, minutes: r.minutes, occurredAt: r.occurredAt }];

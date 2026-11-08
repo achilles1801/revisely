@@ -373,3 +373,130 @@ it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo
     reviews.restore();
   }
 });
+
+it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting written then: after a session, a question, today finished and the next day; an earlier conversation or the Day in review only when picked, the review offered until it is opened', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-06 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+  await setServerDoc(`coachSettings/${uid}`, { revoOn: true });
+
+  const reviews = watchFunction('revoDayInReview');
+  try {
+    app = await phone.open(revoStack);
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    const home = new Home(app);
+    await home.ready();
+
+    const openRevo = async () => {
+      await tap(app, 'revo-button');
+      await app.until(() => app.screen.queryByTestId('revo-history') != null, 'Revo’s sheet');
+    };
+    const closeRevo = async () => {
+      await app.act(async () => {
+        app.mods.rtl.fireEvent(app.screen.getByTestId('revo-sheet-handle'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+      });
+      await app.until(() => app.screen.queryByTestId('revo-button') != null, 'the button back on Home');
+    };
+    /** A new conversation: the greeting, nothing asked in it; what the greeting says. */
+    const fresh = async (when: string) => {
+      await app.until(() => app.screen.queryByTestId('revo-greeting') != null, `the greeting (${when})`);
+      expect(app.screen.queryAllByTestId('revo-question')).toHaveLength(0);
+      expect(app.screen.queryAllByTestId('revo-answer')).toHaveLength(0);
+      return plainText(String(app.screen.getByTestId('revo-greeting').props.children));
+    };
+    const send = async (text: string) => {
+      await app.act(async () => {
+        app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), text);
+      });
+      await tap(app, 'revo-send');
+    };
+    /** Revises the rest of today in its session, from the page it opens on. */
+    const finishToday = async () => {
+      const session = await home.startSession();
+      const left = session.pages().length - session.pages().indexOf(session.current()!);
+      await session.swipeThrough(left);
+      await session.back();
+      await app.untilSynced();
+    };
+
+    // The morning: today's plan.
+    await openRevo();
+    expect(await fresh('morning')).toMatch(/Today is 5 pages, starting at Al-Fatihah\./);
+    await closeRevo();
+
+    // Two pages revised: the next open says so.
+    const session = await home.startSession();
+    await session.swipeThrough(2);
+    await session.back();
+    await app.untilSynced();
+    await openRevo();
+    expect(await fresh('two pages')).toMatch(/You’re 2 pages into today, and .+ is next\./);
+
+    // A question asked, then the sheet closed: the next open is a new conversation on the greeting,
+    // and the question waits in History.
+    await modelSays(uid, reply('You revised steadily this week.'));
+    await tap(app, 'revo-chip-How was my week?');
+    await app.until(() => app.screen.queryByText('You revised steadily this week.') != null, 'the answer');
+    await closeRevo();
+    await openRevo();
+    // [REVO-35] The second open with nothing changed: today's line, then something else.
+    expect(await fresh('after a question')).toMatch(/^Salaam( [^.]+)?\. You’re 2 pages into today, and .+ is next\. This week you’ve revised 2 pages on 1 day\.$/);
+    await tap(app, 'revo-history');
+    await app.until(() => app.screen.queryByText('My week') != null, 'the conversation in History');
+    await tap(app, 'revo-back');
+    expect(await fresh('back from History')).toMatch(/You’re 2 pages into today/);
+    await closeRevo();
+
+    // The evening, today finished: the Day in review is written (REVO-9), and the dot shows.
+    setNow('2026-11-06 20:00');
+    await modelSays(uid, reply('Three pages revised so far this evening.', { title: 'Day in review', chips: [] }));
+    await finishToday();
+    await app.until(() => reviews.calls > 0 && app.screen.queryByTestId('revo-button-dot') != null, 'the Day in review’s dot');
+
+    // [REVO-34] The open still starts on a greeting written now, the review a row under it, not
+    // what the sheet shows: it was written earlier and may no longer be true.
+    await openRevo();
+    expect(await fresh('evening')).toMatch(/Today’s 5 pages are done\./);
+    expect(app.screen.queryByText('Three pages revised so far this evening.')).toBeNull();
+    await tap(app, 'revo-review');
+    await app.until(() => app.screen.queryByText('Three pages revised so far this evening.') != null, 'the Day in review, once picked');
+    // A follow-up in it.
+    await modelSays(uid, reply('Start tomorrow with Al-Baqarah.'));
+    await send('What should I start with tomorrow?');
+    await app.until(() => app.screen.queryByText('Start tomorrow with Al-Baqarah.') != null, 'the follow-up’s answer');
+    await closeRevo();
+    await app.idle(500);
+
+    // [REVO-9] Opened, so no dot; and the next open is the greeting with no row, the follow-up
+    // in the review notwithstanding. [REVO-35] Today was done already, so it doesn't say so again:
+    // it leads with where tomorrow starts, as Home's line does, and its first suggestion follows.
+    expect(app.screen.queryByTestId('revo-button-dot')).toBeNull();
+    await openRevo();
+    const second = await fresh('after the review');
+    expect(second).toMatch(/^Salaam( [^.]+)?\. Tomorrow starts at Al-Baqarah, ayah \d+, 5 pages\.$/);
+    expect(app.screen.getByTestId('revo-chip-How do I revise ahead?')).toBeTruthy();
+    expect(app.screen.queryByTestId('revo-review')).toBeNull();
+    await closeRevo();
+    expect(app.screen.queryByTestId('revo-button-dot')).toBeNull();
+    // Opened again: something else again (the week), never "done".
+    await openRevo();
+    const third = await fresh('third open, done');
+    expect(third).toMatch(/^Salaam( [^.]+)?\. This week you’ve revised 5 pages on 1 day\.$/);
+    expect(third).not.toBe(second);
+    await closeRevo();
+
+    // The next revision day (midnight here): the greeting is the new day's.
+    setNow('2026-11-07 09:00');
+    await app.foreground();
+    await openRevo();
+    expect(await fresh('next day')).toMatch(/Today is 5 pages, starting at /);
+    await app.close();
+  } finally {
+    reviews.restore();
+  }
+});

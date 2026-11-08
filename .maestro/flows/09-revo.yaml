@@ -121,15 +121,19 @@ appId: com.revisionbuddy.app
 # The chart answers a touch (REVO-7): a tap on a row picks it, and its panel leads to the passage
 # (Revise first tomorrow, Open in the reader). The tap also puts the keyboard away; if that is all
 # it did, a second one picks the row.
-- tapOn:
-    id: revo-chart-pageRatings-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-pageRatings-plot
 - runFlow:
     when:
       notVisible:
         id: revo-chart-pageRatings-reader
     commands:
-      - tapOn:
-          id: revo-chart-pageRatings-plot
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-pageRatings-plot
 - extendedWaitUntil:
     visible:
       id: revo-chart-pageRatings-reader
@@ -139,8 +143,10 @@ appId: com.revisionbuddy.app
     env:
       NAME: r5c-chart-passage
 # Tapping the picked row again puts it back, as the mock shows the conversation.
-- tapOn:
-    id: revo-chart-pageRatings-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-pageRatings-plot
 - assertNotVisible:
     id: revo-chart-pageRatings-reader
 - runFlow:
@@ -170,15 +176,19 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-chart-dailyPages
     timeout: 15000
-- tapOn:
-    id: revo-chart-dailyPages-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-dailyPages-plot
 - runFlow:
     when:
       notVisible:
         id: revo-chart-dailyPages-day
     commands:
-      - tapOn:
-          id: revo-chart-dailyPages-plot
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-dailyPages-plot
 - extendedWaitUntil:
     visible:
       id: revo-chart-dailyPages-day
@@ -187,8 +197,10 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r5d-chart-day
-- tapOn:
-    id: revo-chart-dailyPages-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-dailyPages-plot
 - assertNotVisible:
     id: revo-chart-dailyPages-day
 
@@ -208,15 +220,19 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-chart-juzMap
     timeout: 15000
-- tapOn:
-    id: revo-chart-juzMap-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-juzMap-plot
 - runFlow:
     when:
       notVisible:
         id: revo-chart-juzMap-reader
     commands:
-      - tapOn:
-          id: revo-chart-juzMap-plot
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-juzMap-plot
 - extendedWaitUntil:
     visible:
       id: revo-chart-juzMap-reader
@@ -225,8 +241,10 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r5e-chart-juz
-- tapOn:
-    id: revo-chart-juzMap-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-juzMap-plot
 - assertNotVisible:
     id: revo-chart-juzMap-reader
 
@@ -246,15 +264,19 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-chart-timeline
     timeout: 15000
-- tapOn:
-    id: revo-chart-timeline-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-timeline-plot
 - runFlow:
     when:
       notVisible:
         id: revo-chart-timeline-day
     commands:
-      - tapOn:
-          id: revo-chart-timeline-plot
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-timeline-plot
 - extendedWaitUntil:
     visible:
       id: revo-chart-timeline-day
@@ -263,8 +285,10 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r5f-chart-timeline
-- tapOn:
-    id: revo-chart-timeline-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-timeline-plot
 - assertNotVisible:
     id: revo-chart-timeline-day
 
@@ -284,15 +308,19 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-chart-weeks
     timeout: 15000
-- tapOn:
-    id: revo-chart-weeks-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-plot
 - runFlow:
     when:
       notVisible:
         id: revo-chart-weeks-day
     commands:
-      - tapOn:
-          id: revo-chart-weeks-plot
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-weeks-plot
 - extendedWaitUntil:
     visible:
       id: revo-chart-weeks-day
@@ -301,17 +329,23 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r5g-chart-weeks
-- tapOn:
-    id: revo-chart-weeks-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-plot
 - assertNotVisible:
     id: revo-chart-weeks-day
-- tapOn:
-    id: revo-chart-weeks-col-6
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-col-6
 - assertVisible:
     id: revo-chart-weeks-title
     text: "Saturdays.*"
-- tapOn:
-    id: revo-chart-weeks-col-6
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-weeks-col-6
 
 # The table (a `visual`): Juz 27 and 28 side by side. A heading sorts; a row opens under itself
 # with Open in the reader.
@@ -329,10 +363,14 @@ appId: com.revisionbuddy.app
     visible:
       id: revo-chart-table
     timeout: 15000
-- tapOn:
-    id: revo-chart-table-sort-weak
-- tapOn:
-    id: revo-chart-table-row-28
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-table-sort-weak
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-table-row-28
 - extendedWaitUntil:
     visible:
       id: revo-chart-table-reader
@@ -341,8 +379,10 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r5h-chart-table
-- tapOn:
-    id: revo-chart-table-row-28
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-table-row-28
 - assertNotVisible:
     id: revo-chart-table-reader
 
@@ -516,15 +556,19 @@ appId: com.revisionbuddy.app
     timeout: 15000
 # The keyboard away: a tap on the chart picks a row (or only puts the keyboard away), and one more
 # leaves the conversation as the mock shows it.
-- tapOn:
-    id: revo-chart-pageRatings-plot
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-pageRatings-plot
 - runFlow:
     when:
       visible:
         id: revo-chart-pageRatings-reader
     commands:
-      - tapOn:
-          id: revo-chart-pageRatings-plot
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-pageRatings-plot
 - assertNotVisible:
     id: revo-chart-pageRatings-reader
 - runFlow:
