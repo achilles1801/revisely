@@ -112,10 +112,11 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-send
 # The answer's plan card, once revoAsk has answered (a few seconds on a CI runner, after the warm-up).
+# Every answer waits up to 30 s: on a loaded macOS runner one took over 20 (run 42444458733).
 - extendedWaitUntil:
     visible:
       id: revo-plan
-    timeout: 15000
+    timeout: 30000
 - assertVisible:
     id: revo-chart-pageRatings
 # The chart answers a touch (REVO-7): a tap on a row picks it, and its panel leads to the passage
@@ -175,7 +176,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-chart-dailyPages
-    timeout: 15000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-chart-tap.yaml
     env:
@@ -219,7 +220,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-chart-juzMap
-    timeout: 15000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-chart-tap.yaml
     env:
@@ -263,7 +264,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-chart-timeline
-    timeout: 15000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-chart-tap.yaml
     env:
@@ -307,7 +308,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-chart-weeks
-    timeout: 15000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-chart-tap.yaml
     env:
@@ -362,7 +363,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-chart-table
-    timeout: 15000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-chart-tap.yaml
     env:
@@ -401,7 +402,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-chart-memorized-plot
-    timeout: 15000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-chart-tap.yaml
     env:
@@ -597,7 +598,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-plan
-    timeout: 15000
+    timeout: 30000
 # The keyboard away: a tap on the chart picks a row (or only puts the keyboard away), and one more
 # leaves the conversation as the mock shows it.
 - runFlow:
