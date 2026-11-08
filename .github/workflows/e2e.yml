@@ -129,7 +129,8 @@ jobs:
       run_android: ${{ steps.shards.outputs.run_android }}
     steps:
       # The jobs and their flows. Every flow: two jobs a platform of about the
-      # same length (03 and 04, the long ones, apart). The smoke set: two Android jobs, one iOS.
+      # same length (03 and 04, the long ones, apart; every flow in one of them, which
+      # scripts/e2e/__tests__/shards.test.js checks). The smoke set: two Android jobs, one iOS.
       # Called from CI: what `ios` and `android` say. On its own: a run by hand
       # with `flows` is one job each with those, `smoke` the smoke set, and
       # otherwise (and nightly) every flow.
@@ -146,7 +147,7 @@ jobs:
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          full='[{"name":"01 02 03 08 09 11","flows":".maestro/flows/0[12389]-*.yaml .maestro/flows/11-*.yaml"},{"name":"04 05 06 07 10 14","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/1[04]-*.yaml"}]'
+          full='[{"name":"01 02 03 08 09 11","flows":".maestro/flows/0[12389]-*.yaml .maestro/flows/11-*.yaml"},{"name":"04 05 06 07 10 12 13 14","flows":".maestro/flows/0[4567]-*.yaml .maestro/flows/1[0234]-*.yaml"}]'
           # Android's smoke set is a single PR's long pole: two jobs side by side
           # (about 8 minutes of flows each: 02 + 05, 04 + 06) instead of one of 16.
           # iOS keeps one job: macOS runners are the scarce part (5 at a time).
