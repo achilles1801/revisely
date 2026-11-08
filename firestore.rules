@@ -148,6 +148,9 @@ service cloud.firestore {
         'recordingBackup', 'recordingBackupCellular',
         // The new design's accent (Settings → Appearance), kept with the account.
         'accent',
+        // The last "What's new" walkthrough this account finished (a release id,
+        // lib/whatsNew), set by onboarding too so new accounts never see it.
+        'whatsNewSeen',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -279,6 +282,9 @@ service cloud.firestore {
                          incomingData().translationId.size() <= 40)) &&
                        (!hasField('accent') ||
                         incomingData().accent in ['indigo', 'crimson', 'jade']) &&
+                       (!hasField('whatsNewSeen') ||
+                        (incomingData().whatsNewSeen is string &&
+                         incomingData().whatsNewSeen.matches('^[a-z0-9.-]{1,20}$'))) &&
                        (!hasField('scheduleShiftPages') ||
                         (incomingData().scheduleShiftPages is int &&
                          isInRange(incomingData().scheduleShiftPages, 0, 1000000))) &&

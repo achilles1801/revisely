@@ -245,6 +245,23 @@ describe('users/{userId}', () => {
       await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { accent: 3 }));
     });
 
+    it('owner can mark a "What\'s new" release seen, with onboarding in the same write', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: '2026-11' }));
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}`), { onboardingComplete: true, whatsNewSeen: '2026-11' }),
+      );
+    });
+
+    it('rejects a "What\'s new" mark that is not a short release id', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: 3 } as any));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: '' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: 'x'.repeat(21) }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: 'Nov 2026' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: true } as any));
+    });
+
     it('rejects an unknown carry-over mode', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { carryOverMode: 'double' }));
