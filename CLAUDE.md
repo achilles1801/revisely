@@ -489,6 +489,13 @@ translations matched to a source, is `~/Documents/revisely-translations/inventor
   sura shown and QuranEnc.com (TRANS-2). Right-to-left languages read right to left (TRANS-3).
 - **Who:** testers get the picker of every translation (`offeredTranslations`, TRANS-5); everyone else
   keeps Saheeh International and The Clear Quran®.
+- **Downloads** (`lib/translationDownloads`, TRANS-6): a picker row shows its size, downloads the whole
+  translation on any connection (one tap, a few MB; stoppable, carries on), and the bin removes it.
+  Saheeh International stays with the offline mushaf. Offline, a translation not on the phone offers
+  one that is: the same language, then Saheeh, then any (`fallbackTranslation`, TRANS-7).
+- **E2E:** builds fetch nothing, so `src/lib/e2e/demoTranslations.ts` writes Al-Ikhlas in 24
+  recorded translations (one per script) and page 604's Arabic, and `revisely://e2e/verse?ref=112:2&t=…`
+  opens the real verse sheet. Flow `14-translations` captures each script on both platforms.
 - **Not yet:** 87 entries on QuranEnc's website aren't in its list (41 are tafsirs). The 25 that
   Quran.com also has, Russian, Bengali, Malay and Korean among them, publish no version, which the
   terms require: they wait for QuranEnc's answer. Tanzil's translations are non-commercial only. The

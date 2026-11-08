@@ -1,14 +1,16 @@
-// What the translation picker lists: the translation in use first, then every language (by its
-// English name), each with its translations. A search keeps the translations whose language (in
-// English or its own name), translator or credit has every word typed, accents and case aside.
+// What the translation picker lists: the translation in use first, then the ones downloaded to the
+// phone, then every language (by its English name) with its other translations. A search keeps the
+// translations whose language (in English or its own name), translator or credit has every word
+// typed, accents and case aside.
 
 import { languageName } from './translationLanguages';
 import type { TranslationInfo } from './translation';
+import type { DownloadStatus } from './translationDownloads';
 
 export interface PickerSection {
-  /** "chosen", or the language's code. */
+  /** "chosen", "downloaded", or the language's code. */
   key: string;
-  /** "In use", or the language's English name. */
+  /** "In use", "Downloaded", or the language's English name. */
   title: string;
   /** The language's own name, when it differs from the title. */
   native?: string;
@@ -36,14 +38,23 @@ export function matchesQuery(t: TranslationInfo, query: string): boolean {
   return words.every((w) => hay.includes(w));
 }
 
-export function pickerSections(list: TranslationInfo[], query: string, chosenId: string): PickerSection[] {
+export function pickerSections(
+  list: TranslationInfo[],
+  query: string,
+  chosenId: string,
+  downloaded: (t: TranslationInfo) => boolean = () => false,
+): PickerSection[] {
   const shown = list.filter((t) => matchesQuery(t, query));
   const sections: PickerSection[] = [];
   const chosen = shown.find((t) => t.id === chosenId);
   if (chosen) sections.push({ key: 'chosen', title: 'In use', data: [chosen] });
+  const onPhone = shown.filter((t) => t.id !== chosenId && downloaded(t));
+  if (onPhone.length > 0) {
+    sections.push({ key: 'downloaded', title: 'Downloaded', data: onPhone.sort((a, b) => a.name.localeCompare(b.name)) });
+  }
   const byLanguage = new Map<string, TranslationInfo[]>();
   for (const t of shown) {
-    if (t.id === chosenId) continue;
+    if (t.id === chosenId || onPhone.includes(t)) continue;
     const group = byLanguage.get(t.languageCode) ?? [];
     group.push(t);
     byLanguage.set(t.languageCode, group);
@@ -59,4 +70,28 @@ export function pickerSections(list: TranslationInfo[], query: string, chosenId:
     });
   }
   return sections;
+}
+
+/** Megabytes as Settings writes them ("1.1 MB", "12 MB"; mushafOfflineUi's formatMegabytes). */
+export function megabytes(bytes: number): string {
+  const mb = bytes / 1e6;
+  return `${mb >= 10 ? Math.round(mb) : Math.max(0.1, Math.round(mb * 10) / 10)}\u00A0MB`;
+}
+
+/** The row's line about the phone: its size, what is on the phone, a download's progress. */
+export function downloadLine(s: DownloadStatus | null): string | null {
+  if (!s) return null;
+  if (!s.manageable) return s.phase === 'complete' ? 'On this phone, with the offline mushaf' : 'Downloads with the offline mushaf';
+  switch (s.phase) {
+    case 'downloading':
+      return `Downloading… ${Math.floor((100 * s.suras) / s.total)}%`;
+    case 'complete':
+      return `On this phone · ${megabytes(s.bytes)}`;
+    case 'failed':
+      return `Couldn’t download all of it · ${s.suras} of ${s.total} suras on this phone`;
+    case 'partial':
+      return `${s.suras} of ${s.total} suras on this phone · ${megabytes(s.bytes)}`;
+    default:
+      return megabytes(s.bytes);
+  }
 }

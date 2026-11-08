@@ -1,11 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import type { TranslationInfo } from '../../lib/translation';
-import { pickerSections } from '../../lib/translationPicker';
+import { downloadLine, megabytes, pickerSections } from '../../lib/translationPicker';
+import {
+  DownloadStatus,
+  downloadStatus,
+  removeTranslation,
+  startDownload,
+  stopDownload,
+  useDownloadsTick,
+} from '../../lib/translationDownloads';
 
 /** Names and lines grow with Dynamic Type only this far (chrome). */
 const CHROME_TEXT_SCALE = 1.4;
@@ -19,14 +27,28 @@ interface Props {
 }
 
 /**
- * The verse sheet's translation picker (testers, for now): a search, the translation in use, then
- * every language with its translations, each row the translator and the credit its licence asks for.
- * A panel inside the verse sheet, not a modal of its own (iOS can't stack one over a modal sheet).
+ * The verse sheet's translation picker (testers, for now): a search, the translation in use, the ones
+ * on the phone, then every language with its translations, each row the translator and the credit
+ * its licence asks for, what is on the phone, and a button to download it whole (with its size), stop
+ * the download, or remove it. A panel inside the verse sheet, not a modal of its own (iOS can't
+ * stack one over a modal sheet).
  */
 export function TranslationPicker({ translations, chosenId, onChoose }: Props) {
   const { palette } = useTheme();
   const [query, setQuery] = useState('');
-  const sections = useMemo(() => pickerSections(translations, query, chosenId), [translations, query, chosenId]);
+  // Re-renders as downloads move on, and as suras are kept while being read.
+  const tick = useDownloadsTick(translations);
+  const sections = useMemo(
+    () => pickerSections(translations, query, chosenId, (t) => downloadStatus(t)?.phase === 'complete'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [translations, query, chosenId, tick],
+  );
+
+  const confirmRemove = (t: TranslationInfo, s: DownloadStatus) =>
+    Alert.alert(`Remove ${t.name}?`, `This frees ${megabytes(s.bytesOnPhone)}. You can download it again.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => removeTranslation(t) },
+    ]);
 
   return (
     <View style={styles.flex} testID="translation-picker">
@@ -81,6 +103,8 @@ export function TranslationPicker({ translations, chosenId, onChoose }: Props) {
         )}
         renderItem={({ item }) => {
           const chosen = item.id === chosenId;
+          const status = downloadStatus(item);
+          const line = downloadLine(status);
           return (
             <Tap
               onPress={() => onChoose(item.id)}
@@ -102,13 +126,76 @@ export function TranslationPicker({ translations, chosenId, onChoose }: Props) {
                 <Text style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
                   {item.credit.linkLabel}
                 </Text>
+                {line ? (
+                  <Text
+                    style={[typeV2.meta, { color: status?.phase === 'failed' ? palette.red : palette.secondary }]}
+                    maxFontSizeMultiplier={CHROME_TEXT_SCALE}
+                    testID={`translation-status-${item.id}`}
+                  >
+                    {line}
+                  </Text>
+                ) : null}
               </View>
+              {status?.manageable ? <DownloadButton t={item} s={status} onRemove={confirmRemove} /> : null}
               {chosen ? <Ionicons name="checkmark" size={22} color={palette.text} /> : <View style={styles.check} />}
             </Tap>
           );
         }}
       />
     </View>
+  );
+}
+
+/** Download (with its size), stop a download, or remove it from the phone. */
+function DownloadButton({
+  t,
+  s,
+  onRemove,
+}: {
+  t: TranslationInfo;
+  s: DownloadStatus;
+  onRemove: (t: TranslationInfo, s: DownloadStatus) => void;
+}) {
+  const { palette } = useTheme();
+  if (s.phase === 'downloading') {
+    return (
+      <Tap
+        onPress={() => stopDownload(t)}
+        hitSlop={8}
+        style={styles.action}
+        accessibilityRole="button"
+        accessibilityLabel={`Stop downloading ${t.name}`}
+        testID={`translation-stop-${t.id}`}
+      >
+        <Ionicons name="stop-circle-outline" size={24} color={palette.text} />
+      </Tap>
+    );
+  }
+  if (s.phase === 'complete') {
+    return (
+      <Tap
+        onPress={() => onRemove(t, s)}
+        hitSlop={8}
+        style={styles.action}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${t.name} from this phone, ${megabytes(s.bytesOnPhone)}`}
+        testID={`translation-remove-${t.id}`}
+      >
+        <Ionicons name="trash-outline" size={22} color={palette.red} />
+      </Tap>
+    );
+  }
+  return (
+    <Tap
+      onPress={() => void startDownload(t)}
+      hitSlop={8}
+      style={styles.action}
+      accessibilityRole="button"
+      accessibilityLabel={`Download ${t.name}, ${megabytes(s.bytes)}`}
+      testID={`translation-download-${t.id}`}
+    >
+      <Ionicons name="cloud-download-outline" size={24} color={palette.text} />
+    </Tap>
   );
 }
 
@@ -134,5 +221,6 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, minWidth: 0, gap: 1 },
   check: { width: 22 },
+  action: { minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   empty: { paddingVertical: 24, textAlign: 'center' },
 });

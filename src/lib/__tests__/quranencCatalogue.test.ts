@@ -6,6 +6,8 @@ import { LANGUAGES, languageName } from '../translationLanguages';
 import {
   ALL_TRANSLATIONS,
   creditLine,
+  fallbackTranslation,
+  nameWithLanguage,
   offeredTranslations,
   QURANENC_TRANSLATIONS,
   quranEncTranslationId,
@@ -114,5 +116,34 @@ describe('what the picker offers', () => {
     const found = pickerSections(offeredTranslations(true), 'türkçe', 'en.sahih');
     expect(found.map((s) => s.key)).toEqual(['tr']);
     expect(pickerSections(offeredTranslations(true), 'nothing like this', 'en.sahih')).toEqual([]);
+  });
+});
+
+describe('offline, the translation offered instead (TRANS-7)', () => {
+  const offered = offeredTranslations(true);
+  const id = (t: { id: string } | null) => t?.id ?? null;
+  const on = (...ids: string[]) => (t: { id: string }) => ids.includes(t.id);
+
+  it('the same language first, then Saheeh International, then any other on the phone', () => {
+    const turkish = resolveTranslation('qe.turkish_shaban');
+    expect(id(fallbackTranslation(turkish, 2, offered, on('qe.turkish_rwwad', 'en.sahih', 'qe.french_rashid')))).toBe('qe.turkish_rwwad');
+    expect(id(fallbackTranslation(turkish, 2, offered, on('en.sahih', 'qe.french_rashid')))).toBe('en.sahih');
+    expect(id(fallbackTranslation(turkish, 2, offered, on('qe.french_rashid')))).toBe('qe.french_rashid');
+    expect(fallbackTranslation(turkish, 2, offered, on())).toBeNull();
+  });
+
+  it('never itself, and never The Clear Quran® (it can’t be on the phone whole)', () => {
+    const saheeh = resolveTranslation('en.sahih');
+    expect(fallbackTranslation(saheeh, 2, offered, on('en.sahih', 'en.khattab'))).toBeNull();
+  });
+
+  it('everyone else is offered Saheeh International only', () => {
+    const tcq = resolveTranslation('en.khattab');
+    expect(id(fallbackTranslation(tcq, 2, offeredTranslations(false), on('en.sahih', 'qe.french_rashid')))).toBe('en.sahih');
+  });
+
+  it('named with its language where the sheet doesn’t say it', () => {
+    expect(nameWithLanguage(resolveTranslation('qe.french_rashid'))).toBe('Rachid Maach (French)');
+    expect(nameWithLanguage(resolveTranslation('en.sahih'))).toBe('Saheeh International');
   });
 });
