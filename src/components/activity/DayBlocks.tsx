@@ -50,7 +50,7 @@ export const activityBlocksEnabled = (user: { previewTester?: boolean } | null |
 
 interface Props {
   day: string;
-  /** Today's revision day: a day before it "ran", today "runs" (the footer); a past day's Revised says what was left. */
+  /** Today's revision day: a past day's Revised says what was left. */
   today?: string;
   /** The day's log notes of each kind this block shows. */
   revisionNotes: JournalNote[];
@@ -224,8 +224,8 @@ export function DayBlocks({
   }, [day, user]);
   const footerText = useMemo(() => {
     const fmt = (x: Date) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return windowFooter(day, today, dayWindow ? { from: fmt(dayWindow.from), to: fmt(dayWindow.to) } : null);
-  }, [day, today, dayWindow]);
+    return windowFooter(day, dayWindow ? { from: fmt(dayWindow.from), to: fmt(dayWindow.to) } : null);
+  }, [day, dayWindow]);
   const view: DayView | null = useMemo(
     () => (items ? buildDayView(day, { ...items, notes: [] }, memorizedSet) : null),
     [items, day, memorizedSet],

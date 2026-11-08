@@ -18,6 +18,9 @@ import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 
+/** Chrome text (the picked day's preview) stops growing here, as headers and menu rows do. */
+const MAX_SCALE = 1.4;
+
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -181,26 +184,36 @@ export function CalendarMonth({
 
       <View style={[styles.legendRule, { backgroundColor: palette.separator }]} />
 
-      {/* The picked day: its date and Open, then one row per block that has something. */}
+      {/* The picked day: its date and Open, then one row per block that has something. Chrome, so it
+          stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
+          screen and the rows clipped into each other (Nov 2026). */}
       <View style={styles.preview}>
         <View style={styles.previewHead}>
-          <Text style={[styles.previewDate, { color: palette.text }]}>{formatDayLong(shownDay)}</Text>
+          <Text style={[styles.previewDate, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
+            {formatDayLong(shownDay)}
+          </Text>
           <Tap onPress={() => onOpen(shownDay)} accessibilityRole="button" accessibilityLabel="Open the day" style={styles.openRow}>
-            <Text style={[typeV2.name, { color: palette.link }]}>Open</Text>
+            <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
+              Open
+            </Text>
             <Ionicons name="chevron-forward" size={16} color={palette.link} />
           </Tap>
         </View>
         {previewRows.map((r) => (
           <View key={r.key} style={styles.previewRow}>
             {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
-            <Text style={[typeV2.body, { color: palette.text, width: 84 }]}>{r.label}</Text>
-            <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]} numberOfLines={1}>
+            <Text style={[typeV2.body, { color: palette.text, minWidth: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+              {r.label}
+            </Text>
+            <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {r.value}
             </Text>
             {r.mics ? (
               <View style={styles.mics} accessible accessibilityLabel={`${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}`} testID={`preview-recordings-${r.key}`}>
                 <Ionicons name="mic-outline" size={13} color={palette.secondary} />
-                <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]}>{r.mics}</Text>
+                <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                  {r.mics}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -349,9 +362,9 @@ const styles = StyleSheet.create({
   legendRule: { height: StyleSheet.hairlineWidth, marginTop: 10 },
   tabular: { fontVariant: ['tabular-nums'] },
   preview: { paddingTop: 10, paddingHorizontal: 16 },
-  previewHead: { height: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  previewDate: { fontSize: 16, lineHeight: 20, fontWeight: '600' },
-  openRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  previewRow: { height: 32, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewHead: { minHeight: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  previewDate: { flexShrink: 1, fontSize: 16, lineHeight: 20, fontWeight: '600' },
+  openRow: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  previewRow: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 10 },
   mics: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -2 },
 });

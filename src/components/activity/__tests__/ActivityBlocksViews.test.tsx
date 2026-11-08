@@ -86,6 +86,20 @@ describe('the Activity calendar (gap audit §3)', () => {
     }
   });
 
+  // At the largest text the date pushed "Open" off the screen's edge and the rows clipped into each
+  // other (iOS, Nov 2026): the date gives way, the preview's chrome stops at 1.4×, rows may grow.
+  it('the picked day’s preview keeps Open on screen at the largest text', async () => {
+    render(<ActivityBlocksViews {...props} />);
+    const open = await screen.findByLabelText('Open the day');
+    expect(screen.getByText('Open').props.maxFontSizeMultiplier).toBe(1.4);
+    const head = open.parent?.parent as { props: { style: unknown } } | undefined;
+    const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
+    expect(flat(head?.props.style).height).toBeUndefined();
+    const date = screen.getByTestId('preview-date');
+    expect(date.props.maxFontSizeMultiplier).toBe(1.4);
+    expect(flat(date.props.style).flexShrink).toBe(1);
+  });
+
   it('the preview names what was memorized and read by surah, not pages (Majd, Nov 7 2026)', async () => {
     const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
     service.getActivityItemsBetween.mockResolvedValue({

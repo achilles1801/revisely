@@ -42,14 +42,15 @@ export function dayTitle(day: string, today: string): { title: string; subtitle:
 }
 
 /**
- * The day view's footer (gap audit §4): which window the day covers, "runs" while it is today or
- * ahead, "ran" once it is over. "Tuesday runs Fajr to Fajr, 5:22 AM to 5:23 AM", "Sunday ran
- * midnight to midnight".
+ * The day view's footer (gap audit §4): the window the revision day covers. With the Fajr boundary it
+ * names the next day for the Fajr that ends it ("Tuesday: Fajr 5:07 AM to Wednesday’s Fajr 5:08 AM"):
+ * "Tuesday runs Fajr to Fajr, 5:07 AM to 5:08 AM" read as a one-minute window (Nov 2026). Otherwise
+ * "Tuesday: midnight to midnight". One line at ordinary text sizes.
  */
-export function windowFooter(day: string, today: string, window: { from: string; to: string } | null): string {
-  const weekday = new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
-  const verb = day < today ? 'ran' : 'runs';
-  return window ? `${weekday} ${verb} Fajr to Fajr, ${window.from} to ${window.to}` : `${weekday} ${verb} midnight to midnight`;
+export function windowFooter(day: string, window: { from: string; to: string } | null): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const weekday = (offset: number) => new Date(y, m - 1, d + offset).toLocaleDateString('en-US', { weekday: 'long' });
+  return window ? `${weekday(0)}: Fajr ${window.from} to ${weekday(1)}’s Fajr ${window.to}` : `${weekday(0)}: midnight to midnight`;
 }
 
 /**

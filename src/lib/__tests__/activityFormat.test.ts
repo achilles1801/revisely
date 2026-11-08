@@ -33,11 +33,16 @@ describe('the short page form (mocks d1, d5–d7)', () => {
 });
 
 describe('the day view footer (gap audit §4)', () => {
-  it('runs today and ahead, ran once the day is over', () => {
-    expect(windowFooter('2026-11-03', '2026-11-03', { from: '5:22 AM', to: '5:23 AM' })).toBe('Tuesday runs Fajr to Fajr, 5:22 AM to 5:23 AM');
-    expect(windowFooter('2026-11-01', '2026-11-03', { from: '5:19 AM', to: '5:20 AM' })).toBe('Sunday ran Fajr to Fajr, 5:19 AM to 5:20 AM');
-    expect(windowFooter('2026-10-28', '2026-11-03', null)).toBe('Wednesday ran midnight to midnight');
-    expect(windowFooter('2026-11-04', '2026-11-03', null)).toBe('Wednesday runs midnight to midnight');
+  // "Tuesday runs Fajr to Fajr, 5:07 AM to 5:08 AM" read as a one-minute window (Nov 2026): the end is
+  // the next day's Fajr, and says so.
+  it('names the next day for the Fajr that ends it', () => {
+    expect(windowFooter('2026-11-03', { from: '5:07 AM', to: '5:08 AM' })).toBe('Tuesday: Fajr 5:07 AM to Wednesday’s Fajr 5:08 AM');
+    expect(windowFooter('2026-11-01', { from: '5:19 AM', to: '5:20 AM' })).toBe('Sunday: Fajr 5:19 AM to Monday’s Fajr 5:20 AM');
+    expect(windowFooter('2026-11-07', { from: '5:10 AM', to: '5:11 AM' })).toBe('Saturday: Fajr 5:10 AM to Sunday’s Fajr 5:11 AM');
+  });
+
+  it('without the Fajr boundary, the day runs midnight to midnight', () => {
+    expect(windowFooter('2026-10-28', null)).toBe('Wednesday: midnight to midnight');
   });
 });
 

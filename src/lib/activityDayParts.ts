@@ -37,8 +37,3 @@ export function strengthCounts(revised: number[], ratingOf: (page: number) => nu
   return out;
 }
 
-/** "Tuesday runs Fajr to Fajr, 5:22 AM to 5:23 AM", or midnight to midnight. */
-export function windowFooterText(weekday: string, from: Date | null, to: Date | null, fmt: (d: Date) => string): string {
-  if (from && to) return `${weekday} runs Fajr to Fajr, ${fmt(from)} to ${fmt(to)}`;
-  return `${weekday} runs midnight to midnight`;
-}

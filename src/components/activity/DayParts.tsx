@@ -103,7 +103,10 @@ export function WindowFooter({ text }: { text: string }) {
   return (
     <View style={styles.footer} testID="activity-day-footer">
       <Ionicons name="moon-outline" size={13} color={palette.secondary} />
-      <Text style={[typeV2.meta, { color: palette.secondary, flex: 1 }]}>{text}</Text>
+      {/* Chrome: it stops growing at 1.4× (it ran to four lines at the largest text). */}
+      <Text style={[typeV2.meta, { color: palette.secondary, flex: 1 }]} maxFontSizeMultiplier={1.4}>
+        {text}
+      </Text>
     </View>
   );
 }
