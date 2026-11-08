@@ -25,6 +25,7 @@ export function JuzMapChart({
   preview,
   onReviseFirst,
   onOpenPage,
+  smart = true,
   testID = 'revo-chart-juzMap',
 }: {
   title: string;
@@ -35,6 +36,8 @@ export function JuzMapChart({
   preview?: (pages: number[]) => string | null;
   onReviseFirst?: (pages: number[]) => Promise<void>;
   onOpenPage?: (page: number) => void;
+  /** The account's Smart Tracking: off, no strength strip (REVO-36); `preview` says when and how often. */
+  smart?: boolean;
   testID?: string;
 }) {
   const { palette } = useTheme();
@@ -70,7 +73,7 @@ export function JuzMapChart({
           <>
             {line ? <DetailLine text={line} /> : null}
             {/* Nothing rated (a juz not memorized, or never revised): no strip, only where to go. */}
-            {strip.some((s) => s.band) ? (
+            {smart && strip.some((s) => s.band) ? (
               <>
                 <RatingStrip cells={strip.map((s) => s.band)} first={ends.first} last={ends.last} />
                 <RatingCounts counts={counts} />

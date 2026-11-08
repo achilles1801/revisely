@@ -28,6 +28,7 @@ export function DailyPagesChart({
   facts,
   planPages,
   onOpenDay,
+  smart = true,
   testID = 'revo-chart-dailyPages',
 }: {
   title: string;
@@ -40,6 +41,8 @@ export function DailyPagesChart({
   facts?: (day: string) => RevoDayFacts | null;
   planPages?: (day: string) => readonly number[];
   onOpenDay?: (day: string) => void;
+  /** The account's Smart Tracking: off, no ratings strip (REVO-36). */
+  smart?: boolean;
   testID?: string;
 }) {
   const { palette } = useTheme();
@@ -85,7 +88,7 @@ export function DailyPagesChart({
             ) : null}
             {detail.planned ? <DetailLine text="Planned, not revised" /> : null}
             {/* A day with no ratings has nothing for the strip to say: the passage names it. */}
-            {detail.strip.some((s) => s.band) ? (
+            {smart && detail.strip.some((s) => s.band) ? (
               <>
                 <RatingStrip cells={detail.strip.map((s) => s.band)} first={detail.first} last={detail.last} />
                 <RatingCounts counts={detail.counts} />

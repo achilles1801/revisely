@@ -386,6 +386,50 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: revo-chart-table-reader
 
+# Memorized by month (a `visual`): twelve months of the account's memorization records. A tap picks a
+# month: its header says how many pages (× puts it back).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Here is your year of memorizing.", "chart": {"kind": "memorized", "title": "Pages memorized", "months": 12}, "remember": [], "title": "My year", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How much have I memorized this year?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-memorized-plot
+    timeout: 15000
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-memorized-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-memorized-close
+    commands:
+      - runFlow:
+          file: ../subflows/revo-chart-tap.yaml
+          env:
+            ID: revo-chart-memorized-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-memorized-close
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5i-chart-memorized
+- runFlow:
+    file: ../subflows/revo-chart-tap.yaml
+    env:
+      ID: revo-chart-memorized-close
+- assertNotVisible:
+    id: revo-chart-memorized-close
+
 # Tonight's Day in review, written by the real function (as the app asks for it on a day with
 # something done). The memory holds what the conversation's answer asked to remember.
 - runScript:
