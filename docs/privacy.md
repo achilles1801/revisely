@@ -6,7 +6,7 @@ permalink: /privacy/
 # Privacy Policy for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-02**
+**Last updated: 2026-11-08**
 
 This Privacy Policy describes how Revisely ("we", "us", or "the app") collects, uses, and protects information when you use the Revisely mobile application, and when you donate to Revisely on our website, revisely.app.
 
@@ -22,6 +22,7 @@ Revisely is a mobile application that helps users track and review their Quran m
 - **Account information** — your name, email address, and password when you create an account.
 - **Profile information** received from Apple Sign-In or Google Sign-In if you choose to authenticate that way (typically your name, email address, and profile picture URL).
 - **Memorization data** — the pages, surahs, or juz you mark as memorized; weakness ratings you assign to pages; revision sessions you complete; entries you write in the Daily log (what you memorized or revised, minutes spent, and any personal notes); and reading sessions you time with the reading timer (start/end time, length, and the pages you assign to them).
+- **Revo conversations (optional)**: if you turn on Revo, the questions you ask it, its answers, and the short facts it remembers about your routine. See [Revo, the AI assistant](#revo).
 
 ### Information collected automatically
 - **Device and app information** — device model, operating system version, app version, language, time zone, and anonymous device identifiers (used by Firebase to manage your session).
@@ -37,6 +38,33 @@ Revisely is a mobile application that helps users track and review their Quran m
 - When you sign in with **Apple** or **Google**, we receive the profile information you authorize them to share (typically name and email).
 - We do not buy data from data brokers, scrape it from public sources, or import contacts from your device.
 
+<a id="revo"></a>
+### Revo, the AI assistant (optional)
+
+Revo is an assistant in the app that answers questions about your own revision. It is off until you turn it on, and before you do, the app tells you what it sends and that Claude, from Anthropic, writes its answers. You can turn it off at any time in Settings → Revo AI.
+
+**What is sent.** When you ask Revo something, our server sends Anthropic, which writes Revo's answers with its Claude models:
+- your question, and the conversation's last 10 messages when you continue a conversation;
+- what the app shows you about your revision: today's plan and how far you've got, this week, your streak, how many pages you have memorized and recently revised, your pace, and the time of day; with Smart Tracking on, also your page ratings and weak pages;
+- the short facts Revo remembers about you, if memory is on;
+- anything you add to that question with +: a surah, juz or pages and when you revised them; a day, with what you did that day and that day's Daily log notes; or a recording's length and the pages it covered, never its audio.
+
+Each evening, on a day you revised or memorized something, Revo may write a short Day in review from the same kind of information about that day, without a question.
+
+We never send Anthropic your name, email address, account ID, location, or the audio of any recording. What you type in a question is sent as you wrote it, so leave out personal details you don't want to share.
+
+**What Anthropic does with it.** Anthropic acts as our processor. It uses what we send only to write the answer, and under its commercial terms it does not train its models on it. Anthropic deletes it within 30 days. The exceptions: a request its automated safety systems flag as breaking its Usage Policy may be kept for up to 2 years, and the law may require it to keep data longer.
+
+**What we store.** We store these with your account in Cloud Firestore:
+- your conversations with Revo: each question with what you added to it, each answer, and any rating you give an answer;
+- up to 30 short facts Revo remembers about your goals and routine (for example "Revises after Fajr"). You can see each one, delete one or all of them, or turn memory off in Settings → Revo AI → Memory;
+- the answer to a first question, kept for that day, so asking the same question again doesn't send it to Anthropic again;
+- a count of the questions you ask each day, which sets the daily limit.
+
+Our logs record counts and costs, never your questions, Revo's answers or your notes.
+
+**Deleting it.** Settings → Revo AI → Delete conversations deletes all your conversations. Turning Revo off deletes your conversations, what it remembers and the kept answers. Deleting your account deletes all of it.
+
 ### Donations
 If you donate on revisely.app, you pay on a checkout page run by **Stripe**, which processes your card or other payment details; Revisely never receives your full card number. From Stripe we receive your **full name**, **email address**, the **amount** you gave and the **payment's status** (for example, whether it succeeded or was refunded), along with the limited payment details Stripe shows the businesses it serves, such as the card brand, the last four digits of the card or bank account, and the country. We use this information only to send your receipt, to thank you, and to keep our financial records. If you pay with a service offered on Stripe's checkout page, such as Apple Pay, Link, Cash App Pay or Amazon Pay, that service also processes the payment, under its own privacy policy. How Stripe handles your information is described in the [Stripe Privacy Policy](https://stripe.com/privacy).
 
@@ -48,6 +76,7 @@ We use the information described above to:
 
 - Operate the app — store your account, sync your revision data across devices, generate your daily revision schedule.
 - Send you the revision reminders you've enabled.
+- Answer your questions with Revo, and write its Day in review, if you turn Revo on.
 - Respond to support requests you send us.
 - Process donations — send your receipt, thank you, and keep financial records.
 - Detect and fix bugs and crashes.
@@ -57,14 +86,14 @@ We use the information described above to:
 We do **not**:
 - Sell your personal information.
 - Share your personal information with advertisers.
-- Use your data to train any AI model.
+- Use your data to train any AI model. Anthropic, which writes Revo's answers, doesn't train its models on what we send it either.
 
 ## 4. Legal bases (GDPR / UK GDPR)
 
 If you are in the European Economic Area, the United Kingdom, or Switzerland, we process your information on the following bases:
 
 - **Performance of a contract** — to create and operate your account, sync your data, provide the core memorization-tracking service, and process a donation you make.
-- **Consent** — for push notifications, location (when you enable the fajr-aligned day boundary), and Apple/Google sign-in (you consent through the system permission prompts).
+- **Consent**: for push notifications, location (when you enable the fajr-aligned day boundary), Revo (you turn it on in the app and can turn it off at any time), and Apple/Google sign-in (you consent through the system permission prompts).
 - **Legitimate interests** — to detect crashes, prevent abuse, improve the app, and thank people who donate. We balance this against your right to privacy and have minimized what we collect.
 - **Legal obligation** — to respond to lawful requests from authorities and retain records required by law.
 
@@ -79,27 +108,32 @@ We use the following processors to deliver Revisely. Each is bound by their own 
 | **Sentry / Functional Software, Inc.** | Crash and error reporting, problem reports | United States |
 | **Expo / 650 Industries, Inc.** | Build infrastructure and over-the-air updates | United States |
 | **AlQuran Cloud (Islamic Network)** | The Qur'an's Arabic text (Tanzil Project's text) | Not specified |
-| **QuranEnc.com** | The Saheeh International translation | Not specified |
+| **QuranEnc.com** | Translations of the Qur'an's meanings: Saheeh International, and any other translation you choose | Not specified |
 | **EveryAyah (everyayah.com)** | Recitation audio | Not specified |
 | **The Clear Quran® API (Al-Furqaan Foundation)** | The Clear Quran® English translation, when you choose it | United States |
 | **Cloudflare, Inc.** | Hosts this website and our server that fetches The Clear Quran® translation | United States |
+| **Anthropic, PBC** | Writes Revo's answers (Claude), if you turn Revo on | United States |
 | **Stripe, Inc.** | Payment processing for donations on revisely.app | United States |
 
-When you press and hold a verse, the app requests that verse's Arabic text from AlQuran Cloud (api.alquran.cloud) and, with Saheeh International, its translation from QuranEnc.com; when you play a verse, it requests its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page, surah or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again. So that the Qur'an can be read offline, the app also downloads, on Wi-Fi unless you allow mobile data, the mushaf's page images (from our Cloud Storage), the whole Arabic text from AlQuran Cloud and the whole Saheeh International translation from QuranEnc.com, and asks QuranEnc.com about once a day whether the translation has a newer version; Settings → Offline mushaf removes them from your device.
+When you press and hold a verse, the app requests that verse's Arabic text from AlQuran Cloud (api.alquran.cloud) and, with Saheeh International or another QuranEnc.com translation you choose, that translation from QuranEnc.com; when you play a verse, it requests its recitation audio, in the reciter you chose, from EveryAyah (everyayah.com). These requests contain only the page, surah or verse number, nothing from your account; like any web request, they reveal your device's IP address to that service. Text is then kept on your device so the same verse is not requested again. So that the Qur'an can be read offline, the app also downloads, on Wi-Fi unless you allow mobile data, the mushaf's page images (from our Cloud Storage), the whole Arabic text from AlQuran Cloud and the whole Saheeh International translation from QuranEnc.com, and asks QuranEnc.com about once a day whether a translation you use has a newer version; Settings → Offline mushaf removes them from your device. A translation you download from the list of translations is kept on your device until you remove it there.
 
 If you choose The Clear Quran® translation, its text comes through our own server instead (revisely.app, hosted by Cloudflare). The app sends that server the verse number and your sign-in token, so that only Revisely users can use our licence for the translation, and our server requests that verse, with the verses around it, from The Clear Quran® API (Al-Furqaan Foundation). The Clear Quran® API receives only verse numbers, from our server: not your IP address and nothing from your account. Our server, like any web server, sees your device's IP address; we don't log or store it, your token, or which verses you read. So that text isn't requested again, our server keeps The Clear Quran® text it has fetched for up to 60 days, and the app keeps the text of verses you have read on your device for up to 60 days, in its private cache folder (not backed up or shared; deleting the app removes it). This is the translation's text only, nothing about you.
+
+If you turn on Revo, what it needs to answer goes to Anthropic from our server, never straight from your device: see [Revo, the AI assistant](#revo).
 
 We do not transfer your data to any party not listed above for any other purpose.
 
 ## 6. International data transfers
 
-Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, Expo, and Stripe maintain comparable safeguards.
+Our processors are located in the United States. If you are in the European Economic Area, the United Kingdom, Switzerland, or Canada, your information is transferred to and processed in the United States. We rely on Google Cloud's Standard Contractual Clauses and the EU-US Data Privacy Framework (Google LLC is DPF-certified) for these transfers. Apple, Sentry, Expo, and Stripe maintain comparable safeguards, and Anthropic's data processing terms include the EU Standard Contractual Clauses, with the UK and Swiss addenda.
 
 ## 7. Data retention
 
 - **Account data** — kept for the life of your account, plus 30 days after account deletion.
 - **Memorization and revision history** — kept for the life of your account, plus 30 days after account deletion.
 - **Backed-up recordings** — kept until you delete them (one at a time, all at once, by deleting the backup when you turn backup off, or by deleting your account). They are then deleted from our storage, and any remaining copies within 30 days.
+- **Revo conversations and what it remembers**: kept until you delete them, turn Revo off, or delete your account. Anthropic deletes what Revo sends it within 30 days. It keeps a request for up to 2 years if its safety systems flag it, and longer where the law requires.
+- **Revo's daily question count**: kept for the life of your account.
 - **Push notification tokens** — kept until you uninstall the app or revoke notification permission.
 - **Crash logs** — kept for 90 days.
 - **Support email correspondence** — kept for 2 years.
@@ -114,7 +148,7 @@ Depending on where you live, you have some or all of the following rights:
 
 - **Access** the personal information we hold about you.
 - **Correct** information that's inaccurate or incomplete.
-- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `support@revisely.app`.
+- **Delete** your account and associated data. You can do this from inside the app at **Settings → Delete account**, or by emailing us at `support@revisely.app`. Revo's conversations and what it remembers can also be deleted on their own, in Settings → Revo AI.
 - **Export** your data in a portable format.
 - **Withdraw consent** for processing based on consent (e.g., push notifications, location).
 - **Object** to processing based on legitimate interests.
