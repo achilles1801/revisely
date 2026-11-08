@@ -103,10 +103,10 @@ describe('the juz sheet', () => {
     fireEvent.press(screen.getByTestId('juz-tile-28'));
     await flush();
     expect(screen.getByText('Juz 28')).toBeTruthy();
-    expect(screen.getByTestId('juz-sheet-headline').props.children).toBe('Revised today');
-    expect(screen.getByText(/1 time in 30 days/)).toBeTruthy();
+    expect(screen.getByTestId('juz-sheet-headline').props.children).toBe('Last revised today');
+    expect(screen.getByText(/^\s*once in 30 days$/)).toBeTruthy();
     expect(screen.getAllByTestId(/^juz-cell-/)).toHaveLength(20);
-    expect(plainText(String(screen.getByTestId('juz-surah-58').props.accessibilityLabel))).toMatch(/^Al-Mujadila, Today/);
+    expect(plainText(String(screen.getByTestId('juz-surah-58').props.accessibilityLabel))).toMatch(/^Al-Mujadila, Last revised today · once in 30 days$/);
   });
 
   it('[ACT-19] without Smart Tracking the sheet shows recency, never strength', async () => {

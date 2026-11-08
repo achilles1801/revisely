@@ -6,7 +6,7 @@
 import { getJuzForPage, getJuzRange, getSurahsForPage } from './quranData';
 import { ayahOf, ayahsOnPage, pageOfAyah, suraOf } from './ayahKeys';
 import { memorizedAyahsOnPage, pageShare } from './memorizedAyahs';
-import { daysBetween } from './activityHeatmap';
+import { daysSince, lastRevisedWords, recencyLine, timesWord } from './recency';
 import { describeSurahs } from './pageRanges';
 import { describeAyahs, pageRunEnds, surahName } from './passages';
 import { strengthOf, type Strength } from './activityDayParts';
@@ -38,6 +38,8 @@ export interface JuzSheetInput {
   windowDays: number;
   /** Its words ("in 30 days", "since 9 September"); `in ${windowDays} days` when not given. */
   windowWords?: string;
+  /** "in the last 30 days", "since 9 September": what "not …" says when a part wasn't revised in it. */
+  windowInTheLast?: string;
   smartTracking: boolean;
 }
 
@@ -46,7 +48,7 @@ export interface JuzSurahRow {
   name: string;
   /** Its first page in this juz (the reader opens there). */
   firstPage: number;
-  /** "Ayahs 17–24 weak", "Strong · skipped 3 times" (strength); "3 days ago · 4 times" (recency). */
+  /** "Ayahs 17–24 weak", "Strong · skipped 3 times" (strength); "Last revised 3 days ago · twice in 30 days" (recency). */
   text: string;
   /** Strength's weak rows are drawn in red; recency's stale ones too. */
   alert: boolean;
@@ -59,9 +61,9 @@ export interface JuzSheetModel {
   title: string;
   /** "Al-Mujadila to At-Tahrim". */
   subtitle: string;
-  /** "Revised today", "Last revised 41 days ago", "Not revised yet", "Not memorized yet". */
+  /** "Last revised today", "Last revised 41 days ago", "Never revised", "Not memorized yet" (lib/recency). */
   headline: string;
-  /** "4 times in 30 days"; empty when nothing of it is memorized. */
+  /** "twice in 30 days", "not in the last 30 days"; empty when nothing of it is memorized or ever revised. */
   times: string;
   /** Over 30 days since a memorized page of it was revised, or one never was (the untouched juz). */
   stale: boolean;
@@ -83,21 +85,12 @@ export interface JuzSheetModel {
   continueAt: { page: number; label: string } | null;
 }
 
-/** "Today", "Yesterday", "3 days ago". */
-function agoWord(days: number): string {
-  return days <= 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days} days ago`;
-}
-
-/** "Revised today", "Revised yesterday", "Last revised 3 days ago". */
-function lastRevisedLine(days: number): string {
-  return days <= 0 ? 'Revised today' : days === 1 ? 'Revised yesterday' : `Last revised ${days} days ago`;
-}
-
-const timesWord = (n: number) => `${n} ${n === 1 ? 'time' : 'times'}`;
+/** "3 times" for a count of skips (recency's "once", "twice" are for revisions: lib/recency). */
+const skipsWord = (n: number) => `${n} ${n === 1 ? 'time' : 'times'}`;
 
 export function recencyOf(lastDay: string | null | undefined, today: string): Recency {
   if (!lastDay) return 'older';
-  const d = daysBetween(lastDay, today);
+  const d = daysSince(lastDay, today);
   return d < 7 ? 'week' : d < 30 ? 'month' : 'older';
 }
 
@@ -132,13 +125,14 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
   // Each page's last revision: the latest of its own record and the items read.
   const last = new Map<number, string>();
   for (const p of memorized) {
+    // A page's record is a timestamp in the app ("2026-11-02T09:00:00.000Z"): its day is what counts.
     const own = byNumber.get(p)?.lastRevisedDate;
-    if (own) last.set(p, own);
+    if (own) last.set(p, own.slice(0, 10));
   }
   // Days in the window each page was revised (a page counts once a day).
   const inWindow = new Map<number, Set<string>>();
   for (const r of input.revised) {
-    const age = daysBetween(r.countsFor, today);
+    const age = daysSince(r.countsFor, today);
     if (age < 0) continue;
     for (const p of r.pages) {
       if (!memorizedSet.has(p)) continue;
@@ -158,7 +152,7 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
       const d = last.get(p);
       if (d && (newest == null || d > newest)) newest = d;
     }
-    return newest ? daysBetween(newest, today) : null;
+    return newest ? daysSince(newest, today) : null;
   };
   // The juz is as stale as its least recently revised memorized page (the untouched row, ACT-4).
   let oldest: number | null = 0;
@@ -168,7 +162,7 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
       oldest = null;
       break;
     }
-    oldest = Math.max(oldest, daysBetween(d, today));
+    oldest = Math.max(oldest, daysSince(d, today));
   }
   const staleByDays = memorized.length > 0 && (oldest == null || oldest >= 30);
 
@@ -195,6 +189,13 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
   const newest = lastOf(memorized);
   const beingLearned = learned.size > 0 && newest == null;
   const stale = staleByDays && !beingLearned;
+
+  // One wording with Revo (lib/recency): "Last revised 3 days ago · twice in 30 days".
+  const inWords = input.windowWords ?? `in ${windowDays} days`;
+  const inTheLast = input.windowInTheLast ?? `in the last ${windowDays} days`;
+  const timesText = (n: number) => (n > 0 ? `${timesWord(n)} ${inWords}` : `not ${inTheLast}`);
+  const recency = (ago: number | null, n: number) =>
+    input.windowWords ? (ago == null ? lastRevisedWords(null) : `${lastRevisedWords(ago)} · ${timesText(n)}`) : recencyLine(ago, n, windowDays);
 
   const strength = (p: number): Strength => strengthOf(byNumber.get(p)?.weaknessRating ?? 4);
   const cellState = (p: number): JuzCellState =>
@@ -253,21 +254,20 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
         return { ...base, text: `${at} ${weakest}`.trim(), alert: weakest === 'weak', state: weakest };
       }
       const skips = mine.reduce((n, p) => n + (byNumber.get(p)?.skipCount ?? 0), 0);
-      return { ...base, text: skips > 0 ? `Strong · skipped ${timesWord(skips)}` : 'Strong', alert: false, state: 'strong' as const };
+      return { ...base, text: skips > 0 ? `Strong · skipped ${skipsWord(skips)}` : 'Strong', alert: false, state: 'strong' as const };
     }
     const ago = lastOf(mine);
     const n = daysOf(mine);
     const state: Recency = ago == null || ago >= 30 ? 'older' : ago < 7 ? 'week' : 'month';
-    const text = [ago == null ? 'Not revised yet' : agoWord(ago), n > 0 ? timesWord(n) : null].filter(Boolean).join(' · ');
-    return { ...base, text, alert: state === 'older', state };
+    return { ...base, text: recency(ago, n), alert: state === 'older', state };
   });
 
   return {
     juz,
     title: `Juz ${juz}`,
     subtitle: describeSurahs({ first: start, last: end }),
-    headline: beingLearned ? 'Being learned' : memorized.length === 0 ? 'Not memorized yet' : newest == null ? 'Not revised yet' : lastRevisedLine(newest),
-    times: memorized.length === 0 || beingLearned ? '' : `${timesWord(daysOf(memorized))} ${input.windowWords ?? `in ${windowDays} days`}`,
+    headline: beingLearned ? 'Being learned' : memorized.length === 0 ? 'Not memorized yet' : lastRevisedWords(newest),
+    times: memorized.length === 0 || newest == null || beingLearned ? '' : timesText(daysOf(memorized)),
     stale,
     cells,
     ends: pageRunEnds(start, end),

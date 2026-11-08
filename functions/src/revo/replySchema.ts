@@ -13,7 +13,7 @@
  * Limits on the API's side: at most 16 union-typed parameters (anyOf, or a type array) and 24
  * optional ones across the schema (replySchema.test.ts counts them).
  */
-import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TABLE_COLUMNS, REVO_TIMELINE_DAYS } from './types';
+import { REVO_MEMORIZED_MONTHS, REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TABLE_COLUMNS, REVO_TIMELINE_DAYS } from './types';
 
 type Schema = Record<string, unknown>;
 
@@ -39,6 +39,7 @@ export const CHART_SCHEMAS: Record<string, Schema> = {
     { kind: kind('table'), title: text, juz: wholes, surahs: wholes, columns: { type: 'array', items: { type: 'string', enum: [...REVO_TABLE_COLUMNS] } } },
     ['juz', 'surahs'],
   ),
+  memorized: object({ kind: kind('memorized'), title: text, months: { type: 'integer', enum: [...REVO_MEMORIZED_MONTHS] } }),
 };
 
 /** The one suggestion an answer may carry. */

@@ -121,6 +121,7 @@ export function InsightsView({
           revised={data.revised}
           windowDays={rangeSpan(data.range ?? 30, data.today, data.firstDay).window}
           windowWords={rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}
+          windowInTheLast={rangeSpan(data.range ?? 30, data.today, data.firstDay).inTheLast}
           onOpenPage={onOpenPage}
           onPlanIt={onPlanIt}
         />

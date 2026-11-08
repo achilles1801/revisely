@@ -678,8 +678,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // the rest, unless this app is still writing them (then look again soon).
     const completing = { running: false, attempt: 0 };
     const completePages = () => {
+      if (!active) return;
       const fbUser = getAuth().currentUser;
-      if (!active || !fbUser || fbUser.uid !== uid || completing.running) return;
+      if (!fbUser || fbUser.uid !== uid || completing.running) return;
       if (firestoreService.isDeletingAccount(uid) || firestoreService.isResettingAccount(uid)) return;
       const have = baseRef.current?.uid === uid ? (baseRef.current.pages?.length ?? 0) : 0;
       if (have === 0 || have >= TOTAL_QURAN_PAGES) return;
@@ -695,6 +696,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (n > 0) logger.warn(`Created ${n} missing pages (a sign-up had stopped part way)`);
         })
         .catch((err) => {
+          // Gone meanwhile (signed out, closed): the timers are already cleared, so a retry
+          // scheduled now would outlive it.
+          if (!active) return;
           logger.warn('Could not create the missing pages', err);
           timers.push(setTimeout(completePages, retryDelayMs(completing.attempt++)));
         })

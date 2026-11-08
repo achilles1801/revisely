@@ -338,7 +338,8 @@ How the tests are made: `tests/scenarios/README.md`.
   own button), and from a day's Revised block (the juz most of its pages were in). It names the juz by its
   surahs and says when a memorized page of it was last revised and on how many days in the last 30. A strip
   of its pages and a row per surah follow: strength with Smart Tracking ("Ayahs 17–24 weak", "Strong ·
-  skipped 3 times"), recency without it ("3 days ago · 4 times"; ACT-19). A page, a row and Open in the
+  skipped 3 times"), recency without it ("Last revised 3 days ago · twice in 30 days", the wording Revo uses:
+  lib/recency; ACT-19). A page, a row and Open in the
   reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
   (Majd, Nov 7 2026: "not being able to click on anything in coverage"; mocks i5 and i6.)
 - **ACT-22.** Insights read one range for the whole tab: 7 days, 30 days (at first), 3 months or All time, from a
@@ -546,6 +547,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   revision minutes, timed reading, pages marked memorized, ratings given, this phone's recordings, and its daily-log
   notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
   question's day, or whose place ("2 days ago") or figures don't match it.
+
+- **REVO-36.** With Smart Tracking off (the account's setting; off unless turned on), Revo shows nothing of strength:
+  no ratings chart, no strength strip in a chart's panel, no weak or strength column in a table, and no plan built
+  on weak pages. Its charts show when each part was last revised and how often instead, and every chart that isn't
+  about strength is still offered (asked why a part keeps slipping, a timeline of it). The server reads the
+  setting from the account: Revo isn't told ratings or weak pages, and a ratings chart or a weak or strength column
+  in its reply is dropped.
 
 ## Memorizing
 

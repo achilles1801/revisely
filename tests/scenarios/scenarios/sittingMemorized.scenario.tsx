@@ -55,6 +55,10 @@ describe('a sitting memorized from the Day (MEM-1, MEM-3, MEM-5)', () => {
     };
     await press('activity-add-memorized-sitting-1');
     await app.until(() => app.screen.queryByTestId('add-memorized-ayahs') != null, 'the Ayahs tab');
+    // Already on the sitting's ayahs: no "From your reading" offering the same pages again. (The
+    // day's readings load as the sheet opens.)
+    await app.idle(600);
+    expect(app.screen.queryByTestId('add-memorized-from-reading')).toBeNull();
     await press('add-memorized-to-ayah');
     await press('add-memorized-to-ayah-picker-ayah-20');
     await press('add-memorized-add');
@@ -72,6 +76,14 @@ describe('a sitting memorized from the Day (MEM-1, MEM-3, MEM-5)', () => {
     const finishes = app.screen.getByTestId('activity-finishes-page').props.children as string;
     expect(plain(finishes)).toBe('Al-Mulk 21–26 finishes the page');
     expect(app.screen.queryByTestId('activity-block-read')).toBeNull();
+
+    // Undo sits on the screen, not at the end of the day's scrolling list (where a long day hid it).
+    await app.until(() => app.screen.queryByTestId('undo-toast-bar') != null, 'the Undo toast');
+    const holders: string[] = [];
+    for (let el = app.screen.getByTestId('undo-toast-bar').parent; el; el = el.parent) {
+      if (typeof el.props.testID === 'string') holders.push(el.props.testID);
+    }
+    expect(holders).not.toContain('activity-day-v2');
 
     // Undo: every page back, the ayahs out of the day.
     await press('undo-toast-action');

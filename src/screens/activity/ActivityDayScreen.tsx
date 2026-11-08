@@ -17,7 +17,8 @@ import { EditSessionModal } from '../../components/EditSessionModal';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
-import { DayBlocks, activityBlocksEnabled } from '../../components/activity/DayBlocks';
+import { DayBlocks, activityBlocksEnabled, type UndoOffer } from '../../components/activity/DayBlocks';
+import { UndoToast } from '../../components/revision/UndoToast';
 import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -118,6 +119,8 @@ export default function ActivityDayScreen() {
   const { theme, palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
+  // An add the day's blocks offer to undo (MEM-3), shown on the screen, above the tab bar and Revo.
+  const [undoOffer, setUndoOffer] = useState<UndoOffer | null>(null);
   const { day: today } = useRevisionDay(user);
   // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
   const juzPlan = user?.scheduleMode === 'juz';
@@ -453,6 +456,7 @@ export default function ActivityDayScreen() {
               }}
               onEditSchedule={() => navigation.navigate('PlanEdit')}
               onAddToPlan={(memorizedToday) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: memorizedToday })}
+              onUndoOffer={setUndoOffer}
             />
           )}
           {replies.map((r, i) => {
@@ -496,6 +500,19 @@ export default function ActivityDayScreen() {
           )}
         </ScrollView>
       )}
+      <UndoToast
+        visible={undoOffer != null}
+        message={undoOffer?.text ?? ''}
+        actionLabel="Undo"
+        duration={6000}
+        onUndo={() => {
+          const offer = undoOffer;
+          setUndoOffer(null);
+          offer?.undo();
+        }}
+        onDismiss={() => setUndoOffer(null)}
+        bottomInset={tabFootprint}
+      />
       <ActionSheet
         visible={timedMenu != null}
         onClose={() => setTimedMenu(null)}

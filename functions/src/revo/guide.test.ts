@@ -73,8 +73,10 @@ describe('Revo’s guide names what the app has', () => {
   });
 
   it('stays compact: the prompt carries it on every question', () => {
-    // About 4 characters a token; under ~6,000 tokens.
-    expect(REVO_GUIDE.length).toBeLessThan(24_000);
+    // About 4 characters a token: under ~7,500 tokens (raised from 24,000 characters on Nov 8 2026, for
+    // the interactive Activity and memorizing by the ayah). It rides on every question in the cached
+    // system prompt: a cache miss costs about 0.3¢ more per 1,000 tokens. Trim before raising it again.
+    expect(REVO_GUIDE.length).toBeLessThan(30_000);
     expect(REVO_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
   });
 });

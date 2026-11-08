@@ -4,8 +4,10 @@
 import { getJuzForPage, getPagesForJuz } from './quranData';
 import { describePassage } from './passages';
 import { formatDayLong } from './activityFormat';
+import { lastRevisedWords } from './recency';
 
-const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
+// A day, or a timestamp whose first ten characters are its day (a page's record).
+const dayNumber = (day: string) => Math.round(Date.parse(`${day.slice(0, 10)}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 export interface UncoveredRow {
@@ -15,7 +17,7 @@ export interface UncoveredRow {
   juz: number;
   /** "Juz 4", "Al-Mulk 1–12". */
   label: string;
-  /** "Ali 'Imran 92 to An-Nisa 23 · 41 days ago", "Memorized today, not revised yet". */
+  /** "Ali 'Imran to An-Nisa · Last revised 41 days ago", "Memorized today, not revised yet" (lib/recency). */
   detail: string;
   pages: number[];
 }
@@ -30,7 +32,6 @@ function runs(pages: number[]): number[][] {
   return out;
 }
 
-const agoText = (days: number | null) => (days == null ? 'not revised yet' : days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`);
 
 /**
  * The memorized pages not revised in the range (i7), in mushaf order: a memorized juz none of whose
@@ -70,7 +71,7 @@ export function uncoveredRows(input: {
         kind: 'juz',
         juz,
         label: `Juz ${juz}`,
-        detail: `${describePassage(open, { form: 'short', wholeJuz: false })} · ${agoText(age(open))}`,
+        detail: `${describePassage(open, { form: 'short', wholeJuz: false })} · ${lastRevisedWords(age(open))}`,
         pages: open,
       });
       continue;
@@ -83,11 +84,7 @@ export function uncoveredRows(input: {
         kind: 'passage',
         juz,
         label: describePassage(run, { form: 'short' }),
-        detail: fresh
-          ? `Memorized ${on === today ? 'today' : formatDayLong(on!)}, not revised yet`
-          : ago == null
-            ? 'Not revised yet'
-            : `Last revised ${agoText(ago)}`,
+        detail: fresh ? `Memorized ${on === today ? 'today' : formatDayLong(on!)}, not revised yet` : lastRevisedWords(ago),
         pages: run,
       });
     }

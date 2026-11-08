@@ -16,6 +16,9 @@ import {
   juzSummary,
   dotSizeFor,
   knownChart,
+  memorizedMonthsData,
+  monthDays,
+  monthReadout,
   nearestMark,
   pageDetail,
   pagesStrip,
@@ -25,6 +28,7 @@ import {
   ratingsDotReadout,
   ratingsOn,
   ratingsRowReadout,
+  recencyLine,
   revisedBefore,
   slotAt,
   sortRows,
@@ -115,6 +119,8 @@ describe('knownChart', () => {
     expect(knownChart({ kind: 'table', title: 'x', juz: [26, 31], columns: ['weak'] })).toBe(false);
     expect(knownChart({ kind: 'table', title: 'x', juz: [26, 27], surahs: [59, 60], columns: ['weak'] })).toBe(false);
     expect(knownChart({ kind: 'table', title: 'x', juz: [26, 27], columns: ['colour'] } as unknown as RevoChart)).toBe(false);
+    expect(knownChart({ kind: 'memorized', title: 'x', months: 12 })).toBe(true);
+    expect(knownChart({ kind: 'memorized', title: 'x', months: 3 } as unknown as RevoChart)).toBe(false);
     // A newer server's kind, or a malformed one: no chart (the old app drew an empty bar chart).
     expect(knownChart({ kind: 'weeksAhead', title: 'x' } as unknown as RevoChart)).toBe(false);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 14 } as unknown as RevoChart)).toBe(false);
@@ -293,6 +299,9 @@ describe('timeline', () => {
     expect(plainText(d.ratings ?? '')).toBe(`${plainText(describePassage([583], { form: 'short' }))} weak · ${plainText(describePassage([582], { form: 'short' }))} strong`);
     expect(d.line).toBe('2 pages revised that day in 20 min');
     expect(timelineDetail({ ...second, pages: [584] }, logs).ratings).toBeNull();
+    // Smart Tracking off (REVO-36): no rating, in the readout or the panel.
+    expect(timelineReadout(second, false).title).toBe('Thursday 5 November');
+    expect(timelineDetail(first, logs, false).ratings).toBeNull();
   });
 
   it('says what a tap does, or that it wasn’t revised', () => {
@@ -412,6 +421,18 @@ describe('table', () => {
     expect(tableCell('strength', facts({ strength: { weak: 0, moderate: 0, strong: 0, unrated: 20, average: null } })).text).toBe('—');
   });
 
+  it('[REVO-36] recency in place of strength: when last revised, and how often', () => {
+    expect(recencyLine(facts({ lastRevisedDaysAgo: 4 }))).toBe('Last revised 4 days ago · twice in 30 days');
+    expect(recencyLine(facts({ lastRevisedDaysAgo: 0 }))).toBe('Last revised today · twice in 30 days');
+    expect(recencyLine(facts({ lastRevisedDaysAgo: null, revised: { last7: { days: 0, minEach: 0, maxEach: 0 }, last30: { days: 0, minEach: 0, maxEach: 0 }, all: { days: 0, minEach: 0, maxEach: 0 } } }))).toBe(
+      'Never revised',
+    );
+    expect(recencyLine(facts({ memorized: 10, pages: 23, lastRevisedDaysAgo: 1, revised: { last7: { days: 1, minEach: 0, maxEach: 1 }, last30: { days: 3, minEach: 0, maxEach: 2 }, all: { days: 3, minEach: 0, maxEach: 2 } } }))).toBe(
+      'Last revised yesterday · partly in the last 30 days · 10 of 23 pages memorized',
+    );
+    expect(recencyLine(facts({ memorized: 0 }))).toBe('Not memorized');
+  });
+
   it('sorts what needs care first, or the other way; parts with nothing to say stay last', () => {
     const row = (key: number, f: RevoPassageFacts) => ({ key, name: `Juz ${key}`, pages: [], facts: f });
     const rows = [
@@ -430,6 +451,44 @@ describe('table', () => {
   it('a strip for any pages: memorized and revised ones in their ratings’ colours', () => {
     expect(pagesStrip([583, 592], pages).map((s) => s.memorized)).toEqual([true, false]);
     expect(pagesStrip([592], pages)[0].band).toBeNull();
+  });
+});
+
+describe('memorized by month', () => {
+  // Al-Ma'idah 32–82 across four Tuesdays in October, and a spring month.
+  const items = [
+    { day: '2026-10-06', pages: [113, 114] },
+    { day: '2026-10-13', pages: [115, 116] },
+    { day: '2026-10-20', pages: [117] },
+    { day: '2026-10-20', pages: [118] },
+    { day: '2026-10-27', pages: [119, 120, 121] },
+    { day: '2026-03-04', pages: [102, 103, 104, 105] },
+    { day: '2025-10-01', pages: [1] },
+  ];
+
+  it('counts each month as Insights does, over the last 6 or 12', () => {
+    const year = memorizedMonthsData(items, TODAY, 12);
+    expect(year.map((b) => b.month)).toEqual(['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+    expect(year.find((b) => b.month === '2026-10')?.pages).toBe(9);
+    expect(year.find((b) => b.month === '2026-03')?.pages).toBe(4);
+    expect(memorizedMonthsData(items, TODAY, 6).map((b) => b.month)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+  });
+
+  it('a picked month: how many pages, named by their ayahs', () => {
+    expect(monthReadout({ month: '2026-10', pages: 9 }, items).title).toBe('October · 9 pages');
+    expect(plainText(monthReadout({ month: '2026-10', pages: 9 }, items).line)).toBe("Al-Ma'idah 32–82");
+    expect(monthReadout({ month: '2026-07', pages: 0 }, items).line).toBe('Nothing memorized in July');
+  });
+
+  it('its days, oldest first, one row a day, each named by its ayahs', () => {
+    const days = monthDays(items, '2026-10');
+    expect(days.map((d) => [d.day, plainText(d.name), d.pages])).toEqual([
+      ['2026-10-06', "Al-Ma'idah 32–41", 2],
+      ['2026-10-13', "Al-Ma'idah 42–50", 2],
+      ['2026-10-20', "Al-Ma'idah 51–64", 2],
+      ['2026-10-27', "Al-Ma'idah 65–82", 3],
+    ]);
+    expect(monthDays(items, '2026-07')).toEqual([]);
   });
 });
 

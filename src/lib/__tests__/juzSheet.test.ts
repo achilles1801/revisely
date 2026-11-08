@@ -43,7 +43,7 @@ describe('the juz sheet', () => {
     });
 
     it('when it was last revised, and how many days in the window', () => {
-      expect(m.headline).toBe('Revised today');
+      expect(m.headline).toBe('Last revised today');
       expect(m.times).toBe('3 times in 30 days');
       expect(m.stale).toBe(false);
     });
@@ -56,8 +56,8 @@ describe('the juz sheet', () => {
 
     it('each surah: how long ago, and how often', () => {
       const mujadila = m.surahs[0];
-      expect(mujadila.text).toBe('Today · 3 times');
-      expect(m.surahs.slice(-1)[0].text).toBe('Today · 1 time');
+      expect(mujadila.text).toBe('Last revised today · 3 times in 30 days');
+      expect(m.surahs.slice(-1)[0].text).toBe('Last revised today · once in 30 days');
       expect(m.surahs.some((s) => /weak|moderate|strong/i.test(s.text))).toBe(false);
     });
 
@@ -71,16 +71,28 @@ describe('the juz sheet', () => {
         smartTracking: false,
       });
       expect(old.headline).toBe('Last revised 41 days ago');
-      expect(old.times).toBe('0 times in 30 days');
+      expect(old.times).toBe('not in the last 30 days');
       expect(old.stale).toBe(true);
-      expect(old.surahs[0]).toMatchObject({ text: '41 days ago', alert: true, state: 'older' });
+      expect(old.surahs[0]).toMatchObject({ text: 'Last revised 41 days ago · not in the last 30 days', alert: true, state: 'older' });
     });
 
-    it('never revised: not revised yet, and stale', () => {
+    it('a page’s record is a timestamp, as the app holds it: its day counts', () => {
+      const stamped = juzSheetModel({
+        juz: 28,
+        today: TODAY,
+        pages: JUZ28.map((p) => page(p, { lastRevisedDate: '2026-09-23T18:30:00.000Z' })),
+        revised: [],
+        windowDays: 30,
+        smartTracking: false,
+      });
+      expect(stamped.headline).toBe('Last revised 41 days ago');
+    });
+
+    it('never revised: says so, and stale', () => {
       const never = juzSheetModel({ juz: 28, today: TODAY, pages: JUZ28.map((p) => page(p)), revised: [], windowDays: 30, smartTracking: false });
-      expect(never.headline).toBe('Not revised yet');
+      expect(never.headline).toBe('Never revised');
       expect(never.stale).toBe(true);
-      expect(never.surahs[0].text).toBe('Not revised yet');
+      expect(never.surahs[0].text).toBe('Never revised');
     });
   });
 

@@ -231,7 +231,8 @@ export function AddMemorizedSheet({
     >
       <DismissArea>
       <View style={styles.body}>
-        {suggestion.length > 0 && (
+        {/* From a sitting it is already on that reading's ayahs: nothing to offer again. */}
+        {suggestion.length > 0 && !sitting && (
           <View style={styles.top}>
             <Suggestion
               label="From your reading"
