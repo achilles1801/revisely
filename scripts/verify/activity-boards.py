@@ -56,6 +56,7 @@ MOCK_FOR = {
     "09-juz-day": ("../../activity-interactive/png/i5-juz-sheet", None),
     "09-insights-range-menu": ("../../activity-interactive/png/i2-range-sheet", None),
     "09-insights-3-months": ("../../activity-interactive/png/i1-range-chip", None),
+    "09-insights-all-time": ("../../activity-interactive/png/i4-all-time", None),
     "09-insights-uncovered": ("../../activity-interactive/png/i7-not-revised", None),
     "09-insights-month": ("../../activity-interactive/png/i10-memorized-month", None),
     "09-insights-pace": ("../../activity-interactive/png/i11-pace", None),

@@ -341,13 +341,16 @@ How the tests are made: `tests/scenarios/README.md`.
   skipped 3 times"), recency without it ("3 days ago · 4 times"; ACT-19). A page, a row and Open in the
   reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
   (Majd, Nov 7 2026: "not being able to click on anything in coverage"; mocks i5 and i6.)
-- **ACT-22.** Insights read one range for the whole tab: 7 days, 30 days (at first) or 3 months, from a chip at
-  the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the three; the choice is
-  kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
+- **ACT-22.** Insights read one range for the whole tab: 7 days, 30 days (at first), 3 months or All time, from a
+  chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the four (All time
+  names its start, "Since 9 September"); the choice is kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
   "+N" and Pace (against the same length before it) follow it, and so does the juz sheet's "times"; the juz
   tiles always show where each juz stands now. A range longer than the account counts from its first day
   ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
-  is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). (Majd, Nov 7 2026: "why is
+  is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). All time reads from the
+  account's first day: Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a
+  long range covers nearly everything), the weeks grid from the start (up to half a year), and no Pace
+  comparison. (Majd, Nov 7 2026: "why is
   insights restricted to just the last 30 days?"; mocks i1 and i2.)
 - **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
   too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305

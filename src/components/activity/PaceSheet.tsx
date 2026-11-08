@@ -24,7 +24,7 @@ export function PaceSheet({
   revised,
   today,
   range,
-  rangeWords,
+  inWords,
   beforeWords,
   perPage,
   before,
@@ -34,9 +34,12 @@ export function PaceSheet({
   onClose: () => void;
   revised: { day: string; countsFor?: string; pages: number[]; minutes: number | null }[];
   today: string;
+  /** Days, today included. */
   range: number;
-  rangeWords: string;
-  beforeWords: string;
+  /** "in 30 days", "since 9 September". */
+  inWords: string;
+  /** "the month before"; none for All time. */
+  beforeWords: string | null;
   perPage: number;
   before: number | null;
   onOpenDay?: (day: string) => void;
@@ -73,10 +76,10 @@ export function PaceSheet({
     >
       <View style={styles.figure}>
         <Text style={[styles.big, { color: palette.text }]}>{formatPace(perPage)}</Text>
-        <Text style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{`min a page in ${rangeWords}`}</Text>
+        <Text style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{`min a page ${inWords}`}</Text>
         {change ? <Text style={[typeV2.name, { color: before != null && perPage < before ? palette.good : palette.text }]}>{change}</Text> : null}
       </View>
-      {before != null ? (
+      {before != null && beforeWords ? (
         <Text style={[typeV2.meta, styles.beforeLabel, { color: palette.secondary }]}>{`${formatPace(before)}, ${beforeWords}`}</Text>
       ) : null}
       <View style={styles.chart} onLayout={(e) => setWidth(e.nativeEvent.layout.width)} testID="pace-chart">
@@ -128,7 +131,7 @@ export function PaceSheet({
       ))}
       {untimed > 0 ? (
         <Text style={[typeV2.meta, styles.untimed, { color: palette.secondary }]} testID="pace-untimed">
-          {`${untimed} ${untimed === 1 ? 'revision' : 'revisions'} in ${rangeWords} had no time, so ${untimed === 1 ? 'it isn’t' : 'they aren’t'} counted.`}
+          {`${untimed} ${untimed === 1 ? 'revision' : 'revisions'} ${inWords} had no time, so ${untimed === 1 ? 'it isn’t' : 'they aren’t'} counted.`}
         </Text>
       ) : null}
     </Sheet>

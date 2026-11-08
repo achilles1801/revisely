@@ -36,6 +36,8 @@ export interface JuzSheetInput {
   revised: { countsFor: string; pages: number[] }[];
   /** The window "times" are counted over (30: "4 times in 30 days"). */
   windowDays: number;
+  /** Its words ("in 30 days", "since 9 September"); `in ${windowDays} days` when not given. */
+  windowWords?: string;
   smartTracking: boolean;
 }
 
@@ -215,7 +217,7 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     title: `Juz ${juz}`,
     subtitle: describeSurahs({ first: start, last: end }),
     headline: memorized.length === 0 ? 'Not memorized yet' : newest == null ? 'Not revised yet' : lastRevisedLine(newest),
-    times: memorized.length === 0 ? '' : `${timesWord(daysOf(memorized))} in ${windowDays} days`,
+    times: memorized.length === 0 ? '' : `${timesWord(daysOf(memorized))} ${input.windowWords ?? `in ${windowDays} days`}`,
     stale,
     cells,
     ends: pageRunEnds(start, end),

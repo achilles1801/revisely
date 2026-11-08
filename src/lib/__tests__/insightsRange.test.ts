@@ -1,7 +1,10 @@
 import {
   activeDays,
   beforeWords,
+  coverageCycles,
   coveragePercent,
+  rangeLabel,
+  rangeSpan,
   daysToLoad,
   memorizedIn,
   missedPattern,
@@ -26,6 +29,25 @@ describe('Insights’ range', () => {
     expect(parseRange('90')).toBe(90);
     expect(parseRange(null)).toBe(30);
     expect(parseRange('365')).toBe(30);
+    expect(parseRange('all')).toBe('all');
+  });
+
+  it('All time: since the account’s first day, in its words; no comparison before it', () => {
+    expect(rangeLabel('all')).toBe('All time');
+    expect(rangeSpan('all', TODAY, '2026-09-09')).toEqual({ window: 56, inWords: 'since 9 September', lastWords: 'since 9 September', inTheLast: 'since 9 September', before: null, all: true });
+    expect(rangeSpan(30, TODAY, '2026-09-09')).toMatchObject({ window: 30, inWords: 'in 30 days', inTheLast: 'in the last 30 days', before: 'the month before', all: false });
+    expect(daysToLoad('all', TODAY, '2026-01-01')).toBe(307);
+  });
+
+  it('All time’s coverage in cycles: page revisions over the memorized pages', () => {
+    const revised = [
+      { countsFor: TODAY, pages: [1, 2, 3, 4] },
+      { countsFor: '2026-10-01', pages: [1, 2] },
+      // Credited to tomorrow: not yet.
+      { countsFor: '2026-11-04', pages: [5] },
+    ];
+    expect(coverageCycles(revised, TODAY, 4)).toBe('1.5');
+    expect(coverageCycles(revised.slice(0, 1), TODAY, 4)).toBe('1');
   });
 
   it('words for the chip and the sections', () => {
