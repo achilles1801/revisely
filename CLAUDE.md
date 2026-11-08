@@ -472,6 +472,29 @@ June 2025).
 - The Arabic's source is credited in the verse sheet too: "Arabic text: Tanzil Project · tanzil.net"
   (`ARABIC_CREDIT`, at the end of the verse), as Tanzil's terms ask.
 
+### QuranEnc's other translations (testers; `lib/quranenc`, Nov 2026)
+
+Every translation in QuranEnc's list (76 in 56 languages, Nov 8 2026), on Saheeh's terms (all 163
+translation pages on QuranEnc carry the same seven). The licensing inventory, with Quran.com's 126
+translations matched to a source, is `~/Documents/revisely-translations/inventory.md`.
+- **The store:** `createQuranEncStore(key)` is Saheeh's code made general: suras kept as read in
+  `Documents/translations/<key>/NNN-<version>.json` with `info.json`, the version check, the download.
+  `lib/saheeh` is that store for `english_saheeh`. QuranEnc's list is read once a day and one request
+  answers for every translation (TRANS-4).
+- **The catalogue:** `src/data/quranencCatalogue.json`, from `node scripts/quranenc-catalogue.js`:
+  QuranEnc's list as shipped (key, language, direction, version, title, description, size). Ids in the
+  app are `qe.<key>`; Saheeh International keeps `en.sahih`. The rules allow any `translationId` of up
+  to 40 characters, so new ones need no rules change.
+- **Credits:** QuranEnc's own description of each (who translated and issued it), the version of the
+  sura shown and QuranEnc.com (TRANS-2). Right-to-left languages read right to left (TRANS-3).
+- **Who:** testers get the picker of every translation (`offeredTranslations`, TRANS-5); everyone else
+  keeps Saheeh International and The Clear Quran®.
+- **Not yet:** 87 entries on QuranEnc's website aren't in its list (41 are tafsirs). The 25 that
+  Quran.com also has, Russian, Bengali, Malay and Korean among them, publish no version, which the
+  terms require: they wait for QuranEnc's answer. Tanzil's translations are non-commercial only. The
+  Quran Foundation API (Diyanet, Kuliev, Abdel Haleem…) needs a registered app, a 7-day sync for
+  offline copies and a privacy-policy rewrite.
+
 ## Runtime version is a fingerprint
 
 `runtimeVersion: { policy: "fingerprint" }` in `app.config.js`: an update reaches only binaries built

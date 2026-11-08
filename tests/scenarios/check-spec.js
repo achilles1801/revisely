@@ -18,7 +18,7 @@ const SPEC = path.join(ROOT, 'BEHAVIOUR.md');
 const TEST_DIRS = [path.join(__dirname, 'scenarios'), path.join(__dirname, 'properties')];
 // Test files, and the modules beside them that define tests (scenarios/dayWeeks.ts).
 const TEST_FILE = /\.tsx?$/;
-const TAG = /\[((?:ONBOARD|DAY|SCHED|SESS|AHEAD|CARRY|JUMP|SYNC|RESET|LOG|REC|SET|AUDIO|ACT|COACH|REVO|ACCOUNT|NAME|MEM)-\d+)\]/g;
+const TAG = /\[((?:ONBOARD|DAY|SCHED|SESS|AHEAD|CARRY|JUMP|SYNC|RESET|LOG|REC|SET|AUDIO|ACT|COACH|REVO|ACCOUNT|NAME|MEM|TRANS)-\d+)\]/g;
 
 const problems = [];
 

@@ -1,13 +1,13 @@
 {
   "recordedAt": "2026-11-08T05:17:16.606Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "how": "functions/scripts/record-anthropic.js. The request hash was then moved, without recording again, to the prompt after the guide's lines on translations changed (testers choose from QuranEnc's 76 translations): record it again to match exactly.",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "29ddf8b481117c0539f1a27fce46bf0c6bbf1e7c16ebe2df96372bebc21e988d",
+    "systemSha256": "2a759e96fd50c9c44a1d1ca96364a6ecb65bd142c90ad0b4de5e8e25f79fbdb0",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,

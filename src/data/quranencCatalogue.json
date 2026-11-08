@@ -1,0 +1,766 @@
+{
+ "source": "https://quranenc.com/api/v1/translations/list",
+ "read": "2026-11-08",
+ "translations": [
+  {
+   "key": "afar_hamza",
+   "lang": "aa",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1716365111,
+   "title": "Afar Translation - Mahmoud Abdulqader Hamza",
+   "description": "Translated by a group of scholars headed by Shaykh. Mahmoud Abdulqader Hamza",
+   "bytes": 1179468
+  },
+  {
+   "key": "asante_harun",
+   "lang": "ak",
+   "dir": "ltr",
+   "version": "1.0.3",
+   "updated": 1692136816,
+   "title": "Akan Translation (Asante) - Harun Ismail",
+   "description": "Translated by Shaykh Harun Ismail",
+   "bytes": 978095
+  },
+  {
+   "key": "amharic_sadiq",
+   "lang": "am",
+   "dir": "ltr",
+   "version": "1.1.2",
+   "updated": 1750853231,
+   "title": "Amharic Translation - Muhammad Sadiq",
+   "description": "Translated by Shaykh Muhammed Sadiq and Muhammed al-Thani Habib, developed under the supervision of Rowwad Translation Center. The original translation is available for expressing opinion, evaluation, and continuous development.",
+   "bytes": 1294538
+  },
+  {
+   "key": "amharic_zain",
+   "lang": "am",
+   "dir": "ltr",
+   "version": "1.0.3",
+   "updated": 1793739450,
+   "title": "Amharic Translation - Africa Academy",
+   "description": "Translated by Muhammad Zain Zahruddin. Published by Africa Academy",
+   "bytes": 1380840
+  },
+  {
+   "key": "assamese_rafeeq",
+   "lang": "as",
+   "dir": "ltr",
+   "version": "1.0.5",
+   "updated": 1717775563,
+   "title": "Assamese Translation - Rafiqul Islam Habibur-Rahman",
+   "description": "Translated by Rafiqul Islam Habibur-Rahman",
+   "bytes": 2330168
+  },
+  {
+   "key": "azeri_musayev",
+   "lang": "az",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1748378549,
+   "title": "Azerbaijani Translation - Ali Khan Musayev",
+   "description": "Translated by Ali Khan Musayev, developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 1006863
+  },
+  {
+   "key": "bosnian_mihanovich",
+   "lang": "bs",
+   "dir": "ltr",
+   "version": "1.1.0",
+   "updated": 1576875600,
+   "title": "Bosnian Translation - Muhammad Mahanovic",
+   "description": "Translated by Muhammad Mahanovic, developed under the supervision of Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 805490
+  },
+  {
+   "key": "bosnian_rwwad",
+   "lang": "bs",
+   "dir": "ltr",
+   "version": "2.0.4",
+   "updated": 1741051043,
+   "title": "Bosnian Translation - Rowwad Translation Centre",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 834258
+  },
+  {
+   "key": "bisayan_rwwad",
+   "lang": "ceb",
+   "dir": "ltr",
+   "version": "1.1.3",
+   "updated": 1766471443,
+   "title": "Filipino Translation (Bisayan) - Rowwad Translation Center",
+   "description": "Translated by the team of Rowwad Translation Center, in cooperation with the Dawah Association in Rabwah, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1237003
+  },
+  {
+   "key": "german_bubenheim",
+   "lang": "de",
+   "dir": "ltr",
+   "version": "1.1.5",
+   "updated": 1793715604,
+   "title": "German Translation - Frank Bubenheim",
+   "description": "Translated by ‘Abdullah as-Sāmit (Frank Bubenheim) and Dr. Nadim Elias.",
+   "bytes": 978095
+  },
+  {
+   "key": "german_rwwad",
+   "lang": "de",
+   "dir": "ltr",
+   "version": "1.0.16",
+   "updated": 1793539555,
+   "title": "German Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1035630
+  },
+  {
+   "key": "english_hilali_khan",
+   "lang": "en",
+   "dir": "ltr",
+   "version": "1.1.3",
+   "updated": 1793779302,
+   "title": "English Translation - Hilali and Khan",
+   "description": "Translated by Taqi-ud-Din al-Hilali and Muhammad Muhsin Khan.",
+   "bytes": 1495910
+  },
+  {
+   "key": "english_rwwad",
+   "lang": "en",
+   "dir": "ltr",
+   "version": "1.0.20",
+   "updated": 1792534351,
+   "title": "English Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1093165
+  },
+  {
+   "key": "english_saheeh",
+   "lang": "en",
+   "dir": "ltr",
+   "version": "1.1.2",
+   "updated": 1750772247,
+   "title": "English Translation - Noor International Center",
+   "description": "Issued by Noor International Center.",
+   "bytes": 1093165
+  },
+  {
+   "key": "spanish_garcia",
+   "lang": "es",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1772054067,
+   "title": "Spanish Translation - Isa Garcia",
+   "description": "Translated by Muhammad Isa Garcia",
+   "bytes": 1150700
+  },
+  {
+   "key": "spanish_montada_eu",
+   "lang": "es",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1750840855,
+   "title": "Spanish Translation - Noor International Center",
+   "description": "Issued by Noor International",
+   "bytes": 1352073
+  },
+  {
+   "key": "spanish_montada_latin",
+   "lang": "es",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1750841110,
+   "title": "Spanish Translation (Latin American) - issued by Noor International",
+   "description": "Latin American version issued by Noor International Center",
+   "bytes": 1380840
+  },
+  {
+   "key": "persian_ih",
+   "lang": "fa",
+   "dir": "rtl",
+   "version": "1.1.3",
+   "updated": 1771883634,
+   "title": "Persian Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1553445
+  },
+  {
+   "key": "fulani_rwwad",
+   "lang": "ff",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1728938543,
+   "title": "Fulani Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 834258
+  },
+  {
+   "key": "french_montada",
+   "lang": "fr",
+   "dir": "ltr",
+   "version": "1.0.0",
+   "updated": 1750745766,
+   "title": "French translation - Noor International Center",
+   "description": "Translated by Dr. Nabil Rudwan - issued by Noor International Center",
+   "bytes": 1121933
+  },
+  {
+   "key": "french_rashid",
+   "lang": "fr",
+   "dir": "ltr",
+   "version": "1.0.3",
+   "updated": 1782043143,
+   "title": "French Translation - Rachid Maach",
+   "description": "Translated by Rashid Ma’ash",
+   "bytes": 1208235
+  },
+  {
+   "key": "gujarati_omari",
+   "lang": "gu",
+   "dir": "ltr",
+   "version": "1.1.3",
+   "updated": 1740608943,
+   "title": "Gujarati Translation - Rabella Al-Omari",
+   "description": "Translated by Rabella Al-Omari. Developed under the supervision of the Rowwad Translation Center.",
+   "bytes": 2186330
+  },
+  {
+   "key": "hausa_gummi",
+   "lang": "ha",
+   "dir": "ltr",
+   "version": "1.2.2",
+   "updated": 1750944776,
+   "title": "Hausa Translation - Abu Bakr Jumi",
+   "description": "Translated by Abu Bakr Mahmoud Jumi, developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 1208235
+  },
+  {
+   "key": "hindi_omari",
+   "lang": "hi",
+   "dir": "ltr",
+   "version": "1.1.5",
+   "updated": 1754421301,
+   "title": "Hindi Translation - Azizul Haq Al-Omari",
+   "description": "Translated by Azizul Haq Al-Omari",
+   "bytes": 2991820
+  },
+  {
+   "key": "croatian_rwwad",
+   "lang": "hr",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1748121511,
+   "title": "Croatian Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 834258
+  },
+  {
+   "key": "indonesian_affairs",
+   "lang": "id",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1750665512,
+   "title": "Indonesian Translation - Ministry of Religious Affairs",
+   "description": "Issued by the Indonesian Ministry of Religious Affairs. Developed under the supervision of Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 1237003
+  },
+  {
+   "key": "indonesian_complex",
+   "lang": "id",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1750935542,
+   "title": "Indonesian Translation - The Complex",
+   "description": "Issued by the Indonesian Ministry of Religious Affairs. Developed under the supervision of Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 1380840
+  },
+  {
+   "key": "indonesian_sabiq",
+   "lang": "id",
+   "dir": "ltr",
+   "version": "1.1.3",
+   "updated": 1748871584,
+   "title": "Indonesian Translation - Sabiq Company",
+   "description": "Issued by Sabiq Company, developed under the supervision of Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 1265770
+  },
+  {
+   "key": "japanese_saeedsato",
+   "lang": "ja",
+   "dir": "ltr",
+   "version": "1.0.13",
+   "updated": 1782308017,
+   "title": "Japanese Translation - Saeed Sato",
+   "description": "Translated by Saeed Sato, developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 2445238
+  },
+  {
+   "key": "khmer_cambodia",
+   "lang": "km",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1723098869,
+   "title": "Khmer Translation - Islamic Community Development Association",
+   "description": "Issued by the Cambodian Islamic Community Development Association",
+   "bytes": 2819215
+  },
+  {
+   "key": "khmer_rwwad",
+   "lang": "km",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1769498594,
+   "title": "Khmer Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 3049355
+  },
+  {
+   "key": "kannada_hamza",
+   "lang": "kn",
+   "dir": "ltr",
+   "version": "1.0.3",
+   "updated": 1710623781,
+   "title": "Kannada Translation - Hamza Butur",
+   "description": "Translated by Muhammad Hamza Batur and developed under the supervision of Rowwad Translation Center",
+   "bytes": 2675378
+  },
+  {
+   "key": "kurdish_bamoki",
+   "lang": "ku",
+   "dir": "rtl",
+   "version": "1.1.1",
+   "updated": 1676535258,
+   "title": "Kurdish Translation - Muhammad Salih Bamoki",
+   "description": "Translated by Muhammad Salih Bamoki. Developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 1610980
+  },
+  {
+   "key": "kyrgyz_hakimov",
+   "lang": "ky",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1708440100,
+   "title": "Kyrgyz Translation - Shamsuddin Hakimov",
+   "description": "Translated by Shamsuddin Hakimov Abdulkhaliq and developed under the supervision of Rowwad Translation Center",
+   "bytes": 2243865
+  },
+  {
+   "key": "lingala_zakaria",
+   "lang": "ln",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1751452809,
+   "title": "Lingala Translation - Mohammed Balangogo",
+   "description": "Translated by Zakaria Muhammad Balangogo",
+   "bytes": 920560
+  },
+  {
+   "key": "lithuanian_rwwad",
+   "lang": "lt",
+   "dir": "ltr",
+   "version": "1.0.8",
+   "updated": 1721737827,
+   "title": "Lithuanian Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1179468
+  },
+  {
+   "key": "maguindanao_rwwad",
+   "lang": "mdh",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1765898562,
+   "title": "Filipino Translation (Maguindanaon) - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1006863
+  },
+  {
+   "key": "macedonian_group",
+   "lang": "mk",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1734261827,
+   "title": "Macedonian Translation - a group of Macedonian scholars",
+   "description": "Translated and reviewed by a group of Macedonian scholars",
+   "bytes": 1467143
+  },
+  {
+   "key": "malayalam_kunhi",
+   "lang": "ml",
+   "dir": "ltr",
+   "version": "1.0.3",
+   "updated": 1622322000,
+   "title": "Malayalam Translation - Abdul Hamid Haidar and Kunhi Muhammad",
+   "description": "Translated by Abdul Hamid Haidar Al-Madani and Kunhi Muhammad.",
+   "bytes": 3854845
+  },
+  {
+   "key": "moore_rwwad",
+   "lang": "mos",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1790089281,
+   "title": "Moore Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 949328
+  },
+  {
+   "key": "dutch_center",
+   "lang": "nl",
+   "dir": "ltr",
+   "version": "2.0.10",
+   "updated": 1763559803,
+   "title": "Dutch Translation - Rowwad Translation Center",
+   "description": "Issued by the Dutch Islamic Center and developed under the supervision of Rowwad Translation Center",
+   "bytes": 1064398
+  },
+  {
+   "key": "ankobambara_dayyan",
+   "lang": "nqo",
+   "dir": "rtl",
+   "version": "1.0.5",
+   "updated": 1769028650,
+   "title": "N'ko Translation - Baba Mamadi",
+   "description": "Translated by Karamo, Baba Mamadi Jani",
+   "bytes": 1553445
+  },
+  {
+   "key": "oromo_ababor",
+   "lang": "om",
+   "dir": "ltr",
+   "version": "1.0.3",
+   "updated": 1752390787,
+   "title": "Oromo Translation - Gali Ababor",
+   "description": "Translated by Gali Ababor Abaghona",
+   "bytes": 920560
+  },
+  {
+   "key": "oromo_rwwad",
+   "lang": "om",
+   "dir": "ltr",
+   "version": "1.0.0",
+   "updated": 1784185987,
+   "title": "Oromo Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1064398
+  },
+  {
+   "key": "punjabi_arif",
+   "lang": "pa",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1769264468,
+   "title": "Punjabi Translation - Arif Haleem",
+   "description": "Translated by Arif Haleem",
+   "bytes": 2704145
+  },
+  {
+   "key": "pashto_rwwad",
+   "lang": "ps",
+   "dir": "rtl",
+   "version": "1.0.1",
+   "updated": 1707999381,
+   "title": "Pashto Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1323305
+  },
+  {
+   "key": "portuguese_nasr",
+   "lang": "pt",
+   "dir": "ltr",
+   "version": "1.4.1",
+   "updated": 1771850195,
+   "title": "Portuguese Translation - Helmi Nasr",
+   "description": "Translated by Dr. Helmi Nasr, developed under the supervision of Rowwad Translation Center",
+   "bytes": 1150700
+  },
+  {
+   "key": "ikirundi_gehiti",
+   "lang": "rn",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1732380150,
+   "title": "Kirundi Translation - Yusuf Gahiti",
+   "description": "Translated by Yusuf Gheti - Issued by African Development Foundation",
+   "bytes": 1582213
+  },
+  {
+   "key": "romanian_project",
+   "lang": "ro",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1746075668,
+   "title": "Romanian Translation - Islam4ro.com",
+   "description": "Translation of the Noble Quran's meanings into Romanian; issued by islam4ro.com",
+   "bytes": 1093165
+  },
+  {
+   "key": "kinyarwanda_assoc",
+   "lang": "rw",
+   "dir": "ltr",
+   "version": "1.0.5",
+   "updated": 1751532850,
+   "title": "Kinyarwanda Translation - Rwanda Muslim Association",
+   "description": "Issued by Rwanda Muslim Association",
+   "bytes": 1006863
+  },
+  {
+   "key": "sinhalese_mahir",
+   "lang": "si",
+   "dir": "ltr",
+   "version": "1.0.6",
+   "updated": 1757883823,
+   "title": "Sinhalese Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 2272633
+  },
+  {
+   "key": "somali_yacob",
+   "lang": "so",
+   "dir": "ltr",
+   "version": "1.0.27",
+   "updated": 1793713194,
+   "title": "Somali Translation - Abdullah Hasan Yaqoub",
+   "description": "Translated by Abdullah Hasan Yaqoub",
+   "bytes": 1093165
+  },
+  {
+   "key": "albanian_nahi",
+   "lang": "sq",
+   "dir": "ltr",
+   "version": "1.1.0",
+   "updated": 1576962000,
+   "title": "Albanian Translation - Hassan Nahi",
+   "description": "Translated by Hassan Nahi, issued by the Albanian Institute for Islamic Thought and Civilization.",
+   "bytes": 1035630
+  },
+  {
+   "key": "albanian_rwwad",
+   "lang": "sq",
+   "dir": "ltr",
+   "version": "1.0.5",
+   "updated": 1779690992,
+   "title": "Albanian Translation - Rowwad Translation Center",
+   "description": "Translated by the team of Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 949328
+  },
+  {
+   "key": "serbian_rwwad",
+   "lang": "sr",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1711928682,
+   "title": "Serbian Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1294538
+  },
+  {
+   "key": "swedish_rwwad",
+   "lang": "sv",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1782647439,
+   "title": "Swedish Translation - Rowad Translation",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 891793
+  },
+  {
+   "key": "swahili_barawani",
+   "lang": "sw",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1750881078,
+   "title": "Swahili Translation - Ali Mohsin Al-Barwani",
+   "description": "Translated by Ali Mohsen Al-Barwani",
+   "bytes": 2330168
+  },
+  {
+   "key": "swahili_rwwad",
+   "lang": "sw",
+   "dir": "ltr",
+   "version": "1.0.5",
+   "updated": 1765978543,
+   "title": "Swahili Translation - Rowad Translation Center",
+   "description": "Issued by the Islamic Content Service Association in Languages",
+   "bytes": 863025
+  },
+  {
+   "key": "tamil_baqavi",
+   "lang": "ta",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1609966800,
+   "title": "Tamil Translation - Abdulhamid Baqawi",
+   "description": "Translated by Abdulhamid Al-Baqawi",
+   "bytes": 3423333
+  },
+  {
+   "key": "tamil_omar",
+   "lang": "ta",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1792595421,
+   "title": "Tamil Translation - Omar Sharif",
+   "description": "Translated by Shaykh Omar Sharif ibn Abdussalam",
+   "bytes": 3250728
+  },
+  {
+   "key": "tamil_omar_brief",
+   "lang": "ta",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1770710046,
+   "title": "Tamil Translation - Omar Sharif - Abridged Version",
+   "description": "Translated by Shaykh Omar Sharif ibn Abdussalam",
+   "bytes": 2934285
+  },
+  {
+   "key": "telugu_muhammad",
+   "lang": "te",
+   "dir": "ltr",
+   "version": "1.0.7",
+   "updated": 1788865130,
+   "title": "Telugu Translation - Abdurrahim ibn Muhammad",
+   "description": "Translated by Abdurrahim ibn Muhammad",
+   "bytes": 3595938
+  },
+  {
+   "key": "tajik_arifi",
+   "lang": "tg",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1713872419,
+   "title": "Tajiki Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1726050
+  },
+  {
+   "key": "thai_rwwad",
+   "lang": "th",
+   "dir": "ltr",
+   "version": "1.0.1",
+   "updated": 1781781064,
+   "title": "Thai Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 2617843
+  },
+  {
+   "key": "tagalog_rwwad",
+   "lang": "tl",
+   "dir": "ltr",
+   "version": "1.1.4",
+   "updated": 1738708294,
+   "title": "Filipino Translation (Tagalog) - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1121933
+  },
+  {
+   "key": "turkish_rwwad",
+   "lang": "tr",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1759071052,
+   "title": "Turkish Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 920560
+  },
+  {
+   "key": "turkish_shaban",
+   "lang": "tr",
+   "dir": "ltr",
+   "version": "1.1.0",
+   "updated": 1577307600,
+   "title": "Turkish Translation - Shaaban British",
+   "description": "Translated by Shaaban British, developed under the supervision of Rowad Translation Center. The original translation is available for expressing opinion, evaluation, and continuous development.",
+   "bytes": 863025
+  },
+  {
+   "key": "turkish_shahin",
+   "lang": "tr",
+   "dir": "ltr",
+   "version": "1.0.0",
+   "updated": 1495486800,
+   "title": "Turkish Translation - Dr. Ali Ozek and others",
+   "description": "Translated by Ali Ozek and others, developed under the supervision of Rowad Translation Center. The original translation is available for expressing opinion, evaluation, and continuous development.",
+   "bytes": 949328
+  },
+  {
+   "key": "uyghur_saleh",
+   "lang": "ug",
+   "dir": "rtl",
+   "version": "1.0.2",
+   "updated": 1756933089,
+   "title": "Uyghur Translation - Muhammad Saleh",
+   "description": "Translated by Muhammad Saleh, developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 2013725
+  },
+  {
+   "key": "urdu_junagarhi",
+   "lang": "ur",
+   "dir": "rtl",
+   "version": "1.1.3",
+   "updated": 1755085049,
+   "title": "Urdu Translation - Muhammad Junagarhi",
+   "description": "Translated by Muhammad Ibrahim Junagarhi, developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 5408290
+  },
+  {
+   "key": "uzbek_mansour",
+   "lang": "uz",
+   "dir": "ltr",
+   "version": "1.0.0",
+   "updated": 1750751975,
+   "title": "Uzbek Translation - Alaauddin Mansour",
+   "description": "Translated by Alaauddin Mansour. Developed under the supervision of Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 2416470
+  },
+  {
+   "key": "uzbek_rwwad",
+   "lang": "uz",
+   "dir": "ltr",
+   "version": "1.0.4",
+   "updated": 1698749305,
+   "title": "Uzbek Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1438375
+  },
+  {
+   "key": "vietnamese_rwwad",
+   "lang": "vi",
+   "dir": "ltr",
+   "version": "1.0.9",
+   "updated": 1790689814,
+   "title": "Vietnamese Translation - Rowwad Translation Center",
+   "description": "Translated by the team of the Rowwad Translation Center, in cooperation with the Rabwah Dawah Association, the Islamic Content Service Association in Languages, and the IslamHouse.com website.",
+   "bytes": 1524678
+  },
+  {
+   "key": "yoruba_mikail",
+   "lang": "yo",
+   "dir": "ltr",
+   "version": "1.0.10",
+   "updated": 1793623366,
+   "title": "Yoruba Translation - Abu Rahimah Mikael",
+   "description": "Translated by Shaykh Abu Rahimah Mikael Aikoyini",
+   "bytes": 1668515
+  },
+  {
+   "key": "chinese_makin",
+   "lang": "zh",
+   "dir": "ltr",
+   "version": "1.0.2",
+   "updated": 1662501318,
+   "title": "Chinese Translation - Muhammad Makeen",
+   "description": "Translated by Muhammad Makeen, developed under the supervision of the Rowwad Translation Center. The original translation is available for the purpose of expressing opinion, evaluation, and continuous development.",
+   "bytes": 805490
+  },
+  {
+   "key": "chinese_suliman",
+   "lang": "zh",
+   "dir": "ltr",
+   "version": "1.0.8",
+   "updated": 1760014298,
+   "title": "Chinese Translation - Muhammad Suleiman",
+   "description": "Translated by Muhammad Makeen. Reviewed by Muhammad Sulaiman and other language experts",
+   "bytes": 805490
+  }
+ ]
+}
