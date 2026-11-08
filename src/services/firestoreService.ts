@@ -833,7 +833,8 @@ export async function getActivityItemsForDay(
   userId?: string,
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
-  memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
+  /** `updatedAt`: when the item last took minutes from an add (ms), so the same add is never counted twice. */
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Pages revised in an earlier session, credited to this day ("done ahead"). */
   doneAhead: { fromDay: string; pages: number[] }[];
@@ -858,7 +859,13 @@ export async function getActivityItemsForDay(
         minutes: x.minutes ?? null,
       };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    memorized: mem.docs.map((d) => ({
+      id: d.id,
+      day: d.data().day,
+      pages: d.data().pages ?? [],
+      minutes: d.data().minutes ?? null,
+      updatedAt: typeof d.data().updatedAt === 'number' ? d.data().updatedAt : null,
+    })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
     doneAhead: ahead.docs
       .filter((d) => d.data().day !== day)
