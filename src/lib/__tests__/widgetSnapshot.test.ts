@@ -221,3 +221,22 @@ describe('widget snapshot: prayer times (for the prayer widgets)', () => {
     expect('prayer' in buildWidgetSnapshot(inputs({ prayer: null }))).toBe(false);
   });
 });
+
+describe('a partly memorized page on the widget (MEM-4)', () => {
+  it('is in the day, named by its memorized ayahs', () => {
+    // Pages 1–4, and An-Nas alone on the last page: five pages at five a day.
+    const some: UserPage[] = pages.map((p) =>
+      p.pageNumber <= 4
+        ? { ...p, status: 'memorized' as const, dateMemorized: '2025-01-01' }
+        : p.pageNumber === 604
+          ? { ...p, status: 'in_progress' as const, dateMemorized: '2025-01-01', verses: [114001, 114002, 114003, 114004, 114005, 114006] }
+          : { ...p, status: 'not_memorized' as const, dateMemorized: null },
+    );
+    const snap = buildWidgetSnapshot(inputs({ pages: some }));
+    expect(snap.state).toBe('ready');
+    const day = snap.days[0];
+    expect(day.total).toBe(5);
+    expect(plainText(day.title)).toBe('Al-Fatihah to Al-Baqarah, then An-Nas');
+    expect(plainText(day.title)).not.toMatch(/Ikhlas/);
+  });
+});

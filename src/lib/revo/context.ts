@@ -10,6 +10,7 @@ import { shiftDay } from '../journal';
 import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoContext, RevoTotals } from './types';
 import { contextWords } from './words';
+import { isRevisable, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 const MAX_PAGES = 20;
 const MAX_WEAK = 30;
@@ -35,7 +36,8 @@ const isWeak = (p: UserPage) => p.weaknessRating <= 2;
 
 export function revoTotals(input: { pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string; streakDays: number; plannedPerDay: number }): RevoTotals {
   const { pages, logs, today } = input;
-  const memorizedPages = pages.filter((p) => p.status === 'memorized');
+  // Memorized and partly memorized pages: both are revised (MEM-4).
+  const memorizedPages = revisablePages(pages);
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
   const revised = revisedItems(logs);
   const last = lastRevisedByPage(revised, today);
@@ -46,7 +48,8 @@ export function revoTotals(input: { pages: readonly UserPage[]; logs: readonly R
   const r30 = within(from30);
   const weak = new Set(memorizedPages.filter(isWeak).map((p) => p.pageNumber));
   return {
-    memorizedPages: memorized.size,
+    // A partly memorized page counts by its share (MEM-2): "305.6 pages memorized".
+    memorizedPages: Math.round(memorizedPageShare(pages) * 10) / 10,
     revisedWithin7Days: Math.round(coverage(memorized, last, today, 7) * memorized.size),
     revisedWithin30Days: Math.round(coverage(memorized, last, today, 30) * memorized.size),
     daysWithSession30: consistency(revised, today, 30).days,
@@ -78,10 +81,12 @@ export function buildRevoContext(input: {
   const revisedHere = reviewedOn(logs, today);
   const minutes = logs.filter((l) => l.date === today).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
   // The revision day each page was marked on (DAY-2), not the UTC date of the timestamp.
-  const memorizedToday = pages.filter((p) => p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), user) === today).length;
+  const memorizedToday = pages.filter(
+    (p) => isRevisable(p) && p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), user) === today,
+  ).length;
   const last = lastRevisedByPage(revisedItems(logs), today);
   const weakPages = pages
-    .filter((p) => p.status === 'memorized' && isWeak(p))
+    .filter((p) => isRevisable(p) && isWeak(p))
     .sort((a, b) => (last.get(a.pageNumber) ?? '').localeCompare(last.get(b.pageNumber) ?? '') || a.pageNumber - b.pageNumber)
     .map((p) => p.pageNumber)
     .slice(0, MAX_WEAK);
@@ -95,7 +100,7 @@ export function buildRevoContext(input: {
     })
     .slice(0, MAX_PAGES);
   // Surah and juz first (lib/passages): the model names parts of the Qur'an with these words.
-  const words = contextWords({ today: snapshot.pages, next: nextPages, weakNext, weak: weakPages });
+  const words = contextWords({ today: snapshot.pages, next: nextPages, weakNext, weak: weakPages }, partlyMemorizedAyahs(pages));
   return {
     totals: revoTotals({ pages, logs, today, streakDays: reading.streak, plannedPerDay: user.dailyPageCapacity ?? 0 }),
     today: {

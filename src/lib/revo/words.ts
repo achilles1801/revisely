@@ -3,7 +3,7 @@
 // rest of the app word them the same way.
 
 import { getJuzForPage } from '../quranData';
-import { describePassage, placeOfPage, plainText, type PassageOptions } from '../passages';
+import { describePassage, describePagesToRevise, placeOfPageToRevise, plainText, type PartialPages, type PassageOptions } from '../passages';
 
 /** For labels (a chip, a chart's row, a picker row): "Al-Hashr 17–24", "Juz 28", "Al-Hashr to Al-Mumtahanah". */
 export function passageShort(pages: readonly number[]): string {
@@ -44,25 +44,29 @@ export interface ContextWords {
  * The parts of the Qur'an Revo's context names, worded for the model (plain text): today's pages and
  * where they start, what's next and where it starts, the weak ones, and each page on its own.
  */
-export function contextWords(input: { today: readonly number[]; next: readonly number[]; weakNext: readonly number[]; weak: readonly number[] }): ContextWords {
+export function contextWords(
+  input: { today: readonly number[]; next: readonly number[]; weakNext: readonly number[]; weak: readonly number[] },
+  /** The partly memorized pages and their memorized ayahs: named by those (MEM-4). */
+  partial: PartialPages = new Map(),
+): ContextWords {
   const passages: ContextWords['passages'] = {};
   const put = (key: keyof ContextWords['passages'], text: string | null) => {
     if (text) passages[key] = text;
   };
   const given = { order: 'given', juz: true } as const;
   if (input.today.length > 0) {
-    put('today', fit(describePassage(input.today, given), MAX_PASSAGE));
-    put('startsAt', fit(placeOfPage(input.today[0]), MAX_PASSAGE));
+    put('today', fit(describePagesToRevise(input.today, partial, given), MAX_PASSAGE));
+    put('startsAt', fit(placeOfPageToRevise(input.today[0], partial), MAX_PASSAGE));
   }
   if (input.next.length > 0) {
-    put('next', fit(describePassage(input.next, given), MAX_PASSAGE));
-    put('nextAt', fit(placeOfPage(input.next[0]), MAX_PASSAGE));
+    put('next', fit(describePagesToRevise(input.next, partial, given), MAX_PASSAGE));
+    put('nextAt', fit(placeOfPageToRevise(input.next[0], partial), MAX_PASSAGE));
   }
-  if (input.weakNext.length > 0) put('weakNext', fit(describePassage(input.weakNext, { juz: true }), MAX_PASSAGE));
-  if (input.weak.length > 0) put('weak', fit(describePassage(input.weak, { juz: true }), MAX_PASSAGE));
+  if (input.weakNext.length > 0) put('weakNext', fit(describePagesToRevise(input.weakNext, partial, { juz: true }), MAX_PASSAGE));
+  if (input.weak.length > 0) put('weak', fit(describePagesToRevise(input.weak, partial, { juz: true }), MAX_PASSAGE));
   const pageNames: Record<string, string> = {};
   for (const p of new Set([...input.next, ...input.weakNext, ...input.weak])) {
-    const name = fit(describePassage([p], { juz: true }), MAX_PAGE_NAME);
+    const name = fit(describePagesToRevise([p], partial, { juz: true }), MAX_PAGE_NAME);
     if (name) pageNames[String(p)] = name;
   }
   return { passages, pageNames };

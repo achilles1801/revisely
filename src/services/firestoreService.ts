@@ -960,10 +960,14 @@ export async function getActivityItemsBetween(
 }
 
 /** The memorization items between two revision days, inclusive (Insights' twelve months). */
-export async function getMemorizationsBetween(from: string, to: string, userId?: string): Promise<{ day: string; pages: number[] }[]> {
+export async function getMemorizationsBetween(from: string, to: string, userId?: string): Promise<{ day: string; pages: number[]; verses?: number[] }[]> {
   const uid = userId || getCurrentUserId();
   const snap = await getDocs(query(collection(db, 'users', uid, 'memorizations'), where('day', '>=', from), where('day', '<=', to)));
-  return snap.docs.map((d) => ({ day: d.data().day, pages: d.data().pages ?? [] }));
+  // An item added by the ayah carries its ayahs (MEM-2: it counts by their share of the page).
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { day: data.day, pages: data.pages ?? [], ...(Array.isArray(data.verses) ? { verses: data.verses as number[] } : {}) };
+  });
 }
 
 /** Save a finished session. Returns the new document id. */

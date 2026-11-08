@@ -30,7 +30,7 @@
 // tests), `spokenText` reads it for VoiceOver ("ayahs 142 to 176").
 
 import pageVerseTable from '../data/pageVerses.json';
-import { ayahOf, ayahRuns, firstAyahOfPage, lastAyahOfPage, nextAyah, pageOfAyah, previousAyah, suraOf } from './ayahKeys';
+import { ayahOf, ayahRuns, ayahsOnPage, firstAyahOfPage, lastAyahOfPage, nextAyah, pageOfAyah, previousAyah, suraOf } from './ayahKeys';
 import { getMushafEdition, MushafEditionId } from './mushafEdition';
 import { getJuzForPage, getJuzRange, getSurah, getSurahDisplay } from './quranData';
 
@@ -308,6 +308,39 @@ export function describeAyahs(keys: Iterable<number>, opts: Omit<PassageOptions,
     if (juz) text = `${text} · ${juz}`;
   }
   return finish(text, opts.sentence);
+}
+
+/** The partly memorized pages, each with its memorized ayahs (lib/memorizedAyahs partlyMemorizedAyahs). */
+export type PartialPages = ReadonlyMap<number, readonly number[]>;
+
+/**
+ * Pages to revise in words, as describePassage names them, with a partly memorized page among them
+ * named by its memorized ayahs (MEM-4): "Al-Kafirun to Al-Masad and An-Nas, then Al-Fatihah" when
+ * only An-Nas is memorized on the last page. With no partly memorized page among them, exactly
+ * describePassage. Every screen naming the pages of a revision day uses it (Home, the widget, Revo).
+ */
+export function describePagesToRevise(pages: Iterable<number>, partial: PartialPages, opts: PassageOptions = {}): string {
+  const list = [...pages].filter(validPage);
+  if (partial.size === 0 || !list.some((p) => partial.has(p))) return describePassage(list, opts);
+  const edition = opts.edition ?? getMushafEdition();
+  const ayahsOf = (ps: number[]) => ps.flatMap((p) => [...(partial.get(p) ?? ayahsOnPage(p, edition))]);
+  const { order, juz, sentence, ...rest } = opts;
+  if ((order ?? 'mushaf') === 'mushaf') return describeAyahs(ayahsOf(list), { ...rest, juz, sentence });
+  // In the order given: each run of pages apart, joined ", then ", as describePassage does.
+  const max = Math.max(1, opts.max ?? 3);
+  const runs = runsOf(list, 'given').map((r) => describeAyahs(ayahsOf(Array.from({ length: r.last - r.first + 1 }, (_, i) => r.first + i)), { ...rest, max: 99 }));
+  let text = (runs.length > max ? [...runs.slice(0, max - 1), `${runs.length - max + 1} more`] : runs).join(', then ');
+  if (juz && !text.includes(`Juz${NBSP}`)) {
+    const j = juzOfPages(list);
+    if (j) text = `${text} · ${j}`;
+  }
+  return finish(text, sentence);
+}
+
+/** Where reading a page to revise begins: placeOfPage, or a partly memorized page's first memorized ayah (MEM-4). */
+export function placeOfPageToRevise(page: number, partial: PartialPages, opts: Pick<PassageOptions, 'form' | 'edition'> = {}): string {
+  const mine = partial.get(page);
+  return mine && mine.length > 0 ? placeOfAyah(mine[0], opts) : placeOfPage(page, opts);
 }
 
 /** One range of pages, first to last (either order), in words: describePassage for that run. */

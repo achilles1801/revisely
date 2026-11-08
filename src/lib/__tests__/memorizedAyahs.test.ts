@@ -6,6 +6,9 @@ import {
   isRevisable,
   juzShares,
   memorizedAyahs,
+  memorizedByMonth,
+  memorizedItemAyahs,
+  memorizedItemShare,
   memorizedAyahsOnPage,
   memorizedPageShare,
   memorizedSurahs,
@@ -120,5 +123,29 @@ describe('memorized ayahs', () => {
     expect(stats.share).toBeLessThan(1.62);
     expect(stats.surahs).toBe(0);
     expect(stats.completeJuz).toBe(0);
+  });
+
+  it('an item counts by its ayahs’ share of their pages, or a page a page when added whole', () => {
+    expect(memorizedItemShare({ day: '2026-11-03', pages: [562, 563], verses: AL_MULK_1_20 })).toBeCloseTo(1 + pageShare(page(563, 'in_progress', ayahsBetween(67013, 67020))), 10);
+    expect(memorizedItemShare({ day: '2026-11-03', pages: [562, 563, 563] })).toBe(2);
+    expect(memorizedItemAyahs({ day: '2026-11-03', pages: [562, 563], verses: AL_MULK_1_20 })).toBe(20);
+    expect(memorizedItemAyahs({ day: '2026-11-03', pages: [562] })).toBe(12);
+  });
+
+  it('months: twelve, oldest first, each by page share to one decimal and its ayahs', () => {
+    const months = memorizedByMonth(
+      [
+        { day: '2026-11-03', pages: [562, 563], verses: AL_MULK_1_20 },
+        { day: '2026-11-01', pages: [1] },
+        { day: '2026-10-15', pages: [2, 3] },
+        { day: '2025-11-30', pages: [4] },
+      ],
+      '2026-11',
+    );
+    expect(months).toHaveLength(12);
+    expect(months[0].month).toBe('2025-12');
+    expect(months[11]).toEqual({ month: '2026-11', pages: 2.6, ayahs: 27 });
+    expect(months[10]).toMatchObject({ month: '2026-10', pages: 2 });
+    expect(months.slice(0, 10).every((m) => m.pages === 0 && m.ayahs === 0)).toBe(true);
   });
 });

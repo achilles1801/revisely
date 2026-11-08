@@ -21,15 +21,12 @@
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
 import type { Leftovers } from './carryOver';
-import { describeAyahs, describePassage, NBHY, NBSP, pagesNote, placeOfAyah, placeOfPage, spokenText } from './passages';
-import { suraOf, type AyahKey } from './ayahKeys';
-import { ayahsToRevise } from './memorizedAyahs';
+import { describePagesToRevise, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, type PartialPages } from './passages';
+import { suraOf } from './ayahKeys';
 import { getSurah } from './quranData';
 
-/** The partly memorized pages, each with its memorized ayahs (lib/memorizedAyahs partlyMemorizedAyahs). */
-export type PartialPages = ReadonlyMap<number, readonly AyahKey[]>;
+export type { PartialPages };
 const NONE: PartialPages = new Map();
-const anyPartial = (list: readonly number[], partial: PartialPages) => partial.size > 0 && list.some((p) => partial.has(p));
 
 /** A no-break space (keeps "ayah 10 ›" and "20 pages" together) and a no-break hyphen ("Al-" never ends a line). */
 export { NBHY, NBSP };
@@ -42,10 +39,7 @@ export { NBHY, NBSP };
  */
 export function catchUpLine(leftovers: Leftovers, partial: PartialPages = NONE): { title: string; label: string } | null {
   if (leftovers.pages.length === 0) return null;
-  const opts = { form: 'short', sentence: true, max: 2 } as const;
-  const what = anyPartial(leftovers.pages, partial)
-    ? describeAyahs(ayahsToRevise(leftovers.pages, partial), opts)
-    : describePassage(leftovers.pages, opts);
+  const what = describePagesToRevise(leftovers.pages, partial, { form: 'short', sentence: true, max: 2 });
   const missed = leftovers.days.every((d) => d.missed);
   const when =
     leftovers.days.length === 1
@@ -92,10 +86,7 @@ const lastSurah = (p: number, partial: PartialPages = NONE) => {
   return held(all[all.length - 1]?.name);
 };
 /** Where reading a page begins: its first ayah, or a partly memorized page's first memorized one. */
-const placeOf = (p: number, partial: PartialPages) => {
-  const mine = partial.get(p);
-  return mine ? placeOfAyah(mine[0]) : placeOfPage(p);
-};
+const placeOf = (p: number, partial: PartialPages) => placeOfPageToRevise(p, partial);
 
 /** Runs of consecutive pages, in the order given (the session's order). */
 export function runsInOrder(list: number[]): PageRun[] {
@@ -116,14 +107,6 @@ export function juzSpan(list: number[]): string | null {
   return null;
 }
 
-/** "Juz 28", or "Juz 27–28" for two in a row (as describePassage's `juz`); null otherwise. */
-function nearJuz(list: number[]): string | null {
-  const js = [...new Set(list.map(getJuzForPage))].sort((a, b) => a - b);
-  if (js.length === 1) return `Juz${NBSP}${js[0]}`;
-  if (js.length === 2 && js[1] === js[0] + 1) return `Juz${NBSP}${js[0]}–${js[1]}`;
-  return null;
-}
-
 /** A "→" held to the name before it: a line may end with it, never start with it. */
 const to = (a: string, b: string) => `${a}${NBSP}→ ${b}`;
 
@@ -141,17 +124,7 @@ function surahSpan(run: PageRun, partial: PartialPages = NONE): string {
  */
 export function rangesText(list: number[], partial: PartialPages = NONE): string {
   if (list.length === 0) return '';
-  const what = anyPartial(list, partial)
-    ? // Each run in the session's order, its partly memorized pages by their ayahs.
-      [
-        runsInOrder(list)
-          .map((r) => describeAyahs(ayahsToRevise(Array.from({ length: r.last - r.first + 1 }, (_, i) => r.first + i), partial), { wholeJuz: false }))
-          .join(', then '),
-        nearJuz(list),
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : describePassage(list, { order: 'given', juz: true, wholeJuz: false });
+  const what = describePagesToRevise(list, partial, { order: 'given', juz: true, wholeJuz: false });
   return [what, pagesNote(list, { order: 'given' })].filter(Boolean).join(' · ');
 }
 

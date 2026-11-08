@@ -12,10 +12,10 @@ import {
   removeAyahs,
 } from '../../../src/lib/memorizedAyahs';
 import type { MushafEditionId } from '../../../src/lib/mushafEdition';
-import { describeAyahs, describePassage } from '../../../src/lib/passages';
+import { describeAyahs, describePagesToRevise, describePassage } from '../../../src/lib/passages';
 import type { PageStatus, UserPage } from '../../../src/types';
 import { getPagesScheduledForDate, generateDailyAssignment } from '../../../src/lib/algorithm';
-import { revisablePages } from '../../../src/lib/memorizedAyahs';
+import { ayahsToRevise, revisablePages } from '../../../src/lib/memorizedAyahs';
 import { dayAt, memorizedPages, parseDay, runs, userWith } from './fixtures';
 
 const NOW = '2026-11-03T13:40:00.000Z';
@@ -190,6 +190,28 @@ describe('naming any ayahs (NAME-1)', () => {
         expect(describeAyahs(ayahsOfPages(pages, edition), opts)).toBe(describePassage(pages, opts));
       }),
       { numRuns: runs(300) },
+    );
+  });
+
+  it('[NAME-1] [MEM-4] the pages of a day are named as describePassage names them, a partly memorized page by its ayahs', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(pageArb, { minLength: 1, maxLength: 30 }),
+        fc.uniqueArray(pageWithSubset1405, { selector: (x) => x.n, maxLength: 6 }),
+        fc.constantFrom('long', 'compact', 'short'),
+        fc.boolean(),
+        (pages, partialPages, form, given) => {
+          const opts = { form: form as 'long' | 'compact' | 'short', edition: 'madani1405' as const, order: given ? ('given' as const) : ('mushaf' as const), juz: given };
+          expect(describePagesToRevise(pages, new Map(), opts)).toBe(describePassage(pages, opts));
+          const partial = new Map(partialPages.filter((x) => x.some.length > 0).map((x) => [x.n, x.some]));
+          const all = [...pages, ...partial.keys()];
+          if (!given) {
+            const sorted = [...new Set(all)].sort((a, b) => a - b);
+            expect(describePagesToRevise(all, partial, opts)).toBe(describeAyahs(ayahsToRevise(sorted, partial, 'madani1405'), { ...opts, order: undefined } as never));
+          }
+        },
+      ),
+      { numRuns: runs(200) },
     );
   });
 });
