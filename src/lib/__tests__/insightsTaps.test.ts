@@ -1,4 +1,4 @@
-import { monthOfMemorizing, uncoveredRows } from '../insightsTaps';
+import { hourDetail, minutesWords, monthOfMemorizing, timedRevisions, uncoveredRows } from '../insightsTaps';
 import { plainText } from '../passages';
 import { getJuzForPage, getPagesForJuz } from '../quranData';
 
@@ -53,5 +53,44 @@ describe('a month of memorizing (i10)', () => {
   });
   it('a month with none', () => {
     expect(monthOfMemorizing(items, '2026-08')).toMatchObject({ pages: 0, items: [] });
+  });
+});
+
+describe('the hours scrub (i8)', () => {
+  // Local times: two sessions from 6:10 (40 min each), one from 21:30 (50 min, into 10 PM).
+  const at = (day: string, h: number, m: number) => new Date(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), h, m).getTime();
+  const items = [
+    { day: '2026-11-02', occurredAt: at('2026-11-02', 6, 10), minutes: 40 },
+    { day: '2026-10-30', occurredAt: at('2026-10-30', 6, 10), minutes: 40 },
+    { day: '2026-11-03', occurredAt: at('2026-11-03', 21, 30), minutes: 50 },
+    { day: '2026-08-01', occurredAt: at('2026-08-01', 6, 0), minutes: 60 },
+  ];
+  it('the hour’s minutes, its sessions and the last', () => {
+    expect(hourDetail(items, TODAY, 30, '30 days', 6)).toEqual({ title: '6–7 AM · 1 h 20 min', detail: '2 sessions in 30 days, the last yesterday' });
+    expect(hourDetail(items, TODAY, 30, '30 days', 22)).toEqual({ title: '10–11 PM · 20 min', detail: '1 session in 30 days, the last today' });
+    expect(hourDetail(items, TODAY, 30, '30 days', 11)).toEqual({ title: '11 AM–12 PM', detail: 'Nothing timed in 30 days' });
+  });
+  it('minutes in words', () => {
+    expect(minutesWords(54)).toBe('54 min');
+    expect(minutesWords(354)).toBe('5 h 54 min');
+    expect(minutesWords(120)).toBe('2 h');
+  });
+});
+
+describe('Pace’s timed revisions (i11)', () => {
+  const revised = [
+    { day: TODAY, countsFor: TODAY, pages: Array.from({ length: 18 }, (_, i) => 542 + i), minutes: 34 },
+    { day: '2026-11-01', countsFor: '2026-11-01', pages: [522, 523, 524, 525, 526, 527], minutes: 9 },
+    { day: '2026-10-31', countsFor: '2026-10-31', pages: [500, 501], minutes: null },
+    // Ahead for tomorrow: not a revision of its own day.
+    { day: TODAY, countsFor: '2026-11-04', pages: [562], minutes: 2 },
+  ];
+  it('each timed revision, newest first, with its minutes a page; the ones without time counted', () => {
+    const { list, untimed } = timedRevisions(revised, TODAY, 30);
+    expect(list.map((r) => r.day)).toEqual([TODAY, '2026-11-01']);
+    expect(list[0].detail).toBe('Today · 18 pages in 34 min');
+    expect(list[1].detail).toBe('Sunday · 6 pages in 9 min');
+    expect(list[1].perPage).toBeCloseTo(1.5);
+    expect(untimed).toBe(1);
   });
 });

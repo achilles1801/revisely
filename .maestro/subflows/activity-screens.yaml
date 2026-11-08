@@ -4,7 +4,8 @@
 # Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
 # (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
 # from the untouched row, i5 and i6; the range's menu and 3 months, i1 and i2; what wasn't revised, i7;
-# Weak spots; a month's bar, i10; the end). Each is a screenshot named 09-<screen>-${THEME}.
+# Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a screenshot named
+# 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -432,3 +433,18 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-end-${THEME}
+# Pace's timed revisions (ACT-23, mock i11). (The hours scrub is a press that slides: no Maestro step.)
+- tapOn:
+    id: insights-pace-revisions
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: pace-chart
+    commands:
+      - waitForAnimationToEnd
+      - runFlow:
+          file: shot.yaml
+          env:
+            NAME: 09-insights-pace-${THEME}
+      - tapOn: "Close"

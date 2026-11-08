@@ -120,3 +120,112 @@ export function monthOfMemorizing(items: { day: string; pages: number[] }[], mon
     })),
   };
 }
+
+// ── The hours scrub (i8) ─────────────────────────────────────────────────
+
+/** Minutes as "54 min", "5 h 54 min", "2 h". */
+export function minutesWords(minutes: number): string {
+  const m = Math.round(minutes);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest > 0 ? `${h} h ${rest} min` : `${h} h`;
+}
+
+const hourWord = (h: number) => {
+  const n = h % 12 === 0 ? 12 : h % 12;
+  return { n, p: h < 12 ? 'AM' : 'PM' };
+};
+
+/** One hour held on the bars: "6–7 AM · 5 h 54 min" over "15 sessions in 30 days, the last on Monday". */
+export function hourDetail(
+  items: { day: string; occurredAt?: number | null; minutes: number | null }[],
+  today: string,
+  window: number,
+  windowWords: string,
+  hour: number,
+): { title: string; detail: string } {
+  let minutes = 0;
+  const days: string[] = [];
+  let sessions = 0;
+  for (const i of items) {
+    const age = daysBetween(i.day, today);
+    if (i.occurredAt == null || i.minutes == null || i.minutes <= 0 || age < 0 || age >= window) continue;
+    let at = new Date(i.occurredAt);
+    let left = i.minutes;
+    let here = 0;
+    while (left > 0) {
+      const take = Math.min(left, 60 - at.getMinutes());
+      if (at.getHours() === hour) here += take;
+      left -= take;
+      at = new Date(at.getTime() + take * 60_000);
+    }
+    if (here > 0) {
+      minutes += here;
+      sessions++;
+      days.push(i.day);
+    }
+  }
+  const a = hourWord(hour);
+  const b = hourWord((hour + 1) % 24);
+  const range = a.p === b.p ? `${a.n}–${b.n} ${b.p}` : `${a.n} ${a.p}–${b.n} ${b.p}`;
+  if (sessions === 0) return { title: range, detail: `Nothing timed in ${windowWords}` };
+  const last = days.sort().pop()!;
+  const ago = daysBetween(last, today);
+  const when =
+    ago === 0
+      ? 'today'
+      : ago === 1
+        ? 'yesterday'
+        : ago < 7
+          ? `on ${new Date(`${last}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })}`
+          : `on ${formatDayLong(last)}`;
+  return {
+    title: `${range} · ${minutesWords(minutes)}`,
+    detail: `${sessions} ${sessions === 1 ? 'session' : 'sessions'} in ${windowWords}, the last ${when}`,
+  };
+}
+
+// ── Pace's timed revisions (i11) ─────────────────────────────────────────
+
+export interface TimedRevision {
+  day: string;
+  /** "Juz 28", "Al-Mulk to Al-Qalam". */
+  label: string;
+  /** "Today · 18 pages in 34 min". */
+  detail: string;
+  /** Minutes a page. */
+  perPage: number;
+}
+
+/**
+ * Each revision in the window with its time (newest first), its minutes a page, and how many had no
+ * time (Pace counts only timed ones, ACT-4).
+ */
+export function timedRevisions(
+  revised: { day: string; countsFor?: string; pages: number[]; minutes: number | null }[],
+  today: string,
+  window: number,
+): { list: TimedRevision[]; untimed: number } {
+  const inWindow = revised.filter((r) => {
+    const age = daysBetween(r.day, today);
+    return age >= 0 && age < window && r.pages.length > 0 && (r.countsFor == null || r.countsFor === r.day);
+  });
+  const timed = inWindow.filter((r) => r.minutes != null && r.minutes > 0).sort((a, b) => b.day.localeCompare(a.day));
+  const dayWord = (day: string) => {
+    const ago = daysBetween(day, today);
+    if (ago === 0) return 'Today';
+    if (ago === 1) return 'Yesterday';
+    if (ago < 7) return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    return formatDayLong(day);
+  };
+  return {
+    list: timed.map((r) => ({
+      day: r.day,
+      label: describePassage(r.pages, { form: 'short' }),
+      detail: `${dayWord(r.day)} · ${r.pages.length} ${r.pages.length === 1 ? 'page' : 'pages'} in ${minutesWords(r.minutes!)}`,
+      perPage: r.minutes! / r.pages.length,
+    })),
+    untimed: inWindow.length - timed.length,
+  };
+}

@@ -354,8 +354,12 @@ How the tests are made: `tests/scenarios/README.md`.
   memorized pages in 30 days ›") lists what wasn't revised in the range, a memorized juz as one row ("Juz 4 …
   41 days ago") and otherwise each run of pages ("Memorized today, not revised yet"), each row opening its juz
   (ACT-21); a month's bar under Memorization turns the figure into that month ("9 pages in October · …") and
-  lists its memorizations, each opening its day, until the same bar is tapped again. (Majd, Nov 7 2026: "why's
-  none of the activity screen interactive?"; mocks i7 and i10.)
+  lists its memorizations, each opening its day, until the same bar is tapped again; Pace's "From 24 timed
+  revisions ›" shows each one (its minutes a page as a dot against the range's pace and the same length
+  before, then a row each, opening its day) and says how many had no time; a press that slides on the hour
+  bars turns their title into the hour under the finger ("6–7 AM · 5 h 54 min", "15 sessions in 30 days, the
+  last on Monday") until it lets go. (Majd, Nov 7 2026: "why's none of the activity screen interactive?";
+  mocks i7, i8, i10 and i11.)
 
 ## Ask coach
 

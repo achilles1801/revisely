@@ -33,7 +33,9 @@ import { openRevo } from '../../lib/revo/open';
 import { spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
 import { Sheet } from '../v2/Sheet';
-import { monthOfMemorizing, uncoveredRows, type UncoveredRow } from '../../lib/insightsTaps';
+import { hourDetail, minutesWords, monthOfMemorizing, uncoveredRows, type UncoveredRow } from '../../lib/insightsTaps';
+import { PaceSheet } from './PaceSheet';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
   beforeWords,
@@ -110,7 +112,7 @@ export function InsightsView({
         <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
       ) : null}
       <Memorization data={data} onOpenDay={onOpenDay} />
-      <Pace data={data} />
+      <Pace data={data} onOpenDay={onOpenDay} />
       {juzUsed ? (
         <JuzSheet juz={juz} onClose={() => setJuz(null)} today={data.today} revised={data.revised} windowDays={data.range ?? 30} onOpenPage={onOpenPage} onPlanIt={onPlanIt} />
       ) : null}
@@ -411,6 +413,24 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
         ? `of ${inRange.of} days since you started`
         : `of the last ${inRange.of} days`;
   const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, range), [data.revised, data.read, data.today, range]);
+  // The hours scrub (i8): a press that slides picks the hour under the finger; letting go puts it back.
+  const [heldHour, setHeldHour] = useState<number | null>(null);
+  const barsWidth = React.useRef(0);
+  const hourAt = (x: number) => (barsWidth.current > 0 ? Math.max(0, Math.min(23, Math.floor((x / barsWidth.current) * 24))) : null);
+  const scrub = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .activateAfterLongPress(150)
+        .onStart((e) => setHeldHour(hourAt(e.x)))
+        .onUpdate((e) => setHeldHour(hourAt(e.x)))
+        .onFinalize(() => setHeldHour(null))
+        .withTestId('insights-hours-scrub'),
+    // hourAt reads a ref; the gesture is made once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const held = heldHour == null ? null : hourDetail([...data.revised, ...data.read], data.today, range, rangeWords(range), heldHour);
   const busiest = busiestHours(hours);
   const max = Math.max(1, ...hours);
 
@@ -478,21 +498,32 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
       ) : null}
       {busiest ? (
         <View style={styles.hoursBlock} testID="insights-hours">
-          <Text style={[typeV2.name, { color: palette.text }]}>{busiest}</Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>{`Minutes by hour, last ${rangeWords(range)}`}</Text>
-          <View style={styles.hourBars}>
-            {hours.map((v, h) => (
-              <View
-                key={h}
-                style={[
-                  styles.hourBar,
-                  v > 0
-                    ? { height: Math.max(3, Math.round((60 * v) / max)), backgroundColor: palette.primary, opacity: v >= 20 ? 1 : 0.45 }
-                    : { height: 3, backgroundColor: palette.track },
-                ]}
-              />
-            ))}
-          </View>
+          {/* Press and slide on the bars (i8): the title becomes the hour under the finger. */}
+          <Text style={[typeV2.name, { color: palette.text }]} testID="insights-hours-title">
+            {held ? held.title : busiest}
+          </Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : `Minutes by hour, last ${rangeWords(range)}`}</Text>
+          <GestureDetector gesture={scrub}>
+            <View style={styles.hourBars} onLayout={(e) => (barsWidth.current = e.nativeEvent.layout.width)} testID="insights-hour-bars">
+              {hours.map((v, h) => (
+                <View
+                  key={h}
+                  style={[
+                    styles.hourBar,
+                    v > 0
+                      ? {
+                          height: Math.max(3, Math.round((60 * v) / max)),
+                          backgroundColor: palette.primary,
+                          opacity: heldHour == null ? (v >= 20 ? 1 : 0.45) : heldHour === h ? 1 : 0.3,
+                        }
+                      : { height: 3, backgroundColor: palette.track },
+                  ]}
+                  accessible
+                  accessibilityLabel={`${hourDetail([], data.today, range, rangeWords(range), h).title}, ${v > 0 ? minutesWords(v) : 'nothing timed'}`}
+                />
+              ))}
+            </View>
+          </GestureDetector>
           <View style={styles.hourLabels}>
             {[0, 6, 12, 18].map((h) => (
               <Text key={h} style={[typeV2.meta, styles.hourLabel, { color: palette.secondary, left: `${(h / 24) * 100}%` }]}>
@@ -739,9 +770,12 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
 
 // ── Pace ─────────────────────────────────────────────────────────────────
 
-function Pace({ data }: { data: InsightsData }) {
+function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
   const { palette } = useTheme();
   const range = data.range ?? 30;
+  // "From 24 timed revisions ›" (i11): each one, as dots and a list.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetUsed, setSheetUsed] = useState(false);
   const p = paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: range });
   // Hidden under ten items with minutes (ACT-4).
   if (!p) return null;
@@ -769,11 +803,36 @@ function Pace({ data }: { data: InsightsData }) {
           <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{`A ${p.capacity}-page day at that pace`}</Text>
         </View>
       </View>
-      <Text style={[typeV2.meta, styles.footnote, { color: palette.secondary }]}>
-        {[`From ${p.revisions} ${p.revisions === 1 ? 'revision' : 'revisions'} with their time.`, p.readingPerPage != null ? `Reading: ${formatPace(p.readingPerPage)} min a page.` : null]
-          .filter(Boolean)
-          .join(' ')}
-      </Text>
+      <Tap
+        onPress={() => {
+          setSheetUsed(true);
+          setSheetOpen(true);
+        }}
+        accessibilityRole="button"
+        accessibilityHint="Shows each timed revision"
+        style={styles.footnoteTap}
+        testID="insights-pace-revisions"
+      >
+        <Text style={[typeV2.meta, styles.flex, { color: palette.secondary }]}>
+          {[`From ${p.revisions} timed ${p.revisions === 1 ? 'revision' : 'revisions'} ›`, p.readingPerPage != null ? `Reading: ${formatPace(p.readingPerPage)} min a page.` : null]
+            .filter(Boolean)
+            .join(' ')}
+        </Text>
+      </Tap>
+      {sheetUsed ? (
+        <PaceSheet
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          revised={data.revised}
+          today={data.today}
+          range={range}
+          rangeWords={rangeWords(range)}
+          beforeWords={beforeWords(range)}
+          perPage={p.perPage}
+          before={p.before}
+          onOpenDay={onOpenDay}
+        />
+      ) : null}
     </Section>
   );
 }
@@ -837,4 +896,5 @@ const styles = StyleSheet.create({
   paceNumber: { fontSize: 22, lineHeight: 26, fontWeight: '700', fontVariant: ['tabular-nums'] },
   paceText: { marginTop: 4 },
   footnote: { marginTop: 10 },
+  footnoteTap: { flexDirection: 'row', marginTop: 10, paddingVertical: 4 },
 });

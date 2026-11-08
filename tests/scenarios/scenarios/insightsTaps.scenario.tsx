@@ -3,6 +3,8 @@
 import React from 'react';
 import { Modal } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { State } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { InsightsView, type InsightsData } from '../../../src/components/activity/InsightsView';
 import { plainText } from '../../../src/lib/passages';
@@ -39,12 +41,24 @@ const data: InsightsData = {
   range: 30,
 };
 
-function open() {
+// Twelve timed revisions at 6:10 in the morning (local), 20 pages each, the last 12 days but one with
+// no time; Pace shows from ten timed ones (ACT-4).
+const localAt = (day: string, h: number, m: number) => new Date(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), h, m).getTime();
+const dayBefore = (n: number) => new Date(Date.parse(`${TODAY}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+const timedData: InsightsData = {
+  ...data,
+  revised: Array.from({ length: 13 }, (_, n) => {
+    const day = dayBefore(n);
+    return { day, countsFor: day, pages: JUZ30.slice(0, 20), skipped: [], minutes: n === 5 ? null : 36 + n, occurredAt: localAt(day, 6, 10) };
+  }),
+};
+
+function open(shown: InsightsData = data) {
   const onOpenDay = jest.fn();
   const onOpenCalendar = jest.fn();
   render(
     <SafeAreaProvider initialMetrics={METRICS}>
-      <InsightsView data={data} onReviseTomorrow={jest.fn()} onPlanIt={jest.fn()} onOpenPage={jest.fn()} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
+      <InsightsView data={shown} onReviseTomorrow={jest.fn()} onPlanIt={jest.fn()} onOpenPage={jest.fn()} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
     </SafeAreaProvider>,
   );
   return { onOpenDay, onOpenCalendar };
@@ -94,5 +108,34 @@ describe('Insights’ one-line taps', () => {
     // The same bar again: back to the total.
     fireEvent.press(screen.getByTestId('insights-month-2026-10'));
     expect(screen.queryByTestId('insights-month-list')).toBeNull();
+  });
+
+  it('[ACT-23] Pace’s timed revisions: each as a dot and a row, the untimed one said; a row opens its day', () => {
+    const { onOpenDay } = open(timedData);
+    fireEvent.press(screen.getByTestId('insights-pace-revisions'));
+    expect(screen.getByText('12 timed revisions')).toBeTruthy();
+    expect(screen.getByTestId('pace-untimed').props.children).toBe('1 revision in 30 days had no time, so it isn’t counted.');
+    fireEvent.press(screen.getByTestId(`pace-row-${dayBefore(1)}-1`));
+    sheetGone();
+    expect(onOpenDay).toHaveBeenCalledWith(dayBefore(1));
+  });
+
+  it('[ACT-23] press and slide on the hour bars: the title becomes the hour; letting go puts it back', async () => {
+    open(timedData);
+    const title = () => screen.getByTestId('insights-hours-title').props.children;
+    expect(title()).toMatch(/^Mostly 6–7 AM/);
+    fireEvent(screen.getByTestId('insights-hour-bars'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 240, height: 60 } } });
+    // fireGestureHandler ends a gesture it is given, so the moment it is held is driven by its handlers.
+    const scrub = getByGestureTestId('insights-hours-scrub') as unknown as { handlers: { onStart: (e: { x: number }) => void; onUpdate: (e: { x: number }) => void } };
+    act(() => scrub.handlers.onStart({ x: 65 }));
+    expect(title()).toMatch(/^6–7 AM · /);
+    expect(screen.getByText(/^12 sessions in 30 days, the last today$/)).toBeTruthy();
+    act(() => scrub.handlers.onUpdate({ x: 230 }));
+    expect(title()).toBe('11 PM–12 AM');
+    // Let go.
+    act(() => {
+      fireGestureHandler(getByGestureTestId('insights-hours-scrub'), [{ state: State.BEGAN, x: 65 }, { state: State.ACTIVE, x: 65 }, { state: State.END, x: 65 }]);
+    });
+    expect(title()).toMatch(/^Mostly 6–7 AM/);
   });
 });
