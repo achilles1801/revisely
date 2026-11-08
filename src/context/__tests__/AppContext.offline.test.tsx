@@ -108,6 +108,7 @@ import { AppProvider, useApp, SERVER_WAIT_MS } from '../AppContext';
 import { writeAccountPart, readAccount } from '../../lib/offline/accountCache';
 import { enqueue, loadOutbox, resetOutboxForTests } from '../../lib/offline/outbox';
 import { resetSyncForTests, settleSync } from '../../lib/offline/sync';
+import { CURRENT_RELEASE } from '../../lib/help/whatsNew';
 
 // ---- an account
 const ts = (iso: string) => Timestamp.fromMillis(new Date(iso).getTime());
@@ -593,7 +594,10 @@ describe('an account reset on the server (functions/scripts/reset-account.js)', 
       await app.completeOnboarding();
     });
     await act(async () => settleSync('u1'));
-    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([{ kind: 'user', fields: { onboardingComplete: true } }]);
+    // Onboarding marks the release it ran on, so What's new never shows to it (NEW-1).
+    expect(mockServer.applied.map((a) => a.entry.op)).toEqual([
+      { kind: 'user', fields: { onboardingComplete: true, whatsNewSeen: CURRENT_RELEASE.id } },
+    ]);
   });
 
   it('signed out since (no copy): only the changes made before the reset are dropped', async () => {

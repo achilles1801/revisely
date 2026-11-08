@@ -74,6 +74,8 @@ export interface User {
   carryOverMode?: 'shift' | 'add';
   // The new design's accent (Settings → Appearance → Accent); unset = Indigo.
   accent?: 'indigo' | 'crimson' | 'jade';
+  /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew, NEW-1). */
+  whatsNewSeen?: string;
   // Pages carried into one revision day. They go first that day and replace its
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.

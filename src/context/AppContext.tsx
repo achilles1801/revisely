@@ -44,6 +44,7 @@ import {
 import { restartFirestore, watchConnectivity } from '../lib/offline/connectivity';
 import { setCurrentAccount } from '../lib/offline/queue';
 import { removeAheadPages } from '../lib/aheadCredit';
+import { CURRENT_RELEASE } from '../lib/help/whatsNew';
 
 // ============================================================================
 // CONVERSION HELPERS - Convert between Firestore and local types
@@ -84,6 +85,7 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     recordingBackup: fsUser.recordingBackup,
     recordingBackupCellular: fsUser.recordingBackupCellular,
     previewTester: fsUser.previewTester === true,
+    whatsNewSeen: typeof fsUser.whatsNewSeen === 'string' ? fsUser.whatsNewSeen : undefined,
   };
 }
 
@@ -156,6 +158,8 @@ interface AppContextType extends AppState {
   deleteLog: (logId: string) => Promise<void>;
   deleteLogs: (logIds: string[]) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  /** "What's new" finished (NEW-1): the account has seen this release. */
+  markWhatsNewSeen: (release: string) => Promise<void>;
   resetOnboarding: () => Promise<void>;
   createDefaultUser: (overrides?: Partial<User>) => User;
   initializeUserInFirestore: (uid: string, email?: string | null, displayName?: string | null) => Promise<void>;
@@ -1031,8 +1035,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const completeOnboarding = useCallback(async () => {
     setError(null);
-    await enqueueOp({ kind: 'user', fields: { onboardingComplete: true } });
+    // Set up on this release: its "What's new" describes nothing new to this account (NEW-1).
+    await enqueueOp({ kind: 'user', fields: { onboardingComplete: true, whatsNewSeen: CURRENT_RELEASE.id } });
   }, [enqueueOp]);
+
+  const markWhatsNewSeen = useCallback(
+    async (release: string) => {
+      await enqueueOp({ kind: 'user', fields: { whatsNewSeen: release } });
+    },
+    [enqueueOp],
+  );
 
   const resetOnboarding = useCallback(async () => {
     setError(null);
@@ -1181,6 +1193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteLog,
         deleteLogs,
         completeOnboarding,
+        markWhatsNewSeen,
         resetOnboarding,
         createDefaultUser,
         initializeUserInFirestore,

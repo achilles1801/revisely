@@ -735,6 +735,28 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   2026: "the helper icons should be on by default for ex a new user account unless a user turns them
   off manually".)
 
+## What's new
+
+A short walkthrough after the update (`lib/help/whatsNew`, `components/whatsNew`; Majd, Nov 8 2026: "only
+shows up once and they must go through it and complete it … just the main stuff").
+
+- **NEW-1.** An account set up before a release sees that release's "What's new" once, after the update,
+  when the release is switched on: its user document has no `whatsNewSeen`, or an earlier release's.
+  Finishing it (Done) marks the release seen on the account, so no other phone shows it. Finishing
+  onboarding marks the release it ran on, so an account set up on it never sees its walkthrough. A card
+  shows only when the account has what it describes (a feature still for testers is left out). The kill
+  switch (`config/app.whatsNewOff`) stops it showing.
+- **NEW-2.** It is required: no skip and no close, one Next a card and Done on the last. A swipe right or
+  Android's back goes to the card before. Leaving the app part way (or a restart) reopens it on the card
+  it was on, on that phone.
+- **NEW-3.** Settings → About → What's new shows the release's cards again, with a ✕, and changes nothing
+  (testers see the row before the release is switched on). A tester's Settings → Testing → Show What's
+  new at launch runs it as App Store users will see it from the next launch, resuming the same way;
+  finishing that run turns the switch off and writes nothing to the account.
+- **NEW-4.** It opens before Home, so nothing opens over it: "A new update is ready", "New version
+  available" and Revo wait for Home, a widget's link opened at launch goes through after Done, and an
+  update never restarts the app under it. Only "Update required" comes first.
+
 ## Naming the Qur'an
 
 - **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers
