@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-08T08:56:26.419Z",
+  "recordedAt": "2026-11-08T09:56:09.268Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "45770e154934bcc7ab13e19b4c18ab7a2ba329b53df23fd7cfea757a113395bc",
+    "systemSha256": "bce6ef1a38e939bd7c7d3144f334a4364d7b836232658cde41990b2479e01091",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgqBXLY2BycUF8Ur64RoM",
+    "id": "msg_011CgqG5RBSAyAmCXL7aG9Ud",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You finished the whole plan on four of the last six days, and one of those came on Thursday when you did 9 of 10. Saturday was the one missed day, and your 2-day streak is building again.\",\"chart\":{\"kind\":\"weeks\",\"title\":\"Your last few weeks, day by day\",\"weeks\":4},\"textAfter\":\"Six pages of Juz 30 are still waiting today, so finishing them tonight keeps this going.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, starting at Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak pages?\",\"How am I doing today?\"]}"
+        "text": "{\"text\":\"Four of the last six days had the whole plan done, and Thursday came close with 9 pages. Only Saturday was missed, and you picked it straight back up on Sunday.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Today still has 6 pages left, starting from Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"Which days do I miss?\",\"How is my pace over 30 days?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 15759,
+      "cache_creation_input_tokens": 15800,
+      "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 15800,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 233,
+      "output_tokens": 228,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
