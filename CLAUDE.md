@@ -472,6 +472,39 @@ June 2025).
 - The Arabic's source is credited in the verse sheet too: "Arabic text: Tanzil Project · tanzil.net"
   (`ARABIC_CREDIT`, at the end of the verse), as Tanzil's terms ask.
 
+### QuranEnc's other translations (testers; `lib/quranenc`, Nov 2026)
+
+Every translation in QuranEnc's list (76 in 56 languages, Nov 8 2026), on Saheeh's terms (all 163
+translation pages on QuranEnc carry the same seven). The licensing inventory, with Quran.com's 126
+translations matched to a source, is `~/Documents/revisely-translations/inventory.md`.
+- **The store:** `createQuranEncStore(key)` is Saheeh's code made general: suras kept as read in
+  `Documents/translations/<key>/NNN-<version>.json` with `info.json`, the version check, the download.
+  `lib/saheeh` is that store for `english_saheeh`. QuranEnc's list is read once a day and one request
+  answers for every translation (TRANS-4).
+- **The catalogue:** `src/data/quranencCatalogue.json`, from `node scripts/quranenc-catalogue.js`:
+  QuranEnc's list as shipped (key, language, direction, version, title, description, size). Ids in the
+  app are `qe.<key>`; Saheeh International keeps `en.sahih`. The rules allow any `translationId` of up
+  to 40 characters, so new ones need no rules change.
+- **Credits:** QuranEnc's own description of each (who translated and issued it), the version of the
+  sura shown and QuranEnc.com (TRANS-2). Right-to-left languages read right to left (TRANS-3).
+- **Who:** testers get the picker of every translation (`offeredTranslations`, TRANS-5); everyone else
+  keeps Saheeh International and The Clear Quran®.
+- **The picker** (Majd's design, Nov 8 2026): Translations and Edit, a search over every group, then
+  Selected, Favorites (starred, in that order; `lib/translationFavorites`, on the phone per account,
+  TRANS-8), Downloaded, and every language. Edit moves or unstars favorites and deletes downloads.
+- **Downloads** (`lib/translationDownloads`, TRANS-6): a picker row shows its size, downloads the whole
+  translation on any connection (one tap, a few MB; stoppable, carries on), and the bin removes it.
+  Saheeh International stays with the offline mushaf. Offline, a translation not on the phone offers
+  one that is: the same language, then Saheeh, then any (`fallbackTranslation`, TRANS-7).
+- **E2E:** builds fetch nothing, so `src/lib/e2e/demoTranslations.ts` writes Al-Ikhlas in 24
+  recorded translations (one per script) and page 604's Arabic, and `revisely://e2e/verse?ref=112:2&t=…`
+  opens the real verse sheet. Flow `15-translations` captures each script on both platforms.
+- **Not yet:** 87 entries on QuranEnc's website aren't in its list (41 are tafsirs). The 25 that
+  Quran.com also has, Russian, Bengali, Malay and Korean among them, publish no version, which the
+  terms require: they wait for QuranEnc's answer. Tanzil's translations are non-commercial only. The
+  Quran Foundation API (Diyanet, Kuliev, Abdel Haleem…) needs a registered app, a 7-day sync for
+  offline copies and a privacy-policy rewrite.
+
 ## Runtime version is a fingerprint
 
 `runtimeVersion: { policy: "fingerprint" }` in `app.config.js`: an update reaches only binaries built
@@ -1436,9 +1469,29 @@ classic default), and a fresh install starts in light.
     then 15, then 30) and Down / Up; running, a red bin (Discard), Pause and End. A timer's length
     can be typed: tap the clock or the length, a number pad, 1–480 minutes (`parseMinutes`); the
     card rises above the keyboard. "Open the Quran" is a small link where it applies.
-  - **No help.** No "?" or ⓘ buttons, guide sheets or first-run guides; a label or a subtitle says
-    what a control does (e.g. Keep daily amount). No paragraphs of explanation in sheets either
-    (the Mushaf picker's was removed, Nov 3 2026).
+  - **Help, kept small** (Majd, Nov 8 2026: "helper buttons are good". This replaced the "No help"
+    rule). A label or a subtitle still says what a control does (e.g. Keep daily amount), and sheets
+    hold no paragraphs of explanation (the Mushaf picker's was removed, Nov 3 2026). On top of that,
+    the few screens that can't explain themselves get one ? (`components/help/HelpButton`; testers
+    for now, `lib/help/availability`). Home's is in the Today post's header, the schedule editor's
+    before Save, the reader's a round button at the right of its header, and a session's the last
+    row of its ⋯ menu (its header is full), Activity's in its top bar before search (for the tab on
+    show: Overview or Insights), and a day's before +. It opens a `v2/Sheet` of at
+    most four topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the
+    account, `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding
+    is one switch for every screen, kept on the phone per account; Settings → Support → Help buttons
+    turns it back on. BEHAVIOUR.md HELP-1 to HELP-3. No first-run guides,
+    tooltips, coach marks, or ⓘ beside single controls.
+    - **All help text is in `src/lib/help/topics.ts`.** Each topic lists the BEHAVIOUR.md rules it
+      explains (`covers`). `src/lib/help/__tests__/topics.test.ts` keeps a hash of each covered rule
+      in `reviewed.json` and fails when a rule changes until its topic is reviewed: read the topic
+      against the rule, fix the words, then `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`. A topic
+      no rule covers yet says why (`unruled`: the reader's gestures and player, the hidden page); the
+      check can't watch those, so a rule with a scenario for one turns it into `covers`.
+    - A change to something a topic describes (a label, a gesture, where a button is) updates the
+      topic in the same PR. `{{labels}}` must be text the app shows (the test checks `src/`).
+    - With Smart Tracking off, no topic mentions ratings or strength (`when`; HELP-3). The hidden
+      page's topic shows only where it's offered. Surahs and juz, never page numbers.
 - **Accents** (Settings → Appearance → Accent, a row like Theme: label on the left, the three pills
   on the right, swatches only on narrow screens or large text): **Indigo (the default)**, Crimson and Jade. The
   choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it follows the

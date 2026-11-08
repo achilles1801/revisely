@@ -21,6 +21,8 @@ import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HELP_ICON, useHelpSheet } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { HiddenPageOverlay } from '../../components/recite/HiddenPageOverlay';
 import { RecitePanel } from '../../components/recite/RecitePanel';
@@ -62,8 +64,9 @@ import { useApp } from '../../context/AppContext';
 import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
-import { carryOverOn, generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
-import { catchUpDayOf, duePagesOf } from '../../lib/carryOver';
+import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
+import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
 import { describePageRange, describePassage } from '../../lib/passages';
@@ -260,6 +263,8 @@ export default function ActiveRevisionScreen() {
   // the 1405 pages only, for now.
   const edition = useMushafEdition();
   const reciteAvailable = reciteModeEnabled(user) && mushafEdition(edition).reciteData;
+  // The session's help (HELP-1): a row of ⋯, since the header already holds four round buttons.
+  const help = useHelpSheet('session', { recite: reciteAvailable });
   const [hidden, setHidden] = useState(false);
   const [reveal, setReveal] = useState<RevealState>(NOTHING_REVEALED);
   const [listenOn, setListenOn] = useState(true);
@@ -429,7 +434,7 @@ export default function ActiveRevisionScreen() {
     const revisionDay = sessionDay;
     // The pages that finish the day (SESS-7): its own; or, when Keep daily amount filled it with
     // catch-up pages, those (still credited to the days they were missed).
-    const assignedPages = duePagesOf(assignment.pages, user, revisionDay);
+    const assignedPages = duePagesOf(assignment.pages, user, revisionDay, revisablePages(pages));
     while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
       (p) => !silentlySavedRef.current.has(p),
@@ -757,7 +762,7 @@ export default function ActiveRevisionScreen() {
         const revisionDay = sessionDay ?? getCurrentRevisionDay(user!);
         await addLog({
           date: revisionDay,
-          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay),
+          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay, revisablePages(pages)),
           pagesRevised: sessionCredit(pagesRevised, pageDays, revisionDay).pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,
@@ -917,6 +922,7 @@ export default function ActiveRevisionScreen() {
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
+    ...(help.shown ? [{ key: 'help', label: 'How a session works', icon: HELP_ICON, onPress: help.open }] : []),
   ];
 
   const palette = getReadPalette(isDark);
@@ -934,8 +940,10 @@ export default function ActiveRevisionScreen() {
     />
   );
 
-  // Pages put in front by "Revise these first tomorrow" (Insights), labelled as such.
-  const fromInsights = !!sessionDay && carryOverOn(user, sessionDay)?.source === 'insights';
+  // Pages Insights put in front (ACT-24), named by their surahs or juz: "From Insights: Juz 1". It said
+  // "the weak pages first" whatever put them there, Plan it and "Revise them tomorrow" too (Nov 8 2026).
+  const insightsFirst = sessionDay ? [...insightsPagesOn(user, sessionDay)] : [];
+  const fromInsights = insightsFirst.length > 0;
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame
@@ -961,7 +969,7 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-from-insights"
               >
-                From Insights: the weak pages first
+                {`From Insights: ${describePassage(insightsFirst, { form: 'short' })}`}
               </Text>
             ) : null}
             {hidden ? (
@@ -1167,6 +1175,9 @@ export default function ActiveRevisionScreen() {
         onDismiss={() => setUndoState(null)}
         bottomInset={insets.bottom - spacing.sm}
       />
+
+      <HelpToast screen="session" bottomInset={insets.bottom - spacing.sm} />
+      {help.sheet}
 
       <SessionMenuSheet
         visible={menuOpen}

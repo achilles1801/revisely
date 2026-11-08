@@ -38,6 +38,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      # npm 10, which Node 20 comes with, can give two of its cache's temporary files the same
+      # name, and `npm ci` then fails with EEXIST (npm/cli#7308; a scenario shard in #422's CI).
+      # npm 11.12 fixed it (cacache 20.0.4).
+      - name: npm 11
+        run: npm install -g npm@11.21.1 --no-audit --no-fund
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

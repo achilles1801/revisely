@@ -1,7 +1,7 @@
 // Revo (functions/src/revo): who may ask, what is sent, the day's questions, the shared monthly cap,
 // the answer cache, the reply's checks, memory, the Day in review and history. Storage and the
 // model are fakes; the request the model would get is inspected.
-import { MONTHLY_CAP_USD, MAX_MONTHLY_CAP_USD, monthlyCapFrom } from '../../../functions/src/coach/handler';
+import { DAILY_CAP_SHARE, MONTHLY_CAP_USD, MAX_MONTHLY_CAP_USD, dailyCapFrom, monthlyCapFrom } from '../../../functions/src/coach/handler';
 import { costUsd, worstCaseCostUsd } from '../../../functions/src/coach/pricing';
 import type { MessagesRequest } from '../../../functions/src/coach/call';
 import { CoachCallError } from '../../../functions/src/coach/call';
@@ -24,6 +24,7 @@ import { parseReply } from '../../../functions/src/revo/reply';
 import { REVO_SCREENS, type CachedAnswer, type RevoChat, type RevoContext, type RevoMemoryItem, type RevoSettings, type StoredMessage } from '../../../functions/src/revo/types';
 import { validateAttachment, validateContext } from '../../../functions/src/revo/validate';
 import { revoSettingsOf } from '../../../functions/src/revo/settings';
+import { type RevoRelease, revoAllowed, revoReleaseOf } from '../../../functions/src/revo/release';
 
 const usage = { input_tokens: 2000, output_tokens: 200, cache_read_input_tokens: 1800 };
 const NOW = new Date('2026-11-06T18:00:00Z');
@@ -52,7 +53,9 @@ const context = (over: Partial<RevoContext['today']> = {}): RevoContext => ({
 });
 
 /** An account's Revo, in memory. */
-function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; cap?: number; smartTracking?: boolean } = {}) {
+function fakeStore(
+  opts: { tester?: boolean; settings?: Partial<RevoSettings>; cap?: number; smartTracking?: boolean; release?: RevoRelease; dailyCap?: number; spentToday?: number } = {},
+) {
   const settings = new Map<string, RevoSettings>();
   const usageDoc = new Map<string, { day: string; count: number }>();
   const chats = new Map<string, Map<string, RevoChat>>();
@@ -64,6 +67,8 @@ function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; c
   const chatsOf = (uid: string) => chats.get(uid) ?? chats.set(uid, new Map()).get(uid)!;
   const key = (uid: string, chatId: string) => `${uid}/${chatId}`;
   const store: RevoStore = {
+    ...(opts.release !== undefined ? { release: async () => opts.release! } : {}),
+    ...(opts.dailyCap !== undefined ? { dailyCapUsd: async () => opts.dailyCap!, spentOn: async () => opts.spentToday ?? 0 } : {}),
     isPreviewTester: async () => opts.tester ?? true,
     ...(opts.smartTracking !== undefined ? { smartTracking: async () => opts.smartTracking! } : {}),
     getSettings: async (uid) => settings.get(uid) ?? { optIn: true, memoryOn: true, ...opts.settings },
@@ -160,6 +165,64 @@ describe('who may use Revo (REVO-1)', () => {
     expect(await handleSetOptions(U, { memoryOn: false }, deps(f.store, m.call))).toEqual({ optIn: true, memoryOn: false });
     await expect(handleSetOptions(U, { optIn: 'yes' }, deps(f.store, m.call))).rejects.toMatchObject({ code: 'invalid-argument' });
     await expect(handleSetOptions(U, { optIn: true }, deps(fakeStore({ tester: false }).store, m.call))).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+});
+
+describe('who has Revo: the release switch (REVO-37)', () => {
+  it('[REVO-37] config/app.revo: "everyone" and "off" as written; unset or anything else is testers', () => {
+    expect(revoReleaseOf('everyone')).toBe('everyone');
+    expect(revoReleaseOf('off')).toBe('off');
+    for (const v of [undefined, null, 'testers', 'Everyone', true, 1, {}]) expect(revoReleaseOf(v)).toBe('testers');
+    expect(revoAllowed('testers', true)).toBe(true);
+    expect(revoAllowed('testers', false)).toBe(false);
+    expect(revoAllowed('everyone', false)).toBe(true);
+    expect(revoAllowed('off', true)).toBe(false);
+  });
+
+  it('[REVO-37] testers (the default): a non-tester is refused as access, before any call', async () => {
+    const m = model();
+    for (const release of [undefined, 'testers'] as const) {
+      await expect(handleRevoAsk(U, ask(), deps(fakeStore({ tester: false, release }).store, m.call))).rejects.toMatchObject({
+        code: 'permission-denied',
+        details: { reason: 'access' },
+      });
+    }
+    expect(m.requests).toHaveLength(0);
+  });
+
+  it('[REVO-37] everyone: any account turns it on, asks and gets its Day in review', async () => {
+    const f = fakeStore({ tester: false, release: 'everyone', settings: { optIn: false } });
+    const m = model();
+    expect(await handleSetOptions(U, { optIn: true }, deps(f.store, m.call))).toEqual({ optIn: true, memoryOn: true });
+    await expect(handleRevoAsk(U, ask(), deps(f.store, m.call))).resolves.toMatchObject({ reply: { role: 'revo' } });
+    await expect(handleDayInReview(U, { day: DAY, context: context() }, deps(f.store, m.call))).resolves.toMatchObject({ chat: { kind: 'review' } });
+    expect(m.requests).toHaveLength(2);
+  });
+
+  it('[REVO-37] off: testers too are refused as paused, the Day in review included, with no call', async () => {
+    const f = fakeStore({ release: 'off' });
+    const m = model();
+    await expect(handleRevoAsk(U, ask(), deps(f.store, m.call))).rejects.toMatchObject({ code: 'permission-denied', details: { reason: 'paused' }, message: 'Revo is paused for now. Try again later.' });
+    await expect(handleDayInReview(U, { day: DAY, context: context() }, deps(f.store, m.call))).rejects.toMatchObject({ details: { reason: 'paused' } });
+    await expect(handleSetOptions(U, { optIn: true }, deps(fakeStore({ release: 'off', settings: { optIn: false } }).store, m.call))).rejects.toMatchObject({ details: { reason: 'paused' } });
+    expect(m.requests).toHaveLength(0);
+    expect(f.usage()).toBeUndefined();
+  });
+
+  it('[REVO-37] turning Revo off and deleting its data stay open to every account, paused or not open to it', async () => {
+    for (const opts of [{ release: 'off' as const }, { release: 'testers' as const, tester: false }]) {
+      const on = fakeStore({ release: 'everyone' });
+      const m = model();
+      await handleRevoAsk(U, ask(), deps(on.store, m.call));
+      expect(on.chats().size).toBe(1);
+      // The same account's data, after the release changed under it.
+      const later = { ...on.store, ...fakeStore(opts).store, getSettings: on.store.getSettings, setSettings: on.store.setSettings, deleteHistory: on.store.deleteHistory, deleteMemory: on.store.deleteMemory };
+      expect(await handleClear(U, { what: 'history' }, deps(later, m.call))).toEqual({ deleted: 1 });
+      expect(await handleSetOptions(U, { memoryOn: false }, deps(later, m.call))).toMatchObject({ memoryOn: false });
+      expect(await handleSetOptions(U, { optIn: false }, deps(later, m.call))).toMatchObject({ optIn: false });
+      expect(await handleSetOptions(U, {}, deps(later, m.call))).toMatchObject({ optIn: false });
+      await expect(handleSetOptions(undefined, { optIn: false }, deps(later, m.call))).rejects.toMatchObject({ code: 'unauthenticated' });
+    }
   });
 });
 
@@ -431,6 +494,35 @@ describe('the monthly cap (REVO-4)', () => {
     await handleRevoAsk(U, ask(), deps(f.store, m.call));
     // 2,000 input at $2, 200 output at $10, 1,800 cache reads at $0.10 (per million).
     expect(f.spend()).toBeCloseTo((2000 * 2 + 200 * 10 + 1800 * 0.1) / 1e6, 8);
+  });
+
+  it('[REVO-4] one UTC day may spend a tenth of the month unless config/coach.dailyCapUsd says otherwise (0 to the monthly cap)', () => {
+    expect(DAILY_CAP_SHARE).toBe(0.1);
+    expect(dailyCapFrom(undefined, 150)).toBe(15);
+    expect(dailyCapFrom(40, 150)).toBe(40);
+    expect(dailyCapFrom(0, 150)).toBe(0);
+    expect(dailyCapFrom(151, 150)).toBe(15);
+    expect(dailyCapFrom('40', 150)).toBe(15);
+    expect(dailyCapFrom(Number.NaN, 10)).toBe(1);
+  });
+
+  it('[REVO-4] past the day’s share: refused as resting, saying when it is back, no call, the question given back; no Day in review', async () => {
+    const f = fakeStore({ cap: 150, dailyCap: 15, spentToday: 14.99 });
+    const m = model();
+    // 18:00 UTC: the next UTC day is 6 hours away.
+    await expect(handleRevoAsk(U, ask(), deps(f.store, m.call))).rejects.toMatchObject({
+      code: 'resource-exhausted',
+      details: { reason: 'resting' },
+      message: 'Revo has reached today’s limit for everyone. It’s back in about 6 hours.',
+    });
+    await expect(handleRevoAsk(U, ask(), deps(f.store, m.call, [], new Date('2026-11-06T23:30:00Z')))).rejects.toMatchObject({ message: 'Revo has reached today’s limit for everyone. It’s back in about an hour.' });
+    expect(await handleDayInReview(U, { day: DAY, context: context() }, deps(f.store, m.call))).toEqual({ none: true });
+    expect(m.requests).toHaveLength(0);
+    expect(f.usage()).toEqual({ day: DAY, count: 0 });
+    expect(f.spend()).toBe(0);
+    // Under it, the question goes ahead.
+    await handleRevoAsk(U, ask(), deps(fakeStore({ cap: 150, dailyCap: 15, spentToday: 3 }).store, m.call));
+    expect(m.requests).toHaveLength(1);
   });
 
   it('[REVO-4] each model is priced at its own rates (docs.claude.com, Nov 7 2026)', () => {
@@ -812,6 +904,9 @@ describe('how the app works: the guide (REVO-30)', () => {
   it('[REVO-30] it answers the owner’s questions and says what isn’t possible, with the closest way', () => {
     // "I want to revise Juz 29 backwards but I don't see where I can do that."
     expect(REVO_GUIDE).toMatch(/Revising one juz backwards[^\n]*“Reverse order” on[^\n]*“Today starts at”/);
+    // …and that the closest way turns the whole plan backwards, which Revo is told to say (Nov 8 2026 eval).
+    expect(REVO_GUIDE).toMatch(/Revising one juz backwards[^\n]*turns the whole plan backwards/);
+    expect(REVO_SYSTEM_PROMPT).toContain('When that way changes more than they asked for (the whole plan, for one juz), say so in a few words.');
     // "Will I keep my streak if I revise yesterday's stuff?"
     const streak = GUIDE_SECTIONS.find((s) => s.covers.includes('SESS-6'))!.text;
     expect(streak).toMatch(/Revising yesterday’s missed pages before today ends brings it back at once/);

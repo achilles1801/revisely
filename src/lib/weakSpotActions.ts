@@ -1,9 +1,13 @@
-// Weak spots' two actions (Insights, Majd's defaults):
-//  - "Revise these first tomorrow": the weak pages go to the FRONT of tomorrow's session,
-//    as tomorrow's carry (they count for tomorrow when revised);
-//  - "Plan it": the plan day for tomorrow, pre-filled with those pages.
+// Insights' actions (ACT-24):
+//  - "Revise these first tomorrow" and "Plan it" put the pages at the FRONT of tomorrow's session,
+//    as tomorrow's carry, on every plan: for that day only;
+//  - on a custom plan, "Add to plan" (under "First tomorrow" once Plan it is done) is the deliberate
+//    second step: tomorrow's day of the plan with the pages added, kept every cycle once the plan is
+//    saved (Majd, Nov 8 2026: "a temp change by default with the option to make it a perm change").
 
-import type { User } from '../types';
+import type { User, UserPage } from '../types';
+import { liveCustomPlanDays } from './planBuilder';
+import { describePassage, plainText } from './passages';
 
 type CarryOver = NonNullable<User['carryOver']>;
 
@@ -34,14 +38,83 @@ export function carryForTomorrow(tomorrow: string, weak: number[], existing: Use
   return { ...todays, next: { day: tomorrow, pages, source: 'insights' } };
 }
 
-/**
- * "Plan it" for every plan type (decision, documented in the PR): a custom plan opens its
- * day for tomorrow pre-filled; a pages or juz plan has no day editor, so the pages go to
- * the front of tomorrow's session, as "Revise these first tomorrow" does.
- */
-export function planItAction(hasCustomPlan: boolean): 'plan-day' | 'carry' {
-  return hasCustomPlan ? 'plan-day' : 'carry';
+/** Tomorrow's position in the plan editor's days (today is 0): the day "Add to plan" opens. */
+export const PLAN_IT_DAY_INDEX = 1;
+
+/** A plan day with `pages` added after its own, none twice. */
+export function addToPlanDay(dayPages: readonly number[], pages: readonly number[]): number[] {
+  const out = [...dayPages];
+  for (const p of pages) if (!out.includes(p)) out.push(p);
+  return out;
 }
 
-/** The plan day "Plan it" opens: tomorrow's position in the plan, with the weak pages. */
-export const PLAN_IT_DAY_INDEX = 1;
+/**
+ * Where "Add to plan" goes on a custom plan: tomorrow's day of the plan as the plan editor shows it
+ * (`basePages`), with the pages added after its own, and a line saying it is every cycle. Nothing is
+ * saved until the plan is.
+ */
+export function addToPlanParams(
+  user: User,
+  memorizedPages: UserPage[],
+  revisionDate: Date,
+  pages: number[],
+): { dayIndex: number; initialPages: number[]; basePages: number[]; note: string } {
+  const basePages = liveCustomPlanDays(user, memorizedPages, revisionDate)[PLAN_IT_DAY_INDEX] ?? [];
+  return {
+    dayIndex: PLAN_IT_DAY_INDEX,
+    initialPages: addToPlanDay(basePages, pages),
+    basePages,
+    note: `Saving the plan adds ${plainText(describePassage(pages, { form: 'short' }))} to this day in every cycle.`,
+  };
+}
+
+/** The pages already put in front of `tomorrow` (Insights' carry): their buttons show they're done. */
+export function firstTomorrowPages(user: Pick<User, 'carryOver'> | null | undefined, tomorrow: string): Set<number> {
+  const carry = user?.carryOver;
+  if (!carry) return new Set();
+  if (carry.day === tomorrow) return new Set(carry.pages);
+  return new Set(carry.next?.day === tomorrow ? carry.next.pages : []);
+}
+
+/** Whether every one of `pages` already goes first tomorrow (a button's done state). */
+export function allFirstTomorrow(pages: readonly number[], first: ReadonlySet<number>): boolean {
+  return pages.length > 0 && pages.every((p) => first.has(p));
+}
+
+/**
+ * The toast after putting pages first tomorrow (by surah, NAME-1): "Al-Hashr 17–24 goes first tomorrow".
+ * Several passages lead with the outcome, "6 pages go first tomorrow: Al-Baqarah 246–252, …", so a toast
+ * cut to two lines loses names, never what happened (a long name cut off "first tomorrow" on a phone).
+ */
+export function firstTomorrowText(name: string, pages: number): string {
+  if (!/,| and /.test(name)) return `${name} goes first tomorrow`;
+  return `${pages} ${pages === 1 ? 'page goes' : 'pages go'} first tomorrow: ${name}`;
+}
+
+/**
+ * Puts `pages` first tomorrow and returns what the toast says, with its Undo (ACT-24). Undo puts the
+ * carry back as it was before, on the latest user (`latest()`), so a change made since stays.
+ */
+export async function putFirstTomorrow(input: {
+  user: User;
+  saveUser: (user: User) => Promise<void>;
+  /** Today's revision day. */
+  today: string;
+  pages: number[];
+  /** The pages in words ("Al-Hashr 17–24"). */
+  name: string;
+  latest: () => User | null | undefined;
+}): Promise<{ text: string; undo: () => Promise<void> }> {
+  const { user, saveUser, today, pages, name, latest } = input;
+  const before = user.carryOver ?? null;
+  const [y, m, d] = today.split('-').map(Number);
+  const tomorrow = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  await saveUser({ ...user, carryOver: carryForTomorrow(tomorrow, pages, user.carryOver) });
+  return {
+    text: firstTomorrowText(name, new Set(pages).size),
+    undo: async () => {
+      const now = latest();
+      if (now) await saveUser({ ...now, carryOver: before });
+    },
+  };
+}

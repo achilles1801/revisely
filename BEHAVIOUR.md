@@ -225,6 +225,48 @@ How the tests are made: `tests/scenarios/README.md`.
   counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
   Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
   pages known reads "Timed in Read".
+- **REC-3.** On today or yesterday in Activity (testers), a sitting from the reader with nothing left to
+  memorize on its pages, that held pages of the day's revision not revised yet, offers Add to revised:
+  "At-Taghabun is the 2 pages left of today's revision" ("… is 2 of the 4 pages left …" when it held
+  some of them). Add logs exactly those pages for that day by hand, as Revised elsewhere does: they show
+  in the Revised block at once (ACT-13), carry no strength or minutes, and go from its menu (ACT-14).
+  A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
+  already revised, or on an older day were reading, and offer nothing.
+
+## Translations
+
+A held verse's translation (the verse sheet). The sources' terms are in CLAUDE.md ("Saheeh
+International", "The Clear Quran®") and in `lib/quranenc`.
+
+- **TRANS-1.** A translation shows exactly as its source gives it: the text and its footnotes, nothing
+  changed, added or cut. A "[n]" marker that has its footnote shows as the raised number, and the
+  footnote is under the verse. A translation that can't load says so; another translation's text is
+  never shown in its place or under its name.
+- **TRANS-2.** Under a QuranEnc translation is its credit: QuranEnc's own description of who translated
+  and issued it, the version of the text shown ("· v1.1.3"), and QuranEnc.com, a link to its page. The
+  picker shows the same credit with each translation.
+- **TRANS-3.** A right-to-left translation (Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko) reads right to
+  left, aligned to the right, its footnotes too.
+- **TRANS-4.** A QuranEnc translation stays at QuranEnc's latest version. Its list is read at most once a
+  day, and one request answers for every translation. A sura kept from an older version is fetched again
+  when it is read, and shows with its own version until then.
+- **TRANS-5.** Testers choose from every translation in QuranEnc's list (76, in 56 languages, Nov 2026).
+  The picker lists Selected (the one in use), Favorites, Downloaded, then each language by its English
+  name with its own name beside it, each translation once. A search over every group finds a language,
+  in English or its own name (accents aside), or a translator. Everyone else chooses Saheeh
+  International or The Clear Quran®, as before.
+- **TRANS-6.** A tester can download a whole QuranEnc translation from the picker, on any connection:
+  its size shows before ("1.2 MB"), its progress while it downloads ("Downloading… 40%"), and it can be
+  stopped, carrying on later from where it stopped. Once every sura is on the phone it reads "On this
+  phone" and is listed under Downloaded; Remove, after a confirmation, deletes it. A download that fails
+  says so and keeps what came. Saheeh International comes and goes with the offline mushaf, as before.
+- **TRANS-7.** Offline, a verse in a translation that isn't on the phone says so ("This translation isn't
+  downloaded"; The Clear Quran® "needs the internet") and offers a translation of that sura that is on
+  the phone: one in the same language first, then Saheeh International, then any other. A verse whose
+  Arabic isn't on the phone either says it shows once back online. Back online, it loads by itself.
+- **TRANS-8.** A tester stars translations to keep them under Favorites, below Selected, in the order
+  starred. Edit moves a favorite up or down or takes its star away, and deletes downloads (after a
+  confirmation). Favorites are kept on the phone for each account.
 
 ## Activity
 
@@ -321,7 +363,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-18.** Activity has two tabs, Overview and Insights. Overview's calendar shows a month or a week:
   a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
   the picked day (or else today) on screen. When the calendar shows another month or week than today's,
-  Today, beside the arrows, brings back today's with today picked. The picked day's whole preview opens
+  Today, beside the arrows, brings back today's with today picked: its cell highlighted as a tapped day's
+  is, and its preview below (Majd, Nov 8 2026). The picked day's whole preview opens
   that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
   that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
   weeks instead of month"; Open alone was easy to miss.)
@@ -350,8 +393,8 @@ How the tests are made: `tests/scenarios/README.md`.
   ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
   is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). All time reads from the
   account's first day: Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a
-  long range covers nearly everything), the weeks grid from the start (up to half a year), and no Pace
-  comparison. (Majd, Nov 7 2026: "why is
+  long range covers nearly everything), the weeks grid from the start (up to half a year), and Pace week by
+  week ("Week by week: 2.1 → 1.8 min a page") in place of a comparison. (Majd, Nov 7 2026: "why is
   insights restricted to just the last 30 days?"; mocks i1 and i2.)
 - **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
   too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305
@@ -364,6 +407,29 @@ How the tests are made: `tests/scenarios/README.md`.
   bars turns their title into the hour under the finger ("6–7 AM · 5 h 54 min", "15 sessions in 30 days, the
   last on Monday") until it lets go. (Majd, Nov 7 2026: "why's none of the activity screen interactive?";
   mocks i7, i8, i10 and i11.)
+
+- **ACT-24.** "Revise these first tomorrow" (Weak spots), Plan it (the untouched juz, on every plan),
+  the juz sheet's "Plan it for tomorrow first" and the Day's "Revise them tomorrow" put the pages in front of
+  tomorrow's session (Insights' carry). They come in addition to tomorrow's scheduled pages, never in place
+  of any: nothing shifts, whatever Keep daily amount says, and tomorrow is done (for the streak and Home's
+  Done) when its own pages are, with or without them. A page tomorrow has anyway stays one of its own, put
+  first; a day with no pages of its own (an off day) is done once the pages from Insights are revised.
+  (Nov 8 2026: with every page of the day put first, none was its own, and Home said "28 of 28" and Continue
+  revision for good.) On a custom plan this is temporary too, and the plan is never changed by it: under
+  Plan it's "First tomorrow" (the untouched row, the juz sheet), "Add to plan ›" opens tomorrow's day of
+  the plan with the pages added after its own, saying "… to this day in every cycle"; the plan changes
+  only when it is saved (Majd, Nov 8 2026: "a temp change by default with the option to make it a perm
+  change"; Plan it used to open that day with the juz alone, and saving replaced the day). The session
+  names them ("From Insights: Juz 1"; it said "the weak pages" whatever put them there), and Home says
+  "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
+  with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button
+  becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026: "the buttons on the activity
+  screen don't work": they saved, silently.)
+  They never stop the catch-up (CARRY-1): on their day, the leftovers of the days before are offered as
+  on any other, and Add to today puts them after the pages from Insights, each credited to the day it was
+  missed (SESS-7). The pages from Insights stay labelled and stay extra, even when the leftovers fill the
+  day, and Home names both ("2 from Insights, 5 from yesterday first"). (Before Nov 8 2026 they blocked it:
+  no catch-up was offered that day.)
 
 ## Ask coach
 
@@ -393,8 +459,8 @@ How the tests are made: `tests/scenarios/README.md`.
 
 Revo is the in-app assistant (it supersedes the Ask coach, whose rules above still hold for its own calls).
 
-- **REVO-1.** Revo is for previewTester accounts only, and off until the account turns it on (the opt-in, or Settings →
-  Revo AI). The switch is Revo's own: turning on the Ask coach doesn't turn on Revo. Only the functions change that
+- **REVO-1.** Revo is for the accounts its release switch opens it to (REVO-37: previewTester accounts until the
+  production release), and off until the account turns it on (the opt-in, or Settings → Revo AI). The switch is Revo's own: turning on the Ask coach doesn't turn on Revo. Only the functions change that
   switch, its memory switch and the day's count; the account reads its own. During the changeover the server also
   serves an account that never set Revo's switch but has the coach's on (apps from before it read that one); only
   Revo's own switch turned off stops it.
@@ -414,7 +480,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   sets another (0 to $1,000, `functions/scripts/set-coach-cap.js`), read again within a minute, with no deploy. A
   question that would pass it is refused as `monthly`, makes no call and is given back; the real cost replaces each
   call's reserve, at the call's model's prices (Revo: claude-sonnet-5-5; the Ask coach: claude-haiku-5-5). The
-  config is set to $150 (Nov 7 2026), within the $200 of API credit a month that only Revisely uses.
+  config is set to $150 (Nov 7 2026), within the $200 of API credit a month that only Revisely uses. One UTC day may
+  spend at most a tenth of the month's cap on Revo (`config/coach.dailyCapUsd` sets another, 0 to the monthly cap):
+  past it a question is refused as `resting`, saying in hours when Revo is back (the next UTC midnight), makes no call
+  and is given back, and no Day in review is written, so a burst can't use up the month. A refusal that isn't one of
+  ours (the platform turning a call away) says Revo is busy, never that the day's questions are used.
 
 - **REVO-5.** A first question with nothing attached is kept for the revision day: the same question again (case and
   spaces aside) opens a new conversation with the same answer, with no call and nothing counted. A question with an
@@ -448,7 +518,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and,
   with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Its own words name
   parts of the Qur'an by surah and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
-  The context also carries each part it names in those words, for Revo's answers (REVO-27).
+  The context also carries each part it names in those words, for Revo's answers (REVO-27). A day with nothing
+  left to revise reads as done, even before it is marked done, and no greeting or suggestion names an empty passage
+  (Majd's phone, Nov 8 2026: "You're 28 pages into today, and  is next.").
 
 - **REVO-34.** Each time Revo's sheet opens (its button, or another screen opening it), it opens on a new
   conversation with a greeting written from what the phone shows at that moment (REVO-20): after a session, pages
@@ -555,6 +627,16 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   setting from the account: Revo isn't told ratings or weak pages, and a ratings chart or a weak or strength column
   in its reply is dropped.
 
+- **REVO-37.** Who has Revo is one switch, `config/app.revo` (`functions/scripts/set-app-config.js --revo`), read by
+  the functions and the app: `testers` (or unset, or anything else) opens it to previewTester accounts only;
+  `everyone`, to every signed-in account, with no new build (set at the production release); `off`, to nobody,
+  testers included (an emergency). The functions apply a change within a minute. The app reads it when Revo is
+  first needed and back in front after 10 minutes, keeps the last value on the phone (testers until it has read
+  one), and reads it again at once when the server refuses Revo as paused or not open to the account; the button,
+  Settings → Revo AI and every "Ask Revo" follow it. Such a refusal is said in the sheet as it is, never as the
+  opt-in. Turning Revo off, turning memory off and deleting conversations or memory stay open to every account,
+  whatever the switch.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7
@@ -584,7 +666,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).
   - Memorized today, the block says where the pages stand in the plan. On an automatic plan it says when
     they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
-    add new pages by itself, it offers Add to your plan (tomorrow's day of it).
+    add new pages by itself, it offers Add to your plan: tomorrow's day of it with the pages added after
+    its own (it opened with them alone, and saving replaced the day).
 
 - **MEM-6.** The schedule editor (testers) lists, under "Not in your plan", the memorized and partly
   memorized pages a custom plan doesn't hold, named by their ayahs. A custom plan never adds new pages by
@@ -599,6 +682,23 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   as its headline, "Being learned", while nothing of the juz has been revised yet, and on a line of its
   own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk 21").
   A page marked in progress with no ayahs saved has nothing memorized, and reads as not memorized.
+
+## Help
+
+- **HELP-1.** Screens that need explaining have a ? (testers, for now). Home's sits at the right of the Today
+  post's header; the schedule editor's before Save; the reader's is a round button at the right of its
+  header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full);
+  Activity's is in its top bar before search, and explains the tab on show (Overview or Insights); a
+  day's is before +. It opens
+  that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›" when the account has
+  Revo (it opens Revo; nothing is counted until a question is sent), "Hide help buttons", and Done. The
+  words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons are good".)
+- **HELP-2.** "Hide help buttons" removes every ? at once, for this account on this phone, and they stay
+  hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Support
+  brings them back." with Undo. Settings → Support → Help buttons turns them back on, or off again.
+- **HELP-3.** Help follows Smart Tracking: with it off, no topic mentions ratings or strength. A session's
+  Rating topic and the new plan's "weakest first" show only with it on. The hidden page's topic shows only
+  where the hidden page is offered.
 
 ## Naming the Qur'an
 

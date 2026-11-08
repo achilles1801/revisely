@@ -13,7 +13,29 @@ import { ScenarioId, SeedPlan, buildScenario, parseContext } from '../../../func
 
 type Lib = typeof import('../../../src/lib/testScenarios');
 
-/** Loads `scenario` the way Settings does, and waits for the phone to show it. */
+/**
+ * Whether the phone shows the scenario's plan: the user document's schedule fields, which the
+ * server writes last (after the pages and sessions), so a phone can show the new pages and
+ * sessions under the plan it had before for a moment. The pages and sessions alone weren't
+ * enough: RESET-3 checked "beginner"'s sessions against "new"'s plan (#400's CI), and
+ * checklistPlans and checklistCatchUp read Home under scenarioPhone's own three pages a day
+ * (#422's CI).
+ */
+export function planShown(user: Record<string, unknown> | null | undefined, want: Record<string, unknown>): boolean {
+  if (!user) return false;
+  for (const key of ['scheduleMode', 'dailyPageCapacity', 'dailyJuzCount', 'scheduleAnchorDate', 'fajrBoundaryEnabled', 'smartTrackingEnabled']) {
+    if (key in want && user[key] !== want[key]) return false;
+  }
+  if ('customPlan' in want) {
+    const plan = want.customPlan as { cycleStartDate: string; direction: string } | null;
+    const shown = user.customPlan as { days?: unknown[]; cycleStartDate?: string; direction?: string } | null | undefined;
+    if (plan === null) return !shown || !shown.days?.length;
+    return shown?.cycleStartDate === plan.cycleStartDate && shown?.direction === plan.direction;
+  }
+  return true;
+}
+
+/** Loads `scenario` the way Settings does, and waits for the phone to show it, plan and all. */
 export async function loadScenario(app: OpenApp, scenario: ScenarioId): Promise<SeedPlan> {
   const lib = app.mods.require<Lib>('src/lib/testScenarios');
   const user = app.app.user;
@@ -24,6 +46,7 @@ export async function loadScenario(app: OpenApp, scenario: ScenarioId): Promise<
   const dates = plan.sessions.map((s) => s.date).join();
   await app.until(
     () =>
+      planShown(app.app.user as unknown as Record<string, unknown> | null, plan.user) &&
       app.app.onboardingComplete &&
       app.app.pages.filter((p) => p.status === 'memorized').length === plan.pages.length &&
       [...app.app.logs]

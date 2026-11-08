@@ -13,7 +13,7 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester, watchFunction } from '../harness/admin';
 import { failAppCheck } from '../harness/appCheck';
-import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
+import { deleteServerDoc, getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Phone, PASSWORD, type Booted, type OpenApp } from '../harness/phone';
 
 type CoachApi = typeof import('../../../src/lib/coach/api');
@@ -359,9 +359,9 @@ it('[REVO-1] [REVO-3] [REVO-4] [REVO-23] Revo through the app’s own backend: a
     revo().ask({ chatId: null, day: DAY, question: 'How was my week?', context: revoContext(DAY), attach: null, ...over } as Parameters<ReturnType<typeof revo>['ask']>[0]);
   const count = async () => Number((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0);
 
-  // [REVO-1] Not a tester: refused ('off'), even to turn it on.
-  expect(await refusal(app, () => revo().setOptions({ optIn: true }))).toBe('off');
-  expect(await refusal(app, () => ask())).toBe('off');
+  // [REVO-1] Not a tester: refused, even to turn it on ('paused': Revo isn't open to the account, REVO-37).
+  expect(await refusal(app, () => revo().setOptions({ optIn: true }))).toBe('paused');
+  expect(await refusal(app, () => ask())).toBe('paused');
   await app.close();
   await markPreviewTester(uid);
   app = await phone.open();
@@ -428,6 +428,50 @@ it('[REVO-1] [REVO-3] [REVO-4] [REVO-23] Revo through the app’s own backend: a
   await app.close();
 });
 
+type RevoReleaseMod = typeof import('../../../src/lib/revo/release');
+type RevoAvailabilityMod = typeof import('../../../src/lib/revo/availability');
+
+// The switch is one document every file's functions read, so only "everyone" is tried here (testers
+// keep Revo under it): "off" would refuse other files' testers while they run. The functions' and the
+// app's handling of "off" is in properties/revo.property.ts and the app's tests.
+it('[REVO-37] the release switch: everyone opens Revo to an account that isn’t a tester, with no new build, and the phone reads it', async () => {
+  setZone(ZONES.chicago);
+  setNow('2031-10-14 20:10');
+  const DAY = '2031-10-14';
+  const phone = new Phone('phone');
+  const app = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5 } });
+  const revo = () => app.mods.require<RevoBackendMod>('src/lib/revo/backend').revoBackend();
+  const release = () => app.mods.require<RevoReleaseMod>('src/lib/revo/release');
+  const { revoAvailable } = app.mods.require<RevoAvailabilityMod>('src/lib/revo/availability');
+  try {
+    // Testers only (config/app without it): the server refuses this account, and the phone hides Revo.
+    expect(await refusal(app, () => revo().setOptions({ optIn: true }))).toBe('paused');
+    await app.act(() => release().refreshRevoRelease(true));
+    expect(release().currentRevoRelease()).toBe('testers');
+    expect(revoAvailable(app.app.user, release().currentRevoRelease())).toBe(false);
+
+    // Everyone: the same app reads it from config/app (its rules let every install read it), and the
+    // functions open Revo to the account: it turns Revo on and gets an answer.
+    await setServerDoc('config/app', { revo: 'everyone' });
+    await app.act(() => release().refreshRevoRelease(true));
+    expect(release().currentRevoRelease()).toBe('everyone');
+    expect(revoAvailable(app.app.user, release().currentRevoRelease())).toBe(true);
+    await app.act(async () => {
+      await expect(withAuthRetry(() => revo().setOptions({ optIn: true }))).resolves.toEqual({ optIn: true, memoryOn: true });
+    });
+    let answer: unknown;
+    await app.act(async () => {
+      answer = await withAuthRetry(() =>
+        revo().ask({ chatId: null, day: DAY, question: 'How was my week?', context: revoContext(DAY), attach: null } as Parameters<ReturnType<typeof revo>['ask']>[0]),
+      );
+    });
+    expect(answer).toMatchObject({ reply: { role: 'revo' }, remainingToday: 19 });
+  } finally {
+    await deleteServerDoc('config/app');
+  }
+  await app.close();
+});
+
 it('[REVO-9] [REVO-10] [REVO-8] the Day in review once a day, skipped when capped; turning Revo off and Clear delete what they say', async () => {
   setZone(ZONES.chicago);
   setNow('2031-09-09 20:30');
@@ -485,7 +529,10 @@ it('[REVO-9] [REVO-10] [REVO-8] the Day in review once a day, skipped when cappe
   expect(settings).toMatchObject({ optIn: false });
   expect(await listServerDocs(`users/${uid}/revoMemory`)).toHaveLength(0);
   expect((await getServerDoc(`coachSettings/${uid}`))?.revoOn).toBe(false);
-  // And off means refused.
-  expect(await refusal(app, () => revo().clear('memory'))).toBe('off');
+  // [REVO-37] Deleting stays open once off (there is nothing left to delete).
+  await app.act(async () => {
+    await expect(withAuthRetry(() => revo().clear('memory'))).resolves.toBeUndefined();
+  });
+  expect(await listServerDocs(`users/${uid}/revoMemory`)).toHaveLength(0);
   await app.close();
 });

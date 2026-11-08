@@ -19,6 +19,8 @@ import { useRevoFootprint } from '../../lib/revo/presence';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
 import { DayBlocks, activityBlocksEnabled, type UndoOffer } from '../../components/activity/DayBlocks';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -60,7 +62,9 @@ import { previousIsoDay } from '../../lib/streak';
 import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
 import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import { carryForTomorrow, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
+import { addToPlanParams, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { revisablePages } from '../../lib/memorizedAyahs';
+import { describePassage } from '../../lib/passages';
 import { shiftDay } from '../../lib/journal';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
@@ -116,12 +120,15 @@ export default function ActivityDayScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const scrolledToRecordingRef = useRef(false);
   const { user, logs, updateLog, deleteLog, pages, updatePages, saveUser } = useApp();
+  // The latest user, for an Undo that runs after other changes.
+  const userRef = useRef(user);
+  userRef.current = user;
   const { theme, palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   // An add the day's blocks offer to undo (MEM-3), shown on the screen, above the tab bar and Revo.
   const [undoOffer, setUndoOffer] = useState<UndoOffer | null>(null);
-  const { day: today } = useRevisionDay(user);
+  const { day: today, date: revisionDate } = useRevisionDay(user);
   // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
   const juzPlan = user?.scheduleMode === 'juz';
   // The Revised and Memorized blocks from items replace the session rows and the log's copies (C2).
@@ -379,13 +386,17 @@ export default function ActivityDayScreen() {
             </View>
           }
           right={
-            <IconButton
-              icon="add"
-              label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
-              onPress={() => setAddOpen(true)}
-              size={28}
-              testID="day-add"
-            />
+            <>
+              {/* Its help (HELP-1), before +. */}
+              <HelpButton screen="day" />
+              <IconButton
+                icon="add"
+                label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
+                onPress={() => setAddOpen(true)}
+                size={28}
+                testID="day-add"
+              />
+            </>
           }
           separator
         />
@@ -451,11 +462,16 @@ export default function ActivityDayScreen() {
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
               onDeleteReading={removeReading}
               // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.
+              // A toast says so, with Undo (ACT-24): the tap used to save with no sign of it.
               onReviseTomorrow={(memorizedToday) => {
-                if (user) void saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(today, 1), memorizedToday, user.carryOver) });
+                if (!user) return;
+                putFirstTomorrow({ user, saveUser, today, pages: memorizedToday, name: describePassage(memorizedToday, { form: 'short' }), latest: () => userRef.current })
+                  .then(({ text, undo }) => setUndoOffer({ text, undo: () => void undo().catch((err) => logger.warn('Could not undo "first tomorrow"', err)) }))
+                  .catch((err) => logger.warn('Could not put the pages first tomorrow', err));
               }}
               onEditSchedule={() => navigation.navigate('PlanEdit')}
-              onAddToPlan={(memorizedToday) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: memorizedToday })}
+              // Added to tomorrow's day of the plan, beside its own pages (it opened with these alone).
+              onAddToPlan={(memorizedToday) => user && navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, memorizedToday))}
               onUndoOffer={setUndoOffer}
             />
           )}
@@ -513,6 +529,7 @@ export default function ActivityDayScreen() {
         onDismiss={() => setUndoOffer(null)}
         bottomInset={tabFootprint}
       />
+      <HelpToast screen="day" bottomInset={tabFootprint} />
       <ActionSheet
         visible={timedMenu != null}
         onClose={() => setTimedMenu(null)}

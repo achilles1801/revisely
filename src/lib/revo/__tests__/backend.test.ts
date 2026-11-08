@@ -67,4 +67,18 @@ describe('why a question failed', () => {
     const kept = new RevoError('off', 'Sign in to use Revo.');
     expect(refusalOf(kept)).toBe(kept);
   });
+
+  it('[REVO-37] paused or not open to the account: said in the server’s words, never the opt-in', () => {
+    expect(refusalOf(callableError('PERMISSION_DENIED', 'Revo is paused for now. Try again later.', { reason: 'paused' }))).toMatchObject({
+      refusal: 'paused',
+      message: 'Revo is paused for now. Try again later.',
+    });
+    expect(refusalOf(callableError('PERMISSION_DENIED', 'Revo isn’t available on this account yet.', { reason: 'access' })).refusal).toBe('paused');
+  });
+
+  it('[REVO-4] the day’s share of the cap is resting; a refusal that isn’t ours (every instance busy) is busy, never the day’s questions', () => {
+    const msg = 'Revo has reached today’s limit for everyone. It’s back in about 6 hours.';
+    expect(refusalOf(callableError('RESOURCE_EXHAUSTED', msg, { reason: 'resting' }))).toMatchObject({ refusal: 'resting', message: msg });
+    expect(refusalOf(callableError('RESOURCE_EXHAUSTED', 'Rate exceeded.'))).toMatchObject({ refusal: 'unavailable', message: REVO_MESSAGES.busy });
+  });
 });

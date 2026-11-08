@@ -17,6 +17,8 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 const mockCopy = jest.fn();
 jest.mock('../../../lib/clipboard', () => ({ copyText: (t: string) => mockCopy(t) }));
 jest.mock('../../../lib/firebase', () => ({ auth: { currentUser: { uid: 'u', displayName: 'Maryam' } }, db: {} }));
+const mockRefreshRelease = jest.fn(async (..._a: unknown[]) => undefined);
+jest.mock('../../../lib/revo/release', () => ({ ...jest.requireActual('../../../lib/revo/release'), refreshRevoRelease: (...a: unknown[]) => mockRefreshRelease(...a) }));
 
 const DAY = '2026-11-03';
 const ctx: RevoContext = {
@@ -382,6 +384,37 @@ describe('Revo’s conversation', () => {
     await flush();
     expect(screen.getByText('Revo is resting')).toBeTruthy();
     expect(screen.getByTestId('revo-input').props.placeholder).toBe('Back next month');
+  });
+
+  it('[REVO-4] the day’s share of the cap reached: Revo is resting, with when it is back in the server’s words', async () => {
+    const msg = 'Revo has reached today’s limit for everyone. It’s back in about 6 hours.';
+    __setRevoBackendForTests({ ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('resting', msg))) });
+    render(<Chat />);
+    await flush();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(screen.getByText('Revo is resting')).toBeTruthy();
+    expect(screen.getByText(`${msg} Your conversations stay in History.`)).toBeTruthy();
+    expect(screen.getByTestId('revo-input').props.placeholder).toBe('Back later');
+  });
+
+  it('[REVO-37] Revo paused for everyone: the sheet says so and stays, never the opt-in', async () => {
+    __setRevoBackendForTests({ ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('paused', 'Revo is paused for now. Try again later.'))) });
+    const onOff = jest.fn();
+    render(<Chat onOff={onOff} />);
+    await flush();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(screen.getByTestId('revo-error')).toHaveTextContent('Revo is paused for now. Try again later.');
+    expect(onOff).not.toHaveBeenCalled();
+    // The switch is read again at once, so the button goes.
+    expect(mockRefreshRelease).toHaveBeenCalledWith(true);
   });
 });
 

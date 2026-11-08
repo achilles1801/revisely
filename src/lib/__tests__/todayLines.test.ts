@@ -66,6 +66,14 @@ describe('Today’s lines (E: "Starts at")', () => {
     });
   });
 
+  it('pages put first by Insights ("Revise these first tomorrow") say so, not "from yesterday" (ACT-24)', () => {
+    expect(lines('not_started', range(538, 557), new Set(), 2, 2, undefined, 2).detail).toBe('20 pages · 2 from Insights first');
+  });
+
+  it('pages from Insights and leftovers together: each said (ACT-24)', () => {
+    expect(lines('not_started', range(538, 557), new Set(), 7, 7, undefined, 2).detail).toBe('20 pages · 2 from Insights, 5 from yesterday first');
+  });
+
   it('pages carried in from yesterday: said once', () => {
     expect(lines('not_started', range(538, 557), new Set(), 4)).toMatchObject({
       title: 'Starts at Al-Hadid, ayah 4',

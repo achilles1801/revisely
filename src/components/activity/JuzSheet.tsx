@@ -4,21 +4,24 @@
 // they show recency (ACT-19). Figures: lib/juzSheet.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
+import { ChromeText, STACK_AT_SCALE } from './ChromeText';
+import { AddToPlanLink } from './AddToPlanLink';
 import * as firestoreService from '../../services/firestoreService';
 import { juzSheetModel, type JuzCellState } from '../../lib/juzSheet';
 import { shiftDay } from '../../lib/journal';
 import { describePassage, spokenText } from '../../lib/passages';
-import { revoAvailable } from '../../lib/revo/availability';
+import { useRevoAvailable } from '../../lib/revo/availability';
 import { openRevo } from '../../lib/revo/open';
 import { prepare } from '../../lib/revo/facts';
 import { juzAttachment } from '../../lib/revo/attachments';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { logger } from '../../lib/logger';
 import { smartTrackingOn } from '../../lib/smartTracking';
+import { allFirstTomorrow } from '../../lib/weakSpotActions';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
@@ -58,6 +61,8 @@ export function JuzSheet({
   windowInTheLast,
   onOpenPage,
   onPlanIt,
+  onAddToPlan,
+  firstTomorrow,
 }: {
   /** The juz shown; null closes the sheet. */
   juz: number | null;
@@ -74,9 +79,14 @@ export function JuzSheet({
   onOpenPage: (page: number) => void;
   /** A stale juz: put its memorized pages first tomorrow (the untouched row's Plan it). */
   onPlanIt?: (pages: number[]) => void;
+  /** A custom plan: "Add to plan" beside "First tomorrow", once Plan it is done (ACT-24). */
+  onAddToPlan?: (pages: number[]) => void;
+  /** Pages already first tomorrow: Plan it shows "First tomorrow ✓" instead (ACT-24). */
+  firstTomorrow?: ReadonlySet<number>;
 }) {
   const { palette } = useTheme();
   const { pages, user } = useApp();
+  const revoOpen = useRevoAvailable(user);
   // The juz stays while the sheet slides away.
   const [shown, setShown] = useState<number | null>(juz);
   useEffect(() => {
@@ -118,12 +128,12 @@ export function JuzSheet({
   };
   const revo = useRevoContext();
   const ask =
-    model && revoAvailable(user)
+    model && revoOpen
       ? () => {
           const src = revo.sources();
-          if (!src) return;
-          const attach = juzAttachment(model.juz, prepare(src));
-          closeThen(() => openRevo({ attach }));
+          // Without the account's figures yet, Revo still opens (the juz isn't attached): never a dead tap.
+          const attach = src ? juzAttachment(model.juz, prepare(src)) : undefined;
+          closeThen(() => openRevo(attach ? { attach } : {}));
         }
       : null;
 
@@ -164,17 +174,36 @@ export function JuzSheet({
         <View>
           {/* When it was last revised, and how often in the window. */}
           <View style={styles.head}>
-            <Text style={styles.headLine} maxFontSizeMultiplier={MAX_SCALE}>
-              <Text style={[typeV2.name, { color: model.stale ? palette.red : palette.text }]} testID="juz-sheet-headline">
+            <ChromeText style={styles.headLine} maxFontSizeMultiplier={MAX_SCALE}>
+              <ChromeText style={[typeV2.name, { color: model.stale ? palette.red : palette.text }]} testID="juz-sheet-headline">
                 {model.headline}
-              </Text>
+              </ChromeText>
               {model.beingLearned && model.learningText ? (
-                <Text style={[typeV2.meta, { color: palette.secondary }]} testID="juz-sheet-learning">{`   ${model.learningText}`}</Text>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]} testID="juz-sheet-learning">{`   ${model.learningText}`}</ChromeText>
               ) : model.times ? (
-                <Text style={[typeV2.meta, { color: palette.secondary }]}>{`   ${model.times}`}</Text>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`   ${model.times}`}</ChromeText>
               ) : null}
-            </Text>
-            {model.stale && onPlanIt && model.memorizedPages.length > 0 ? (
+            </ChromeText>
+            {model.stale && onPlanIt && allFirstTomorrow(model.memorizedPages, firstTomorrow ?? new Set()) ? (
+              <View style={styles.doneRow}>
+                <View style={styles.planIt} accessible accessibilityLabel="Goes first tomorrow" testID="juz-sheet-plan-it-done">
+                  <Ionicons name="checkmark" size={16} color={palette.secondary} />
+                  <ChromeText style={[typeV2.name, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                    First tomorrow
+                  </ChromeText>
+                </View>
+                {onAddToPlan ? (
+                  <AddToPlanLink
+                    onPress={() => {
+                      const planned = model.memorizedPages;
+                      closeThen(() => onAddToPlan(planned));
+                    }}
+                    maxScale={MAX_SCALE}
+                    testID="juz-sheet-add-to-plan"
+                  />
+                ) : null}
+              </View>
+            ) : model.stale && onPlanIt && model.memorizedPages.length > 0 ? (
               <Tap
                 onPress={() => {
                   const planned = model.memorizedPages;
@@ -185,9 +214,9 @@ export function JuzSheet({
                 style={styles.planIt}
                 testID="juz-sheet-plan-it"
               >
-                <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
+                <ChromeText style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
                   Plan it for tomorrow first
-                </Text>
+                </ChromeText>
                 <Ionicons name="chevron-forward" size={16} color={palette.link} />
               </Tap>
             ) : null}
@@ -214,32 +243,32 @@ export function JuzSheet({
             ))}
           </View>
           <View style={styles.ends}>
-            <Text style={[typeV2.meta, styles.end, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+            <ChromeText style={[typeV2.meta, styles.end, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {model.ends[0]}
-            </Text>
-            <Text style={[typeV2.meta, styles.end, styles.endRight, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+            </ChromeText>
+            <ChromeText style={[typeV2.meta, styles.end, styles.endRight, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {model.ends[1]}
-            </Text>
+            </ChromeText>
           </View>
           {model.counts.length > 0 || partShown ? (
             <View style={styles.counts} testID="juz-sheet-counts">
               {model.counts.map((c) => (
                 <View key={c.state} style={styles.count}>
                   <View style={[styles.countMark, look(c.state)]} />
-                  <Text style={[typeV2.meta, styles.tabular, { color: palette.text, fontWeight: '600' }]} maxFontSizeMultiplier={MAX_SCALE}>
+                  <ChromeText style={[typeV2.meta, styles.tabular, { color: palette.text, fontWeight: '600' }]} maxFontSizeMultiplier={MAX_SCALE}>
                     {c.n}
-                  </Text>
-                  <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                  </ChromeText>
+                  <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
                     {COUNT_WORDS[c.state]}
-                  </Text>
+                  </ChromeText>
                 </View>
               ))}
               {partShown ? (
                 <View style={styles.count}>
                   <PartMark color={palette.done} />
-                  <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                  <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
                     Part of a page
-                  </Text>
+                  </ChromeText>
                 </View>
               ) : null}
             </View>
@@ -248,10 +277,10 @@ export function JuzSheet({
           {model.learningText && !model.beingLearned ? (
             <View style={styles.learning} testID="juz-sheet-learning">
               <PartMark color={palette.done} />
-              <Text style={[typeV2.meta, styles.learningText, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                <Text style={{ color: palette.text, fontWeight: '600' }}>Being learned</Text>
+              <ChromeText style={[typeV2.meta, styles.learningText, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                <ChromeText style={{ color: palette.text, fontWeight: '600' }}>Being learned</ChromeText>
                 {`   ${model.learningText}`}
-              </Text>
+              </ChromeText>
             </View>
           ) : null}
 
@@ -274,12 +303,12 @@ export function JuzSheet({
               )}
               {/* The name, and what it is under it (recency's line is long: "Last revised … in 30 days"). */}
               <View style={styles.rowMain}>
-                <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                <ChromeText style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
                   {s.name}
-                </Text>
-                <Text style={[typeV2.meta, { color: s.alert ? palette.red : palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                </ChromeText>
+                <ChromeText style={[typeV2.meta, { color: s.alert ? palette.red : palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
                   {s.text}
-                </Text>
+                </ChromeText>
               </View>
               <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Tap>
@@ -331,6 +360,7 @@ const styles = StyleSheet.create({
   head: { paddingTop: 4, paddingBottom: 12, gap: 6 },
   headLine: { flexWrap: 'wrap' },
   planIt: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  doneRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 16, rowGap: 4 },
   strip: { flexDirection: 'row', gap: 3 },
   cell: { flex: 1, height: 28, borderRadius: 5, overflow: 'hidden' },
   partFill: { position: 'absolute', top: 0, left: 0, right: 0 },

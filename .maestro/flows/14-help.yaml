@@ -1,0 +1,119 @@
+# The help buttons, for a previewTester account (marked one through the emulator, as the owner's script
+# does): Home's ? on the Today post opens "How Home works"; the sheet closes; "Hide help buttons" takes the
+# ? away with a toast and Undo; hidden it stays hidden after a relaunch, until Settings → Support → Help
+# buttons brings it back. Screenshots of the button, the sheet and the toast (h1–h3).
+# Rules (BEHAVIOUR.md): HELP-1, HELP-2
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T19:00
+      BOUNDARY: midnight
+# A tester (help is theirs only, for now): the app sees it when its user document changes.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+
+# HELP-1: the ? at the right of the Today post's header, and its sheet.
+- extendedWaitUntil:
+    visible:
+      id: help-button-home
+    timeout: 20000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: h1-home-help-button
+- tapOn:
+    id: help-button-home
+- extendedWaitUntil:
+    visible:
+      id: help-sheet-home
+    timeout: 10000
+- assertVisible: "How Home works"
+- assertVisible: "Missed days"
+- assertVisible: "Streak"
+- assertVisible:
+    id: help-ask-revo
+- assertVisible:
+    id: help-hide
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: h2-help-sheet
+# Closed (a tap on the backdrop), the ? stays.
+- runFlow: ../subflows/close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: help-sheet-home
+    timeout: 10000
+- assertVisible:
+    id: help-button-home
+
+# HELP-2: Hide help buttons. The ? goes, and Home says how to bring it back, with Undo.
+- tapOn:
+    id: help-button-home
+- extendedWaitUntil:
+    visible:
+      id: help-hide
+    timeout: 10000
+# The sheet slides up; a tap while it moves can miss (iOS).
+- waitForAnimationToEnd
+- tapOn:
+    id: help-hide
+- extendedWaitUntil:
+    visible: "Help buttons hidden.*"
+    timeout: 10000
+- assertNotVisible:
+    id: help-button-home
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: h3-help-hidden
+# Undo brings it back; hidden again, it stays hidden after a relaunch.
+- tapOn:
+    id: undo-toast-action
+- extendedWaitUntil:
+    visible:
+      id: help-button-home
+    timeout: 10000
+- tapOn:
+    id: help-button-home
+- extendedWaitUntil:
+    visible:
+      id: help-hide
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: help-hide
+- extendedWaitUntil:
+    notVisible:
+      id: help-button-home
+    timeout: 10000
+- runFlow: ../subflows/relaunch.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- assertNotVisible:
+    id: help-button-home
+
+# Settings → Support → Help buttons: off; turned on, the ? is back on Home.
+- tapOn:
+    id: open-settings
+# Centred: found at the screen's foot, a row can sit under the tab bar, which takes the tap (the
+# first run, Nov 8 2026, tapped Read instead).
+- scrollUntilVisible:
+    element:
+      id: settings-help-buttons
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: settings-help-buttons
+- runFlow: ../subflows/back-home.yaml
+- extendedWaitUntil:
+    visible:
+      id: help-button-home
+    timeout: 10000

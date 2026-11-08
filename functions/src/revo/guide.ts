@@ -167,11 +167,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Insights and page strength',
-    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23'],
+    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16', 'ACT-19', 'ACT-21', 'ACT-22', 'ACT-23', 'ACT-24'],
     routes: ['Activity', 'ActivityDay', 'PagesByStrength', 'QuranReader'],
     text: lines(
       '- Testers: Activity → “Insights”. One range for the whole tab, from the chip at the end of the Overview | Insights row ("30 days ⌄" at first): “7 days”, “30 days”, “3 months” or “All time” (since the account’s first day). It is kept on the phone; a range longer than the account counts from its first day.',
-      '- “Coverage”: a tile per juz (“This week”, “This month”, “30+ days”, “Not memorized”) and the share of memorized pages revised in the range. Tap the figure for what wasn’t revised (e.g. "Not revised in 30 days"), a row per juz or run of pages. The "Juz 4, untouched the longest" row: tap it for that juz; “Plan it” puts it first tomorrow (on a custom plan it opens tomorrow’s day of the plan with those pages).',
+      '- “Coverage”: a tile per juz (“This week”, “This month”, “30+ days”, “Not memorized”) and the share of memorized pages revised in the range. Tap the figure for what wasn’t revised (e.g. "Not revised in 30 days"), a row per juz or run of pages. The "Juz 4, untouched the longest" row: tap it for that juz; “Plan it” puts it first tomorrow, for that day only, on every plan; on a custom plan, “Add to plan” under “First tomorrow” then opens tomorrow’s day of the plan with those pages added, kept every cycle once the plan is saved.',
       '- The juz sheet (from a Coverage tile, the untouched row, or a day’s Revised block): the juz named by its surahs, when it was last revised and on how many days in the last 30, a strip of its pages and a row per surah. Tap a page, a row or “Open in the reader” to read it there; a juz left too long offers “Plan it for tomorrow first”.',
       '- “Consistency”: days with a revision or a read in the range, and the minutes by hour (press and slide along the hour bars to read each hour). A day’s circle opens that day; the figure opens Overview at its month. At 3 months: a weeks grid and, if there is one, the missed days’ pattern ("Every missed day was a Saturday").',
       '- “Memorization”: pages memorized each month; tap a month’s bar for that month’s memorizations, each opening its day. “Pace”: minutes per page, shown from ten timed items, against the same length before; tap its "From 24 timed revisions ›" line for each one.',
@@ -182,11 +182,13 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Reading, recitation and translations',
-    covers: ['AUDIO-1', 'AUDIO-2'],
+    covers: ['AUDIO-1', 'AUDIO-2', 'TRANS-1', 'TRANS-2', 'TRANS-3', 'TRANS-4', 'TRANS-5', 'TRANS-6', 'TRANS-7', 'TRANS-8'],
     routes: ['ReadIndex', 'QuranReader'],
     text: lines(
       '- Read tab → a surah, or “Recent pages” → the reader. Tap the page for the controls; swipe to turn pages; the bar at the bottom moves through the mushaf.',
-      '- Hold a verse: “Play”, “Translation”, “Copy”, “Share”. Translations: Saheeh International (offline once downloaded) and The Clear Quran (needs the internet); switch by tapping the translation’s name at the top of the translation sheet.',
+      '- Hold a verse: “Play”, “Translation”, “Copy”, “Share”. “Translation” shows the verse in Arabic and in the chosen translation, exactly as its publisher gives it, with its footnotes and its credit (who translated it, the version and where it comes from) under it; ‹ › move between verses.',
+      '- Changing the translation: in the translation sheet, ⋯ at the top right → “Select translation”. Everyone has Saheeh International (offline once downloaded with the offline mushaf) and The Clear Quran (needs the internet, unless read before). Testers can choose from 76 translations in 56 languages, among them Urdu, Indonesian, Turkish, French, Spanish, German, Persian, Hindi, Chinese, Hausa, Swahili and Portuguese: the list shows “Selected”, “Favorites”, “Downloaded”, then every language; search a language, in English or its own name, or a translator. Urdu, Persian, Kurdish, Pashto and Uyghur read right to left. A translation is kept on the phone once read, and stays at its latest version.',
+      '- Testers, favorites and offline translations: the star on a translation adds it to “Favorites” (kept on this phone); “Edit” moves favorites up or down, takes a star away, and deletes downloads. Each translation shows its size; its download button downloads it whole (it can be stopped, and carries on later), the bin removes it, and downloaded ones are listed under “Downloaded” and read offline. Offline, a translation that isn’t downloaded says so and offers one of that surah that is on the phone (the same language first, then Saheeh International). Saheeh International downloads with the offline mushaf.',
       '- The player bar: ▶ plays from this page; the reciter’s name picks the reciter; the options icon opens “Audio Options”: “Reciter”, “Playback speed” (0.25× to 2×), “From” and “To” (surah and ayah), “Play up to” (Page, Surah, Juz’ or Custom), “Repeat” (loop, or 1 to 10 times) and “Pause after each verse”. While playing: stop, speed, previous and next verse, pause.',
       '- Reciters: Al-Husary, Al-Minshawi, Abdul Basit, Alafasy, As-Sudais, Ash-Shuraim, Al-Muaiqly, Al-Ghamdi, Al-Ajamy, Ash-Shatri, Al-Hudhaify, Muhammad Ayyub, Al-Tablawi, Ad-Dossari. The reciter follows the account; speed, repeat, pause and Play up to are kept on the phone.',
       '- Recitation goes on after leaving the reader (a mini player above the tab bar: pause, ✕ to stop, › back to the reader), in the background and with the phone locked. It streams, so it needs the internet.',
@@ -251,7 +253,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Revo itself',
-    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33', 'REVO-34', 'REVO-35', 'REVO-36'],
+    covers: ['REVO-1', 'REVO-2', 'REVO-3', 'REVO-5', 'REVO-7', 'REVO-8', 'REVO-9', 'REVO-10', 'REVO-20', 'REVO-21', 'REVO-22', 'REVO-23', 'REVO-30', 'REVO-31', 'REVO-32', 'REVO-33', 'REVO-34', 'REVO-35', 'REVO-36', 'REVO-37'],
     routes: ['Settings'],
     text: lines(
       '- For testers, off until turned on. Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
@@ -267,18 +269,21 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: [],
     routes: [],
     text: lines(
-      '- Revising one juz backwards while the rest goes forward: not as such. Closest: “Create new plan” → “Balanced” → “Reverse order” on → “Today starts at” → that juz → Apply → Save: today starts at the juz’s end and goes back page by page, then carries on into the juz before it. (“By Juz” with “Reverse order” puts the juz in reverse order, each juz’s pages in their usual order.)',
+      '- Revising one juz backwards while the rest goes forward: there’s no such option, because “Reverse order” turns the whole plan backwards, not one juz. Closest: “Create new plan” → “Balanced” → “Reverse order” on → “Today starts at” → that juz → Apply → Save: today starts at the juz’s end and goes back page by page, and the days after carry on backwards into the juz before it. (“By Juz” with “Reverse order” puts the juz in reverse order, each juz’s pages in their usual order.)',
       '- A plan of whole surahs made for you: there is no surah mode (only pages, juz, or weakest). Closest: in “Edit schedule”, tap a day → “Add or remove content” → Surahs; or “Jump to…” → Surah.',
       '- Revising a passage as a session without touching the plan: no. Closest: “Jump to…” (moves today’s start), or read it in the reader with the timer, and (testers) log it with Activity → + → “Revised”.',
       '- Pausing the plan for a holiday: there’s no pause, and missed days don’t pile up: the plan follows the calendar, and their pages are offered for three days. Back from the trip, “Jump to…” picks up where you stopped. (Rest days come round every cycle, so they aren’t a pause.)',
       '- Getting a streak back after two missed days, catching up days older than three, or moving a session to another day: no.',
-      '- Following the phone’s light or dark setting, choosing reminder times, more translations or tafsir, a tajweed mushaf, recitation offline, sharing progress with a teacher, exporting data, several active plans at once (one is active; others can be saved), Android widgets: not yet.',
+      '- Following the phone’s light or dark setting, choosing reminder times, translations in Bengali, Russian, Malay, Korean or Italian, tafsir, a tajweed mushaf, recitation offline, sharing progress with a teacher, exporting data, several active plans at once (one is active; others can be saved), Android widgets: not yet.',
     ),
   },
 ];
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  'HELP-1': 'the help buttons (testers); the guide gets them with its next re-record',
+  'HELP-2': 'hiding the help buttons (testers); the guide gets it with its next re-record',
+  'HELP-3': 'the help follows Smart Tracking (testers); the guide gets it with its next re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
@@ -299,6 +304,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
   // Not in the guide's sections yet: their words would change Revo's system prompt, so they come with the
   // next recording of Revo's replies (functions/scripts/record-anthropic.js).
+  'REC-3': 'a sitting’s Add to revised on the Day (testers; Memorizing by the ayah’s section, next recording)',
   'MEM-7': 'the juz sheet’s look for a juz being learned (testers; Memorizing by the ayah’s section, next recording)',
 };
 
@@ -330,7 +336,7 @@ export const GUIDE_PROMPT = [
   '- In such an answer say nothing about today’s pages, what is left today, weak pages or the streak unless the question is about them, and don’t suggest starting today’s revision. Its action is an openScreen to the screen the answer names, whenever that screen is in the openScreen list; otherwise no action.',
   '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the compass: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; the daily log → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
   '- When the streak, missed days or missed pages come up, say how to catch up: tap “Add to today” on Home. A streak broken by two missed days can’t come back, but those days’ pages can still be added that way (the last three days): always say so.',
-  '- Never invent a feature, a button, a setting or a path. When the guide says the app can’t do something (it is under “Not possible (yet)”, or the guide says no or not yet), say so plainly (“Not yet.” or “There’s no …”), then give the closest way the guide names. Say “I’m not sure that’s possible in Revisely” only for something the guide doesn’t mention at all, then offer the closest thing it has.',
+  '- Never invent a feature, a button, a setting or a path. When the guide says the app can’t do something (it is under “Not possible (yet)”, or the guide says no or not yet), say so plainly (“Not yet.” or “There’s no …”), then give the closest way the guide names. When that way changes more than they asked for (the whole plan, for one juz), say so in a few words. Say “I’m not sure that’s possible in Revisely” only for something the guide doesn’t mention at all, then offer the closest thing it has.',
   '- What the guide marks as for testers is there for this person: Revo is only for testers.',
   '',
   '<guide>',

@@ -353,6 +353,8 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       <VerseSheet
         verse={sheetVerse}
         translationId={user?.translationId}
+        tester={user?.previewTester === true}
+        accountId={user?.id}
         onChangeTranslation={changeTranslation}
         reciter={user?.reciter}
         onChangeReciter={changeReciter}

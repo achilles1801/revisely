@@ -46,7 +46,7 @@ export function memorizedText(pages: UserPage[]) {
  */
 const LINES_MAX_SCALE = 1.6;
 /** The name and streak above them, like the top bar and the buttons. */
-const HEADER_MAX_SCALE = 1.4;
+export const HEADER_MAX_SCALE = 1.4;
 
 /**
  * A › that grows with the text around it (icons don't scale by themselves).
@@ -71,6 +71,7 @@ export function TodayPost({
   done,
   carried = 0,
   carriedLeft = 0,
+  carriedInsights = 0,
   partial,
   streak,
   streakGrace,
@@ -84,6 +85,7 @@ export function TodayPost({
   carrying,
   ahead,
   onAhead,
+  help,
 }: {
   name: string;
   initial: string;
@@ -95,6 +97,8 @@ export function TodayPost({
   carried?: number;
   /** Of those, how many are still to revise (once today's own pages are done, the button goes on to them). */
   carriedLeft?: number;
+  /** Of those, how many Insights put there ("Revise these first tomorrow"): "2 from Insights first". */
+  carriedInsights?: number;
   /** The partly memorized pages and their memorized ayahs: named by those (MEM-4). */
   partial?: PartialPages;
   streak: number;
@@ -115,10 +119,12 @@ export function TodayPost({
   /** Done today: the next revision day, for the quiet line that opens it (revise ahead). */
   ahead?: { lead: string; first: number } | null;
   onAhead?: () => void;
+  /** Home's ? (HELP-1), at the right of the header, where ⋯ was. */
+  help?: React.ReactNode;
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const lines = todayLines(status, pages, done, carried, carriedLeft, partial);
+  const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights);
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace
@@ -186,12 +192,17 @@ export function TodayPost({
         name={name || 'Today'}
         meta={name ? meta : undefined}
         figure={
-          grace ? (
-            <ProgressRing
-              fraction={grace.progress.scheduled > 0 ? grace.progress.credited / grace.progress.scheduled : 0}
-              done={false}
-              size={18}
-            />
+          grace || help ? (
+            <View style={styles.figure}>
+              {grace ? (
+                <ProgressRing
+                  fraction={grace.progress.scheduled > 0 ? grace.progress.credited / grace.progress.scheduled : 0}
+                  done={false}
+                  size={18}
+                />
+              ) : null}
+              {help}
+            </View>
           ) : undefined
         }
         headerMaxScale={HEADER_MAX_SCALE}
@@ -289,6 +300,7 @@ export function TodayPost({
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  figure: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   catchUp: { gap: 8 },
   shrink: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },

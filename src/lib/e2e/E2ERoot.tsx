@@ -9,6 +9,7 @@ import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
 import { e2eReady } from './install';
 import { clockLabel, onClockChange } from './clock';
 import { isOffline, onNetworkChange } from './network';
+import { e2eVerse, E2EVerse, onE2EVerse } from './demoTranslations';
 import NetInfo from '@react-native-community/netinfo';
 import { paletteV2 } from '../../theme/v2';
 
@@ -60,6 +61,59 @@ function Status() {
   );
 }
 
+/**
+ * The verse sheet a link asked for (demoTranslations: revisely://e2e/verse?ref=…&t=…), over the app,
+ * as a tester's: the real sheet and picker, with providers of its own (this root is outside the
+ * app's). Loaded only when asked for, so the sheet's modules don't load before Firebase starts.
+ */
+function VerseOverlay() {
+  const [verse, setVerse] = useState<E2EVerse | null>(e2eVerse);
+  const [translationId, setTranslationId] = useState<string | undefined>(e2eVerse()?.translationId);
+  useEffect(
+    () =>
+      onE2EVerse((v) => {
+        setVerse(v);
+        if (v) setTranslationId(v.translationId);
+      }),
+    [],
+  );
+  if (!verse) return null;
+  /* eslint-disable @typescript-eslint/no-var-requires */
+  const { VerseSheet } = require('../../components/verse/VerseSheet') as typeof import('../../components/verse/VerseSheet');
+  const { ThemeProvider } = require('../../context/ThemeContext') as typeof import('../../context/ThemeContext');
+  const { DesignProvider } = require('../../design/DesignContext') as typeof import('../../design/DesignContext');
+  const { SafeAreaProvider, initialWindowMetrics } = require('react-native-safe-area-context') as typeof import('react-native-safe-area-context');
+  const { pageOfVerse } = require('../verses') as typeof import('../verses');
+  /* eslint-enable @typescript-eslint/no-var-requires */
+  return (
+    // Over the whole window, so the provider measures the window's insets: laid out after the app, it
+    // had no height and gave a top inset of 0, and the expanded sheet ran up under iOS's status bar
+    // (only here; the reader's sheet has the app's provider, at the root).
+    <SafeAreaProvider
+      key={verse.theme ?? 'as-saved'}
+      initialMetrics={initialWindowMetrics}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="box-none"
+    >
+      <DesignProvider>
+        <ThemeProvider>
+          <VerseSheet
+            verse={verse}
+            translationId={translationId}
+            tester
+            accountId="e2e-verse"
+            onChangeTranslation={setTranslationId}
+            reciter={undefined}
+            onChangeReciter={() => undefined}
+            onNavigate={(v) => setVerse({ ...v, page: pageOfVerse(v) })}
+            onClose={() => setVerse(null)}
+          />
+        </ThemeProvider>
+      </DesignProvider>
+    </SafeAreaProvider>
+  );
+}
+
 export function withE2E<P extends object>(App: React.ComponentType<P>): React.ComponentType<P> {
   return function E2ERoot(props: P) {
     const [ready, setReady] = useState(false);
@@ -88,6 +142,7 @@ export function withE2E<P extends object>(App: React.ComponentType<P>): React.Co
     return (
       <View ref={root} style={styles.root} onLayout={onLayout}>
         {ready ? <App {...props} /> : null}
+        {ready ? <VerseOverlay /> : null}
         <Status />
       </View>
     );

@@ -11,11 +11,12 @@
 // Carrying over happens at most once per revision day.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { carryOverOn, getPagesForDay, getPagesScheduledForDate, keepLaterCarry } from './algorithm';
+import { carryOverOn, getPagesForDay, getPagesScheduledForDate, keepLaterCarry, ownScheduledPages } from './algorithm';
 import { catchUpPagesOf, creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 
 export type CarryOverMode = 'shift' | 'add';
+type Carry = NonNullable<User['carryOver']>;
 export const DEFAULT_CARRY_OVER_MODE: CarryOverMode = 'shift';
 
 /**
@@ -116,7 +117,7 @@ export function leftoversFor(
   const memorized = new Set(memorizedPages.map((p) => p.pageNumber));
   // Only a carry of leftovers moves the schedule; pages put on tomorrow by "Revise these first
   // tomorrow" move nothing, and hid today's leftovers when they were the last carry.
-  const carriedDay = user.carryOver && user.carryOver.source !== 'insights' ? user.carryOver.day : undefined;
+  const carriedDay = user.carryOver && holdsLeftovers(user.carryOver) ? user.carryOver.day : undefined;
   const scheduledOn = (day: string) => {
     if (carriedDay && day < carriedDay) return [];
     const [y, m, d] = day.split('-').map(Number);
@@ -136,9 +137,30 @@ export function findLeftoverPages(
   return findLeftovers(logs, today, todaysPages, memorized, lookbackDays).pages;
 }
 
-/** Whether pages were already carried into the revision day `today`. */
+/**
+ * Whether leftovers were already carried into the revision day `today` (once a day, CARRY-1). Pages
+ * Insights put there alone don't count: they never stop the catch-up (ACT-24). Before Nov 8 2026 they
+ * did, so on their day the leftovers of the days before weren't offered, and Add to today did nothing.
+ */
 export function hasCarriedOver(user: User | null | undefined, today: string): boolean {
-  return carryOverOn(user, today) != null;
+  const carry = carryOverOn(user, today);
+  return carry != null && holdsLeftovers(carry);
+}
+
+/** Whether a carry holds leftovers (pages from earlier days), not only the pages Insights put there. */
+function holdsLeftovers(carry: Carry): boolean {
+  return carry.source !== 'insights' || carry.pages.some((p) => carry.from?.[String(p)] != null);
+}
+
+/**
+ * The pages Insights put in front of `day` ("Revise these first tomorrow", ACT-24): an Insights carry's
+ * pages without the leftovers added to it since, which have the day they were missed in `from`. They
+ * are extra: never needed for the day to be done.
+ */
+export function insightsPagesOn(user: Pick<User, 'carryOver'> | null | undefined, day: string): Set<number> {
+  const carry = carryOverOn(user, day);
+  if (!carry || carry.source !== 'insights') return new Set();
+  return new Set(carry.pages.filter((p) => carry.from?.[String(p)] == null));
 }
 
 /**
@@ -163,15 +185,28 @@ export function applyCarryOver(
   const mode = user.carryOverMode ?? DEFAULT_CARRY_OVER_MODE;
   // Tomorrow's pages put there by "Revise these first tomorrow" stay, beside today's.
   const later = keepLaterCarry(user, today);
+  // Today's pages from Insights stay first and stay labelled; the leftovers follow, each with the day
+  // it was missed, which is also how they're told apart from the Insights pages (ACT-24). Without
+  // `from`, they're yesterday's.
+  const insights = [...insightsPagesOn(user, today)].filter((p) => !leftovers.includes(p));
+  const days = from ?? (insights.length > 0 ? Object.fromEntries(leftovers.map((p) => [String(p), addDays(today, -1)])) : undefined);
+  const carried = {
+    day: today,
+    pages: [...insights, ...leftovers],
+    ...(days ? { from: pick(days, leftovers) } : {}),
+    ...(insights.length > 0 ? { source: 'insights' as const } : {}),
+    ...later,
+  };
   if (mode === 'add') {
-    return { ...user, carryOver: { day: today, pages: [...leftovers], skip: 0, ...(from ? { from: pick(from, leftovers) } : {}), ...later } };
+    return { ...user, carryOver: { ...carried, skip: 0 } };
   }
+  // The Insights pages are extra: only the leftovers take the place of today's own pages.
   const scheduled = getPagesScheduledForDate(user, revisionDate, memorizedPages);
   const skip = Math.min(leftovers.length, scheduled.length);
   return {
     ...user,
     scheduleShiftPages: (user.scheduleShiftPages ?? 0) + skip,
-    carryOver: { day: today, pages: [...leftovers], skip, ...(from ? { from: pick(from, leftovers) } : {}), ...later },
+    carryOver: { ...carried, skip },
   };
 }
 
@@ -202,10 +237,21 @@ export function carriedPagesFor(user: User, day: string): Set<number> {
 /**
  * Today's OWN pages: the day's pages without the ones carried in from earlier days. Today is done
  * when these are credited to today; a catch-up page is credited to the day it was missed (SESS-7).
+ * A page Insights put first that the day has anyway is still its own (with `memorizedPages`, which
+ * the schedule is read from): Majd's phone, Nov 8 2026, put every page of the day first, so none was
+ * its own and the day could never be done ("28 of 28", Continue revision).
  */
-export function ownPagesOf(pages: readonly number[], user: User, day: string): number[] {
+export function ownPagesOf(pages: readonly number[], user: User, day: string, memorizedPages?: UserPage[]): number[] {
   const carried = carriedPagesFor(user, day);
-  return pages.filter((p) => !carried.has(p));
+  const insights = insightsPagesOn(user, day);
+  const scheduled =
+    memorizedPages && insights.size > 0 ? new Set(ownScheduledPages(user, parseDay(day), memorizedPages)) : null;
+  return pages.filter((p) => !carried.has(p) || (scheduled != null && insights.has(p) && scheduled.has(p)));
+}
+
+function parseDay(day: string): Date {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 /**
@@ -222,8 +268,7 @@ export function planDuePages(user: User, day: string, memorizedPages: UserPage[]
     const gave = carry.pages.filter((p) => from[String(p)] === day);
     if (gave.length > 0) return gave;
   }
-  const [y, m, d] = day.split('-').map(Number);
-  return duePagesOf(getPagesForDay(user, new Date(y, m - 1, d), memorizedPages), user, day);
+  return duePagesOf(getPagesForDay(user, parseDay(day), memorizedPages), user, day, memorizedPages);
 }
 
 /**
@@ -232,13 +277,15 @@ export function planDuePages(user: User, day: string, memorizedPages: UserPage[]
  * days they were missed; revising them in the day's session is what finishes the day (Majd, Nov 7
  * 2026: "let it be missed pages only"). Its own pages are the next day's, done by revising ahead.
  */
-export function duePagesOf(pages: readonly number[], user: User, day: string): number[] {
-  const own = ownPagesOf(pages, user, day);
+export function duePagesOf(pages: readonly number[], user: User, day: string, memorizedPages?: UserPage[]): number[] {
+  const own = ownPagesOf(pages, user, day, memorizedPages);
   if (own.length > 0) return own;
   const carry = carryOverOn(user, day);
   if (!carry || !(carry.skip && carry.skip > 0)) return own;
   const carried = carriedPagesFor(user, day);
-  return pages.filter((p) => carried.has(p));
+  // The pages from Insights stay extra, even beside leftovers that fill the day (ACT-24).
+  const insights = insightsPagesOn(user, day);
+  return pages.filter((p) => carried.has(p) && !insights.has(p));
 }
 
 /** The day a carried page is credited to, when it came from an earlier day; null otherwise. */

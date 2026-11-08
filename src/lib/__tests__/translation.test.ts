@@ -20,6 +20,8 @@ const mockSaheehVerse = jest.fn(async (s: number, a: number) => {
 const mockPrefetchSaheeh = jest.fn();
 jest.mock('../saheeh', () => ({
   SAHEEH_PAGE_URL: 'https://quranenc.com/en/browse/english_saheeh',
+  SAHEEH_KEY: 'english_saheeh',
+  SAHEEH_BYTES: 1_093_165,
   getSaheehVerse: (s: number, a: number) => mockSaheehVerse(s, a),
   peekSaheehVerse: (s: number, a: number) => mockSaheehLoaded.get(`${s}:${a}`) ?? null,
   prefetchSaheeh: (...a: unknown[]) => mockPrefetchSaheeh(...a),

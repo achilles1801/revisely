@@ -1,0 +1,407 @@
+# QuranEnc's translations in the verse sheet (testers; TRANS-*), on both platforms: Saheeh
+# International as everyone has it, the testers' picker and its search, then Al-Ikhlas 2 in one
+# translation per script the app shows (right to left: Urdu, Persian, Kurdish, Pashto, Uyghur,
+# N'Ko). E2E builds fetch nothing, so they write the recorded translations to the phone and open the
+# real verse sheet by a link (src/lib/e2e/demoTranslations.ts). Nobody signs in: the sheet opens over
+# the sign-in screen of a fresh install, which is what shows behind it in the screenshots. The screenshots are the proof that
+# every script renders with the system fonts and lays out the right way.
+# Rules (BEHAVIOUR.md): TRANS-1, TRANS-2, TRANS-3, TRANS-5, TRANS-8
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/launch.yaml
+    env:
+      CLOCK: 2026-11-08T10:00
+
+# Saheeh International, as everyone has it: its footnote under the verse, its credit.
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: en.sahih
+      CREDIT: "Saheeh International, issued by Noor International Center.*"
+- assertVisible:
+    id: verse-footnotes
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t01-saheeh
+
+# The testers' picker: ⋯ → Select translation. Selected first, then every language.
+- tapOn:
+    id: verse-more
+- tapOn:
+    id: verse-select-translation
+- extendedWaitUntil:
+    visible:
+      id: translation-picker
+    timeout: 5000
+- assertVisible:
+    id: translation-section-selected
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t02-picker
+
+# Favorites: French and Turkish starred, listed under Selected in that order; then Edit.
+- tapOn:
+    id: translation-search
+- inputText: "rashid"
+- tapOn:
+    id: translation-star-qe.french_rashid
+- tapOn:
+    id: translation-search-clear
+- tapOn:
+    id: translation-search
+- inputText: "shaban"
+- tapOn:
+    id: translation-star-qe.turkish_shaban
+- tapOn:
+    id: translation-search-clear
+# The keyboard away: the Search key on iOS (a single-line field), hideKeyboard on Android.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: translation-section-favorites
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t02b-favorites
+- tapOn:
+    id: translation-edit
+- extendedWaitUntil:
+    visible:
+      id: translation-up-qe.turkish_shaban
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t02c-edit
+- tapOn:
+    id: translation-edit
+
+# A search by the language's own name, then the choice: the verse in Urdu, right to left.
+- tapOn:
+    id: translation-search
+- inputText: "urdu"
+- extendedWaitUntil:
+    visible:
+      id: translation-row-qe.urdu_junagarhi
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t03-search
+- tapOn:
+    id: translation-row-qe.urdu_junagarhi
+- extendedWaitUntil:
+    visible:
+      text: "Translated by Muhammad Ibrahim Junagarhi.*"
+    timeout: 10000
+- assertVisible:
+    id: verse-footnotes
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t04-urdu-chosen
+
+# Every script.
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.french_rashid
+      CREDIT: "Translated by Rashid Ma.ash.*v1\\.0\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-french_rashid
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.vietnamese_rwwad
+      CREDIT: "Translated by the team of th.*v1\\.0\\.9"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-vietnamese_rwwad
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.urdu_junagarhi
+      CREDIT: "Translated by Muhammad Ibrah.*v1\\.1\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-urdu_junagarhi
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.persian_ih
+      CREDIT: "Translated by the team of th.*v1\\.1\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-persian_ih
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.kurdish_bamoki
+      CREDIT: "Translated by Muhammad Salih.*v1\\.1\\.1"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-kurdish_bamoki
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.pashto_rwwad
+      CREDIT: "Translated by the team of th.*v1\\.0\\.1"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-pashto_rwwad
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.uyghur_saleh
+      CREDIT: "Translated by Muhammad Saleh.*v1\\.0\\.2"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-uyghur_saleh
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.ankobambara_dayyan
+      CREDIT: "Translated by Karamo, Baba M.*v1\\.0\\.5"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-ankobambara_dayyan
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.hindi_omari
+      CREDIT: "Translated by Azizul Haq Al-.*v1\\.1\\.5"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-hindi_omari
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.assamese_rafeeq
+      CREDIT: "Translated by Rafiqul Islam .*v1\\.0\\.5"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-assamese_rafeeq
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.punjabi_arif
+      CREDIT: "Translated by Arif Haleem.*v1\\.0\\.1"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-punjabi_arif
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.gujarati_omari
+      CREDIT: "Translated by Rabella Al-Oma.*v1\\.1\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-gujarati_omari
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.tamil_baqavi
+      CREDIT: "Translated by Abdulhamid Al-.*v1\\.0\\.1"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-tamil_baqavi
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.telugu_muhammad
+      CREDIT: "Translated by Abdurrahim ibn.*v1\\.0\\.7"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-telugu_muhammad
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.kannada_hamza
+      CREDIT: "Translated by Muhammad Hamza.*v1\\.0\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-kannada_hamza
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.malayalam_kunhi
+      CREDIT: "Translated by Abdul Hamid Ha.*v1\\.0\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-malayalam_kunhi
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.sinhalese_mahir
+      CREDIT: "Translated by the team of th.*v1\\.0\\.6"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-sinhalese_mahir
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.amharic_sadiq
+      CREDIT: "Translated by Shaykh Muhamme.*v1\\.1\\.2"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-amharic_sadiq
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.chinese_makin
+      CREDIT: "Translated by Muhammad Makee.*v1\\.0\\.2"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-chinese_makin
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.japanese_saeedsato
+      CREDIT: "Translated by Saeed Sato, de.*v1\\.0\\.13"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-japanese_saeedsato
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.thai_rwwad
+      CREDIT: "Translated by the team of th.*v1\\.0\\.1"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-thai_rwwad
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.khmer_cambodia
+      CREDIT: "Issued by the Cambodian Isla.*v1\\.0\\.2"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-khmer_cambodia
+
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: light
+      T: qe.serbian_rwwad
+      CREDIT: "Translated by the team of th.*v1\\.0\\.4"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t-serbian_rwwad
+
+# The same in dark: Saheeh International, the picker with its favorites, and Urdu.
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: dark
+      T: en.sahih
+      CREDIT: "Saheeh International, issued by Noor International Center.*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t01-saheeh-dark
+- tapOn:
+    id: verse-more
+- tapOn:
+    id: verse-select-translation
+- extendedWaitUntil:
+    visible:
+      id: translation-section-favorites
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t02-picker-dark
+# The picker away (⋯ closes it), so the verse shows.
+- tapOn:
+    id: verse-more
+- runFlow:
+    file: ../subflows/verse-link.yaml
+    env:
+      THEME: dark
+      T: qe.urdu_junagarhi
+      CREDIT: "Translated by Muhammad Ibrah.*v1\\.1\\.3"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: t04-urdu-dark

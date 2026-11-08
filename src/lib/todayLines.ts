@@ -149,6 +149,8 @@ export function todayLines(
   carried = 0,
   carriedLeft = 0,
   partial: PartialPages = NONE,
+  /** How many of the carried pages came from Insights ("Revise these first tomorrow"); the rest are leftovers. */
+  carriedInsights = 0,
 ): TodayLines {
   const ordered = [...new Set(list)];
   const total = ordered.length;
@@ -209,7 +211,11 @@ export function todayLines(
   const title = `Starts at ${placeOf(start, partial)}`;
   let detail: string;
   if (carried > 0) {
-    detail = `${pages(total)} · ${carried} from yesterday first`;
+    // "2 from Insights first", "4 from yesterday first", or both: "2 from Insights, 5 from yesterday first".
+    const insights = Math.min(carriedInsights, carried);
+    const left = carried - insights;
+    const from = insights === 0 ? `${carried} from yesterday` : left === 0 ? `${carried} from Insights` : `${insights} from Insights, ${left} from yesterday`;
+    detail = `${pages(total)} · ${from} first`;
   } else if (runs.length > 1) {
     detail = `${pages(total)} · then ${placeOf(runs[1].first, partial)}`;
   } else {

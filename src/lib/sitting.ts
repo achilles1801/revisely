@@ -17,3 +17,18 @@ export function sittingSavedText(input: { day: string; today: string; pages: rea
   const what = input.pages.length > 0 ? describePassage(input.pages) : '';
   return `Saved to ${sittingDayWord(input.day, input.today)}: ${[what, formatMinutesLong(minutes)].filter(Boolean).join(', ')}`;
 }
+
+/**
+ * The Day's line over a sitting's Add to revised (REC-3): "At-Taghabun is the 2 pages left of today’s
+ * revision", or "… is 2 of the 4 pages left …" when it holds only some of them.
+ */
+export function sittingToReviseText(pages: readonly number[], left: readonly number[], day: 'today' | 'yesterday'): string {
+  const what = describePassage([...pages]);
+  const share =
+    pages.length >= left.length
+      ? pages.length === 1
+        ? 'the page left'
+        : `the ${pages.length} pages left`
+      : `${pages.length} of the ${left.length} pages left`;
+  return `${what} is ${share} of ${day}’s revision.`;
+}

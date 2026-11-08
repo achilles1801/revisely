@@ -43,6 +43,8 @@ import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../l
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
+import { HELP_ICON } from '../../components/help/HelpButton';
+import { useHelpButtons } from '../../components/help/useHelpButtons';
 import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -71,7 +73,7 @@ import { shareIcon } from '../../lib/platformUi';
 import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
 import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
 import { showsResetMyData } from '../../lib/testerReset';
-import { revoAvailable } from '../../lib/revo/availability';
+import { useRevoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { openRevo } from '../../lib/revo/open';
 import { useRevoSettings } from '../../lib/revo/useRevoSettings';
@@ -249,6 +251,7 @@ export default function SettingsScreen() {
     [scrollToWanted],
   );
   const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
+  const help = useHelpButtons();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
@@ -275,8 +278,12 @@ export default function SettingsScreen() {
   const homePrefs = useHomePrefs();
   // The speech model (hidden pages, word by word; testers): its size, its
   // download, Delete.
-  // Revo (previewTester accounts): on and off here; off deletes its history and memory.
-  const revoSettings = useRevoSettings(revoAvailable(user));
+  // Revo (the accounts its release opens it to, REVO-37): on and off here; off deletes its history and memory.
+  // An account with Revo on keeps the section while Revo is paused or no longer open to it, so it can
+  // still turn Revo off and delete its conversations.
+  const revoOpen = useRevoAvailable(user);
+  const revoSettings = useRevoSettings(!!user);
+  const revoShown = revoOpen || revoSettings?.optIn === true;
   const confirmRevoOff = () =>
     Alert.alert('Turn off Revo?', 'Your conversations with Revo and what it remembers are deleted.', [
       { text: 'Cancel', style: 'cancel' },
@@ -793,14 +800,14 @@ export default function SettingsScreen() {
 
         </Section>
 
-        {revoAvailable(user) && (
+        {revoShown && (
           <Section title="Revo AI" footer="Revo AI can make mistakes. It answers from your own revision data.">
             <View style={v2.iconRow} testID="revo-settings-row">
               <SettingIcon name="sparkles-outline" />
               <View style={v2.iconRowText}>
                 <Text style={[typeV2.body, { color: palette.text }]}>Revo</Text>
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                  {revoSettings?.optIn ? 'Your revision coach, from the button on Home' : 'Off. Turn on to ask about your revision'}
+                  {!revoOpen ? 'Paused for now' : revoSettings?.optIn ? 'Your revision coach, from the button on Home' : 'Off. Turn on to ask about your revision'}
                 </Text>
               </View>
               <SettingSwitch
@@ -812,7 +819,9 @@ export default function SettingsScreen() {
             </View>
             {revoSettings?.optIn ? (
               <>
-                <Row icon="bulb-outline" label="Memory" value={revoSettings.memoryOn ? 'On' : 'Off'} onPress={() => openRevo({ view: 'memory' })} />
+                {revoOpen ? (
+                  <Row icon="bulb-outline" label="Memory" value={revoSettings.memoryOn ? 'On' : 'Off'} onPress={() => openRevo({ view: 'memory' })} />
+                ) : null}
                 <Row icon="trash-outline" label="Delete conversations" destructive onPress={confirmRevoHistoryDelete} />
               </>
             ) : null}
@@ -901,6 +910,21 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Support">
+          {help.available ? (
+            <Row
+              icon={HELP_ICON}
+              label="Help buttons"
+              subtitle="A ? on screens that need explaining"
+              rightSlot={
+                <SettingSwitch
+                  value={help.shown}
+                  onValueChange={help.setShown}
+                  accessibilityLabel="Help buttons on screens"
+                  testID="settings-help-buttons"
+                />
+              }
+            />
+          ) : null}
           <Row
             icon={shareIcon}
             label="Share Revisely"

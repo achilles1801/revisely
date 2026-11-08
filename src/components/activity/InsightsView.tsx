@@ -3,10 +3,13 @@
 // come from lib/insightsView (definitions: ACT-4).
 
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Polyline } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
+import { CHROME_MAX_SCALE, ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
+import { AddToPlanLink } from './AddToPlanLink';
 import { typeV2 } from '../../theme/v2';
 import { lastRevisedByPage } from '../../lib/activityInsights';
 import {
@@ -29,6 +32,7 @@ import {
   type JuzTile,
 } from '../../lib/insightsView';
 import { getPagesForJuz } from '../../lib/quranData';
+import { allFirstTomorrow } from '../../lib/weakSpotActions';
 import { openRevo } from '../../lib/revo/open';
 import { spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
@@ -43,6 +47,7 @@ import {
   memorizedIn,
   missedPattern,
   rangeSpan,
+  weeklyPace,
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
@@ -70,12 +75,43 @@ export interface InsightsData {
   firstDay?: string | null;
   /** Each memorized page's last revision on record (all time), for how long ago a page was revised. */
   lastRevisedOn?: Map<number, string>;
+  /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
+  firstTomorrow?: ReadonlySet<number>;
+}
+
+/**
+ * A button's done state once its pages go first tomorrow: quiet, with a check, not tappable twice. On a
+ * custom plan, Plan it's has "Add to plan" under it, the deliberate step to keep them in the plan.
+ */
+function FirstTomorrowDone({ pill, testID, onAddToPlan }: { pill?: boolean; testID: string; onAddToPlan?: () => void }) {
+  const { palette } = useTheme();
+  if (onAddToPlan) {
+    return (
+      <View style={styles.doneStack}>
+        <FirstTomorrowDone pill={pill} testID={testID} />
+        <AddToPlanLink onPress={onAddToPlan} testID={testID.replace(/-done$/, '-add-to-plan')} />
+      </View>
+    );
+  }
+  return (
+    <View
+      style={pill ? [styles.outlinePill, styles.donePill, { borderColor: palette.separator }] : styles.doneLink}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel="Goes first tomorrow"
+      testID={testID}
+    >
+      <Ionicons name="checkmark" size={16} color={palette.secondary} />
+      <ChromeText style={[typeV2.name, { color: palette.secondary }]}>First tomorrow</ChromeText>
+    </View>
+  );
 }
 
 export function InsightsView({
   data,
   onReviseTomorrow,
   onPlanIt,
+  onAddToPlan,
   onOpenPage,
   onSeeAllPages,
   onTurnOnSmartTracking,
@@ -85,6 +121,8 @@ export function InsightsView({
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
   onPlanIt: (pages: number[]) => void;
+  /** A custom plan: "Add to plan" under Plan it's "First tomorrow" (ACT-24). */
+  onAddToPlan?: (pages: number[]) => void;
   onOpenPage: (page: number) => void;
   /** Weak spots' "See all pages by strength": every revised page, weakest first (ACT-12). */
   onSeeAllPages?: () => void;
@@ -104,7 +142,7 @@ export function InsightsView({
   };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} onOpenJuz={openJuz} />
+      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} />
       <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
       {data.smartTracking !== false ? (
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
@@ -124,6 +162,8 @@ export function InsightsView({
           windowInTheLast={rangeSpan(data.range ?? 30, data.today, data.firstDay).inTheLast}
           onOpenPage={onOpenPage}
           onPlanIt={onPlanIt}
+          onAddToPlan={onAddToPlan}
+          firstTomorrow={data.firstTomorrow}
         />
       ) : null}
     </View>
@@ -150,10 +190,10 @@ function Section({
     <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
       <View style={styles.sectionHead}>
         <View style={styles.flex}>
-          <Text style={[styles.sectionTitle, { color: palette.text }]} accessibilityRole="header">
+          <ChromeText style={[styles.sectionTitle, { color: palette.text }]} accessibilityRole="header">
             {title}
-          </Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>{detail}</Text>
+          </ChromeText>
+          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{detail}</ChromeText>
         </View>
         {right}
       </View>
@@ -182,22 +222,33 @@ function Figure({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // At large text the right-hand words ("+9 in 30 days") take a line of their own.
+  const stacked = useWindowDimensions().fontScale >= STACK_AT_SCALE;
   const inner = (
     <>
-      <Text style={[styles.big, { color: palette.text }]}>{value}</Text>
-      <Text style={[typeV2.body, styles.flex, { color: palette.secondary }]}>
+      <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {value}
+      </ChromeText>
+      <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>
         {text}
         {onPress ? ' ›' : ''}
-      </Text>
+      </ChromeText>
       {right}
     </>
   );
   return onPress ? (
-    <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={`${value} ${spokenText(text)}`} accessibilityHint={hint} style={styles.figure} testID={testID}>
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${value} ${spokenText(text)}`}
+      accessibilityHint={hint}
+      style={[styles.figure, stacked && styles.figureWrap]}
+      testID={testID}
+    >
       {inner}
     </Tap>
   ) : (
-    <View style={styles.figure} testID={testID}>
+    <View style={[styles.figure, stacked && styles.figureWrap]} testID={testID}>
       {inner}
     </View>
   );
@@ -205,7 +256,17 @@ function Figure({
 
 // ── Coverage ─────────────────────────────────────────────────────────────
 
-function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt: (pages: number[]) => void; onOpenJuz: (juz: number) => void }) {
+function Coverage({
+  data,
+  onPlanIt,
+  onAddToPlan,
+  onOpenJuz,
+}: {
+  data: InsightsData;
+  onPlanIt: (pages: number[]) => void;
+  onAddToPlan?: (pages: number[]) => void;
+  onOpenJuz: (juz: number) => void;
+}) {
   const { palette } = useTheme();
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const days = span.window;
@@ -253,7 +314,9 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
         accessibilityHint={`Opens Juz ${t.juz}`}
         testID={`juz-tile-${t.juz}`}
       >
-        <Text style={[styles.tileText, { color: look.color, opacity: 'dim' in look ? 0.7 : 1 }]}>{t.juz}</Text>
+        <ChromeText style={[styles.tileText, { color: look.color, opacity: 'dim' in look ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {t.juz}
+        </ChromeText>
         {t.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
       </Tap>
     );
@@ -302,9 +365,9 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
         {legend.map((l) => (
           <View key={l.key} style={styles.legendItem}>
             <View style={[styles.swatch, l.swatch]} />
-            <Text style={[typeV2.meta, styles.legendText, { color: palette.secondary }]} numberOfLines={1}>
+            <ChromeText style={[typeV2.meta, styles.legendText, { color: palette.secondary }]} numberOfLines={1}>
               {l.label}
-            </Text>
+            </ChromeText>
           </View>
         ))}
       </View>
@@ -320,26 +383,33 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
           >
           <View style={[styles.dot8, { backgroundColor: palette.red }]} />
           <View style={styles.flex}>
-            <Text style={[typeV2.name, { color: palette.text }]}>{`Juz ${untouched.first.juz}, untouched the longest`}</Text>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>
+            <ChromeText style={[typeV2.name, { color: palette.text }]}>{`Juz ${untouched.first.juz}, untouched the longest`}</ChromeText>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>
               {[
                 untouched.first.daysSince == null ? 'Never revised' : `Last revised ${untouched.first.daysSince} days ago`,
                 untouched.next ? `Juz ${untouched.next.juz}, ${untouched.next.daysSince == null ? 'never' : `${untouched.next.daysSince} days`}` : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
-            </Text>
+            </ChromeText>
           </View>
           </Tap>
-          <Tap
-            onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
-            accessibilityRole="button"
-            accessibilityLabel={`Plan Juz ${untouched.first.juz}`}
-            hitSlop={10}
-            testID="insights-plan-it"
-          >
-            <Text style={[typeV2.name, { color: palette.link }]}>Plan it</Text>
-          </Tap>
+          {allFirstTomorrow(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)), data.firstTomorrow ?? new Set()) ? (
+            <FirstTomorrowDone
+              testID="insights-plan-it-done"
+              onAddToPlan={onAddToPlan ? () => onAddToPlan(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p))) : undefined}
+            />
+          ) : (
+            <Tap
+              onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
+              accessibilityRole="button"
+              accessibilityLabel={`Plan Juz ${untouched.first.juz}`}
+              hitSlop={10}
+              testID="insights-plan-it"
+            >
+              <ChromeText style={[typeV2.name, { color: palette.link }]}>Plan it</ChromeText>
+            </Tap>
+          )}
         </View>
       ) : null}
       {uncoveredUsed ? (
@@ -348,6 +418,7 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
           onClose={() => setUncoveredOpen(false)}
           title={`Not revised ${span.inWords}`}
           message={`${count.of - count.revised} of ${count.of} memorized pages`}
+          messageMaxScale={CHROME_MAX_SCALE}
           scroll
           onHidden={() => {
             const j = thenJuz.current;
@@ -367,9 +438,9 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
               }}
             />
           ))}
-          <Text style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
+          <ChromeText style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
             {`Every other memorized page was revised ${span.inTheLast}.`}
-          </Text>
+          </ChromeText>
         </Sheet>
       ) : null}
     </Section>
@@ -390,18 +461,18 @@ function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separat
     >
       <View style={[styles.uncoveredMark, { backgroundColor: palette.bubble }]}>
         {row.kind === 'juz' ? (
-          <Text style={[typeV2.name, { color: palette.red }]}>{row.juz}</Text>
+          <ChromeText style={[typeV2.name, { color: palette.red }]}>{row.juz}</ChromeText>
         ) : (
           <Ionicons name="leaf-outline" size={18} color={palette.text} />
         )}
       </View>
       <View style={styles.flex}>
-        <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <ChromeText style={[typeV2.name, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
           {row.label}
-        </Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+        </ChromeText>
+        <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {row.detail}
-        </Text>
+        </ChromeText>
       </View>
       <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
     </Tap>
@@ -507,23 +578,23 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
             <View style={[styles.circle, d.done ? { backgroundColor: palette.primary } : { borderWidth: 1.5, borderColor: palette.outline }]}>
               {d.done ? <Ionicons name="checkmark" size={16} color={palette.onPrimary} /> : null}
             </View>
-            <Text style={[typeV2.meta, styles.letter, { color: palette.secondary }]}>{d.letter}</Text>
+            <ChromeText style={[typeV2.meta, styles.letter, { color: palette.secondary }]}>{d.letter}</ChromeText>
           </Tap>
         ))}
       </View>
       )}
       {pattern ? (
-        <Text style={[typeV2.meta, styles.pattern, { color: palette.secondary }]} testID="insights-pattern">
+        <ChromeText style={[typeV2.meta, styles.pattern, { color: palette.secondary }]} testID="insights-pattern">
           {pattern}
-        </Text>
+        </ChromeText>
       ) : null}
       {busiest ? (
         <View style={styles.hoursBlock} testID="insights-hours">
           {/* Press and slide on the bars (i8): the title becomes the hour under the finger. */}
-          <Text style={[typeV2.name, { color: palette.text }]} testID="insights-hours-title">
+          <ChromeText style={[typeV2.name, { color: palette.text }]} testID="insights-hours-title">
             {held ? held.title : busiest}
-          </Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : `Minutes by hour, ${span.lastWords}`}</Text>
+          </ChromeText>
+          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : `Minutes by hour, ${span.lastWords}`}</ChromeText>
           <GestureDetector gesture={scrub}>
             <View style={styles.hourBars} onLayout={(e) => (barsWidth.current = e.nativeEvent.layout.width)} testID="insights-hour-bars">
               {hours.map((v, h) => (
@@ -547,9 +618,9 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
           </GestureDetector>
           <View style={styles.hourLabels}>
             {[0, 6, 12, 18].map((h) => (
-              <Text key={h} style={[typeV2.meta, styles.hourLabel, { color: palette.secondary, left: `${(h / 24) * 100}%` }]}>
+              <ChromeText key={h} style={[typeV2.meta, styles.hourLabel, { color: palette.secondary, left: `${(h / 24) * 100}%` }]}>
                 {h === 0 ? '12 AM' : h === 6 ? '6 AM' : h === 12 ? '12 PM' : '6 PM'}
-              </Text>
+              </ChromeText>
             ))}
           </View>
         </View>
@@ -573,9 +644,9 @@ function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
   return (
     <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
       <Tap onPress={onPress} accessibilityRole="link" accessibilityLabel={INVITE} hitSlop={8} style={styles.invite} testID="insights-smart-tracking">
-        <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+        <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
           {INVITE}
-        </Text>
+        </ChromeText>
         <Ionicons name="chevron-forward" size={16} color={palette.link} />
       </Tap>
     </View>
@@ -618,14 +689,14 @@ function WeakSpots({
             testID="insights-ask-revo"
           >
             <Ionicons name="sparkles-outline" size={16} color={palette.accentText} />
-            <Text style={[typeV2.name, { color: palette.text }]}>Ask</Text>
+            <ChromeText style={[typeV2.name, { color: palette.text }]}>Ask</ChromeText>
           </Tap>
         ) : undefined
       }
       testID="insights-weak-spots"
     >
       {rows.length === 0 ? (
-        <Text style={[typeV2.body, styles.none, { color: palette.secondary }]}>Nothing weak or often skipped</Text>
+        <ChromeText style={[typeV2.body, styles.none, { color: palette.secondary }]}>Nothing weak or often skipped</ChromeText>
       ) : (
         <View style={styles.weakList}>
           {rows.map((r, i) => (
@@ -640,25 +711,27 @@ function WeakSpots({
               <View style={[styles.dot8, { backgroundColor: palette.red }]} />
               <View style={styles.flex}>
                 {/* The surah and ayahs first; the page only as a quiet detail (Majd, Nov 7 2026). */}
-                <Text numberOfLines={1}>
-                  <Text style={[typeV2.name, { color: palette.text }]}>{r.label}</Text>
-                  <Text style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</Text>
-                </Text>
-                <Text style={[typeV2.meta, { color: palette.secondary }]}>{r.reason}</Text>
+                <ChromeText numberOfLines={2}>
+                  <ChromeText style={[typeV2.name, { color: palette.text }]}>{r.label}</ChromeText>
+                  <ChromeText style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</ChromeText>
+                </ChromeText>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{r.reason}</ChromeText>
               </View>
               <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Tap>
           ))}
         </View>
       )}
-      {rows.length > 0 ? (
+      {rows.length > 0 && allFirstTomorrow(pages, data.firstTomorrow ?? new Set()) ? (
+        <FirstTomorrowDone pill testID="insights-revise-tomorrow-done" />
+      ) : rows.length > 0 ? (
         <Tap
           onPress={() => onReviseTomorrow(pages)}
           accessibilityRole="button"
           style={[styles.outlinePill, { borderColor: palette.outline }]}
           testID="insights-revise-tomorrow"
         >
-          <Text style={[typeV2.name, { color: palette.text }]}>{reviseFirstLabel(rows)}</Text>
+          <ChromeText style={[typeV2.name, { color: palette.text }]}>{reviseFirstLabel(rows)}</ChromeText>
         </Tap>
       ) : null}
       {onSeeAllPages ? (
@@ -669,9 +742,9 @@ function WeakSpots({
           style={styles.seeAll}
           testID="insights-see-all-pages"
         >
-          <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
             See all pages by strength
-          </Text>
+          </ChromeText>
           <Ionicons name="chevron-forward" size={16} color={palette.link} />
         </Tap>
       ) : null}
@@ -701,14 +774,14 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
         <Figure
           value={String(shownMonth.pages)}
           text={[`${shownMonth.pages === 1 ? 'page' : 'pages'} in ${monthName(shownMonth.month)}`, shownMonth.passage || null].filter(Boolean).join(' · ')}
-          right={<Text style={[typeV2.meta, { color: palette.secondary }]}>{`${data.memorized.size} in all`}</Text>}
+          right={<ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`${data.memorized.size} in all`}</ChromeText>}
           testID="insights-memorization-figure"
         />
       ) : (
         <Figure
           value={String(data.memorized.size)}
           text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
-          right={added > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${added} ${span.inWords}`}</Text> : undefined}
+          right={added > 0 ? <ChromeText style={[typeV2.name, { color: palette.good }]}>{`+${added} ${span.inWords}`}</ChromeText> : undefined}
           testID="insights-memorization-figure"
         />
       )}
@@ -729,7 +802,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
               accessibilityState={{ selected: picked === m.month }}
               testID={`insights-month-${m.month}`}
             >
-              {lit && m.pages > 0 ? <Text style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{m.pages}</Text> : null}
+              {lit && m.pages > 0 ? <ChromeText style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{m.pages}</ChromeText> : null}
               <View style={[styles.monthBar, { height: Math.round((72 * m.pages) / top), backgroundColor: palette.primary, opacity: lit ? 1 : 0.4 }]} />
             </Tap>
           );
@@ -737,12 +810,15 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
       </View>
       <View style={styles.monthLabels}>
         {months.map((m, i) => (
-          <Text
+          <ChromeText
             key={m.month}
             style={[typeV2.meta, styles.monthLabel, { color: m.month === picked ? palette.text : palette.secondary, fontWeight: m.month === picked ? '600' : '400' }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
           >
             {monthLabel(m.month, i === 0 || i === months.length - 1 || m.month === picked)}
-          </Text>
+          </ChromeText>
         ))}
       </View>
       {shownMonth ? (
@@ -762,24 +838,24 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
                 <Ionicons name="leaf-outline" size={18} color={palette.text} />
               </View>
               <View style={styles.flex}>
-                <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                <ChromeText style={[typeV2.name, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
                   {it.label}
-                </Text>
-                <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+                </ChromeText>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
                   {it.when}
-                </Text>
+                </ChromeText>
               </View>
               <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Tap>
           ))}
           {shownMonth.items.length === 0 ? (
-            <Text style={[typeV2.meta, styles.none, { color: palette.secondary }]}>{`Nothing memorized in ${monthName(shownMonth.month)}`}</Text>
+            <ChromeText style={[typeV2.meta, styles.none, { color: palette.secondary }]}>{`Nothing memorized in ${monthName(shownMonth.month)}`}</ChromeText>
           ) : null}
           {!allShown && shownMonth.items.length > 4 ? (
             <Tap onPress={() => setAllShown(true)} accessibilityRole="button" hitSlop={8} style={styles.seeAll} testID="insights-month-more">
-              <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+              <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
                 {`${shownMonth.items.length - 4} more in ${monthName(shownMonth.month)}`}
-              </Text>
+              </ChromeText>
               <Ionicons name="chevron-down" size={16} color={palette.link} />
             </Tap>
           ) : null}
@@ -791,10 +867,40 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
 
 // ── Pace ─────────────────────────────────────────────────────────────────
 
+/** All time's Pace week by week (the NOTE's table): a line of each week's minutes a page, and its ends. */
+function WeekByWeek({ revised, today }: { revised: InsightsData['revised']; today: string }) {
+  const { palette } = useTheme();
+  const [width, setWidth] = useState(0);
+  const weeks = useMemo(() => weeklyPace(revised, today), [revised, today]);
+  const known = weeks.map((v, i) => ({ v, i })).filter((w): w is { v: number; i: number } => w.v != null);
+  if (known.length < 2) return null;
+  const lo = Math.min(...known.map((w) => w.v));
+  const hi = Math.max(...known.map((w) => w.v));
+  const h = 40;
+  const x = (i: number) => (weeks.length <= 1 ? 0 : 3 + (i / (weeks.length - 1)) * Math.max(0, width - 6));
+  const y = (v: number) => (hi - lo < 0.01 ? h / 2 : 4 + ((hi - v) / (hi - lo)) * (h - 8));
+  const first = known[0].v;
+  const last = known[known.length - 1].v;
+  return (
+    <View style={styles.weekByWeek} testID="insights-pace-weeks">
+      <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`Week by week: ${formatPace(first)} → ${formatPace(last)} min a page`}</ChromeText>
+      <View style={styles.weekLine} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        {width > 0 ? (
+          <Svg width={width} height={h}>
+            <Polyline points={known.map((w) => `${x(w.i)},${y(w.v)}`).join(' ')} fill="none" stroke={palette.primary} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          </Svg>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
   const { palette } = useTheme();
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const range = span.window;
+  // At large text Pace's two tiles stack, one above the other.
+  const stacked = useWindowDimensions().fontScale >= STACK_AT_SCALE;
   // "From 24 timed revisions ›" (i11): each one, as dots and a list.
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetUsed, setSheetUsed] = useState(false);
@@ -809,22 +915,23 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
         : `${p.perPage < p.before ? 'Down' : 'Up'} from ${formatPace(p.before)} ${span.before}`;
   return (
     <Section title="Pace" detail="Minutes per page" testID="insights-pace">
-      <View style={styles.paceTiles}>
+      <View style={[styles.paceTiles, stacked && styles.paceTilesStacked]} testID="insights-pace-tiles">
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
-            <Text style={[styles.paceNumber, { color: palette.text }]}>{formatPace(p.perPage)}</Text>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>min a page</Text>
+            <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{formatPace(p.perPage)}</ChromeText>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>min a page</ChromeText>
           </View>
-          <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[`Revising, ${span.lastWords}.`, change].filter(Boolean).join(' ')}</Text>
+          <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[`Revising, ${span.lastWords}.`, change].filter(Boolean).join(' ')}</ChromeText>
         </View>
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
-            <Text style={[styles.paceNumber, { color: palette.text }]}>{p.dayMinutes}</Text>
-            <Text style={[typeV2.meta, { color: palette.secondary }]}>min</Text>
+            <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{p.dayMinutes}</ChromeText>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>min</ChromeText>
           </View>
-          <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{`A ${p.capacity}-page day at that pace`}</Text>
+          <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{`A ${p.capacity}-page day at that pace`}</ChromeText>
         </View>
       </View>
+      {span.all ? <WeekByWeek revised={data.revised} today={data.today} /> : null}
       <Tap
         onPress={() => {
           setSheetUsed(true);
@@ -835,11 +942,11 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
         style={styles.footnoteTap}
         testID="insights-pace-revisions"
       >
-        <Text style={[typeV2.meta, styles.flex, { color: palette.secondary }]}>
+        <ChromeText style={[typeV2.meta, styles.flex, { color: palette.secondary }]}>
           {[`From ${p.revisions} timed ${p.revisions === 1 ? 'revision' : 'revisions'} ›`, p.readingPerPage != null ? `Reading: ${formatPace(p.readingPerPage)} min a page.` : null]
             .filter(Boolean)
             .join(' ')}
-        </Text>
+        </ChromeText>
       </Tap>
       {sheetUsed ? (
         <PaceSheet
@@ -865,10 +972,11 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   sectionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.3 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12 },
+  figureWrap: { flexWrap: 'wrap', rowGap: 4 },
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   tiles: { marginTop: 14, gap: 4 },
   tileRow: { flexDirection: 'row', gap: 4 },
-  tile: { flex: 1, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  tile: { flex: 1, minHeight: 32, paddingHorizontal: 2, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   tileText: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
   learnDot: { position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: 2.5 },
   // One line across the tiles' width, as the mock (iOS draws 13pt a little wider than the mock did,
@@ -885,6 +993,9 @@ const styles = StyleSheet.create({
   gridCol: { flex: 1, gap: 4 },
   gridCell: { aspectRatio: 1, borderRadius: 4 },
   pattern: { marginTop: 10 },
+  donePill: { flexDirection: 'row', gap: 6 },
+  doneLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  doneStack: { alignItems: 'flex-end', gap: 6 },
   uncoveredRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   uncoveredMark: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   uncoveredFoot: { paddingTop: 12, paddingBottom: 8 },
@@ -898,14 +1009,14 @@ const styles = StyleSheet.create({
   hourBar: { flex: 1, borderRadius: 2 },
   hourLabels: { height: 18, marginTop: 6 },
   hourLabel: { position: 'absolute', top: 0 },
-  ask: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
+  ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
   none: { marginTop: 12 },
   weakList: { marginTop: 4 },
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginTop: 14 },
   invite: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   linkText: { flexShrink: 1 },
-  outlinePill: { alignSelf: 'flex-start', height: 36, borderRadius: 18, borderWidth: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  outlinePill: { alignSelf: 'flex-start', minHeight: 36, borderRadius: 18, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   monthBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 72 + 21, marginTop: 10 },
   monthCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   monthValue: { fontWeight: '600', marginBottom: 3 },
@@ -913,10 +1024,13 @@ const styles = StyleSheet.create({
   monthLabels: { flexDirection: 'row', gap: 6, marginTop: 6 },
   monthLabel: { flex: 1, textAlign: 'center' },
   paceTiles: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  paceTilesStacked: { flexDirection: 'column' },
   paceTile: { flex: 1, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14 },
   paceFigure: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   paceNumber: { fontSize: 22, lineHeight: 26, fontWeight: '700', fontVariant: ['tabular-nums'] },
   paceText: { marginTop: 4 },
   footnote: { marginTop: 10 },
   footnoteTap: { flexDirection: 'row', marginTop: 10, paddingVertical: 4 },
+  weekByWeek: { marginTop: 12, gap: 6 },
+  weekLine: { height: 40 },
 });

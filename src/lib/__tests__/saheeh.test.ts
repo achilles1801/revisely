@@ -87,7 +87,7 @@ import {
 } from '../saheeh';
 
 const DIR = 'file:///documents/translations/english_saheeh';
-const LIST = 'https://quranenc.com/api/v1/translations/list/en';
+const LIST = 'https://quranenc.com/api/v1/translations/list';
 const sura = (n: number) => `https://quranenc.com/api/v1/translation/sura/english_saheeh/${n}`;
 
 let version = '1.1.2';

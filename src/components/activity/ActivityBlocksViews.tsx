@@ -13,7 +13,7 @@ import * as firestoreService from '../../services/firestoreService';
 import { monthGrid, shiftMonth } from '../../lib/activityHeatmap';
 import { type Memorized, type Read, type Revised } from '../../lib/activityInsights';
 import { ratedWeakCounts } from '../../lib/insightsView';
-import { revoAvailable } from '../../lib/revo/availability';
+import { useRevoAvailable } from '../../lib/revo/availability';
 import { logger } from '../../lib/logger';
 import { layoutV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
@@ -34,15 +34,19 @@ const shiftDays = (day: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-type ViewKind = 'calendar' | 'insights';
+export type ViewKind = 'calendar' | 'insights';
 
 interface Props {
   today: string;
   /** Weak spots' actions (Insights): the weak pages to tomorrow's front; the untouched juz to the plan. */
   onReviseTomorrow: (weak: number[]) => void;
   onPlanIt: (pages: number[]) => void;
+  /** A custom plan's "Add to plan" under Plan it's "First tomorrow" (ACT-24). */
+  onAddToPlan?: (pages: number[]) => void;
   /** A weak spot's row: the reader at that page. */
   onOpenPage: (page: number) => void;
+  /** Pages already first tomorrow (Insights' carry): their buttons show they're done (ACT-24). */
+  firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
@@ -51,11 +55,17 @@ interface Props {
   noteDays: Set<string>;
   /** A day; at a block when a preview row opened it (ACT-18). */
   onOpenDay: (day: string, block?: PreviewBlock) => void;
+  /** The tab on show changed (Overview or Insights): the top bar's help explains that one. */
+  onViewChange?: (view: ViewKind) => void;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange }: Props) {
   const { pages, logs, user } = useApp();
+  const revo = useRevoAvailable(user);
   const [view, setView] = useState<ViewKind>('calendar');
+  const viewChange = useRef(onViewChange);
+  viewChange.current = onViewChange;
+  useEffect(() => viewChange.current?.(view), [view]);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [span, setSpanState] = useState<CalendarSpan>('month');
   const [week, setWeek] = useState(weekStartOf(today));
@@ -74,11 +84,12 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     setSpanState(next);
     AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
   };
-  // Today (ACT-18): back to today's month or week, with today picked.
+  // Today (ACT-18): back to today's month or week, with today picked and highlighted as a tapped day is
+  // (Majd, Nov 8 2026: it came back to today's month without marking today).
   const toToday = () => {
     setMonth(today.slice(0, 7));
     setWeek(weekStartOf(today));
-    setPicked(null);
+    setPicked(today);
   };
   // Insights' range (ACT-22): one for the whole tab, kept on the phone like Week | Month.
   const [range, setRangeState] = useState<InsightsRange>(30);
@@ -259,16 +270,18 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             read: data?.reads ?? [],
             memorizations: yearOfMemorizing,
             capacity: user?.dailyPageCapacity ?? 20,
-            revo: revoAvailable(user),
+            revo,
             smartTracking: smartTrackingOn(user),
             range,
             firstDay,
             lastRevisedOn,
+            firstTomorrow,
           }}
           onOpenDay={onOpenDay}
           onOpenCalendar={openCalendar}
           onReviseTomorrow={onReviseTomorrow}
           onPlanIt={onPlanIt}
+          onAddToPlan={onAddToPlan}
           onOpenPage={onOpenPage}
           onSeeAllPages={onSeeAllPages}
           onTurnOnSmartTracking={onTurnOnSmartTracking}
@@ -279,5 +292,6 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 }
 
 const styles = StyleSheet.create({
-  switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  // The range chip wraps under the tabs when the row can't hold all three (large text, an SE).
+  switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 8 },
 });

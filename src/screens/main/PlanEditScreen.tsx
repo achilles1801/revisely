@@ -21,11 +21,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import {
   buildDefaultPlanDays,
-  scheduledDaysFrom,
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
 } from '../../lib/algorithm';
-import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
+import { createCustomPlanFromDraft } from '../../lib/schedulePlans';
 import { userWithNewSchedule } from '../../lib/planChange';
 import {
   defaultStartPage,
@@ -37,7 +36,7 @@ import {
   PlanDirection,
   planStats,
   removeDay,
-  rotateCustomPlanToToday,
+  liveCustomPlanDays,
 } from '../../lib/planBuilder';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan, User } from '../../types';
@@ -47,6 +46,9 @@ import { InlineStepper } from '../../components/plan/InlineStepper';
 import { DAY_ROW_INSET } from '../../components/plan/DayRow';
 import { ReorderableDayList, ScrollLink } from '../../components/plan/ReorderableDayList';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
+import { useHelpButtons } from '../../components/help/useHelpButtons';
 import {
   PlanBuilderHandle,
   PlanBuilderSheet,
@@ -92,6 +94,7 @@ export default function PlanEditScreen() {
   // Outcomes only (a save, a load).
   const haptics = useHaptics();
   const { user, pages, logs, saveUser } = useApp();
+  const helpShown = useHelpButtons().shown;
   // "Today" in the editor is the revision day (it starts at fajr when that is
   // on). It is fixed once the account is loaded: the draft is rotated to that
   // day, so it must not move while the editor is open. Read before the account
@@ -125,16 +128,10 @@ export default function PlanEditScreen() {
   // the cycle to today on save).
   const initialState = useMemo(() => {
     if (user?.customPlan && user.customPlan.days.length > 0) {
-      const plan = user.customPlan;
-      // With a carry-over shift, show the days as they are now scheduled.
-      const shifted =
-        (user.scheduleShiftPages ?? 0) > 0 &&
-        plan.cycleStartDate <= dateToLocalISODay(revisionDate);
+      // With a carry-over shift, the days as they are now scheduled ("Add to plan" reads the same).
       return {
-        days: shifted
-          ? scheduledDaysFrom(user, memorizedPages, revisionDate, plan.days.length)
-          : rotateCustomPlanToToday(plan, revisionDate),
-        direction: plan.direction as PlanDirection,
+        days: liveCustomPlanDays(user, memorizedPages, revisionDate),
+        direction: user.customPlan.direction as PlanDirection,
       };
     }
     if (isJuzMode && user) {
@@ -509,16 +506,21 @@ export default function PlanEditScreen() {
         title="Schedule"
         onBack={() => navigation.goBack()}
         right={
-          <PillButton
-            title="Save"
-            size="sm"
-            onPress={handleSave}
-            disabled={!canSave}
-            busy={saving}
-            accessibilityLabel="Save schedule"
-            testID="plan-save"
-          />
+          <>
+            <HelpButton screen="schedule" />
+            <PillButton
+              title="Save"
+              size="sm"
+              onPress={handleSave}
+              disabled={!canSave}
+              busy={saving}
+              accessibilityLabel="Save schedule"
+              testID="plan-save"
+            />
+          </>
         }
+        // The ? beside Save needs a little more room than Save alone; both sides stay equal.
+        sideWidth={helpShown ? 112 : undefined}
         separator
       />
 
@@ -688,6 +690,7 @@ export default function PlanEditScreen() {
         </GroupedSection>
       </Animated.ScrollView>
 
+      <HelpToast screen="schedule" bottomInset={insets.bottom} />
       <UndoToast
         key={removed?.seq ?? 0}
         visible={removed != null}

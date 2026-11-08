@@ -296,6 +296,33 @@ async function refusal(app: OpenApp, call: () => Promise<unknown>): Promise<stri
   return (caught as { refusal?: string }).refusal ?? `not a RevoError: ${String(caught)}`;
 }
 
+/**
+ * The least context the server takes, with nothing done today: a Day in review asked with it answers
+ * none, with no model call, once the account's switch lets it through (and is refused when it doesn't).
+ */
+function quietContext(day: string) {
+  return {
+    totals: {
+      memorizedPages: 20,
+      revisedWithin7Days: 0,
+      revisedWithin30Days: 0,
+      daysWithSession30: 0,
+      streakDays: 0,
+      sessions30: 0,
+      weakPages: 0,
+      moderatePages: 0,
+      strongPages: 0,
+      weakRevisedLast7Days: 0,
+      pagesPerDay7: 0,
+      pagesPerDay30: 0,
+      plannedPerDay: 5,
+    },
+    today: { plannedPages: 5, revisedPages: 0, minutes: 0, memorizedPages: 0, nextPages: [1, 2, 3, 4, 5], weakNext: [], done: false },
+    weakPages: [],
+    week: [{ day, pages: 0 }],
+  };
+}
+
 it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo still opens on its opt-in and sends nothing before it, the Day in review included; once on, a tap just after launch opens the chat', async () => {
   setZone(ZONES.amman);
   setNow('2026-11-06 20:00');
@@ -317,13 +344,12 @@ it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo
     app = await phone.open(revoStack);
     await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
     // [REVO-1] The changeover: the server still serves that account (an app from before #310 reads
-    // the coach's switch and shows it Revo) until Revo's own switch is set.
-    const clears = watchFunction('revoClear');
+    // the coach's switch and shows it Revo) until Revo's own switch is set. (Clear can't show it: it
+    // is open to every account, REVO-37.) A quiet day's review: let through, none, no model call.
     await app.act(async () => {
-      await withAuthRetry(() => revo().clear('memory'));
+      await expect(withAuthRetry(() => revo().dayInReview({ day: '2026-11-06', context: quietContext('2026-11-06') } as never))).resolves.toBeNull();
     });
-    expect(clears.results).toEqual([{ result: { deleted: 0 } }]);
-    clears.restore();
+    expect(reviews.calls).toBe(1);
 
     const home = new Home(app);
     await home.ready();
@@ -335,16 +361,16 @@ it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo
     await app.untilSynced();
     await app.idle(500);
 
-    // [REVO-21] [REVO-9] Nothing sent, and the first tap opens the opt-in.
-    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([0, 0, 0]);
+    // [REVO-21] [REVO-9] Nothing sent by the app (the one review above was this test's), and the first tap opens the opt-in.
+    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([0, 0, 1]);
     await tap(app, 'revo-button');
     await app.until(() => app.screen.queryByTestId('revo-optin') != null, 'the opt-in');
-    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([0, 0, 0]);
+    expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([0, 0, 1]);
 
     // Turned on: the evening's Day in review is asked for now, not before.
     await modelSays(uid, reply('Two pages revised today.', { title: 'Day in review', chips: [] }));
     await tap(app, 'revo-turn-on');
-    await app.until(() => reviews.calls > 0, 'the Day in review, once Revo is on');
+    await app.until(() => reviews.calls > 1, 'the Day in review, once Revo is on');
     expect(setOptions.sent).toEqual([{ optIn: true }]);
     expect(await getServerDoc(`coachSettings/${uid}`)).toMatchObject({ revoOn: true, optIn: true });
     await app.close();
@@ -365,7 +391,7 @@ it('[REVO-21] [REVO-1] [REVO-9] Revo’s own switch: with the Ask coach on, Revo
       await withAuthRetry(() => revo().setOptions({ optIn: false }));
     });
     expect(await getServerDoc(`coachSettings/${uid}`)).toMatchObject({ revoOn: false, optIn: true });
-    expect(await refusal(app, () => revo().clear('memory'))).toBe('off');
+    expect(await refusal(app, () => revo().dayInReview({ day: '2026-11-06', context: quietContext('2026-11-06') } as never))).toBe('off');
     await app.close();
   } finally {
     setOptions.restore();

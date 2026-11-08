@@ -29,8 +29,12 @@ import {
   creditLine,
   DEFAULT_TRANSLATION_ID,
   getVerseText,
+  fallbackTranslation,
   hasArabicForPage,
+  hasTranslationSura,
   isTranslationAvailable,
+  nameWithLanguage,
+  offeredTranslations,
   pickerTitle,
   CLEAR_QURAN_ID,
   resolveTranslation,
@@ -45,6 +49,7 @@ import { knownOffline, onNetworkState } from '../../lib/networkState';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
+import { TranslationPicker } from './TranslationPicker';
 import { AyahRef } from '../../lib/ayahBounds';
 
 interface VerseSheetProps {
@@ -52,6 +57,10 @@ interface VerseSheetProps {
   verse: AyahRef | null;
   translationId: string | undefined;
   onChangeTranslation: (id: string) => void;
+  /** A previewTester account: the picker offers every translation (lib/translation offeredTranslations). */
+  tester?: boolean;
+  /** The account: the picker's favorites are kept on the phone for each. */
+  accountId?: string;
   /** Reciter and style for Play ('<reciter>:<style>'). */
   reciter: string | undefined;
   onChangeReciter: (choice: string) => void;
@@ -131,6 +140,8 @@ export function VerseSheet({
   verse,
   translationId,
   onChangeTranslation,
+  tester = false,
+  accountId,
   reciter,
   onChangeReciter,
   onNavigate,
@@ -140,7 +151,8 @@ export function VerseSheet({
   const styles = useMemo(() => makeStylesV2(palette), [palette]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
+  // 'translations' is the short list; 'picker' the testers' picker of every translation.
+  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'picker' | 'reciters'>('closed');
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
@@ -293,11 +305,19 @@ export function VerseSheet({
   const prev = verse ? previousVerse(verse) : null;
   const next = verse ? nextVerse(verse) : null;
   failedRef.current = view.status === 'error';
-  // Offline, with this page's Arabic here: The Clear Quran® is what's missing,
-  // and Saheeh International can show the verse if its sura is here too.
+  // Offline, with this page's Arabic here: the translation is what's missing, and another one on the
+  // phone can show the verse (TRANS-7): the same language first, then Saheeh International.
   const offline = view.status === 'error' && knownOffline();
   const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
-  const saheehHere = arabicHere && !!verse && hasSaheehSura(verse.sura);
+  const alternative =
+    arabicHere && verse
+      ? fallbackTranslation(translation, verse.sura, offeredTranslations(tester), (t, sura) =>
+          t.id === DEFAULT_TRANSLATION_ID ? hasSaheehSura(sura) : hasTranslationSura(t, sura),
+        )
+      : null;
+  const notDownloaded = arabicHere && translation.source === 'quranenc' && translation.id !== DEFAULT_TRANSLATION_ID;
+  // Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko: the translation reads right to left.
+  const rtl = translation.direction === 'rtl';
 
   return (
     <Modal visible={verse != null} transparent animationType="slide" onRequestClose={onClose}>
@@ -307,7 +327,12 @@ export function VerseSheet({
         <Backdrop onPress={onClose} label="Close translation" />
         <Reanimated.View style={dragged}>
           <View
-            style={[styles.sheet, { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) }]}
+            style={[
+              styles.sheet,
+              { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) },
+              // The picker fills the expanded sheet, however short the verse is.
+              menu === 'picker' && { minHeight: maxHeight },
+            ]}
             onLayout={(e) => {
               setSheetHeight(e.nativeEvent.layout.height);
               sheetH.value = e.nativeEvent.layout.height;
@@ -398,6 +423,7 @@ export function VerseSheet({
                       accessibilityRole="button"
                       accessibilityLabel="More"
                       accessibilityState={{ expanded: menu !== 'closed' }}
+                      testID="verse-more"
                     >
                       <Ionicons name="ellipsis-horizontal" size={22} color={palette.text} />
                     </Tap>
@@ -405,7 +431,21 @@ export function VerseSheet({
                 </View>
               </GestureDetector>
 
-              {menu !== 'closed' && (
+              {menu === 'picker' && (
+                // Every translation, by language (testers, for now): over the verse, under the header.
+                <View style={[styles.pickerPanel, { top: headerBottom, bottom: Math.max(insets.bottom, spacing.md) }]}>
+                  <TranslationPicker
+                    translations={offeredTranslations(tester)}
+                    chosenId={translation.id}
+                    accountId={accountId}
+                    onChoose={(id) => {
+                      onChangeTranslation(id);
+                      setMenu('closed');
+                    }}
+                  />
+                </View>
+              )}
+              {menu !== 'closed' && menu !== 'picker' && (
                 // A flat panel in the sheet, not a second modal (iOS can't stack one
                 // over a sheet that is itself a modal).
                 <View style={[styles.dropdown, { top: headerBottom }]} testID="verse-menu-panel">
@@ -413,9 +453,17 @@ export function VerseSheet({
                     <>
                       <Tap
                         style={styles.dropRow}
-                        onPress={() => setMenu('translations')}
+                        onPress={() => {
+                          if (tester) {
+                            setMenu('picker');
+                            setExpanded(true);
+                          } else {
+                            setMenu('translations');
+                          }
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel={`Select translation, ${pickerTitle(translation)}`}
+                        testID="verse-select-translation"
                       >
                         <Ionicons name="language-outline" size={22} color={palette.text} />
                         <View style={v2Only.flex}>
@@ -511,9 +559,21 @@ export function VerseSheet({
                         The Clear Quran® needs the internet
                       </Text>
                       <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
-                        {saheehHere
-                          ? 'Saheeh International is available offline.'
+                        {alternative
+                          ? `${nameWithLanguage(alternative)} is available offline.`
                           : "Verses you've read before show offline. Try again once you're online."}
+                      </Text>
+                    </>
+                  ) : notDownloaded ? (
+                    // A QuranEnc translation with this sura not on the phone (TRANS-7).
+                    <>
+                      <Text style={[typeV2.name, v2Only.centerText, { color: palette.text }]} testID="verse-offline">
+                        This translation isn't downloaded
+                      </Text>
+                      <Text style={[typeV2.meta, v2Only.centerText, { color: palette.secondary }]}>
+                        {alternative
+                          ? `${nameWithLanguage(alternative)} is available offline.`
+                          : 'Download it from Select translation to read it offline.'}
                       </Text>
                     </>
                   ) : offline ? (
@@ -534,12 +594,12 @@ export function VerseSheet({
                     </Text>
                   )}
                   <View style={styles.errorActions}>
-                    {translation.id === CLEAR_QURAN_ID && saheehHere && (
+                    {alternative && (
                       <PillButton
-                        title="Show Saheeh International"
+                        title={`Show ${nameWithLanguage(alternative)}`}
                         variant="outline"
-                        onPress={() => onChangeTranslation(DEFAULT_TRANSLATION_ID)}
-                        testID="verse-use-saheeh"
+                        onPress={() => onChangeTranslation(alternative.id)}
+                        testID={alternative.id === DEFAULT_TRANSLATION_ID ? 'verse-use-saheeh' : 'verse-use-offline'}
                       />
                     )}
                     <PillButton title="Try again" onPress={() => setAttempt((a) => a + 1)} testID="verse-retry" />
@@ -572,7 +632,11 @@ export function VerseSheet({
                     <Text style={styles.arabic} maxFontSizeMultiplier={2}>
                       {view.text.arabic}
                     </Text>
-                    <Text style={styles.translation} testID="verse-translation">
+                    <Text
+                      style={[styles.translation, rtl && styles.rtlText]}
+                      accessibilityLanguage={translation.languageCode}
+                      testID="verse-translation"
+                    >
                       {/* Exactly as given; footnote markers shown as raised numbers. */}
                       {(translation.id === CLEAR_QURAN_ID
                         ? clearQuranSegments(view.text.translation)
@@ -588,10 +652,10 @@ export function VerseSheet({
                       )}
                     </Text>
                     {view.text.footnotes ? (
-                      // Saheeh International's footnotes, as given (its terms: nothing cut).
+                      // A QuranEnc translation's footnotes, as given (its terms: nothing cut).
                       <View style={styles.footnotes} testID="verse-footnotes">
                         {saheehFootnotes(view.text.footnotes).map((f, i) => (
-                          <Text key={i} style={styles.footnoteText}>
+                          <Text key={i} style={[styles.footnoteText, rtl && styles.rtlFootnote]} accessibilityLanguage={translation.languageCode}>
                             {f.mark ? <Text style={styles.footnote}>{`${f.mark} `}</Text> : null}
                             {f.text}
                           </Text>
@@ -726,6 +790,17 @@ const makeStylesV2 = (p: PaletteV2) =>
     },
     // Reading text: grows with Dynamic Type, uncapped.
     translation: { ...typeV2.body, fontSize: 18, lineHeight: 27, color: p.text },
+    // A right-to-left translation: laid out from the right, with room for its script's marks.
+    rtlText: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 34 },
+    rtlFootnote: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 26 },
+    // The testers' picker: fills the sheet under the header.
+    pickerPanel: {
+      position: 'absolute',
+      left: layoutV2.gutter,
+      right: layoutV2.gutter,
+      backgroundColor: p.sheet,
+      zIndex: 10,
+    },
     footnote: { color: p.accentText },
     footnotes: { marginTop: 12, gap: 8 },
     // Reading text too: grows with Dynamic Type, uncapped.

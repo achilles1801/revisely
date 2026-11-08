@@ -167,6 +167,34 @@ beforeEach(async () => {
   });
 });
 
+describe('the schedule’s help (HELP-1, HELP-3)', () => {
+  it('a tester gets a ? before Save; its sheet explains the cycle, and with Smart Tracking off a new plan has no weakest first', async () => {
+    Object.assign(mockApp, { user: { ...baseUser, previewTester: true, smartTrackingEnabled: false } });
+    await mount(<PlanEditScreen />);
+    fireEvent.press(await screen.findByTestId('help-button-schedule'));
+    expect(await screen.findByTestId('help-sheet-schedule')).toBeTruthy();
+    expect(screen.getByText('How the schedule works')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-schedule.cycle')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-schedule.new.off')).toBeTruthy();
+    expect(screen.queryByTestId('help-topic-schedule.new')).toBeNull();
+    expect(screen.queryByText(/weakest/i)).toBeNull();
+  });
+
+  it('with Smart Tracking on, a new plan can put the weakest pages first', async () => {
+    Object.assign(mockApp, { user: { ...baseUser, previewTester: true, smartTrackingEnabled: true } });
+    await mount(<PlanEditScreen />);
+    fireEvent.press(await screen.findByTestId('help-button-schedule'));
+    expect(await screen.findByTestId('help-topic-schedule.new')).toBeTruthy();
+    expect(screen.queryByTestId('help-topic-schedule.new.off')).toBeNull();
+  });
+
+  it('no ? for an account that isn’t a tester', async () => {
+    await mount(<PlanEditScreen />);
+    await act(async () => {});
+    expect(screen.queryByTestId('help-button-schedule')).toBeNull();
+  });
+});
+
 describe('the schedule in the new design', () => {
   it('a v2 top bar: back, the title, Save as a solid pill (off until something changes)', async () => {
     await mount(<PlanEditScreen />);
@@ -333,6 +361,17 @@ describe('a day in the new design', () => {
     );
     fireEvent.press(screen.getByLabelText('Back to schedule'));
     expect(mockNavigation.goBack).toHaveBeenCalled();
+  });
+
+  it('[ACT-24] from “Add to plan”: the pages added to the day are an edit, saying it is every cycle; back hands them to the plan', async () => {
+    mockRoute.params = { dayIndex: 1, initialPages: [1, 2, 3, 4], basePages: [1, 2], note: 'Saving the plan adds Al-Baqarah 1–16 to this day in every cycle.' };
+    await mount(<PlanDayEditScreen />);
+    expect(screen.getByTestId('plan-day-note').props.children).toMatch(/every cycle\.$/);
+    expect(screen.getByText(/Edited$/)).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Back to schedule'));
+    // Into the plan's draft, which is saved from the plan (nothing is saved here).
+    expect(mockNavigation.popTo).toHaveBeenCalledWith('PlanEdit', { editedDay: { index: 1, pages: [1, 2, 3, 4] } }, { merge: true });
+    expect(mockNavigation.goBack).not.toHaveBeenCalled();
   });
 
   it('the picker: search on the quiet fill, pill tabs, rows checked in ink', async () => {

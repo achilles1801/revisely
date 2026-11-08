@@ -57,7 +57,7 @@ async function mount(el: React.ReactElement, id: string) {
 const text = (id: string) => plainText(String(screen.getByTestId(id).props.children));
 const layout = (id: string, width: number, height: number, y = 0) =>
   fireEvent(screen.getByTestId(id), 'layout', { nativeEvent: { layout: { x: 0, y, width, height } } });
-const tap = (id: string, x: number, y = 40) =>
+const touch = (id: string, x: number, y = 40) =>
   act(() =>
     fireGestureHandler(getByGestureTestId(id), [
       { state: State.BEGAN, x, y },
@@ -65,6 +65,13 @@ const tap = (id: string, x: number, y = 40) =>
       { state: State.END, x, y },
     ]),
   );
+/** The next frame (Jest's requestAnimationFrame is a timer). */
+const nextFrame = () => act(() => new Promise<void>((done) => setTimeout(done, 0)));
+/** A tap on a plot: its pick lands on the next frame (ChartPlot). */
+const tap = async (id: string, x: number, y = 40) => {
+  touch(id, x, y);
+  await nextFrame();
+};
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -88,7 +95,7 @@ describe('pages per day', () => {
   it('a tap picks the day under the finger; its panel leads to that day in Activity; × puts it back', async () => {
     await week();
     layout('revo-chart-dailyPages-plot', 350, 130);
-    tap('revo-chart-dailyPages-plot-tap', 20);
+    await tap('revo-chart-dailyPages-plot-tap', 20);
     expect(text('revo-chart-dailyPages-title')).toBe('Sunday 1 November');
     // No facts given: what was revised.
     expect(text('revo-chart-dailyPages-line')).toBe('2 pages revised');
@@ -105,7 +112,7 @@ describe('pages per day', () => {
   it('a day with no ratings shows no strip: the passage names it', async () => {
     await week();
     layout('revo-chart-dailyPages-plot', 350, 130);
-    tap('revo-chart-dailyPages-plot-tap', 70);
+    await tap('revo-chart-dailyPages-plot-tap', 70);
     expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
     expect(screen.getByTestId('revo-chart-dailyPages-passage')).toBeTruthy();
     expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
@@ -114,10 +121,25 @@ describe('pages per day', () => {
   it('tapping the picked day again puts it back', async () => {
     await week();
     layout('revo-chart-dailyPages-plot', 350, 130);
-    tap('revo-chart-dailyPages-plot-tap', 70);
+    await tap('revo-chart-dailyPages-plot-tap', 70);
     expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
-    tap('revo-chart-dailyPages-plot-tap', 60);
+    await tap('revo-chart-dailyPages-plot-tap', 60);
     expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+  });
+
+  it('a pick lands a frame after the tap, once the touch has ended (iOS lost the next tap, flow 09)', async () => {
+    await week();
+    layout('revo-chart-dailyPages-plot', 350, 130);
+    touch('revo-chart-dailyPages-plot-tap', 70);
+    expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+    await nextFrame();
+    expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
+    // Putting the panel away (the chat gets shorter) waits too.
+    touch('revo-chart-dailyPages-plot-tap', 60);
+    expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
+    await nextFrame();
+    expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+    expect(screen.queryByTestId('revo-chart-dailyPages-detail')).toBeNull();
   });
 
   it('a slide runs along the days with a tick for each new one, and leaves the last one open', async () => {
@@ -191,7 +213,7 @@ describe('page ratings', () => {
     await ratings();
     rows();
     // 6 November sits at 30/30 of the line: x = 310.
-    tap('revo-chart-pageRatings-plot-tap', 305, 30);
+    await tap('revo-chart-pageRatings-plot-tap', 305, 30);
     expect(text('revo-chart-pageRatings-title')).toMatch(/ · weak$/);
     expect(text('revo-chart-pageRatings-line')).toBe('6 November, 5 days after the time before');
     expect(text('revo-chart-pageRatings-passage')).toMatch(/· Juz 30/);
@@ -201,14 +223,14 @@ describe('page ratings', () => {
   it('a tap on a row away from its dots picks the row', async () => {
     await ratings();
     rows();
-    tap('revo-chart-pageRatings-plot-tap', 150, 70);
+    await tap('revo-chart-pageRatings-plot-tap', 150, 70);
     expect(text('revo-chart-pageRatings-line')).toBe('No ratings in 31 days');
   });
 
   it('Revise first tomorrow waits for the tap, then says so; Open in the reader opens the page', async () => {
     await ratings();
     rows();
-    tap('revo-chart-pageRatings-plot-tap', 150, 20);
+    await tap('revo-chart-pageRatings-plot-tap', 150, 20);
     fireEvent.press(screen.getByTestId('revo-chart-pageRatings-reader'));
     expect(onOpenPage).toHaveBeenCalledWith(583);
     expect(onReviseFirst).not.toHaveBeenCalled();
@@ -249,7 +271,7 @@ describe('juz map', () => {
     await map();
     layout('revo-chart-juzMap-plot', 370, 104);
     // Juz 28: third row, eighth column.
-    tap('revo-chart-juzMap-plot-tap', 7.5 * 37, 90);
+    await tap('revo-chart-juzMap-plot-tap', 7.5 * 37, 90);
     expect(text('revo-chart-juzMap-title')).toBe('Juz 28 · last revised 6 days ago');
     expect(screen.getByText('Revised 1× in 30 days · 1 weak spot')).toBeTruthy();
     expect(screen.getByLabelText('1 weak, 0 moderate, 19 strong')).toBeTruthy();
@@ -289,15 +311,15 @@ describe('timeline', () => {
     expect(screen.getAllByTestId('revo-chart-revision')).toHaveLength(2);
     // The line sits 7 in from each side of a 314-wide plot: 300 wide.
     layout('revo-chart-timeline-plot', 314, 80);
-    tap('revo-chart-timeline-plot-tap', 7 + 250);
+    await tap('revo-chart-timeline-plot-tap', 7 + 250);
     expect(text('revo-chart-timeline-title')).toBe('Friday 6 November · weak');
     expect(text('revo-chart-timeline-line')).toBe('5 days after the time before');
     fireEvent.press(screen.getByTestId('revo-chart-timeline-day'));
     expect(onOpenDay).toHaveBeenCalledWith('2026-11-06');
     // Away from any dot: nothing changes.
-    tap('revo-chart-timeline-plot-tap', 7 + 120);
+    await tap('revo-chart-timeline-plot-tap', 7 + 120);
     expect(text('revo-chart-timeline-title')).toBe('Friday 6 November · weak');
-    tap('revo-chart-timeline-plot-tap', 7 + 2);
+    await tap('revo-chart-timeline-plot-tap', 7 + 2);
     expect(text('revo-chart-timeline-line')).toBe('The first time in this view');
   });
 
@@ -321,7 +343,7 @@ describe('timeline', () => {
     await mount(<TimelineChart title="End of An-Naba" passage={[582, 583]} days={30} today={TODAY} logs={logs} smart={false} />, 'revo-chart-timeline');
     expect(screen.queryByText('weak', { includeHiddenElements: true })).toBeNull();
     layout('revo-chart-timeline-plot', 314, 80);
-    tap('revo-chart-timeline-plot-tap', 7 + 250);
+    await tap('revo-chart-timeline-plot-tap', 7 + 250);
     expect(text('revo-chart-timeline-title')).toBe('Friday 6 November');
     expect(screen.queryByTestId('revo-chart-timeline-ratings')).toBeNull();
   });
@@ -370,13 +392,13 @@ describe('weeks grid', () => {
     await grid();
     layout('revo-chart-weeks-plot', 370, 100);
     // Sunday of the last row: x past the month column, y in the fourth row.
-    tap('revo-chart-weeks-plot-tap', 39 + 10, 90);
+    await tap('revo-chart-weeks-plot-tap', 39 + 10, 90);
     expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
     expect(text('revo-chart-weeks-line')).toBe('Done · 2 of 2 pages · 20 min');
     fireEvent.press(screen.getByTestId('revo-chart-weeks-day'));
     expect(onOpenDay).toHaveBeenCalledWith('2026-11-01');
     fireEvent.press(screen.getByTestId('revo-chart-weeks-close'));
-    tap('revo-chart-weeks-plot-tap', 39 + 10, 10);
+    await tap('revo-chart-weeks-plot-tap', 39 + 10, 10);
     expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
   });
 
@@ -472,7 +494,7 @@ describe('memorized by month', () => {
     expect(screen.getAllByTestId('revo-chart-month')).toHaveLength(12);
     // October is the 11th of 12 bars (December to November).
     layout('revo-chart-memorized-plot', 360, 120);
-    tap('revo-chart-memorized-plot-tap', 10.5 * 30);
+    await tap('revo-chart-memorized-plot-tap', 10.5 * 30);
     expect(text('revo-chart-memorized-title')).toBe('October · 4 pages');
     expect(text('revo-chart-memorized-line')).toBe("Al-Ma'idah 32–50");
     fireEvent.press(screen.getByTestId('revo-chart-memorized-day-2026-10-13'));
@@ -537,7 +559,7 @@ describe('Smart Tracking off (REVO-36)', () => {
       'revo-chart-juzMap',
     );
     layout('revo-chart-juzMap-plot', 370, 104);
-    tap('revo-chart-juzMap-plot-tap', 7.5 * 37, 90);
+    await tap('revo-chart-juzMap-plot-tap', 7.5 * 37, 90);
     expect(screen.getByText('Last revised 6 days ago · once in 30 days')).toBeTruthy();
     expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
   });
@@ -545,7 +567,7 @@ describe('Smart Tracking off (REVO-36)', () => {
   it('a day’s panel has no ratings strip', async () => {
     await mount(<DailyPagesChart title="Week" days={7} today={TODAY} logs={logs} smart={false} />, 'revo-chart-dailyPages');
     layout('revo-chart-dailyPages-plot', 350, 130);
-    tap('revo-chart-dailyPages-plot-tap', 20);
+    await tap('revo-chart-dailyPages-plot-tap', 20);
     expect(screen.getByTestId('revo-chart-dailyPages-passage')).toBeTruthy();
     expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
   });

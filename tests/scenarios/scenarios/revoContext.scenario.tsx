@@ -52,7 +52,7 @@ function homeSays(home: Home): { planned?: number; done?: number; doneAll?: numb
   const doneAll = /Done · (\d+) pages?/.exec(title);
   const detail = home.detail() ?? '';
   const pages = /^(\d+) pages?/.exec(detail);
-  const carried = /(\d+) from yesterday first/.exec(detail);
+  const carried = /(\d+) from (?:yesterday|Insights) first/.exec(detail);
   if (doneAll) return { doneAll: Number(doneAll[1]), carried: 0, isDone: true };
   if (progress && title.startsWith('Continue at')) return { done: Number(progress[1]), planned: Number(progress[2]), carried: 0, isDone: false };
   return { planned: pages ? Number(pages[1]) : undefined, done: 0, carried: carried ? Number(carried[1]) : 0, isDone: false };
@@ -348,7 +348,7 @@ it('[REVO-26] Add to today: the carried pages are in what Revo is told, as Home 
     expect(home.carryOver()).toBe('Add to today');
     await home.tap('today-carry-over');
     await app.until(() => home.carryOver() == null, 'the offer to go');
-    const carried = Number(/(\d+) from yesterday first/.exec(home.detail() ?? '')?.[1] ?? 0);
+    const carried = Number(/(\d+) from (?:yesterday|Insights) first/.exec(home.detail() ?? '')?.[1] ?? 0);
     expect(carried).toBeGreaterThan(0);
     const ctx = await askRevo(app, asks, 'What is today?');
     expect(ctx.today.carriedPages).toBe(carried);

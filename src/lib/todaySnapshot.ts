@@ -7,9 +7,10 @@ import type { RevisionLog, User, UserPage } from '../types';
 import { caughtUpOnDay, creditedOnDay, doneOnDay, needDoneCount } from './aheadCredit';
 import { handLogsOf, withPhoneSessions } from './activityHistory';
 import { carryOverOn } from './algorithm';
-import { duePagesOf } from './carryOver';
+import { duePagesOf, insightsPagesOn } from './carryOver';
 import { streakDetailFromLogs, type StreakDetail } from './streak';
 import { streakDetailFromItems, type HistoryItem } from './streakFromItems';
+import { revisablePages } from './memorizedAyahs';
 
 export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
@@ -33,6 +34,8 @@ export interface TodaySnapshot {
   status: TodayStatus;
   /** Carried pages still to revise. */
   carriedLeft: number;
+  /** How many of the carried pages Insights put there ("Revise these first tomorrow"); the rest are leftovers. */
+  carriedInsights: number;
   /** The streak, and the days behind it, as Home reads it. */
   streak: StreakDetail;
 }
@@ -77,12 +80,18 @@ export function todaySnapshot(input: {
 }): TodaySnapshot {
   const { user, pages, logs, day, assignment, history } = input;
   const list = [...new Set(assignment)];
-  const own = duePagesOf(list, user, day);
+  const own = duePagesOf(list, user, day, revisablePages(pages));
   const carried = carriedPagesOn(user, day, list);
+  const insights = insightsPagesOn(user, day);
   // Pages logged by hand for today count as its sessions' do (ACT-15), once each.
   const counted = history ? [...logs, ...handLogsOf(history)] : logs;
   const done = doneOnDay(counted, day);
-  const { status } = todayStatusOf(own, creditedOnDay(counted, day), caughtUpOnDay(counted, day));
+  // A day with none of its own pages (an off day given pages from Insights) is done once its pages are:
+  // Home said "N of N" and Continue revision for good (Nov 8 2026).
+  const status =
+    own.length === 0 && list.length > 0 && list.every((p) => done.has(p))
+      ? ('completed' as const)
+      : todayStatusOf(own, creditedOnDay(counted, day), caughtUpOnDay(counted, day)).status;
   // From the Activity items once they've loaded, with the phone's sessions over them; the logs until then.
   const streak = history
     ? streakDetailFromItems({ user, pages, items: withPhoneSessions(history, logs, input.now), today: day })
@@ -96,6 +105,7 @@ export function todaySnapshot(input: {
     pagesDone: list.filter((p) => done.has(p)).length,
     status,
     carriedLeft: carried.filter((p) => !done.has(p)).length,
+    carriedInsights: carried.filter((p) => insights.has(p)).length,
     streak,
   };
 }

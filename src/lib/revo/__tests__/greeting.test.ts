@@ -67,6 +67,21 @@ describe('Revo’s greeting (REVO-20)', () => {
   });
 });
 
+describe('a day with nothing left to revise (REVO-20)', () => {
+  it('[REVO-20] all 28 pages revised but the day not marked done: today is done, never "and  is next"', () => {
+    const c = ctx({ plannedPages: 28, revisedPages: 28, nextPages: [], done: false });
+    expect(said('Majd', c)).toBe('Salaam Majd. Today’s 28 pages are done. That’s a 12-day streak. Ask me anything about your revision.');
+    expect(greetingState(c)).toBe('done');
+    // Opened again: what's ahead, as on any done day.
+    expect(plainText(revoGreeting('Majd', c, 1))).not.toMatch(/is next|\s{2}/);
+  });
+
+  it('[REVO-20] nothing revised here but nothing left either (done earlier): done, never "starting at" nothing', () => {
+    const c = ctx({ plannedPages: 5, revisedPages: 0, doneEarlier: 5, nextPages: [], done: false });
+    expect(said(null, c)).toBe('Salaam. Today’s 5 pages are done. That’s a 12-day streak. Ask me anything about your revision.');
+  });
+});
+
 describe('Revo’s greeting opened again (REVO-35)', () => {
   const week = [
     { day: '2026-10-28', pages: 20, planned: 20, done: true },
@@ -93,7 +108,7 @@ describe('Revo’s greeting opened again (REVO-35)', () => {
     rec = nextOpens(rec, '2026-11-03', 'done');
     expect(rec.n).toBe(2);
     expect(nextOpens(rec, '2026-11-04', 'done').n).toBe(0);
-    expect(greetingState(ctx({ revisedPages: 6 }))).toBe('todo:6');
+    expect(greetingState(ctx({ revisedPages: 6, nextPages: [7, 8] }))).toBe('todo:6');
     expect(greetingState(doneCtx)).toBe('done');
     expect(greetingState(ctx({ plannedPages: 0 }))).toBe('none');
   });

@@ -3,10 +3,11 @@
 // each row opening its day. It says how many revisions had no time.
 
 import React, { useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { CHROME_MAX_SCALE, ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { formatPace } from '../../lib/insightsView';
 import { timedRevisions } from '../../lib/insightsTaps';
 import { spokenText } from '../../lib/passages';
@@ -45,6 +46,7 @@ export function PaceSheet({
   onOpenDay?: (day: string) => void;
 }) {
   const { palette } = useTheme();
+  const stacked = useWindowDimensions().fontScale >= STACK_AT_SCALE;
   const [width, setWidth] = useState(0);
   // A row's day opens once the sheet has gone.
   const thenDay = useRef<string | null>(null);
@@ -66,6 +68,7 @@ export function PaceSheet({
       onClose={onClose}
       title="Pace"
       message="Minutes a page, revising"
+      messageMaxScale={CHROME_MAX_SCALE}
       scroll
       onHidden={() => {
         const d = thenDay.current;
@@ -74,13 +77,15 @@ export function PaceSheet({
       }}
       testID="pace-sheet"
     >
-      <View style={styles.figure}>
-        <Text style={[styles.big, { color: palette.text }]}>{formatPace(perPage)}</Text>
-        <Text style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{`min a page ${inWords}`}</Text>
-        {change ? <Text style={[typeV2.name, { color: before != null && perPage < before ? palette.good : palette.text }]}>{change}</Text> : null}
+      <View style={[styles.figure, stacked && styles.figureWrap]} testID="pace-sheet-figure">
+        <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          {formatPace(perPage)}
+        </ChromeText>
+        <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{`min a page ${inWords}`}</ChromeText>
+        {change ? <ChromeText style={[typeV2.name, { color: before != null && perPage < before ? palette.good : palette.text }]}>{change}</ChromeText> : null}
       </View>
       {before != null && beforeWords ? (
-        <Text style={[typeV2.meta, styles.beforeLabel, { color: palette.secondary }]}>{`${formatPace(before)}, ${beforeWords}`}</Text>
+        <ChromeText style={[typeV2.meta, styles.beforeLabel, { color: palette.secondary }]}>{`${formatPace(before)}, ${beforeWords}`}</ChromeText>
       ) : null}
       <View style={styles.chart} onLayout={(e) => setWidth(e.nativeEvent.layout.width)} testID="pace-chart">
         {width > 0 ? (
@@ -94,13 +99,13 @@ export function PaceSheet({
         ) : null}
       </View>
       <View style={styles.ends}>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>{formatDayLong(startDay).split(' ').slice(1).join(' ')}</Text>
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>Today</Text>
+        <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{formatDayLong(startDay).split(' ').slice(1).join(' ')}</ChromeText>
+        <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>Today</ChromeText>
       </View>
 
-      <Text style={[typeV2.name, styles.listHead, { color: palette.secondary }]} accessibilityRole="header">
+      <ChromeText style={[typeV2.name, styles.listHead, { color: palette.secondary }]} accessibilityRole="header">
         {`${list.length} timed ${list.length === 1 ? 'revision' : 'revisions'}`}
-      </Text>
+      </ChromeText>
       {list.map((r, i) => (
         <Tap
           key={`${r.day}-${i}`}
@@ -116,23 +121,23 @@ export function PaceSheet({
           testID={`pace-row-${r.day}-${i}`}
         >
           <View style={styles.flex}>
-            <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <ChromeText style={[typeV2.name, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
               {r.label}
-            </Text>
-            <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+            </ChromeText>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
               {r.detail}
-            </Text>
+            </ChromeText>
           </View>
-          <Text style={[typeV2.name, styles.tabular, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+          <ChromeText style={[typeV2.name, styles.tabular, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
             {formatPace(r.perPage)}
-          </Text>
+          </ChromeText>
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
         </Tap>
       ))}
       {untimed > 0 ? (
-        <Text style={[typeV2.meta, styles.untimed, { color: palette.secondary }]} testID="pace-untimed">
+        <ChromeText style={[typeV2.meta, styles.untimed, { color: palette.secondary }]} testID="pace-untimed">
           {`${untimed} ${untimed === 1 ? 'revision' : 'revisions'} ${inWords} had no time, so ${untimed === 1 ? 'it isn’t' : 'they aren’t'} counted.`}
-        </Text>
+        </ChromeText>
       ) : null}
     </Sheet>
   );
@@ -141,6 +146,7 @@ export function PaceSheet({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingTop: 4 },
+  figureWrap: { flexWrap: 'wrap', rowGap: 4 },
   big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   beforeLabel: { textAlign: 'right', marginTop: 10 },
   chart: { height: CHART_HEIGHT, marginTop: 4 },
