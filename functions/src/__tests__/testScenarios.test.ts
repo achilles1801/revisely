@@ -274,6 +274,8 @@ describe('every scenario', () => {
         const memorized = new Set(plan.pages.map((p) => p.pageNumber));
         expect(memorized.size).toBeGreaterThan(0);
         expect(plan.user.onboardingComplete).toBe(true);
+        // NEW-1: a loaded scenario opens on Home, never on "What's new".
+        expect(plan.user.whatsNewSeen).toBe('all');
         expect(plan.user.totalMemorizedPages).toBe(memorized.size);
         // Nothing on a day that hasn't started; one session a day, keyed by its day.
         const ids = plan.sessions.map((s) => s.id);

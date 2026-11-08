@@ -1,4 +1,4 @@
-// Favorite translations (testers; TRANS-8): starred in the picker, listed under Selected in the
+// Favorite translations (TRANS-8): starred in the picker, listed under Selected in the
 // order starred, reordered or removed in Edit. Kept on the phone for each account
 // (@revisely_translation_favorites:v1:<uid>), not on the account: a synced field would need the user
 // document's allowlist and a rules deploy first.

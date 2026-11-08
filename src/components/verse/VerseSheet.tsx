@@ -57,8 +57,8 @@ interface VerseSheetProps {
   verse: AyahRef | null;
   translationId: string | undefined;
   onChangeTranslation: (id: string) => void;
-  /** A previewTester account: the picker offers every translation (lib/translation offeredTranslations). */
-  tester?: boolean;
+  /** The picker offers every translation (lib/translationsOffered: any account), else the short list. */
+  everyTranslation?: boolean;
   /** The account: the picker's favorites are kept on the phone for each. */
   accountId?: string;
   /** Reciter and style for Play ('<reciter>:<style>'). */
@@ -140,7 +140,7 @@ export function VerseSheet({
   verse,
   translationId,
   onChangeTranslation,
-  tester = false,
+  everyTranslation = false,
   accountId,
   reciter,
   onChangeReciter,
@@ -151,7 +151,7 @@ export function VerseSheet({
   const styles = useMemo(() => makeStylesV2(palette), [palette]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  // 'translations' is the short list; 'picker' the testers' picker of every translation.
+  // 'translations' is the short list; 'picker' the picker of every translation.
   const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'picker' | 'reciters'>('closed');
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
@@ -311,7 +311,7 @@ export function VerseSheet({
   const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
   const alternative =
     arabicHere && verse
-      ? fallbackTranslation(translation, verse.sura, offeredTranslations(tester), (t, sura) =>
+      ? fallbackTranslation(translation, verse.sura, offeredTranslations(everyTranslation), (t, sura) =>
           t.id === DEFAULT_TRANSLATION_ID ? hasSaheehSura(sura) : hasTranslationSura(t, sura),
         )
       : null;
@@ -432,10 +432,10 @@ export function VerseSheet({
               </GestureDetector>
 
               {menu === 'picker' && (
-                // Every translation, by language (testers, for now): over the verse, under the header.
+                // Every translation, by language: over the verse, under the header.
                 <View style={[styles.pickerPanel, { top: headerBottom, bottom: Math.max(insets.bottom, spacing.md) }]}>
                   <TranslationPicker
-                    translations={offeredTranslations(tester)}
+                    translations={offeredTranslations(everyTranslation)}
                     chosenId={translation.id}
                     accountId={accountId}
                     onChoose={(id) => {
@@ -454,7 +454,7 @@ export function VerseSheet({
                       <Tap
                         style={styles.dropRow}
                         onPress={() => {
-                          if (tester) {
+                          if (everyTranslation) {
                             setMenu('picker');
                             setExpanded(true);
                           } else {
@@ -793,7 +793,7 @@ const makeStylesV2 = (p: PaletteV2) =>
     // A right-to-left translation: laid out from the right, with room for its script's marks.
     rtlText: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 34 },
     rtlFootnote: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 26 },
-    // The testers' picker: fills the sheet under the header.
+    // The picker of every translation: fills the sheet under the header.
     pickerPanel: {
       position: 'absolute',
       left: layoutV2.gutter,

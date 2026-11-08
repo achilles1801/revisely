@@ -37,7 +37,7 @@ import { firstSurahOnPage, toAyahRef } from '../../lib/verses';
 import { ayahKey, ayahOf, ayahsBetween, suraOf } from '../../lib/ayahKeys';
 import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
-import { sittingSavedText } from '../../lib/sitting';
+import { sittingSavedText, sittingsEnabled } from '../../lib/sitting';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
@@ -80,9 +80,9 @@ export default function QuranReaderScreen() {
   const [savedRecording, setSavedRecording] = useState<{ day: string; recordingId: string } | null>(
     null,
   );
-  // A sitting (REC-1, testers): ending the timer ends a recording running with it, and one note
-  // says what was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
-  const sittings = user?.previewTester === true;
+  // A sitting (REC-1): ending the timer ends a recording running with it, and one note says what
+  // was saved ("Saved to today: Al-Mulk, ayahs 1–26, 41 min · View").
+  const sittings = sittingsEnabled(user);
   const endingSitting = useRef(false);
   const [sittingSaved, setSittingSaved] = useState<{ day: string; text: string } | null>(null);
   const recorder = useVoiceRecorder({

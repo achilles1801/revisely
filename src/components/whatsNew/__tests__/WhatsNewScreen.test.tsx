@@ -121,14 +121,27 @@ describe('<WhatsNewScreen />', () => {
     expect(mockMark).not.toHaveBeenCalled();
   });
 
-  it('[NEW-1] an account without the testers’ features sees only what is already everyone’s', async () => {
-    mockApp.user = { id: 'u1', previewTester: false };
-    await show('required');
-    // Revo is for testers until its switch says everyone; the last card keeps its offline row.
-    expect(title()).toBe('Also new');
-    expect(screen.getByTestId('whats-new-row-offline')).toBeTruthy();
-    expect(screen.queryByTestId('whats-new-row-help')).toBeNull();
-    expect(screen.getByTestId('whats-new-done')).toBeTruthy();
+  it('[NEW-1] an account that isn’t a tester sees every card, Revo’s only once its switch says everyone', async () => {
+    for (const user of [{ id: 'u1' }, { id: 'u1', previewTester: false }]) {
+      mockApp.user = user;
+      const view = await show('required');
+      // Revo's switch unread here: testers only (lib/revo/release), so its card waits.
+      const shown = CURRENT_RELEASE.cards.filter((c) => c.needs !== 'revo').map((c) => c.title);
+      expect(title()).toBe(shown[0]);
+      expect(screen.getByTestId('whats-new-title').props.accessibilityLabel).toBe(`Step 1 of ${shown.length}. ${shown[0]}`);
+      for (let i = 1; i < shown.length; i++) {
+        await next();
+        expect(title()).toBe(shown[i]);
+      }
+      // The last card has every row: help and every translation are everyone's.
+      for (const row of CURRENT_RELEASE.cards[CURRENT_RELEASE.cards.length - 1].rows ?? []) {
+        expect(screen.getByTestId(`whats-new-row-${row.id}`)).toBeTruthy();
+      }
+      expect(screen.getByTestId('whats-new-done')).toBeTruthy();
+      view.unmount();
+      await AsyncStorage.clear();
+      resetWhatsNewForTests();
+    }
   });
 
   it('[NEW-2] Revo’s card plays full screen: Skip takes it to its end, and Later goes on', async () => {

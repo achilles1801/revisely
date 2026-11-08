@@ -32,6 +32,7 @@ import { queueChange } from '../lib/offline/queue';
 import { autoId } from '../lib/offline/apply';
 import { alertSessionSaved } from '../components/timer/sessionSavedAlert';
 import { logger } from '../lib/logger';
+import { sittingsEnabled } from '../lib/sitting';
 import { setBusy } from '../lib/updates/busy';
 import { REMINDER_CHANNEL_ID } from '../lib/notificationChannels';
 import { ReadingTimerMode } from '../types';
@@ -91,8 +92,8 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     else AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
   }, []);
 
-  // A sitting in the reader is saved with the pages it held (REC-2, testers).
-  const holdPages = user?.previewTester === true;
+  // A sitting in the reader is saved with the pages it held (REC-2).
+  const holdPages = sittingsEnabled(user);
   const save = useCallback(async (t: ActiveReadingTimer, now: number) => {
     const session = readingSessionFromTimer(t, now, { pagesHeld: holdPages });
     const { durationSeconds } = session;

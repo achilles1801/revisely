@@ -168,11 +168,18 @@ describe('the cards an account sees', () => {
     expect(noRevo.map((c) => c.id)).not.toContain('revo');
   });
 
-  it('a tester has every card today; an App Store account has only what is already everyone’s', () => {
+  it('a tester has every card; so does an account that isn’t one, with only Revo’s waiting on its own switch', () => {
     const tester = { previewTester: true };
     expect(cardsFor(CURRENT_RELEASE, (n) => needOpen(n, tester, 'testers'))).toHaveLength(CURRENT_RELEASE.cards.length);
-    const everyone = { previewTester: false };
-    for (const need of needsOf(CURRENT_RELEASE)) expect(typeof needOpen(need, everyone, 'everyone')).toBe('boolean');
+    // previewTester unset and false: an App Store account.
+    for (const account of [{}, { previewTester: false }]) {
+      const all = cardsFor(CURRENT_RELEASE, (n) => needOpen(n, account, 'everyone'));
+      expect(all.map((c) => c.id)).toEqual(CURRENT_RELEASE.cards.map((c) => c.id));
+      expect(all.find((c) => c.rows)?.rows?.map((r) => r.id)).toEqual(CURRENT_RELEASE.cards.find((c) => c.rows)?.rows?.map((r) => r.id));
+      // Revo still for testers (config/app.revo unset): every card but Revo's.
+      const revoForTesters = cardsFor(CURRENT_RELEASE, (n) => needOpen(n, account, 'testers')).map((c) => c.id);
+      expect(revoForTesters).toEqual(CURRENT_RELEASE.cards.filter((c) => c.needs !== 'revo').map((c) => c.id));
+    }
   });
 
   it('a release switched on needs nothing that is still for testers only', () => {

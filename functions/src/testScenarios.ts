@@ -725,6 +725,9 @@ class Builder {
     }
     Object.assign(this.user, {
       onboardingComplete: true,
+      // Every "What's new" seen (the app's SEEN_ALL, src/lib/help/whatsNew): a loaded scenario opens on
+      // Home, not on a walkthrough. Testers replay it from Settings → About or Settings → Testing.
+      whatsNewSeen: 'all',
       totalMemorizedPages: pages.length,
       totalLearningPages: 0,
       totalSessionsCompleted: done.length,

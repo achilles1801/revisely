@@ -1,12 +1,16 @@
 // Which features a "What's new" card may describe to an account: each feature's own gate, so a card
 // shows only to accounts that have what it describes, and drops by itself while that is still for
 // testers. A live release may not need a feature that is still testers only (whatsNew.test.ts).
+// Since the November 2026 release every gate here is open to every account except Revo's, which
+// follows its own release switch (config/app.revo, lib/revo/release).
 
 import { useCallback } from 'react';
 import type { User } from '../../types';
 import type { WhatsNewNeed } from '../../lib/help/whatsNew';
 import { activityBlocksEnabled } from '../../lib/activityBlocks';
 import { helpAvailable } from '../../lib/help/availability';
+import { sittingsEnabled } from '../../lib/sitting';
+import { everyTranslationOffered } from '../../lib/translationsOffered';
 import { revoAvailable } from '../../lib/revo/availability';
 import { useRevoRelease, type RevoRelease } from '../../lib/revo/release';
 
@@ -17,15 +21,16 @@ export function needOpen(need: WhatsNewNeed, user: Who, revo: RevoRelease): bool
     case 'activity':
       return activityBlocksEnabled(user);
     case 'sittings':
-      // QuranReaderScreen's `sittings` (REC-1) and the Day's Add to memorized (MEM-5): testers.
-      return user?.previewTester === true;
+      // The reader's sittings (REC-1, REC-2) and the schedule editor's "Not in your plan" (MEM-6); the
+      // Day's Add to memorized (MEM-5) comes with the Activity blocks.
+      return sittingsEnabled(user) && activityBlocksEnabled(user);
     case 'revo':
       return revoAvailable(user, revo);
     case 'help':
       return helpAvailable(user);
     case 'translations':
-      // The verse sheet offers every translation to testers (offeredTranslations, TRANS-5).
-      return user?.previewTester === true;
+      // The verse sheet's picker of every translation (TRANS-5).
+      return everyTranslationOffered(user);
   }
 }
 

@@ -12,6 +12,7 @@ import {
 import * as firestoreService from '../services/firestoreService';
 import { updateAuthDisplayName } from '../lib/firebase';
 import { generateId } from '../lib/utils';
+import { activityBlocksEnabled } from '../lib/activityBlocks';
 import { recomputePagesFromLogs, type HandAddedRevision } from '../lib/algorithm';
 import {
   customPlanFromFirestore,
@@ -765,9 +766,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const viewUser = view?.user ?? null;
   const user = useMemo(() => (viewUser ? firestoreUserToLocal(viewUser) : null), [viewUser]);
-  // Testers can log pages revised elsewhere (Activity's +); the self-heal counts them (ACT-16).
-  const testerRef = useRef(false);
-  testerRef.current = user?.previewTester === true;
+  // Accounts with the Activity blocks can log pages revised elsewhere (Activity's +); the self-heal
+  // counts them (ACT-16).
+  const handLogRef = useRef(false);
+  handLogRef.current = activityBlocksEnabled(user);
   const viewPages = view?.pages;
   const pages = useMemo(() => (viewPages ?? []).map(firestorePageToLocal), [viewPages]);
   const viewSessions = view?.sessions;
@@ -885,14 +887,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const syncPagesFromLogs = useCallback(
     async (currentPages: UserPage[], freshLogs: RevisionLog[]) => {
       if (currentPages.length === 0) return;
-      // A tester's pages logged by hand (Activity's + → Revised elsewhere) are revisions too (ACT-16):
+      // Pages logged by hand (Activity's + → Revised elsewhere) are revisions too (ACT-16):
       // read from the server, with those still waiting here (and without those deleted here). Left out,
       // every launch set their last revised day back. If they can't be read (offline), nothing is
       // re-derived this time.
       let hand: HandAddedRevision[] = [];
       let base = currentPages;
       const forUid = uidRef.current;
-      if (testerRef.current && forUid) {
+      if (handLogRef.current && forUid) {
         try {
           const server = await firestoreService.getManualRevisionItems(forUid);
           const waiting = pendingEntries(forUid);

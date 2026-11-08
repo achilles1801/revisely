@@ -252,17 +252,17 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## The reader
 
-- **REC-1.** A sitting in the reader (testers): ending the timer while a recording runs, or is paused,
+- **REC-1.** A sitting in the reader: ending the timer while a recording runs, or is paused,
   ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
   surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
   place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
   it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
   named. Stopping only the recording leaves the timer running.
-- **REC-2.** A sitting in the reader (testers) is saved with the pages it held, so the Day's Read block
+- **REC-2.** A sitting in the reader is saved with the pages it held, so the Day's Read block
   counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
   Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
   pages known reads "Timed in Read".
-- **REC-3.** On today or yesterday in Activity (testers), a sitting from the reader with nothing left to
+- **REC-3.** On today or yesterday in Activity, a sitting from the reader with nothing left to
   memorize on its pages, that held pages of the day's revision not revised yet, offers Add to revised:
   "At-Taghabun is the 2 pages left of today's revision" ("… is 2 of the 4 pages left …" when it held
   some of them). Add logs exactly those pages for that day by hand, as Revised elsewhere does: they show
@@ -306,12 +306,12 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **TRANS-4.** A QuranEnc translation stays at QuranEnc's latest version. Its list is read at most once a
   day, and one request answers for every translation. A sura kept from an older version is fetched again
   when it is read, and shows with its own version until then.
-- **TRANS-5.** Testers choose from every translation in QuranEnc's list (76, in 56 languages, Nov 2026).
+- **TRANS-5.** Every account chooses from every translation in QuranEnc's list (76, in 56 languages, Nov 2026).
   The picker lists Selected (the one in use), Favorites, Downloaded, then each language by its English
   name with its own name beside it, each translation once. A search over every group finds a language,
-  in English or its own name (accents aside), or a translator. Everyone else chooses Saheeh
-  International or The Clear Quran®, as before.
-- **TRANS-6.** A tester can download a whole QuranEnc translation from the picker, on any connection:
+  in English or its own name (accents aside), or a translator. (Testers only until the November 2026
+  release, when everyone else had Saheeh International and The Clear Quran®.)
+- **TRANS-6.** A whole QuranEnc translation can be downloaded from the picker, on any connection:
   its size shows before ("1.2 MB"), its progress while it downloads ("Downloading… 40%"), and it can be
   stopped, carrying on later from where it stopped. Once every sura is on the phone it reads "On this
   phone" and is listed under Downloaded; Remove, after a confirmation, deletes it. A download that fails
@@ -320,7 +320,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   downloaded"; The Clear Quran® "needs the internet") and offers a translation of that sura that is on
   the phone: one in the same language first, then Saheeh International, then any other. A verse whose
   Arabic isn't on the phone either says it shows once back online. Back online, it loads by itself.
-- **TRANS-8.** A tester stars translations to keep them under Favorites, below Selected, in the order
+- **TRANS-8.** Starred translations are kept under Favorites, below Selected, in the order they were
   starred. Edit moves a favorite up or down or takes its star away, and deletes downloads (after a
   confirmation). Favorites are kept on the phone for each account.
 
@@ -334,11 +334,11 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   2026: memorized items used to have no Fajr shift; Majd chose one day rule for all of Activity.)
 - **ACT-2.** A day's Revised block is built from its revision items: one per day, with the pages revised
   ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
-  under the Revised block. Shown to preview testers while the Activity blocks are built.
+  under the Revised block. Every account's since the November 2026 release (testers' before).
 
 - **ACT-3.** The calendar's day shows the share of the day's assigned pages revised (a ring), and a dot for a
-  memorized item, a read item and a note on that day. A month steps with ‹ ›. Shown to preview testers while
-  the Activity blocks are built.
+  memorized item, a read item and a note on that day. A month steps with ‹ ›. Every account's since the
+  November 2026 release (testers' before).
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within the range
   (ACT-22; a longer range never covers less, and it never shows 100% while a page is left); consistency is the days with a revision or a read; pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
@@ -396,14 +396,13 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-11.** A log note tagged to one of the day's items shows under that item in Activity: a Revised,
   Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
   While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
-- **ACT-12.** Insights live in Activity (Calendar | Insights) for accounts with the new Activity (preview testers
-  while its blocks are built): their tab bar is Home and Read, with or without Smart Tracking, and there is no
-  Insights tab to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
+- **ACT-12.** Insights live in Activity (Calendar | Insights), for every account since the November 2026 release
+  (testers' before): the tab bar is Home and Read, with or without Smart Tracking, and there is no Insights tab
+  to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
   no "See all"): one line stands in its place, "Turn on Smart Tracking to see your weak spots ›" (a link, not a
   guide), which opens Settings at Revision, where its switch is; once it is on, Weak spots shows. With it, Weak
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
-  juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
-  2026; the line, Nov 7.)
+  juz and by strength (the Insights tab's Browse). (Majd, Nov 6 2026; the line, Nov 7.)
 - **ACT-13.** What the day's + adds (pages revised elsewhere, Memorized, a note) shows on
   that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
   changes still waiting on the phone over what it read. Once the server has them, the day shows the
@@ -707,7 +706,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   guide with it.
 
 - **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
-  pages, Activity (testers' Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
+  pages, Activity (Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
   times, the Qibla, or the reader at a surah or a juz. The server drops any other screen, section, surah or juz (the
   answer kept, as with a page Revo wasn't given). An answer that suggests nothing but names one of those screens the way
   the app does ("Edit schedule", "Settings → Appearance", "Jump to…") gets that screen's card from the server, the
@@ -820,7 +819,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   short surah, or a surah's end that shares its page, is revised before the rest of the page is learned.
   Home, the widget and Revo name it by its memorized ayahs: with only An-Nas memorized on the Qur'an's
   last page, the day "Starts at An-Nas", not Al-Ikhlas.
-- **MEM-5.** On a day in Activity (testers), a sitting from the reader whose pages aren't all memorized
+- **MEM-5.** On a day in Activity, a sitting from the reader whose pages aren't all memorized
   offers Add to memorized. The Memorized sheet opens on Ayahs, From and To never outside the pages the
   sitting held. From starts at the first ayah not yet memorized there, To at the end of those pages, and
   the sitting's minutes come with it. Whole pages and Surah are its other tabs; Whole pages keeps to the
@@ -833,13 +832,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
     add new pages by itself, it offers Add to your plan: tomorrow's day of it with the pages added after
     its own (it opened with them alone, and saving replaced the day).
 
-- **MEM-6.** The schedule editor (testers) lists, under "Not in your plan", the memorized and partly
+- **MEM-6.** The schedule editor lists, under "Not in your plan", the memorized and partly
   memorized pages a custom plan doesn't hold, named by their ayahs. A custom plan never adds new pages by
   itself. Add offers "With tomorrow's pages" (they join tomorrow's day) or "As a day of its own,
   tomorrow" (the cycle grows by a day). Either is an edit to Save, and the list leaves at once. The
   automatic schedule holds every memorized page, so it has no such list.
 
-- **MEM-7.** The juz sheet shows a juz being learned (testers' Activity). A page memorized in part is
+- **MEM-7.** The juz sheet shows a juz being learned (Activity). A page memorized in part is
   filled by the share of it that is memorized ("Part of a page" in the legend). A surah with ayahs
   memorized on such a page reads what is memorized and what is to go ("Ayahs 1–20 · 21–30 to go"),
   and opens the reader where it goes on. The sheet says what is learned so far ("Al-Mulk 1–20 so far"):
@@ -849,7 +848,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 ## Help
 
-- **HELP-1.** Screens that need explaining have a ? (testers, for now). Home's sits at the right of the Today
+- **HELP-1.** Screens that need explaining have a ?. Home's sits at the right of the Today
   post's header; the schedule editor's before Save; the reader's is a round button at the right of its
   header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full);
   Activity's is in its top bar before search, and explains the tab on show (Overview or Insights); a
@@ -867,7 +866,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **HELP-4.** The ? buttons are on by default: an account that has help sees them on every phone where
   its user hasn't hidden them, new or existing, with nothing stored. Only the user takes them away, with
   "Hide help buttons" or Settings → Support → Help buttons (HELP-2); a setting that can't be read leaves
-  them on. Help is for testers until the release that brings it, then for every account. (Majd, Nov 8
+  them on. Help is every account's since the November 2026 release (testers' before). (Majd, Nov 8
   2026: "the helper icons should be on by default for ex a new user account unless a user turns them
   off manually".)
 

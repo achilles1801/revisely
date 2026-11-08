@@ -1,8 +1,8 @@
-// The tabs, from the account. Accounts on the new Activity (components/activity/DayBlocks'
-// activityBlocksEnabled: preview testers while it is built) have Insights in Activity
+// The tabs, from the account. Accounts on the new Activity (lib/activityBlocks' activityBlocksEnabled:
+// every account since the November 2026 release, testers before) have Insights in Activity
 // (Calendar | Insights), so their tab bar is Home and Read, with or without Smart Tracking: the
-// Insights tab isn't a route at all (ACT-12; Majd, Nov 6 2026). Everyone else keeps the Insights
-// tab as before.
+// Insights tab isn't a route at all (ACT-12; Majd, Nov 6 2026). The Insights tab is what an account
+// without them had, and would have again if the blocks were gated.
 
 /**
  * How many tabs, from the first, are in the pager: Home and Read, and Insights

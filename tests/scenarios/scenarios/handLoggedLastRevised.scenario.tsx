@@ -6,7 +6,6 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { markPreviewTester } from '../harness/admin';
 import { ActivityDayView, Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
 import { getServerDoc } from '../harness/serverDocs';
@@ -36,7 +35,7 @@ it('[ACT-16] pages 9–10 logged as revised elsewhere on Tuesday: revised that d
   const uid = first.uid;
   await first.untilSynced();
   await first.close();
-  await markPreviewTester(uid);
+  // An App Store account, not a tester: this is everyone's since the November 2026 release.
 
   // Monday's session, so there are sessions to re-derive the pages from.
   setNow('2026-11-02 20:00');

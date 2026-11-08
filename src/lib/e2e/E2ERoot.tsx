@@ -63,7 +63,7 @@ function Status() {
 
 /**
  * The verse sheet a link asked for (demoTranslations: revisely://e2e/verse?ref=…&t=…), over the app,
- * as a tester's: the real sheet and picker, with providers of its own (this root is outside the
+ * as any account's: the real sheet and picker, with providers of its own (this root is outside the
  * app's). Loaded only when asked for, so the sheet's modules don't load before Firebase starts.
  */
 function VerseOverlay() {
@@ -100,7 +100,7 @@ function VerseOverlay() {
           <VerseSheet
             verse={verse}
             translationId={translationId}
-            tester
+            everyTranslation
             accountId="e2e-verse"
             onChangeTranslation={setTranslationId}
             reciter={undefined}
