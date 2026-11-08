@@ -4,7 +4,7 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,9 +28,12 @@ import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
 type SheetAction = ContextMenuAction;
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
-import { joinedSince, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { joinedSince, keepTaken, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { onApplied } from '../../lib/offline/sync';
+import type { OutboxEntry } from '../../lib/offline/ops';
 import { pendingEntries } from '../../lib/offline/outbox';
-import { currentAccount } from '../../lib/offline/queue';
+import { currentAccount, queueChange } from '../../lib/offline/queue';
+import { isManualRevisionId } from '../../lib/manualRevision';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -109,7 +112,7 @@ export function DayBlocks({
   onOpenRecording,
   onDeleteReading,
 }: Props) {
-  const { pages, user } = useApp();
+  const { pages, user, refreshPageStates } = useApp();
   const { palette } = useTheme();
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
@@ -137,6 +140,15 @@ export function DayBlocks({
   // The server's last answer for this day, under the changes still waiting, and those changes' ids.
   const served = useRef<{ day: string; items: DayItems } | null>(null);
   const waiting = useRef<Set<string>>(new Set());
+  // Changes to this day the server has taken while it shows: laid over every answer, so a read that
+  // comes back without one never hides it (lib/offline/dayItems keepTaken).
+  const taken = useRef<{ day: string; entries: OutboxEntry[] }>({ day, entries: [] });
+  useEffect(() => {
+    taken.current = { day, entries: [] };
+    return onApplied((uid, entry) => {
+      if (uid === currentAccount()) keepTaken(taken.current.entries, entry, day);
+    });
+  }, [day]);
   const load = useCallback(() => {
     const n = ++loads.current;
     // What the server has, with the changes still waiting on this phone laid over it (ACT-13): an
@@ -145,7 +157,8 @@ export function DayBlocks({
     const pending = uid ? pendingEntries(uid) : [];
     const withPending = (items: DayItems) => {
       const now = currentAccount();
-      return now ? overlayDayItems(items, pendingEntries(now), day, now) : items;
+      const kept = taken.current.day === day ? taken.current.entries : [];
+      return now ? overlayDayItems(items, [...kept, ...pendingEntries(now)], day, now) : items;
     };
     // At once, from the last answer, when a change has just joined: an add shows without waiting for
     // the read below. (One that left is in what's shown already.)
@@ -246,23 +259,42 @@ export function DayBlocks({
 
   const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0 || taggedTo('revision').length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0 || taggedTo('memorization').length > 0;
-  // The block headers' menus: Revised (its session), Memorized (each entry), Read (each timed session).
-  const revisedMenu = revisedLog
-    ? headerMenu('Revised', [
-        {
-          key: 'delete',
-          label: 'Delete this session',
-          icon: 'trash-outline' as const,
-          destructive: true,
-          onPress: () =>
-            confirmDelete(
-              'Delete this session?',
-              `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
-              () => onDeleteRevised(revisedLog),
-            ),
-        },
-      ])
-    : {};
+  // The block headers' menus: Revised (its session, and each entry added by hand), Memorized (each
+  // entry), Read (each timed session). Every item can be deleted, confirmed first (ACT-6, ACT-7): an
+  // entry added by hand had no way out before (Nov 2026).
+  const sessionRevised = revisedLog ? new Set(revisedLog.pagesRevised).size : 0;
+  const handAdded = (items?.revisions ?? []).filter((r) => r.day === day && r.countsFor === day && isManualRevisionId(r.id) && r.pages.length > 0);
+  const revisedMenu = headerMenu('Revised', [
+    ...(revisedLog
+      ? [
+          {
+            key: 'delete',
+            label: 'Delete this session',
+            icon: 'trash-outline' as const,
+            destructive: true,
+            onPress: () =>
+              confirmDelete(
+                'Delete this session?',
+                `Its ${sessionRevised} revised ${sessionRevised === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
+                () => onDeleteRevised(revisedLog),
+              ),
+          },
+        ]
+      : []),
+    ...handAdded.map((a) => ({
+      key: `delete-${a.id}`,
+      label: `Delete ${describePassage(a.pages, { form: 'short' })}, added by hand`,
+      icon: 'trash-outline' as const,
+      destructive: true,
+      onPress: () =>
+        confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
+          queueChange({ kind: 'revision.delete', day, id: a.id })
+            // The pages' last revised day and count go back without it (ACT-16).
+            .then(() => refreshPageStates?.())
+            .catch((err) => logger.warn('Could not delete pages added by hand', err));
+        }),
+    })),
+  ]);
   const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
   const noteItem = (n: JournalNote) => (
@@ -347,6 +379,9 @@ export function DayBlocks({
   // A day that is over with pages left says how many, in the surahs' place (mock d2: "Juz 27 · 9 min ·
   // 14 not revised"); today, the strip shows what is left.
   const revisedSet = new Set(revised.revised);
+  // "18 of 20": of the pages assigned, those revised. A page added by hand that wasn't assigned shows in
+  // the counts below, not in this figure (it read "22 of 20", Nov 2026).
+  const assignedDone = revised.assigned.filter((p) => revisedSet.has(p)).length;
   const left = day < today ? new Set(revised.assigned.filter((p) => !revisedSet.has(p))).size : 0;
   const revisedSubline =
     left > 0
@@ -359,12 +394,12 @@ export function DayBlocks({
         <DayBlock
           mark={
             <RevisedMark
-              fraction={revised.assigned.length > 0 ? revised.revised.length / revised.assigned.length : 0}
-              done={revised.assigned.length > 0 && revised.revised.length >= revised.assigned.length}
+              fraction={revised.assigned.length > 0 ? assignedDone / revised.assigned.length : 0}
+              done={revised.assigned.length > 0 && assignedDone >= revised.assigned.length}
             />
           }
           title="Revised"
-          figure={revised.assigned.length > 0 ? `${revised.revised.length} of ${revised.assigned.length}` : undefined}
+          figure={revised.assigned.length > 0 ? `${assignedDone} of ${revised.assigned.length}` : undefined}
           subline={revisedSubline}
           summary={
             revised.assigned.length > 0 ? (

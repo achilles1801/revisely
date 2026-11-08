@@ -43,12 +43,22 @@ export class AddToDay {
     await this.app.until(() => this.app.screen.queryByTestId(`add-${row}-sheet`) == null, `the ${row} sheet to close`);
   }
 
-  /** + → Revised → pages `from` to `to` → Add. */
-  async revised(from: number, to: number): Promise<void> {
+  /** The pages Revised elsewhere offers (each a ticked row), in order. */
+  offered(): number[] {
+    return this.app.screen
+      .queryAllByTestId(/^add-revised-page-\d+$/)
+      .map((el) => Number(String(el.props.testID).replace('add-revised-page-', '')));
+  }
+
+  /** + → Revised elsewhere → untick every offered page not in `keep` (all kept when omitted) → Add. */
+  async revisedElsewhere(keep?: number[]): Promise<void> {
     await this.open();
     await this.choose('revised');
-    await this.type('add-revised-from', String(from));
-    await this.type('add-revised-to', String(to));
+    // The day's items load as the sheet opens (useDayItems): pages already revised leave the list.
+    await this.app.idle(400);
+    if (keep) {
+      for (const p of this.offered()) if (!keep.includes(p)) await this.press(`add-revised-page-${p}`);
+    }
     await this.add('revised');
   }
 
@@ -67,11 +77,6 @@ export class AddToDay {
     await this.choose('note');
     await this.type('add-note-text', text);
     await this.add('note');
-  }
-
-  /** The day's text, flattened (blocks, figures, notes). */
-  text(): string {
-    return JSON.stringify(this.app.screen.toJSON());
   }
 }
 

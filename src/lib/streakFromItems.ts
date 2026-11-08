@@ -42,6 +42,9 @@ export function graceEndMs(day: string, user?: User | null): number {
   return dayEndMs(nextIsoDay(day), user);
 }
 
+/** Pages added by hand (Activity's +, lib/manualRevision): their ids start "manual-". */
+const isManualItem = (item: HistoryItem) => item.id?.startsWith('manual-') === true;
+
 export function streakReadingFromItems(input: {
   user: User;
   pages: readonly UserPage[];
@@ -74,7 +77,10 @@ export function streakDetailFromItems(input: {
   };
   for (const item of input.items) {
     const day = item.countsFor;
-    if (item.day === day) own.set(day, item);
+    // A day's own item is its session's, which holds what was scheduled. Pages added by hand carry no
+    // assignment: as the day's own item they read as "nothing scheduled", which never counts, so a
+    // missed day caught up by hand stayed missed (ACT-15, Nov 2026). They are credits, below.
+    if (item.day === day && !isManualItem(item)) own.set(day, item);
     add(credited, day, item.pages);
     if (item.occurredAt != null && item.occurredAt < graceEndMs(day, input.user)) add(onTime, day, item.pages);
     if (day < item.day) {

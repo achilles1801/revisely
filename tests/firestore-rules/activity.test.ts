@@ -173,6 +173,14 @@ describe('users/{userId}/revisions|memorizations|reads/{id} (Activity items)', (
       );
     });
 
+    it('owner can save the ayahs an item added (MEM-2), up to 2,000', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      const ref = doc(alice, `users/${ALICE}/memorizations/mem-1`);
+      await assertSucceeds(setDoc(ref, memorization('mem-1', { pages: [562, 563], verses: [67001, 67002, 67020] })));
+      await assertFails(setDoc(ref, memorization('mem-1', { verses: Array.from({ length: 2001 }, (_, i) => 2001 + i) })));
+      await assertFails(setDoc(ref, memorization('mem-1', { verses: { 67: [1, 20] } })));
+    });
+
     it('rejects a memorization without minutes', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       const withoutMinutes: Record<string, unknown> = memorization();

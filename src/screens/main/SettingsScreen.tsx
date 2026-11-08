@@ -467,6 +467,23 @@ export default function SettingsScreen() {
     );
   };
 
+  // Delete account always ends (ACCOUNT-3): deleted, or an error with Try again.
+  const runDeleteAccount = async () => {
+    try {
+      await deleteAccount();
+      Alert.alert('Account deleted', 'Your account and data have been removed.');
+    } catch (err: any) {
+      Alert.alert(
+        'Could not delete account',
+        err?.message ?? 'Please try again. If the issue persists, contact support.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Try again', style: 'destructive', onPress: () => void runDeleteAccount() },
+        ],
+      );
+    }
+  };
+
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
@@ -483,21 +500,7 @@ export default function SettingsScreen() {
               'Your account, revision history and backed-up recordings will be deleted. There is no recovery.',
               [
                 { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'I understand, delete',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await deleteAccount();
-                      Alert.alert('Account deleted', 'Your account and data have been removed.');
-                    } catch (err: any) {
-                      Alert.alert(
-                        'Could not delete account',
-                        err?.message ?? 'Please try again. If the issue persists, contact support.',
-                      );
-                    }
-                  },
-                },
+                { text: 'I understand, delete', style: 'destructive', onPress: () => void runDeleteAccount() },
               ],
             );
           },

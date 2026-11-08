@@ -97,7 +97,7 @@ describe('the scripts that ask the real model still build their requests', () =>
   // A change to the request (Nov 7: `attach` became `attached`) broke all three without a test failing.
   const lib = join(__dirname, '..', '..', 'lib', 'revo', 'prompt.js');
   // The tone script compares with an older prompt from git; CI's checkout is shallow, so it compares with HEAD here.
-  it.each([['revo-guide-samples.js'], ['record-anthropic.js'], ['revo-tone-samples.js', '--before', 'HEAD']])('%s --dry', (script, ...args) => {
+  it.each([['revo-guide-samples.js'], ['record-anthropic.js'], ['revo-tone-samples.js', '--before', 'HEAD'], ['revo-chart-samples.js']])('%s --dry', (script, ...args) => {
     if (!existsSync(lib)) throw new Error('Build the functions first: npm run build');
     execFileSync(process.execPath, [join(__dirname, '..', '..', 'scripts', script), '--dry', ...args], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, ANTHROPIC_API_KEY: '' } });
   });

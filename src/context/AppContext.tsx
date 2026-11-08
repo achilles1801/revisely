@@ -12,7 +12,7 @@ import {
 import * as firestoreService from '../services/firestoreService';
 import { updateAuthDisplayName } from '../lib/firebase';
 import { generateId } from '../lib/utils';
-import { recomputePagesFromLogs } from '../lib/algorithm';
+import { recomputePagesFromLogs, type HandAddedRevision } from '../lib/algorithm';
 import {
   customPlanFromFirestore,
   customPlanToFirestore,
@@ -142,6 +142,8 @@ interface AppState {
 
 interface AppContextType extends AppState {
   loadData: () => Promise<void>;
+  /** Re-derives each page's revision state from the sessions and pages logged by hand (ACT-16), and saves what changed. */
+  refreshPageStates: () => Promise<void>;
   /** Try the server again now (the "Connect to the internet" screen). */
   retryConnection: () => void;
   saveUser: (user: User) => Promise<void>;
@@ -752,6 +754,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const viewUser = view?.user ?? null;
   const user = useMemo(() => (viewUser ? firestoreUserToLocal(viewUser) : null), [viewUser]);
+  // Testers can log pages revised elsewhere (Activity's +); the self-heal counts them (ACT-16).
+  const testerRef = useRef(false);
+  testerRef.current = user?.previewTester === true;
   const viewPages = view?.pages;
   const pages = useMemo(() => (viewPages ?? []).map(firestorePageToLocal), [viewPages]);
   const viewSessions = view?.sessions;
@@ -869,10 +874,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const syncPagesFromLogs = useCallback(
     async (currentPages: UserPage[], freshLogs: RevisionLog[]) => {
       if (currentPages.length === 0) return;
-      const next = recomputePagesFromLogs(currentPages, freshLogs);
+      // A tester's pages logged by hand (Activity's + → Revised elsewhere) are revisions too (ACT-16):
+      // read from the server, with those still waiting here (and without those deleted here). Left out,
+      // every launch set their last revised day back. If they can't be read (offline), nothing is
+      // re-derived this time.
+      let hand: HandAddedRevision[] = [];
+      let base = currentPages;
+      const forUid = uidRef.current;
+      if (testerRef.current && forUid) {
+        try {
+          const server = await firestoreService.getManualRevisionItems(forUid);
+          const waiting = pendingEntries(forUid);
+          const deleted = new Set(waiting.flatMap((e) => (e.op.kind === 'revision.delete' ? [e.op.id] : [])));
+          const seen = new Set(server.map((h) => h.id));
+          const added = waiting.flatMap((e) =>
+            e.op.kind === 'revision.add' && !seen.has(e.op.item.id) ? [{ id: e.op.item.id, day: e.op.item.day, pages: e.op.item.pages }] : [],
+          );
+          hand = [...server, ...added].filter((h) => !deleted.has(h.id));
+        } catch (err) {
+          logger.warn('Self-heal skipped: pages logged by hand could not be read', err);
+          return;
+        }
+        if (uidRef.current !== forUid) return;
+        if (pagesRef.current.length > 0) base = pagesRef.current;
+      }
+      const next = recomputePagesFromLogs(base, freshLogs, hand);
       const changed = next
         .filter((p) => {
-          const old = currentPages.find((c) => c.pageNumber === p.pageNumber);
+          const old = base.find((c) => c.pageNumber === p.pageNumber);
           if (!old) return false;
           return (
             // The logs give a day ("2026-10-27"); the page holds a time (that
@@ -914,6 +943,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ============================================================================
   // LOAD DATA (pull to refresh)
   // ============================================================================
+
+  // After a log made by hand (Activity's +, ACT-16): only the re-derive, on the server's data with the
+  // changes waiting on top. Unlike loadData it restarts nothing and sends nothing.
+  const refreshPageStates = useCallback(async () => {
+    const forUid = uidRef.current;
+    const b = baseRef.current;
+    if (!forUid || !b || b.uid !== forUid || !b.pagesFresh || !b.sessionsFresh) return;
+    await syncPagesFromLogs(pagesRef.current, viewRef.current?.sessions.map(firestoreSessionToLog) ?? []);
+  }, [syncPagesFromLogs]);
 
   const loadData = useCallback(async () => {
     const forUid = uidRef.current;
@@ -1125,6 +1163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         offline,
         pendingChanges: pending.length,
         loadData,
+        refreshPageStates,
         retryConnection,
         saveUser,
         savePages,

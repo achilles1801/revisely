@@ -5,7 +5,7 @@
 
 import type { RevisionLog, User, UserPage } from '../types';
 import { caughtUpOnDay, creditedOnDay, doneOnDay, needDoneCount } from './aheadCredit';
-import { withPhoneSessions } from './activityHistory';
+import { handLogsOf, withPhoneSessions } from './activityHistory';
 import { carryOverOn } from './algorithm';
 import { duePagesOf } from './carryOver';
 import { streakDetailFromLogs, type StreakDetail } from './streak';
@@ -79,8 +79,10 @@ export function todaySnapshot(input: {
   const list = [...new Set(assignment)];
   const own = duePagesOf(list, user, day);
   const carried = carriedPagesOn(user, day, list);
-  const done = doneOnDay(logs, day);
-  const { status } = todayStatusOf(own, creditedOnDay(logs, day), caughtUpOnDay(logs, day));
+  // Pages logged by hand for today count as its sessions' do (ACT-15), once each.
+  const counted = history ? [...logs, ...handLogsOf(history)] : logs;
+  const done = doneOnDay(counted, day);
+  const { status } = todayStatusOf(own, creditedOnDay(counted, day), caughtUpOnDay(counted, day));
   // From the Activity items once they've loaded, with the phone's sessions over them; the logs until then.
   const streak = history
     ? streakDetailFromItems({ user, pages, items: withPhoneSessions(history, logs, input.now), today: day })

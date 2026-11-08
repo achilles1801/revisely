@@ -71,6 +71,12 @@ service cloud.firestore {
       return status in ['not_memorized', 'learning', 'memorized'];
     }
 
+    // Memorized ayahs (sura * 1000 + ayah, src/lib/memorizedAyahs): a 'learning' page's own (a page
+    // holds at most about 40), or the ayahs a memorization item added. Null clears them.
+    function isValidVerseList(verses, max) {
+      return verses == null || (verses is list && verses.size() <= max);
+    }
+
     // Validate session state
     function isValidSessionState(state) {
       return state in ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'];
@@ -157,6 +163,7 @@ service cloud.firestore {
         'status', 'weaknessRating',
         'dateMemorized', 'lastRevisedAt',
         'totalRevisionCount', 'skipCount',
+        'verses',
         'updatedAt'
       ];
     }
@@ -309,7 +316,8 @@ service cloud.firestore {
                          hasField('totalRevisionCount') &&
                          incomingData().totalRevisionCount >= 0 &&
                          hasField('skipCount') &&
-                         incomingData().skipCount >= 0;
+                         incomingData().skipCount >= 0 &&
+                         (!hasField('verses') || isValidVerseList(incomingData().verses, 60));
 
         // Users can update their pages
         allow update: if isOwner(userId) &&
@@ -328,7 +336,10 @@ service cloud.firestore {
                          (!hasField('totalRevisionCount') ||
                           incomingData().totalRevisionCount >= 0) &&
                          (!hasField('skipCount') ||
-                          incomingData().skipCount >= 0);
+                          incomingData().skipCount >= 0) &&
+                         // A partly memorized page's ayahs (MEM-1)
+                         (!hasField('verses') ||
+                          isValidVerseList(incomingData().verses, 60));
 
         // Users cannot delete pages
         allow delete: if false;
@@ -620,9 +631,11 @@ service cloud.firestore {
       let data = incomingData();
       return isValidActivityItem(itemId, userId,
                ['id', 'uid', 'day', 'occurredAt', 'source', 'pages', 'minutes',
-                'recordings', 'createdAt', 'updatedAt'],
+                'recordings', 'verses', 'createdAt', 'updatedAt'],
                ['id', 'uid', 'day', 'occurredAt', 'source', 'pages', 'minutes']) &&
-             data.source in ['auto', 'manual'];
+             data.source in ['auto', 'manual'] &&
+             // The ayahs it added, when added by the ayah (MEM-2)
+             (!('verses' in data) || isValidVerseList(data.verses, 2000));
     }
 
     function isValidReadItem(itemId, userId) {
