@@ -1,4 +1,4 @@
-import { dayChangesKey, joinedSince, overlayDayItems, touchesDay, type DayItems } from '../dayItems';
+import { dayChangesKey, joinedSince, keepTaken, overlayDayItems, touchesDay, type DayItems } from '../dayItems';
 import { manualRevisionItem } from '../../manualRevision';
 import type { OutboxEntry, OutboxOp } from '../ops';
 
@@ -18,7 +18,7 @@ describe('the day’s items with the waiting changes over them (ACT-13)', () => 
   it('[ACT-13] pages memorized join the day’s item (pages merged, minutes added)', () => {
     const base: DayItems = { ...empty, memorized: [{ id: DAY, day: DAY, pages: [562], minutes: 25 }] };
     const out = overlayDayItems(base, [entry('a', { kind: 'memorization.mark', day: DAY, pages: [563, 562], at: 9, minutes: 10 })], DAY, UID);
-    expect(out.memorized).toEqual([{ id: DAY, day: DAY, pages: [562, 563], minutes: 35 }]);
+    expect(out.memorized).toEqual([{ id: DAY, day: DAY, pages: [562, 563], minutes: 35, updatedAt: 9 }]);
   });
 
   it('[ACT-13] a memorization removed, or its pages un-memorized, leaves the day', () => {
@@ -56,5 +56,23 @@ describe('the day’s items with the waiting changes over them (ACT-13)', () => 
     const sent = joinedSince(first.ids, [], DAY);
     expect(sent.joined).toBe(false);
     expect(joinedSince(new Set(), [entry('a', { kind: 'usage', seconds: 3 })], DAY).joined).toBe(false);
+  });
+
+  it('[ACT-13] a change the server has taken, laid again over a copy that has it, changes nothing (minutes join once)', () => {
+    const mark = entry('m', { kind: 'memorization.mark', day: DAY, pages: [563], at: 9, minutes: 10 });
+    const server: DayItems = { ...empty, memorized: [{ id: DAY, day: DAY, pages: [562, 563], minutes: 35, updatedAt: 9 }] };
+    expect(overlayDayItems(server, [mark], DAY, UID).memorized).toEqual([{ id: DAY, day: DAY, pages: [562, 563], minutes: 35, updatedAt: 9 }]);
+    // Listed twice (taken and still waiting): once.
+    const before: DayItems = { ...empty, memorized: [{ id: DAY, day: DAY, pages: [562], minutes: 25, updatedAt: 1 }] };
+    expect(overlayDayItems(before, [mark, mark], DAY, UID).memorized[0].minutes).toBe(35);
+  });
+
+  it('[ACT-13] keeps only the taken changes that touch the day, each once', () => {
+    const taken: OutboxEntry[] = [];
+    const mark = entry('m', { kind: 'memorization.mark', day: DAY, pages: [563], at: 9 });
+    keepTaken(taken, mark, DAY);
+    keepTaken(taken, mark, DAY);
+    keepTaken(taken, entry('u', { kind: 'usage', seconds: 5 }), DAY);
+    expect(taken.map((e) => e.id)).toEqual(['m']);
   });
 });

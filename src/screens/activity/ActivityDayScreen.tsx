@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import {
   ActivityIndicator,
@@ -24,7 +24,9 @@ import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { currentAccount, queueChange, withPendingJournalDay, withPendingReadings } from '../../lib/offline/queue';
 import { pendingEntries } from '../../lib/offline/outbox';
-import { joinedSince } from '../../lib/offline/dayItems';
+import { joinedSince, keepTaken } from '../../lib/offline/dayItems';
+import { onApplied } from '../../lib/offline/sync';
+import type { OutboxEntry } from '../../lib/offline/ops';
 import { pagesToUnmark } from '../../lib/activityAdd';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { isRevisionActivity, normalizeReadingSession } from '../../lib/activity';
@@ -136,6 +138,16 @@ export default function ActivityDayScreen() {
   const loads = useRef(0);
   // The server's last copy of the day's log, under the notes still waiting.
   const servedLog = useRef<{ date: string; entry: JournalEntry | null } | null>(null);
+  // Notes the server has taken while the day shows: laid under the waiting ones, so a read without
+  // one never hides it (withPendingJournalDay's `sent`).
+  const takenNotes = useRef<{ date: string; entries: OutboxEntry[] }>({ date, entries: [] });
+  useEffect(() => {
+    takenNotes.current = { date, entries: [] };
+    return onApplied((uid, entry) => {
+      if (uid === currentAccount()) keepTaken(takenNotes.current.entries, entry, date);
+    });
+  }, [date]);
+  const sentNotes = () => (takenNotes.current.date === date ? takenNotes.current.entries : []);
   const waitingIds = useRef<Set<string>>(new Set());
   const load = useCallback(async () => {
     const n = ++loads.current;
@@ -144,7 +156,7 @@ export default function ActivityDayScreen() {
     const since = joinedSince(waitingIds.current, pendingEntries(currentAccount()), date);
     waitingIds.current = since.ids;
     if (since.joined && servedLog.current?.date === date) {
-      const shown = withPendingJournalDay(date, servedLog.current.entry);
+      const shown = withPendingJournalDay(date, servedLog.current.entry, currentAccount(), sentNotes());
       setJournal(shown && !isJournalEntryEmpty(shown) ? shown : null);
     }
     const [r, j] = await Promise.allSettled([
@@ -152,11 +164,11 @@ export default function ActivityDayScreen() {
       firestoreService.getJournalEntry(date).then(
         (entry) => {
           if (n === loads.current) servedLog.current = { date, entry };
-          return withPendingJournalDay(date, entry);
+          return withPendingJournalDay(date, entry, currentAccount(), sentNotes());
         },
         // Offline and not in Firestore's memory: a change waiting here still shows.
         (err) => {
-          const waiting = withPendingJournalDay(date, null);
+          const waiting = withPendingJournalDay(date, null, currentAccount(), sentNotes());
           if (waiting) return waiting;
           throw err;
         },

@@ -4,7 +4,7 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,7 +28,9 @@ import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
 type SheetAction = ContextMenuAction;
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
-import { joinedSince, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { joinedSince, keepTaken, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { onApplied } from '../../lib/offline/sync';
+import type { OutboxEntry } from '../../lib/offline/ops';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { currentAccount } from '../../lib/offline/queue';
 
@@ -137,6 +139,15 @@ export function DayBlocks({
   // The server's last answer for this day, under the changes still waiting, and those changes' ids.
   const served = useRef<{ day: string; items: DayItems } | null>(null);
   const waiting = useRef<Set<string>>(new Set());
+  // Changes to this day the server has taken while it shows: laid over every answer, so a read that
+  // comes back without one never hides it (lib/offline/dayItems keepTaken).
+  const taken = useRef<{ day: string; entries: OutboxEntry[] }>({ day, entries: [] });
+  useEffect(() => {
+    taken.current = { day, entries: [] };
+    return onApplied((uid, entry) => {
+      if (uid === currentAccount()) keepTaken(taken.current.entries, entry, day);
+    });
+  }, [day]);
   const load = useCallback(() => {
     const n = ++loads.current;
     // What the server has, with the changes still waiting on this phone laid over it (ACT-13): an
@@ -145,7 +156,8 @@ export function DayBlocks({
     const pending = uid ? pendingEntries(uid) : [];
     const withPending = (items: DayItems) => {
       const now = currentAccount();
-      return now ? overlayDayItems(items, pendingEntries(now), day, now) : items;
+      const kept = taken.current.day === day ? taken.current.entries : [];
+      return now ? overlayDayItems(items, [...kept, ...pendingEntries(now)], day, now) : items;
     };
     // At once, from the last answer, when a change has just joined: an add shows without waiting for
     // the read below. (One that left is in what's shown already.)
