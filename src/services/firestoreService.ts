@@ -62,6 +62,7 @@ import { JournalEntry, JournalNote, ReadingSession } from '../types';
 import { journalDayFromEntries, legacyJournalNotes, LEGACY_NOTE_ID } from '../lib/journal';
 import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
+import { isDeadlineError, withTimeLimit } from '../lib/timeLimit';
 import { memorizedMinutesAfter } from '../lib/activityAdd';
 
 // ============================================================================
@@ -1067,20 +1068,51 @@ export function isDeletingAccount(uid: string | undefined | null): boolean {
   return uid != null && uid === deletingUid;
 }
 
+/**
+ * How long the app waits for deleteUserAccount. It takes a second or two (its
+ * own limit is 60 s); without a limit, an answer lost on the way back kept the
+ * phone on the spinner for good (ACCOUNT-3).
+ */
+export const DELETE_ACCOUNT_TIMEOUT_MS = 30_000;
+/** How long the app waits for Auth to say whether the account still exists. */
+export const ACCOUNT_CHECK_TIMEOUT_MS = 10_000;
+
 export async function deleteAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
   deletingUid = user.uid;
   try {
-    await deleteAccountOnServer(user);
+    await callFunction(user, 'deleteUserAccount', {}, { timeoutMs: DELETE_ACCOUNT_TIMEOUT_MS });
   } catch (err) {
+    // The server may have deleted it all the same: its answer lost, or a retry
+    // after it had. The account is gone when Auth no longer knows it.
+    if (await accountGone(user)) return;
     deletingUid = null;
+    if (isDeadlineError(err)) {
+      throw Object.assign(
+        new Error("The server didn't answer in time, so your account may not be deleted. Check your connection and try again."),
+        { code: 'deadline-exceeded' },
+      );
+    }
     throw err;
   }
 }
 
-async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>): Promise<void> {
-  await callFunction(user, 'deleteUserAccount', {});
+/**
+ * Whether Auth no longer knows this account. The server deletes the sign-in last,
+ * after everything else, so a sign-in gone means the delete finished. Still
+ * there, or no answer (offline, or not within ACCOUNT_CHECK_TIMEOUT_MS): false.
+ */
+async function accountGone(user: NonNullable<typeof auth.currentUser>): Promise<boolean> {
+  try {
+    await withTimeLimit(user.reload(), ACCOUNT_CHECK_TIMEOUT_MS);
+    return false;
+  } catch (err) {
+    // The JS SDK reports a deleted account (USER_NOT_FOUND from the token and
+    // lookup endpoints) as auth/user-token-expired, and signs the phone out.
+    const code = (err as { code?: unknown } | null)?.code;
+    return code === 'auth/user-token-expired' || code === 'auth/user-not-found';
+  }
 }
 
 // The account whose data is being reset (Settings → Reset my data, testers):
@@ -1144,11 +1176,33 @@ export async function loadTestScenarioOnServer(data: {
   return out.result;
 }
 
-/** Call one of our callable Cloud Functions with the account's ID token and App Check. */
+/**
+ * Call one of our callable Cloud Functions with the account's ID token and App Check.
+ * `timeoutMs` limits the whole call (the fresh token, App Check, the request and its
+ * answer); past it the request is aborted and the call rejects with code
+ * `deadline-exceeded`. Without it, the call waits as long as the network does.
+ */
 export async function callFunction(
   user: NonNullable<typeof auth.currentUser>,
   name: string,
   data: Record<string, unknown>,
+  opts: { timeoutMs?: number } = {},
+): Promise<unknown> {
+  if (!opts.timeoutMs) return callFunctionNow(user, name, data);
+  const controller = new AbortController();
+  return withTimeLimit(
+    callFunctionNow(user, name, data, controller.signal),
+    opts.timeoutMs,
+    `${name} didn't answer in time.`,
+    () => controller.abort(),
+  );
+}
+
+async function callFunctionNow(
+  user: NonNullable<typeof auth.currentUser>,
+  name: string,
+  data: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const idToken = await user.getIdToken(/* forceRefresh */ true);
 
@@ -1185,6 +1239,7 @@ export async function callFunction(
     method: 'POST',
     headers,
     body: JSON.stringify({ data }),
+    ...(signal ? { signal } : {}),
   });
 
   if (!resp.ok) {
