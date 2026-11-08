@@ -124,6 +124,7 @@ interface FirestorePage {
   weaknessRating: 1 | 2 | 3 | 4 | 5; // 1=very weak, 5=very strong
   totalRevisionCount: number;        // Lifetime revision count
   skipCount: number;                 // Times skipped when assigned
+  verses?: number[] | null;          // 'learning' only: its memorized ayahs, sura * 1000 + ayah (at most 60)
   updatedAt: Timestamp;              // Last update timestamp
 }
 ```
