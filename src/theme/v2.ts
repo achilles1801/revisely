@@ -514,4 +514,6 @@ export function mixColors(a: string, b: string, t: number): string {
 export const revoV2 = {
   discMid: '#0A0A12',
   discEdge: '#000000',
+  /** The pen's lit tip while the R writes itself (What's new's Revo moment): white on any accent. */
+  penTip: '#FFFFFF',
 } as const;

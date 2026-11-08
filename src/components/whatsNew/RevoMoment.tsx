@@ -238,7 +238,7 @@ function Mark({ p, L, ring }: { p: P; L: MomentLayout; ring: boolean }) {
               animatedProps={stroke}
             />
             <AnimatedCircle r={11 / R_SCALE} fill="url(#momentPen)" animatedProps={penGlow} />
-            <AnimatedCircle r={2.4 / R_SCALE} fill="#FFFFFF" animatedProps={penTip} />
+            <AnimatedCircle r={2.4 / R_SCALE} fill={revoV2.penTip} animatedProps={penTip} />
           </G>
         </Svg>
       </Animated.View>
