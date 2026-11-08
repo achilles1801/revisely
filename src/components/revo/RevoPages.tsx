@@ -171,14 +171,50 @@ export function RevoMemory({ uid, settings, today, onBack }: { uid: string; sett
   );
 }
 
-const OPT_IN_ROWS: { icon: keyof typeof Ionicons.glyphMap; title: string; line: string }[] = [
-  { icon: 'stats-chart-outline', title: 'Uses your totals', line: 'Coverage, consistency, weak spots and pace.' },
-  { icon: 'lock-closed-outline', title: 'Your notes and recordings stay private', line: 'Only sent when you add their day, or the recording, to a question.' },
-  { icon: 'settings-outline', title: 'Off any time', line: 'Settings → Revo AI. Your history can be deleted there too.' },
-];
+type OptInRow = { icon: keyof typeof Ionicons.glyphMap; title: string; line: string };
 
-/** The first time: what Revo is, what it is sent and what isn't, and how to turn it off. */
-export function RevoOptIn({ onTurnOn, onNotNow, busy, error }: { onTurnOn: () => void; onNotNow: () => void; busy: boolean; error: string | null }) {
+/**
+ * What the opt-in says is sent, to whom, and what isn't (REVO-21). Apple's 5.1.2(i) asks an app to
+ * name the AI a user's data goes to before it is sent. Keep every line true to what the server sends
+ * (functions/src/revo/prompt.ts: no name, email or account id; ratings only with Smart Tracking) and to
+ * Anthropic's commercial terms (no training on API inputs or outputs).
+ */
+export function optInRows(smartTracking: boolean): OptInRow[] {
+  return [
+    {
+      icon: 'stats-chart-outline',
+      title: 'Uses your totals',
+      // With Smart Tracking off there are no ratings to send, so no weak spots (REVO-36).
+      line: smartTracking ? 'Coverage, consistency, weak spots and pace.' : 'Coverage, consistency and pace.',
+    },
+    {
+      icon: 'cloud-outline',
+      title: 'Answered by Claude, from Anthropic',
+      line: 'Your questions, the chat so far and the totals Revo needs go to Anthropic to write each answer. Anthropic doesn’t train its models on them.',
+    },
+    {
+      icon: 'lock-closed-outline',
+      title: 'Your notes and recordings stay private',
+      line: 'A day’s notes go only when you add that day to a question. Revo never gets your audio.',
+    },
+    { icon: 'settings-outline', title: 'Off any time', line: 'Settings → Revo AI. Your history can be deleted there too.' },
+  ];
+}
+
+/** The first time: what Revo is, what it is sent, who answers, what isn't sent, and how to turn it off. */
+export function RevoOptIn({
+  onTurnOn,
+  onNotNow,
+  busy,
+  error,
+  smartTracking = true,
+}: {
+  onTurnOn: () => void;
+  onNotNow: () => void;
+  busy: boolean;
+  error: string | null;
+  smartTracking?: boolean;
+}) {
   const { palette } = useTheme();
   // A smaller mark on short phones (an iPhone SE), so more of what is sent shows above the buttons.
   const short = useWindowDimensions().height < SHORT_SCREEN;
@@ -190,10 +226,12 @@ export function RevoOptIn({ onTurnOn, onNotNow, busy, error }: { onTurnOn: () =>
           Meet Revo
         </Text>
         <Text style={[styles.optInBody, { color: palette.secondary }]}>
-          Your revision coach. Ask about your progress, your weak spots or your plan, and get answers from your own Revisely data.
+          {smartTracking
+            ? 'Your revision coach. Ask about your progress, your weak spots or your plan, and get answers from your own Revisely data.'
+            : 'Your revision coach. Ask about your progress or your plan, and get answers from your own Revisely data.'}
         </Text>
         <View style={styles.optInRows}>
-          {OPT_IN_ROWS.map((r) => (
+          {optInRows(smartTracking).map((r) => (
             <View key={r.title} style={styles.optInRow}>
               <View style={[styles.optInIcon, { backgroundColor: palette.bubble }]}>
                 <Ionicons name={r.icon} size={22} color={palette.text} />

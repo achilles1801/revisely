@@ -506,20 +506,36 @@ describe('Revo’s Memory and History', () => {
     expect(onOpen).toHaveBeenCalled();
   });
 
-  it('the opt-in: Turn on and Not now; it says what is sent', async () => {
+  it('[REVO-21] the opt-in: Turn on and Not now; it says what is sent, that Claude, from Anthropic, answers, and that Anthropic doesn’t train on it', async () => {
     const onTurnOn = jest.fn();
     const onNotNow = jest.fn();
     render(
       <ThemeProvider>
-        <RevoOptIn onTurnOn={onTurnOn} onNotNow={onNotNow} busy={false} error={null} />
+        <RevoOptIn onTurnOn={onTurnOn} onNotNow={onNotNow} busy={false} error={null} smartTracking />
       </ThemeProvider>,
     );
     await flush();
     expect(screen.getByText('Coverage, consistency, weak spots and pace.')).toBeTruthy();
+    // Apple 5.1.2(i): the AI the data goes to is named before anything is sent.
+    expect(screen.getByText('Answered by Claude, from Anthropic')).toBeTruthy();
+    expect(screen.getByText(/go to Anthropic to write each answer\. Anthropic doesn’t train its models on them\.$/)).toBeTruthy();
+    expect(screen.getByText('A day’s notes go only when you add that day to a question. Revo never gets your audio.')).toBeTruthy();
     expect(screen.getByText('Revo AI can make mistakes.', { exact: false })).toBeTruthy();
     fireEvent.press(screen.getByTestId('revo-turn-on'));
     fireEvent.press(screen.getByTestId('revo-not-now'));
     expect(onTurnOn).toHaveBeenCalled();
     expect(onNotNow).toHaveBeenCalled();
+  });
+
+  it('[REVO-21] [REVO-36] with Smart Tracking off, the opt-in says nothing about weak spots (no ratings are sent)', async () => {
+    render(
+      <ThemeProvider>
+        <RevoOptIn onTurnOn={jest.fn()} onNotNow={jest.fn()} busy={false} error={null} smartTracking={false} />
+      </ThemeProvider>,
+    );
+    await flush();
+    expect(screen.getByText('Coverage, consistency and pace.')).toBeTruthy();
+    expect(screen.getByText('Answered by Claude, from Anthropic')).toBeTruthy();
+    expect(screen.queryByText(/weak|strong|strength|rating/i)).toBeNull();
   });
 });
