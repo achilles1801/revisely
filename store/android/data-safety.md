@@ -14,7 +14,7 @@ own use: nothing here is shared.
 | Is all of the user data collected by your app encrypted in transit? | **Yes** (HTTPS everywhere) |
 | Which of the following methods of account creation does your app support? | **Username and password**, **OAuth** (Sign in with Google) |
 | Delete account URL | `https://revisely.app/support/#delete-account` (live once the docs PR reaches `main`) |
-| Do you provide a way for users to request that some or all of their data is deleted, without requiring them to delete their account? | **Yes**: recordings, sessions, daily log entries and the recording backup can each be deleted in the app |
+| Do you provide a way for users to request that some or all of their data is deleted, without requiring them to delete their account? | **Yes**: recordings, sessions, daily log entries, the recording backup, and Revo's conversations and memory (Settings → Revo AI) can each be deleted in the app |
 
 ## Data types
 
@@ -28,8 +28,8 @@ Every collected type: **not shared**, **not processed ephemerally**.
 | Personal info → **Email address** | Yes | Required | App functionality, Account management | The account's email. |
 | Personal info → **User IDs** | Yes | Required | App functionality, Account management, Analytics | The account's internal ID (Firebase); crash reports carry it instead of a name or email. |
 | Audio → **Voice or sound recordings** | Yes | Optional | App functionality | Recitation recordings backed up to the user's account (Settings → Activity → Back up recordings turns it off). |
-| App activity → **App interactions** | Yes | Required | App functionality | Revision sessions, pages revised and their ratings, reading sessions, time in the app. |
-| App activity → **Other user-generated content** | Yes | Optional | App functionality | Daily log notes, Send feedback and Report a problem text. |
+| App activity → **App interactions** | Yes | Required | App functionality | Revision sessions, pages revised and their ratings, reading sessions, time in the app, the number of Revo questions a day. |
+| App activity → **Other user-generated content** | Yes | Optional | App functionality | Daily log notes, Send feedback and Report a problem text, and, with Revo on, questions to Revo, its answers and what it remembers (a day's notes when the user attaches that day). |
 | App info and performance → **Crash logs** | Yes | Required | Analytics | Crash and error reports (Sentry). |
 | App info and performance → **Diagnostics** | Yes | Required | Analytics | Session health per app version, device model and OS (Sentry); a problem report's technical details, including a screenshot of Revisely's own screen if the user takes one in Report a problem. |
 | Device or other IDs → **Device or other IDs** | Yes | Required | App functionality | The notification token registered with Expo's push service. |
