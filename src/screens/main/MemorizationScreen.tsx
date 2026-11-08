@@ -181,7 +181,7 @@ export default function MemorizationScreen() {
             {`${formatFractional(stats.fractionalJuz)} of 30 juz · ${stats.surahs} of 114 surahs`}
           </Text>
           <View style={v2.bar}>
-            <ProgressBar progress={(stats.pages / 604) * 100} height={6} testID="memorization-progress" />
+            <ProgressBar progress={(stats.share / 604) * 100} height={6} testID="memorization-progress" />
           </View>
         </View>
         <MemorizationBrowser

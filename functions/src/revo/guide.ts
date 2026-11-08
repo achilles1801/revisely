@@ -276,6 +276,9 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-25': 'the button’s size and the room lists leave for it',
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
+  'MEM-1': 'memorizing by the ayah: no one can save ayahs yet; the Day’s Add to memorized brings it, with its own section here',
+  'MEM-2': 'a partly memorized page’s share in the %: nothing to ask until ayahs can be saved (MEM-1)',
+  'MEM-3': 'taking ayahs off the memorized: nothing to ask until ayahs can be saved (MEM-1)',
 };
 
 /** The guide as Revo reads it. */

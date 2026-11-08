@@ -96,6 +96,8 @@ function firestorePageToLocal(fsPage: FirestorePage): UserPage {
     lastRevisedDate: fsPage.lastRevisedAt ? timestampToISOString(fsPage.lastRevisedAt) : null,
     totalRevisionCount: fsPage.totalRevisionCount || 0,
     skipCount: fsPage.skipCount || 0,
+    // A partly memorized page keeps its memorized ayahs (MEM-1); any other page's are left behind.
+    ...(fsPage.status === 'learning' && Array.isArray(fsPage.verses) ? { verses: fsPage.verses.filter((k) => typeof k === 'number') } : {}),
   };
 }
 
