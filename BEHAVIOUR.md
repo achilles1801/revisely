@@ -297,6 +297,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-17.** A day before yesterday offers only a note: its + opens the Note sheet at once, so old history
   and streaks can't be rewritten. What is already logged there can still be seen and deleted. (Majd,
   Nov 7 2026.)
+- **ACT-16.** Pages logged as revised elsewhere are revised that day: they count in each page's last revised
+  day and number of revisions (and clear its skips) as a session's pages do, at once and after every
+  launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
+  no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
+  pages were re-derived from sessions alone.)
 
 ## Ask coach
 

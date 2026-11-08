@@ -39,7 +39,7 @@ export function RevisedElsewhereSheet({
   dayName: string;
   logs: RevisionLog[];
 }) {
-  const { user, pages } = useApp();
+  const { user, pages, refreshPageStates } = useApp();
   const { palette } = useTheme();
   const [unticked, setUnticked] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -76,6 +76,8 @@ export function RevisedElsewhereSheet({
     try {
       await queueChange({ kind: 'revision.add', item: manualRevisionItem({ uid: user.id, day, now: Date.now(), pages: ticked, minutes: null }) });
       onClose();
+      // Each page's last revised day and count take the log at once (ACT-16), not at the next launch.
+      refreshPageStates?.().catch((err) => logger.warn('Could not re-derive the pages after a log', err));
     } catch (err) {
       logger.warn('Could not log the pages revised elsewhere', err);
     } finally {
