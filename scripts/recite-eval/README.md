@@ -90,8 +90,13 @@ $PY scripts/recite-eval/score.py --bench $LAB/data/bench-v0 --run $LAB/runs/v0 -
 - `--params '{"sub_p": 1.01}'`: words, plus words that clearly don't match (no single-letter judgements).
 - The model's output is cached per recording (`<run>/logprobs/hisn/`), so a rerun with other settings takes
   about a minute for the whole bench.
-- Decisions are made on the whole recording; the times in the results are estimates (word end + `delay`).
-  A streaming version is the next step.
+- `--live`: as the app would. The model runs every `hop` (0.5 s) on the last `win` seconds (4 s) and keeps
+  the frames with `look` seconds (1 s) of audio after them; the checker takes each step's new frames and
+  decides a word once it is `commit` seconds (0.5 s) behind the newest frame. Flags are timed when they
+  would show, and a flag later taken back still counts (score.py's fa-ever). Without `--live`, decisions
+  are made on the whole recording and the times are estimates (word end + `delay`).
+- `record_bench.py` turns volunteers' recordings from revisely.app/record (downloaded from the owner's
+  private Drive folder) into a bench, with each item's truth from the page's own script.
 - Settings were tuned on four reciters (Abdul Basit mujawwad, Shuraym, Alafasy, Husary) and checked on the
   other four. The model was trained on EveryAyah and RetaSy, which overlap both test sets, so every number
   here is optimistic until recordings it has never heard (revisely.app/record) are in.

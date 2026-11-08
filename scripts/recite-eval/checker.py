@@ -62,7 +62,15 @@ DEFAULTS = {
     'alts': 4,          # look-alike words listened for in place of each word (وما for ومن); 0: none
     'alt_pen': -5.0,    # the cost of hearing a look-alike instead of the word itself
     'extra_min': 0.35,  # a filler shorter than this (seconds) is not reported as an extra word
-    'delay': 1.0,       # seconds after a word ends that a streaming checker would decide it
+    'delay': 1.0,       # (offline) seconds after a word ends that a live checker would decide it
+    'look': 1.0,        # (live) seconds of audio after a frame before the model's frame is final
+    'hop': 0.5,         # (live) how often the model runs and the checker decides
+    'win': 4.0,         # (live) seconds of audio the model sees each time
+    'commit': 0.5,      # (live) seconds a word must be behind the newest final frame before it is decided
+    'context': 30.0,    # (live) seconds of the path re-judged at each step
+    'stable': 1,        # (live) steps in a row a word must look wrong before it is flagged
+    'skip_wait': 'start',  # (live) a jumped-over word is decided once the next word heard has 'start'ed or 'end'ed
+    'live_order': False,  # (live) flag words out of order as they happen (else only at the end)
 }
 
 
@@ -122,6 +130,33 @@ class Hisn:
         mel = mel[:, : mel.shape[1] // 2 * 2]
         out = self.sess.run(None, {'mel': mel[None], 'riwaya': np.array([self.riwaya], np.int64)})[0][0]
         return out.astype(np.float32)
+
+    def stream(self, x, win=4.0, hop=0.5, look=1.0):
+        """Live: every hop seconds, run the model on the last win seconds and keep the frames that have at
+        least look seconds of audio after them (the last hop keeps the rest). Returns the frames in order;
+        frame f was available at the hop that kept it, about f / 50 + look seconds into the recording."""
+        sr, n = 16000, len(x)
+        T = (1 + n // 160) // 2
+        out = np.zeros((T, len(self.vocab) + 1), np.float32)
+        done = 0
+        k = 1
+        while done < T:
+            t_end = min(int(round(k * hop * sr)), n)
+            s0 = max(0, t_end - int(win * sr))
+            s0 -= s0 % 320
+            last = t_end >= n
+            hi = T if last else min(T, int((t_end / sr - look) * FPS))
+            if hi > done:
+                lp = self._run(x[s0:t_end])
+                f0 = s0 // 320
+                a, b = done, min(hi, f0 + lp.shape[0])
+                if b > a:
+                    out[a:b] = lp[a - f0:b - f0]
+                if b < hi:  # the model gave a frame or two fewer than expected at the very end
+                    out[b:hi] = lp[-1]
+                done = hi
+            k += 1
+        return out
 
     def logprobs(self, x, win=20.0, hop=16.0):
         """Overlapping windows (the encoder takes at most 30 s); each keeps the middle of its overlap."""
@@ -369,33 +404,47 @@ class Graph:
         self.start = np.array(entries[0], np.int64)
 
 
-def viterbi(lp, g, P):
-    """Best path through the passage graph. Returns ([(frame, state, entered)], score): state >= 0 is a word
-    state, state < 0 is the filler -(gap+1); entered is True on the first frame of a visit to a word."""
-    T, S, W = lp.shape[0], g.S, g.W
+class Decoder:
+    """The Viterbi pass, one frame at a time, so it can run as audio arrives: feed() frames, then
+    traceback() from the best state now (live) or from the passage's end (final)."""
+
     NEG = -1e30
-    best_any = lp.max(axis=1)
-    d = np.full(S + 1, NEG)
-    gap = np.full(W + 1, NEG)
-    gap[0] = best_any[0] + P['edge']
-    for s in g.start:
-        d[s] = lp[0, g.lab[s]]
-    bp = np.zeros((T, S + 1), np.uint8)      # 0 self, 1 s-1, 2 s-2, 3 s+1 (madd), 4 entry
-    ent_src = np.zeros((T, W), np.int32)     # entry source: code * 1_000_000 + index
-    gap_src = np.zeros((T, W + 1), np.uint8)  # 0 self, 1 from the word before
-    ex_state = np.zeros((T, W), np.int32)    # which exit state gave each word's exit score
-    widx = np.arange(W)
-    skips = [k for k in range(1, int(P['skip_max']) + 1) if k < W]
-    backs = min(int(P['back_max']), W - 1)
-    rows = np.arange(W)
-    pen = np.full(W + 1, P['fill']); pen[0] = pen[W] = P['edge']
-    alt_pen = np.where(g.entry_alt, P['alt_pen'], 0.0)
-    for t in range(1, T):
-        e = lp[t]
+
+    def __init__(self, g, P, T):
+        self.g, self.P = g, P
+        S, W = g.S, g.W
+        self.bp = np.zeros((T, S + 1), np.uint8)      # 0 self, 1 s-1, 2 s-2, 3 s+1 (madd), 4 entry
+        self.ent_src = np.zeros((T, W), np.int32)     # entry source: code * 1_000_000 + index
+        self.gap_src = np.zeros((T, W + 1), np.uint8)  # 0 self, 1 from the word before
+        self.ex_state = np.zeros((T, W), np.int32)    # which exit state gave each word's exit score
+        self.widx = np.arange(W)
+        self.skips = [k for k in range(1, int(P['skip_max']) + 1) if k < W]
+        self.backs = min(int(P['back_max']), W - 1)
+        self.pen = np.full(W + 1, P['fill']); self.pen[0] = self.pen[W] = P['edge']
+        self.alt_pen = np.where(g.entry_alt, P['alt_pen'], 0.0)
+        self.t = 0  # frames taken in
+
+    def feed(self, lp):
+        for row in lp:
+            self._step(row)
+
+    def _step(self, e):
+        g, P, NEG = self.g, self.P, self.NEG
+        S, W, t = g.S, g.W, self.t
+        best_any = float(e.max())
+        if t == 0:
+            self.d = np.full(S + 1, NEG)
+            self.gap = np.full(W + 1, NEG)
+            self.gap[0] = best_any + P['edge']
+            for s in g.start:
+                self.d[s] = e[g.lab[s]]
+            self.t = 1
+            return
+        d, gap, widx, rows = self.d, self.gap, self.widx, self.widx
         vals = d[g.exits]
         am = vals.argmax(axis=1)
         ex = vals[rows, am]
-        ex_state[t] = g.exits[rows, am]
+        self.ex_state[t] = g.exits[rows, am]
         cand = np.full(W, NEG)
         src = np.zeros(W, np.int64)
 
@@ -408,12 +457,12 @@ def viterbi(lp, g, P):
         offer(c, 1, widx - 1)
         c = np.full(W, NEG); c[0] = gap[0]
         offer(c, 3, np.zeros(W, np.int64))
-        for k in skips:
+        for k in self.skips:
             c = np.full(W, NEG); c[k + 1:] = ex[:W - k - 1] + P['skip'] * k
             offer(c, 2, widx - 1 - k)
-        if backs > 0:
+        if self.backs > 0:
             win = np.full(W, NEG); warg = np.zeros(W, np.int64)
-            for o in range(backs + 1):
+            for o in range(self.backs + 1):
                 c2 = np.full(W, NEG); c2[:W - o] = ex[o:]
                 b = c2 > win; win[b] = c2[b]; warg[b] = o
             offer(win + P['back'], 4, widx + warg)
@@ -421,7 +470,7 @@ def viterbi(lp, g, P):
         offer(c, 5, widx)
         c = np.full(W, NEG); c[1:] = gap[1:W] + P['fill_sub']
         offer(c, 6, widx - 1)
-        ent_src[t] = src
+        self.ent_src[t] = src
 
         nd = d.copy()
         code = np.zeros(S + 1, np.uint8)
@@ -431,59 +480,78 @@ def viterbi(lp, g, P):
         b = c > nd; nd[b] = c[b]; code[b] = 2
         c = np.full(S + 1, NEG); c[:-1] = d[1:]; c[~g.madd] = NEG
         b = c > nd; nd[b] = c[b]; code[b] = 3
-        ce = cand[:, None] + alt_pen
+        ce = cand[:, None] + self.alt_pen
         cur = nd[g.entries]
         b = ce > cur
         nd[g.entries[b]] = ce[b]
         code[g.entries[b]] = 4
         nd += e[g.lab]
         nd[S] = NEG
-        bp[t] = code
+        self.bp[t] = code
 
         ng = gap.copy()
         gs = np.zeros(W + 1, np.uint8)
         c = np.full(W + 1, NEG); c[1:W] = ex[:W - 1] + P['fill_in']; c[W] = ex[W - 1]
         b = c > ng; ng[b] = c[b]; gs[b] = 1
-        ng += best_any[t] + pen
-        gap_src[t] = gs
-        d, gap = nd, ng
+        ng += best_any + self.pen
+        self.gap_src[t] = gs
+        self.d, self.gap = nd, ng
+        self.t = t + 1
 
-    vals = d[g.exits]
-    am = vals.argmax(axis=1)
-    ex = vals[rows, am]
-    ends = ex + P['stop']
-    ends[W - 1] = ex[W - 1]
-    if gap[W] >= ends.max():
-        cur, score = ('gap', W), float(gap[W])
-    else:
-        w = int(np.argmax(ends))
-        cur, score = ('state', int(g.exits[w, am[w]])), float(ends.max())
-    path = []
-    t = T - 1
-    while t >= 0:
-        if cur[0] == 'gap':
-            gi = cur[1]
-            path.append((t, -(gi + 1), False))
+    def traceback(self, final=True):
+        """The best path so far. final: it must end where a passage can end (the trail, the last word, or an
+        earlier word at a cost); live: from whatever state is best now, mid-word included."""
+        g, P, W = self.g, self.P, self.g.W
+        d, gap = self.d, self.gap
+        vals = d[g.exits]
+        am = vals.argmax(axis=1)
+        if final:
+            ex = vals[self.widx, am]
+            ends = ex + P['stop']
+            ends[W - 1] = ex[W - 1]
+            if gap[W] >= ends.max():
+                cur, score = ('gap', W), float(gap[W])
+            else:
+                w = int(np.argmax(ends))
+                cur, score = ('state', int(g.exits[w, am[w]])), float(ends.max())
+        else:
+            s, gi = int(np.argmax(d)), int(np.argmax(gap))
+            cur, score = (('state', s), float(d[s])) if d[s] >= gap[gi] else (('gap', gi), float(gap[gi]))
+        path = []
+        t = self.t - 1
+        while t >= 0:
+            if cur[0] == 'gap':
+                gi = cur[1]
+                path.append((t, -(gi + 1), False))
+                if t == 0:
+                    break
+                if self.gap_src[t, gi] == 1:
+                    cur = ('state', int(self.ex_state[t, gi - 1]))
+                t -= 1
+                continue
+            s = cur[1]
+            c = self.bp[t, s] if t > 0 else 4
+            path.append((t, s, c == 4))
             if t == 0:
                 break
-            if gap_src[t, gi] == 1:
-                cur = ('state', int(ex_state[t, gi - 1]))
+            if c == 4:
+                w = int(g.word_of[s])
+                kind, idx = divmod(int(self.ent_src[t, w]), 1_000_000)
+                cur = ('state', int(self.ex_state[t, idx])) if kind in (1, 2, 4) else ('gap', idx)
+            else:
+                cur = ('state', s + {0: 0, 1: -1, 2: -2, 3: 1}[int(c)])
             t -= 1
-            continue
-        s = cur[1]
-        c = bp[t, s] if t > 0 else 4
-        path.append((t, s, c == 4))
-        if t == 0:
-            break
-        if c == 4:
-            w = int(g.word_of[s])
-            kind, idx = divmod(int(ent_src[t, w]), 1_000_000)
-            cur = ('state', int(ex_state[t, idx])) if kind in (1, 2, 4) else ('gap', idx)
-        else:
-            cur = ('state', s + {0: 0, 1: -1, 2: -2, 3: 1}[int(c)])
-        t -= 1
-    path.reverse()
-    return path, score
+        path.reverse()
+        return path, score
+
+
+def viterbi(lp, g, P):
+    """Best path through the passage graph over a whole recording. Returns ([(frame, state, entered)], score):
+    state >= 0 is a word state, state < 0 is the filler -(gap+1); entered is True on the first frame of a
+    visit to a word."""
+    dec = Decoder(g, P, lp.shape[0])
+    dec.feed(lp)
+    return dec.traceback(final=True)
 
 
 # Sounds that only tajweed tells apart (mode 3), and how mode 2 (letters and harakat) sees them
@@ -564,7 +632,7 @@ def substitutions(expected, heard, vocab, edge_free=2, span=None, edge_frames=99
     return subs, dels, sum(1 for c in exp if c not in LONG)
 
 
-def decide(key_words, g, lp, path, P, vocab=None):
+def decide(key_words, g, lp, path, P, vocab=None, toks=None):
     """Statuses, flags and extras from the best path."""
     W = g.W
     nonblank_best = lp[:, 1:].max(axis=1)
@@ -610,7 +678,7 @@ def decide(key_words, g, lp, path, P, vocab=None):
         fillers.append((cur_gap, gstart, end))
     if P['sound_rule'] == 'subst':
         index = {c: i + 1 for i, c in enumerate(vocab)}
-        toks = heard_tokens(lp)
+        toks = heard_tokens(lp) if toks is None else toks
         peaks = np.array([pk for _, pk, _ in toks]) if toks else np.zeros(0, int)
         for vs in visits:
             for v in vs:
@@ -757,6 +825,118 @@ def run_item(item_path, run, name, P, ear_name='hisn'):
     return truth['id'], res['stats']['decode_s']
 
 
+def run_item_live(item_path, run, name, P, ear_name='hisn'):
+    """As the app would: the model on a sliding window, the checker fed each hop's new frames, and a word
+    decided once it is commit seconds behind the newest final frame. Flags are timed when they would show;
+    a flag later cleared (the reciter went back) still counts as shown. The final statuses come from the
+    whole recording."""
+    truth = json.loads(pathlib.Path(item_path).read_text())
+    lo, hi = truth['range']
+    if isinstance(lo, str):
+        lo, hi = json.loads(truth['range'])
+    start_at = truth.get('start_at', lo)
+    stop_at = truth.get('stop_at', hi)
+    tag = f"{ear_name}-live-w{P['win']:g}-h{P['hop']:g}-l{P['look']:g}"
+    cache = run / 'logprobs' / tag / f"{truth.get('sha1') or truth['id']}.npy"
+    if cache.exists():
+        lp = np.load(cache).astype(np.float32)
+    else:
+        import soundfile as sf
+        x, sr = sf.read(pathlib.Path(item_path).with_suffix('.wav'), dtype='float32')
+        if x.ndim > 1:
+            x = x.mean(axis=1)
+        lp = EAR.stream(x, P['win'], P['hop'], P['look'])
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        np.save(cache, lp.astype(np.float16))
+    kws = KEY.passage(start_at, stop_at, int(P['alts']))
+    g = Graph(kws)
+    T = lp.shape[0]
+    toks = heard_tokens(lp)  # a final frame never changes, so tokens behind the newest frame stand
+    peaks = np.array([pk for _, pk, _ in toks]) if toks else np.zeros(0, int)
+    dec = Decoder(g, P, T)
+    app = [k['word'] for k in kws]
+    shown, decided, flag_t, flag_kind = {}, {}, {}, {}
+    bad_run = {}
+    hop, look = P['hop'], P['look']
+    cf, ctx = int(P['commit'] * FPS), int(P['context'] * FPS)
+    t0 = time.perf_counter()
+    k, now = 0, 0.0
+    while True:
+        k += 1
+        now = k * hop
+        avail = T if now >= T / FPS + look - 1e-9 else max(0, min(T, int((now - look) * FPS)))
+        if avail > dec.t:
+            dec.feed(lp[dec.t:avail])
+        if dec.t >= 5:
+            path, _ = dec.traceback(final=False)
+            lo_t = max(0, dec.t - ctx)
+            pw = [p for p in path if p[0] >= lo_t]
+            n_tok = int(np.searchsorted(peaks, dec.t))
+            st, fl, _, _, _, visits, _ = decide(kws, g, lp[:dec.t], pw, P, EAR.vocab, toks[:n_tok])
+            seen = [w for w in range(g.W) if visits[w]]
+            # words the path jumped over inside the window (visits in time order); only these can be judged
+            # skipped now: a word whose visits fell out of the window isn't skipped, just out of view
+            order = [w for _, w in sorted((v['start'], w) for w in seen for v in visits[w])]
+            jumped = set()
+            for wa, wb in zip(order, order[1:]):
+                if wb > wa + 1:
+                    jumped.update(range(wa + 1, wb))
+            if seen:
+                w_first = min(seen)
+                if lo_t > 0 and visits[w_first][0]['start'] <= lo_t + 1:
+                    w_first += 1  # its start is outside the window: judged at an earlier step
+                for w in range(g.W):
+                    aw = app[w]
+                    if visits[w] and aw not in shown:
+                        shown[aw] = now
+                    if w < w_first or st.get(aw, 'pending') == 'pending':
+                        continue
+                    if not visits[w] and w not in jumped:
+                        continue
+                    if visits[w]:
+                        end_f = visits[w][-1]['end']
+                    else:  # a word jumped over: once the word heard after it is over, not just begun
+                        later = [v for ww in range(w + 1, g.W) for v in visits[ww]]
+                        if not later:
+                            continue
+                        end_f = min(later, key=lambda v: v['start'])[P['skip_wait']]
+                    if end_f > dec.t - cf:
+                        continue
+                    decided.setdefault(aw, now)
+                    kind = fl.get(aw, {}).get('kind')
+                    bad = st[aw] in ('wrong', 'missed') and (P['live_order'] or kind != 'order')
+                    bad_run[aw] = bad_run.get(aw, 0) + 1 if bad else 0
+                    if bad and bad_run[aw] >= P['stable'] and aw not in flag_t:
+                        flag_t[aw] = now
+                        flag_kind[aw] = kind
+        if dec.t >= T:
+            break
+    live_s = time.perf_counter() - t0
+    path, score = dec.traceback(final=True)
+    PF = dict(P, delay=look + P['commit'])
+    statuses, fl, _, _, extras, visits, fillers = decide(kws, g, lp, path, PF, EAR.vocab, toks)
+    late = 0
+    for aw, x in fl.items():  # flags only the end of the recording showed
+        if aw not in flag_t:
+            flag_t[aw] = now
+            flag_kind[aw] = x['kind']
+            late += 1
+    for w in range(lo, hi):
+        statuses.setdefault(w, 'pending')
+    cleared = sum(1 for aw in flag_t if statuses.get(aw) not in ('wrong', 'missed'))
+    res = {
+        'id': truth['id'], 'engine': name, 'live': True, 'statuses': statuses, 'shown': shown, 'decided': decided,
+        'flagged': {aw: {'t': flag_t[aw], 'kind': flag_kind[aw]} for aw in flag_t}, 'flaggedOutside': 0,
+        'extras': extras,
+        'stats': {'frames': T, 'steps': k, 'decode_s': round(live_s, 2), 'score': score, 'flags_cleared': cleared,
+                  'flags_at_end': late},
+    }
+    out = run / 'results' / name / f"{truth['id']}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(res, ensure_ascii=False))
+    return truth['id'], res['stats']['decode_s']
+
+
 def _init(threads):
     global EAR, KEY
     EAR = Hisn(threads=threads)
@@ -765,7 +945,7 @@ def _init(threads):
 
 def _work(args):
     try:
-        return run_item(*args)
+        return (run_item_live if args[3].get('live') else run_item)(*args)
     except Exception as e:  # report and go on
         return pathlib.Path(args[0]).stem, f'error: {type(e).__name__}: {e}'
 
@@ -780,6 +960,7 @@ def main():
     ap.add_argument('--jobs', type=int, default=4)
     ap.add_argument('--threads', type=int, default=2)
     ap.add_argument('--params', default='{}', help='JSON overrides of DEFAULTS')
+    ap.add_argument('--live', action='store_true', help='decide as the audio arrives (sliding-window model)')
     ap.add_argument('--lexicon', action='store_true', help='build cache/lexicon.json (every distinct word, alone)')
     args = ap.parse_args()
     if args.lexicon:
@@ -795,6 +976,7 @@ def main():
         print(f'{len(lex)} words -> {LAB / "cache/lexicon.json"}')
         return
     P = dict(DEFAULTS, **json.loads(args.params))
+    P['live'] = bool(args.live)
     run = pathlib.Path(args.run)
     items = sorted(pathlib.Path(args.bench, 'items').glob('*.json'))
     items = [f for f in items if args.only in f.name]
