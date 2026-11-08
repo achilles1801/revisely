@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-08T09:56:11.579Z",
+  "recordedAt": "2026-11-08T10:27:17.267Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "bce6ef1a38e939bd7c7d3144f334a4364d7b836232658cde41990b2479e01091",
+    "systemSha256": "f2612880772aeefa2ae7b4a0d33c999327957570513783b835964cdd26c1fa6a",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgqG5dpCrcgxdzdWfkXGn",
+    "id": "msg_011CgqJTC12VZnteS28iXKYi",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised 4 pages today, 22 minutes in, and with yesterday done your streak stands at 2 days. For tomorrow, put the weak page in Al-Mutaffifin and Al-Inshiqaq first while it is fresh.\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"reviseFirst\",\"title\":\"Revise Al-Mutaffifin 35 to Al-Inshiqaq first\",\"detail\":\"Your weakest page, put at the front of tomorrow's session\",\"pages\":[589]},\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"How is my week going?\",\"Which pages are weak?\"]}"
+        "text": "{\"text\":\"You revised 4 of today's 10 pages in 22 minutes, and kept your two-day streak going. Tonight, or first thing tomorrow, finish the rest, starting with the weak page in Al-Mutaffifin to Al-Inshiqaq.\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"Which pages are weakest?\",\"How was my week?\"]}"
       }
     ],
     "container": null,
@@ -29,12 +29,12 @@
     "usage": {
       "input_tokens": 555,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 15800,
+      "cache_read_input_tokens": 15957,
       "cache_creation": {
         "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 214,
+      "output_tokens": 197,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

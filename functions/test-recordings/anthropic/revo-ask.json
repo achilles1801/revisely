@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-08T09:56:09.268Z",
+  "recordedAt": "2026-11-08T10:27:15.316Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "bce6ef1a38e939bd7c7d3144f334a4364d7b836232658cde41990b2479e01091",
+    "systemSha256": "f2612880772aeefa2ae7b4a0d33c999327957570513783b835964cdd26c1fa6a",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgqG5RBSAyAmCXL7aG9Ud",
+    "id": "msg_011CgqJSyaeW4DwnJU345MFT",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"Four of the last six days had the whole plan done, and Thursday came close with 9 pages. Only Saturday was missed, and you picked it straight back up on Sunday.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Today still has 6 pages left, starting from Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"Which days do I miss?\",\"How is my pace over 30 days?\"]}"
+        "text": "{\"text\":\"Your week was steady: you finished the whole plan on four of the last six days, and you've revised on 24 of the last 30 days. Saturday was missed and Thursday fell one page short.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Today is still open, with 6 pages left starting from Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Pick up from Al-Infitar, 6 pages left\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak spots?\",\"How is my streak?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 15800,
+      "cache_creation_input_tokens": 15957,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 15800,
+        "ephemeral_5m_input_tokens": 15957,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 228,
+      "output_tokens": 226,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
