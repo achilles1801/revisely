@@ -123,7 +123,10 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
   other subflows), together with the smoke set, on **both platforms, twice**, with no reruns
   (`E2E_REPEAT=2`: every run must pass).
 - **`run.sh`, `.maestro/config.yaml`, `e2e.yml` or `ci.yml`:** every flow, both platforms, twice.
-- **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice.
+- **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice. Both
+  runs use the same emulators, so a test sets up every document it reads that other accounts share
+  (the month's coach ledger: COACH-4 clears it first, after #328's second run found the first run's
+  call there).
 
 Drafts and a stack's lower layers wait until they are ready (or the top). It is slow on purpose:
 one slow PR instead of a broken develop.

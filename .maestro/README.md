@@ -403,7 +403,10 @@ A failed attempt keeps Maestro's log and screenshots, a screenshot of the device
 in `.maestro/build/results/<platform>/<flow>/`:
 - `app.log` (iOS): the E2E build's own log (`src/lib/e2e/log.ts`). It has every console line the
   JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
-  An iOS release build passes only `console.error` to the unified log.
+  An iOS release build passes only `console.error` to the unified log. Each press of a `v2/Tap`
+  with a testID is there in stages (`[e2e] tap <id> in`, `out`, `press`; `src/lib/e2e/taps.ts`):
+  a tap the app ignored says whether JavaScript never had the touch or cancelled the press (twice
+  on iOS in #328's runs, a Tap in a sheet got the touch, by `device.log`, and never pressed).
 - `device.log` (iOS): the unified log. Its `CFNetwork:Summary` lines give each request's length
   (`transaction_duration_ms`; the emulators' ports name the service).
 - `logcat.txt` (Android): logcat, which has the same lines under `ReactNativeJS`.
