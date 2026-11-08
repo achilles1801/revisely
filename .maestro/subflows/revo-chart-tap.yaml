@@ -1,10 +1,21 @@
 # Taps a chart's part in Revo's chat (the plot, a weekday, a table's heading or row), first
 # scrolling it whole into view. With the keyboard still up after a question (iOS keeps it), the
 # chat sits at its end and a chart's middle can be above the list, under the header; a tap there
-# misses (iOS run 42437606335, Nov 8 2026). The tap also puts the keyboard away.
+# misses (iOS run 42437606335, Nov 8 2026).
 #   env ID: the element's id
 appId: com.revisionbuddy.app
 ---
+# First the keyboard goes. With it up, the list ends just above the middle of the screen, where
+# Maestro starts every scroll (scrollUntilVisible's, and hideKeyboard's on iOS), so nothing moved
+# and the chart stayed under the header (iOS run 42440690949). A tap at the foot of the list, in
+# its blank bottom padding (or beside the last answer's icons, which sit on the left), is one no
+# control takes, so the list puts the keyboard away (keyboardShouldPersistTaps="handled"). The list
+# is at its end after every answer and every tap on a chart, so with the keyboard down it does nothing.
+- tapOn:
+    id: revo-messages
+    point: '50%,97%'
+- waitForAnimationToEnd:
+    timeout: 2000
 - scrollUntilVisible:
     element:
       id: ${ID}
