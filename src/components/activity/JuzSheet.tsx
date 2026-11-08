@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
+import { AddToPlanLink } from './AddToPlanLink';
 import * as firestoreService from '../../services/firestoreService';
 import { juzSheetModel, type JuzCellState } from '../../lib/juzSheet';
 import { shiftDay } from '../../lib/journal';
@@ -60,6 +61,7 @@ export function JuzSheet({
   windowInTheLast,
   onOpenPage,
   onPlanIt,
+  onAddToPlan,
   firstTomorrow,
 }: {
   /** The juz shown; null closes the sheet. */
@@ -77,6 +79,8 @@ export function JuzSheet({
   onOpenPage: (page: number) => void;
   /** A stale juz: put its memorized pages first tomorrow (the untouched row's Plan it). */
   onPlanIt?: (pages: number[]) => void;
+  /** A custom plan: "Add to plan" beside "First tomorrow", once Plan it is done (ACT-24). */
+  onAddToPlan?: (pages: number[]) => void;
   /** Pages already first tomorrow: Plan it shows "First tomorrow ✓" instead (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
 }) {
@@ -176,11 +180,23 @@ export function JuzSheet({
               {model.times ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`   ${model.times}`}</ChromeText> : null}
             </ChromeText>
             {model.stale && onPlanIt && allFirstTomorrow(model.memorizedPages, firstTomorrow ?? new Set()) ? (
-              <View style={styles.planIt} accessible accessibilityLabel="Goes first tomorrow" testID="juz-sheet-plan-it-done">
-                <Ionicons name="checkmark" size={16} color={palette.secondary} />
-                <ChromeText style={[typeV2.name, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                  First tomorrow
-                </ChromeText>
+              <View style={styles.doneRow}>
+                <View style={styles.planIt} accessible accessibilityLabel="Goes first tomorrow" testID="juz-sheet-plan-it-done">
+                  <Ionicons name="checkmark" size={16} color={palette.secondary} />
+                  <ChromeText style={[typeV2.name, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                    First tomorrow
+                  </ChromeText>
+                </View>
+                {onAddToPlan ? (
+                  <AddToPlanLink
+                    onPress={() => {
+                      const planned = model.memorizedPages;
+                      closeThen(() => onAddToPlan(planned));
+                    }}
+                    maxScale={MAX_SCALE}
+                    testID="juz-sheet-add-to-plan"
+                  />
+                ) : null}
               </View>
             ) : model.stale && onPlanIt && model.memorizedPages.length > 0 ? (
               <Tap
@@ -290,6 +306,7 @@ const styles = StyleSheet.create({
   head: { paddingTop: 4, paddingBottom: 12, gap: 6 },
   headLine: { flexWrap: 'wrap' },
   planIt: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  doneRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 16, rowGap: 4 },
   strip: { flexDirection: 'row', gap: 3 },
   cell: { flex: 1, height: 28, borderRadius: 5 },
   ends: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 6 },

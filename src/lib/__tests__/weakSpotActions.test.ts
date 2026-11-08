@@ -1,4 +1,4 @@
-import { allFirstTomorrow, carryForTomorrow, firstTomorrowPages, firstTomorrowText, planItAction, putFirstTomorrow } from '../weakSpotActions';
+import { addToPlanDay, allFirstTomorrow, carryForTomorrow, firstTomorrowPages, firstTomorrowText, putFirstTomorrow } from '../weakSpotActions';
 
 describe('weak spots’ actions (Insights)', () => {
   it('“Revise these first tomorrow”: the weak pages lead tomorrow’s carry', () => {
@@ -37,9 +37,9 @@ describe('weak spots’ actions (Insights)', () => {
     });
   });
 
-  it('“Plan it” works for every plan type: a custom plan opens its day, the others carry', () => {
-    expect(planItAction(true)).toBe('plan-day');
-    expect(planItAction(false)).toBe('carry');
+  it('“Add to plan” adds the pages after the plan day’s own, never in place of them, none twice', () => {
+    expect(addToPlanDay([590, 591], [562, 563, 590])).toEqual([590, 591, 562, 563]);
+    expect(addToPlanDay([], [562])).toEqual([562]);
   });
 });
 

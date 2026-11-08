@@ -363,6 +363,17 @@ describe('a day in the new design', () => {
     expect(mockNavigation.goBack).toHaveBeenCalled();
   });
 
+  it('[ACT-24] from “Add to plan”: the pages added to the day are an edit, saying it is every cycle; back hands them to the plan', async () => {
+    mockRoute.params = { dayIndex: 1, initialPages: [1, 2, 3, 4], basePages: [1, 2], note: 'Saving the plan adds Al-Baqarah 1–16 to this day in every cycle.' };
+    await mount(<PlanDayEditScreen />);
+    expect(screen.getByTestId('plan-day-note').props.children).toMatch(/every cycle\.$/);
+    expect(screen.getByText(/Edited$/)).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Back to schedule'));
+    // Into the plan's draft, which is saved from the plan (nothing is saved here).
+    expect(mockNavigation.popTo).toHaveBeenCalledWith('PlanEdit', { editedDay: { index: 1, pages: [1, 2, 3, 4] } }, { merge: true });
+    expect(mockNavigation.goBack).not.toHaveBeenCalled();
+  });
+
   it('the picker: search on the quiet fill, pill tabs, rows checked in ink', async () => {
     await mount(<PlanDayEditScreen />);
     fireEvent.press(screen.getByTestId('day-pick'));

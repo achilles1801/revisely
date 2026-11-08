@@ -18,6 +18,15 @@ function resetPager() {
 
 /** Pass to Phone.open: the app opens on Home. */
 export function homeStack(mods: Booted): ReactElement {
+  return homeStackWith(mods, {});
+}
+
+/** Home's stack with the Activity screen real (Overview and Insights), the rest of "elsewhere" empty. */
+export function activityStack(mods: Booted): ReactElement {
+  return homeStackWith(mods, { Activity: mods.require<any>('src/screens/activity/ActivityScreen').default });
+}
+
+function homeStackWith(mods: Booted, real: Record<string, unknown>): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
@@ -47,7 +56,7 @@ export function homeStack(mods: Booted): ReactElement {
       h(Stack.Screen, { name: 'Memorization', component: Manager }),
       h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
       ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights'].map(
-        (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
+        (name) => h(Stack.Screen, { key: name, name, component: real[name] ?? Elsewhere }),
       ),
     ),
     ),

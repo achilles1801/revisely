@@ -62,7 +62,8 @@ import { previousIsoDay } from '../../lib/streak';
 import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
 import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import { PLAN_IT_DAY_INDEX, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { addToPlanParams, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { describePassage } from '../../lib/passages';
 import { shiftDay } from '../../lib/journal';
 
@@ -127,7 +128,7 @@ export default function ActivityDayScreen() {
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
   // An add the day's blocks offer to undo (MEM-3), shown on the screen, above the tab bar and Revo.
   const [undoOffer, setUndoOffer] = useState<UndoOffer | null>(null);
-  const { day: today } = useRevisionDay(user);
+  const { day: today, date: revisionDate } = useRevisionDay(user);
   // A session of whole juz on the juz plan reads "Juz 1" (lib/pageRanges describeRevised).
   const juzPlan = user?.scheduleMode === 'juz';
   // The Revised and Memorized blocks from items replace the session rows and the log's copies (C2).
@@ -469,7 +470,8 @@ export default function ActivityDayScreen() {
                   .catch((err) => logger.warn('Could not put the pages first tomorrow', err));
               }}
               onEditSchedule={() => navigation.navigate('PlanEdit')}
-              onAddToPlan={(memorizedToday) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: memorizedToday })}
+              // Added to tomorrow's day of the plan, beside its own pages (it opened with these alone).
+              onAddToPlan={(memorizedToday) => user && navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, memorizedToday))}
               onUndoOffer={setUndoOffer}
             />
           )}

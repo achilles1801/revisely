@@ -41,6 +41,8 @@ interface Props {
   /** Weak spots' actions (Insights): the weak pages to tomorrow's front; the untouched juz to the plan. */
   onReviseTomorrow: (weak: number[]) => void;
   onPlanIt: (pages: number[]) => void;
+  /** A custom plan's "Add to plan" under Plan it's "First tomorrow" (ACT-24). */
+  onAddToPlan?: (pages: number[]) => void;
   /** A weak spot's row: the reader at that page. */
   onOpenPage: (page: number) => void;
   /** Pages already first tomorrow (Insights' carry): their buttons show they're done (ACT-24). */
@@ -57,7 +59,7 @@ interface Props {
   onViewChange?: (view: ViewKind) => void;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const [view, setView] = useState<ViewKind>('calendar');
@@ -279,6 +281,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           onOpenCalendar={openCalendar}
           onReviseTomorrow={onReviseTomorrow}
           onPlanIt={onPlanIt}
+          onAddToPlan={onAddToPlan}
           onOpenPage={onOpenPage}
           onSeeAllPages={onSeeAllPages}
           onTurnOnSmartTracking={onTurnOnSmartTracking}

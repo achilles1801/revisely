@@ -9,6 +9,7 @@ import Svg, { Polyline } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { CHROME_MAX_SCALE, ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
+import { AddToPlanLink } from './AddToPlanLink';
 import { typeV2 } from '../../theme/v2';
 import { lastRevisedByPage } from '../../lib/activityInsights';
 import {
@@ -78,9 +79,20 @@ export interface InsightsData {
   firstTomorrow?: ReadonlySet<number>;
 }
 
-/** A button's done state once its pages go first tomorrow: quiet, with a check, not tappable twice. */
-function FirstTomorrowDone({ pill, testID }: { pill?: boolean; testID: string }) {
+/**
+ * A button's done state once its pages go first tomorrow: quiet, with a check, not tappable twice. On a
+ * custom plan, Plan it's has "Add to plan" under it, the deliberate step to keep them in the plan.
+ */
+function FirstTomorrowDone({ pill, testID, onAddToPlan }: { pill?: boolean; testID: string; onAddToPlan?: () => void }) {
   const { palette } = useTheme();
+  if (onAddToPlan) {
+    return (
+      <View style={styles.doneStack}>
+        <FirstTomorrowDone pill={pill} testID={testID} />
+        <AddToPlanLink onPress={onAddToPlan} testID={testID.replace(/-done$/, '-add-to-plan')} />
+      </View>
+    );
+  }
   return (
     <View
       style={pill ? [styles.outlinePill, styles.donePill, { borderColor: palette.separator }] : styles.doneLink}
@@ -99,6 +111,7 @@ export function InsightsView({
   data,
   onReviseTomorrow,
   onPlanIt,
+  onAddToPlan,
   onOpenPage,
   onSeeAllPages,
   onTurnOnSmartTracking,
@@ -108,6 +121,8 @@ export function InsightsView({
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
   onPlanIt: (pages: number[]) => void;
+  /** A custom plan: "Add to plan" under Plan it's "First tomorrow" (ACT-24). */
+  onAddToPlan?: (pages: number[]) => void;
   onOpenPage: (page: number) => void;
   /** Weak spots' "See all pages by strength": every revised page, weakest first (ACT-12). */
   onSeeAllPages?: () => void;
@@ -127,7 +142,7 @@ export function InsightsView({
   };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} onOpenJuz={openJuz} />
+      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} />
       <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
       {data.smartTracking !== false ? (
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
@@ -147,6 +162,7 @@ export function InsightsView({
           windowInTheLast={rangeSpan(data.range ?? 30, data.today, data.firstDay).inTheLast}
           onOpenPage={onOpenPage}
           onPlanIt={onPlanIt}
+          onAddToPlan={onAddToPlan}
           firstTomorrow={data.firstTomorrow}
         />
       ) : null}
@@ -240,7 +256,17 @@ function Figure({
 
 // ── Coverage ─────────────────────────────────────────────────────────────
 
-function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt: (pages: number[]) => void; onOpenJuz: (juz: number) => void }) {
+function Coverage({
+  data,
+  onPlanIt,
+  onAddToPlan,
+  onOpenJuz,
+}: {
+  data: InsightsData;
+  onPlanIt: (pages: number[]) => void;
+  onAddToPlan?: (pages: number[]) => void;
+  onOpenJuz: (juz: number) => void;
+}) {
   const { palette } = useTheme();
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const days = span.window;
@@ -369,7 +395,10 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
           </View>
           </Tap>
           {allFirstTomorrow(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)), data.firstTomorrow ?? new Set()) ? (
-            <FirstTomorrowDone testID="insights-plan-it-done" />
+            <FirstTomorrowDone
+              testID="insights-plan-it-done"
+              onAddToPlan={onAddToPlan ? () => onAddToPlan(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p))) : undefined}
+            />
           ) : (
             <Tap
               onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
@@ -966,6 +995,7 @@ const styles = StyleSheet.create({
   pattern: { marginTop: 10 },
   donePill: { flexDirection: 'row', gap: 6 },
   doneLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  doneStack: { alignItems: 'flex-end', gap: 6 },
   uncoveredRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   uncoveredMark: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   uncoveredFoot: { paddingTop: 12, paddingBottom: 8 },

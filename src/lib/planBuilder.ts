@@ -7,7 +7,8 @@
  * user revises today.
  */
 import type { CustomPlan, User, UserPage } from '../types';
-import { buildOneJuzPerDayPlanDays } from './algorithm';
+import { buildOneJuzPerDayPlanDays, scheduledDaysFrom } from './algorithm';
+import { dateToLocalISODay } from './schedulePlans';
 
 export type PlanDirection = 'forward' | 'reverse';
 
@@ -222,6 +223,17 @@ function startOfLocalDay(date: Date): Date {
  * If the cycle hasn't started yet (anchor in the future after "push back a
  * day"), the plan is returned unrotated.
  */
+/**
+ * A custom plan's days as the plan editor shows them, today first: with a carry-over shift, as they
+ * are now scheduled; otherwise the plan rotated to today. Empty without a custom plan.
+ */
+export function liveCustomPlanDays(user: User, memorizedPages: UserPage[], revisionDate: Date): number[][] {
+  const plan = user.customPlan;
+  if (!plan || plan.days.length === 0) return [];
+  const shifted = (user.scheduleShiftPages ?? 0) > 0 && plan.cycleStartDate <= dateToLocalISODay(revisionDate);
+  return shifted ? scheduledDaysFrom(user, memorizedPages, revisionDate, plan.days.length) : rotateCustomPlanToToday(plan, revisionDate);
+}
+
 export function rotateCustomPlanToToday(
   plan: Pick<CustomPlan, 'days' | 'cycleStartDate'>,
   today: Date = new Date(),
