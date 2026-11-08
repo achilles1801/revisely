@@ -20,6 +20,7 @@ import { juzAttachment } from '../../lib/revo/attachments';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { logger } from '../../lib/logger';
 import { smartTrackingOn } from '../../lib/smartTracking';
+import { allFirstTomorrow } from '../../lib/weakSpotActions';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
@@ -59,6 +60,7 @@ export function JuzSheet({
   windowInTheLast,
   onOpenPage,
   onPlanIt,
+  firstTomorrow,
 }: {
   /** The juz shown; null closes the sheet. */
   juz: number | null;
@@ -75,6 +77,8 @@ export function JuzSheet({
   onOpenPage: (page: number) => void;
   /** A stale juz: put its memorized pages first tomorrow (the untouched row's Plan it). */
   onPlanIt?: (pages: number[]) => void;
+  /** Pages already first tomorrow: Plan it shows "First tomorrow ✓" instead (ACT-24). */
+  firstTomorrow?: ReadonlySet<number>;
 }) {
   const { palette } = useTheme();
   const { pages, user } = useApp();
@@ -122,9 +126,9 @@ export function JuzSheet({
     model && revoAvailable(user)
       ? () => {
           const src = revo.sources();
-          if (!src) return;
-          const attach = juzAttachment(model.juz, prepare(src));
-          closeThen(() => openRevo({ attach }));
+          // Without the account's figures yet, Revo still opens (the juz isn't attached): never a dead tap.
+          const attach = src ? juzAttachment(model.juz, prepare(src)) : undefined;
+          closeThen(() => openRevo(attach ? { attach } : {}));
         }
       : null;
 
@@ -170,7 +174,14 @@ export function JuzSheet({
               </ChromeText>
               {model.times ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`   ${model.times}`}</ChromeText> : null}
             </ChromeText>
-            {model.stale && onPlanIt && model.memorizedPages.length > 0 ? (
+            {model.stale && onPlanIt && allFirstTomorrow(model.memorizedPages, firstTomorrow ?? new Set()) ? (
+              <View style={styles.planIt} accessible accessibilityLabel="Goes first tomorrow" testID="juz-sheet-plan-it-done">
+                <Ionicons name="checkmark" size={16} color={palette.secondary} />
+                <ChromeText style={[typeV2.name, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                  First tomorrow
+                </ChromeText>
+              </View>
+            ) : model.stale && onPlanIt && model.memorizedPages.length > 0 ? (
               <Tap
                 onPress={() => {
                   const planned = model.memorizedPages;

@@ -161,3 +161,29 @@ export function memorizedIn(items: { day: string; pages: number[] }[], today: st
     return age >= 0 && age < range;
   }).reduce((n, i) => n + i.pages.length, 0);
 }
+
+/**
+ * Pace week by week (All time, the NOTE's table): minutes a page of each week's timed revisions, oldest
+ * first, the last week ending today; null for a week with none. At most `weeks` weeks, from the first
+ * week that has any.
+ */
+export function weeklyPace(
+  revised: { day: string; countsFor?: string; pages: number[]; minutes: number | null }[],
+  today: string,
+  weeks = 26,
+): (number | null)[] {
+  const sums = Array.from({ length: weeks }, () => ({ minutes: 0, pages: 0 }));
+  for (const r of revised) {
+    if (r.countsFor != null && r.countsFor !== r.day) continue;
+    if (r.minutes == null || r.minutes <= 0 || r.pages.length === 0) continue;
+    const age = daysBetween(r.day, today);
+    if (age < 0) continue;
+    const w = weeks - 1 - Math.floor(age / 7);
+    if (w < 0) continue;
+    sums[w].minutes += r.minutes;
+    sums[w].pages += r.pages.length;
+  }
+  const out = sums.map((s) => (s.pages > 0 ? s.minutes / s.pages : null));
+  const first = out.findIndex((v) => v != null);
+  return first < 0 ? [] : out.slice(first);
+}

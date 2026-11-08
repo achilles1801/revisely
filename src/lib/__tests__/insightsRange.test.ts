@@ -10,6 +10,7 @@ import {
   missedPattern,
   parseRange,
   rangeWords,
+  weeklyPace,
   weeksGrid,
 } from '../insightsRange';
 
@@ -108,5 +109,20 @@ describe('Insights’ range', () => {
     expect(memorizedIn(items, TODAY, 7)).toBe(1);
     expect(memorizedIn(items, TODAY, 30)).toBe(3);
     expect(memorizedIn(items, TODAY, 90)).toBe(3);
+  });
+});
+
+describe('Pace week by week (All time)', () => {
+  it('each week’s minutes a page, oldest first, from the first week with any; a week with none is null', () => {
+    const revised = [
+      { day: TODAY, countsFor: TODAY, pages: [1, 2], minutes: 4 },
+      { day: shift(TODAY, -3), countsFor: shift(TODAY, -3), pages: [1, 2], minutes: 2 },
+      { day: shift(TODAY, -15), countsFor: shift(TODAY, -15), pages: [1, 2, 3, 4], minutes: 10 },
+      // Untimed and credited ahead: not counted.
+      { day: shift(TODAY, -8), countsFor: shift(TODAY, -8), pages: [1], minutes: null },
+      { day: TODAY, countsFor: shift(TODAY, 1), pages: [5], minutes: 9 },
+    ];
+    expect(weeklyPace(revised, TODAY, 26)).toEqual([2.5, null, 1.5]);
+    expect(weeklyPace([], TODAY)).toEqual([]);
   });
 });

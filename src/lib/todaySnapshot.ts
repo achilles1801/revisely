@@ -33,6 +33,8 @@ export interface TodaySnapshot {
   status: TodayStatus;
   /** Carried pages still to revise. */
   carriedLeft: number;
+  /** The carried pages were put there by Insights ("Revise these first tomorrow"), not left over. */
+  carriedFromInsights: boolean;
   /** The streak, and the days behind it, as Home reads it. */
   streak: StreakDetail;
 }
@@ -96,6 +98,7 @@ export function todaySnapshot(input: {
     pagesDone: list.filter((p) => done.has(p)).length,
     status,
     carriedLeft: carried.filter((p) => !done.has(p)).length,
+    carriedFromInsights: carryOverOn(user, day)?.source === 'insights',
     streak,
   };
 }

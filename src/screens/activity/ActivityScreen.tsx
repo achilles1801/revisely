@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -25,7 +25,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
 import { journalFirstDay, shiftDay } from '../../lib/journal';
-import { carryForTomorrow, planItAction, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
+import { firstTomorrowPages, planItAction, PLAN_IT_DAY_INDEX, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { describePassage } from '../../lib/passages';
+import { logger } from '../../lib/logger';
+import { UndoToast } from '../../components/revision/UndoToast';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { Tap } from '../../components/v2/Tap';
@@ -52,13 +55,27 @@ export default function ActivityScreen() {
 
   // The day picked in the calendar (today until one is tapped).
   const [pickedDay, setPickedDay] = useState<string | null>(null);
-  // "Revise these first tomorrow" (Insights): the weak pages lead tomorrow's session, labelled From Insights.
+  // "Revise these first tomorrow" (Insights): the weak pages lead tomorrow's session, labelled From Insights,
+  // in front of its own pages (ACT-24). A toast says so, with Undo (it put the carry back as it was);
+  // before, the tap saved with no sign of it and read as a dead button (Majd, Nov 8 2026).
+  const [carryToast, setCarryToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  const userRef = useRef(user);
+  userRef.current = user;
   const reviseTomorrow = (weak: number[]) => {
-    if (!user) return;
-    void saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(today, 1), weak, user.carryOver) });
+    if (!user || weak.length === 0) return;
+    putFirstTomorrow({ user, saveUser, today, pages: weak, name: describePassage(weak, { form: 'short' }), latest: () => userRef.current })
+      .then(({ text, undo }) =>
+        setCarryToast({ text, undo: () => void undo().catch((err) => logger.warn('Could not undo "first tomorrow"', err)) }),
+      )
+      .catch((err) => {
+        logger.warn('Could not put pages first tomorrow', err);
+        setCarryToast({ text: "Couldn't put them first tomorrow. Try again." });
+      });
   };
 
   const { day: today } = useRevisionDay(user);
+  // Pages already first tomorrow: their buttons say so ("First tomorrow ✓") and can't be tapped again.
+  const firstTomorrow = useMemo(() => firstTomorrowPages(user, shiftDay(today, 1)), [user, today]);
   const { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh } = useActivitySources();
   const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
 
@@ -123,6 +140,7 @@ export default function ActivityScreen() {
               noteDays={noteDays}
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
+              firstTomorrow={firstTomorrow}
               // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
               onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
@@ -168,6 +186,19 @@ export default function ActivityScreen() {
           ) : null}
         </ScrollView>
       )}
+      <UndoToast
+        visible={carryToast != null}
+        message={carryToast?.text ?? ''}
+        onUndo={carryToast?.undo ? () => {
+          const undo = carryToast.undo;
+          setCarryToast(null);
+          undo?.();
+        } : undefined}
+        actionLabel="Undo"
+        duration={6000}
+        onDismiss={() => setCarryToast(null)}
+        bottomInset={tabFootprint}
+      />
     </TopSafeAreaView>
   );
 }

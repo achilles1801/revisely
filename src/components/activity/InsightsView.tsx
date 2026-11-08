@@ -5,6 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Polyline } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { CHROME_MAX_SCALE, ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
@@ -30,6 +31,7 @@ import {
   type JuzTile,
 } from '../../lib/insightsView';
 import { getPagesForJuz } from '../../lib/quranData';
+import { allFirstTomorrow } from '../../lib/weakSpotActions';
 import { openRevo } from '../../lib/revo/open';
 import { spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
@@ -44,6 +46,7 @@ import {
   memorizedIn,
   missedPattern,
   rangeSpan,
+  weeklyPace,
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
@@ -71,6 +74,25 @@ export interface InsightsData {
   firstDay?: string | null;
   /** Each memorized page's last revision on record (all time), for how long ago a page was revised. */
   lastRevisedOn?: Map<number, string>;
+  /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
+  firstTomorrow?: ReadonlySet<number>;
+}
+
+/** A button's done state once its pages go first tomorrow: quiet, with a check, not tappable twice. */
+function FirstTomorrowDone({ pill, testID }: { pill?: boolean; testID: string }) {
+  const { palette } = useTheme();
+  return (
+    <View
+      style={pill ? [styles.outlinePill, styles.donePill, { borderColor: palette.separator }] : styles.doneLink}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel="Goes first tomorrow"
+      testID={testID}
+    >
+      <Ionicons name="checkmark" size={16} color={palette.secondary} />
+      <ChromeText style={[typeV2.name, { color: palette.secondary }]}>First tomorrow</ChromeText>
+    </View>
+  );
 }
 
 export function InsightsView({
@@ -125,6 +147,7 @@ export function InsightsView({
           windowInTheLast={rangeSpan(data.range ?? 30, data.today, data.firstDay).inTheLast}
           onOpenPage={onOpenPage}
           onPlanIt={onPlanIt}
+          firstTomorrow={data.firstTomorrow}
         />
       ) : null}
     </View>
@@ -345,15 +368,19 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
             </ChromeText>
           </View>
           </Tap>
-          <Tap
-            onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
-            accessibilityRole="button"
-            accessibilityLabel={`Plan Juz ${untouched.first.juz}`}
-            hitSlop={10}
-            testID="insights-plan-it"
-          >
-            <ChromeText style={[typeV2.name, { color: palette.link }]}>Plan it</ChromeText>
-          </Tap>
+          {allFirstTomorrow(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)), data.firstTomorrow ?? new Set()) ? (
+            <FirstTomorrowDone testID="insights-plan-it-done" />
+          ) : (
+            <Tap
+              onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
+              accessibilityRole="button"
+              accessibilityLabel={`Plan Juz ${untouched.first.juz}`}
+              hitSlop={10}
+              testID="insights-plan-it"
+            >
+              <ChromeText style={[typeV2.name, { color: palette.link }]}>Plan it</ChromeText>
+            </Tap>
+          )}
         </View>
       ) : null}
       {uncoveredUsed ? (
@@ -666,7 +693,9 @@ function WeakSpots({
           ))}
         </View>
       )}
-      {rows.length > 0 ? (
+      {rows.length > 0 && allFirstTomorrow(pages, data.firstTomorrow ?? new Set()) ? (
+        <FirstTomorrowDone pill testID="insights-revise-tomorrow-done" />
+      ) : rows.length > 0 ? (
         <Tap
           onPress={() => onReviseTomorrow(pages)}
           accessibilityRole="button"
@@ -809,6 +838,34 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
 
 // ── Pace ─────────────────────────────────────────────────────────────────
 
+/** All time's Pace week by week (the NOTE's table): a line of each week's minutes a page, and its ends. */
+function WeekByWeek({ revised, today }: { revised: InsightsData['revised']; today: string }) {
+  const { palette } = useTheme();
+  const [width, setWidth] = useState(0);
+  const weeks = useMemo(() => weeklyPace(revised, today), [revised, today]);
+  const known = weeks.map((v, i) => ({ v, i })).filter((w): w is { v: number; i: number } => w.v != null);
+  if (known.length < 2) return null;
+  const lo = Math.min(...known.map((w) => w.v));
+  const hi = Math.max(...known.map((w) => w.v));
+  const h = 40;
+  const x = (i: number) => (weeks.length <= 1 ? 0 : 3 + (i / (weeks.length - 1)) * Math.max(0, width - 6));
+  const y = (v: number) => (hi - lo < 0.01 ? h / 2 : 4 + ((hi - v) / (hi - lo)) * (h - 8));
+  const first = known[0].v;
+  const last = known[known.length - 1].v;
+  return (
+    <View style={styles.weekByWeek} testID="insights-pace-weeks">
+      <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`Week by week: ${formatPace(first)} → ${formatPace(last)} min a page`}</ChromeText>
+      <View style={styles.weekLine} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        {width > 0 ? (
+          <Svg width={width} height={h}>
+            <Polyline points={known.map((w) => `${x(w.i)},${y(w.v)}`).join(' ')} fill="none" stroke={palette.primary} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          </Svg>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
   const { palette } = useTheme();
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
@@ -845,6 +902,7 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
           <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{`A ${p.capacity}-page day at that pace`}</ChromeText>
         </View>
       </View>
+      {span.all ? <WeekByWeek revised={data.revised} today={data.today} /> : null}
       <Tap
         onPress={() => {
           setSheetUsed(true);
@@ -906,6 +964,8 @@ const styles = StyleSheet.create({
   gridCol: { flex: 1, gap: 4 },
   gridCell: { aspectRatio: 1, borderRadius: 4 },
   pattern: { marginTop: 10 },
+  donePill: { flexDirection: 'row', gap: 6 },
+  doneLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   uncoveredRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   uncoveredMark: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   uncoveredFoot: { paddingTop: 12, paddingBottom: 8 },
@@ -941,4 +1001,6 @@ const styles = StyleSheet.create({
   paceText: { marginTop: 4 },
   footnote: { marginTop: 10 },
   footnoteTap: { flexDirection: 'row', marginTop: 10, paddingVertical: 4 },
+  weekByWeek: { marginTop: 12, gap: 6 },
+  weekLine: { height: 40 },
 });

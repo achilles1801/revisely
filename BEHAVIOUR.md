@@ -328,7 +328,8 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-18.** Activity has two tabs, Overview and Insights. Overview's calendar shows a month or a week:
   a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
   the picked day (or else today) on screen. When the calendar shows another month or week than today's,
-  Today, beside the arrows, brings back today's with today picked. The picked day's whole preview opens
+  Today, beside the arrows, brings back today's with today picked: its cell highlighted as a tapped day's
+  is, and its preview below (Majd, Nov 8 2026). The picked day's whole preview opens
   that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
   that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
   weeks instead of month"; Open alone was easy to miss.)
@@ -357,8 +358,8 @@ How the tests are made: `tests/scenarios/README.md`.
   ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
   is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). All time reads from the
   account's first day: Coverage in cycles ("3.1 cycles of your 305 memorized pages since 9 September", since a
-  long range covers nearly everything), the weeks grid from the start (up to half a year), and no Pace
-  comparison. (Majd, Nov 7 2026: "why is
+  long range covers nearly everything), the weeks grid from the start (up to half a year), and Pace week by
+  week ("Week by week: 2.1 → 1.8 min a page") in place of a comparison. (Majd, Nov 7 2026: "why is
   insights restricted to just the last 30 days?"; mocks i1 and i2.)
 - **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
   too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305
@@ -372,6 +373,14 @@ How the tests are made: `tests/scenarios/README.md`.
   last on Monday") until it lets go. (Majd, Nov 7 2026: "why's none of the activity screen interactive?";
   mocks i7, i8, i10 and i11.)
 
+- **ACT-24.** "Revise these first tomorrow" (Weak spots), Plan it (the untouched juz, on a pages or juz plan),
+  the juz sheet's "Plan it for tomorrow first" and the Day's "Revise them tomorrow" put the pages in front of
+  tomorrow's session (Insights' carry). They come in addition to tomorrow's scheduled pages, never in place
+  of any: nothing shifts, whatever Keep daily amount says, and tomorrow is done (for the streak and Home's
+  Done) when its own pages are, with or without them. The session labels them From Insights, and Home says
+  "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
+  with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026:
+  "the buttons on the activity screen don't work": they saved, silently.)
 ## Ask coach
 
 - **COACH-1.** The coach answers only a previewTester account that has opted in. One answer is kept per insight and

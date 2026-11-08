@@ -155,13 +155,22 @@ export function ItemLine({
 }
 
 /** A page chip ("p. 562"): the same chip as a recording's pages (RecordingsList), mock d1. */
-export function PageChip({ label }: { label: string }) {
+/** A passage as a chip; with `onPress` it opens the reader there (it looks tappable, so it is). */
+export function PageChip({ label, onPress, testID }: { label: string; onPress?: () => void; testID?: string }) {
   const { palette } = useTheme();
-  return (
-    <View style={[styles.chip, { backgroundColor: palette.fill, borderColor: palette.separator }]}>
-      <Text style={[styles.chipText, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-        {label}
-      </Text>
+  const text = (
+    <Text style={[styles.chipText, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+      {label}
+    </Text>
+  );
+  const style = [styles.chip, { backgroundColor: palette.fill, borderColor: palette.separator }];
+  return onPress ? (
+    <Tap onPress={onPress} accessibilityRole="button" accessibilityHint="Opens in the reader" hitSlop={6} style={style} testID={testID}>
+      {text}
+    </Tap>
+  ) : (
+    <View style={style} testID={testID}>
+      {text}
     </View>
   );
 }

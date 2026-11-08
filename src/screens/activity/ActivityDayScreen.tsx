@@ -60,7 +60,8 @@ import { previousIsoDay } from '../../lib/streak';
 import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
 import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import { carryForTomorrow, PLAN_IT_DAY_INDEX } from '../../lib/weakSpotActions';
+import { PLAN_IT_DAY_INDEX, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { describePassage } from '../../lib/passages';
 import { shiftDay } from '../../lib/journal';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
@@ -116,6 +117,9 @@ export default function ActivityDayScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const scrolledToRecordingRef = useRef(false);
   const { user, logs, updateLog, deleteLog, pages, updatePages, saveUser } = useApp();
+  // The latest user, for an Undo that runs after other changes.
+  const userRef = useRef(user);
+  userRef.current = user;
   const { theme, palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
@@ -451,8 +455,12 @@ export default function ActivityDayScreen() {
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
               onDeleteReading={removeReading}
               // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.
+              // A toast says so, with Undo (ACT-24): the tap used to save with no sign of it.
               onReviseTomorrow={(memorizedToday) => {
-                if (user) void saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(today, 1), memorizedToday, user.carryOver) });
+                if (!user) return;
+                putFirstTomorrow({ user, saveUser, today, pages: memorizedToday, name: describePassage(memorizedToday, { form: 'short' }), latest: () => userRef.current })
+                  .then(({ text, undo }) => setUndoOffer({ text, undo: () => void undo().catch((err) => logger.warn('Could not undo "first tomorrow"', err)) }))
+                  .catch((err) => logger.warn('Could not put the pages first tomorrow', err));
               }}
               onEditSchedule={() => navigation.navigate('PlanEdit')}
               onAddToPlan={(memorizedToday) => navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: memorizedToday })}

@@ -43,6 +43,8 @@ interface Props {
   onPlanIt: (pages: number[]) => void;
   /** A weak spot's row: the reader at that page. */
   onOpenPage: (page: number) => void;
+  /** Pages already first tomorrow (Insights' carry): their buttons show they're done (ACT-24). */
+  firstTomorrow?: ReadonlySet<number>;
   /** Weak spots' "See all pages by strength" (ACT-12). */
   onSeeAllPages?: () => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
@@ -53,7 +55,7 @@ interface Props {
   onOpenDay: (day: string, block?: PreviewBlock) => void;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow }: Props) {
   const { pages, logs, user } = useApp();
   const [view, setView] = useState<ViewKind>('calendar');
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -74,11 +76,12 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     setSpanState(next);
     AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
   };
-  // Today (ACT-18): back to today's month or week, with today picked.
+  // Today (ACT-18): back to today's month or week, with today picked and highlighted as a tapped day is
+  // (Majd, Nov 8 2026: it came back to today's month without marking today).
   const toToday = () => {
     setMonth(today.slice(0, 7));
     setWeek(weekStartOf(today));
-    setPicked(null);
+    setPicked(today);
   };
   // Insights' range (ACT-22): one for the whole tab, kept on the phone like Week | Month.
   const [range, setRangeState] = useState<InsightsRange>(30);
@@ -264,6 +267,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             range,
             firstDay,
             lastRevisedOn,
+            firstTomorrow,
           }}
           onOpenDay={onOpenDay}
           onOpenCalendar={openCalendar}

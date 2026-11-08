@@ -88,7 +88,7 @@ describe('Activity: Overview', () => {
     await waitFor(async () => expect(await AsyncStorage.getItem('activity.calendarSpan')).toBe('week'));
   });
 
-  it('[ACT-18] away from today’s month, Today brings it back with today picked', async () => {
+  it('[ACT-18] away from today’s month, Today brings it back with today picked and highlighted', async () => {
     open();
     await screen.findByText('November 2026');
     expect(screen.queryByTestId('calendar-today')).toBeNull();
@@ -100,6 +100,10 @@ describe('Activity: Overview', () => {
     expect(await screen.findByText('November 2026')).toBeTruthy();
     expect(screen.queryByTestId('calendar-today')).toBeNull();
     expect(screen.getByTestId('preview-date').props.children).toBe('Thursday 5 November');
+    // Today is picked as a tapped day is: its cell highlighted (Majd, Nov 8 2026).
+    const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
+    expect(flat(screen.getByTestId('calendar-day-2026-11-05').props.style).backgroundColor).toBeDefined();
+    expect(flat(screen.getByTestId('calendar-day-2026-11-04').props.style).backgroundColor).toBeUndefined();
   });
 
   it('[ACT-18] the picked day’s whole preview opens the day: its date and Open at the top, each row at its block', async () => {
