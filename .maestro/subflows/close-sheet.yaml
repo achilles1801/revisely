@@ -1,8 +1,9 @@
-# Closes the v2/Sheet on show by its handle (id sheet-handle). Not by "Close": the full-screen backdrop
-# carries that label too and comes first, so Maestro tapped the middle of the screen, which on a tall,
-# scrolling sheet (the juz sheet) is the sheet itself: a page of its strip or a surah row opened the
-# reader (E2E 09, iOS and Android, Nov 8 2026).
+# Closes the v2/Sheet on show with a tap on its backdrop, near the top of the screen. A sheet is at most
+# 90% of the screen's height, so 8% down is always backdrop, below the status bar. Not "Close": the
+# handle is a plain view (it closes by a drag, or VoiceOver's activate), and the backdrop's own "Close"
+# is tapped at the screen's middle, which on a tall, scrolling sheet (the juz sheet) is the sheet itself:
+# a page of its strip or a surah row opened the reader (E2E 09, iOS and Android, Nov 8 2026).
 appId: com.revisionbuddy.app
 ---
 - tapOn:
-    id: sheet-handle
+    point: 50%, 8%
