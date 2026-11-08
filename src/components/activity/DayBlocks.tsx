@@ -40,6 +40,7 @@ import { memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../
 import { scheduledDaysFrom } from '../../lib/algorithm';
 import { AddMemorizedSheet, type SittingToAdd } from './AddMemorizedSheet';
 import { JuzSheet } from './JuzSheet';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import { juzOfPages } from '../../lib/juzSheet';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
@@ -169,7 +170,7 @@ export function DayBlocks({
   const [juzUsed, setJuzUsed] = useState(false);
   const { palette } = useTheme();
   // Strength only with Smart Tracking: without it no page is rated (ACT-19).
-  const smartTracking = user?.smartTrackingEnabled === true;
+  const smartTracking = smartTrackingOn(user);
   // Opened at a block: its place is told once, the first time it is laid out.
   const focusTold = useRef(false);
   const layoutFor = (kind: DayBlockKind) =>
