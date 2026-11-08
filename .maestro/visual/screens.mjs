@@ -61,6 +61,12 @@ export const SCREEN_MASKS = {
     ios: [{ x: 880, y: 360, w: 242, h: 60, why: 'prayer countdown' }],
     android: [{ x: 800, y: 279, w: 205, h: 53, why: 'prayer countdown' }],
   }),
+  // The log at 03:00 (04-fajr-boundary) opens on the note added from the day: its time, typed under a
+  // clock that runs on.
+  '04-daily-log': {
+    ios: [{ x: 316, y: 384, w: 210, h: 56, why: 'note time' }],
+    android: [{ x: 272, y: 296, w: 196, h: 50, why: 'note time' }],
+  },
   '05-daily-log-notes': {
     // Each note's time ("8:02pm"): when the flow typed it.
     ios: [
@@ -87,27 +93,30 @@ export const SCREEN_MASKS = {
   ),
   // All activity: the session's row, its minutes.
   ...Object.fromEntries(['11-see-all', '11-see-all-dark'].map((n) => [n, sessionMinutes(777, 640)])),
-  // The daily log: the Memorized entry's time ("12:03 pm").
+  // The daily log: the times ("12:03 pm") of the note added from the day (it opens the log, ACT-5)
+  // and of the Memorized entry under it.
   ...Object.fromEntries(
     ['11-daily-log', '11-daily-log-dark'].map((n) => [
       n,
       {
         ios: [
-          { x: 510, y: 384, w: 260, h: 56, why: 'note time' },
+          { x: 316, y: 384, w: 210, h: 56, why: 'note time' },
+          { x: 510, y: 606, w: 260, h: 56, why: 'entry time' },
           // Dark is shot straight after Add, with the To field still focused: its cursor blinks,
           // and the number pad stays up unless Maestro found the keyboard's Done bar (optional in
           // keyboard-done.yaml). Nothing on the log reaches that low, keyboard or not.
           ...(n.endsWith('-dark')
             ? [
-                { x: 858, y: 796, w: 20, h: 76, why: 'text cursor' },
+                { x: 858, y: 1018, w: 20, h: 76, why: 'text cursor' },
                 { x: 0, y: 1680, w: 1206, h: 894, why: 'keyboard (up or down)' },
               ]
             : []),
         ],
         android: [
-          { x: 430, y: 294, w: 230, h: 50, why: 'note time' },
+          { x: 272, y: 296, w: 196, h: 50, why: 'note time' },
+          { x: 430, y: 489, w: 230, h: 50, why: 'entry time' },
           // The To field keeps the focus after Add: its cursor blinks.
-          { x: 740, y: 660, w: 120, h: 76, why: 'text cursor' },
+          { x: 740, y: 855, w: 120, h: 76, why: 'text cursor' },
         ],
       },
     ]),

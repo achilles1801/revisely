@@ -1,12 +1,13 @@
-# A tester's sitting in the reader, then part of it added as memorized from the Day, by the ayah, and
+# A sitting in the reader, then part of it added as memorized from the Day, by the ayah, and
 # undone (the memorization flow approved Nov 7 2026). In the reader, the timer and a recording run
 # together; End stops both and one note says what was saved ("Saved to today: Al-Mulk, ayahs 1–12,
 # 1 min · View"), with no "Recording saved" of its own. View opens the Day: the sitting, named by its
 # ayahs, offers Add to memorized. The sheet opens on its ayahs; To moved back a few ayahs, Add shows
 # them at once ("Memorized, 8 ayahs", what finishes the page), and Undo takes them off again.
 # Rules (BEHAVIOUR.md): REC-1, REC-2, MEM-1, MEM-3, MEM-5
-# The account: onboarded (Juz 30 and Al-Fatihah memorized, so Al-Mulk's first page, 562, is not), then
-# marked a tester through the emulator, as the owner's script does: sittings are testers' only.
+# The account: onboarded (Juz 30 and Al-Fatihah memorized, so Al-Mulk's first page, 562, is not), and
+# not a tester: sittings and the Day's blocks are every account's since the November 2026 release
+# (sittingsEnabled, activityBlocksEnabled).
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -14,10 +15,6 @@ appId: com.revisionbuddy.app
     env:
       CLOCK: 2026-11-03T12:00
       BOUNDARY: midnight
-- runScript:
-    file: ../scripts/server-revo.js
-    env:
-      MODE: tester
 
 # The reader at Al-Mulk (page 562): Read → the surah's row.
 - tapOn:
@@ -254,8 +251,12 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: 13-add-memorized
+# Undo's toast is on a 6 s clock from here, and its animation keeps the screen from settling: no
+# waiting for it to settle until Undo (waiting cost 3 s on Add and 2–3 s more before the screenshot,
+# and Undo came as the toast went, iOS, Nov 8 2026).
 - tapOn:
     id: add-memorized-add
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     notVisible:
       id: add-memorized-sheet
@@ -270,13 +271,12 @@ appId: com.revisionbuddy.app
     id: activity-finishes-page
     text: "Al.Mulk.*12 finishes the page"
 - assertVisible: ".*marked memorized"
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: 13-day-memorized
+- takeScreenshot: 13-day-memorized
 
 # Undo (MEM-3): the ayahs come off; the Day has nothing memorized again and offers the page.
-- tapOn: "Undo"
+- tapOn:
+    text: "Undo"
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     notVisible:
       id: activity-block-memorized
