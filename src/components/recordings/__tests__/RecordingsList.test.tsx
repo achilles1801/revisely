@@ -257,7 +257,8 @@ describe("<RecordingsList /> recordings in the backup", () => {
     const { Alert } = require("react-native");
     const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
     await renderList();
-    fireEvent.press(screen.getByTestId("recording-r1-delete"));
+    // VoiceOver's Delete (there is no swipe to delete; a hold opens the menu).
+    fireEvent(screen.getByLabelText(/^Revision recording, /), "accessibilityAction", { nativeEvent: { actionName: "delete" } });
     expect(alert).toHaveBeenCalledWith(
       "Delete this recording?",
       expect.stringContaining("from your backup"),

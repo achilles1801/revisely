@@ -438,6 +438,7 @@ export default function ActivityDayScreen() {
                 void deleteLog(log.id);
               }}
               onDeleteMemorized={onDeleteMemorized}
+              onEditMemorized={(focusPages) => navigation.navigate('Memorization', { edit: true, focusPages })}
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
               onDeleteReading={removeReading}
               // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.

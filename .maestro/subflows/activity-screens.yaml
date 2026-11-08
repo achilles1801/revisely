@@ -58,6 +58,45 @@ appId: com.revisionbuddy.app
 - tapOn:
     text: "Close menu"
     optional: true
+# The Memorized block's menu: exactly Edit and Delete (ACT-6, Majd, Nov 8 2026). Edit opens the
+# memorized pages at the entry: Al-Mulk open and scrolled to, p. 562 ringed. Back returns to the day.
+- scrollUntilVisible:
+    element:
+      id: activity-block-memorized-header
+    direction: DOWN
+    timeout: 10000
+- longPressOn:
+    id: activity-block-memorized-header
+- extendedWaitUntil:
+    visible:
+      id: activity-row-menu
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-menu-memorized-${THEME}
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible:
+      id: memorization-v2
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-memorized-edit-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 10000
+# Back to the day's top, which the add sheets' mocks show behind them.
+- scrollUntilVisible:
+    element:
+      id: activity-block-revised-header
+    direction: UP
+    timeout: 10000
 # The + (d5): add to today.
 - tapOn:
     id: day-add

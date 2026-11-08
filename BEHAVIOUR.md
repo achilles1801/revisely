@@ -262,7 +262,10 @@ How the tests are made: `tests/scenarios/README.md`.
   window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
   header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
-  VoiceOver offers the same actions as custom actions on the header.
+  A Memorized entry's menu is exactly Edit and Delete (each named when the day has several entries); Edit opens
+  the memorized pages ready to edit, at that entry: its surah open and scrolled to, its pages ringed. A
+  recording has no swipe either: a hold opens its menu (Listen back, Delete). (Majd, Nov 8 2026.)
+  VoiceOver offers the same actions as custom actions on the header (a recording's Delete, on its play button).
   The menu is the iOS-style long-press menu: a preview of the held item (its label and text) with its actions
   beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
   The daily log's note menu is the same menu (Edit, and Copy when the note has text).

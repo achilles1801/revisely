@@ -1,6 +1,8 @@
 import React from "react";
 import { Alert, StyleSheet } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { State } from "react-native-gesture-handler";
+import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RecordingsList } from "../RecordingsList";
 import { RecordButton } from "../RecordButton";
@@ -412,11 +414,28 @@ describe("<RecordingsList /> as voice bubbles (Variant B)", () => {
     });
   });
 
-  it("swipe → Delete recording asks first, then deletes (hold opens the menu, as in the journal)", async () => {
+  // Majd, Nov 8 2026: the swipe to delete was "very ugly"; the hold and its menu stay.
+  it("no swipe to delete: a hold opens the menu, whose Delete asks first, then deletes", async () => {
     const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
     const onChanged = jest.fn();
     await renderV2(<RecordingsList day="2026-10-19" onChanged={onChanged} />);
-    fireEvent.press(screen.getByTestId("recording-r1-delete"));
+    expect(screen.queryByTestId("recording-r1-delete")).toBeNull();
+    act(() => {
+      fireGestureHandler(getByGestureTestId("recording-r1-hold"), [
+        { state: State.BEGAN },
+        { state: State.ACTIVE },
+        { state: State.END },
+      ]);
+    });
+    // runOnJS hands the hold back to the JS thread a moment later.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    fireEvent.press(screen.getByTestId("sheet-action-delete"));
+    act(() => {
+      const { Modal } = jest.requireActual("react-native");
+      screen.UNSAFE_getAllByType(Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
+    });
     expect(alert).toHaveBeenCalledWith(
       "Delete this recording?",
       "It cannot be recovered.",
@@ -433,6 +452,17 @@ describe("<RecordingsList /> as voice bubbles (Variant B)", () => {
     const { deleteRecording } = require("../../../lib/recordings");
     expect(deleteRecording).toHaveBeenCalledWith("r1");
     expect(onChanged).toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it("in a day's block: no swipe either, and VoiceOver finds Delete on the play button", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    await renderV2(<RecordingsList day="2026-10-19" variant="block" emptyText={null} />);
+    expect(screen.queryByTestId("recording-r1-delete")).toBeNull();
+    const play = screen.getByTestId("recording-play-r1");
+    expect(play.props.accessibilityActions).toEqual([{ name: "delete", label: "Delete recording" }]);
+    fireEvent(play, "accessibilityAction", { nativeEvent: { actionName: "delete" } });
+    expect(alert).toHaveBeenCalledWith("Delete this recording?", expect.any(String), expect.any(Array));
     alert.mockRestore();
   });
 

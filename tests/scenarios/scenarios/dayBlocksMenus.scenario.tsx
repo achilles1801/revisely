@@ -1,10 +1,12 @@
 // The Activity day's rows (ACT-6): a hold on a row under a block does nothing (notes are edited
 // in the daily log); a block header holds a menu of Edit and Delete, and VoiceOver offers the
-// same actions as custom actions.
+// same actions as custom actions. A Memorized entry's menu is exactly Edit and Delete, and Edit
+// opens the memorized pages at that entry (Majd, Nov 8 2026).
 import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { DayBlocks } from '../../../src/components/activity/DayBlocks';
 import * as firestoreService from '../../../src/services/firestoreService';
+import { plainText } from '../../../src/lib/passages';
 
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -26,7 +28,7 @@ jest.mock('../../../src/components/v2/ContextMenu', () => ({
 }));
 jest.mock('../../../src/lib/recordings', () => ({ listRecordings: jest.fn(async () => []) }));
 
-type Sheet = { visible: boolean; actions: { label: string }[] };
+type Sheet = { visible: boolean; actions: { key: string; label: string; onPress: () => void }[]; preview?: { label: string; text?: string } };
 const sheet = () => (globalThis as { __sheet?: Sheet }).__sheet ?? { visible: false, actions: [] };
 
 async function flush() {
@@ -76,5 +78,46 @@ describe('Activity day rows (ACT-6)', () => {
     expect(sheet().visible).toBe(true);
     expect(sheet().actions.some((a) => a.label.startsWith('Edit'))).toBe(true);
     expect(sheet().actions.some((a) => a.label.startsWith('Delete'))).toBe(true);
+  });
+
+  it('[ACT-6] a Memorized entry holds exactly Edit and Delete; Edit opens the memorized pages at it', async () => {
+    (firestoreService.getActivityItemsForDay as unknown as jest.Mock).mockResolvedValue({
+      revisions: [],
+      memorized: [{ id: 'm1', day: '2026-11-03', pages: [562, 563], minutes: 25 }],
+      reads: [],
+    });
+    const onEditMemorized = jest.fn();
+    const onDeleteMemorized = jest.fn();
+    const screen = render(
+      (<DayBlocks {...props} notes={[]} readings={[]} onEditMemorized={onEditMemorized} onDeleteMemorized={onDeleteMemorized} />) as never,
+    );
+    await flush();
+    const header = screen.getByLabelText('Memorized, 2 pages');
+    expect(header.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['edit-m1', 'delete-m1']);
+    fireEvent(header, 'longPress');
+    expect(sheet().visible).toBe(true);
+    expect(sheet().actions.map((a) => a.label)).toEqual(['Edit', 'Delete']);
+    // The preview names the entry, by surah.
+    expect(plainText(sheet().preview?.text ?? '')).toMatch(/^Al-Mulk/);
+    act(() => sheet().actions[0].onPress());
+    expect(onEditMemorized).toHaveBeenCalledWith([562, 563]);
+  });
+
+  it('[ACT-6] two Memorized entries: Edit and Delete for each, named', async () => {
+    (firestoreService.getActivityItemsForDay as unknown as jest.Mock).mockResolvedValue({
+      revisions: [],
+      memorized: [
+        { id: 'm1', day: '2026-11-03', pages: [562] },
+        { id: 'm2', day: '2026-11-03', pages: [1] },
+      ],
+      reads: [],
+    });
+    const screen = render((<DayBlocks {...props} notes={[]} readings={[]} onEditMemorized={jest.fn()} />) as never);
+    await flush();
+    fireEvent(screen.getByLabelText('Memorized, 2 pages'), 'longPress');
+    const labels = sheet().actions.map((a) => a.label);
+    expect(labels).toHaveLength(4);
+    expect(labels.filter((l) => l.startsWith('Edit '))).toHaveLength(2);
+    expect(labels.filter((l) => l.startsWith('Delete '))).toHaveLength(2);
   });
 });
