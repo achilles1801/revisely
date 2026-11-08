@@ -22,6 +22,18 @@ export const MAX_MONTHLY_CAP_USD = 1000;
 export function monthlyCapFrom(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_MONTHLY_CAP_USD ? value : MONTHLY_CAP_USD;
 }
+
+/**
+ * The share of the month's cap one UTC day may spend on Revo, unless config/coach.dailyCapUsd sets
+ * another: a burst (or one account's abuse) then rests Revo until the next UTC day, not the month.
+ */
+export const DAILY_CAP_SHARE = 0.1;
+
+/** The daily cap a config value gives: a number from 0 to the monthly cap, else DAILY_CAP_SHARE of it. */
+export function dailyCapFrom(value: unknown, monthly: number): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= monthly) return value;
+  return Math.round(monthly * DAILY_CAP_SHARE * 100) / 100;
+}
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type CoachErrorCode = 'unauthenticated' | 'permission-denied' | 'invalid-argument' | 'resource-exhausted' | 'unavailable';

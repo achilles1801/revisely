@@ -8,7 +8,8 @@ import { navigationRef } from '../../navigation/navigationRef';
 import { useTabBarHeight } from '../../navigation/TabBar';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../player/MiniPlayer';
 import { useMiniPlayer } from '../../lib/nowPlaying';
-import { REVO_BUTTON_ROUTES, revoAvailable } from '../../lib/revo/availability';
+import { refreshRevoRelease } from '../../lib/revo/release';
+import { REVO_BUTTON_ROUTES, useRevoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
 import { greetingState, nextOpens, type GreetingOpens } from '../../lib/revo/greeting';
@@ -71,20 +72,23 @@ function useKeyboardUp(): boolean {
 }
 
 /**
- * Revo in the app (previewTester accounts): its button on the main screens and its sheet. The
- * first tap opens the opt-in; after that, every open is a new conversation on a greeting written
- * then (REVO-34). An earlier one shows only when picked: in History, or today's Day in review from
+ * Revo in the app (the accounts its release opens it to: config/app.revo, REVO-37): its button on
+ * the main screens and its sheet. The first tap opens the opt-in; after that, every open is a new
+ * conversation on a greeting written then (REVO-34). An earlier one shows only when picked: in History, or today's Day in review from
  * its row under the greeting, which the button's dot points to until it is opened. Each evening
  * with something done, the day's review is written once (it never counts toward the day's questions).
  */
 export function RevoHost() {
   const { user } = useApp();
-  const available = revoAvailable(user);
-  if (!available || !user) return null;
-  return <RevoHostInner />;
+  const available = useRevoAvailable(user);
+  // An open sheet stays until it is closed, even when Revo is paused meanwhile (REVO-37): it says why,
+  // and only the button goes at once.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  if (!user || (!available && !sheetOpen)) return null;
+  return <RevoHostInner available={available} onOpenChange={setSheetOpen} />;
 }
 
-function RevoHostInner() {
+function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpenChange: (open: boolean) => void }) {
   const uid = auth.currentUser?.uid ?? '';
   useEffect(() => {
     setRevoPresent(true);
@@ -273,6 +277,7 @@ function RevoHostInner() {
     setOpen(false);
     Keyboard.dismiss();
   };
+  useEffect(() => onOpenChange(open), [open, onOpenChange]);
 
   const turnOn = async () => {
     setOptInBusy(true);
@@ -285,6 +290,8 @@ function RevoHostInner() {
       setFull(false);
     } catch (err) {
       setOptInError((err as Error)?.message ?? 'Revo isn’t available on this account.');
+      // Paused, or not open to this account (REVO-37): the switch is read again, so the button goes.
+      if ((err as { refusal?: string })?.refusal === 'paused') void refreshRevoRelease(true);
     } finally {
       setOptInBusy(false);
     }
@@ -307,7 +314,7 @@ function RevoHostInner() {
     setRevoButtonRoute(buttonRoute);
     return () => setRevoButtonRoute(false);
   }, [buttonRoute]);
-  const buttonShown = buttonRoute && !open && !keyboard;
+  const buttonShown = available && buttonRoute && !open && !keyboard;
   const bottom = tabBar + (miniPlayer ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0) + REVO_BUTTON_GAP;
 
   return (

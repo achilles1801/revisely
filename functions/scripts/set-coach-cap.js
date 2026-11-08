@@ -4,10 +4,16 @@
  * functions read; they pick a change up within a minute, with no deploy. Without it the cap
  * is MONTHLY_CAP_USD (functions/src/coach/handler.ts, $10). At most $1,000.
  *
+ * One UTC day may spend on Revo a tenth of the monthly cap, unless config/coach.dailyCapUsd sets
+ * another (0 to the monthly cap): past it Revo rests until the next UTC day, so a burst can't use up
+ * the month (REVO-4).
+ *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/set-coach-cap.js 200
- *   ... node scripts/set-coach-cap.js --show     # the cap and this month's spend
- *   ... node scripts/set-coach-cap.js --clear    # back to the default
+ *   ... node scripts/set-coach-cap.js --show          # the caps, this month's and today's spend
+ *   ... node scripts/set-coach-cap.js --daily 25      # one UTC day's cap
+ *   ... node scripts/set-coach-cap.js --daily-clear   # back to a tenth of the month
+ *   ... node scripts/set-coach-cap.js --clear         # the monthly cap back to the default
  */
 const admin = require('firebase-admin');
 
@@ -24,10 +30,34 @@ async function main() {
   const arg = process.argv[2];
   const ref = db.doc('config/coach');
   if (arg === '--show' || arg === undefined) {
-    const cap = (await ref.get()).get('monthlyCapUsd');
-    const month = new Date().toISOString().slice(0, 7);
+    const doc = await ref.get();
+    const cap = doc.get('monthlyCapUsd');
+    const monthly = typeof cap === 'number' ? cap : DEFAULT;
+    const daily = doc.get('dailyCapUsd');
+    const today = new Date().toISOString().slice(0, 10);
+    const month = today.slice(0, 7);
     const spent = (await db.doc(`coachLedger/${month}`).get()).get('spendUsd') ?? 0;
+    const spentToday = (await db.doc(`coachLedgerDay/${today}`).get()).get('spendUsd') ?? 0;
+    const dailyShown = typeof daily === 'number' && daily >= 0 && daily <= monthly ? daily : `${Math.round(monthly * 10) / 100} (a tenth of the month)`;
     console.log(`Cap: $${typeof cap === 'number' ? cap : `${DEFAULT} (default)`}. Spent in ${month}: $${Number(spent).toFixed(4)}.`);
+    console.log(`Daily cap (Revo): $${dailyShown}. Spent today (UTC): $${Number(spentToday).toFixed(4)}.`);
+    return;
+  }
+  if (arg === '--daily-clear') {
+    await ref.set({ dailyCapUsd: admin.firestore.FieldValue.delete() }, { merge: true });
+    console.log('Daily cap back to a tenth of the monthly cap.');
+    return;
+  }
+  if (arg === '--daily') {
+    const value = Number(process.argv[3]);
+    const cap = (await ref.get()).get('monthlyCapUsd');
+    const monthly = typeof cap === 'number' ? cap : DEFAULT;
+    if (!Number.isFinite(value) || value < 0 || value > monthly) {
+      console.error(`Usage: node scripts/set-coach-cap.js --daily <dollars, 0 to the monthly cap ($${monthly})>`);
+      process.exit(1);
+    }
+    await ref.set({ dailyCapUsd: value, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    console.log(`Daily cap set to $${value} (applies within a minute).`);
     return;
   }
   if (arg === '--clear') {
@@ -37,7 +67,7 @@ async function main() {
   }
   const value = Number(arg);
   if (!Number.isFinite(value) || value < 0 || value > MAX) {
-    console.error(`Usage: node scripts/set-coach-cap.js <dollars, 0 to ${MAX}> | --show | --clear`);
+    console.error(`Usage: node scripts/set-coach-cap.js <dollars, 0 to ${MAX}> | --daily <dollars> | --daily-clear | --show | --clear`);
     process.exit(1);
   }
   await ref.set({ monthlyCapUsd: value, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });

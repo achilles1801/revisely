@@ -253,4 +253,9 @@ export interface RevoAskResult {
 }
 
 /** Why a question was refused, as the app tells the user. */
-export type RevoRefusal = 'daily' | 'monthly' | 'off' | 'unavailable' | 'clock' | 'offline' | 'gone';
+/**
+ * Why a question was refused: the day's questions, the month's cap, the day's share of it (resting),
+ * Revo off on the account (the opt-in), off for everyone or not open to the account (paused, REVO-37),
+ * a failure, the phone's clock, offline, or a deleted chat.
+ */
+export type RevoRefusal = 'daily' | 'monthly' | 'resting' | 'off' | 'paused' | 'unavailable' | 'clock' | 'offline' | 'gone';

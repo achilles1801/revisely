@@ -17,6 +17,14 @@
  *                                writes it when android-build.yml has put a build
  *                                on internal testing (offered to previewTester
  *                                accounts only).
+ *   revo                         Who has Revo (REVO-37): testers (previewTester
+ *                                accounts; the same as unset), everyone (set at the
+ *                                production release), or off (nobody, testers
+ *                                included: an emergency). The functions apply it
+ *                                within a minute; phones at launch, back in front
+ *                                after 10 minutes, or at once when the server
+ *                                refuses Revo. Turning Revo off and deleting its
+ *                                data stay open to every account.
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
@@ -24,6 +32,9 @@
  *   ... node scripts/set-app-config.js --latest-android 1.0.4 --latest-android-code 7   # production, rolled out to all
  *   ... node scripts/set-app-config.js --min-ios 1.0.4 --min-android 1.0.4
  *   ... node scripts/set-app-config.js --clear-min               # nobody blocked
+ *   ... node scripts/set-app-config.js --revo everyone           # Revo for every account
+ *   ... node scripts/set-app-config.js --revo off                # Revo paused for everyone
+ *   ... node scripts/set-app-config.js --revo testers            # back to testers only
  *
  * A minimum above what the store has now is refused without --force: the app
  * would ignore it until the store caught up, then block everyone below it at once.
@@ -33,6 +44,7 @@ const admin = require('firebase-admin');
 
 const BUNDLE_ID = 'com.revisionbuddy.app';
 const VERSION = /^\d{1,4}(\.\d{1,4}){0,3}$/;
+const REVO = ['testers', 'everyone', 'off'];
 
 function compare(a, b) {
   const pa = a.split('.').map(Number);
@@ -54,6 +66,11 @@ function parseArgs(argv) {
       const v = argv[++i];
       if (!/^[1-9]\d{0,9}$/.test(v || '')) throw new Error(`${a} needs a version code like 7 (got ${v ?? 'nothing'})`);
       opts.latestAndroidCode = Number(v);
+    }
+    else if (a === '--revo') {
+      const v = argv[++i];
+      if (!REVO.includes(v)) throw new Error(`--revo needs one of ${REVO.join(', ')} (got ${v ?? 'nothing'})`);
+      opts.revo = v;
     }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
@@ -80,7 +97,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--force]',
     );
     process.exit(1);
   }
@@ -104,6 +121,7 @@ async function main() {
           minSupported: data.minSupported || {},
           latest: data.latest || {},
           testing: testing ? { android: { version: testing.version, code: testing.code } } : {},
+          revo: REVO.includes(data.revo) ? data.revo : 'testers (unset)',
         },
         null,
         2,
@@ -111,7 +129,7 @@ async function main() {
     );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
-  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin;
+  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo;
   if (opts.show || !changes) {
     show(current);
     return;
@@ -143,6 +161,7 @@ async function main() {
     // A version alone clears the old code: it belonged to another build.
     update['latest.androidCode'] = opts.latestAndroidCode || FieldValue.delete();
   }
+  if (opts.revo) update.revo = opts.revo;
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
     process.exit(1);

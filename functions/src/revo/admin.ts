@@ -2,6 +2,8 @@
  * Revo's Firestore store (firebase-admin). Only these functions write Revo's documents; the
  * rules let the owner read them and change only a few fields (firestore.rules).
  *   users/{uid}.previewTester                      read: the tester gate
+ *   config/app.revo                                read: who has Revo (release.ts, REVO-37), at most once a minute
+ *   config/coach, coachLedgerDay/{day}             read: the daily cap and the day's spend (REVO-4)
  *   users/{uid}.smartTrackingEnabled               read: whether Revo speaks of ratings (REVO-36)
  *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn; optIn is the Ask coach's
  *   revoUsage/{uid}                                { uid, day, count }: questions on that revision day
@@ -12,12 +14,25 @@
  *   coachLedger, coachLedgerDay                    the Ask coach's ledger, shared (coach/admin.ts)
  */
 import { FieldValue, Firestore } from 'firebase-admin/firestore';
-import { adminCoachStore } from '../coach/admin';
+import { adminCoachStore, coachCaps, spentOn } from '../coach/admin';
 import type { RevoStore } from './handler';
+import { RevoRelease, revoReleaseOf } from './release';
 import { REVO_ON, revoSettingsOf } from './settings';
 import type { CachedAnswer, RevoChat, RevoMemoryItem, StoredMessage } from './types';
 
 const chatsOf = (db: Firestore, uid: string) => db.collection(`users/${uid}/revoChats`);
+
+/** How long a read of config/app's release is used before reading it again (a change applies within this). */
+const RELEASE_CACHE_MS = 60_000;
+let releaseCache: { value: RevoRelease; until: number } | null = null;
+
+/** config/app.revo, read at most once a minute (every call in the emulator, where tests flip it). */
+export async function revoRelease(db: Firestore): Promise<RevoRelease> {
+  if (releaseCache && Date.now() < releaseCache.until) return releaseCache.value;
+  const value = revoReleaseOf((await db.doc('config/app').get()).get('revo'));
+  if (process.env.FUNCTIONS_EMULATOR !== 'true') releaseCache = { value, until: Date.now() + RELEASE_CACHE_MS };
+  return value;
+}
 const memoryOf = (db: Firestore, uid: string) => db.collection(`users/${uid}/revoMemory`);
 
 /** The account's cached answers deleted. Returns how many. */
@@ -88,6 +103,7 @@ export function adminRevoStore(db: Firestore): RevoStore {
   const messagesOf = (uid: string, chatId: string) => chatsOf(db, uid).doc(chatId).collection('messages');
 
   return {
+    release: () => revoRelease(db),
     async isPreviewTester(uid) {
       const snap = await db.doc(`users/${uid}`).get();
       return snap.exists && snap.get('previewTester') === true;
@@ -134,6 +150,8 @@ export function adminRevoStore(db: Firestore): RevoStore {
     },
     reserveSpend: (month, amount, cap) => coach.reserveSpend(month, amount, cap),
     monthlyCapUsd: () => coach.monthlyCapUsd!(),
+    dailyCapUsd: async () => (await coachCaps(db)).daily,
+    spentOn: (day) => spentOn(db, day),
     settleSpend: (month, reserved, actual, usage, day) => coach.settleSpend(month, reserved, actual, usage, day),
     async getChat(uid, chatId) {
       const snap = await chatsOf(db, uid).doc(chatId).get();

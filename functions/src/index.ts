@@ -314,8 +314,9 @@ export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, 
 });
 
 /**
- * Revo, the in-app assistant (previewTester accounts that turned it on): 10 new questions an
- * account a revision day, the Ask coach's monthly cap and key. See functions/src/revo/.
+ * Revo, the in-app assistant (the accounts config/app.revo opens it to, once turned on): 20 new
+ * questions an account a revision day, the Ask coach's monthly cap and key, and a daily share of
+ * the month. See functions/src/revo/.
  */
 function revoDeps(caller: CallerRequest) {
   return {
@@ -327,7 +328,10 @@ function revoDeps(caller: CallerRequest) {
   };
 }
 
-const REVO_CALL_OPTIONS = { enforceAppCheck: true, secrets: [ANTHROPIC_COACH_KEY], timeoutSeconds: 90, memory: '256MiB' as const, maxInstances: 3 };
+// Each call waits on the model for seconds, one call per instance: 3 instances served only 3 people
+// at once, and a 4th waited or was turned away. 30 is for Revo open to everyone (REVO-37); idle
+// instances cost nothing.
+const REVO_CALL_OPTIONS = { enforceAppCheck: true, secrets: [ANTHROPIC_COACH_KEY], timeoutSeconds: 90, memory: '256MiB' as const, maxInstances: 30 };
 
 /** A RevoError as the app sees it; anything else is logged (no content) and answered as internal. */
 function revoFailure(name: string, err: unknown, message: string): HttpsError {

@@ -13,7 +13,7 @@ import * as firestoreService from '../../services/firestoreService';
 import { monthGrid, shiftMonth } from '../../lib/activityHeatmap';
 import { type Memorized, type Read, type Revised } from '../../lib/activityInsights';
 import { ratedWeakCounts } from '../../lib/insightsView';
-import { revoAvailable } from '../../lib/revo/availability';
+import { useRevoAvailable } from '../../lib/revo/availability';
 import { logger } from '../../lib/logger';
 import { layoutV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
@@ -57,6 +57,7 @@ interface Props {
 
 export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow }: Props) {
   const { pages, logs, user } = useApp();
+  const revo = useRevoAvailable(user);
   const [view, setView] = useState<ViewKind>('calendar');
   const [month, setMonth] = useState(today.slice(0, 7));
   const [span, setSpanState] = useState<CalendarSpan>('month');
@@ -262,7 +263,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             read: data?.reads ?? [],
             memorizations: yearOfMemorizing,
             capacity: user?.dailyPageCapacity ?? 20,
-            revo: revoAvailable(user),
+            revo,
             smartTracking: smartTrackingOn(user),
             range,
             firstDay,
