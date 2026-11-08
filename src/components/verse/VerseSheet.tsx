@@ -31,6 +31,7 @@ import {
   getVerseText,
   hasArabicForPage,
   isTranslationAvailable,
+  offeredTranslations,
   pickerTitle,
   CLEAR_QURAN_ID,
   resolveTranslation,
@@ -45,6 +46,7 @@ import { knownOffline, onNetworkState } from '../../lib/networkState';
 import { nextVerse, previousVerse } from '../../lib/verses';
 import { resolveVoice, voiceLabel } from '../../lib/recitation';
 import { ReciterList } from './ReciterList';
+import { TranslationPicker } from './TranslationPicker';
 import { AyahRef } from '../../lib/ayahBounds';
 
 interface VerseSheetProps {
@@ -52,6 +54,8 @@ interface VerseSheetProps {
   verse: AyahRef | null;
   translationId: string | undefined;
   onChangeTranslation: (id: string) => void;
+  /** A previewTester account: the picker offers every translation (lib/translation offeredTranslations). */
+  tester?: boolean;
   /** Reciter and style for Play ('<reciter>:<style>'). */
   reciter: string | undefined;
   onChangeReciter: (choice: string) => void;
@@ -131,6 +135,7 @@ export function VerseSheet({
   verse,
   translationId,
   onChangeTranslation,
+  tester = false,
   reciter,
   onChangeReciter,
   onNavigate,
@@ -140,7 +145,8 @@ export function VerseSheet({
   const styles = useMemo(() => makeStylesV2(palette), [palette]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'reciters'>('closed');
+  // 'translations' is the short list; 'picker' the testers' picker of every translation.
+  const [menu, setMenu] = useState<'closed' | 'root' | 'translations' | 'picker' | 'reciters'>('closed');
   const translation = resolveTranslation(translationId);
   const [expanded, setExpanded] = useState(false);
   // Where the "…" menu opens: under the header, however tall large text makes it.
@@ -298,6 +304,8 @@ export function VerseSheet({
   const offline = view.status === 'error' && knownOffline();
   const arabicHere = offline && !!verse && hasArabicForPage(verse.page);
   const saheehHere = arabicHere && !!verse && hasSaheehSura(verse.sura);
+  // Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko: the translation reads right to left.
+  const rtl = translation.direction === 'rtl';
 
   return (
     <Modal visible={verse != null} transparent animationType="slide" onRequestClose={onClose}>
@@ -307,7 +315,12 @@ export function VerseSheet({
         <Backdrop onPress={onClose} label="Close translation" />
         <Reanimated.View style={dragged}>
           <View
-            style={[styles.sheet, { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) }]}
+            style={[
+              styles.sheet,
+              { maxHeight, paddingBottom: Math.max(insets.bottom, spacing.md) },
+              // The picker fills the expanded sheet, however short the verse is.
+              menu === 'picker' && { minHeight: maxHeight },
+            ]}
             onLayout={(e) => {
               setSheetHeight(e.nativeEvent.layout.height);
               sheetH.value = e.nativeEvent.layout.height;
@@ -405,7 +418,20 @@ export function VerseSheet({
                 </View>
               </GestureDetector>
 
-              {menu !== 'closed' && (
+              {menu === 'picker' && (
+                // Every translation, by language (testers, for now): over the verse, under the header.
+                <View style={[styles.pickerPanel, { top: headerBottom, bottom: Math.max(insets.bottom, spacing.md) }]}>
+                  <TranslationPicker
+                    translations={offeredTranslations(tester)}
+                    chosenId={translation.id}
+                    onChoose={(id) => {
+                      onChangeTranslation(id);
+                      setMenu('closed');
+                    }}
+                  />
+                </View>
+              )}
+              {menu !== 'closed' && menu !== 'picker' && (
                 // A flat panel in the sheet, not a second modal (iOS can't stack one
                 // over a sheet that is itself a modal).
                 <View style={[styles.dropdown, { top: headerBottom }]} testID="verse-menu-panel">
@@ -413,7 +439,14 @@ export function VerseSheet({
                     <>
                       <Tap
                         style={styles.dropRow}
-                        onPress={() => setMenu('translations')}
+                        onPress={() => {
+                          if (tester) {
+                            setMenu('picker');
+                            setExpanded(true);
+                          } else {
+                            setMenu('translations');
+                          }
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel={`Select translation, ${pickerTitle(translation)}`}
                       >
@@ -572,7 +605,11 @@ export function VerseSheet({
                     <Text style={styles.arabic} maxFontSizeMultiplier={2}>
                       {view.text.arabic}
                     </Text>
-                    <Text style={styles.translation} testID="verse-translation">
+                    <Text
+                      style={[styles.translation, rtl && styles.rtlText]}
+                      accessibilityLanguage={translation.languageCode}
+                      testID="verse-translation"
+                    >
                       {/* Exactly as given; footnote markers shown as raised numbers. */}
                       {(translation.id === CLEAR_QURAN_ID
                         ? clearQuranSegments(view.text.translation)
@@ -588,10 +625,10 @@ export function VerseSheet({
                       )}
                     </Text>
                     {view.text.footnotes ? (
-                      // Saheeh International's footnotes, as given (its terms: nothing cut).
+                      // A QuranEnc translation's footnotes, as given (its terms: nothing cut).
                       <View style={styles.footnotes} testID="verse-footnotes">
                         {saheehFootnotes(view.text.footnotes).map((f, i) => (
-                          <Text key={i} style={styles.footnoteText}>
+                          <Text key={i} style={[styles.footnoteText, rtl && styles.rtlFootnote]} accessibilityLanguage={translation.languageCode}>
                             {f.mark ? <Text style={styles.footnote}>{`${f.mark} `}</Text> : null}
                             {f.text}
                           </Text>
@@ -726,6 +763,17 @@ const makeStylesV2 = (p: PaletteV2) =>
     },
     // Reading text: grows with Dynamic Type, uncapped.
     translation: { ...typeV2.body, fontSize: 18, lineHeight: 27, color: p.text },
+    // A right-to-left translation: laid out from the right, with room for its script's marks.
+    rtlText: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 34 },
+    rtlFootnote: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 26 },
+    // The testers' picker: fills the sheet under the header.
+    pickerPanel: {
+      position: 'absolute',
+      left: layoutV2.gutter,
+      right: layoutV2.gutter,
+      backgroundColor: p.sheet,
+      zIndex: 10,
+    },
     footnote: { color: p.accentText },
     footnotes: { marginTop: 12, gap: 8 },
     // Reading text too: grows with Dynamic Type, uncapped.

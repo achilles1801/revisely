@@ -233,6 +233,28 @@ How the tests are made: `tests/scenarios/README.md`.
   A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
   already revised, or on an older day were reading, and offer nothing.
 
+## Translations
+
+A held verse's translation (the verse sheet). The sources' terms are in CLAUDE.md ("Saheeh
+International", "The Clear Quran®") and in `lib/quranenc`.
+
+- **TRANS-1.** A translation shows exactly as its source gives it: the text and its footnotes, nothing
+  changed, added or cut. A "[n]" marker that has its footnote shows as the raised number, and the
+  footnote is under the verse. A translation that can't load says so; another translation's text is
+  never shown in its place or under its name.
+- **TRANS-2.** Under a QuranEnc translation is its credit: QuranEnc's own description of who translated
+  and issued it, the version of the text shown ("· v1.1.3"), and QuranEnc.com, a link to its page. The
+  picker shows the same credit with each translation.
+- **TRANS-3.** A right-to-left translation (Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko) reads right to
+  left, aligned to the right, its footnotes too.
+- **TRANS-4.** A QuranEnc translation stays at QuranEnc's latest version. Its list is read at most once a
+  day, and one request answers for every translation. A sura kept from an older version is fetched again
+  when it is read, and shows with its own version until then.
+- **TRANS-5.** Testers choose from every translation in QuranEnc's list (76, in 56 languages, Nov 2026):
+  the one in use first, then each language by its English name with its own name beside it. A search
+  finds a language, in English or its own name (accents aside), or a translator. Everyone else chooses
+  Saheeh International or The Clear Quran®, as before.
+
 ## Activity
 
 - **ACT-1.** A memorized page is filed under the same revision day as everything else in Activity: the

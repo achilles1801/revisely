@@ -21,6 +21,9 @@
 //   owner's decision of Oct 27 2026), never the whole of it: its terms don't
 //   allow more. Offline, a verse not read before can't be shown, and the sheet
 //   says so (pointing to Saheeh International when that is on the phone).
+// - Every other translation in QuranEnc's list (src/data/quranencCatalogue.json, lib/quranenc), on
+//   the same terms as Saheeh International: kept as read, downloadable whole, credited with QuranEnc's
+//   own description, QuranEnc.com and the version shown. Offered to testers first (offeredTranslations).
 // One that is not `available` is shown in the picker as unavailable.
 
 import { Platform } from 'react-native';
@@ -28,16 +31,29 @@ import { Directory, File, Paths } from 'expo-file-system';
 import RecitationAudio from '../../modules/recitation-audio';
 import { logger } from './logger';
 import { getClearQuranVerse, peekClearQuranVerse, prefetchClearQuran, prefetchClearQuranAround } from './clearQuran';
-import { getSaheehVerse, peekSaheehVerse, prefetchSaheeh, SAHEEH_PAGE_URL } from './saheeh';
+import { getSaheehVerse, peekSaheehVerse, prefetchSaheeh, SAHEEH_BYTES, SAHEEH_KEY, SAHEEH_PAGE_URL } from './saheeh';
+import { QURANENC_CATALOGUE, QuranEncEntry, quranEncPageUrl, quranEncStore, QuranEncVerse } from './quranenc';
+import { languageName } from './translationLanguages';
 import { nextVerse, pageOfVerse, previousVerse, VerseKey } from './verses';
 
 export interface TranslationInfo {
   id: string;
   name: string;
   author: string;
+  /** Its language's English name. */
   language: string;
-  /** Where its text comes from: lib/saheeh (QuranEnc.com) or lib/clearQuran. */
+  /** Its language's ISO code, as QuranEnc gives it ("ur"). */
+  languageCode: string;
+  /** Right to left (Urdu, Persian, Kurdish, Pashto, Uyghur, N'Ko) or left to right. */
+  direction: 'ltr' | 'rtl';
+  /** Where its text comes from: QuranEnc.com (lib/quranenc, lib/saheeh) or lib/clearQuran. */
   source: 'quranenc' | 'clearquran';
+  /** QuranEnc's key, for its translations. */
+  key?: string;
+  /** About how many bytes the whole translation takes on the phone (QuranEnc's). */
+  bytes?: number;
+  /** Offered in the picker to testers only, for now (offeredTranslations). */
+  testersOnly?: boolean;
   available: boolean;
   /** Required attribution, shown with the text and in the picker. */
   credit: Credit;
@@ -57,7 +73,11 @@ export const TRANSLATIONS: TranslationInfo[] = [
     name: 'Saheeh International',
     author: 'Noor International Center',
     language: 'English',
+    languageCode: 'en',
+    direction: 'ltr',
     source: 'quranenc',
+    key: SAHEEH_KEY,
+    bytes: SAHEEH_BYTES,
     available: true,
     // QuranEnc's terms: the publisher, the source and the version (creditLine).
     credit: {
@@ -71,6 +91,8 @@ export const TRANSLATIONS: TranslationInfo[] = [
     name: 'The Clear Quran®',
     author: 'Dr. Mustafa Khattab',
     language: 'English',
+    languageCode: 'en',
+    direction: 'ltr',
     source: 'clearquran',
     available: true,
     credit: {
@@ -82,6 +104,56 @@ export const TRANSLATIONS: TranslationInfo[] = [
 ];
 
 export const DEFAULT_TRANSLATION_ID = 'en.sahih';
+
+/** A QuranEnc translation's id in the app (the user doc's translationId): "qe." and QuranEnc's key. */
+export function quranEncTranslationId(key: string): string {
+  return `qe.${key}`;
+}
+
+/**
+ * The translator or publisher, from QuranEnc's title: "Urdu Translation - Muhammad Junagarhi" is
+ * "Muhammad Junagarhi"; a variety in the language part stays ("Spanish Translation (Latin
+ * American) - issued by Noor International" is "Noor International (Latin American)").
+ */
+export function translatorName(title: string): string {
+  const parts = title.split(' - ');
+  if (parts.length < 2) return title.trim();
+  const variety = /\(([^)]+)\)/.exec(parts[0])?.[1];
+  const name = parts.slice(1).join(' - ').trim().replace(/^issued by\s+/i, '');
+  return variety ? `${name} (${variety})` : name;
+}
+
+function fromCatalogue(e: QuranEncEntry): TranslationInfo {
+  // QuranEnc's own words for who translated and issued it: the credit its terms ask for.
+  const credit = e.description || e.title;
+  return {
+    id: quranEncTranslationId(e.key),
+    name: translatorName(e.title),
+    author: credit,
+    language: languageName(e.lang).name,
+    languageCode: e.lang,
+    direction: e.dir,
+    source: 'quranenc',
+    key: e.key,
+    bytes: e.bytes,
+    testersOnly: true,
+    available: true,
+    credit: { text: credit, linkLabel: 'QuranEnc.com', url: quranEncPageUrl(e.key) },
+  };
+}
+
+/** QuranEnc's other translations (Saheeh International is in TRANSLATIONS). */
+export const QURANENC_TRANSLATIONS: TranslationInfo[] = QURANENC_CATALOGUE.filter((e) => e.key !== SAHEEH_KEY).map(
+  fromCatalogue,
+);
+
+/** Every translation the app knows. */
+export const ALL_TRANSLATIONS: TranslationInfo[] = [...TRANSLATIONS, ...QURANENC_TRANSLATIONS];
+
+/** What the picker offers: testers get every translation; everyone else Saheeh International and The Clear Quran®. */
+export function offeredTranslations(tester: boolean): TranslationInfo[] {
+  return tester ? ALL_TRANSLATIONS : ALL_TRANSLATIONS.filter((t) => !t.testersOnly);
+}
 const ARABIC_EDITION = 'quran-uthmani';
 
 /** Can be chosen. */
@@ -124,7 +196,7 @@ export const TANZIL_NOTICE = [
 
 /** The translation to use for a saved choice, falling back to the default. */
 export function resolveTranslation(id: string | null | undefined): TranslationInfo {
-  const chosen = TRANSLATIONS.find((t) => t.id === id && isTranslationAvailable(t));
+  const chosen = ALL_TRANSLATIONS.find((t) => t.id === id && isTranslationAvailable(t));
   return chosen ?? (TRANSLATIONS.find((t) => t.id === DEFAULT_TRANSLATION_ID) as TranslationInfo);
 }
 
@@ -401,7 +473,7 @@ export interface VerseText {
   arabic: string;
   translation: string;
   translationName: string;
-  /** Saheeh International: its footnotes ("[n] …" lines, as given) and the version shown. */
+  /** A QuranEnc translation: its footnotes ("[n] …" lines, as given) and the version shown. */
   footnotes?: string;
   version?: string;
 }
@@ -441,11 +513,30 @@ export async function getVerseText(
     ]);
     return compose(t, sura, ayah, arabic, text);
   }
-  const [arabic, saheeh] = await Promise.all([
+  const [arabic, verse] = await Promise.all([
     getAyahEdition(page, sura, ayah, ARABIC_EDITION),
-    getSaheehVerse(sura, ayah),
+    quranEncVerse(t, sura, ayah),
   ]);
-  return compose(t, sura, ayah, arabic, saheeh.text, saheeh);
+  return compose(t, sura, ayah, arabic, verse.text, verse);
+}
+
+/** A QuranEnc translation's verse: Saheeh International through lib/saheeh, the others from their store. */
+function quranEncVerse(t: TranslationInfo, sura: number, ayah: number): Promise<QuranEncVerse> {
+  if (t.id === DEFAULT_TRANSLATION_ID) return getSaheehVerse(sura, ayah);
+  const store = t.key ? quranEncStore(t.key) : undefined;
+  if (!store) return Promise.reject(new Error(`No source for ${t.id}`));
+  return store.getVerse(sura, ayah);
+}
+
+function peekQuranEncVerse(t: TranslationInfo, sura: number, ayah: number): QuranEncVerse | null {
+  if (t.id === DEFAULT_TRANSLATION_ID) return peekSaheehVerse(sura, ayah);
+  return (t.key ? quranEncStore(t.key) : undefined)?.peekVerse(sura, ayah) ?? null;
+}
+
+/** This verse's sura of a QuranEnc translation is on the phone (or in memory): it shows offline. */
+export function hasTranslationSura(t: TranslationInfo, sura: number): boolean {
+  if (t.source !== 'quranenc' || !t.key) return false;
+  return quranEncStore(t.key)?.hasSura(sura) ?? false;
 }
 
 /** A verse's Arabic (Uthmani), exactly as the verse sheet shows it. */
@@ -477,8 +568,8 @@ export function peekVerseText(
     const text = peekClearQuranVerse(sura, ayah);
     return text === undefined ? null : compose(t, sura, ayah, arabic, text);
   }
-  const saheeh = peekSaheehVerse(sura, ayah);
-  return saheeh ? compose(t, sura, ayah, arabic, saheeh.text, saheeh) : null;
+  const verse = peekQuranEncVerse(t, sura, ayah);
+  return verse ? compose(t, sura, ayah, arabic, verse.text, verse) : null;
 }
 
 /** Starts loading a verse's Arabic and translation (a press and hold on it). Never fails. */
@@ -486,13 +577,14 @@ export function prefetchVerseText(page: number, sura: number, ayah: number, tran
   const t = resolveTranslation(translationId);
   getAyahEdition(page, sura, ayah, ARABIC_EDITION).catch(() => undefined);
   if (t.id === CLEAR_QURAN_ID) prefetchClearQuran(sura, ayah);
-  else prefetchSaheeh(sura);
+  else if (t.id === DEFAULT_TRANSLATION_ID) prefetchSaheeh(sura);
+  else if (t.key) quranEncStore(t.key)?.prefetch(sura);
 }
 
 /**
  * The verses before and after `v`, loaded while it is shown, so previous / next
  * shows at once. The Clear Quran looks two verses ahead (its next block takes
- * seconds); Saheeh International comes by sura, so one verse is enough.
+ * seconds); QuranEnc's translations come by sura, so one verse is enough.
  */
 export function prefetchVerseNeighbours(v: VerseKey, translationId?: string | null): void {
   for (const n of [nextVerse(v), previousVerse(v)]) {
