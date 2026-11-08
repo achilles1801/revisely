@@ -213,6 +213,19 @@ How the tests are made: `tests/scenarios/README.md`.
   closed) while a recording plays, it stops and its player is freed: nothing plays on with nothing
   on screen to stop it.
 
+## The reader
+
+- **REC-1.** A sitting in the reader (testers): ending the timer while a recording runs, or is paused,
+  ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
+  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
+  place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
+  it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
+  named. Stopping only the recording leaves the timer running.
+- **REC-2.** A sitting in the reader (testers) is saved with the pages it held, so the Day's Read block
+  counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
+  Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
+  pages known reads "Timed in Read".
+
 ## Activity
 
 - **ACT-1.** A memorized page is filed under the same revision day as everything else in Activity: the
@@ -488,6 +501,16 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   short surah, or a surah's end that shares its page, is revised before the rest of the page is learned.
   Home, the widget and Revo name it by its memorized ayahs: with only An-Nas memorized on the Qur'an's
   last page, the day "Starts at An-Nas", not Al-Ikhlas.
+- **MEM-5.** On a day in Activity (testers), a sitting from the reader whose pages aren't all memorized
+  offers Add to memorized. The Memorized sheet opens on Ayahs, From and To never outside the pages the
+  sitting held. From starts at the first ayah not yet memorized there, To at the end of those pages, and
+  the sitting's minutes come with it. Whole pages and Surah are its other tabs.
+  - After adding, the sitting stands under Memorized. The block counts in ayahs when part of a page was
+    memorized ("20 ayahs"), and says what finishes the page ("Al-Mulk 21–26 finishes the page").
+  - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).
+  - Memorized today, the block says where the pages stand in the plan. On an automatic plan it says when
+    they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
+    add new pages by itself, it offers Add to your plan (tomorrow's day of it).
 
 ## Naming the Qur'an
 

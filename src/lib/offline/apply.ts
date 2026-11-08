@@ -92,9 +92,14 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
     case 'memorization.delete':
       return firestoreService.deleteMemorizationItem(op.id, uid);
     case 'memorization.mark':
-      return firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid, op.minutes ?? null);
+      // Added by the ayah, with its ayahs (MEM-1).
+      return op.verses
+        ? firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid, op.minutes ?? null, op.verses)
+        : firestoreService.addMemorizationPages(op.day, op.pages, op.at, uid, op.minutes ?? null);
     case 'memorization.unmark':
-      return firestoreService.removeMemorizationPages(op.pages, uid);
+      return op.verses
+        ? firestoreService.removeMemorizationPages(op.pages, uid, op.verses)
+        : firestoreService.removeMemorizationPages(op.pages, uid);
     case 'reading.add':
       await firestoreService.putReadingSession(op.id, op.session, entry.at, uid);
       return mirrorReadItem(uid, () => firestoreService.setReadItem(readItemFor(op.id, uid, op.session), uid));

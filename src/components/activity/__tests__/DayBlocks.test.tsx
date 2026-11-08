@@ -105,6 +105,23 @@ describe('the blocks as mock d1 and d2 read them', () => {
     expect(screen.queryByText(/p\. 562|Page 562/)).toBeNull();
   });
 
+  it('[REC-2] a timed sitting is named by the pages it held; one with no pages, "Timed in Read"', async () => {
+    const at = new Date(2026, 10, 3, 7, 42).getTime();
+    items.mockResolvedValueOnce({
+      revisions: [],
+      memorized: [],
+      reads: [
+        { id: 'r1', day: '2026-11-03', pages: [562, 563], minutes: 41, occurredAt: at },
+        { id: 'r2', day: '2026-11-03', pages: [], minutes: 10, occurredAt: at + 3_600_000 },
+      ],
+      doneAhead: [],
+    });
+    render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
+    expect(await screen.findByText('Al-Mulk, ayahs 1–26', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText('Timed in Read')).toBeTruthy();
+    expect(screen.getByText('2 pages')).toBeTruthy();
+  });
+
   it('pages credited to other days read with their dates, and a catch-up never as ahead [SESS-7]', async () => {
     items.mockResolvedValueOnce({
       revisions: [

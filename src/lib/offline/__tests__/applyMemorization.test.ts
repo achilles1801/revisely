@@ -36,4 +36,12 @@ describe('removing a memorization (C4)', () => {
     await applyEntry('u1', { id: 'e3', at: 1, op: { kind: 'memorization.unmark', pages: [7] } });
     expect(mocked.removeMemorizationPages).toHaveBeenCalledWith([7], 'u1');
   });
+
+  it('[MEM-1] ayahs memorized go with the day’s item; ayahs taken off come out of it', async () => {
+    const ayahs = [67001, 67002, 67020];
+    await applyEntry('u1', { id: 'e3', at: 1, op: { kind: 'memorization.mark', day: '2026-11-03', pages: [562, 563], at: 5, verses: ayahs } });
+    expect(mocked.addMemorizationPages).toHaveBeenCalledWith('2026-11-03', [562, 563], 5, 'u1', null, ayahs);
+    await applyEntry('u1', { id: 'e4', at: 2, op: { kind: 'memorization.unmark', pages: [563], verses: ayahs } });
+    expect(mocked.removeMemorizationPages).toHaveBeenCalledWith([563], 'u1', ayahs);
+  });
 });

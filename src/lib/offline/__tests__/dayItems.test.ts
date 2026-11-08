@@ -83,3 +83,26 @@ describe('the day’s items with the waiting changes over them (ACT-13)', () => 
     expect(taken.map((e) => e.id)).toEqual(['m']);
   });
 });
+
+describe('ayahs memorized, before the server has them (MEM-1, MEM-3)', () => {
+  const alMulk1to20 = Array.from({ length: 20 }, (_, i) => 67001 + i);
+  it('[MEM-1] an add by the ayah shows on its day with its ayahs; one by the page beside it brings that page’s', () => {
+    const mark = entry('m', { kind: 'memorization.mark', day: DAY, pages: [562, 563], at: 5, verses: alMulk1to20 });
+    const out = overlayDayItems(empty, [mark], DAY, UID);
+    expect(out.memorized).toHaveLength(1);
+    expect(out.memorized[0]).toMatchObject({ id: DAY, day: DAY, pages: [562, 563], minutes: null, verses: alMulk1to20 });
+    const whole = entry('w', { kind: 'memorization.mark', day: DAY, pages: [1], at: 6 });
+    const both = overlayDayItems(empty, [mark, whole], DAY, UID);
+    expect(both.memorized[0].pages).toEqual([1, 562, 563]);
+    expect(both.memorized[0].verses).toEqual([1001, 1002, 1003, 1004, 1005, 1006, 1007, ...alMulk1to20]);
+    // By the page alone, no ayahs at all.
+    expect(overlayDayItems(empty, [whole], DAY, UID).memorized[0].verses).toBeUndefined();
+  });
+
+  it('[MEM-3] taking off what was added leaves nothing; taking off part keeps the rest', () => {
+    const mark = entry('m', { kind: 'memorization.mark', day: DAY, pages: [562, 563], at: 5, verses: alMulk1to20 });
+    expect(overlayDayItems(empty, [mark, entry('u', { kind: 'memorization.unmark', pages: [562, 563], verses: alMulk1to20 })], DAY, UID).memorized).toEqual([]);
+    const part = overlayDayItems(empty, [mark, entry('u', { kind: 'memorization.unmark', pages: [563], verses: alMulk1to20.slice(12) })], DAY, UID);
+    expect(part.memorized[0]).toMatchObject({ pages: [562], verses: alMulk1to20.slice(0, 12) });
+  });
+});
