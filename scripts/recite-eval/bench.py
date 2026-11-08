@@ -294,7 +294,7 @@ def similar_ayat(words, s, a, min_prefix=2):
     return out
 
 
-def build_item(words, audio, passage, rng, mistakes):
+def build_item(words, audio, passage, rng, mistakes, lead=4):
     s, a0, a1 = passage
     ayat = []
     for a in range(a0, a1 + 1):
@@ -357,13 +357,15 @@ def build_item(words, audio, passage, rng, mistakes):
                 if not done:
                     continue
                 continue
-            # word-level: not in the first 4 words (the reciter is found first) nor the last 2
-            j = rng.randrange(4, len(flat) - 2)
+            # word-level: not in the first `lead` words (the reciter is found first) nor the last 2
+            if len(flat) - 2 <= lead:
+                continue
+            j = rng.randrange(lead, len(flat) - 2)
             k, i = flat[j]
             width = 2 if kind == 'swap' else 1
             if kind == 'swap' and (j + 1 >= len(flat) or flat[j + 1][0] != k):
                 continue
-            span = set(range(j - 4, j + width + 4))
+            span = set(range(j - min(4, lead + 2), j + width + 4))
             if span & taken or any(isinstance(key, tuple) and key[0] == 'ayah' and key[1] == k for key in plan):
                 continue
             c = ayat[k][1][i]
@@ -527,6 +529,9 @@ def main():
     ap.add_argument('--passages', default=','.join(PASSAGES))
     ap.add_argument('--conditions', default='clean,babble10')
     ap.add_argument('--seed', type=int, default=7)
+    ap.add_argument('--short', type=int, default=0,
+                    help='instead of whole passages: this many short ranges (1-3 ayat, starting mid-passage) '
+                         'per reciter and passage, as someone who memorized only those ayat would recite them')
     args = ap.parse_args()
 
     words = Words()
@@ -538,16 +543,47 @@ def main():
     index = []
     babble_pool = []
     built = []
+    def ranges(p):
+        """(name, (sura, first, last)) for the whole passage, or --short ranges of it."""
+        s_, a0, a1 = PASSAGES[p]
+        if not args.short:
+            return [(p, PASSAGES[p])]
+        out_ = []
+        pick = random.Random(f'{args.seed}-{p}-short')
+        for _ in range(args.short * 4):
+            if len(out_) == args.short:
+                break
+            first = pick.randint(min(a0 + 1, a1), a1)
+            last = first
+            # 1-3 ayat, but at least 6 words (an ayah like يس is one word)
+            while last < a1 and (last - first < pick.choice([0, 1, 2]) or
+                                 sum(words.counts[words.vindex[(s_, a)]] for a in range(first, last + 1)) < 6):
+                last += 1
+            if sum(words.counts[words.vindex[(s_, a)]] for a in range(first, last + 1)) < 6:
+                continue
+            name = f'{p}s{first}-{last}'
+            if name not in [n for n, _ in out_]:
+                out_.append((name, (s_, first, last)))
+        return out_
+
     for r in reciters:
         audio = Audio(args.cache, r)
-        for p in passages:
-            for variant in ('clean', 'm1'):
+        for p0 in passages:
+            for p, rng_passage in ranges(p0):
+              for variant in ('clean', 'm1'):
                 rng = random.Random(f'{args.seed}-{r}-{p}-{variant}')
-                got = build_item(words, audio, PASSAGES[p], rng, mistakes=variant != 'clean')
+                got = build_item(words, audio, rng_passage, rng, mistakes=variant != 'clean',
+                                 lead=1 if args.short else 4)
                 if got is None:
                     log(f'skip {RECITERS[r]} {p}: timings missing or not word for word')
                     break
                 x, truth = got
+                if args.short:
+                    # memorized only these ayat: the app stops at the last one (ayah-level memorization)
+                    # and, knowing where they start, listens from the first memorized word
+                    truth['stop_at'] = truth['range'][1]
+                    truth['start_at'] = truth['range'][0]
+                    truth['span'] = 'short'
                 base = f'{RECITERS[r]}.{p}.{variant}'
                 built.append((base, r, p, variant, x, truth))
                 if variant == 'clean':

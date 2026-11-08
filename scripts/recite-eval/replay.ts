@@ -54,11 +54,17 @@ function loadTranscripts(): Map<string, { text: string; ms: number }> {
   return map;
 }
 
-function replay(item: string, events: Ev[], truth: { range: [number, number]; start_at?: number }, transcripts: Map<string, { text: string; ms: number }>) {
+function replay(
+  item: string,
+  events: Ev[],
+  truth: { range: [number, number]; start_at?: number; stop_at?: number },
+  transcripts: Map<string, { text: string; ms: number }>) {
   const [lo, hi] = truth.range;
   const firstPage = words.pageOf(lo);
   const lastPage = words.pageOf(hi - 1);
-  const lastWord = words.pageRange(lastPage)[1] - 1;
+  // The session ends past the last word of its pages, or (ayah-level memorization) past the last
+  // memorized ayah.
+  const lastWord = truth.stop_at != null ? truth.stop_at - 1 : words.pageRange(lastPage)[1] - 1;
   const tracker = new RecitationTracker(words, firstPage);
   // Single-ayah items (learners): as "recite from here" on that ayah, so the judgement of each word
   // is measured rather than finding the reciter from one short ayah.

@@ -24,6 +24,11 @@ def main():
     run = pathlib.Path(args.run)
     out = run / 'transcripts' / f'oracle-{args.tag}.jsonl'
     rows = {}
+    if out.exists():  # keep clips of other benches in the same run
+        for line in out.read_text().splitlines():
+            if line.strip():
+                r = json.loads(line)
+                rows[r['clip']] = r
     for f in sorted((run / 'segments' / args.tag).glob('*.json')):
         truth_path = bench / 'items' / f.name
         if not truth_path.exists():

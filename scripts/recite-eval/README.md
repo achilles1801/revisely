@@ -13,6 +13,7 @@ wherever `--out`, `--run` point). The recordings are for evaluation only and are
 | Step | Script | What it does |
 | --- | --- | --- |
 | 1 | `bench.py` | Builds the benchmark from quran.com's per-ayah audio and per-word timings: clean recordings, recordings with planted mistakes (word left out, said as another word, extra word, two words swapped, ayah left out, ayah carried on as a similar ayah elsewhere) and non-mistakes (going back a few words, repeating an ayah), each also with babble noise at 10 dB SNR. |
+| 1a | `bench.py --short 2 --out …/bench-v0-short` | Short ayah ranges (1–3 ayat, starting mid-passage), as someone who memorized only those ayat recites them: the replay listens from the first memorized word and ends after the last (`start_at`, `stop_at`). |
 | 1b | `learners.py` | Held-out learner recordings (RetaSy, non-Arabic speakers, labelled correct / in_correct per recording). |
 | 2 | `segment.ts` | Streams each recording through the app's segmenter in 100 ms buffers and saves every clip it would decode (partials and finals), named by hash. `--lib` points at another checkout's `src/lib/recite` to measure that version. |
 | 3 | `decode_whisper.py` | Decodes the clips with a whisper.cpp model through `whisper-server` and caches text and decode time per clip. |
