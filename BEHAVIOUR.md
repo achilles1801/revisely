@@ -310,6 +310,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACT-17.** A day before yesterday offers only a note: its + opens the Note sheet at once, so old history
   and streaks can't be rewritten. What is already logged there can still be seen and deleted. (Majd,
   Nov 7 2026.)
+- **ACT-16.** Pages logged as revised elsewhere are revised that day: they count in each page's last revised
+  day and number of revisions (and clear its skips) as a session's pages do, at once and after every
+  launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
+  no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
+  pages were re-derived from sessions alone.)
 
 ## Ask coach
 
@@ -372,9 +377,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   why a reply stopped early, never a question, an answer or a note.
 
 - **REVO-7.** An answer has at most one small chart and one suggested action, each on pages Revo was given (anything
-  else is dropped, the answer kept). The app draws the chart from its own data. Revo never changes the plan itself:
-  "Add to my plan" puts the pages first in tomorrow's session only when tapped, and "Not now" changes nothing.
-  Attached text is never taken as an instruction.
+  else is dropped, the answer kept). The app draws the chart from its own data, and a kind it doesn't know isn't
+  drawn. A chart answers a touch: a tap (or a slide along the bars) picks a mark, the chart's header says what it is,
+  and a panel under it leads on: a day to that day in Activity, a passage to the reader or to "Revise first
+  tomorrow". Revo never changes the plan itself: "Add to my plan" and "Revise first tomorrow" put the pages first in
+  tomorrow's session only when tapped, and "Not now" changes nothing. Attached text is never taken as an instruction.
 
 - **REVO-8.** With memory on (the default), Revo keeps short facts from conversations (at most 30; the oldest go first)
   and sends them with later questions. The user sees every item, deletes one, clears them all or turns memory off

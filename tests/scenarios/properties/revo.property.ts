@@ -517,6 +517,75 @@ describe('the reply (REVO-7)', () => {
     expect(invented).toEqual({ text: 'Try these.', remember: [] });
   });
 
+  it('[REVO-7] a newer chart kind goes out as `visual`, never as `chart`, so an older app shows the words and no empty chart', () => {
+    const juz = parseReply(JSON.stringify({ text: 'Juz 4 and Juz 5.', chart: { kind: 'juzMap', title: 'Your juz · last revised' } }), allowed, { firstTurn: false })!;
+    expect(juz).toEqual({ text: 'Juz 4 and Juz 5.', visual: { kind: 'juzMap', title: 'Your juz · last revised' }, remember: [] });
+    // The first two kinds stay in `chart`, as every app reads them.
+    const week = parseReply(JSON.stringify({ text: 'A good week.', chart: { kind: 'dailyPages', title: 'This week', days: 7 } }), allowed, { firstTurn: false })!;
+    expect(week.chart).toEqual({ kind: 'dailyPages', title: 'This week', days: 7 });
+    expect(week.visual).toBeUndefined();
+    // A timeline: one surah or one juz, over 30, 90 or 365 days.
+    const line = parseReply(JSON.stringify({ text: 'Every 12 days.', chart: { kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 } }), allowed, { firstTurn: false })!;
+    expect(line.visual).toEqual({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 });
+    expect(parseReply(JSON.stringify({ text: 'x', chart: { kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 });
+    // A weeks grid: 4 to 12 weeks.
+    expect(parseReply(JSON.stringify({ text: 'Saturdays.', chart: { kind: 'weeks', title: 'Since 9 September', weeks: 8 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'weeks', title: 'Since 9 September', weeks: 8 });
+    // A table: juz or surahs (2–8), in 1–3 known columns.
+    const table = { kind: 'table', title: 'Juz 24–28', juz: [24, 25, 26, 27, 28], columns: ['lastRevised', 'weak'] };
+    expect(parseReply(JSON.stringify({ text: 'Juz 28.', chart: table }), allowed, { firstTurn: false })!.visual).toEqual(table);
+    const surahs = { kind: 'table', title: 'Three surahs', surahs: [59, 60, 61], columns: ['strength', 'times30', 'memorized'] };
+    expect(parseReply(JSON.stringify({ text: 'x', chart: surahs }), allowed, { firstTurn: false })!.visual).toEqual(surahs);
+    // Anything wrong with it drops the chart and keeps the answer.
+    for (const bad of [
+      { kind: 'table', title: 'One row', juz: [28], columns: ['weak'] },
+      { kind: 'table', title: 'Nine rows', juz: [20, 21, 22, 23, 24, 25, 26, 27, 28], columns: ['weak'] },
+      { kind: 'table', title: 'Twice', juz: [28, 28], columns: ['weak'] },
+      { kind: 'table', title: 'Both', juz: [27, 28], surahs: [59, 60], columns: ['weak'] },
+      { kind: 'table', title: 'No juz 31', juz: [30, 31], columns: ['weak'] },
+      { kind: 'table', title: 'No columns', juz: [27, 28], columns: [] },
+      { kind: 'table', title: 'Four columns', juz: [27, 28], columns: ['weak', 'strength', 'times30', 'memorized'] },
+      { kind: 'table', title: 'Colour', juz: [27, 28], columns: ['colour'] },
+      { kind: 'weeks', title: 'Too few', weeks: 3 },
+      { kind: 'weeks', title: 'Too many', weeks: 13 },
+      { kind: 'weeks', title: 'Half', weeks: 6.5 },
+      { kind: 'juzMap' },
+      { kind: 'juzMap', title: 'x'.repeat(61) },
+      { kind: 'pieChart', title: 'Pie' },
+      'juzMap',
+      { kind: 'timeline', title: 'Both', surah: 59, juz: 28, days: 30 },
+      { kind: 'timeline', title: 'Neither', days: 30 },
+      { kind: 'timeline', title: 'No surah 115', surah: 115, days: 30 },
+      { kind: 'timeline', title: 'Half a juz', juz: 4.5, days: 30 },
+      { kind: 'timeline', title: 'Two weeks', surah: 59, days: 14 },
+    ]) {
+      expect(parseReply(JSON.stringify({ text: 'Words.', chart: bad }), allowed, { firstTurn: false })).toEqual({ text: 'Words.', remember: [] });
+    }
+  });
+
+  it('[REVO-7] a newer chart is stored with the answer, and comes back with the cached one', async () => {
+    const f = fakeStore();
+    const m = model(json({ chart: { kind: 'juzMap', title: 'Your juz' } }));
+    const first = await handleRevoAsk(U, ask({ question: 'Which juz haven’t I revised lately?' }), deps(f.store, m.call));
+    expect(first.reply.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+    expect(first.reply.chart).toBeUndefined();
+    expect(f.messages('u', first.chatId).find((x) => x.role === 'revo')?.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+    const again = await handleRevoAsk(U, ask({ question: 'Which juz haven’t I revised lately?' }), deps(f.store, m.call));
+    expect(again.cached).toBe(true);
+    expect(again.reply.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+  });
+
+  it('[REVO-7] the prompt names every chart kind and when to use it; a newer chart shows in the history as a short note', () => {
+    for (const kind of ['dailyPages', 'pageRatings', 'juzMap', 'timeline', 'weeks', 'table']) expect(REVO_SYSTEM_PROMPT).toContain(`"${kind}"`);
+    // The one-object rule is the prompt's last word (Nov 8 2026: a longer chart list left "How was my week?" in plain prose).
+    expect(REVO_SYSTEM_PROMPT.trim().split('\n').pop()).toMatch(/^Every reply is that one JSON object/);
+    const said = (visual: StoredMessage['visual']) => historyTurn({ id: 'm', uid: 'u', role: 'revo', text: 'Here.', at: 1, visual }).content;
+    expect(said({ kind: 'juzMap', title: 'Your juz' })).toBe('Here.\n[chart: juz by last revised]');
+    expect(said({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 })).toContain('[chart: revisions of surah 59, last 90 days]');
+    expect(said({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 })).toContain('[chart: revisions of juz 4, last 365 days]');
+    expect(said({ kind: 'weeks', title: 'Weeks', weeks: 8 })).toContain('[chart: days done or missed, last 8 weeks]');
+    expect(said({ kind: 'table', title: 'Juz', juz: [26, 27], columns: ['lastRevised', 'weak'] })).toContain('[chart: table of juz 26, 27: lastRevised, weak]');
+  });
+
   it('[REVO-7] a reply that isn’t JSON is shown as written; a fenced one is read; at most one action', () => {
     expect(parseReply('Plain words.', allowed, { firstTurn: true })).toEqual({ text: 'Plain words.', remember: [] });
     const fenced = parseReply('```json\n{"text": "Fenced.", "action": [{"kind": "startRevision", "title": "Start", "detail": ""}, {"kind": "openPage", "title": "Open", "detail": "", "page": 12}]}\n```', allowed, { firstTurn: false })!;

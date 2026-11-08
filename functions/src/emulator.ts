@@ -62,6 +62,8 @@ export interface RecordedRequest {
   max_tokens: number;
   thinking: unknown;
   systemSha256: string;
+  /** The structured-output schema's hash (Revo's requests); null, or absent from older recordings, when none was sent. */
+  outputSchemaSha256?: string | null;
 }
 
 export interface Recording {
@@ -78,6 +80,7 @@ export function shortRequest(request: MessagesRequest): RecordedRequest {
     max_tokens: request.max_tokens,
     thinking: (request as { thinking?: unknown }).thinking ?? null,
     systemSha256: createHash('sha256').update(request.system.map((s) => s.text).join('\n')).digest('hex'),
+    outputSchemaSha256: request.output_config ? createHash('sha256').update(JSON.stringify(request.output_config)).digest('hex') : null,
   };
 }
 
@@ -90,6 +93,7 @@ export function driftOf(now: RecordedRequest, recorded: RecordedRequest): string
     out.push(`thinking ${JSON.stringify(recorded.thinking)} → ${JSON.stringify(now.thinking)}`);
   }
   if (now.systemSha256 !== recorded.systemSha256) out.push('system prompt changed');
+  if ((now.outputSchemaSha256 ?? null) !== (recorded.outputSchemaSha256 ?? null)) out.push('reply schema changed');
   return out;
 }
 

@@ -587,6 +587,16 @@ export async function deleteRevisionItem(id: string, userId?: string): Promise<v
 }
 
 /**
+ * Pages logged by hand (Activity's + → Revised elsewhere), from the server: the self-heal counts them
+ * with the sessions for each page's last revised day and number of revisions (ACT-16). From the server
+ * only: a partial copy from the phone's memory would leave some out.
+ */
+export async function getManualRevisionItems(userId: string): Promise<{ id: string; day: string; pages: number[] }[]> {
+  const snap = await getDocsFromServer(query(collection(db, 'users', userId, 'revisions'), where('source', '==', 'manual')));
+  return snap.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [] }));
+}
+
+/**
  * Makes a day's session items (users/{uid}/revisions) exactly `items`: each is
  * written, and any other session item of that day is deleted (an edit that
  * dropped an ahead credit, or a deleted session). Items added by hand

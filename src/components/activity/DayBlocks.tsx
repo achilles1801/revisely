@@ -132,7 +132,7 @@ export function DayBlocks({
   onEditSchedule,
   onAddToPlan,
 }: Props) {
-  const { pages, user, updatePages } = useApp();
+  const { pages, user, updatePages, refreshPageStates } = useApp();
   // A sitting's Add to memorized (MEM-1): the sheet, opened on its pages, and the add's Undo.
   const [sittingToAdd, setSittingToAdd] = useState<SittingToAdd | null>(null);
   // Mounted from the first Add on (so it can slide away after), never before: it loads the day's reads.
@@ -313,7 +313,10 @@ export function DayBlocks({
       destructive: true,
       onPress: () =>
         confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
-          queueChange({ kind: 'revision.delete', day, id: a.id }).catch((err) => logger.warn('Could not delete pages added by hand', err));
+          queueChange({ kind: 'revision.delete', day, id: a.id })
+            // The pages' last revised day and count go back without it (ACT-16).
+            .then(() => refreshPageStates?.())
+            .catch((err) => logger.warn('Could not delete pages added by hand', err));
         }),
     })),
   ]);
