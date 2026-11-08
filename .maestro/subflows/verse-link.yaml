@@ -1,0 +1,33 @@
+# The verse sheet on Al-Ikhlas 2 in one translation (E2E builds: src/lib/e2e/demoTranslations.ts,
+# which also wrote the recorded translations to the phone), waiting for that translation's credit.
+#   env T:      a translation id (en.sahih, qe.urdu_junagarhi)
+#   env CREDIT: a pattern for the start of its credit
+appId: com.revisionbuddy.app
+---
+- openLink:
+    link: revisely://e2e/verse?ref=112:2&t=${T}
+    optional: true
+# iOS asks "Open in “Revisely”?" the first time, on a slow simulator many seconds later; a link that
+# didn't get there is sent again.
+- repeat:
+    while:
+      notVisible:
+        text: "${CREDIT}"
+    times: 10
+    commands:
+      - runFlow: open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            text: "${CREDIT}"
+          timeout: 4000
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              text: "${CREDIT}"
+          commands:
+            - openLink:
+                link: revisely://e2e/verse?ref=112:2&t=${T}
+                optional: true
+- assertVisible:
+    id: verse-translation

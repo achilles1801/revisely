@@ -411,6 +411,7 @@ export function VerseSheet({
                       accessibilityRole="button"
                       accessibilityLabel="More"
                       accessibilityState={{ expanded: menu !== 'closed' }}
+                      testID="verse-more"
                     >
                       <Ionicons name="ellipsis-horizontal" size={22} color={palette.text} />
                     </Tap>
@@ -449,6 +450,7 @@ export function VerseSheet({
                         }}
                         accessibilityRole="button"
                         accessibilityLabel={`Select translation, ${pickerTitle(translation)}`}
+                        testID="verse-select-translation"
                       >
                         <Ionicons name="language-outline" size={22} color={palette.text} />
                         <View style={v2Only.flex}>
