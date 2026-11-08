@@ -389,7 +389,15 @@ Things that bit:
   its account, in a way that changes nothing (09-revo: `scripts/server-revo.js`, `MODE=warm`, after
   the account exists). A call without an ID token isn't enough: refused before the token checks and
   Firestore, it starts the worker (1–3 s) and leaves the rest to the app's call. A worker stays up
-  until `functions/` changes.
+  until `functions/` changes. A function that can't run without changing the account runs as a
+  throwaway account (10-delete-account: `scripts/warm-delete-account.js`).
+- A worker that takes longer to start than the emulator allows gets its request dropped, never
+  answered: the emulator logs "Failed to load function" and the caller waits for good (iOS, run
+  42423019809: the app's `deleteUserAccount`, on a spinner). It allowed 30 s; `scripts/emulators.sh`
+  gives it 120 (`FUNCTIONS_DISCOVERY_TIMEOUT`), so a slow start is a late answer, as deployed.
+- The app's internet check waits as long as in a release build (15 s). At 5 s, the Auth emulator's
+  slow answers at a launch read as offline for 3 s (run 42423019809): Home's "Offline" note came and
+  went between Maestro reading the screen and tapping, and the tap landed on the row below.
 
 A failed attempt keeps Maestro's log and screenshots, a screenshot of the device and the app's logs
 in `.maestro/build/results/<platform>/<flow>/`:

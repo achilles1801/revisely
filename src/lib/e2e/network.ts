@@ -118,12 +118,16 @@ export function installNetwork(): void {
   // NetInfo's internet check would go to Google (blocked above): ask the Auth
   // emulator instead, which answers 200. Android checks natively (the
   // emulator's network is validated) and goes offline in airplane mode.
+  // Checks come more often than in release builds, so coming back online shows
+  // sooner; each check waits as long as in release builds (NetInfo's 15 s). With
+  // 5 s, the Auth emulator's slow answers at a launch on a CI macOS runner (4.7 s,
+  // and over 5 s; run 42423019809) read as offline for 3 s: Home's "Offline" note
+  // came and went under a tap, which landed on the row below.
   NetInfo.configure({
     reachabilityUrl: `http://${e2eHost()}:${EMULATOR_PORTS.auth}/`,
     reachabilityTest: async (response) => response.status === 200,
     reachabilityShortTimeout: 3_000,
     reachabilityLongTimeout: 15_000,
-    reachabilityRequestTimeout: 5_000,
     useNativeReachability: Platform.OS === 'android',
   });
 }

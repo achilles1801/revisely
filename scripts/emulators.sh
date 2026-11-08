@@ -146,6 +146,12 @@ if [ "$WITH_FUNCTIONS" = true ]; then
   npm --prefix "$ROOT/functions" run --silent build >&2
   [ -f "$ROOT/functions/.secret.local" ] || echo 'ANTHROPIC_COACH_KEY=emulator-only-recorded-replies' >"$ROOT/functions/.secret.local"
   export REVISELY_FUNCTIONS_EMULATOR="127.0.0.1:$FUNCTIONS"
+  # Seconds a function's worker has to start. A request whose worker misses it is never answered:
+  # the emulator logs "Failed to load function" and drops it (firebase-tools 15.15 and 15.34,
+  # functionsEmulator.js), so the caller waits for good. 30 s by default, and a loaded CI macOS
+  # runner took longer (E2E run 42423019809: the app's deleteUserAccount got no answer). A deployed
+  # function's slow start is a late answer or an error, never silence; the callers' own limits judge.
+  export FUNCTIONS_DISCOVERY_TIMEOUT=${FUNCTIONS_DISCOVERY_TIMEOUT:-120}
 fi
 
 # ---- config --------------------------------------------------------------
