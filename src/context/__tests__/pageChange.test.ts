@@ -1,5 +1,7 @@
 // What a page change writes (AppContext pageChange): a partly memorized page's ayahs, and nothing
 // about ayahs for any other page (MEM-1).
+// AppContext brings AuthContext, and with it Google Sign-In's native module: not needed here.
+jest.mock('../AuthContext', () => ({ useAuth: () => ({}) }));
 import { pageChange } from '../AppContext';
 import type { PageStatus, UserPage } from '../../types';
 
