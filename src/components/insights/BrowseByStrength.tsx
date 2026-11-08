@@ -21,6 +21,7 @@ import { ActionSheet } from '../v2/ActionSheet';
 import { PillButton } from '../v2/PillButton';
 import { PillTabs } from '../v2/PillTabs';
 import { Hairline, InsightRow, QuietLine, ShowMore } from './InsightsV2';
+import { revisablePages } from '../../lib/memorizedAyahs';
 
 type BrowseMode = 'pages' | 'surahs' | 'juz';
 
@@ -101,7 +102,7 @@ export function usePageStrengthRows(): {
 } {
   const { user, pages, logs } = useApp();
   const quranData = useMemo(() => getQuranData(), []);
-  const memorizedPages = useMemo(() => pages.filter((p) => p.status === 'memorized'), [pages]);
+  const memorizedPages = useMemo(() => revisablePages(pages), [pages]);
   const completedSessionCount = useMemo(() => countCompletedSessions(logs), [logs]);
 
   const rows = useMemo((): PageRow[] => {

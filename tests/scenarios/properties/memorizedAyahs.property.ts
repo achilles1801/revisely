@@ -14,7 +14,9 @@ import {
 import type { MushafEditionId } from '../../../src/lib/mushafEdition';
 import { describeAyahs, describePassage } from '../../../src/lib/passages';
 import type { PageStatus, UserPage } from '../../../src/types';
-import { runs } from './fixtures';
+import { getPagesScheduledForDate, generateDailyAssignment } from '../../../src/lib/algorithm';
+import { revisablePages } from '../../../src/lib/memorizedAyahs';
+import { dayAt, memorizedPages, parseDay, runs, userWith } from './fixtures';
 
 const NOW = '2026-11-03T13:40:00.000Z';
 const editionArb = fc.constantFrom<MushafEditionId>('madani1405', 'madani1441');
@@ -24,11 +26,15 @@ function page(pageNumber: number, status: PageStatus = 'not_memorized', verses?:
   return { pageNumber, status, dateMemorized: null, weaknessRating: 4, lastRevisedDate: null, totalRevisionCount: 0, skipCount: 0, verses };
 }
 
-/** A page and a subset of its ayahs (by a mask over them). */
-const pageWithSubset = fc.tuple(pageArb, editionArb, fc.array(fc.boolean(), { minLength: 300, maxLength: 300 })).map(([n, ed, mask]) => {
-  const all = ayahsOnPage(n, ed);
-  return { n, ed, all, some: all.filter((_, i) => mask[i]) };
-});
+/** A page and a subset of its ayahs (by a mask over them), in a print. */
+const subsetIn = (eds: fc.Arbitrary<MushafEditionId>) =>
+  fc.tuple(pageArb, eds, fc.array(fc.boolean(), { minLength: 300, maxLength: 300 })).map(([n, ed, mask]) => {
+    const all = ayahsOnPage(n, ed);
+    return { n, ed, all, some: all.filter((_, i) => mask[i]) };
+  });
+const pageWithSubset = subsetIn(editionArb);
+/** The same in the 1405 print, for checks across many pages at once. */
+const pageWithSubset1405 = subsetIn(fc.constant<MushafEditionId>('madani1405'));
 
 /** Splits a list into sittings: each ayah goes to sitting `parts[i] % k`, in a shuffled order. */
 function sittings<T>(list: T[], parts: number[], k: number): T[][] {
@@ -95,7 +101,7 @@ describe('memorized ayahs (MEM-1 to MEM-3)', () => {
 
   it('[MEM-2] the total is the whole pages plus each partly memorized page’s share, and the juz shares add up to it', () => {
     fc.assert(
-      fc.property(fc.uniqueArray(pageWithSubset, { selector: (x) => x.n, maxLength: 30 }), fc.uniqueArray(pageArb, { maxLength: 40 }), (partial, whole) => {
+      fc.property(fc.uniqueArray(pageWithSubset1405, { selector: (x) => x.n, maxLength: 30 }), fc.uniqueArray(pageArb, { maxLength: 40 }), (partial, whole) => {
         const wholeSet = new Set(whole);
         const pages = [
           ...whole.map((n) => page(n, 'memorized')),
@@ -137,6 +143,41 @@ describe('memorized ayahs (MEM-1 to MEM-3)', () => {
         expect(after.status).toBe(rest.length === 0 ? 'not_memorized' : rest.length === all.length ? 'memorized' : 'in_progress');
       }),
       { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('partly memorized pages are revised (MEM-4)', () => {
+  it('[MEM-4] over a cycle of the pages plan, every memorized and partly memorized page comes round once; others never', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(pageArb, { minLength: 1, maxLength: 40 }),
+        fc.uniqueArray(pageWithSubset1405, { selector: (x) => x.n, maxLength: 12 }),
+        fc.integer({ min: 1, max: 20 }),
+        (whole, partial, perDay) => {
+          const wholeSet = new Set(whole);
+          const parts = partial.filter((x) => !wholeSet.has(x.n) && x.some.length > 0 && x.some.length < x.all.length);
+          const pages: UserPage[] = [
+            ...memorizedPages(whole),
+            ...parts.map((x) => page(x.n, 'in_progress', x.some)),
+            ...partial.filter((x) => !wholeSet.has(x.n) && x.some.length === 0).map((x) => page(x.n, 'in_progress', [])),
+          ];
+          const revised = revisablePages(pages, 'madani1405');
+          const expected = [...whole, ...parts.map((x) => x.n)].sort((a, b) => a - b);
+          expect(revised.map((p) => p.pageNumber).sort((a, b) => a - b)).toEqual(expected);
+          const user = userWith({ dailyPageCapacity: perDay });
+          const days = Math.ceil(expected.length / Math.min(perDay, expected.length));
+          const seen: number[] = [];
+          const start = parseDay('2026-03-02');
+          for (let i = 0; i < days; i++) seen.push(...getPagesScheduledForDate(user, dayAt(start, i, 12), revised));
+          // Each page once in a cycle (the last day may wrap round to the first pages).
+          expect(new Set(seen)).toEqual(new Set(expected));
+          // The day's assignment, from all the pages, holds only pages that are revised.
+          const today = generateDailyAssignment(pages, [], user, dayAt(start, 0, 12)).pages;
+          expect(today.every((n) => expected.includes(n))).toBe(true);
+        },
+      ),
+      { numRuns: runs(150) },
     );
   });
 });

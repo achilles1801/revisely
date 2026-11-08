@@ -6,6 +6,7 @@ import { RevisionLog, User, UserPage } from '../types';
 import { getPagesForDay } from './algorithm';
 import { creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
+import { revisablePages } from './memorizedAyahs';
 
 const MAX_DAYS_AHEAD = 400;
 
@@ -51,7 +52,7 @@ export function nextRevisionDayPlan(
   taken: ReadonlySet<number>,
   logs: readonly RevisionLog[] = [],
 ): RevisionDayPlan | null {
-  const memorized = pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(pages);
   const index = creditIndex(logs);
   for (let delta = 1; delta <= MAX_DAYS_AHEAD; delta++) {
     const day = addDays(after, delta);
@@ -77,7 +78,7 @@ export function revisionDayPlan(
   day: string,
   logs: readonly RevisionLog[] = [],
 ): RevisionDayPlan {
-  const memorized = pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(pages);
   const credited = creditIndex(logs).get(day);
   const scheduled = getPagesForDay(user, parseDay(day), memorized);
   return { day, pages: credited ? scheduled.filter((p) => !credited.has(p)) : [...scheduled] };
@@ -92,7 +93,7 @@ export function daysDoneAhead(
   pages: readonly UserPage[],
   logs: readonly RevisionLog[],
 ): Set<string> {
-  const memorized = pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(pages);
   const index = creditIndex(logs);
   const done = new Set<string>();
   for (const log of logs) {

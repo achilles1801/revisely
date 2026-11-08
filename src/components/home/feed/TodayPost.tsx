@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { computeMemorizationStats } from '../../../lib/memorizationStats';
-import { aheadLine, NBSP, todayLines, type TodayStatus } from '../../../lib/todayLines';
+import { aheadLine, NBSP, todayLines, type TodayStatus, type PartialPages } from '../../../lib/todayLines';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ProgressRing } from '../../activity/DayParts';
@@ -71,6 +71,7 @@ export function TodayPost({
   done,
   carried = 0,
   carriedLeft = 0,
+  partial,
   streak,
   streakGrace,
   memorized,
@@ -94,6 +95,8 @@ export function TodayPost({
   carried?: number;
   /** Of those, how many are still to revise (once today's own pages are done, the button goes on to them). */
   carriedLeft?: number;
+  /** The partly memorized pages and their memorized ayahs: named by those (MEM-4). */
+  partial?: PartialPages;
   streak: number;
   /** Yesterday missed but restorable (SESS-6): the streak reads dimmed, with a ring for the missed pages. */
   streakGrace?: { previous: number; progress: { scheduled: number; credited: number } } | null;
@@ -115,7 +118,7 @@ export function TodayPost({
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const lines = todayLines(status, pages, done, carried, carriedLeft);
+  const lines = todayLines(status, pages, done, carried, carriedLeft, partial);
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace
@@ -223,12 +226,12 @@ export function TodayPost({
                 onPress={onAhead}
                 hitSlop={6}
                 accessibilityRole="button"
-                accessibilityLabel={aheadLine(ahead.lead, ahead.first).label}
+                accessibilityLabel={aheadLine(ahead.lead, ahead.first, partial).label}
                 style={styles.memorized}
                 testID="today-ahead"
               >
                 <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
-                  {aheadLine(ahead.lead, ahead.first).text}
+                  {aheadLine(ahead.lead, ahead.first, partial).text}
                   {NBSP}
                   <Chevron color={palette.secondary} />
                 </Text>

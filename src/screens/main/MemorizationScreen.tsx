@@ -24,6 +24,7 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types';
+import { revisablePages } from '../../lib/memorizedAyahs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Memorization'>;
 
@@ -91,9 +92,7 @@ export default function MemorizationScreen() {
         // doesn't surface pages the user no longer knows. We don't auto-add
         // newly-memorized pages — the user slots those in the plan editor.
         if (user.customPlan) {
-          const memorizedNumbers = updatedPages
-            .filter((p) => p.status === 'memorized')
-            .map((p) => p.pageNumber);
+          const memorizedNumbers = revisablePages(updatedPages).map((p) => p.pageNumber);
           const { plan } = pruneCustomPlanForMemorized(
             user.customPlan,
             memorizedNumbers,

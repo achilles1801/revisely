@@ -351,10 +351,20 @@ export function describeSession(
  */
 export function placeOfPage(page: number, opts: Pick<PassageOptions, 'form' | 'edition'> = {}): string {
   if (!validPage(page)) return '';
-  const v = firstVerseOfPage(page, opts.edition ?? getMushafEdition());
-  const name = surahName(v.sura);
-  if (v.ayah === 1) return name;
-  return opts.form === 'short' ? `${name}${NBSP}${v.ayah}` : `${name}, ayah${NBSP}${v.ayah}`;
+  return placeOfAyah(firstAyahOfPage(page, opts.edition ?? getMushafEdition()), opts);
+}
+
+/**
+ * Where reading from an ayah begins (sura × 1000 + ayah, lib/ayahKeys): the surah when it is its
+ * first ayah ("An-Nas"), else the ayah ("Al-Mulk, ayah 13"; short "Al-Mulk 13").
+ */
+export function placeOfAyah(key: number, opts: Pick<PassageOptions, 'form'> = {}): string {
+  const sura = suraOf(key);
+  const ayah = ayahOf(key);
+  if (sura < 1 || sura > 114) return '';
+  const name = surahName(sura);
+  if (ayah === 1) return name;
+  return opts.form === 'short' ? `${name}${NBSP}${ayah}` : `${name}, ayah${NBSP}${ayah}`;
 }
 
 /**

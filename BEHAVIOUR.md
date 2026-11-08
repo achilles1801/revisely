@@ -457,6 +457,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **MEM-3.** Taking ayahs off the memorized takes only those. A memorized page keeps its other ayahs as
   partly memorized, and a page left with none is not memorized. Taking off just what was added puts every
   page back as it was.
+- **MEM-4.** A partly memorized page is revised like a memorized one. It is in the revision cycle (the
+  pages plan, the juz plan, the plans the editor builds, revising ahead, the streak, the widget), so a
+  short surah, or a surah's end that shares its page, is revised before the rest of the page is learned.
+  Home names it by its memorized ayahs: with only An-Nas memorized on the Qur'an's last page, the day
+  "Starts at An-Nas", not Al-Ikhlas.
 
 ## Naming the Qur'an
 

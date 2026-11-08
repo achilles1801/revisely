@@ -17,6 +17,7 @@ import { describePassage, placeOfPage } from '../passages';
 import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
+import { revisablePages } from '../memorizedAyahs';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export const WIDGET_APP_GROUP = 'group.com.revisionbuddy.app';
@@ -180,7 +181,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   };
   if (!input.signedIn || !input.user) return { ...base, state: 'signedOut', days: [] };
   const user = input.user;
-  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(input.pages);
   const memorizedCount = memorized.length;
   if (!input.onboardingComplete || memorizedCount === 0) return { ...base, state: 'noPlan', days: [] };
 

@@ -6,6 +6,7 @@
 import { RevisionLog, User, UserPage } from '../types';
 import { catchUpIndex, creditIndex, needDone, needDoneCount } from './aheadCredit';
 import { planDuePages } from './carryOver';
+import { revisablePages } from './memorizedAyahs';
 
 /** The day before an ISO day ('YYYY-MM-DD'). UTC calendar arithmetic: no daylight-saving shift. */
 export function previousIsoDay(s: string): string {
@@ -62,7 +63,7 @@ export function streakFromLogs(input: {
   logs: readonly RevisionLog[];
   today: string;
 }): number {
-  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(input.pages);
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
   const scheduled = (day: string): readonly number[] => {
     const assigned = logOf.get(day)?.assignedPages;
@@ -154,7 +155,7 @@ export function streakReadingFromLogs(input: { user: User; pages: readonly UserP
 
 /** streakReadingFromLogs, with the days behind it. */
 export function streakDetailFromLogs(input: { user: User; pages: readonly UserPage[]; logs: readonly RevisionLog[]; today: string }): StreakDetail {
-  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(input.pages);
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
   const scheduled = (day: string): readonly number[] => {
     const assigned = logOf.get(day)?.assignedPages;

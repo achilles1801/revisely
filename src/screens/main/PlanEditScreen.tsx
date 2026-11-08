@@ -56,6 +56,7 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { useHaptics } from '../../design/haptics';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { getRevisionDateForUser } from '../../lib/fajrBoundary';
+import { revisablePages } from '../../lib/memorizedAyahs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -108,10 +109,8 @@ export default function PlanEditScreen() {
 
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
 
-  const memorizedPages = useMemo(
-    () => pages.filter((p) => p.status === 'memorized'),
-    [pages],
-  );
+  // Memorized and partly memorized pages: both are revised (MEM-4).
+  const memorizedPages = useMemo(() => revisablePages(pages), [pages]);
   const memorizedNumbers = useMemo(
     () => memorizedPages.map((p) => p.pageNumber).sort((a, b) => a - b),
     [memorizedPages],

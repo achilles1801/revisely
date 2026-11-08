@@ -47,6 +47,29 @@ export function revisablePages<T extends PageMemorization>(pages: readonly T[], 
   return pages.filter((p) => isRevisable(p, edition));
 }
 
+/**
+ * The partly memorized pages, each with its memorized ayahs. Screens that name the pages to revise
+ * take it, so a page in part is named by what is memorized on it (MEM-4).
+ */
+export function partlyMemorizedAyahs(pages: readonly PageMemorization[], edition: MushafEditionId = getMushafEdition()): Map<number, AyahKey[]> {
+  const out = new Map<number, AyahKey[]>();
+  for (const p of pages) {
+    if (p.status !== 'in_progress') continue;
+    const mine = memorizedAyahsOnPage(p, edition);
+    if (mine.length > 0) out.set(p.pageNumber, mine);
+  }
+  return out;
+}
+
+/** The ayahs to revise on some pages, in the order given: a whole page's, or a partly memorized page's own (MEM-4). */
+export function ayahsToRevise(
+  pageNumbers: readonly number[],
+  partial: ReadonlyMap<number, readonly AyahKey[]> = new Map(),
+  edition: MushafEditionId = getMushafEdition(),
+): AyahKey[] {
+  return pageNumbers.flatMap((n) => [...(partial.get(n) ?? ayahsOnPage(n, edition))]);
+}
+
 /** How much of a page is memorized, 0–1: its share of the page's text (MEM-2). */
 export function pageShare(page: PageMemorization, edition: MushafEditionId = getMushafEdition()): number {
   if (page.status === 'memorized') return 1;
