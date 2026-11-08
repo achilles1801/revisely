@@ -135,8 +135,13 @@ function RowDetail({
   return (
     <View style={styles.detail} testID={`${testID}-detail`}>
       <DetailLine text={line} />
-      <RatingStrip cells={strip.map((s) => s.band)} first={ends.first} last={ends.last} />
-      {strip.some((s) => s.band) ? <RatingCounts counts={counts} /> : null}
+      {/* Nothing rated (not memorized, or never revised): no strip, only where to go. */}
+      {strip.some((s) => s.band) ? (
+        <>
+          <RatingStrip cells={strip.map((s) => s.band)} first={ends.first} last={ends.last} />
+          <RatingCounts counts={counts} />
+        </>
+      ) : null}
       <ChartButtons
         key={row.key}
         reviseFirst={onReviseFirst && memorized.length > 0 ? () => onReviseFirst(memorized) : undefined}

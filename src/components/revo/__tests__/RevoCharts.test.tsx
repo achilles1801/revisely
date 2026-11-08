@@ -439,6 +439,10 @@ describe('table', () => {
     expect(onReviseFirst).toHaveBeenCalledWith(range(542));
     fireEvent.press(screen.getByTestId('revo-chart-table-row-28'));
     expect(screen.queryByTestId('revo-chart-table-detail')).toBeNull();
+    // Juz 26 has nothing rated on this account: no strip, only where to go.
+    fireEvent.press(screen.getByTestId('revo-chart-table-row-26'));
+    expect(screen.getByTestId('revo-chart-table-reader')).toBeTruthy();
+    expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
   });
 });
 
