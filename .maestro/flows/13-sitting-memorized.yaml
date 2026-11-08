@@ -270,10 +270,10 @@ appId: com.revisionbuddy.app
     id: activity-finishes-page
     text: "Al.Mulk.*12 finishes the page"
 - assertVisible: ".*marked memorized"
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: 13-day-memorized
+# Taken at once, not through shot.yaml: its wait for animations ran its full 2 s here, and Undo's
+# toast lasts six; the tap then came as the toast went (iOS, #328's run 42498597405). The checks above
+# have waited for this screen already.
+- takeScreenshot: 13-day-memorized
 
 # Undo (MEM-3): the ayahs come off; the Day has nothing memorized again and offers the page.
 - tapOn: "Undo"
