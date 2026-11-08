@@ -111,16 +111,19 @@ appId: com.revisionbuddy.app
       id: whats-new-forced
     timeout: 20000
 - assertVisible: "Memorize by the ayah"
+# NEW-2: Revo's card plays by itself (about 19 s); a tap takes it to its end, where Later goes on.
+# While it plays the screen never settles: these taps don't wait for it (.maestro/README.md). The
+# title is matched by id: iOS reads it as "Step 4 of 5. Meet Revo".
 - tapOn:
     id: whats-new-next
-# NEW-2: Revo's card plays by itself (about 19 s); a tap takes it to its end, where Later goes on.
-# The title is matched by id: iOS reads it as "Step 4 of 5. Meet Revo".
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: whats-new-moment
     timeout: 10000
 - tapOn:
     id: whats-new-moment
+    waitToSettleTimeoutMs: 500
 - assertVisible:
     id: whats-new-title
     text: '.*Meet Revo'
