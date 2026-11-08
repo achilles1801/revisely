@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-07T23:40:04.931Z",
+  "recordedAt": "2026-11-08T01:32:02.641Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,18 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "3a316eaeadd0c13ccab49261b06a4754d2aaee8b259d462f05abee67426244b0"
+    "systemSha256": "42d7f4d609cf82de52992bbf621522999ea404bf4d60a53332efa2b2a5858078",
+    "outputSchemaSha256": "f648371bd7d71f8ac7324ec3a218fb76d7ddaba5925e63f6d93456e19275c733"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgpT6cqiR2rsD6CgSrqUM",
+    "id": "msg_011CgpbdrHPfSezymwvHFYQr",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "Five of the last six days were close to full, and you finished the whole plan on four of them. Thursday fell one page short, and only Saturday was missed.\n\nToday is half done, with 6 pages left starting from Al-Infitar. Finishing them keeps your streak going.\n\n```json\n{\"text\": \"You finished the whole plan on four of the last six days, and Thursday was one page short. Only Saturday was missed. Today has 6 pages left, starting from Al-Infitar, and finishing them keeps your 2-day streak growing.\", \"chart\": {\"kind\": \"dailyPages\", \"title\": \"Pages revised this week\", \"days\": 7}, \"textAfter\": \"Six pages left today:\", \"action\": {\"kind\": \"startRevision\", \"title\": \"Continue today's revision\", \"detail\": \"6 pages left, starting from Al-Infitar\"}, \"remember\": [], \"title\": \"How was my week?\", \"chips\": [\"Which pages are weak?\", \"How many pages are left today?\", \"Am I on track this month?\"]}\n```"
+        "text": "{\"text\":\"You revised on most days this week and finished the whole plan on four of them; only Saturday was missed, and Thursday fell one page short. Your 2-day streak is alive, and today has 6 pages left.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Finishing today keeps the streak going:\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting at Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weak?\",\"Why did I miss Saturday?\",\"How am I doing overall?\"]}"
       }
     ],
     "container": null,
@@ -28,12 +29,12 @@
     "usage": {
       "input_tokens": 551,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 10554,
+      "cache_read_input_tokens": 13075,
       "cache_creation": {
         "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 326,
+      "output_tokens": 218,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
