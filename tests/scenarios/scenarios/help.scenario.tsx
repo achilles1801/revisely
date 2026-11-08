@@ -137,6 +137,28 @@ describe('the help on Home', () => {
     await app.close();
   });
 
+  it('[HELP-4] the ? is on by default: a phone with nothing stored shows it, and hiding it on one phone leaves another’s on', async () => {
+    const phone = await account(true);
+    const { app } = await openHome(phone, true);
+    // Nothing about help on this phone, and the ? shows.
+    expect([...phone.storage.keys()].filter((k) => k.startsWith('@revisely_help'))).toEqual([]);
+    await app.until(() => helpButton(app) != null, 'the ? on the Today post');
+    // Hidden here (the user's own choice) ...
+    await press(app, 'help-button-home');
+    await press(app, 'help-hide');
+    await app.until(() => helpButton(app) == null, 'the ? to go');
+    await app.close();
+
+    // ... the same account on another phone, nothing stored there: on.
+    const other = new Phone('other');
+    const app2 = await other.open(homeAndSettings);
+    await app2.signIn(phone.email!);
+    await app2.until(() => app2.app.user?.previewTester === true, 'the account to be a tester');
+    await new Home(app2).ready();
+    await app2.until(() => helpButton(app2) != null, 'the ? on the other phone');
+    await app2.close();
+  });
+
   it('[HELP-2] Hide help buttons takes every ? away, with Undo; hidden they stay hidden at the next launch, until Settings → Support → Help buttons', async () => {
     const phone = await account(true);
     let { app } = await openHome(phone, true);
