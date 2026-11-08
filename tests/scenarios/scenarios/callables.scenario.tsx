@@ -82,8 +82,10 @@ const tap = async (app: OpenApp, testID: string) => {
 
 it('[COACH-4] [COACH-5] [COACH-2] the Ask coach sheet against the real function: turned on, an answer with the questions left, kept for the day', async () => {
   setZone(ZONES.chicago);
-  // A month of its own: the ledger is shared by every account in a month.
+  // A month of its own: the ledger is shared by every account in a month. Empty to start with: a
+  // second run of the suite (TESTING.md) uses the same emulators, and found this run's call there.
   setNow('2031-03-04 10:00');
+  await deleteServerDoc('coachLedger/2031-03');
   const phone = new Phone('phone');
   const sheet = (mods: Booted) => {
     const { AskCoachSheet } = mods.require<typeof import('../../../src/components/coach/AskCoachSheet')>('src/components/coach/AskCoachSheet');
