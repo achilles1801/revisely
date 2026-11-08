@@ -283,6 +283,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'MEM-3': 'taking ayahs off the memorized (MEM-1’s section)',
   'MEM-4': 'a partly memorized page in the revision cycle (MEM-1’s section)',
   'MEM-5': 'the Day’s Add to memorized from a sitting (MEM-1’s section)',
+  'MEM-6': 'the schedule editor’s Not in your plan (MEM-1’s section)',
   'REC-1': 'the reader’s End also stopping its recording, and its one note (MEM-1’s section)',
   'REC-2': 'a sitting saved with the pages it held (MEM-1’s section)',
   // The interactive Activity (testers):
@@ -290,6 +291,8 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ACT-19': 'no strength shown without Smart Tracking (ACT-18’s note: with the next recording)',
   'ACT-20': 'the day’s page strip opening the reader (ACT-18’s note: with the next recording)',
   'ACT-21': 'the juz sheet from a Coverage tile, the untouched row or a day’s Revised block (ACT-18’s note: with the next recording)',
+  'ACT-22': 'Insights’ range chip (ACT-18’s note: with the next recording)',
+  'ACT-23': 'Insights’ one-line taps (ACT-18’s note: with the next recording)',
 };
 
 /** The guide as Revo reads it. */

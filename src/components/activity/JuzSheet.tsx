@@ -53,6 +53,7 @@ export function JuzSheet({
   today,
   revised,
   windowDays = 30,
+  windowWords,
   onOpenPage,
   onPlanIt,
 }: {
@@ -63,6 +64,8 @@ export function JuzSheet({
   /** Revision items covering the window, when the host has them; otherwise the sheet reads them. */
   revised?: Revised;
   windowDays?: number;
+  /** The window in words ("in 30 days", "since 9 September"). */
+  windowWords?: string;
   /** The reader at a page (pushed over the screen, so back returns: ACT-20). */
   onOpenPage: (page: number) => void;
   /** A stale juz: put its memorized pages first tomorrow (the untouched row's Plan it). */
@@ -94,8 +97,8 @@ export function JuzSheet({
     () =>
       shown == null
         ? null
-        : juzSheetModel({ juz: shown, today, pages, revised: revised ?? loaded ?? [], windowDays, smartTracking }),
-    [shown, today, pages, revised, loaded, windowDays, smartTracking],
+        : juzSheetModel({ juz: shown, today, pages, revised: revised ?? loaded ?? [], windowDays, windowWords, smartTracking }),
+    [shown, today, pages, revised, loaded, windowDays, windowWords, smartTracking],
   );
   // What a tap leads to runs once the sheet has gone (iOS can't present Revo, or move the stack
   // cleanly, while the sheet's modal is being dismissed).
