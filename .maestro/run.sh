@@ -20,7 +20,7 @@
 #   E2E_REPEAT         runs of each flow, every one of which must pass, with no reruns (default 1;
 #                      2 for a PR that changes shared test code: plan in ci.yml)
 #   E2E_ZONE           the zone for flows that name none (America/Chicago)
-#   E2E_FLOW_LIMIT     seconds an attempt may take before it is stopped (900)
+#   E2E_FLOW_LIMIT     seconds an attempt may take before it is stopped (iOS 1200, Android 900)
 #   E2E_WARMUP_LIMIT   seconds the warm-up may take (360)
 set -uo pipefail
 
@@ -82,8 +82,10 @@ with_limit() {
   return "$status"
 }
 
-# A flow's attempt (a flow takes 2–10 minutes on CI) and the warm-up.
-FLOW_LIMIT=${E2E_FLOW_LIMIT:-900}
+# A flow's attempt and the warm-up. They catch a hang (Maestro once waited 55 minutes), not a slow
+# flow: on Android flows take 2–10 minutes, on iOS up to 15 (11-surah-names took 13:29 and once ran
+# past 15:00, #328's run 42498597405; 09-revo 15:01), so iOS gets 20.
+if [ "$PLATFORM" = ios ]; then FLOW_LIMIT=${E2E_FLOW_LIMIT:-1200}; else FLOW_LIMIT=${E2E_FLOW_LIMIT:-900}; fi
 WARMUP_LIMIT=${E2E_WARMUP_LIMIT:-360}
 
 # `# e2e-ci-skip: ios — why` in a flow: not run on that platform in CI (CI set).

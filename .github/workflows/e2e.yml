@@ -286,8 +286,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.app == 'true' && needs.changes.outputs.run_ios == 'true' }}
     runs-on: macos-26
-    # Each flow run twice (a change to shared test code): twice the flows' time.
-    timeout-minutes: ${{ inputs.repeat == '2' && 180 || 90 }}
+    # Each flow run twice (a change to shared test code): twice the flows' time. The longer iOS job
+    # took 2 h 49 min that way, and about 85 min once (#328's run 42498597405), so 240 and 120.
+    timeout-minutes: ${{ inputs.repeat == '2' && 240 || 120 }}
     # The macOS runner takes 4–9 minutes a flow, and a native build 20 to 35
     # (when the fingerprint has none kept: a native change). (A third job often
     # waited for a macOS runner until GitHub gave up on it.)
