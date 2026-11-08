@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-07**
+**Last updated: 2026-11-08**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
@@ -38,6 +38,7 @@ Revisely is a tool to help you track and review your Quran memorization. Specifi
 - Voice recordings of your recitation, kept on your device and, unless you turn it off, backed up to your account.
 - Prayer times, prayer notifications, and a Qibla compass, calculated on your device.
 - Home Screen and Lock Screen widgets (on iPhone).
+- Revo, an optional AI assistant that answers questions about your own revision, when you turn it on. It has a daily limit on questions and may be paused at times.
 - Revision reminders (when enabled).
 
 We may add, change, or remove features at any time.
@@ -53,12 +54,13 @@ You agree not to:
 - Use the app to send spam, malware, or other malicious content.
 - Send automated, excessive, or malicious requests to our services.
 - Resell, sublicense, or commercially redistribute the app or its content without our prior written permission.
+- Misuse Revo, for example by trying to make it produce harmful content or anything that breaks [Anthropic's Usage Policy](https://www.anthropic.com/legal/aup).
 
 ## 5. Your content
 
 You retain ownership of any content you submit to Revisely (for example, the notes you write in the daily log). By submitting content, you grant us a non-exclusive, worldwide, royalty-free license to process and store it as needed to operate the service.
 
-We do not use your content to train any AI model.
+We do not use your content to train any AI model, and Anthropic, which writes Revo's answers, doesn't train its models on what Revo sends it.
 
 ## 6. Intellectual property
 
@@ -68,7 +70,7 @@ The Holy Quran itself is in the public domain. Page images displayed in the app 
 
 ## 7. Third-party services
 
-Revisely relies on third-party services to operate, including Apple, Google (Firebase), Sentry and Expo. Your use of Sign in with Apple or Google Sign-In is also subject to their terms. Section 5 of the [Privacy Policy](/privacy/) lists each service and what it is used for.
+Revisely relies on third-party services to operate, including Apple, Google (Firebase), Sentry, Expo and Anthropic (Revo's answers). Your use of Sign in with Apple or Google Sign-In is also subject to their terms. Section 5 of the [Privacy Policy](/privacy/) lists each service and what it is used for.
 
 ## 8. Pricing
 
@@ -77,6 +79,8 @@ Revisely is currently free to download and use, and contains no in-app purchases
 ## 9. Disclaimer of warranties
 
 Revisely is provided **"as is" and "as available"** without warranties of any kind, express or implied. We do not warrant that the app will be uninterrupted, error-free, secure, or that defects will be corrected. We do not guarantee the suggestions made by the revision schedule. **You are responsible for verifying that data entered into and displayed by Revisely is accurate.**
+
+Revo's answers are written by an AI model (Claude, from Anthropic) from your own revision data. They can be wrong or incomplete, so check anything that matters, including any surah, ayah or page it names, against the mushaf. Revo doesn't give religious rulings, tafsir, or medical, legal or financial advice: for those, ask a qualified teacher.
 
 To the fullest extent permitted by law, we disclaim all implied warranties, including warranties of merchantability, fitness for a particular purpose, and non-infringement.
 
