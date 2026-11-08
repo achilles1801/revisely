@@ -37,6 +37,7 @@ appId: com.revisionbuddy.app
     visible: "Meet Revo"
     timeout: 10000
 - assertVisible: "Your notes and recordings stay private"
+- assertVisible: "Answered by Claude, from Anthropic"
 - runFlow:
     file: ../subflows/shot.yaml
     env:

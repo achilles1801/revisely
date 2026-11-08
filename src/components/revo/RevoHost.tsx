@@ -18,6 +18,7 @@ import { HOME, placeKey, revoPlaceOf, type RevoPlace } from '../../lib/revo/plac
 import { dayAttachment, dayLabel } from '../../lib/revo/attachments';
 import { prepare } from '../../lib/revo/facts';
 import { shiftDay } from '../../lib/journal';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import { listRecordings } from '../../lib/recordings';
 import { openScreen } from '../../lib/revo/screens';
 import { setRevoButtonRoute, setRevoPresent } from '../../lib/revo/presence';
@@ -95,6 +96,7 @@ export function RevoHost() {
 
 function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpenChange: (open: boolean) => void }) {
   const uid = auth.currentUser?.uid ?? '';
+  const { user } = useApp();
   useEffect(() => {
     setRevoPresent(true);
     return () => setRevoPresent(false);
@@ -365,7 +367,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       <RevoSheetFrame visible={open} onClose={close} full={full} onFullChange={setFull}>
         <RevoBoundary resetKey={open}>
           {view.name === 'optin' ? (
-            <RevoOptIn onTurnOn={() => void turnOn()} onNotNow={close} busy={optInBusy} error={optInError} />
+            <RevoOptIn onTurnOn={() => void turnOn()} onNotNow={close} busy={optInBusy} error={optInError} smartTracking={smartTrackingOn(user)} />
           ) : view.name === 'history' ? (
             <RevoHistory
               uid={uid}

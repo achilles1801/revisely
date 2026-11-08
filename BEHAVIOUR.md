@@ -541,8 +541,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   planned works like done. The first suggestion follows what the greeting leads with. All of it is written on the
   phone: no call, nothing counted.
 
-- **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent and what isn't; nothing is
-  sent before "Turn on Revo", the Day in review included. The sheet opens on the opt-in itself, at its height; a tap
+- **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent, that Claude, from Anthropic,
+  answers (Anthropic doesn't train its models on it), and what isn't sent; with Smart Tracking off it says nothing
+  about weak spots (REVO-36). Settings → Revo AI's switch opens the same opt-in. Nothing is sent before "Turn on
+  Revo", the Day in review included. The sheet opens on the opt-in itself, at its height; a tap
   before the account's switch is read waits for it (up to 2 s), so an account with Revo on never sees the opt-in. The
   button shows only on the screens REVO-25 lists: never on the Read tab or in a session.
 
