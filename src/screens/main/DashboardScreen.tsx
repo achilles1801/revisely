@@ -549,7 +549,7 @@ export default function DashboardScreen() {
           partial={partial}
           done={donePagesToday}
           carried={carriedToday}
-          carriedFromInsights={snapshot?.carriedFromInsights ?? false}
+          carriedInsights={snapshot?.carriedInsights ?? 0}
           carriedLeft={carriedLeft}
           streak={calculatedStreak}
           streakGrace={streakNow?.grace ?? null}

@@ -71,7 +71,7 @@ export function TodayPost({
   done,
   carried = 0,
   carriedLeft = 0,
-  carriedFromInsights = false,
+  carriedInsights = 0,
   partial,
   streak,
   streakGrace,
@@ -97,8 +97,8 @@ export function TodayPost({
   carried?: number;
   /** Of those, how many are still to revise (once today's own pages are done, the button goes on to them). */
   carriedLeft?: number;
-  /** The carried pages came from Insights ("Revise these first tomorrow"): "2 from Insights first". */
-  carriedFromInsights?: boolean;
+  /** Of those, how many Insights put there ("Revise these first tomorrow"): "2 from Insights first". */
+  carriedInsights?: number;
   /** The partly memorized pages and their memorized ayahs: named by those (MEM-4). */
   partial?: PartialPages;
   streak: number;
@@ -124,7 +124,7 @@ export function TodayPost({
 }) {
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedFromInsights);
+  const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights);
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace
