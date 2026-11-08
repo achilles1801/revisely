@@ -2,19 +2,31 @@ import { useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useSharedActivityHistory } from '../activityHistory';
+import { nextRevisionDayPlan, revisionDayAfter } from '../aheadPlan';
 import { generateDailyAssignment } from '../algorithm';
 import { getQuranData } from '../quranData';
 import { todaySnapshot } from '../todaySnapshot';
 import { buildRevoContext } from './context';
 import type { FactSources } from './facts';
+import type { GreetingExtras } from './greeting';
 import type { RevoContext } from './types';
+
+/** "Wednesday": the next revision day with pages, when it isn't tomorrow. */
+const weekday = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
 
 /**
  * The revision day, and Revo's context built from the account's data as Home sees it now: the same
  * assignment, the same snapshot (lib/todaySnapshot) and the same history Home's streak read.
- * `sources` gives the same data for what + attaches (lib/revo/facts).
+ * `sources` gives the same data for what + attaches (lib/revo/facts). `extras` is what the greeting
+ * also says and the context doesn't carry, as Home has it: "Done · N" and where the next day starts.
  */
-export function useRevoContext(): { day: string; context: RevoContext | null; build: () => RevoContext | null; sources: () => FactSources | null } {
+export function useRevoContext(): {
+  day: string;
+  context: RevoContext | null;
+  extras: GreetingExtras;
+  build: () => RevoContext | null;
+  sources: () => FactSources | null;
+} {
   const { user, pages, logs } = useApp();
   const { day, date } = useRevisionDay(user);
   const history = useSharedActivityHistory(user?.id, day);
@@ -29,6 +41,22 @@ export function useRevoContext(): { day: string; context: RevoContext | null; bu
     const src = sources();
     return src ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot }) : null;
   }, [sources]);
-  const context = useMemo(build, [build]);
-  return { day, context, build, sources };
+  const { context, extras } = useMemo(() => {
+    const src = sources();
+    if (!src) return { context: null, extras: {} };
+    const { snapshot } = src;
+    // Home's "Tomorrow starts at …" (DashboardScreen's aheadNext): only once today is done.
+    let next: GreetingExtras['next'] = null;
+    if (snapshot.status === 'completed' && assignment.length > 0) {
+      const plan = nextRevisionDayPlan(src.user, src.pages, day, new Set(assignment), src.logs);
+      if (plan && plan.pages.length > 0) {
+        next = { lead: plan.day === revisionDayAfter(day) ? 'Tomorrow' : weekday(plan.day), first: plan.pages[0], pages: plan.pages.length };
+      }
+    }
+    return {
+      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot }),
+      extras: { doneCount: snapshot.done.size, next },
+    };
+  }, [sources, assignment, day]);
+  return { day, context, extras, build, sources };
 }
