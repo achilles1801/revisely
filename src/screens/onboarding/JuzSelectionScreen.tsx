@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { ScreenSafeAreaView } from '../../components/SafeAreaView';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
@@ -120,7 +120,7 @@ export default function JuzSelectionScreen() {
   // The title scrolls with the list, so the largest text sizes still leave
   // room for it; the count and the action stay at the foot, over a hairline.
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="juz-selection">
+    <ScreenSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="juz-selection">
       <TopBar onBack={() => navigation.goBack()} center={<Stepper total={3} current={2} />} />
       <ScrollView
         style={styles.scrollView}
@@ -169,7 +169,7 @@ export default function JuzSelectionScreen() {
           testID="juz-continue"
         />
       </View>
-    </SafeAreaView>
+    </ScreenSafeAreaView>
   );
 }
 
