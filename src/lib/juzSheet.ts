@@ -121,8 +121,9 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
   // Each page's last revision: the latest of its own record and the items read.
   const last = new Map<number, string>();
   for (const p of memorized) {
+    // A page's record is a timestamp in the app ("2026-11-02T09:00:00.000Z"): its day is what counts.
     const own = byNumber.get(p)?.lastRevisedDate;
-    if (own) last.set(p, own);
+    if (own) last.set(p, own.slice(0, 10));
   }
   // Days in the window each page was revised (a page counts once a day).
   const inWindow = new Map<number, Set<string>>();
