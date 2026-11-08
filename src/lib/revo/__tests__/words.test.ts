@@ -49,3 +49,15 @@ describe('Revo’s words for parts of the Qur’an (REVO-20, REVO-27)', () => {
     }
   });
 });
+
+describe('Revo’s words for a partly memorized page (MEM-4)', () => {
+  it('[REVO-27] names it by its memorized ayahs', () => {
+    const partial = new Map([[604, [114001, 114002, 114003, 114004, 114005, 114006]]]);
+    const w = contextWords({ today: [604, 1], next: [604], weakNext: [], weak: [] }, partial);
+    expect(w.passages.today).toBe('An-Nas, then Al-Fatihah');
+    expect(w.passages.startsAt).toBe('An-Nas');
+    expect(w.passages.nextAt).toBe('An-Nas');
+    expect(w.pageNames['604']).toBe('An-Nas · Juz 30');
+    expect(w.passages.today).toMatch(SERVER);
+  });
+});

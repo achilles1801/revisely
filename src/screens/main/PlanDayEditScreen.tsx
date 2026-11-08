@@ -44,6 +44,7 @@ import { useHaptics } from '../../design/haptics';
 import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { arabicLabelLines } from '../../lib/platformUi';
+import { revisablePages } from '../../lib/memorizedAyahs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanDayEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanDayEdit'>;
@@ -77,8 +78,7 @@ export default function PlanDayEditScreen() {
 
   const memorized = useMemo(
     () =>
-      allPages
-        .filter((p) => p.status === 'memorized')
+      revisablePages(allPages)
         .map((p) => p.pageNumber)
         .sort((a, b) => a - b),
     [allPages],

@@ -71,6 +71,7 @@ import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
 import type { User } from '../../types';
+import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
@@ -229,7 +230,7 @@ export default function DashboardScreen() {
   const leftovers = useMemo<Leftovers>(() => {
     if (!user || !assignment) return { pages: [], from: {}, days: [] };
     // Pages logged by hand for a day aren't left over from it (ACT-15).
-    return leftoversFor(user, [...logs, ...handLogsOf(counted)], revisionDay, assignment.pages, pages.filter((p) => p.status === 'memorized'));
+    return leftoversFor(user, [...logs, ...handLogsOf(counted)], revisionDay, assignment.pages, revisablePages(pages));
   }, [logs, counted, revisionDay, assignment, pages, user]);
 
   // Today's pages that came from earlier days (they come first: "4 from yesterday first").
@@ -257,6 +258,8 @@ export default function DashboardScreen() {
   // Includes pages revised ahead for today (lib/aheadCredit).
   // Also the pages today's sessions revised ahead, so "Done" counts the whole day.
   const donePagesToday = useMemo(() => snapshot?.done ?? new Set<number>(), [snapshot]);
+  // Partly memorized pages are named by their memorized ayahs (MEM-4).
+  const partial = useMemo(() => partlyMemorizedAyahs(pages), [pages]);
   // Carried pages still to revise: once today's own pages are done, the button goes on to them.
   const carriedLeft = snapshot?.carriedLeft ?? 0;
 
@@ -431,7 +434,7 @@ export default function DashboardScreen() {
     carryingRef.current = true;
     setCarrying(true);
     try {
-      const memorized = pages.filter((p) => p.status === 'memorized');
+      const memorized = revisablePages(pages);
       await saveUser(applyCarryOver(user, memorized, leftovers.pages, revisionDate, leftovers.from));
     } catch {
       Alert.alert("Couldn't update today's session", 'Please try again.');
@@ -445,7 +448,7 @@ export default function DashboardScreen() {
   const handleJump = async (target: JumpTarget) => {
     setJumpOpen(false);
     if (!user) return;
-    const memorized = pages.filter((p) => p.status === 'memorized');
+    const memorized = revisablePages(pages);
     const result = jumpTo(user, target, { revisionDate, memorized, logs });
     if (!result) {
       Alert.alert("Couldn't start there", "That part isn't in your schedule.");
@@ -541,6 +544,7 @@ export default function DashboardScreen() {
           initial={avatarInitial(userName, firebaseUser?.email)}
           status={todayStatus.status}
           pages={assignment.pages}
+          partial={partial}
           done={donePagesToday}
           carried={carriedToday}
           carriedLeft={carriedLeft}
@@ -551,7 +555,7 @@ export default function DashboardScreen() {
           onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
           onJump={() => setJumpOpen(true)}
-          catchUp={catchUpLine(leftovers)}
+          catchUp={catchUpLine(leftovers, partial)}
           onCarryOver={handleCarryOver}
           carrying={carrying}
           ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
@@ -595,7 +599,7 @@ export default function DashboardScreen() {
         visible={jumpOpen}
         onClose={() => setJumpOpen(false)}
         user={user}
-        memorized={pages.filter((p) => p.status === 'memorized')}
+        memorized={revisablePages(pages)}
         revisionDate={revisionDate}
         onJump={handleJump}
       />

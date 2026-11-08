@@ -6,6 +6,7 @@
 import { getPagesForJuz, getSurahsForPage } from './quranData';
 import { describePassage, pagesNote } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
+import { memorizedByMonth, type MemorizationItemLike } from './memorizedAyahs';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -266,24 +267,9 @@ export function ratedWeakCounts(logs: { date: string; weaknessUpdates?: { page: 
 
 // ── Memorization ─────────────────────────────────────────────────────────
 
-/** Pages memorized each month, the 12 months ending `last`, oldest first. */
-export function memorizationMonths(items: { day: string; pages: number[] }[], last: string): { month: string; pages: number }[] {
-  const months: string[] = [];
-  let [y, m] = last.split('-').map(Number);
-  for (let k = 0; k < 12; k++) {
-    months.unshift(`${y}-${String(m).padStart(2, '0')}`);
-    m -= 1;
-    if (m === 0) {
-      m = 12;
-      y -= 1;
-    }
-  }
-  const counts = new Map(months.map((mo) => [mo, 0]));
-  for (const i of items) {
-    const mo = i.day.slice(0, 7);
-    if (counts.has(mo)) counts.set(mo, (counts.get(mo) ?? 0) + new Set(i.pages).size);
-  }
-  return months.map((month) => ({ month, pages: counts.get(month) ?? 0 }));
+/** Pages memorized each month, the 12 months ending `last`, oldest first, by page share (lib/memorizedAyahs, MEM-2). */
+export function memorizationMonths(items: MemorizationItemLike[], last: string): { month: string; pages: number }[] {
+  return memorizedByMonth(items, last).map(({ month, pages }) => ({ month, pages }));
 }
 
 /** A month's label under its bar: its initial, or "Nov" at either end. */

@@ -1,6 +1,7 @@
-// What is memorized, ayah by ayah, as the app reads it from the server (MEM-1, MEM-2): a partly
-// memorized page (Firestore status 'learning' with its ayahs in `verses`) counts on Home by the share
-// of the page its ayahs fill, and ayahs left on a page another build re-marked mean nothing.
+// What is memorized, ayah by ayah, as the app reads it from the server (MEM-1, MEM-2, MEM-4): a
+// partly memorized page (Firestore status 'learning' with its ayahs in `verses`) counts on Home by
+// the share of the page its ayahs fill, is revised like a memorized one and named by its ayahs, and
+// ayahs left on a page another build re-marked mean nothing.
 // The page is written as the owner (the emulator's admin), as a phone saving ayahs would.
 
 import bounds from '../../../src/data/ayahBounds.json';
@@ -26,12 +27,14 @@ function alMulk1to7Share(): number {
 /** Home's percent, one decimal, as it is written: "3.4%". */
 const percent = (pages: number) => `${(Math.round((pages / 604) * 1000) / 10).toFixed(1)}%`;
 const AL_MULK_1_7 = [67001, 67002, 67003, 67004, 67005, 67006, 67007];
+/** Home's words with its no-break spaces and hyphens as plain ones. */
+const plain = (s: string | null) => (s ?? '').split('\u00a0').join(' ').split('\u2011').join('-');
 
-async function account(): Promise<{ phone: Phone; uid: string }> {
+async function account(memorized = pagesRange(1, 20)): Promise<{ phone: Phone; uid: string }> {
   setZone(ZONES.london);
   setNow('2026-11-03 20:00');
   const phone = new Phone();
-  const app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const app = await newAccount(phone, { memorized, user: { dailyPageCapacity: 5 } });
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
@@ -71,6 +74,22 @@ describe('memorized ayahs, read from the server (MEM-1, MEM-2)', () => {
     const expected = percent(21);
     await app.until(() => home.memorized()?.startsWith(expected) ?? false, `Home to say ${expected}`);
     expect(home.memorized()).toMatch(new RegExp(`^${expected.replace(".", "\\.")} of the Quran memorized`));
+    await app.close();
+  });
+
+  it('[MEM-4] a partly memorized page is in the day’s revision, named by its memorized ayahs', async () => {
+    // Pages 1–4 and, on the Qur'an's last page (Al-Ikhlas, Al-Falaq, An-Nas), An-Nas alone: five pages
+    // at five a day, so today is all of them in page order, the last page after the first four.
+    const { phone, uid } = await account(pagesRange(1, 4));
+    await setServerDoc(`users/${uid}/pages/604`, { status: 'learning', verses: [114001, 114002, 114003, 114004, 114005, 114006] });
+
+    const app = await phone.open(homeStack);
+    const home = new Home(app);
+    await home.ready();
+    // Left out it would be "4 pages"; named by the page it would be "then Al-Ikhlas".
+    await app.until(() => plain(home.detail()).startsWith('5 pages'), 'today to hold the partly memorized page');
+    expect(plain(home.title())).toMatch(/^Starts at Al-Fatihah/);
+    expect(plain(home.detail())).toBe('5 pages · then An-Nas');
     await app.close();
   });
 });

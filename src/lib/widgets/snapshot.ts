@@ -13,10 +13,11 @@ import { aliveStreak, completedDays } from '../streak';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
 import { getNextRevisionDayStart, getRevisionDayForUser } from '../fajrBoundary';
-import { describePassage, placeOfPage } from '../passages';
+import { describePagesToRevise, placeOfPageToRevise, type PartialPages } from '../passages';
 import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
+import { partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export const WIDGET_APP_GROUP = 'group.com.revisionbuddy.app';
@@ -149,9 +150,9 @@ export function juzLabel(juzBreakdown: { juz: number }[]): string {
 /** The Lock Screen's rectangular widget fits about this many characters on its line. */
 const SHORT_FITS = 20;
 
-function shortLabel(pages: number[], title: string): string {
+function shortLabel(pages: number[], title: string, partial: PartialPages): string {
   if (pages.length === 0) return '';
-  return title.length <= SHORT_FITS ? title : placeOfPage(pages[0], { form: 'short' });
+  return title.length <= SHORT_FITS ? title : placeOfPageToRevise(pages[0], partial, { form: 'short' });
 }
 
 function localDay(s: string): Date {
@@ -180,7 +181,9 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   };
   if (!input.signedIn || !input.user) return { ...base, state: 'signedOut', days: [] };
   const user = input.user;
-  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(input.pages);
+  // A partly memorized page is named by its memorized ayahs (MEM-4).
+  const partial = partlyMemorizedAyahs(input.pages);
   const memorizedCount = memorized.length;
   if (!input.onboardingComplete || memorizedCount === 0) return { ...base, state: 'noPlan', days: [] };
 
@@ -194,7 +197,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const endsAt = getNextRevisionDayStart(user, startsAt);
     const assignment = generateDailyAssignment(input.pages, input.quranData, user, localDay(day));
     // The day's pages in the order it reads them, by surah (CLAUDE.md: surahs and juz first).
-    const title = describePassage(assignment.pages, { form: 'short', order: 'given', wholeJuz: false, max: 2 });
+    const title = describePagesToRevise(assignment.pages, partial, { form: 'short', order: 'given', wholeJuz: false, max: 2 });
 
     // As Home: done once every page of the day is revised, today or ahead.
     const credited = creditedOnDay(input.logs, day);
@@ -212,7 +215,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       endsAt: endsAt.getTime(),
       title,
       where: juzLabel(assignment.juzBreakdown),
-      short: shortLabel(assignment.pages, title),
+      short: shortLabel(assignment.pages, title, partial),
       total,
       done: completed ? total : doneHere,
       completed,

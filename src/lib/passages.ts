@@ -30,7 +30,7 @@
 // tests), `spokenText` reads it for VoiceOver ("ayahs 142 to 176").
 
 import pageVerseTable from '../data/pageVerses.json';
-import { ayahOf, ayahRuns, firstAyahOfPage, lastAyahOfPage, nextAyah, pageOfAyah, previousAyah, suraOf } from './ayahKeys';
+import { ayahOf, ayahRuns, ayahsOnPage, firstAyahOfPage, lastAyahOfPage, nextAyah, pageOfAyah, previousAyah, suraOf } from './ayahKeys';
 import { getMushafEdition, MushafEditionId } from './mushafEdition';
 import { getJuzForPage, getJuzRange, getSurah, getSurahDisplay } from './quranData';
 
@@ -310,6 +310,39 @@ export function describeAyahs(keys: Iterable<number>, opts: Omit<PassageOptions,
   return finish(text, opts.sentence);
 }
 
+/** The partly memorized pages, each with its memorized ayahs (lib/memorizedAyahs partlyMemorizedAyahs). */
+export type PartialPages = ReadonlyMap<number, readonly number[]>;
+
+/**
+ * Pages to revise in words, as describePassage names them, with a partly memorized page among them
+ * named by its memorized ayahs (MEM-4): "Al-Kafirun to Al-Masad and An-Nas, then Al-Fatihah" when
+ * only An-Nas is memorized on the last page. With no partly memorized page among them, exactly
+ * describePassage. Every screen naming the pages of a revision day uses it (Home, the widget, Revo).
+ */
+export function describePagesToRevise(pages: Iterable<number>, partial: PartialPages, opts: PassageOptions = {}): string {
+  const list = [...pages].filter(validPage);
+  if (partial.size === 0 || !list.some((p) => partial.has(p))) return describePassage(list, opts);
+  const edition = opts.edition ?? getMushafEdition();
+  const ayahsOf = (ps: number[]) => ps.flatMap((p) => [...(partial.get(p) ?? ayahsOnPage(p, edition))]);
+  const { order, juz, sentence, ...rest } = opts;
+  if ((order ?? 'mushaf') === 'mushaf') return describeAyahs(ayahsOf(list), { ...rest, juz, sentence });
+  // In the order given: each run of pages apart, joined ", then ", as describePassage does.
+  const max = Math.max(1, opts.max ?? 3);
+  const runs = runsOf(list, 'given').map((r) => describeAyahs(ayahsOf(Array.from({ length: r.last - r.first + 1 }, (_, i) => r.first + i)), { ...rest, max: 99 }));
+  let text = (runs.length > max ? [...runs.slice(0, max - 1), `${runs.length - max + 1} more`] : runs).join(', then ');
+  if (juz && !text.includes(`Juz${NBSP}`)) {
+    const j = juzOfPages(list);
+    if (j) text = `${text} · ${j}`;
+  }
+  return finish(text, sentence);
+}
+
+/** Where reading a page to revise begins: placeOfPage, or a partly memorized page's first memorized ayah (MEM-4). */
+export function placeOfPageToRevise(page: number, partial: PartialPages, opts: Pick<PassageOptions, 'form' | 'edition'> = {}): string {
+  const mine = partial.get(page);
+  return mine && mine.length > 0 ? placeOfAyah(mine[0], opts) : placeOfPage(page, opts);
+}
+
 /** One range of pages, first to last (either order), in words: describePassage for that run. */
 export function describePageRange(first: number, last: number, opts: PassageOptions = {}): string {
   const [a, b] = first <= last ? [first, last] : [last, first];
@@ -351,10 +384,20 @@ export function describeSession(
  */
 export function placeOfPage(page: number, opts: Pick<PassageOptions, 'form' | 'edition'> = {}): string {
   if (!validPage(page)) return '';
-  const v = firstVerseOfPage(page, opts.edition ?? getMushafEdition());
-  const name = surahName(v.sura);
-  if (v.ayah === 1) return name;
-  return opts.form === 'short' ? `${name}${NBSP}${v.ayah}` : `${name}, ayah${NBSP}${v.ayah}`;
+  return placeOfAyah(firstAyahOfPage(page, opts.edition ?? getMushafEdition()), opts);
+}
+
+/**
+ * Where reading from an ayah begins (sura × 1000 + ayah, lib/ayahKeys): the surah when it is its
+ * first ayah ("An-Nas"), else the ayah ("Al-Mulk, ayah 13"; short "Al-Mulk 13").
+ */
+export function placeOfAyah(key: number, opts: Pick<PassageOptions, 'form'> = {}): string {
+  const sura = suraOf(key);
+  const ayah = ayahOf(key);
+  if (sura < 1 || sura > 114) return '';
+  const name = surahName(sura);
+  if (ayah === 1) return name;
+  return opts.form === 'short' ? `${name}${NBSP}${ayah}` : `${name}, ayah${NBSP}${ayah}`;
 }
 
 /**

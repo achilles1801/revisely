@@ -47,6 +47,29 @@ export function revisablePages<T extends PageMemorization>(pages: readonly T[], 
   return pages.filter((p) => isRevisable(p, edition));
 }
 
+/**
+ * The partly memorized pages, each with its memorized ayahs. Screens that name the pages to revise
+ * take it, so a page in part is named by what is memorized on it (MEM-4).
+ */
+export function partlyMemorizedAyahs(pages: readonly PageMemorization[], edition: MushafEditionId = getMushafEdition()): Map<number, AyahKey[]> {
+  const out = new Map<number, AyahKey[]>();
+  for (const p of pages) {
+    if (p.status !== 'in_progress') continue;
+    const mine = memorizedAyahsOnPage(p, edition);
+    if (mine.length > 0) out.set(p.pageNumber, mine);
+  }
+  return out;
+}
+
+/** The ayahs to revise on some pages, in the order given: a whole page's, or a partly memorized page's own (MEM-4). */
+export function ayahsToRevise(
+  pageNumbers: readonly number[],
+  partial: ReadonlyMap<number, readonly AyahKey[]> = new Map(),
+  edition: MushafEditionId = getMushafEdition(),
+): AyahKey[] {
+  return pageNumbers.flatMap((n) => [...(partial.get(n) ?? ayahsOnPage(n, edition))]);
+}
+
 /** How much of a page is memorized, 0–1: its share of the page's text (MEM-2). */
 export function pageShare(page: PageMemorization, edition: MushafEditionId = getMushafEdition()): number {
   if (page.status === 'memorized') return 1;
@@ -171,4 +194,65 @@ export function removeAyahs<T extends UserPage>(
     return withAyahs(page, mine, ayahsOnPage(page.pageNumber, edition), null);
   });
   return { pages: out, changed };
+}
+
+/** A memorization item (users/{uid}/memorizations): a day's pages, and the ayahs it added when added by the ayah. */
+export interface MemorizationItemLike {
+  day: string;
+  pages: readonly number[];
+  /** Every ayah the item added (sura × 1000 + ayah), when it was added by the ayah; absent for whole pages. */
+  verses?: readonly number[] | null;
+}
+
+/**
+ * How many pages an item memorized, by page share (MEM-2): its ayahs' share of their pages, or one
+ * per page when it was added as whole pages. Al-Mulk 1–20 is about 1.6.
+ */
+export function memorizedItemShare(item: MemorizationItemLike, edition: MushafEditionId = getMushafEdition()): number {
+  if (!item.verses || item.verses.length === 0) return new Set(item.pages).size;
+  let total = 0;
+  for (const [page, keys] of byPage(item.verses, edition)) {
+    const shares = ayahSharesOnPage(page, edition);
+    if (keys.size >= shares.size) total += 1;
+    else for (const k of keys) total += shares.get(k) ?? 0;
+  }
+  return total;
+}
+
+/** How many ayahs an item memorized: its ayahs, or every ayah of its pages. */
+export function memorizedItemAyahs(item: MemorizationItemLike, edition: MushafEditionId = getMushafEdition()): number {
+  if (item.verses && item.verses.length > 0) return sortedAyahs(item.verses).length;
+  return [...new Set(item.pages)].reduce((n, p) => n + ayahsOnPage(p, edition).length, 0);
+}
+
+/**
+ * Memorizing by month, the 12 months ending `last` ("2026-11"), oldest first: each month's pages by
+ * page share (to one decimal, MEM-2) and its ayahs. Insights' Memorization bars read it.
+ */
+export function memorizedByMonth(
+  items: readonly MemorizationItemLike[],
+  last: string,
+  edition: MushafEditionId = getMushafEdition(),
+): { month: string; pages: number; ayahs: number }[] {
+  const months: string[] = [];
+  let [y, m] = last.split('-').map(Number);
+  for (let k = 0; k < 12; k++) {
+    months.unshift(`${y}-${String(m).padStart(2, '0')}`);
+    m -= 1;
+    if (m === 0) {
+      m = 12;
+      y -= 1;
+    }
+  }
+  const sums = new Map(months.map((mo) => [mo, { pages: 0, ayahs: 0 }]));
+  for (const i of items) {
+    const sum = sums.get(i.day.slice(0, 7));
+    if (!sum) continue;
+    sum.pages += memorizedItemShare(i, edition);
+    sum.ayahs += memorizedItemAyahs(i, edition);
+  }
+  return months.map((month) => {
+    const sum = sums.get(month)!;
+    return { month, pages: Math.round(sum.pages * 10) / 10, ayahs: sum.ayahs };
+  });
 }

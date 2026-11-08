@@ -129,3 +129,32 @@ describe('Today’s lines (E: "Starts at")', () => {
     expect(juzSpan(range(500, 561))).toBeNull();
   });
 });
+
+describe('Today’s lines with a partly memorized page (MEM-4)', () => {
+  // The Qur'an's last page holds Al-Ikhlas, Al-Falaq and An-Nas; only An-Nas is memorized.
+  const anNas = [114001, 114002, 114003, 114004, 114005, 114006];
+  const partial = new Map([[604, anNas]]);
+  // Al-Mulk's second page, its first eight ayahs memorized (13–20).
+  const alMulk = new Map([[563, [67013, 67014, 67015, 67016, 67017, 67018, 67019, 67020]]]);
+
+  it('starts, continues and runs on to a page by its first memorized ayah', () => {
+    expect(lines('not_started', [604, 1, 2], new Set(), 0, 0, partial).title).toBe('Starts at An-Nas');
+    expect(lines('not_started', [1, 2, 3, 4, 604], new Set(), 0, 0, partial).detail).toBe('5 pages · then An-Nas');
+    expect(lines('partial', [602, 603, 604], new Set([602, 603]), 0, 0, partial).title).toBe('Continue at An-Nas');
+  });
+
+  it('a page whose memorized ayahs start it reads as before; the day ends where its memorized ayahs do', () => {
+    expect(lines('not_started', [562, 563], new Set(), 0, 0, alMulk)).toMatchObject({ title: 'Starts at Al-Mulk', detail: '2 pages · Juz 29' });
+    expect(lines('not_started', range(560, 563), new Set(), 0, 0, alMulk).detail).toBe('4 pages · to Al-Mulk · Juz 28–29');
+  });
+
+  it('the › sheet’s header names only the memorized ayahs', () => {
+    expect(plain(rangesText([562, 563], alMulk))).toBe('Al-Mulk, ayahs 1–20 · Juz 29 · pp. 562–563');
+    expect(plain(rangesText([603, 604, 1], partial))).toBe('Al-Kafirun to Al-Masad and An-Nas, then Al-Fatihah · pp. 603–604, 1');
+  });
+
+  it('with no partly memorized page among them, the lines are exactly as before', () => {
+    expect(todayLines('not_started', range(542, 561), new Set(), 0, 0, partial)).toEqual(todayLines('not_started', range(542, 561), new Set()));
+    expect(rangesText(range(595, 604))).toBe(rangesText(range(595, 604), new Map()));
+  });
+});

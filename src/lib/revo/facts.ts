@@ -24,6 +24,7 @@ import type { RecordingMeta } from '../recordings';
 import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevoDayFacts, RevoPassageFacts, RevoPlanTally, RevoTimes } from './types';
+import { isRevisable } from '../memorizedAyahs';
 
 /** Everything the facts are read from: what Home's snapshot (and so Revo's context) was built from. */
 export interface FactSources {
@@ -239,7 +240,7 @@ export function passageFacts(of: readonly number[], prepared: Prepared, name?: s
   const list = [...new Set(of)].filter((p) => Number.isInteger(p) && p >= 1 && p <= 604).sort((a, b) => a - b);
   const set = new Set(list);
   const byNumber = new Map(src.pages.map((p) => [p.pageNumber, p]));
-  const memorizedPages = list.map((p) => byNumber.get(p)).filter((p): p is UserPage => p?.status === 'memorized');
+  const memorizedPages = list.map((p) => byNumber.get(p)).filter((p): p is UserPage => p != null && isRevisable(p));
   const memorized = memorizedPages.map((p) => p.pageNumber);
   const memorizedSet = new Set(memorized);
 
@@ -363,7 +364,7 @@ export function dayFacts(day: string, prepared: Prepared, extras: DayExtras = {}
   const weakPages = [...ratings].filter(([, r]) => r <= 2).map(([p]) => p).sort((a, b) => a - b).slice(0, MAX_DAY_WEAK);
 
   const memorized = src.pages
-    .filter((p) => p.status === 'memorized' && p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), src.user) === day)
+    .filter((p) => isRevisable(p) && p.dateMemorized != null && revisionDayOf(new Date(p.dateMemorized), src.user) === day)
     .map((p) => p.pageNumber);
 
   let readMinutes: number | null = null;

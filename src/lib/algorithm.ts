@@ -2,6 +2,7 @@ import { User, UserPage, QuranPage, DailyAssignment, RevisionLog } from '../type
 import { getRevisionDayForUser } from './fajrBoundary';
 import { getJuzForPage, getSurahForPage } from './quranData';
 import { creditIndex } from './aheadCredit';
+import { isRevisable, revisablePages } from './memorizedAyahs';
 
 // Surah-aware juz key. Short surahs that straddle a juz boundary (e.g. Yusuf
 // spilling from juz 12 into juz 13) get pinned to the juz where they start —
@@ -571,7 +572,7 @@ export function getMissedScheduledRevisions(
   sessions: RevisionLog[],
   today: Date = new Date(),
 ): number {
-  if (page.status !== 'memorized') return 0;
+  if (!isRevisable(page)) return 0;
   if (memorizedPages.length === 0) return 0;
 
   const userStart = startOfDay(new Date(user.createdAt));
@@ -614,7 +615,7 @@ export function calculatePageUrgency(
   sessions: RevisionLog[],
   today: Date = new Date(),
 ): number {
-  if (page.status !== 'memorized') return 0;
+  if (!isRevisable(page)) return 0;
 
   const missed = getMissedScheduledRevisions(page, user, memorizedPages, sessions, today);
 
@@ -715,7 +716,7 @@ export function generateDailyAssignment(
   user: User,
   today: Date = new Date(),
 ): DailyAssignment {
-  const memorized = pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(pages);
   // Slice order preserved on purpose — on wrap days the user sees the
   // tail of the previous cycle before the start of the new one, which
   // matches the scheduler's "you crossed the cycle boundary today" model.

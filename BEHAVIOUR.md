@@ -476,12 +476,18 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   sitting or several. Adding ayahs to a memorized page, or ones already memorized, changes nothing.
 - **MEM-2.** How much is memorized is measured in pages. A partly memorized page counts for the share of
   the page its memorized ayahs fill: their length on the page, not how many they are. This holds for
-  Home's % memorized and its juz dots, the manager's progress and a juz's share. Ayahs differ in length
+  Home's % memorized and its juz dots, the manager's progress, a juz's share, Insights' pages
+  memorized each month and Revo's totals. Ayahs differ in length
   (Juz 30 is 9% of the ayahs and under 4% of the pages), so the share follows the text. A surah is
   memorized once every one of its own ayahs is, also when it ends partway down a page.
 - **MEM-3.** Taking ayahs off the memorized takes only those. A memorized page keeps its other ayahs as
   partly memorized, and a page left with none is not memorized. Taking off just what was added puts every
   page back as it was.
+- **MEM-4.** A partly memorized page is revised like a memorized one. It is in the revision cycle (the
+  pages plan, the juz plan, the plans the editor builds, revising ahead, the streak, the widget), so a
+  short surah, or a surah's end that shares its page, is revised before the rest of the page is learned.
+  Home, the widget and Revo name it by its memorized ayahs: with only An-Nas memorized on the Qur'an's
+  last page, the day "Starts at An-Nas", not Al-Ikhlas.
 
 ## Naming the Qur'an
 

@@ -8,6 +8,7 @@ import { User, UserPage } from '../types';
 import { getFajrTimeFor } from './fajrBoundary';
 import { planDuePages } from './carryOver';
 import { completedDays, nextIsoDay, streakReading, type StreakDetail, type StreakReading } from './streak';
+import { revisablePages } from './memorizedAyahs';
 
 export interface HistoryItem {
   /** The item's id: a session's own day (`day`) or `day-ahead-<countsFor>`; a manual add's `manual-…`. */
@@ -60,7 +61,7 @@ export function streakDetailFromItems(input: {
   items: readonly HistoryItem[];
   today: string;
 }): StreakDetail {
-  const memorized = input.pages.filter((p) => p.status === 'memorized');
+  const memorized = revisablePages(input.pages);
   const own = new Map<string, HistoryItem>();
   const credited = new Map<string, Set<number>>();
   // The pages credited to each day by the end of its grace window (graceEndMs).
