@@ -39,6 +39,8 @@ export function DayBlock({
   summary,
   items,
   header,
+  onPress,
+  pressHint,
   onLayout,
   testID,
 }: {
@@ -51,6 +53,9 @@ export function DayBlock({
   /** What hangs off the thread line: recordings, notes, hand entries, timed reads. */
   items: React.ReactNode[];
   header?: BlockHeaderActions;
+  /** A tap on the header (the Revised block: its juz sheet, ACT-21), and what it opens for VoiceOver. */
+  onPress?: () => void;
+  pressHint?: string;
   /** Where the block sits (the day scrolls to it when opened at it). */
   onLayout?: (e: LayoutChangeEvent) => void;
   testID?: string;
@@ -67,8 +72,10 @@ export function DayBlock({
   return (
     <View style={[styles.block, { borderBottomColor: palette.separator }]} onLayout={onLayout} testID={testID}>
       <Tap
+        onPress={onPress}
         onLongPress={header?.onLongPress}
-        disabled={!header?.onLongPress && !header?.a11yActions}
+        disabled={!onPress && !header?.onLongPress && !header?.a11yActions}
+        accessibilityHint={pressHint}
         accessibilityRole="button"
         accessibilityLabel={figure ? `${title}, ${figure}` : title}
         accessibilityActions={header?.a11yActions}
