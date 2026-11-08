@@ -1,4 +1,4 @@
-import { UndoQueue, memorizeSuggestion, missedFromSession, pagesToUnmark } from '../activityAdd';
+import { UndoQueue, memorizeSuggestion, missedFromSession, pagesToUnmark, sittingToRevise } from '../activityAdd';
 
 const M = new Set([549, 550, 551, 552, 553, 556, 557, 600]);
 
@@ -93,5 +93,15 @@ describe('a Memorized item’s minutes (ACT-5)', () => {
     expect(memorizedMinutesAfter({ minutes: 25, updatedAt: 100 }, { minutes: 25, at: 100 })).toEqual({ minutes: 25, updatedAt: 100 });
     expect(memorizedMinutesAfter({ minutes: 25, updatedAt: 100 }, { minutes: null, at: 300 })).toEqual({ minutes: 25, updatedAt: 300 });
     expect(memorizedMinutesAfter({ minutes: null }, { at: 300 })).toEqual({ minutes: null, updatedAt: 300 });
+  });
+});
+
+describe('a sitting’s Add to revised (REC-3)', () => {
+  const memorized = new Set([6, 7, 8, 9, 10, 30]);
+  it('offers the pages it held that the day still has to revise, and how many are left', () => {
+    expect(sittingToRevise({ held: [7, 6, 30], due: [6, 7, 8, 9, 10], revised: [8], memorized })).toEqual({ pages: [6, 7], left: [6, 7, 9, 10] });
+  });
+  it('offers nothing for pages already revised, not due, or not memorized', () => {
+    expect(sittingToRevise({ held: [8, 30, 11], due: [6, 7, 8, 9, 10, 11], revised: [8], memorized }).pages).toEqual([]);
   });
 });
