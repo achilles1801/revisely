@@ -82,11 +82,13 @@ function VerseOverlay() {
   const { VerseSheet } = require('../../components/verse/VerseSheet') as typeof import('../../components/verse/VerseSheet');
   const { ThemeProvider } = require('../../context/ThemeContext') as typeof import('../../context/ThemeContext');
   const { DesignProvider } = require('../../design/DesignContext') as typeof import('../../design/DesignContext');
-  const { SafeAreaProvider } = require('react-native-safe-area-context') as typeof import('react-native-safe-area-context');
+  const { SafeAreaProvider, initialWindowMetrics } = require('react-native-safe-area-context') as typeof import('react-native-safe-area-context');
   const { pageOfVerse } = require('../verses') as typeof import('../verses');
   /* eslint-enable @typescript-eslint/no-var-requires */
   return (
-    <SafeAreaProvider>
+    // The window's insets from the first frame, as the app's own provider has them: without them the
+    // expanded sheet ran up under iOS's status bar (only here; the reader's sheet has the app's).
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <DesignProvider>
         <ThemeProvider>
           <VerseSheet
