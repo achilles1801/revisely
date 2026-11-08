@@ -498,7 +498,7 @@ translations matched to a source, is `~/Documents/revisely-translations/inventor
   one that is: the same language, then Saheeh, then any (`fallbackTranslation`, TRANS-7).
 - **E2E:** builds fetch nothing, so `src/lib/e2e/demoTranslations.ts` writes Al-Ikhlas in 24
   recorded translations (one per script) and page 604's Arabic, and `revisely://e2e/verse?ref=112:2&t=…`
-  opens the real verse sheet. Flow `14-translations` captures each script on both platforms.
+  opens the real verse sheet. Flow `15-translations` captures each script on both platforms.
 - **Not yet:** 87 entries on QuranEnc's website aren't in its list (41 are tafsirs). The 25 that
   Quran.com also has, Russian, Bengali, Malay and Korean among them, publish no version, which the
   terms require: they wait for QuranEnc's answer. Tanzil's translations are non-commercial only. The
