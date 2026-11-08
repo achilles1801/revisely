@@ -299,7 +299,7 @@ describe('timeline', () => {
     expect(plainText(d.ratings ?? '')).toBe(`${plainText(describePassage([583], { form: 'short' }))} weak · ${plainText(describePassage([582], { form: 'short' }))} strong`);
     expect(d.line).toBe('2 pages revised that day in 20 min');
     expect(timelineDetail({ ...second, pages: [584] }, logs).ratings).toBeNull();
-    // Smart Tracking off (REVO-34): no rating, in the readout or the panel.
+    // Smart Tracking off (REVO-36): no rating, in the readout or the panel.
     expect(timelineReadout(second, false).title).toBe('Thursday 5 November');
     expect(timelineDetail(first, logs, false).ratings).toBeNull();
   });
@@ -421,7 +421,7 @@ describe('table', () => {
     expect(tableCell('strength', facts({ strength: { weak: 0, moderate: 0, strong: 0, unrated: 20, average: null } })).text).toBe('—');
   });
 
-  it('[REVO-34] recency in place of strength: when last revised, and how often', () => {
+  it('[REVO-36] recency in place of strength: when last revised, and how often', () => {
     expect(recencyLine(facts({ lastRevisedDaysAgo: 4 }))).toBe('Last revised 4 days ago · twice in 30 days');
     expect(recencyLine(facts({ lastRevisedDaysAgo: 0 }))).toBe('Last revised today · twice in 30 days');
     expect(recencyLine(facts({ lastRevisedDaysAgo: null, revised: { last7: { days: 0, minEach: 0, maxEach: 0 }, last30: { days: 0, minEach: 0, maxEach: 0 }, all: { days: 0, minEach: 0, maxEach: 0 } } }))).toBe(

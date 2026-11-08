@@ -263,7 +263,7 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
 // ---------------------------------------------------------------------------------------------
 
 /**
- * When a part was last revised and how often, for an account without Smart Tracking (REVO-34: no
+ * When a part was last revised and how often, for an account without Smart Tracking (REVO-36: no
  * strength without ratings): "Last revised 4 days ago · 2 times in 30 days". How often counts
  * revisions of every memorized page (in full), as Revo's attachments do.
  */
@@ -400,7 +400,7 @@ export function timelineHint(marks: readonly TimelineMark[], days: number): stri
 /** A picked revision: "Friday 16 October · weak", "14 days after the time before". */
 export function timelineReadout(mark: TimelineMark, smart = true): { title: string; line: string } {
   return {
-    // Smart Tracking off (REVO-34): the day alone, no rating.
+    // Smart Tracking off (REVO-36): the day alone, no rating.
     title: smart ? `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}` : formatDayLong(mark.day),
     line: mark.gap != null ? `${plural(mark.gap, 'day')} after the time before` : 'The first time in this view',
   };
