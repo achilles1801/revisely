@@ -12,8 +12,13 @@ import { refreshRevoRelease } from '../../lib/revo/release';
 import { REVO_BUTTON_ROUTES, useRevoAvailable } from '../../lib/revo/availability';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
-import { greetingState, nextOpens, type GreetingOpens } from '../../lib/revo/greeting';
+import { greetingState, nextPlaceOpens, readPlaceOpens, type GreetingOpens, type PlaceOpens } from '../../lib/revo/greeting';
 import { onRevoOpen, type RevoOpenRequest } from '../../lib/revo/open';
+import { HOME, placeKey, revoPlaceOf, type RevoPlace } from '../../lib/revo/place';
+import { dayAttachment, dayLabel } from '../../lib/revo/attachments';
+import { prepare } from '../../lib/revo/facts';
+import { shiftDay } from '../../lib/journal';
+import { listRecordings } from '../../lib/recordings';
 import { openScreen } from '../../lib/revo/screens';
 import { setRevoButtonRoute, setRevoPresent } from '../../lib/revo/presence';
 import type { RevoAction, RevoAttachment, RevoSettings } from '../../lib/revo/types';
@@ -34,7 +39,7 @@ export const SETTINGS_WAIT_MS = 2000;
 export const REVIEW_FROM_HOUR = 19;
 const reviewAskedKey = (uid: string, day: string) => `@revo_review_asked:${uid}:${day}`;
 const reviewSeenKey = (uid: string) => `@revo_review_seen:${uid}`;
-/** How many times today's greeting has opened, and in which state (lib/revo/greeting nextOpens). */
+/** How many times today's greeting has opened from each place, and in which state (lib/revo/greeting nextPlaceOpens). */
 const greetingOpensKey = (uid: string) => `@revo_greeting_opens:${uid}`;
 
 /** The focused route's name, following navigation. */
@@ -99,7 +104,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   const keyboard = useKeyboardUp();
   const tabBar = useTabBarHeight();
   const { visible: miniPlayer } = useMiniPlayer();
-  const { day, build } = useRevoContext();
+  const { day, build, sources } = useRevoContext();
 
   const [settings, setSettings] = useState<RevoSettings | null>(null);
   const [usage, setUsage] = useState({ day: '', count: 0 });
@@ -145,9 +150,12 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
     setSeenDay(day);
     void AsyncStorage.setItem(reviewSeenKey(uid), day).catch(() => undefined);
   }, [uid, day]);
-  // Each new conversation counts one open of today's greeting in the state the day is in, kept on
-  // the phone so a restart doesn't say "done" again (REVO-35).
-  const opens = useRef<GreetingOpens | null>(null);
+  // Where this conversation was opened from (REVO-38): its first line is about it.
+  const [place, setPlace] = useState<RevoPlace>(HOME);
+  const placeRef = useRef<RevoPlace>(HOME);
+  // Each new conversation counts one open of today's greeting from its place, in the state the day is
+  // in, kept on the phone so a restart doesn't say "done" again (REVO-35, REVO-38).
+  const opens = useRef<PlaceOpens | null>(null);
   const [opening, setOpening] = useState<GreetingOpens | null>(null);
   useEffect(() => {
     let live = true;
@@ -157,8 +165,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
         .then((raw) => {
           if (!live || opens.current) return;
           try {
-            const rec = raw ? (JSON.parse(raw) as GreetingOpens) : null;
-            if (rec && typeof rec.day === 'string' && typeof rec.state === 'string' && Number.isInteger(rec.n)) opens.current = rec;
+            opens.current = raw ? readPlaceOpens(JSON.parse(raw)) : null;
           } catch {
             // A record that can't be read starts again.
           }
@@ -168,14 +175,19 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       live = false;
     };
   }, [uid]);
-  const countOpen = useCallback(() => {
-    const ctx = build();
-    if (!ctx) return setOpening(null);
-    const rec = nextOpens(opens.current, day, greetingState(ctx));
-    opens.current = rec;
-    setOpening(rec);
-    void AsyncStorage.setItem(greetingOpensKey(uid), JSON.stringify(rec)).catch(() => undefined);
-  }, [build, day, uid]);
+  const countOpen = useCallback(
+    (at: RevoPlace) => {
+      const ctx = build();
+      if (!ctx) return setOpening(null);
+      const state = greetingState(ctx);
+      const key = placeKey(at, day);
+      const rec = nextPlaceOpens(opens.current, day, key, state);
+      opens.current = rec;
+      setOpening({ day, state, n: rec.places[key].n });
+      void AsyncStorage.setItem(greetingOpensKey(uid), JSON.stringify(rec)).catch(() => undefined);
+    },
+    [build, day, uid],
+  );
   // Revo turned off (here, in Settings or on another phone): turned on again, it starts afresh.
   useEffect(() => {
     if (!uid || settings == null || settings.optIn) return;
@@ -189,13 +201,38 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   const reviewNow = useRef<number | null>(null);
   reviewNow.current = reviewWaiting ? reviewAt : null;
 
-  /** A new conversation: the greeting, written now (REVO-34). */
-  const startFresh = useCallback(() => {
-    setView({ name: 'chat' });
-    setChatId(null);
-    setReviewOffer(reviewNow.current);
-    countOpen();
-  }, [countOpen]);
+  /** A new conversation: the greeting, written now (REVO-34), for where it was opened (REVO-38). */
+  const startFresh = useCallback(
+    (at: RevoPlace = placeRef.current) => {
+      placeRef.current = at;
+      setPlace(at);
+      setView({ name: 'chat' });
+      setChatId(null);
+      setReviewOffer(reviewNow.current);
+      countOpen(at);
+    },
+    [countOpen],
+  );
+
+  // The day Revo was opened from goes with the next question, as + would attach it (REVO-38): at
+  // once with what its screen loaded, then with this phone's recordings of it once they are read.
+  const attachDay = useCallback(
+    (at: Extract<RevoPlace, { kind: 'day' }>) => {
+      const src = sources();
+      if (!src || at.day > day) return;
+      const prepared = prepare(src);
+      const label = dayLabel(at.day, day, shiftDay(day, -1));
+      const extras = at.extras ?? {};
+      const first = dayAttachment(at.day, label, prepared, extras);
+      setAttachments([first]);
+      void listRecordings()
+        .then((recordings) =>
+          setAttachments((list) => (list.length === 1 && list[0] === first ? [dayAttachment(at.day, label, prepared, { ...extras, recordings })] : list)),
+        )
+        .catch(() => undefined);
+    },
+    [sources, day],
+  );
 
   // A conversation the user picked: its messages, at full height; today's review is then opened.
   const openChat = useCallback(
@@ -243,6 +280,9 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
         return;
       }
       setOptInError(null);
+      // The screen in front, unless the request names its own place (a juz sheet, Weak spots).
+      const at = request.place ?? (navigationRef.isReady() ? revoPlaceOf(navigationRef.getCurrentRoute()) : HOME);
+      placeRef.current = at;
       if (!settings?.optIn) {
         setView({ name: 'optin' });
         setFull(true);
@@ -253,13 +293,14 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
         openChat(request.chatId);
       } else {
         // A new conversation, its greeting written now (REVO-34), whatever was open before.
-        startFresh();
+        startFresh(at);
         setFull(false);
         if (request.attach) setAttachments([request.attach]);
+        else if (at.kind === 'day') attachDay(at);
       }
       setOpen(true);
     },
-    [settings, openChat, startFresh],
+    [settings, openChat, startFresh, attachDay],
   );
   const showRef = useRef(show);
   showRef.current = show;
@@ -288,6 +329,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       setSettings(await backend.setOptions({ optIn: true }));
       startFresh();
       setFull(false);
+      if (placeRef.current.kind === 'day') attachDay(placeRef.current);
     } catch (err) {
       setOptInError((err as Error)?.message ?? 'Revo isn’t available on this account.');
       // Paused, or not open to this account (REVO-37): the switch is read again, so the button goes.
@@ -329,7 +371,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               uid={uid}
               onBack={() => setView({ name: 'chat' })}
               onOpen={openChat}
-              onNew={startFresh}
+              onNew={() => startFresh()}
             />
           ) : view.name === 'memory' && settings ? (
             <RevoMemory uid={uid} settings={settings} today={day} onBack={() => setView({ name: 'chat' })} />
@@ -379,6 +421,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               }}
               review={reviewWaiting && reviewOffer != null ? { at: reviewOffer } : null}
               opening={opening}
+              place={place}
               onOpenReview={() => openChat(reviewId)}
             />
           )}

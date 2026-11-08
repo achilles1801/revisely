@@ -105,7 +105,7 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
   await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
   const greeting = String(app.screen.getByTestId('revo-greeting').props.children);
   // Where today starts, by surah (lib/passages), not by page number.
-  expect(plainText(greeting)).toMatch(/^Salaam( [^.]+)?\. Today is 5 pages, starting at Al-Fatihah\. Ask me anything about your revision\.$/);
+  expect(plainText(greeting)).toMatch(/^Assalamu alaikum(, [^.]+)?\. Today is 5 pages, starting at Al-Fatihah\. Ask me anything about your revision\.$/);
   expect(app.screen.getByTestId('revo-chip-How was my week?')).toBeTruthy();
   expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
 
@@ -471,7 +471,7 @@ it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting writt
     await closeRevo();
     await openRevo();
     // [REVO-35] The second open with nothing changed: today's line, then something else.
-    expect(await fresh('after a question')).toMatch(/^Salaam( [^.]+)?\. You’re 2 pages into today, and .+ is next\. This week you’ve revised 2 pages on 1 day\.$/);
+    expect(await fresh('after a question')).toMatch(/^Assalamu alaikum(, [^.]+)?\. You’re 2 pages into today, and .+ is next\. This week you’ve revised 2 pages on 1 day\.$/);
     await tap(app, 'revo-history');
     await app.until(() => app.screen.queryByText('My week') != null, 'the conversation in History');
     await tap(app, 'revo-back');
@@ -504,7 +504,7 @@ it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting writt
     expect(app.screen.queryByTestId('revo-button-dot')).toBeNull();
     await openRevo();
     const second = await fresh('after the review');
-    expect(second).toMatch(/^Salaam( [^.]+)?\. Tomorrow starts at Al-Baqarah, ayah \d+, 5 pages\.$/);
+    expect(second).toMatch(/^Assalamu alaikum(, [^.]+)?\. Tomorrow starts at Al-Baqarah, ayah \d+, 5 pages\.$/);
     expect(app.screen.getByTestId('revo-chip-How do I revise ahead?')).toBeTruthy();
     expect(app.screen.queryByTestId('revo-review')).toBeNull();
     await closeRevo();
@@ -512,7 +512,7 @@ it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting writt
     // Opened again: something else again (the week), never "done".
     await openRevo();
     const third = await fresh('third open, done');
-    expect(third).toMatch(/^Salaam( [^.]+)?\. This week you’ve revised 5 pages on 1 day\.$/);
+    expect(third).toMatch(/^Assalamu alaikum(, [^.]+)?\. This week you’ve revised 5 pages on 1 day\.$/);
     expect(third).not.toBe(second);
     await closeRevo();
 

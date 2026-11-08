@@ -2,11 +2,14 @@
 // about something it shows (e.g. an Insights section, with that insight attached). RevoHost
 // listens; nothing is sent until the user asks.
 
+import type { RevoPlace } from './place';
 import type { RevoAttachment } from './types';
 
 export interface RevoOpenRequest {
   /** Attached to the next question (the user can remove it). */
   attach?: RevoAttachment;
+  /** Where it was opened from, for its first line (REVO-38); else the screen in front (lib/revo/place). */
+  place?: RevoPlace;
   /** Open this conversation (History, a Day in review). */
   chatId?: string;
   /** Open on Memory, or the opt-in. */

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -13,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
+import { setRevoActivityView } from '../../lib/revo/place';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
 import { ActivityBlocksViews, type ViewKind } from '../../components/activity/ActivityBlocksViews';
@@ -107,6 +108,11 @@ export default function ActivityScreen() {
   );
   const blocks = activityBlocksEnabled(user);
   const [view, setView] = useState<ViewKind>('calendar');
+  // Revo opened from here starts on the tab on show (REVO-38).
+  useEffect(() => {
+    setRevoActivityView(view);
+    return () => setRevoActivityView('calendar');
+  }, [view]);
 
   const recentItems = items.slice(0, RECENT_ITEMS);
   const openItem = (it: ActivityItem) =>

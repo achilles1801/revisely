@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { EditSessionModal } from '../../components/EditSessionModal';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
+import { setRevoDayExtras } from '../../lib/revo/place';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
 import { DayBlocks, activityBlocksEnabled, type UndoOffer } from '../../components/activity/DayBlocks';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -203,6 +204,13 @@ export default function ActivityDayScreen() {
     setLoading(false);
   }, [date]);
   const { refreshing, onRefresh } = usePullToRefresh(load);
+
+  // What Revo's first line and its attached day read beyond the logs, as shown here (REVO-38).
+  useEffect(() => {
+    if (loading) return;
+    setRevoDayExtras(date, { journal: loadError ? null : journal ? [journal] : [], readings: loadError ? null : readings, recordings: null });
+    return () => setRevoDayExtras(date, null);
+  }, [date, loading, loadError, journal, readings]);
 
   // Also when a change to this day joins or leaves the outbox: a note added from the + (ACT-13).
   useActivityReload(load, date);

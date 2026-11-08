@@ -516,7 +516,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   its conversations, memory and kept answers (the day's count stays); deleting the account deletes all of it.
 
 - **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and,
-  with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Its own words name
+  with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Every first line
+  starts "Assalamu alaikum, Majd." with the account's first name, or "Assalamu alaikum." without one (Majd, Nov 8
+  2026: "revos greeting should be Assalamu alaikum not just salam"). Its own words name
   parts of the Qur'an by surah and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
   The context also carries each part it names in those words, for Revo's answers (REVO-27). A day with nothing
   left to revise reads as done, even before it is marked done, and no greeting or suggestion names an empty passage
@@ -542,7 +544,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **REVO-21.** The first tap on Revo's button opens the opt-in, which says what is sent and what isn't; nothing is
   sent before "Turn on Revo", the Day in review included. The sheet opens on the opt-in itself, at its height; a tap
   before the account's switch is read waits for it (up to 2 s), so an account with Revo on never sees the opt-in. The
-  button shows on the main screens only, never in the reader or a session.
+  button shows only on the screens REVO-25 lists: never on the Read tab or in a session.
 
 - **REVO-22.** When the day's questions are used, the composer is greyed and says when Revo is back (after Fajr, at
   its time, or at midnight); conversations stay in History.
@@ -560,8 +562,12 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   unless the user has scrolled up to read.
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), bottom-right, 14
-  above the tab bar and the mini player. The screens it shows on end their lists with room for it
-  (`useRevoFootprint`), so their last row scrolls clear of it; other screens leave none.
+  above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
+  all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
+  revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
+  sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
+  screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;
+  other screens leave none.
 
 - **REVO-26.** Revo's context is built when a question is sent, from what the phone shows then (changes still on
   their way to the server included): a Jump to, a session part done or finished, pages added to today, pages
@@ -637,6 +643,28 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   opt-in. Turning Revo off, turning memory off and deleting conversations or memory stay open to every account,
   whatever the switch.
 
+- **REVO-38.** Revo's first line follows where it was opened (Majd, Nov 8 2026: "it should be adaptive depending on
+  where i open it and what's going on"). Like REVO-20, it is written on the phone (no call, nothing counted), names
+  parts of the Qur'an by surah and juz, and says nothing about strength without Smart Tracking (REVO-36).
+  - Home, See all, today's day in Activity and Settings: today's line (REVO-20, REVO-35). A screen's help sheet
+    opens Revo as that screen's button would.
+  - A past day in Activity: what its plan held and how much of it was revised, its minutes and its notes, or that
+    its pages weren't revised. A day ahead: how many pages it has and where they start.
+  - Activity's Overview: the month so far (the days revised out of the days so far, and the pages).
+  - Insights: with Smart Tracking on, the weak part left longest and when it was last revised; without it, the
+    juz that has gone longest without coming round. Opened again: how much of what's memorized was revised in
+    the last 30 days, then the pace against the plan.
+  - Insights' "Ask Revo" on Weak spots, and Pages by strength: how many pages are rated weak and where most of
+    them are.
+  - A juz sheet's "Ask": how much of the juz is memorized, how often it was revised in full in the last 30 days and
+    when last, and with Smart Tracking on how many of its pages are weak.
+
+  A day's and the Overview's line end with today's next part while today isn't done. The suggestions follow the
+  line. The day Revo was opened from (today or a past one, never a day ahead) or the juz goes with the next
+  question, attached as + would attach it, and × removes it. Each place counts its own opens (REVO-35): opened
+  again from the same place with nothing changed, the line's second sentence changes, in turn; another place, day
+  or juz starts afresh, and "done" is still said once a day.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7
@@ -683,7 +711,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   Activity's is in its top bar before search, and explains the tab on show (Overview or Insights); a
   day's is before +. It opens
   that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›" when the account has
-  Revo (it opens Revo; nothing is counted until a question is sent), "Hide help buttons", and Done. The
+  Revo (it opens Revo; nothing is counted until a question is sent; never in the reader's or a session's help,
+  REVO-25), "Hide help buttons", and Done. The
   words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons are good".)
 - **HELP-2.** "Hide help buttons" removes every ? at once, for this account on this phone, and they stay
   hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Support
