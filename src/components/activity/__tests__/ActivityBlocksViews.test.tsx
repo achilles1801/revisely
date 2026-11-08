@@ -1,7 +1,8 @@
 // The Activity calendar (gap audit §3) and Insights (§5): the Overview | Insights tabs, the month with its totals and
 // stepping, and the Week | Month toggle (kept: Majd, Nov 2026).
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Dimensions, Text } from 'react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { ActivityBlocksViews } from '../ActivityBlocksViews';
 import { plainText } from '../../../lib/passages';
 
@@ -98,6 +99,91 @@ describe('the Activity calendar (gap audit §3)', () => {
     const date = screen.getByTestId('preview-date');
     expect(date.props.maxFontSizeMultiplier).toBe(1.4);
     expect(flat(date.props.style).flexShrink).toBe(1);
+  });
+
+  // At the largest text the pills clipped, the month's title pushed the chevrons off, the totals broke
+  // mid-word and ran off the edge, and the day numbers spilled out of their discs (iOS, Nov 2026). Every
+  // piece of the Overview is chrome: it stops at 1.4×; numbers shrink to fit; the totals go two by two.
+  describe('at the largest text', () => {
+    const flat = (st: unknown): Record<string, unknown> => (Array.isArray(st) ? Object.assign({}, ...st.map(flat)) : ((st as Record<string, unknown>) ?? {}));
+    let dims: jest.SpyInstance;
+    const atScale = (fontScale: number) => {
+      dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 375, height: 667, scale: 2, fontScale });
+    };
+    afterEach(() => dims?.mockRestore());
+
+    it('every text in the Overview stops growing at 1.4×', async () => {
+      atScale(3.1);
+      render(<ActivityBlocksViews {...props} />);
+      await screen.findByText('November 2026');
+      // Words and numbers only: an icon is a Text holding its glyph (a private-use character).
+      const words = (c: unknown): string =>
+        Array.isArray(c) ? c.map(words).join('') : typeof c === 'string' || typeof c === 'number' ? String(c).replace(/[\uE000-\uF8FF]/g, '') : '';
+      const texts = screen.UNSAFE_getAllByType(Text).filter((t) => words(t.props.children).trim() !== '');
+      expect(texts.length).toBeGreaterThan(40);
+      const uncapped = texts.filter((t) => !(typeof t.props.maxFontSizeMultiplier === 'number' && t.props.maxFontSizeMultiplier <= 1.4)).map((t) => words(t.props.children));
+      expect(uncapped).toEqual([]);
+    });
+
+    it('the pills grow with their label rather than clip it', async () => {
+      atScale(3.1);
+      render(<ActivityBlocksViews {...props} />);
+      await screen.findByText('November 2026');
+      for (const id of ['pill-calendar', 'pill-insights', 'pill-week', 'pill-month']) {
+        const style = flat(screen.getByTestId(id).props.style);
+        expect(style.height).toBeUndefined();
+        expect(style.minHeight).toBeGreaterThan(0);
+      }
+    });
+
+    it('the title gives way to the chevrons and shrinks to fit', async () => {
+      atScale(3.1);
+      render(<ActivityBlocksViews {...props} />);
+      const title = await screen.findByTestId('calendar-month-title');
+      expect(title.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
+      expect(flat(title.props.style).flexShrink).toBe(1);
+      expect(flat((title.parent?.parent as { props: { style: unknown } }).props.style).height).toBeUndefined();
+    });
+
+    it('the totals go two by two, their values on one line, shrinking to fit', async () => {
+      atScale(3.1);
+      render(<ActivityBlocksViews {...props} />);
+      await screen.findByTestId('calendar-totals');
+      for (const label of ['revised', 'memorized', 'read', 'notes']) {
+        const total = screen.getByTestId(`calendar-total-${label}`);
+        expect(flat(total.props.style)).toMatchObject({ flexBasis: '40%', flexGrow: 1 });
+      }
+      const value = screen.getByText('+0 pages');
+      expect(value.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
+    });
+
+    it('the picked day’s values shrink to fit rather than lose their minutes', async () => {
+      atScale(3.1);
+      const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+      service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [{ id: 'r', day: TODAY, pages: [562], minutes: 18, occurredAt: null }] });
+      try {
+        render(<ActivityBlocksViews {...props} />);
+        const value = await screen.findByTestId('preview-value-read');
+        expect(value.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
+      } finally {
+        service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [] });
+      }
+    });
+
+    it('at the default size the four totals stay in one row', async () => {
+      atScale(1);
+      render(<ActivityBlocksViews {...props} />);
+      await screen.findByTestId('calendar-totals');
+      expect(flat(screen.getByTestId('calendar-total-memorized').props.style)).toMatchObject({ flex: 1 });
+    });
+
+    it('a day’s number shrinks inside its disc rather than spill out', async () => {
+      atScale(3.1);
+      render(<ActivityBlocksViews {...props} />);
+      const day = await screen.findByTestId('calendar-day-2026-11-28');
+      const number = within(day).getByText('28');
+      expect(number.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
+    });
   });
 
   it('the preview names what was memorized and read by surah, not pages (Majd, Nov 7 2026)', async () => {
