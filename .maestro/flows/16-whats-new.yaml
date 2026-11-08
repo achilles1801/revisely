@@ -4,6 +4,7 @@
 # launch runs it from the next launch as App Store users will see it. It resumes on the card it was
 # left on after a relaunch, Android's back goes to the card before, and after Done it doesn't come back.
 # Revo's card is a moment (RevoMoment): Skip takes it to its end, its screenshot is that end.
+# Card titles by id: on iOS a title reads with its step ("Step 1 of 5. Your days, in Activity").
 # Screenshots: the replay, each card of the run, Home after (w1–w7).
 # Rules (BEHAVIOUR.md): NEW-2, NEW-3
 appId: com.revisionbuddy.app
@@ -37,7 +38,9 @@ appId: com.revisionbuddy.app
     visible:
       id: whats-new-replay
     timeout: 10000
-- assertVisible: "Your days, in Activity"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 1 of 5\\. )?Your days, in Activity"
 - assertVisible:
     id: whats-new-close
 - runFlow:
@@ -46,7 +49,9 @@ appId: com.revisionbuddy.app
       NAME: w1-replay
 - tapOn:
     id: whats-new-next
-- assertVisible: "Revised elsewhere?"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 2 of 5\\. )?Revised elsewhere\\?"
 - tapOn:
     id: whats-new-close
 - extendedWaitUntil:
@@ -69,14 +74,18 @@ appId: com.revisionbuddy.app
 # NEW-2: required, so no ✕; one Next a card.
 - assertNotVisible:
     id: whats-new-close
-- assertVisible: "Your days, in Activity"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 1 of 5\\. )?Your days, in Activity"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: w2-activity
 - tapOn:
     id: whats-new-next
-- assertVisible: "Revised elsewhere?"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 2 of 5\\. )?Revised elsewhere\\?"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -87,13 +96,19 @@ appId: com.revisionbuddy.app
       platform: Android
     commands:
       - back
-      - assertVisible: "Your days, in Activity"
+      - assertVisible:
+          id: whats-new-title
+          text: "(Step 1 of 5\\. )?Your days, in Activity"
       - tapOn:
           id: whats-new-next
-      - assertVisible: "Revised elsewhere?"
+      - assertVisible:
+          id: whats-new-title
+          text: "(Step 2 of 5\\. )?Revised elsewhere\\?"
 - tapOn:
     id: whats-new-next
-- assertVisible: "Memorize by the ayah"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 3 of 5\\. )?Memorize by the ayah"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -105,7 +120,9 @@ appId: com.revisionbuddy.app
     visible:
       id: whats-new-forced
     timeout: 20000
-- assertVisible: "Memorize by the ayah"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 3 of 5\\. )?Memorize by the ayah"
 # NEW-2: Revo's card plays by itself (about 19 s); Skip, in its top corner, takes it to its end, where
 # Later goes on (a touch anywhere else does nothing). While it plays the screen never settles: these
 # taps don't wait for it (.maestro/README.md). The title is matched by id: iOS reads it as "Step 4 of 5.
@@ -126,7 +143,9 @@ appId: com.revisionbuddy.app
       NAME: w5-revo
 - tapOn:
     id: whats-new-next
-- assertVisible: "Also new"
+- assertVisible:
+    id: whats-new-title
+    text: "(Step 5 of 5\\. )?Also new"
 - assertVisible:
     id: whats-new-row-offline
 - runFlow:
