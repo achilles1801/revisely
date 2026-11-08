@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-08T04:04:13.827Z",
+  "recordedAt": "2026-11-08T04:50:07.696Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "47f16c133752e07e08d94aaf4a70de23525099a8623b44d0b0a6cc0dcbaec8f7",
+    "systemSha256": "9b1d507433ba3cb2ac99448644ec5097b30f28e32b3aebcb4e3a646d6af15e1a",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgpoEua5wzi1WrMDCX1n1",
+    "id": "msg_011CgprjvnRURYiUDFxs4vQZ",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised on most days this week, with four whole-plan days, and Saturday was the only day with nothing. Thursday fell one page short, and averaging about 9 pages a day against a plan of 10 is a solid week.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Today still has 6 pages left, starting from Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, from Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak pages?\",\"How is my streak?\"]}"
+        "text": "{\"text\":\"You revised on most days this week: whole plan done on four of them and nearly done on Thursday. Saturday was the one missed day, and you're back to a 2-day streak.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Six more pages today would finish it.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"Why did I miss Saturday?\",\"How is my pace over 30 days?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 13751,
-      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 15169,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 13751,
+        "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 229,
+      "output_tokens": 219,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
