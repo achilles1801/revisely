@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-08T01:32:02.641Z",
+  "recordedAt": "2026-11-08T02:18:19.327Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "42d7f4d609cf82de52992bbf621522999ea404bf4d60a53332efa2b2a5858078",
+    "systemSha256": "0ac3996851c71951ff011f93f8e865dca9e5e1d303bf290ecdd2525b68447554",
     "outputSchemaSha256": "f648371bd7d71f8ac7324ec3a218fb76d7ddaba5925e63f6d93456e19275c733"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgpbdrHPfSezymwvHFYQr",
+    "id": "msg_011CgpfAULVimwP8NDsQta7j",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised on most days this week and finished the whole plan on four of them; only Saturday was missed, and Thursday fell one page short. Your 2-day streak is alive, and today has 6 pages left.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Finishing today keeps the streak going:\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting at Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weak?\",\"Why did I miss Saturday?\",\"How am I doing overall?\"]}"
+        "text": "{\"text\":\"Your week was steady: the whole plan done on four of the six days, 9 pages on Thursday, and only Saturday missed. Today you've done 4 of 10 pages, with 22 minutes in so far.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"To finish today, pick up from Al-Infitar:\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Al-Infitar to Al-Ghashiyah, 6 pages left\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weak?\",\"Why did I miss Saturday?\",\"How is my streak?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 13075,
+      "cache_creation_input_tokens": 13086,
+      "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 13086,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 218,
+      "output_tokens": 232,
       "output_tokens_details": {
         "thinking_tokens": 0
       },
