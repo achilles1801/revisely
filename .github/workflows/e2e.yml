@@ -276,6 +276,12 @@ jobs:
         with:
           node-version: '22'
 
+      # npm 10, which Node 22 comes with, can give two of its cache's temporary files the same
+      # name, and `npm ci` then fails with EEXIST (npm/cli#7308; a scenario shard in #422's CI).
+      # npm 11.12 fixed it (cacache 20.0.4).
+      - name: npm 11
+        run: npm install -g npm@11.21.1 --no-audit --no-fund
+
       # The Firestore emulator needs Java 21.
       - uses: actions/setup-java@v4
         with:
@@ -508,6 +514,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # npm 10, which Node 22 comes with, can give two of its cache's temporary files the same
+      # name, and `npm ci` then fails with EEXIST (npm/cli#7308; a scenario shard in #422's CI).
+      # npm 11.12 fixed it (cacache 20.0.4).
+      - name: npm 11
+        run: npm install -g npm@11.21.1 --no-audit --no-fund
 
       # React Native 0.81 builds with JDK 17 (as android-build.yml); the
       # Firestore emulator needs 21, which stays the default.
