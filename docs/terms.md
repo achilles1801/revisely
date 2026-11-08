@@ -6,7 +6,7 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-10-27**
+**Last updated: 2026-11-07**
 
 These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
@@ -34,6 +34,10 @@ Revisely is a tool to help you track and review your Quran memorization. Specifi
 - A daily revision schedule that rotates through your memorized pages, by pages per day, juz per day, or a custom plan.
 - Optional Smart Tracking, which highlights pages you have rated weak or skipped often.
 - A daily log, a reading timer, and progress tracking across pages, surahs, and juz.
+- Verse translations and recitation audio.
+- Voice recordings of your recitation, kept on your device and, unless you turn it off, backed up to your account.
+- Prayer times, prayer notifications, and a Qibla compass, calculated on your device.
+- Home Screen and Lock Screen widgets (on iPhone).
 - Revision reminders (when enabled).
 
 We may add, change, or remove features at any time.
