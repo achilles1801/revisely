@@ -23,6 +23,8 @@ wherever `--out`, `--run` point). The recordings are for evaluation only and are
 
 `run.sh` does steps 2 to 5 for one engine.
 
+`checker.py` is the other engine: phase 3's first checker, which replaces steps 2 to 4 (below).
+
 ## Metrics
 
 - **False alarms per 100 words**: correct words flagged wrong or missed (still flagged at the end).
@@ -63,3 +65,30 @@ scripts/recite-eval/run.sh develop tarteel-base-q5_1 ~/revisely-mistake-lab/mode
 Clips (`<run>/clips`) are a cache: once a run is decoded and replayed they can be deleted (16 h of bench
 audio makes ~14 GB of clips, partials included). `segment.ts` rewrites them in seconds when another engine
 needs to decode them.
+
+## The checker (phase 3, v0)
+
+`checker.py` listens for sounds instead of writing words. A small CTC phoneme model (HisnLabs tajweed-v2,
+int8 ONNX, 23 MB, in `~/revisely-mistake-lab/models/`) gives 50 frames a second of sound probabilities.
+quran_transcript's phonetizer writes what each word should sound like, in four forms: joined to both
+neighbours, started after a pause, stopped on, and alone. One Viterbi pass over a graph of the passage's
+words then decides: next word, a skip (missed), a jump back (a repeat, not a mistake), or a filler that
+hears anything (an extra word, or a word replaced). Each word reached is then checked sound by sound
+against what the model heard: a different sound heard with confidence, most sounds not heard, or a poor
+fit overall marks it wrong.
+
+```bash
+PY=~/revisely-mistake-lab/.venv/bin/python; LAB=~/revisely-mistake-lab
+$PY -I scripts/recite-eval/checker.py --bench $LAB/data/bench-v0 --run $LAB/runs/v0 --name checker.v0 --jobs 10
+$PY scripts/recite-eval/score.py --bench $LAB/data/bench-v0 --run $LAB/runs/v0 --results checker.v0 --by condition
+```
+
+- `--params '{"sound_rule": "off"}'`: words only (said, skipped, extra, out of order).
+- `--params '{"sub_p": 1.01}'`: words, plus words that clearly don't match (no single-letter judgements).
+- The model's output is cached per recording (`<run>/logprobs/hisn/`), so a rerun with other settings takes
+  about a minute for the whole bench.
+- Decisions are made on the whole recording; the times in the results are estimates (word end + `delay`).
+  A streaming version is the next step.
+- Settings were tuned on four reciters (Abdul Basit mujawwad, Shuraym, Alafasy, Husary) and checked on the
+  other four. The model was trained on EveryAyah and RetaSy, which overlap both test sets, so every number
+  here is optimistic until recordings it has never heard (revisely.app/record) are in.

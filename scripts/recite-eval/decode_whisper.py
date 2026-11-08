@@ -34,6 +34,7 @@ def main():
     ap.add_argument('--model', required=True)
     ap.add_argument('--tags', default='develop')
     ap.add_argument('--only', default='', help='only items whose name contains this')
+    ap.add_argument('--bench', default='', help='only items of this bench (a run can hold several)')
     ap.add_argument('--finals-only', action='store_true', help='skip partial clips (for slow models)')
     ap.add_argument('--server', default=str(LAB / 'tools/whisper.cpp/build/bin/whisper-server'))
     ap.add_argument('--threads', default='4')
@@ -54,6 +55,8 @@ def main():
     for tag in args.tags.split(','):
         for f in sorted((run / 'segments' / tag).glob('*.json')):
             if args.only and args.only not in f.name:
+                continue
+            if args.bench and not (pathlib.Path(args.bench) / 'items' / f.name).exists():
                 continue
             for e in json.loads(f.read_text())['events']:
                 if e['type'] not in ('partial', 'final'):
