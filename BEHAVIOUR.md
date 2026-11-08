@@ -395,15 +395,20 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   last on Monday") until it lets go. (Majd, Nov 7 2026: "why's none of the activity screen interactive?";
   mocks i7, i8, i10 and i11.)
 
-- **ACT-24.** "Revise these first tomorrow" (Weak spots), Plan it (the untouched juz, on a pages or juz plan),
+- **ACT-24.** "Revise these first tomorrow" (Weak spots), Plan it (the untouched juz, on every plan),
   the juz sheet's "Plan it for tomorrow first" and the Day's "Revise them tomorrow" put the pages in front of
   tomorrow's session (Insights' carry). They come in addition to tomorrow's scheduled pages, never in place
   of any: nothing shifts, whatever Keep daily amount says, and tomorrow is done (for the streak and Home's
   Done) when its own pages are, with or without them. A page tomorrow has anyway stays one of its own, put
   first; a day with no pages of its own (an off day) is done once the pages from Insights are revised.
   (Nov 8 2026: with every page of the day put first, none was its own, and Home said "28 of 28" and Continue
-  revision for good.) The session names them ("From Insights: Juz 1"; it said "the weak pages" whatever put
-  them there), and Home says "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
+  revision for good.) On a custom plan this is temporary too, and the plan is never changed by it: under
+  Plan it's "First tomorrow" (the untouched row, the juz sheet), "Add to plan ›" opens tomorrow's day of
+  the plan with the pages added after its own, saying "… to this day in every cycle"; the plan changes
+  only when it is saved (Majd, Nov 8 2026: "a temp change by default with the option to make it a perm
+  change"; Plan it used to open that day with the juz alone, and saving replaced the day). The session
+  names them ("From Insights: Juz 1"; it said "the weak pages" whatever put them there), and Home says
+  "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
   with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button
   becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026: "the buttons on the activity
   screen don't work": they saved, silently.)
@@ -646,7 +651,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).
   - Memorized today, the block says where the pages stand in the plan. On an automatic plan it says when
     they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
-    add new pages by itself, it offers Add to your plan (tomorrow's day of it).
+    add new pages by itself, it offers Add to your plan: tomorrow's day of it with the pages added after
+    its own (it opened with them alone, and saving replaced the day).
 
 - **MEM-6.** The schedule editor (testers) lists, under "Not in your plan", the memorized and partly
   memorized pages a custom plan doesn't hold, named by their ayahs. A custom plan never adds new pages by

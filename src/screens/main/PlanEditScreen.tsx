@@ -21,11 +21,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import {
   buildDefaultPlanDays,
-  scheduledDaysFrom,
   buildJuzCycleDays,
   buildWeakestFirstPlanDays,
 } from '../../lib/algorithm';
-import { createCustomPlanFromDraft, dateToLocalISODay } from '../../lib/schedulePlans';
+import { createCustomPlanFromDraft } from '../../lib/schedulePlans';
 import { userWithNewSchedule } from '../../lib/planChange';
 import {
   defaultStartPage,
@@ -37,7 +36,7 @@ import {
   PlanDirection,
   planStats,
   removeDay,
-  rotateCustomPlanToToday,
+  liveCustomPlanDays,
 } from '../../lib/planBuilder';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan, User } from '../../types';
@@ -129,16 +128,10 @@ export default function PlanEditScreen() {
   // the cycle to today on save).
   const initialState = useMemo(() => {
     if (user?.customPlan && user.customPlan.days.length > 0) {
-      const plan = user.customPlan;
-      // With a carry-over shift, show the days as they are now scheduled.
-      const shifted =
-        (user.scheduleShiftPages ?? 0) > 0 &&
-        plan.cycleStartDate <= dateToLocalISODay(revisionDate);
+      // With a carry-over shift, the days as they are now scheduled ("Add to plan" reads the same).
       return {
-        days: shifted
-          ? scheduledDaysFrom(user, memorizedPages, revisionDate, plan.days.length)
-          : rotateCustomPlanToToday(plan, revisionDate),
-        direction: plan.direction as PlanDirection,
+        days: liveCustomPlanDays(user, memorizedPages, revisionDate),
+        direction: user.customPlan.direction as PlanDirection,
       };
     }
     if (isJuzMode && user) {

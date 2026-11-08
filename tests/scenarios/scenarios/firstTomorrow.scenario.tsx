@@ -41,15 +41,22 @@ function data(firstTomorrow: number[]): InsightsData {
   };
 }
 
-function open(firstTomorrow: number[]) {
+function open(firstTomorrow: number[], opts: { customPlan?: boolean } = {}) {
   const onReviseTomorrow = jest.fn();
   const onPlanIt = jest.fn();
+  const onAddToPlan = jest.fn();
   render(
     <SafeAreaProvider initialMetrics={METRICS}>
-      <InsightsView data={data(firstTomorrow)} onReviseTomorrow={onReviseTomorrow} onPlanIt={onPlanIt} onOpenPage={jest.fn()} />
+      <InsightsView
+        data={data(firstTomorrow)}
+        onReviseTomorrow={onReviseTomorrow}
+        onPlanIt={onPlanIt}
+        onAddToPlan={opts.customPlan ? onAddToPlan : undefined}
+        onOpenPage={jest.fn()}
+      />
     </SafeAreaProvider>,
   );
-  return { onReviseTomorrow, onPlanIt };
+  return { onReviseTomorrow, onPlanIt, onAddToPlan };
 }
 
 describe('first tomorrow', () => {
@@ -77,6 +84,22 @@ describe('first tomorrow', () => {
     fireEvent.press(screen.getByTestId('insights-untouched'));
     expect(screen.getByTestId('juz-sheet-plan-it-done')).toBeTruthy();
     expect(screen.queryByTestId('juz-sheet-plan-it')).toBeNull();
+  });
+
+  it('[ACT-24] a custom plan: “Add to plan” under Plan it’s “First tomorrow” and in the juz sheet, never under Weak spots', () => {
+    const { onAddToPlan } = open([546, 547, ...JUZ4], { customPlan: true });
+    expect(screen.queryByTestId('insights-revise-tomorrow-add-to-plan')).toBeNull();
+    fireEvent.press(screen.getByTestId('insights-plan-it-add-to-plan'));
+    expect(onAddToPlan).toHaveBeenCalledWith(JUZ4);
+    fireEvent.press(screen.getByTestId('insights-untouched'));
+    expect(screen.getByTestId('juz-sheet-add-to-plan')).toBeTruthy();
+  });
+
+  it('[ACT-24] not a custom plan: no “Add to plan”', () => {
+    open([546, 547, ...JUZ4]);
+    expect(screen.queryByTestId('insights-plan-it-add-to-plan')).toBeNull();
+    fireEvent.press(screen.getByTestId('insights-untouched'));
+    expect(screen.queryByTestId('juz-sheet-add-to-plan')).toBeNull();
   });
 
   it('[ACT-24] only the pages already first tomorrow count: one weak page more brings the button back', () => {

@@ -27,7 +27,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
 import { journalFirstDay, shiftDay } from '../../lib/journal';
-import { firstTomorrowPages, planItAction, PLAN_IT_DAY_INDEX, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { addToPlanParams, firstTomorrowPages, putFirstTomorrow } from '../../lib/weakSpotActions';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { describePassage } from '../../lib/passages';
 import { logger } from '../../lib/logger';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -50,7 +51,7 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logs, saveUser } = useApp();
+  const { user, logs, pages, saveUser } = useApp();
   const { palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
@@ -75,7 +76,12 @@ export default function ActivityScreen() {
       });
   };
 
-  const { day: today } = useRevisionDay(user);
+  const { day: today, date: revisionDate } = useRevisionDay(user);
+  // "Add to plan" (a custom plan, under "First tomorrow"): tomorrow's day of the plan with the pages
+  // added; the plan changes only when it is saved (ACT-24).
+  const addToPlan = (added: number[]) => {
+    if (user?.customPlan) navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, added));
+  };
   // Pages already first tomorrow: their buttons say so ("First tomorrow ✓") and can't be tapped again.
   const firstTomorrow = useMemo(() => firstTomorrowPages(user, shiftDay(today, 1)), [user, today]);
   const { readings, journal, recordings, loading, refreshing, loadError, load, onRefresh } = useActivitySources();
@@ -153,11 +159,10 @@ export default function ActivityScreen() {
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
-              onPlanIt={(weak) =>
-                planItAction(!!user?.customPlan) === 'plan-day'
-                  ? navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })
-                  : reviseTomorrow(weak)
-              }
+              // First tomorrow on every plan, for that day only (Majd, Nov 8 2026: a custom plan's day
+              // used to open, and saving it replaced that day in every cycle).
+              onPlanIt={reviseTomorrow}
+              onAddToPlan={user?.customPlan ? addToPlan : undefined}
             />
           ) : (
             <View style={v2.graph}>

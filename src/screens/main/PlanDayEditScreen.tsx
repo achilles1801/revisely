@@ -65,7 +65,7 @@ export default function PlanDayEditScreen() {
   const { pages: allPages, user } = useApp();
   const { date: today } = useRevisionDay(user);
 
-  const { dayIndex, initialPages } = route.params;
+  const { dayIndex, initialPages, basePages, note } = route.params;
   const [pages, setPages] = useState<number[]>([...initialPages]);
   const [editing, setEditing] = useState(false);
 
@@ -94,10 +94,12 @@ export default function PlanDayEditScreen() {
     [surahGroups, juzGroups],
   );
 
+  // Against the day as saved: "Add to plan" opens with pages already added, which is an edit.
   const isDirty = useMemo(() => {
-    if (pages.length !== initialPages.length) return true;
-    return pages.some((p, i) => p !== initialPages[i]);
-  }, [pages, initialPages]);
+    const saved = basePages ?? initialPages;
+    if (pages.length !== saved.length) return true;
+    return pages.some((p, i) => p !== saved[i]);
+  }, [pages, initialPages, basePages]);
 
   const summary = summarizeDay(pages);
 
@@ -277,6 +279,11 @@ export default function PlanDayEditScreen() {
               ? `${pageCountLabel(pages.length)}${isDirty ? ' · Edited' : ''}`
               : `Nothing to revise ${dayIndex === 0 ? 'today' : 'on this day'}`}
           </Text>
+          {note ? (
+            <Text style={[typeV2.meta, v2.heroNote, { color: palette.secondary }]} testID="plan-day-note">
+              {note}
+            </Text>
+          ) : null}
         </View>
 
         {hasContent ? (
@@ -351,6 +358,7 @@ const v2 = StyleSheet.create({
   content: { paddingBottom: spacing.huge },
   hero: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: 8 },
   heroSubtitle: { marginTop: 2 },
+  heroNote: { marginTop: 6 },
 });
 
 const styles = StyleSheet.create({

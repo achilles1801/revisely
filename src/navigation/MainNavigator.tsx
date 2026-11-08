@@ -58,7 +58,8 @@ export type HomeStackParamList = {
   // merge the day-level edit into its in-memory days[] without round-tripping
   // through a context or store.
   PlanEdit: { editedDay?: { index: number; pages: number[] } } | undefined;
-  PlanDayEdit: { dayIndex: number; initialPages: number[] };
+  /** `basePages`: the day as saved, when `initialPages` already adds to it ("Add to plan"); `note`: one line under the title. */
+  PlanDayEdit: { dayIndex: number; initialPages: number[]; basePages?: number[]; note?: string };
   // Revision sessions, timed sessions and the daily log, day by day.
   Activity: undefined;
   // date is a revision day, YYYY-MM-DD.
