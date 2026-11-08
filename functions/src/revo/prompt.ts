@@ -159,7 +159,10 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
   if (t.doneEarlier) lines.push(`${pagesWord(t.doneEarlier)} of today’s were revised ahead, on an earlier day.`);
   if (t.otherPages) lines.push(`Also revised today, beyond today’s pages: ${pagesWord(t.otherPages)}.`);
   if (t.minutes > 0) lines.push(`Time revising today: ${Math.round(t.minutes)} min.`);
-  if (t.memorizedPages > 0) lines.push(`Added as memorized today: ${pagesWord(t.memorizedPages)}.`);
+  // By surah and ayah when the app says (MEM-1: most memorize ayahs, not pages), the pages after them.
+  if (t.memorizedPages > 0) {
+    lines.push(`Added as memorized today: ${said.memorizedToday ? `${said.memorizedToday} (${pagesWord(t.memorizedPages)})` : pagesWord(t.memorizedPages)}.`);
+  }
 
   const streak = context.streak;
   if (streak?.atRisk) {
