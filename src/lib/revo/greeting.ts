@@ -47,6 +47,11 @@ export interface GreetingExtras {
   doneCount?: number;
   /** Once today is done, the next revision day with pages: "Tomorrow" or its weekday, its first page and size. */
   next?: { lead: string; first: number; pages: number } | null;
+  /**
+   * Smart Tracking: without it nothing about strength is said, no "rated weak" (Majd, Nov 8 2026).
+   * Unset here counts as on (callers that predate it); the app passes the account's switch.
+   */
+  strength?: boolean;
 }
 
 /** Where today stands, so a sheet opened again with nothing changed can say something else (REVO-35). */
@@ -95,7 +100,7 @@ function asides(ctx: RevoContext, extras: GreetingExtras): Aside[] {
   const out: Aside[] = [];
   const next = extras.next;
   if (next) out.push({ kind: 'next', text: `${next.lead} starts at ${placeOfPage(next.first)}, ${plural(next.pages, 'page')}.`, chip: 'How do I revise ahead?' });
-  const weak = weakToLookAt(ctx);
+  const weak = extras.strength === false ? [] : weakToLookAt(ctx);
   if (weak.length > 0) out.push({ kind: 'weak', text: `${passageLong(weak)} is rated weak. Want a short plan for it?`, chip: `Plan ${passageShort(weak)}` });
   const weekPages = ctx.week.reduce((n, d) => n + d.pages, 0);
   const weekDays = ctx.week.filter((d) => d.pages > 0).length;
@@ -105,7 +110,7 @@ function asides(ctx: RevoContext, extras: GreetingExtras): Aside[] {
     out.push({
       kind: 'memorized',
       text: `You’ve memorized ${percentOfQuran(memorized)} of the Quran.`,
-      chip: ctx.weakPages.length > 0 ? 'Which parts are weakest?' : 'How is my pace?',
+      chip: extras.strength !== false && ctx.weakPages.length > 0 ? 'Which parts are weakest?' : 'How is my pace?',
     });
   }
   if (ctx.totals.streakDays > 1) out.push({ kind: 'streak', text: `You’re on a ${ctx.totals.streakDays}-day streak.`, chip: 'How is my pace?' });
@@ -142,7 +147,7 @@ function opening(name: string | null, ctx: RevoContext, open: number, extras: Gr
     return { text: `${hello} ${doneLine}${streak} Ask me anything about your revision.`, chip: 'What should I revise next?' };
   }
   const next = upNext(ctx);
-  const weakNext = next.filter((p) => ctx.today.weakNext.includes(p));
+  const weakNext = extras.strength === false ? [] : next.filter((p) => ctx.today.weakNext.includes(p));
   const nextLine =
     revisedPages > 0
       ? `You’re ${plural(revisedPages, 'page')} into today, and ${passageLong(next, { sentence: true })} is next.`
@@ -177,10 +182,11 @@ export function revoGreeting(name: string | null, ctx: RevoContext, open = 0, ex
 export function revoChips(ctx: RevoContext, open = 0, extras: GreetingExtras = {}): string[] {
   const out: string[] = [];
   const lead = opening(null, ctx, open, extras).chip;
-  const weakNext = upNext(ctx).filter((p) => ctx.today.weakNext.includes(p));
+  const strength = extras.strength !== false;
+  const weakNext = strength ? upNext(ctx).filter((p) => ctx.today.weakNext.includes(p)) : [];
   if (lead && lead !== 'What should I revise next?') out.push(lead);
   if (weakNext.length > 0) out.push(`Plan ${passageShort(weakNext)}`);
-  else if (ctx.weakPages.length > 0) out.push('Which parts are weakest?');
+  else if (strength && ctx.weakPages.length > 0) out.push('Which parts are weakest?');
   out.push('How was my week?');
   out.push(ctx.today.done ? 'What should I revise next?' : 'How is my pace?');
   return [...new Set(out)].slice(0, 3);

@@ -396,9 +396,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   was attached to them. The app reads its own conversations and memory and can't create them. Turning Revo off deletes
   its conversations, memory and kept answers (the day's count stays); deleting the account deletes all of it.
 
-- **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and which
-  of it is weak), with suggestions; neither is a question or a call. Its own words name parts of the Qur'an by surah
-  and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
+- **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and,
+  with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Its own words name
+  parts of the Qur'an by surah and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
   The context also carries each part it names in those words, for Revo's answers (REVO-27).
 
 - **REVO-34.** Each time Revo's sheet opens (its button, or another screen opening it), it opens on a new
@@ -412,8 +412,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   opens of a new conversation in the state today is in (not started or how many pages done, done, nothing planned).
   Today done: the first open after it says so, with Home's "Done · N" count and the streak; later opens lead with one
   thing from the account's own data instead, in turn, so two opens in a row differ: where the next revision day
-  starts (as Home's "Tomorrow starts at …"), the weak part left longest, the week's pages, the share of the Quran
-  memorized. Not done: the greeting always says where today stands and what is next, and a second open with nothing
+  starts (as Home's "Tomorrow starts at …"), the weak part left longest (with Smart Tracking on: without it nothing
+  is said about strength), the week's pages, the share of the Quran memorized. Not done: the greeting always says where today stands and what is next, and a second open with nothing
   changed follows that with the week, the share memorized or the streak, in turn, instead of the same offer. Nothing
   planned works like done. The first suggestion follows what the greeting leads with. All of it is written on the
   phone: no call, nothing counted.

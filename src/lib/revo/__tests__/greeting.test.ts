@@ -151,3 +151,18 @@ describe('Revo’s greeting opened again (REVO-35)', () => {
     expect(say(2, none, {})).toBe('Salaam Majd. This week you’ve revised 118 pages on 6 days.');
   });
 });
+
+describe('Revo’s greeting without Smart Tracking (REVO-35)', () => {
+  it('[REVO-35] says nothing about strength: no "rated weak" on any open, and no weak suggestion', () => {
+    const notDone = ctx({ revisedPages: 6, nextPages: [548, 549, 550], weakNext: [548, 549] });
+    const done = ctx({ done: true, revisedPages: 20 });
+    const off = { strength: false, doneCount: 20, next: { lead: 'Tomorrow', first: 562, pages: 20 } };
+    const lines = [0, 1, 2, 3, 4].flatMap((n) => [revoGreeting('Majd', notDone, n, off), revoGreeting('Majd', done, n, off)]).map(plainText);
+    for (const line of lines) expect(line).not.toMatch(/weak/i);
+    expect(plainText(revoGreeting('Majd', notDone, 0, off))).toBe(
+      'Salaam Majd. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. Ask me anything about your revision.',
+    );
+    const chips = [0, 1, 2, 3].flatMap((n) => [...revoChips(notDone, n, off), ...revoChips(done, n, off)]);
+    expect(chips.filter((c) => /weak|^Plan /.test(c))).toEqual([]);
+  });
+});

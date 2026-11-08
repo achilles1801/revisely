@@ -55,7 +55,8 @@ export function useRevoContext(): {
     }
     return {
       context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot }),
-      extras: { doneCount: snapshot.done.size, next },
+      // Smart Tracking unset is off, as Activity reads it.
+      extras: { doneCount: snapshot.done.size, next, strength: src.user.smartTrackingEnabled === true },
     };
   }, [sources, assignment, day]);
   return { day, context, extras, build, sources };
