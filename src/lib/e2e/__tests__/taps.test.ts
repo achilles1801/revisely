@@ -2,7 +2,7 @@
 // still called.
 
 import type { GestureResponderEvent } from 'react-native';
-import { traceTap } from '../taps';
+import { touchLine, traceTap } from '../taps';
 
 const touch = { nativeEvent: { pageX: 38.4, pageY: 112.6 } } as unknown as GestureResponderEvent;
 
@@ -30,4 +30,20 @@ it('logs in, out and press for a Tap with a testID, then calls its own handlers'
 it('leaves a Tap without a testID as it was', () => {
   const props = { onPress: jest.fn() };
   expect(traceTap(props)).toBe(props);
+});
+
+it('says where a touch is, what it landed on and how many touches JavaScript holds as down', () => {
+  // The Text inside a PillButton: its own props have no testID; the Pressable's above it does.
+  const button = { memoizedProps: { testID: 'journey-continue' }, return: null };
+  const text = { memoizedProps: { children: 'Continue' }, return: { memoizedProps: {}, return: button } };
+  const e = {
+    target: { __internalInstanceHandle: text },
+    nativeEvent: { pageX: 200.6, pageY: 834.2, target: 1234, touches: [{}, {}], changedTouches: [{}] },
+  } as unknown as GestureResponderEvent;
+  expect(touchLine('start', e)).toBe('[e2e] touch start at (201, 834) on journey-continue, 2 down, 1 changed');
+});
+
+it('names the native tag when nothing above the view has a testID', () => {
+  const e = { target: {}, nativeEvent: { pageX: 1, pageY: 2, target: 77, touches: [{}], changedTouches: [{}] } } as unknown as GestureResponderEvent;
+  expect(touchLine('end', e)).toBe('[e2e] touch end at (1, 2) on #77, 1 down, 1 changed');
 });

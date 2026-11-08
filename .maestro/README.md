@@ -413,8 +413,12 @@ in `.maestro/build/results/<platform>/<flow>/`:
   JavaScript wrote, including the app logger's, connectivity, the outbox and the root view's layout.
   An iOS release build passes only `console.error` to the unified log. Each press of a `v2/Tap`
   with a testID is there in stages (`[e2e] tap <id> in`, `out`, `press`; `src/lib/e2e/taps.ts`):
-  a tap the app ignored says whether JavaScript never had the touch or cancelled the press (twice
-  on iOS in #328's runs, a Tap in a sheet got the touch, by `device.log`, and never pressed).
+  a tap the app ignored says whether JavaScript never had the touch or cancelled the press. Every
+  touch that reaches JavaScript on the app's root is there too (`[e2e] touch start|end|cancel`, what
+  it landed on (the nearest testID) and how many touches JavaScript holds as down; a Modal's root
+  isn't covered). Three times on iOS in
+  #328's runs a tap reached the app's window, by `device.log`, and never pressed; the third had no
+  "in" at all.
   Each line has the real time it was written, so a gap is time the JavaScript didn't run: a gap
   over 2 s while the app is in front is its own line, `[e2e] js stalled 8.5 s, since 03:42:07.812`.
   Native views (scrolling, a sheet's animation) carry on meanwhile, and what the JavaScript missed
