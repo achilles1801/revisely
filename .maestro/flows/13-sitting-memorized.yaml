@@ -72,7 +72,9 @@ appId: com.revisionbuddy.app
     visible:
       id: timer-end
     timeout: 10000
-- tapOn: "Close timer"
+# A tap outside the card shrinks it back (its backdrop: "Close timer" is in Android's tree, not iOS's).
+- tapOn:
+    point: 50%, 25%
 - extendedWaitUntil:
     visible:
       id: timer-chip-running
