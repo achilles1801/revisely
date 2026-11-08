@@ -494,6 +494,16 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   short surah, or a surah's end that shares its page, is revised before the rest of the page is learned.
   Home, the widget and Revo name it by its memorized ayahs: with only An-Nas memorized on the Qur'an's
   last page, the day "Starts at An-Nas", not Al-Ikhlas.
+- **MEM-5.** On a day in Activity (testers), a sitting from the reader whose pages aren't all memorized
+  offers Add to memorized. The Memorized sheet opens on Ayahs, From and To never outside the pages the
+  sitting held. From starts at the first ayah not yet memorized there, To at the end of those pages, and
+  the sitting's minutes come with it. Whole pages and Surah are its other tabs.
+  - After adding, the sitting stands under Memorized. The block counts in ayahs when part of a page was
+    memorized ("20 ayahs"), and says what finishes the page ("Al-Mulk 21–26 finishes the page").
+  - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).
+  - Memorized today, the block says where the pages stand in the plan. On an automatic plan it says when
+    they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
+    add new pages by itself, it offers Add to your plan (tomorrow's day of it).
 
 ## Naming the Qur'an
 

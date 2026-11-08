@@ -34,6 +34,14 @@ import type { OutboxEntry } from '../../lib/offline/ops';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { currentAccount, queueChange } from '../../lib/offline/queue';
 import { isManualRevisionId } from '../../lib/manualRevision';
+import { describeAyahs } from '../../lib/passages';
+import { ayahsOnPage, sortedAyahs } from '../../lib/ayahKeys';
+import { memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../lib/memorizedAyahs';
+import { scheduledDaysFrom } from '../../lib/algorithm';
+import { AddMemorizedSheet, type AyahsAdded, type SittingToAdd } from './AddMemorizedSheet';
+import { UndoToast } from '../revision/UndoToast';
+import { PillButton } from '../v2/PillButton';
+import type { UserPage } from '../../types';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -61,6 +69,12 @@ interface Props {
   onOpenRecording: (id: string) => void;
   /** Deletes a timed session (the screen confirms first). */
   onDeleteReading: (session: ReadingSession) => void;
+  /** Memorized today, on an automatic plan: put the pages first tomorrow (Insights' Plan it). */
+  onReviseTomorrow?: (pages: number[]) => void;
+  /** Opens the schedule editor. */
+  onEditSchedule?: () => void;
+  /** Memorized today, on a custom plan: put the pages on a day of it (tomorrow's day in the editor). */
+  onAddToPlan?: (pages: number[]) => void;
 }
 
 /**
@@ -114,8 +128,16 @@ export function DayBlocks({
   onDeleteMemorized,
   onOpenRecording,
   onDeleteReading,
+  onReviseTomorrow,
+  onEditSchedule,
+  onAddToPlan,
 }: Props) {
-  const { pages, user } = useApp();
+  const { pages, user, updatePages } = useApp();
+  // A sitting's Add to memorized (MEM-1): the sheet, opened on its pages, and the add's Undo.
+  const [sittingToAdd, setSittingToAdd] = useState<SittingToAdd | null>(null);
+  // Mounted from the first Add on (so it can slide away after), never before: it loads the day's reads.
+  const [sheetUsed, setSheetUsed] = useState(false);
+  const [undo, setUndo] = useState<{ text: string; added: AyahsAdded; itemPagesBefore: number[] } | null>(null);
   const { palette } = useTheme();
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
@@ -210,7 +232,7 @@ export function DayBlocks({
   );
   if (!view) return null;
 
-  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[]; minutes?: number | null }[] }];
+  const [revisedRaw, memorized] = view.blocks as [RevisedBlock, { items: { id: string; pages: number[]; minutes?: number | null; verses?: number[] }[] }];
   const revised = revisedRaw;
   const doneAhead = items?.doneAhead ?? [];
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
@@ -331,26 +353,123 @@ export function DayBlocks({
   ];
   const memorizedPages = memorized.items.flatMap((i) => i.pages);
   const memorizedMinutes = memorized.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
+  // By the ayah (MEM-1): the day's ayahs, and the pages it left partly memorized.
+  const pageByNumber = new Map<number, UserPage>(pages.map((p) => [p.pageNumber, p]));
+  const dayAyahs = sortedAyahs(memorized.items.flatMap((i) => i.verses ?? []));
+  const dayPageSet = new Set(memorizedPages);
+  const partlyHere = memorizedPages.filter((p) => pageByNumber.get(p)?.status === 'in_progress');
+  const lastPartly = partlyHere.length > 0 ? pageByNumber.get(Math.max(...partlyHere)) : undefined;
+  const finishesIt = lastPartly
+    ? (() => {
+        const mine = new Set(memorizedAyahsOnPage(lastPartly));
+        const rest = ayahsOnPage(lastPartly.pageNumber).filter((k) => !mine.has(k));
+        return rest.length > 0 ? `${describeAyahs(rest, { form: 'compact' })} finishes the page` : null;
+      })()
+    : null;
+  // A sitting whose pages were memorized that day stands under Memorized, not Read.
+  const nestsUnderMemorized = (i: { pages: number[] }) => memorized.items.length > 0 && i.pages.length > 0 && i.pages.every((p) => dayPageSet.has(p));
+  const nested = readItems.items.filter(nestsUnderMemorized);
+  const readHere = readItems.items.filter((i) => !nestsUnderMemorized(i));
+  // Memorized today: where the pages stand in the plan (an automatic plan takes them by itself, when
+  // its cycle comes round to them; a custom plan doesn't).
+  const planLine = (() => {
+    if (day !== today || memorized.items.length === 0 || !user) return null;
+    const mine = memorizedPages.filter((p) => {
+      const page = pageByNumber.get(p);
+      return page != null && (page.status === 'memorized' || page.status === 'in_progress');
+    });
+    if (mine.length === 0) return null;
+    if (user.customPlan) {
+      const planned = new Set(user.customPlan.days.flat());
+      const outside = mine.filter((p) => !planned.has(p));
+      if (outside.length === 0 || !onAddToPlan) return null;
+      return { title: 'Not in your custom plan yet', links: [{ label: 'Add to your plan', arrow: true, onPress: () => onAddToPlan(outside), id: 'activity-add-to-plan' }] };
+    }
+    const [y, m, d] = today.split('-').map(Number);
+    const days = scheduledDaysFrom(user, revisablePages(pages), new Date(y, m - 1, d + 1), 60);
+    const at = days.findIndex((ps) => ps.some((p) => mine.includes(p)));
+    const when =
+      at < 0
+        ? null
+        : at === 0
+          ? 'tomorrow'
+          : new Date(y, m - 1, d + 1 + at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    const links = [
+      ...(onReviseTomorrow && at !== 0 ? [{ label: 'Revise them tomorrow', arrow: false, onPress: () => onReviseTomorrow(mine), id: 'activity-revise-tomorrow' }] : []),
+      ...(onEditSchedule ? [{ label: 'Edit schedule', arrow: true, onPress: onEditSchedule, id: 'activity-edit-schedule' }] : []),
+    ];
+    return { title: when ? `In your revision from ${when}` : 'In your revision', links };
+  })();
+  const sittingRow = (i: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }) => {
+    const session = readings.find((r) => r.id === i.id);
+    return (
+      <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`${sittingName(i.pages)}. Edit pages`}>
+        <ItemLine icon="stopwatch-outline" right={timeRange(i.occurredAt, i.minutes)}>
+          {/* What the sitting held, by surah and ayah (REC-2), or "Timed in Read" when no pages are known. */}
+          <Text style={[typeV2.body, { color: palette.text }]}>{sittingName(i.pages)}</Text>
+        </ItemLine>
+      </Tap>
+    );
+  };
+  const readRecordings = (
+    <View style={styles.underItem}>
+      <RecordingsList day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />
+    </View>
+  );
   const memorizedItems: React.ReactNode[] = [
+    // A sitting memorized that day, with its recording when every sitting of the day is here.
+    ...nested.map((i, idx) => (
+      <View key={i.id} testID={`activity-sitting-${i.id}`}>
+        {sittingRow(i)}
+        {idx === nested.length - 1 && readHere.length === 0 && readRecs.length > 0 ? readRecordings : null}
+      </View>
+    )),
+    ...(planLine
+      ? [
+          <ItemLine key="plan" icon="calendar-outline">
+            <Text style={[typeV2.body, { color: palette.text }]} testID="activity-plan-line">
+              {planLine.title}
+            </Text>
+            <View style={styles.links}>
+              {planLine.links.map((l) => (
+                <Tap key={l.id} onPress={l.onPress} accessibilityRole="button" testID={l.id}>
+                  <Text style={[typeV2.meta, styles.link, { color: palette.link }]}>{`${l.label}${l.arrow ? ' ›' : ''}`}</Text>
+                </Tap>
+              ))}
+            </View>
+          </ItemLine>,
+        ]
+      : []),
     ...memorized.items.flatMap((i) => taggedTo('memorization', i.id).map(noteItem)),
     ...memorizationNotes.map(handItem),
   ];
   const readItemNodes: React.ReactNode[] = [
-    ...readItems.items.map((i, idx) => {
-      const session = readings.find((r) => r.id === i.id);
-      const last = idx === readItems.items.length - 1;
+    ...readHere.map((i, idx) => {
+      const last = idx === readHere.length - 1;
+      // Pages it held that aren't all memorized: offer to add them (MEM-1). Testers see the Day.
+      const open = i.pages.filter((p) => pageByNumber.get(p)?.status !== 'memorized');
       return (
         <View key={i.id}>
-          <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`${sittingName(i.pages)}. Edit pages`}>
-            <ItemLine icon="stopwatch-outline" right={timeRange(i.occurredAt, i.minutes)}>
-              {/* What the sitting held, by surah and ayah (REC-2), or "Timed in Read" when no pages are known. */}
-              <Text style={[typeV2.body, { color: palette.text }]}>{sittingName(i.pages)}</Text>
-            </ItemLine>
-          </Tap>
+          {sittingRow(i)}
           {/* Its recording hangs under it, with no line of its own. */}
-          {last && readRecs.length > 0 ? (
-            <View style={styles.underItem}>
-              <RecordingsList day={day} kind="reading" emptyText={null} variant="block" onOpen={(r) => onOpenRecording(r.id)} />
+          {last && readRecs.length > 0 ? readRecordings : null}
+          {open.length > 0 ? (
+            <View style={styles.offer} testID={`activity-sitting-offer-${i.id}`}>
+              <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                {`${describePassage(open)} ${open.some((p) => pageByNumber.get(p)?.status === 'in_progress') ? 'isn’t all memorized yet.' : 'isn’t memorized yet.'}`}
+              </Text>
+              <PillButton
+                title="Add to memorized"
+                variant="outline"
+                size="sm"
+                icon="leaf-outline"
+                onPress={() => {
+                  setSheetUsed(true);
+                  setSittingToAdd({ pages: i.pages, minutes: i.minutes });
+                }}
+                style={styles.offerButton}
+                testID={`activity-add-memorized-${i.id}`}
+              />
             </View>
           ) : null}
         </View>
@@ -426,8 +545,18 @@ export function DayBlocks({
         <DayBlock
           mark={<BlockMark kind="memorized" />}
           title="Memorized"
-          figure={memorized.items.length > 0 ? pagesWord(memorizedPages.length) : undefined}
-          subline={subline([(memorizedPages.length > 0 ? describePassage(memorizedPages, { form: 'compact' }) : null), memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null])}
+          // In ayahs when part of a page was memorized (MEM-1), else in pages.
+          figure={
+            memorized.items.length === 0
+              ? undefined
+              : dayAyahs.length > 0 && partlyHere.length > 0
+                ? `${dayAyahs.length} ${dayAyahs.length === 1 ? 'ayah' : 'ayahs'}`
+                : pagesWord(memorizedPages.length)
+          }
+          subline={subline([
+            dayAyahs.length > 0 ? describeAyahs(dayAyahs, { form: 'compact' }) : memorizedPages.length > 0 ? describePassage(memorizedPages, { form: 'compact' }) : null,
+            memorizedMinutes > 0 ? formatMinutesLong(memorizedMinutes) : null,
+          ])}
           summary={
             memorized.items.length > 0 ? (
               <View style={styles.chips}>
@@ -438,7 +567,14 @@ export function DayBlocks({
                     label={describePassage(Array.from({ length: run.last - run.first + 1 }, (_, k) => run.first + k), { form: 'short' })}
                   />
                 ))}
-                <Text style={[typeV2.meta, styles.chipsNote, { color: palette.secondary }]}>{`${memorizedSet.size} pages memorized in all`}</Text>
+                <Text style={[typeV2.meta, styles.chipsNote, { color: palette.secondary }]}>
+                  {partlyHere.length > 0 ? `${percentOf(memorizedPageShare(pages))} of the Quran in all` : `${memorizedSet.size} pages memorized in all`}
+                </Text>
+                {finishesIt ? (
+                  <Text style={[typeV2.meta, styles.finishes, { color: palette.secondary }]} testID="activity-finishes-page">
+                    {finishesIt}
+                  </Text>
+                ) : null}
               </View>
             ) : undefined
           }
@@ -447,12 +583,12 @@ export function DayBlocks({
           testID="activity-block-memorized"
         />
       )}
-      {(readItems.items.length > 0 || readRecs.length > 0) && (
+      {(readHere.length > 0 || (readRecs.length > 0 && nested.length === 0)) && (
         <DayBlock
           mark={<BlockMark kind="read" />}
           title="Read"
-          figure={readItems.items.length > 0 ? pagesWord(readPagesCount) : undefined}
-          subline={subline([surahsOf(readItems.items.flatMap((i) => i.pages)), readMinutes > 0 ? formatMinutesLong(readMinutes) : null])}
+          figure={readHere.length > 0 ? pagesWord(readHere.reduce((n, i) => n + i.pages.length, 0)) : undefined}
+          subline={subline([surahsOf(readHere.flatMap((i) => i.pages)), readHere.reduce((n, i) => n + (i.minutes ?? 0), 0) > 0 ? formatMinutesLong(readHere.reduce((n, i) => n + (i.minutes ?? 0), 0)) : null])}
           items={readItemNodes}
           header={readMenu}
           testID="activity-block-read"
@@ -468,6 +604,38 @@ export function DayBlocks({
         />
       )}
       <WindowFooter text={footerText} />
+      {sheetUsed ? (
+      <AddMemorizedSheet
+        visible={sittingToAdd != null}
+        onClose={() => setSittingToAdd(null)}
+        day={day}
+        dayName={day === today ? 'today' : undefined}
+        sitting={sittingToAdd}
+        onAdded={(added) =>
+          setUndo({
+            text: `${describeAyahs(added.ayahs)} marked memorized`,
+            added,
+            itemPagesBefore: memorizedPages,
+          })
+        }
+      />
+      ) : null}
+      <UndoToast
+        visible={undo != null}
+        message={undo?.text ?? ''}
+        actionLabel="Undo"
+        duration={6000}
+        onUndo={() => {
+          const u = undo;
+          setUndo(null);
+          if (!u) return;
+          // Each page back as it was, and the ayahs out of the day's item (MEM-3).
+          const before = new Map(u.added.previous.map((p) => [p.pageNumber, p] as const));
+          void updatePages(pages.map((p) => before.get(p.pageNumber) ?? p), [...before.keys()]);
+          void queueChange({ kind: 'memorization.unmark', pages: u.added.pages.filter((p) => !u.itemPagesBefore.includes(p)), verses: u.added.ayahs });
+        }}
+        onDismiss={() => setUndo(null)}
+      />
       <ContextMenu
         visible={menu != null}
         onClose={() => setMenu(null)}
@@ -479,8 +647,19 @@ export function DayBlocks({
   );
 }
 
+/** Of the 604 pages, to one decimal, as Home writes it ("50.6%"). */
+const percentOf = (pages: number) => {
+  const p = Math.round((pages / 604) * 1000) / 10;
+  return p <= 0 ? '0%' : p >= 100 ? '100%' : `${p.toFixed(1)}%`;
+};
+
 const styles = StyleSheet.create({
   underItem: { marginTop: 10 },
+  offer: { marginTop: 10, gap: 8, alignItems: 'flex-start' },
+  offerButton: { alignSelf: 'flex-start' },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginTop: 4 },
+  link: { fontWeight: '600' },
+  finishes: { width: '100%', marginTop: 2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   chipsNote: { marginLeft: 4 },
 });
