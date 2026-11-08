@@ -1,13 +1,13 @@
 {
   "recordedAt": "2026-11-07T23:40:07.294Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "how": "functions/scripts/record-anthropic.js, with the prompt before the + was trimmed. The request hash was then moved, without recording again, to the prompt after the guide's line about the + changed (Revised elsewhere, Memorized, Note): record it again to match exactly.",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "3a316eaeadd0c13ccab49261b06a4754d2aaee8b259d462f05abee67426244b0"
+    "systemSha256": "40d3fbd8e8d3bed6a0620b61159a1b25732db0c80b2cae78681826ffb6299555"
   },
   "status": 200,
   "body": {
