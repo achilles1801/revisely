@@ -192,6 +192,44 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: revo-chart-dailyPages-day
 
+# A newer chart kind, the juz map (sent as `visual`): a tap picks a juz, and its panel opens it in
+# the reader. As above, the first tap may only put the keyboard away.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Here is where each juz stands.", "chart": {"kind": "juzMap", "title": "Your juz · last revised"}, "remember": [], "title": "My juz", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "Which juz haven't I revised lately?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-juzMap
+    timeout: 15000
+- tapOn:
+    id: revo-chart-juzMap-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-juzMap-reader
+    commands:
+      - tapOn:
+          id: revo-chart-juzMap-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-juzMap-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5e-chart-juz
+- tapOn:
+    id: revo-chart-juzMap-plot
+- assertNotVisible:
+    id: revo-chart-juzMap-reader
+
 # Tonight's Day in review, written by the real function (as the app asks for it on a day with
 # something done). The memory holds what the conversation's answer asked to remember.
 - runScript:

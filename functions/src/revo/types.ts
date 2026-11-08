@@ -135,6 +135,17 @@ export type RevoAttachment =
 export type RevoChart = { kind: 'pageRatings'; title: string; pages: number[] } | { kind: 'dailyPages'; title: string; days: 7 | 30 };
 
 /**
+ * The charts after the first two (Nov 2026: Majd's interactive charts). They travel in a reply's
+ * `visual`, which apps before them don't read, so those apps show the answer's words and never an
+ * empty chart: an older app draws any `chart` it gets, and fell through to an empty bar chart for
+ * a kind it didn't know. `chart` keeps carrying only the first two; newer apps draw
+ * `visual ?? chart`. The app's side is src/lib/revo/types.ts.
+ */
+export type RevoNewChart = { kind: 'juzMap'; title: string };
+export const REVO_NEW_CHART_KINDS = ['juzMap'] as const;
+export type RevoVisual = RevoChart | RevoNewChart;
+
+/**
  * The screens an `openScreen` action may open (REVO-31). The app has the same list
  * (src/lib/revo/types.ts REVO_SCREENS); guide.test.ts checks they agree.
  */
@@ -168,6 +179,8 @@ export interface RevoMessage {
   at: number;
   textAfter?: string;
   chart?: RevoChart;
+  /** A newer chart kind (RevoNewChart), never set together with `chart`. */
+  visual?: RevoNewChart;
   action?: RevoAction;
   chips?: string[];
   attach?: { kind: RevoAttachment['kind']; label: string };
@@ -215,6 +228,7 @@ export interface RevoReplyParts {
   text: string;
   textAfter?: string;
   chart?: RevoChart;
+  visual?: RevoNewChart;
   action?: RevoAction;
   chips?: string[];
   remember: string[];

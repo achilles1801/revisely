@@ -517,6 +517,31 @@ describe('the reply (REVO-7)', () => {
     expect(invented).toEqual({ text: 'Try these.', remember: [] });
   });
 
+  it('[REVO-7] a newer chart kind goes out as `visual`, never as `chart`, so an older app shows the words and no empty chart', () => {
+    const juz = parseReply(JSON.stringify({ text: 'Juz 4 and Juz 5.', chart: { kind: 'juzMap', title: 'Your juz · last revised' } }), allowed, { firstTurn: false })!;
+    expect(juz).toEqual({ text: 'Juz 4 and Juz 5.', visual: { kind: 'juzMap', title: 'Your juz · last revised' }, remember: [] });
+    // The first two kinds stay in `chart`, as every app reads them.
+    const week = parseReply(JSON.stringify({ text: 'A good week.', chart: { kind: 'dailyPages', title: 'This week', days: 7 } }), allowed, { firstTurn: false })!;
+    expect(week.chart).toEqual({ kind: 'dailyPages', title: 'This week', days: 7 });
+    expect(week.visual).toBeUndefined();
+    // Anything wrong with it drops the chart and keeps the answer.
+    for (const bad of [{ kind: 'juzMap' }, { kind: 'juzMap', title: 'x'.repeat(61) }, { kind: 'pieChart', title: 'Pie' }, 'juzMap']) {
+      expect(parseReply(JSON.stringify({ text: 'Words.', chart: bad }), allowed, { firstTurn: false })).toEqual({ text: 'Words.', remember: [] });
+    }
+  });
+
+  it('[REVO-7] a newer chart is stored with the answer, and comes back with the cached one', async () => {
+    const f = fakeStore();
+    const m = model(json({ chart: { kind: 'juzMap', title: 'Your juz' } }));
+    const first = await handleRevoAsk(U, ask({ question: 'Which juz haven’t I revised lately?' }), deps(f.store, m.call));
+    expect(first.reply.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+    expect(first.reply.chart).toBeUndefined();
+    expect(f.messages('u', first.chatId).find((x) => x.role === 'revo')?.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+    const again = await handleRevoAsk(U, ask({ question: 'Which juz haven’t I revised lately?' }), deps(f.store, m.call));
+    expect(again.cached).toBe(true);
+    expect(again.reply.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+  });
+
   it('[REVO-7] a reply that isn’t JSON is shown as written; a fenced one is read; at most one action', () => {
     expect(parseReply('Plain words.', allowed, { firstTurn: true })).toEqual({ text: 'Plain words.', remember: [] });
     const fenced = parseReply('```json\n{"text": "Fenced.", "action": [{"kind": "startRevision", "title": "Start", "detail": ""}, {"kind": "openPage", "title": "Open", "detail": "", "page": 12}]}\n```', allowed, { firstTurn: false })!;

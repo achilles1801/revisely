@@ -4,11 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { knownChart, plannedOf } from '../../lib/revo/charts';
-import { dayFacts, prepare, type FactSources } from '../../lib/revo/facts';
+import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
 import { SCREEN_BUTTON } from '../../lib/revo/screens';
-import type { RevoAction, RevoChart } from '../../lib/revo/types';
+import type { RevoAction, RevoVisual } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
 import { DailyPagesChart } from './charts/DailyPagesChart';
+import { JuzMapChart } from './charts/JuzMapChart';
 import { PageRatingsChart } from './charts/PageRatingsChart';
 
 /** Where a chart's panel can take the user (RevoChat wires them; RevoHost closes Revo first). */
@@ -24,7 +25,7 @@ export interface ChartHandlers {
  * like an Insights section. Each answers a touch: a tap (or a slide along the bars) picks a mark,
  * and a panel under it leads on. A kind this app doesn't know draws nothing.
  */
-export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoChart; day: string; sources?: () => FactSources | null } & ChartHandlers) {
+export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVisual; day: string; sources?: () => FactSources | null } & ChartHandlers) {
   const { logs, pages } = useApp();
   // What the plan had for each day, and a day's facts, as Revo's attachments read them.
   const reads = useMemo(() => {
@@ -35,9 +36,13 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoCha
       planned: plannedOf(src),
       facts: (d: string) => dayFacts(d, prepared),
       planPages: (d: string) => (d === src.snapshot.day ? src.snapshot.pages : prepared.scheduled(d)),
+      preview: (pages: number[]) => (pages.length > 0 ? passagePreview(passageFacts(pages, prepared)) : null),
     };
   }, [sources]);
   if (!knownChart(chart)) return null;
+  if (chart.kind === 'juzMap') {
+    return <JuzMapChart title={chart.title} today={day} logs={logs} userPages={pages} preview={reads?.preview} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
+  }
   if (chart.kind === 'pageRatings') {
     return <PageRatingsChart title={chart.title} pages={chart.pages} today={day} logs={logs} userPages={pages} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
   }

@@ -8,10 +8,14 @@
 import type { RevisionLog, UserPage } from '../../types';
 import { reviewedOn } from '../aheadCredit';
 import { formatDayLong, formatMinutesLong } from '../activityFormat';
+import { lastRevisedByPage } from '../activityInsights';
+import { juzTiles, type JuzTile } from '../insightsView';
 import { shiftDay } from '../journal';
-import { describePassage, firstVerseOfPage, lastVerseOfPage, pagesNote, surahName } from '../passages';
+import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, pagesNote, surahName } from '../passages';
+import { getJuzRange } from '../quranData';
+import { revisedItems } from './context';
 import type { FactSources } from './facts';
-import type { RevoChart, RevoDayFacts } from './types';
+import type { RevoDayFacts, RevoVisual } from './types';
 import { passageShort } from './words';
 
 export type RatingBand = 'weak' | 'moderate' | 'strong';
@@ -24,10 +28,11 @@ export const RATING_DAYS = 31;
  * A chart this app knows how to draw. A newer server's kind (or a malformed one) draws nothing:
  * the answer's words still show. Before this, an unknown kind fell through to an empty bar chart.
  */
-export function knownChart(c: RevoChart | null | undefined): c is RevoChart {
+export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
   if (!c || typeof c.title !== 'string') return false;
   if (c.kind === 'pageRatings') return Array.isArray(c.pages) && c.pages.length > 0 && c.pages.every((p) => Number.isInteger(p) && p >= 1 && p <= 604);
   if (c.kind === 'dailyPages') return c.days === 7 || c.days === 30;
+  if (c.kind === 'juzMap') return true;
   return false;
 }
 
@@ -229,6 +234,65 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
   if (weak > 0) parts.push(`rated weak ${timesWord(weak)} in ${RATING_DAYS} days`);
   parts.push(userPage?.lastRevisedDate ? `revised ${agoWords(userPage.lastRevisedDate, today)}` : 'not revised yet');
   return { title: describePassage([page], { juz: true }), note: pagesNote([page]), meta: parts.join(' · ') };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Juz map
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Insights' 30 tiles (lib/insightsView juzTiles), from the same reading of the sessions Revo's
+ * context makes (lastRevisedByPage over revisedItems), so the map and Revo's words agree.
+ */
+export function juzMapData(pages: readonly UserPage[], logs: readonly RevisionLog[], today: string): JuzTile[] {
+  const memorized = new Set(pages.filter((p) => p.status === 'memorized').map((p) => p.pageNumber));
+  const learning = new Set(pages.filter((p) => p.status === 'in_progress').map((p) => p.pageNumber));
+  return juzTiles(memorized, learning, lastRevisedByPage(revisedItems(logs), today), today);
+}
+
+/** A picked juz: "Juz 4 · last revised 41 days ago" over its surahs ("Ali 'Imran 92 to the end of Juz 4"). */
+export function juzReadout(tile: JuzTile): { title: string; line: string } {
+  const { start, end } = getJuzRange(tile.juz);
+  const when =
+    tile.state === 'none'
+      ? tile.learning
+        ? 'being learned'
+        : 'not memorized'
+      : tile.daysSince == null
+        ? 'not all revised yet'
+        : tile.daysSince === 0
+          ? 'revised today'
+          : tile.daysSince === 1
+            ? 'last revised yesterday'
+            : `last revised ${tile.daysSince} days ago`;
+  return { title: `Juz ${tile.juz} · ${when}`, line: describePageRange(start, end, { wholeJuz: false }) };
+}
+
+/** A juz's pages for its strip: each memorized page that has been revised in its rating's band; the rest unrated. */
+export function juzStrip(juz: number, pages: readonly UserPage[]): { page: number; band: RatingBand | null; memorized: boolean }[] {
+  const byNumber = new Map(pages.map((p) => [p.pageNumber, p]));
+  const { start, end } = getJuzRange(juz);
+  return Array.from({ length: end - start + 1 }, (_, i) => {
+    const p = byNumber.get(start + i);
+    const memorized = p?.status === 'memorized';
+    return { page: start + i, memorized, band: memorized && p?.lastRevisedDate ? bandOf(p.weaknessRating) : null };
+  });
+}
+
+const juzList = (js: number[]) => (js.length === 0 ? null : js.map((j) => `Juz ${j}`).join(', '));
+
+/** For VoiceOver: the tiles by state ("Revised this week: Juz 24, Juz 25. …"). */
+export function juzSummary(tiles: readonly JuzTile[]): string {
+  const of = (state: JuzTile['state']) => juzList(tiles.filter((t) => t.state === state).map((t) => t.juz));
+  return [
+    ['Revised this week', of('week')],
+    ['This month', of('month')],
+    ['Over 30 days ago', of('stale')],
+    ['Being learned', juzList(tiles.filter((t) => t.state === 'none' && t.learning).map((t) => t.juz))],
+  ]
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('. ');
 }
 
 // ---------------------------------------------------------------------------------------------

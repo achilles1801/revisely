@@ -5,7 +5,7 @@
  * its own text, and nothing else (a reply cut off mid-object keeps its text when it arrived whole).
  */
 import { screenFromText } from './screenText';
-import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoAction, RevoChart, RevoReplyParts } from './types';
+import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoAction, RevoChart, RevoNewChart, RevoReplyParts } from './types';
 
 export const MAX_TEXT = 1500;
 export const MAX_TEXT_AFTER = 300;
@@ -49,6 +49,19 @@ export function checkChart(v: unknown, allowed: ReadonlySet<number>): RevoChart 
     return pages ? { kind: 'pageRatings', title, pages } : null;
   }
   if (v.kind === 'dailyPages' && (v.days === 7 || v.days === 30)) return { kind: 'dailyPages', title, days: v.days };
+  return null;
+}
+
+/**
+ * A newer chart kind (types.ts RevoNewChart), checked like the first two: anything wrong drops the
+ * chart and keeps the answer. The app draws every figure from its own data; the reply only names
+ * the chart.
+ */
+export function checkNewChart(v: unknown): RevoNewChart | null {
+  if (!isObj(v)) return null;
+  const title = clean(v.title, MAX_TITLE);
+  if (!title) return null;
+  if (v.kind === 'juzMap') return { kind: 'juzMap', title };
   return null;
 }
 
@@ -194,8 +207,13 @@ export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { fi
     return found ? { text: cutText(text), remember: [], action: found } : { text: cutText(text), remember: [] };
   }
   const out: RevoReplyParts = { text: cutText(o.text), remember: strings(o.remember, MAX_REMEMBER, MAX_FACT) };
+  // The model names every kind as "chart"; a newer kind goes out as `visual` (apps before it don't read it).
   const chart = checkChart(o.chart, allowed);
   if (chart) out.chart = chart;
+  else {
+    const visual = checkNewChart(o.chart);
+    if (visual) out.visual = visual;
+  }
   const textAfter = clean(o.textAfter, MAX_TEXT_AFTER);
   if (textAfter) out.textAfter = textAfter;
   // One action: an object, or the first valid one of a list.

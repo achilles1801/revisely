@@ -168,6 +168,13 @@ export type RevoChart =
   | { kind: 'pageRatings'; title: string; pages: number[] }
   | { kind: 'dailyPages'; title: string; days: 7 | 30 };
 
+/**
+ * The charts after the first two, in a message's `visual` (the server's types.ts RevoNewChart):
+ * apps before them don't read that field, so they show the words, never an empty chart.
+ */
+export type RevoNewChart = { kind: 'juzMap'; title: string };
+export type RevoVisual = RevoChart | RevoNewChart;
+
 /** The screens an `openScreen` action may open (REVO-31); the server has the same list. */
 export const REVO_SCREENS = ['jumpTo', 'planEditor', 'memorized', 'activity', 'insights', 'dailyLog', 'settings', 'prayerTimes', 'qibla', 'reader'] as const;
 export type RevoScreen = (typeof REVO_SCREENS)[number];
@@ -189,6 +196,8 @@ export interface RevoMessage {
   at: number;
   textAfter?: string;
   chart?: RevoChart;
+  /** A newer chart (never with `chart`): drawn instead of it. */
+  visual?: RevoNewChart;
   action?: RevoAction;
   chips?: string[];
   /** What was attached, as chips: the first (every app version shows it), and all of them when there were several. */

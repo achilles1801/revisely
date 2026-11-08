@@ -9,6 +9,10 @@ import {
   dailyPagesData,
   dayDetail,
   dayMonth,
+  juzMapData,
+  juzReadout,
+  juzStrip,
+  juzSummary,
   knownChart,
   pageDetail,
   pageRatingsData,
@@ -80,8 +84,9 @@ describe('knownChart', () => {
     expect(knownChart({ kind: 'pageRatings', title: 'x', pages: [548, 549] })).toBe(true);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 7 })).toBe(true);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 30 })).toBe(true);
+    expect(knownChart({ kind: 'juzMap', title: 'x' })).toBe(true);
     // A newer server's kind, or a malformed one: no chart (the old app drew an empty bar chart).
-    expect(knownChart({ kind: 'juzMap', title: 'x' } as unknown as RevoChart)).toBe(false);
+    expect(knownChart({ kind: 'weeksAhead', title: 'x' } as unknown as RevoChart)).toBe(false);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 14 } as unknown as RevoChart)).toBe(false);
     expect(knownChart({ kind: 'pageRatings', title: 'x', pages: [] })).toBe(false);
     expect(knownChart({ kind: 'pageRatings', title: 'x', pages: [700] })).toBe(false);
@@ -185,6 +190,44 @@ describe('page ratings', () => {
     expect(plainText(d.note)).toBe('p. 583');
     expect(d.meta).toBe('Weak now · rated weak twice in 31 days · revised yesterday');
     expect(pageDetail(590, undefined, [], TODAY).meta).toBe('not revised yet');
+  });
+});
+
+describe('juz map', () => {
+  // Juz 30 (p. 582–604): ten of its 23 pages memorized here, so it is being learned, not memorized.
+  it('draws Insights’ tiles from the sessions, as Revo’s context reads them', () => {
+    const tiles = juzMapData(pages, logs, TODAY);
+    expect(tiles).toHaveLength(30);
+    expect(tiles[29]).toMatchObject({ juz: 30, state: 'none', learning: true });
+    expect(tiles[0]).toMatchObject({ juz: 1, state: 'none', learning: false });
+    // All of Juz 30 memorized: the oldest page decides, and two were never revised.
+    const all = Array.from({ length: 23 }, (_, i) => ({ ...memorized[0], pageNumber: 582 + i }));
+    expect(juzMapData(recomputePagesFromLogs(all, logs), logs, TODAY)[29]).toMatchObject({ state: 'stale', daysSince: null });
+  });
+
+  it('a picked juz: when it was last revised, and its surahs', () => {
+    expect(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41 })).toEqual({ title: 'Juz 4 · last revised 41 days ago', line: expect.anything() });
+    expect(plainText(juzReadout({ juz: 4, state: 'stale', learning: false, daysSince: 41 }).line)).toBe("Ali 'Imran 92 to the end of Juz 4");
+    expect(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0 }).title).toBe('Juz 28 · revised today');
+    expect(juzReadout({ juz: 27, state: 'week', learning: false, daysSince: 1 }).title).toBe('Juz 27 · last revised yesterday');
+    expect(juzReadout({ juz: 5, state: 'stale', learning: false, daysSince: null }).title).toBe('Juz 5 · not all revised yet');
+    expect(juzReadout({ juz: 29, state: 'none', learning: true, daysSince: null }).title).toBe('Juz 29 · being learned');
+    expect(plainText(juzReadout({ juz: 28, state: 'week', learning: false, daysSince: 0 }).line)).toBe('Al-Mujadila to At-Tahrim');
+  });
+
+  it('its strip: each page, in its rating’s colour once memorized and revised', () => {
+    const strip = juzStrip(30, pages);
+    expect(strip).toHaveLength(23);
+    expect(strip[0]).toEqual({ page: 582, memorized: true, band: expect.any(String) });
+    // 592 on aren't memorized here.
+    expect(strip[10]).toEqual({ page: 592, memorized: false, band: null });
+  });
+
+  it('for VoiceOver, the tiles by state', () => {
+    const t = (juz: number, state: 'week' | 'month' | 'stale' | 'none', learning = false) => ({ juz, state, learning, daysSince: null });
+    expect(juzSummary([t(1, 'month'), t(4, 'stale'), t(5, 'stale'), t(28, 'week'), t(29, 'none', true), t(10, 'none')])).toBe(
+      'Revised this week: Juz 28. This month: Juz 1. Over 30 days ago: Juz 4, Juz 5. Being learned: Juz 29',
+    );
   });
 });
 

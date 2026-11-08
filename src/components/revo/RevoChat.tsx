@@ -207,9 +207,9 @@ export function RevoChat({
           ) : (
             <View key={m.id} style={styles.revo} testID="revo-answer">
               <RevoText text={m.text} />
-              {m.chart ? (
+              {m.visual ?? m.chart ? (
                 <ChartCard
-                  chart={m.chart}
+                  chart={(m.visual ?? m.chart)!}
                   day={day}
                   sources={sources}
                   onOpenDay={onOpenDay}

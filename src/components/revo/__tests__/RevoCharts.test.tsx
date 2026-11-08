@@ -9,6 +9,7 @@ import { ThemeProvider } from '../../../context/ThemeContext';
 import { plainText } from '../../../lib/passages';
 import type { RevisionLog, UserPage } from '../../../types';
 import { DailyPagesChart } from '../charts/DailyPagesChart';
+import { JuzMapChart } from '../charts/JuzMapChart';
 import { PageRatingsChart } from '../charts/PageRatingsChart';
 import { ChartCard } from '../RevoCards';
 
@@ -203,11 +204,68 @@ describe('page ratings', () => {
   });
 });
 
+describe('juz map', () => {
+  // Juz 28 memorized (p. 542–561) and revised Nov 1; Juz 30's first ten pages being learned.
+  const juz28 = Array.from({ length: 20 }, (_, i) => page(542 + i, { lastRevisedDate: '2026-11-01', weaknessRating: i === 6 ? 2 : 4 }));
+  const juzLogs = [log('2026-11-01', Array.from({ length: 20 }, (_, i) => 542 + i))];
+  const onReviseFirst = jest.fn(async () => undefined);
+  const onOpenPage = jest.fn();
+  const map = () =>
+    mount(
+      <JuzMapChart
+        title="Your juz · last revised"
+        today={TODAY}
+        logs={juzLogs}
+        userPages={[...juz28, page(582, { status: 'in_progress' })]}
+        preview={() => 'Revised 1× in 30 days · 1 weak spot'}
+        onReviseFirst={onReviseFirst}
+        onOpenPage={onOpenPage}
+      />,
+      'revo-chart-juzMap',
+    );
+
+  it('at rest: Insights’ 30 tiles and what a tap does', async () => {
+    await map();
+    expect(screen.getAllByText(/^\d+$/)).toHaveLength(30);
+    expect(text('revo-chart-juzMap-line')).toBe('Tap a juz to see it');
+    expect(screen.getByTestId('revo-chart-juzMap-plot').props.accessibilityLabel).toContain('Revised this week: Juz 28');
+  });
+
+  it('a tap picks the juz under the finger: when it was last revised, its strip, and where to go', async () => {
+    await map();
+    layout('revo-chart-juzMap-plot', 370, 104);
+    // Juz 28: third row, eighth column.
+    tap('revo-chart-juzMap-plot-tap', 7.5 * 37, 90);
+    expect(text('revo-chart-juzMap-title')).toBe('Juz 28 · last revised 6 days ago');
+    expect(screen.getByText('Revised 1× in 30 days · 1 weak spot')).toBeTruthy();
+    expect(screen.getByLabelText('1 weak, 0 moderate, 19 strong')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('revo-chart-juzMap-reader'));
+    expect(onOpenPage).toHaveBeenCalledWith(542);
+    fireEvent.press(screen.getByTestId('revo-chart-juzMap-revise'));
+    expect(onReviseFirst).toHaveBeenCalledWith(Array.from({ length: 20 }, (_, i) => 542 + i));
+    expect(await screen.findByTestId('revo-chart-juzMap-revise-added')).toBeTruthy();
+  });
+
+  it('a juz not memorized opens in the reader, with nothing to revise', async () => {
+    await map();
+    const plot = screen.getByTestId('revo-chart-juzMap-plot');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-juzMap-title')).toBe('Juz 1 · not memorized');
+    expect(screen.queryByTestId('revo-chart-juzMap-revise')).toBeNull();
+    expect(screen.getByTestId('revo-chart-juzMap-reader')).toBeTruthy();
+    // Juz 30 is being learned.
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    expect(text('revo-chart-juzMap-title')).toBe('Juz 30 · being learned');
+  });
+});
+
 describe('ChartCard', () => {
   it('draws nothing for a kind this app doesn’t know', async () => {
     render(
       <ThemeProvider>
-        <ChartCard chart={{ kind: 'juzMap', title: 'Your juz' } as never} day={TODAY} />
+        <ChartCard chart={{ kind: 'weeksAhead', title: 'Your juz' } as never} day={TODAY} />
         <ChartCard chart={{ kind: 'dailyPages', title: 'Week', days: 7 }} day={TODAY} />
       </ThemeProvider>,
     );
