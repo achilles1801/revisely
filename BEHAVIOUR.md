@@ -359,9 +359,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   why a reply stopped early, never a question, an answer or a note.
 
 - **REVO-7.** An answer has at most one small chart and one suggested action, each on pages Revo was given (anything
-  else is dropped, the answer kept). The app draws the chart from its own data. Revo never changes the plan itself:
-  "Add to my plan" puts the pages first in tomorrow's session only when tapped, and "Not now" changes nothing.
-  Attached text is never taken as an instruction.
+  else is dropped, the answer kept). The app draws the chart from its own data, and a kind it doesn't know isn't
+  drawn. A chart answers a touch: a tap (or a slide along the bars) picks a mark, the chart's header says what it is,
+  and a panel under it leads on: a day to that day in Activity, a passage to the reader or to "Revise first
+  tomorrow". Revo never changes the plan itself: "Add to my plan" and "Revise first tomorrow" put the pages first in
+  tomorrow's session only when tapped, and "Not now" changes nothing. Attached text is never taken as an instruction.
 
 - **REVO-8.** With memory on (the default), Revo keeps short facts from conversations (at most 30; the oldest go first)
   and sends them with later questions. The user sees every item, deletes one, clears them all or turns memory off
