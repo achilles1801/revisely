@@ -223,7 +223,14 @@ export function CalendarMonth({
             <Text style={[typeV2.body, { color: palette.text, minWidth: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {r.label}
             </Text>
-            <Text style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+            <Text
+              style={[typeV2.body, styles.tabular, { color: palette.text, flex: 1, textAlign: 'right' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              maxFontSizeMultiplier={MAX_SCALE}
+              testID={`preview-value-${r.key}`}
+            >
               {r.value}
             </Text>
             {r.mics ? (

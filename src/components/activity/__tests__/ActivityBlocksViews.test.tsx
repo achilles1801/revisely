@@ -157,6 +157,19 @@ describe('the Activity calendar (gap audit §3)', () => {
       expect(value.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
     });
 
+    it('the picked day’s values shrink to fit rather than lose their minutes', async () => {
+      atScale(3.1);
+      const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+      service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [{ id: 'r', day: TODAY, pages: [562], minutes: 18, occurredAt: null }] });
+      try {
+        render(<ActivityBlocksViews {...props} />);
+        const value = await screen.findByTestId('preview-value-read');
+        expect(value.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
+      } finally {
+        service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [] });
+      }
+    });
+
     it('at the default size the four totals stay in one row', async () => {
       atScale(1);
       render(<ActivityBlocksViews {...props} />);
