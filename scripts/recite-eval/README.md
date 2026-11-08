@@ -58,3 +58,7 @@ $PY scripts/recite-eval/bench.py                       # ~1.2 GB, 240 items, 10.
 $PY scripts/recite-eval/learners.py                    # needs the RetaSy parquet files
 scripts/recite-eval/run.sh develop tarteel-base-q5_1 ~/revisely-mistake-lab/models/ggml-tarteel-whisper-base-q5_1.bin
 ```
+
+Clips (`<run>/clips`) are a cache: once a run is decoded and replayed they can be deleted (16 h of bench
+audio makes ~14 GB of clips, partials included). `segment.ts` rewrites them in seconds when another engine
+needs to decode them.
