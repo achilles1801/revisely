@@ -580,11 +580,30 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL" && df -h /
 
+      # The Gradle the build's wrapper downloads (services.gradle.org), kept so a build doesn't
+      # fetch it each time: the wrapper's download timed out on runners three times on Nov 8 2026.
+      # Saved only after a build that worked (a run that didn't build has none to keep). A PR
+      # restores develop's; a run by hand on a branch sees only its own and main's (the nightly's).
+      - name: Restore Gradle
+        if: steps.cache.outputs.cache-hit != 'true'
+        id: gradle
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: e2e-gradle-dist-${{ runner.os }}-${{ hashFiles('node_modules/@react-native/gradle-plugin/gradle/wrapper/gradle-wrapper.properties') }}
+
       - name: Build the E2E app (native)
         if: steps.cache.outputs.cache-hit != 'true'
         env:
           E2E_ABI: x86_64
         run: JAVA_HOME="$JAVA_HOME_17_X64" bash .maestro/scripts/build-android.sh
+
+      - name: Keep Gradle
+        if: steps.cache.outputs.cache-hit != 'true' && steps.gradle.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: ${{ steps.gradle.outputs.cache-primary-key }}
 
       - name: Keep the native build
         if: steps.cache.outputs.cache-hit != 'true'

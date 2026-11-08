@@ -42,6 +42,16 @@ export SENTRY_DISABLE_AUTO_UPLOAD=true SENTRY_ALLOW_FAILURE=true
 
 npx expo prebuild --platform android --clean --no-install
 
+# The wrapper waits 10 s for services.gradle.org when it downloads Gradle, and timed out on CI
+# runners three times on Nov 8 2026 (a slow answer, not a refusal): give it two minutes.
+WRAPPER=android/gradle/wrapper/gradle-wrapper.properties
+if grep -q '^networkTimeout=' "$WRAPPER"; then
+  sed -i.orig 's/^networkTimeout=.*/networkTimeout=120000/' "$WRAPPER" && rm -f "$WRAPPER.orig"
+else
+  echo 'networkTimeout=120000' >> "$WRAPPER"
+fi
+grep -q '^networkTimeout=120000$' "$WRAPPER"
+
 # The generated project only (android/ is gitignored and rebuilt by prebuild):
 # plain HTTP to the emulators, and no updates.
 MANIFEST=android/app/src/main/AndroidManifest.xml
