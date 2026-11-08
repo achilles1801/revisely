@@ -6,6 +6,7 @@
 import { AppState, Linking } from 'react-native';
 import { handleClockLink, installClock } from './clock';
 import { handleRecordingsLink, installDemoRecordings } from './demoRecordings';
+import { handleVerseLink, installDemoTranslations } from './demoTranslations';
 import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
 import { pinFreshTheme } from './theme';
@@ -17,6 +18,7 @@ function handle(url: string | null | undefined): void {
   if (!url) return;
   if (handleClockLink(url)) return;
   if (handleRecordingsLink(url)) return;
+  if (handleVerseLink(url)) return;
   handleNetworkLink(url);
 }
 
@@ -27,6 +29,7 @@ export function installE2E(): void {
   installClock();
   installNetwork();
   installDemoRecordings();
+  installDemoTranslations();
   Linking.addEventListener('url', ({ url }) => {
     // eslint-disable-next-line no-console
     console.log(`[e2e] link ${url}`);
