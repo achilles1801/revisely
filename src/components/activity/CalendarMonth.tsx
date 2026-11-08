@@ -3,7 +3,7 @@
 // mock's ink pills. A tap on a day picks it; Open goes to the day.
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -18,8 +18,11 @@ import { typeV2 } from '../../theme/v2';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
 
-/** Chrome text (the picked day's preview) stops growing here, as headers and menu rows do. */
+/** Chrome text (the pills, the title, the totals, the grid, the preview) stops growing here, as headers and menu rows do. */
 const MAX_SCALE = 1.4;
+
+/** From this text size the four totals go two by two: four in a row ran off the edge at the largest text. */
+const TOTALS_TWO_BY_TWO = 1.2;
 
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -66,6 +69,7 @@ export function CalendarMonth({
   recordings?: Map<string, RecordingCounts>;
 }) {
   const { palette } = useTheme();
+  const { fontScale } = useWindowDimensions();
   const grid = monthGrid(month);
   const days = grid.flat().filter((d): d is string => d != null);
   const inMonth = (d: string) => d.startsWith(`${month}-`);
@@ -113,9 +117,19 @@ export function CalendarMonth({
         />
       </View>
 
-      {/* Header: the title on the left, the chevrons on the right (22, gap 22). */}
+      {/* Header: the title on the left, the chevrons on the right (22, gap 22). The title gives way to
+          the chevrons (it pushed them off the screen at the largest text, Nov 2026). */}
       <View style={styles.monthHead}>
-        <Text style={[styles.monthTitle, { color: palette.text }]}>{span === 'week' ? weekTitle(week) : monthTitle(month)}</Text>
+        <Text
+          style={[styles.monthTitle, { color: palette.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          maxFontSizeMultiplier={MAX_SCALE}
+          testID="calendar-month-title"
+        >
+          {span === 'week' ? weekTitle(week) : monthTitle(month)}
+        </Text>
         <View style={styles.chevrons}>
           <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel="Previous month" hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={palette.text} />
@@ -126,12 +140,16 @@ export function CalendarMonth({
         </View>
       </View>
 
-      {/* Totals (the month): four equal columns (icon and label, then the value). */}
-      {span === 'month' ? <View style={styles.totals}>
-        <Total icon="repeat" label="Revised" value={`${revisedDays} ${revisedDays === 1 ? 'day' : 'days'}`} />
-        <Total icon="leaf-outline" label="Memorized" value={`+${memorizedPages} pages`} />
-        <Total icon="book-outline" label="Read" value={readMinutes > 0 ? formatMinutesLong(readMinutes) : '0 min'} />
-        <Total icon="document-text-outline" label="Notes" value={String(noteDays)} />
+      {/* Totals (the month): four equal columns (icon and label, then the value); two by two at large text. */}
+      {span === 'month' ? <View style={styles.totals} testID="calendar-totals">
+        {[
+          { icon: 'repeat' as const, label: 'Revised', value: `${revisedDays} ${revisedDays === 1 ? 'day' : 'days'}` },
+          { icon: 'leaf-outline' as const, label: 'Memorized', value: `+${memorizedPages} pages` },
+          { icon: 'book-outline' as const, label: 'Read', value: readMinutes > 0 ? formatMinutesLong(readMinutes) : '0 min' },
+          { icon: 'document-text-outline' as const, label: 'Notes', value: String(noteDays) },
+        ].map((t) => (
+          <Total key={t.label} {...t} twoByTwo={fontScale >= TOTALS_TWO_BY_TWO} />
+        ))}
       </View> : null}
 
       {span === 'week' ? (
@@ -150,7 +168,7 @@ export function CalendarMonth({
       <View style={styles.grid}>
         <View style={styles.weekRow}>
           {WEEKDAYS.map((w, i) => (
-            <Text key={i} style={[styles.letter, { color: palette.secondary }]}>
+            <Text key={i} style={[styles.letter, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
               {w}
             </Text>
           ))}
@@ -272,23 +290,30 @@ function WeekSummary({ day, data, onOpen }: { day: string; data: CalendarData; o
   ].filter(Boolean);
   return (
     <Tap onPress={() => onOpen(day)} accessibilityRole="button" style={styles.summary}>
-      <Text style={[typeV2.name, { color: palette.text, width: 84 }]}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}</Text>
-      <Text style={[typeV2.body, { color: palette.secondary, flex: 1 }]} numberOfLines={1}>
+      <Text style={[typeV2.name, { color: palette.text, width: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+        {new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
+      </Text>
+      <Text style={[typeV2.body, { color: palette.secondary, flex: 1 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
         {parts.length > 0 ? parts.join(' · ') : 'Nothing logged'}
       </Text>
     </Tap>
   );
 }
 
-function Total({ icon, label, value }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string }) {
+/** One of the month's totals. Chrome: its label stops at 1.4× and the value shrinks to its column rather than clip. */
+function Total({ icon, label, value, twoByTwo }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; twoByTwo: boolean }) {
   const { palette } = useTheme();
   return (
-    <View style={styles.total}>
+    <View style={twoByTwo ? styles.totalHalf : styles.total} testID={`calendar-total-${label.toLowerCase()}`}>
       <View style={styles.totalLabel}>
         <Ionicons name={icon} size={14} color={palette.secondary} />
-        <Text style={[typeV2.meta, { color: palette.secondary }]}>{label}</Text>
+        <Text style={[typeV2.meta, styles.totalLabelText, { color: palette.secondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={MAX_SCALE}>
+          {label}
+        </Text>
       </View>
-      <Text style={[styles.totalValue, { color: palette.text }]}>{value}</Text>
+      <Text style={[styles.totalValue, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} maxFontSizeMultiplier={MAX_SCALE}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -321,7 +346,16 @@ function DayDisc({ ring, isToday, isFuture, number }: { ring: number | null; isT
         </Svg>
       ) : null}
       {done ? <View style={[StyleSheet.absoluteFill, { borderRadius: size / 2, backgroundColor: palette.primary }]} /> : null}
-      <Text style={[styles.number, { color: numberColor, fontWeight: done || ring != null ? '600' : '400', opacity: isFuture && !done && ring == null ? 0.5 : 1 }]}>{number}</Text>
+      {/* Inside the 34pt disc: it stops at 1.4× and shrinks rather than clip. */}
+      <Text
+        style={[styles.number, { color: numberColor, fontWeight: done || ring != null ? '600' : '400', opacity: isFuture && !done && ring == null ? 0.5 : 1 }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+        maxFontSizeMultiplier={MAX_SCALE}
+      >
+        {number}
+      </Text>
     </View>
   );
 }
@@ -331,24 +365,28 @@ function LegendItem({ label, children }: { label: string; children: React.ReactN
   return (
     <View style={styles.legendItem}>
       <View style={styles.legendMark}>{children}</View>
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>{label}</Text>
+      <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   spanRow: { paddingTop: 12, paddingHorizontal: 16 },
-  summary: { height: 40, flexDirection: 'row', alignItems: 'center' },
-  monthHead: { height: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  monthTitle: { fontSize: 20, lineHeight: 24, fontWeight: '700' },
-  chevrons: { flexDirection: 'row', gap: 22 },
-  totals: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 4 },
+  summary: { minHeight: 40, flexDirection: 'row', alignItems: 'center' },
+  monthHead: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  monthTitle: { flexShrink: 1, fontSize: 20, lineHeight: 24, fontWeight: '700' },
+  chevrons: { flexShrink: 0, flexDirection: 'row', gap: 22 },
+  totals: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10, paddingHorizontal: 16, paddingTop: 4 },
   total: { flex: 1 },
+  totalHalf: { flexBasis: '40%', flexGrow: 1 },
   totalLabel: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  totalLabelText: { flexShrink: 1 },
   totalValue: { fontSize: 17, lineHeight: 22, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 3 },
   grid: { paddingTop: 12, paddingHorizontal: 16 },
   weekRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
-  letter: { flex: 1, height: 18, lineHeight: 18, fontSize: 13, textAlign: 'center' },
+  letter: { flex: 1, minHeight: 18, lineHeight: 18, fontSize: 13, textAlign: 'center' },
   cell: { flex: 1, height: 50, borderRadius: 12, paddingTop: 4, alignItems: 'center' },
   disc: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
   number: { fontSize: 14, lineHeight: 18, fontVariant: ['tabular-nums'] },
