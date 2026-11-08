@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { knownChart, passagePagesOf, plannedOf, recencyLine, tableRows } from '../../lib/revo/charts';
 import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
 import { SCREEN_BUTTON } from '../../lib/revo/screens';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import type { RevoAction, RevoVisual } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
 import { DailyPagesChart } from './charts/DailyPagesChart';
@@ -32,7 +33,7 @@ export interface ChartHandlers {
 export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVisual; day: string; sources?: () => FactSources | null } & ChartHandlers) {
   const { logs, pages, user } = useApp();
   // Ratings mean something only with Smart Tracking on; off, the charts show recency (REVO-34).
-  const smart = user?.smartTrackingEnabled === true;
+  const smart = smartTrackingOn(user);
   // What the plan had for each day, and a day's facts, as Revo's attachments read them.
   const reads = useMemo(() => {
     const src = sources?.() ?? null;

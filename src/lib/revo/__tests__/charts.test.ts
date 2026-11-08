@@ -425,7 +425,7 @@ describe('table', () => {
     expect(recencyLine(facts({ lastRevisedDaysAgo: 4 }))).toBe('Last revised 4 days ago · twice in 30 days');
     expect(recencyLine(facts({ lastRevisedDaysAgo: 0 }))).toBe('Last revised today · twice in 30 days');
     expect(recencyLine(facts({ lastRevisedDaysAgo: null, revised: { last7: { days: 0, minEach: 0, maxEach: 0 }, last30: { days: 0, minEach: 0, maxEach: 0 }, all: { days: 0, minEach: 0, maxEach: 0 } } }))).toBe(
-      'Not revised yet · not in the last 30 days',
+      'Never revised',
     );
     expect(recencyLine(facts({ memorized: 10, pages: 23, lastRevisedDaysAgo: 1, revised: { last7: { days: 1, minEach: 0, maxEach: 1 }, last30: { days: 3, minEach: 0, maxEach: 2 }, all: { days: 3, minEach: 0, maxEach: 2 } } }))).toBe(
       'Last revised yesterday · partly in the last 30 days · 10 of 23 pages memorized',

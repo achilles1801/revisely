@@ -19,6 +19,9 @@ import { revisedItems } from './context';
 import type { FactSources } from './facts';
 import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
+import { daysSince, lastRevisedWords, recencyLine as recencyWords, timesWord } from '../recency';
+
+export { timesWord };
 
 export type RatingBand = 'weak' | 'moderate' | 'strong';
 export const bandOf = (rating: number): RatingBand => (rating <= 2 ? 'weak' : rating === 3 ? 'moderate' : 'strong');
@@ -62,8 +65,6 @@ const DAY_MS = 86_400_000;
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / DAY_MS);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
-/** "once", "twice", "3 times". */
-export const timesWord = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
 
 /**
  * "today", "yesterday", "4 days ago". `day` may be a full timestamp: a page's lastRevisedDate is
@@ -71,7 +72,7 @@ export const timesWord = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : 
  * reads it.
  */
 export function agoWords(day: string, today: string): string {
-  const n = daysBetween(day.slice(0, 10), today);
+  const n = daysSince(day, today);
   return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
 }
 
@@ -268,14 +269,11 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
  */
 export function recencyLine(f: RevoPassageFacts): string {
   if (f.memorized === 0) return 'Not memorized';
-  const parts: string[] = [];
-  const d = f.lastRevisedDaysAgo;
-  parts.push(d == null ? 'Not revised yet' : d === 0 ? 'Last revised today' : d === 1 ? 'Last revised yesterday' : `Last revised ${d} days ago`);
   const t = f.revised.last30;
   const times = f.memorized === 1 ? t.maxEach : t.minEach;
-  parts.push(t.days === 0 ? 'not in the last 30 days' : times > 0 ? `${timesWord(times)} in 30 days` : 'partly in the last 30 days');
-  if (f.memorized < f.pages) parts.push(`${f.memorized} of ${f.pages} pages memorized`);
-  return parts.join(' · ');
+  // Revised in part only (some pages, never all of them): the shared wording can't say "in full".
+  const line = times === 0 && t.days > 0 ? `${lastRevisedWords(f.lastRevisedDaysAgo)} · partly in the last 30 days` : recencyWords(f.lastRevisedDaysAgo, times, 30);
+  return f.memorized < f.pages ? `${line} · ${f.memorized} of ${f.pages} pages memorized` : line;
 }
 
 // ---------------------------------------------------------------------------------------------
