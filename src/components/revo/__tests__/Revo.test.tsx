@@ -44,7 +44,7 @@ const ctx: RevoContext = {
   localTime: '21:41',
 };
 const mockSaveUser = jest.fn(async () => undefined);
-const mockUser = { name: 'Maryam', carryOver: null, fajrBoundaryEnabled: false };
+const mockUser = { name: 'Maryam', carryOver: null, fajrBoundaryEnabled: false, smartTrackingEnabled: true };
 jest.mock('../../../context/AppContext', () => ({
   useApp: () => ({ user: mockUser, saveUser: mockSaveUser, logs: [], pages: [] }),
 }));
@@ -168,6 +168,22 @@ describe('Revo’s conversation', () => {
     expect(backend.state().usage.count).toBe(0);
     fireEvent.press(screen.getByTestId('revo-greeting-copy'));
     expect(mockCopy).toHaveBeenCalledWith(expect.stringMatching(/^Salaam Maryam\./));
+  });
+
+  it('[REVO-34] with Smart Tracking off, a ratings chart isn’t drawn: the answer and its plan still are', async () => {
+    mockUser.smartTrackingEnabled = false;
+    try {
+      render(<Chat />);
+      await flush();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('revo-chip-Plan Al-Hashr to Al-Mumtahanah'));
+      });
+      await flush();
+      expect(screen.getByTestId('revo-plan')).toBeTruthy();
+      expect(screen.queryByTestId('revo-chart-pageRatings')).toBeNull();
+    } finally {
+      mockUser.smartTrackingEnabled = true;
+    }
   });
 
   it('a suggestion asks it: the answer comes with a chart and one plan, which changes nothing until tapped', async () => {

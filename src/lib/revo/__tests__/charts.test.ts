@@ -28,6 +28,7 @@ import {
   ratingsDotReadout,
   ratingsOn,
   ratingsRowReadout,
+  recencyLine,
   revisedBefore,
   slotAt,
   sortRows,
@@ -298,6 +299,9 @@ describe('timeline', () => {
     expect(plainText(d.ratings ?? '')).toBe(`${plainText(describePassage([583], { form: 'short' }))} weak · ${plainText(describePassage([582], { form: 'short' }))} strong`);
     expect(d.line).toBe('2 pages revised that day in 20 min');
     expect(timelineDetail({ ...second, pages: [584] }, logs).ratings).toBeNull();
+    // Smart Tracking off (REVO-34): no rating, in the readout or the panel.
+    expect(timelineReadout(second, false).title).toBe('Thursday 5 November');
+    expect(timelineDetail(first, logs, false).ratings).toBeNull();
   });
 
   it('says what a tap does, or that it wasn’t revised', () => {
@@ -415,6 +419,18 @@ describe('table', () => {
     expect(tableCell('weak', facts({ strength: { weak: 2, moderate: 0, strong: 18, unrated: 0, average: 3.8 } }))).toEqual({ text: '2', key: 2, alert: true });
     expect(tableCell('strength', facts()).text).toBe('3.9');
     expect(tableCell('strength', facts({ strength: { weak: 0, moderate: 0, strong: 0, unrated: 20, average: null } })).text).toBe('—');
+  });
+
+  it('[REVO-34] recency in place of strength: when last revised, and how often', () => {
+    expect(recencyLine(facts({ lastRevisedDaysAgo: 4 }))).toBe('Last revised 4 days ago · twice in 30 days');
+    expect(recencyLine(facts({ lastRevisedDaysAgo: 0 }))).toBe('Last revised today · twice in 30 days');
+    expect(recencyLine(facts({ lastRevisedDaysAgo: null, revised: { last7: { days: 0, minEach: 0, maxEach: 0 }, last30: { days: 0, minEach: 0, maxEach: 0 }, all: { days: 0, minEach: 0, maxEach: 0 } } }))).toBe(
+      'Not revised yet · not in the last 30 days',
+    );
+    expect(recencyLine(facts({ memorized: 10, pages: 23, lastRevisedDaysAgo: 1, revised: { last7: { days: 1, minEach: 0, maxEach: 1 }, last30: { days: 3, minEach: 0, maxEach: 2 }, all: { days: 3, minEach: 0, maxEach: 2 } } }))).toBe(
+      'Last revised yesterday · partly in the last 30 days · 10 of 23 pages memorized',
+    );
+    expect(recencyLine(facts({ memorized: 0 }))).toBe('Not memorized');
   });
 
   it('sorts what needs care first, or the other way; parts with nothing to say stay last', () => {

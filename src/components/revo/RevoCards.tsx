@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { knownChart, passagePagesOf, plannedOf, tableRows } from '../../lib/revo/charts';
+import { knownChart, passagePagesOf, plannedOf, recencyLine, tableRows } from '../../lib/revo/charts';
 import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
 import { SCREEN_BUTTON } from '../../lib/revo/screens';
 import type { RevoAction, RevoVisual } from '../../lib/revo/types';
@@ -30,7 +30,9 @@ export interface ChartHandlers {
  * and a panel under it leads on. A kind this app doesn't know draws nothing.
  */
 export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVisual; day: string; sources?: () => FactSources | null } & ChartHandlers) {
-  const { logs, pages } = useApp();
+  const { logs, pages, user } = useApp();
+  // Ratings mean something only with Smart Tracking on; off, the charts show recency (REVO-34).
+  const smart = user?.smartTrackingEnabled === true;
   // What the plan had for each day, and a day's facts, as Revo's attachments read them.
   const reads = useMemo(() => {
     const src = sources?.() ?? null;
@@ -40,10 +42,14 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
       planned: plannedOf(src),
       facts: (d: string) => dayFacts(d, prepared),
       planPages: (d: string) => (d === src.snapshot.day ? src.snapshot.pages : prepared.scheduled(d)),
-      preview: (pages: number[]) => (pages.length > 0 ? passagePreview(passageFacts(pages, prepared)) : null),
+      preview: (pages: number[]) => {
+        if (pages.length === 0) return null;
+        const f = passageFacts(pages, prepared);
+        return smart ? passagePreview(f) : recencyLine(f);
+      },
       passage: (pages: number[], name: string) => passageFacts(pages, prepared, name),
     };
-  }, [sources]);
+  }, [sources, smart]);
   const passage = useMemo(() => (chart.kind === 'timeline' && knownChart(chart) ? passagePagesOf(chart) : []), [chart]);
   const rows = useMemo(() => (chart.kind === 'table' && knownChart(chart) && reads ? tableRows(chart, reads.passage) : null), [chart, reads]);
   if (!knownChart(chart)) return null;
@@ -51,10 +57,21 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
     return <MemorizedChart title={chart.title} months={chart.months} today={day} onOpenDay={handlers.onOpenDay} />;
   }
   if (chart.kind === 'juzMap') {
-    return <JuzMapChart title={chart.title} today={day} logs={logs} userPages={pages} preview={reads?.preview} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
+    return (
+      <JuzMapChart
+        title={chart.title}
+        today={day}
+        logs={logs}
+        userPages={pages}
+        preview={reads?.preview}
+        smart={smart}
+        onReviseFirst={handlers.onReviseFirst}
+        onOpenPage={handlers.onOpenPage}
+      />
+    );
   }
   if (chart.kind === 'timeline') {
-    return <TimelineChart title={chart.title} passage={passage} days={chart.days} today={day} logs={logs} onOpenDay={handlers.onOpenDay} />;
+    return <TimelineChart title={chart.title} passage={passage} days={chart.days} today={day} logs={logs} smart={smart} onOpenDay={handlers.onOpenDay} />;
   }
   if (chart.kind === 'table') {
     // Its figures are what Revo's attachments say for each row: without the account's facts, no table.
@@ -65,6 +82,7 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
         rows={rows}
         columns={chart.columns}
         byJuz={chart.juz != null}
+        smart={smart}
         userPages={pages}
         onReviseFirst={handlers.onReviseFirst}
         onOpenPage={handlers.onOpenPage}
@@ -75,6 +93,8 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
     return <WeeksChart title={chart.title} weeks={chart.weeks} today={day} logs={logs} facts={reads?.facts} planned={reads?.planned} onOpenDay={handlers.onOpenDay} />;
   }
   if (chart.kind === 'pageRatings') {
+    // Ratings over time: nothing to show without Smart Tracking (REVO-34).
+    if (!smart) return null;
     return <PageRatingsChart title={chart.title} pages={chart.pages} today={day} logs={logs} userPages={pages} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
   }
   return (
@@ -86,6 +106,7 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
       planned={reads?.planned}
       facts={reads?.facts}
       planPages={reads?.planPages}
+      smart={smart}
       onOpenDay={handlers.onOpenDay}
     />
   );

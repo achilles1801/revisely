@@ -317,6 +317,15 @@ describe('timeline', () => {
     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('with Smart Tracking off, a revision carries no rating: the day alone, no ratings line, no legend', async () => {
+    await mount(<TimelineChart title="End of An-Naba" passage={[582, 583]} days={30} today={TODAY} logs={logs} smart={false} />, 'revo-chart-timeline');
+    expect(screen.queryByText('weak', { includeHiddenElements: true })).toBeNull();
+    layout('revo-chart-timeline-plot', 314, 80);
+    tap('revo-chart-timeline-plot-tap', 7 + 250);
+    expect(text('revo-chart-timeline-title')).toBe('Friday 6 November');
+    expect(screen.queryByTestId('revo-chart-timeline-ratings')).toBeNull();
+  });
+
   it('never revised in the window: it says so, and has nothing to pick', async () => {
     await line([600]);
     expect(text('revo-chart-timeline-line')).toBe('Not revised in 30 days');
@@ -483,6 +492,73 @@ describe('memorized by month', () => {
     expect(screen.queryByTestId('revo-chart-memorized-plot')).toBeNull();
     await act(async () => fail(new Error('offline')));
     expect(text('revo-chart-memorized-line')).toBe('Couldn’t load your memorization');
+  });
+});
+
+describe('Smart Tracking off (REVO-34)', () => {
+  it('a table leaves out weak and strength, and a row says when and how often instead of a strip', async () => {
+    const tally = { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 };
+    const t = { days: 2, minEach: 2, maxEach: 2 };
+    const f = (weak: number, daysAgo: number): RevoPassageFacts => ({
+      name: 'x', pages: 20, memorized: 20, revised: { last7: t, last30: t, all: t }, lastRevisedDaysAgo: daysAgo, oldest: null, neverRevised: 0,
+      plan: { last7: tally, last30: tally }, strength: { weak, moderate: 0, strong: 20 - weak, unrated: 0, average: 4 }, weakSpots: [], today: null, next: null,
+    });
+    const range = (a: number) => Array.from({ length: 20 }, (_, i) => a + i);
+    const rows = [
+      { key: 27, name: 'Juz 27', pages: range(522), facts: f(1, 1) },
+      { key: 28, name: 'Juz 28', pages: range(542), facts: f(2, 0) },
+    ];
+    const userPages = range(542).map((p) => page(p, { lastRevisedDate: '2026-11-07', weaknessRating: p === 548 ? 2 : 4 }));
+    await mount(<TableChart title="Juz 27–28" rows={rows} columns={['lastRevised', 'weak']} byJuz smart={false} userPages={userPages} />, 'revo-chart-table');
+    expect(screen.queryByTestId('revo-chart-table-sort-weak')).toBeNull();
+    expect(screen.getByTestId('revo-chart-table-sort-lastRevised')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('revo-chart-table-row-28'));
+    expect(text('revo-chart-table-recency')).toBe('Last revised today · twice in 30 days');
+    expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
+  });
+
+  it('a table of only strength columns shows when and how often', async () => {
+    const tally = { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 };
+    const t = { days: 2, minEach: 2, maxEach: 2 };
+    const facts: RevoPassageFacts = {
+      name: 'x', pages: 20, memorized: 20, revised: { last7: t, last30: t, all: t }, lastRevisedDaysAgo: 3, oldest: null, neverRevised: 0,
+      plan: { last7: tally, last30: tally }, strength: { weak: 0, moderate: 0, strong: 20, unrated: 0, average: 4 }, weakSpots: [], today: null, next: null,
+    };
+    const rows = [1, 2].map((key) => ({ key, name: `Juz ${key}`, pages: [key], facts }));
+    await mount(<TableChart title="Juz 1–2" rows={rows} columns={['weak', 'strength']} byJuz smart={false} userPages={[]} />, 'revo-chart-table');
+    expect(screen.getByTestId('revo-chart-table-sort-lastRevised')).toBeTruthy();
+    expect(screen.getByTestId('revo-chart-table-sort-times30')).toBeTruthy();
+  });
+
+  it('a juz panel has no strength strip; its line says when and how often', async () => {
+    const juz28 = Array.from({ length: 20 }, (_, i) => page(542 + i, { lastRevisedDate: '2026-11-01', weaknessRating: i === 6 ? 2 : 4 }));
+    await mount(
+      <JuzMapChart title="Your juz" today={TODAY} logs={[log('2026-11-01', Array.from({ length: 20 }, (_, i) => 542 + i))]} userPages={juz28} preview={() => 'Last revised 6 days ago · once in 30 days'} smart={false} />,
+      'revo-chart-juzMap',
+    );
+    layout('revo-chart-juzMap-plot', 370, 104);
+    tap('revo-chart-juzMap-plot-tap', 7.5 * 37, 90);
+    expect(screen.getByText('Last revised 6 days ago · once in 30 days')).toBeTruthy();
+    expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
+  });
+
+  it('a day’s panel has no ratings strip', async () => {
+    await mount(<DailyPagesChart title="Week" days={7} today={TODAY} logs={logs} smart={false} />, 'revo-chart-dailyPages');
+    layout('revo-chart-dailyPages-plot', 350, 130);
+    tap('revo-chart-dailyPages-plot-tap', 20);
+    expect(screen.getByTestId('revo-chart-dailyPages-passage')).toBeTruthy();
+    expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
+  });
+
+  it('ChartCard draws no ratings chart for an account without Smart Tracking', async () => {
+    render(
+      <ThemeProvider>
+        <ChartCard chart={{ kind: 'pageRatings', title: 'The end of Al-Hashr', pages: [548] }} day={TODAY} />
+        <ChartCard chart={{ kind: 'dailyPages', title: 'Week', days: 7 }} day={TODAY} />
+      </ThemeProvider>,
+    );
+    await screen.findByTestId('revo-chart-dailyPages');
+    expect(screen.queryByTestId('revo-chart-pageRatings')).toBeNull();
   });
 });
 

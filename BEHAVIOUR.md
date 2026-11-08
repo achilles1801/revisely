@@ -502,6 +502,12 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
   question's day, or whose place ("2 days ago") or figures don't match it.
 
+- **REVO-34.** With Smart Tracking off (the account's setting; off unless turned on), Revo shows nothing of strength:
+  no ratings chart, no strength strip in a chart's panel, no weak or strength column in a table, and no plan built
+  on weak pages. Its charts show when each part was last revised and how often instead. The server reads the
+  setting from the account: Revo isn't told ratings or weak pages, and a ratings chart or a weak or strength column
+  in its reply is dropped.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7

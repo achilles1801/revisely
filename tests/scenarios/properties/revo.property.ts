@@ -9,6 +9,7 @@ import {
   REVO_DAILY_QUESTIONS,
   REVO_MEMORY_CAP,
   RevoStore,
+  answerKey,
   handleClear,
   handleDayInReview,
   handleRevoAsk,
@@ -16,7 +17,8 @@ import {
   mergeMemory,
   reviewMeta,
 } from '../../../functions/src/revo/handler';
-import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest, historyTurn } from '../../../functions/src/revo/prompt';
+import { REVO_HISTORY, REVO_MAX_TOKENS, REVO_SYSTEM_PROMPT, buildAskRequest, contextText, historyTurn } from '../../../functions/src/revo/prompt';
+import { attachedText } from '../../../functions/src/revo/attachText';
 import { GUIDE_SECTIONS, REVO_GUIDE } from '../../../functions/src/revo/guide';
 import { parseReply } from '../../../functions/src/revo/reply';
 import { REVO_SCREENS, type CachedAnswer, type RevoChat, type RevoContext, type RevoMemoryItem, type RevoSettings, type StoredMessage } from '../../../functions/src/revo/types';
@@ -50,7 +52,7 @@ const context = (over: Partial<RevoContext['today']> = {}): RevoContext => ({
 });
 
 /** An account's Revo, in memory. */
-function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; cap?: number } = {}) {
+function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; cap?: number; smartTracking?: boolean } = {}) {
   const settings = new Map<string, RevoSettings>();
   const usageDoc = new Map<string, { day: string; count: number }>();
   const chats = new Map<string, Map<string, RevoChat>>();
@@ -63,6 +65,7 @@ function fakeStore(opts: { tester?: boolean; settings?: Partial<RevoSettings>; c
   const key = (uid: string, chatId: string) => `${uid}/${chatId}`;
   const store: RevoStore = {
     isPreviewTester: async () => opts.tester ?? true,
+    ...(opts.smartTracking !== undefined ? { smartTracking: async () => opts.smartTracking! } : {}),
     getSettings: async (uid) => settings.get(uid) ?? { optIn: true, memoryOn: true, ...opts.settings },
     setSettings: async (uid, patch) => {
       const next = { ...(settings.get(uid) ?? { optIn: true, memoryOn: true, ...opts.settings }), ...patch };
@@ -501,6 +504,65 @@ describe('the model and the prompt (REVO-6)', () => {
     const all = JSON.stringify(logs);
     expect(all).not.toMatch(/private words|secret answer|keep slipping/);
     expect(logs.some((l) => typeof l.input === 'number' && typeof l.costUsd === 'number')).toBe(true);
+  });
+});
+
+describe('Smart Tracking off (REVO-34)', () => {
+  const allowed = new Set([548, 549, 550, 12]);
+  const reply = (chart: unknown) => JSON.stringify({ text: 'Juz 28.', chart });
+
+  it('[REVO-34] a ratings chart is dropped; a table loses its weak and strength columns, or goes; the answer is kept', () => {
+    const off = { firstTurn: false, smartTracking: false };
+    expect(parseReply(reply({ kind: 'pageRatings', title: 'Two', pages: [548, 549] }), allowed, off)).toEqual({ text: 'Juz 28.', remember: [] });
+    expect(parseReply(reply({ kind: 'table', title: 'Juz', juz: [27, 28], columns: ['lastRevised', 'weak', 'strength'] }), allowed, off)!.visual).toEqual({
+      kind: 'table', title: 'Juz', juz: [27, 28], columns: ['lastRevised'],
+    });
+    expect(parseReply(reply({ kind: 'table', title: 'Juz', juz: [27, 28], columns: ['weak', 'strength'] }), allowed, off)!.visual).toBeUndefined();
+    // Charts without strength stay, and with Smart Tracking on nothing changes.
+    expect(parseReply(reply({ kind: 'juzMap', title: 'Your juz' }), allowed, off)!.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
+    expect(parseReply(reply({ kind: 'pageRatings', title: 'Two', pages: [548] }), allowed, { firstTurn: false, smartTracking: true })!.chart).toBeTruthy();
+  });
+
+  it('[REVO-34] Revo isn’t told ratings or weak pages, and is told Smart Tracking is off', () => {
+    const on = contextText(DAY, context(), []);
+    const off = contextText(DAY, context(), [], { smartTracking: false });
+    expect(on).toMatch(/Ratings: 6 weak/);
+    expect(on).toMatch(/of those, weak/);
+    expect(off).not.toMatch(/[Rr]atings: \d|weak:|Weak pages/);
+    expect(off).toContain('Smart Tracking: off');
+    expect(off).toContain('revised in the last 7 days');
+    // The cached rule, the same for everyone, says what to do then.
+    expect(REVO_SYSTEM_PROMPT).toMatch(/When the context says Smart Tracking is off/);
+  });
+
+  it('[REVO-34] an attached part goes without its ratings or weak spots', () => {
+    const facts = {
+      name: 'Juz 28', pages: 20, memorized: 20,
+      revised: { last7: { days: 1, minEach: 1, maxEach: 1 }, last30: { days: 2, minEach: 2, maxEach: 2 }, all: { days: 4, minEach: 4, maxEach: 4 } },
+      lastRevisedDaysAgo: 0, oldest: null, neverRevised: 0,
+      plan: { last7: { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 }, last30: { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 } },
+      strength: { weak: 2, moderate: 4, strong: 14, unrated: 0, average: 3.8 },
+      weakSpots: [{ name: 'Al-Hashr, ayahs 17–24', pages: [548], rating: 2 }],
+      today: null, next: null,
+    };
+    const a = { kind: 'juz' as const, label: 'Juz 28', juz: 28, facts };
+    expect(attachedText(a)).toMatch(/Ratings \(of 5\)/);
+    const off = attachedText(a, { smartTracking: false })!;
+    expect(off).not.toMatch(/Ratings|Weak spots|weak/i);
+    expect(off).toContain('Last revised today');
+  });
+
+  it('[REVO-34] the server reads the setting: the request says it is off, the reply loses its ratings chart, and the cache keeps them apart', async () => {
+    const f = fakeStore({ smartTracking: false });
+    const m = model(json({ chart: { kind: 'pageRatings', title: 'Two', pages: [548, 549] } }));
+    const r = await handleRevoAsk(U, ask(), deps(f.store, m.call));
+    const last = m.requests[0].messages[m.requests[0].messages.length - 1].content;
+    expect(last).toContain('Smart Tracking: off');
+    expect(r.reply.chart).toBeUndefined();
+    expect(answerKey(DAY, 'q', context(), [], false)).not.toBe(answerKey(DAY, 'q', context(), []));
+    // A store that can't say (older code) answers as before: with ratings.
+    const before = model(json({ chart: { kind: 'pageRatings', title: 'Two', pages: [548, 549] } }));
+    expect((await handleRevoAsk(U, ask(), deps(fakeStore().store, before.call))).reply.chart).toBeTruthy();
   });
 });
 

@@ -258,6 +258,27 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
 }
 
 // ---------------------------------------------------------------------------------------------
+// Recency (Smart Tracking off)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * When a part was last revised and how often, for an account without Smart Tracking (REVO-34: no
+ * strength without ratings): "Last revised 4 days ago · 2 times in 30 days". How often counts
+ * revisions of every memorized page (in full), as Revo's attachments do.
+ */
+export function recencyLine(f: RevoPassageFacts): string {
+  if (f.memorized === 0) return 'Not memorized';
+  const parts: string[] = [];
+  const d = f.lastRevisedDaysAgo;
+  parts.push(d == null ? 'Not revised yet' : d === 0 ? 'Last revised today' : d === 1 ? 'Last revised yesterday' : `Last revised ${d} days ago`);
+  const t = f.revised.last30;
+  const times = f.memorized === 1 ? t.maxEach : t.minEach;
+  parts.push(t.days === 0 ? 'not in the last 30 days' : times > 0 ? `${timesWord(times)} in 30 days` : 'partly in the last 30 days');
+  if (f.memorized < f.pages) parts.push(`${f.memorized} of ${f.pages} pages memorized`);
+  return parts.join(' · ');
+}
+
+// ---------------------------------------------------------------------------------------------
 // Juz map
 // ---------------------------------------------------------------------------------------------
 
@@ -379,9 +400,10 @@ export function timelineHint(marks: readonly TimelineMark[], days: number): stri
 }
 
 /** A picked revision: "Friday 16 October · weak", "14 days after the time before". */
-export function timelineReadout(mark: TimelineMark): { title: string; line: string } {
+export function timelineReadout(mark: TimelineMark, smart = true): { title: string; line: string } {
   return {
-    title: `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}`,
+    // Smart Tracking off (REVO-34): the day alone, no rating.
+    title: smart ? `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}` : formatDayLong(mark.day),
     line: mark.gap != null ? `${plural(mark.gap, 'day')} after the time before` : 'The first time in this view',
   };
 }
@@ -390,7 +412,7 @@ export function timelineReadout(mark: TimelineMark): { title: string; line: stri
  * Its panel: the ratings the passage got that day, weakest first ("Al-Hashr 17–24 weak · Al-Hashr
  * 4–16 moderate"), and the day's revision ("20 pages revised that day in 27 min").
  */
-export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[]): { ratings: string | null; line: string } {
+export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[], smart = true): { ratings: string | null; line: string } {
   const ratings = ratingsOn(logs, mark.day);
   const byBand: Record<RatingBand, number[]> = { weak: [], moderate: [], strong: [] };
   for (const p of mark.pages) {
@@ -401,7 +423,7 @@ export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[])
   const total = reviewedOn(logs, mark.day).size;
   const minutes = logs.filter((l) => l.date === mark.day).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
   return {
-    ratings: parts.length > 0 ? parts.join(' · ') : null,
+    ratings: smart && parts.length > 0 ? parts.join(' · ') : null,
     line: `${plural(total, 'page')} revised that day${minutes > 0 ? ` in ${formatMinutesLong(minutes)}` : ''}`,
   };
 }

@@ -31,7 +31,12 @@ function planText(window: string, t: RevoPlanTally): string {
   return `${window}: on the plan on ${count(t.days, 'day')}, ${count(t.pages, 'page')} in all: ${parts.join(', ')}`;
 }
 
-function passageText(label: string, f: RevoPassageFacts): string {
+/** What the model is told depends on Smart Tracking (REVO-34): off, it hears nothing of ratings. */
+export interface AttachTextOptions {
+  smartTracking?: boolean;
+}
+
+function passageText(label: string, f: RevoPassageFacts, smart = true): string {
   const lines = [`Attached: ${label} (${f.name}). What the app shows for it:`];
   if (f.memorized === 0) {
     lines.push(`- None of its ${count(f.pages, 'page')} is marked memorized, so it isn’t revised or on the plan.`);
@@ -39,19 +44,22 @@ function passageText(label: string, f: RevoPassageFacts): string {
   }
   lines.push(`- Memorized: ${f.memorized} of its ${count(f.pages, 'page')}.`);
 
-  const s = f.strength;
-  const rated = s.weak + s.moderate + s.strong;
-  const unrated = s.unrated ? `; ${count(s.unrated, 'memorized page')} never revised, so not rated yet` : '';
-  lines.push(
-    rated > 0
-      ? `- Ratings (of 5): ${s.weak} weak, ${s.moderate} moderate, ${s.strong} strong, ${s.average} on average${unrated}.`
-      : `- Ratings: none yet${unrated}.`,
-  );
-  lines.push(
-    f.weakSpots.length > 0
-      ? `- Weak spots, weakest first: ${f.weakSpots.map((w) => `${w.name} (${pagesNote(w.pages)}, rated ${w.rating})`).join('; ')}.`
-      : '- Weak spots: none.',
-  );
+  // Smart Tracking off (REVO-34): no ratings and no weak spots; when and how often say the rest.
+  if (smart) {
+    const s = f.strength;
+    const rated = s.weak + s.moderate + s.strong;
+    const unrated = s.unrated ? `; ${count(s.unrated, 'memorized page')} never revised, so not rated yet` : '';
+    lines.push(
+      rated > 0
+        ? `- Ratings (of 5): ${s.weak} weak, ${s.moderate} moderate, ${s.strong} strong, ${s.average} on average${unrated}.`
+        : `- Ratings: none yet${unrated}.`,
+    );
+    lines.push(
+      f.weakSpots.length > 0
+        ? `- Weak spots, weakest first: ${f.weakSpots.map((w) => `${w.name} (${pagesNote(w.pages)}, rated ${w.rating})`).join('; ')}.`
+        : '- Weak spots: none.',
+    );
+  }
 
   lines.push(f.lastRevisedDaysAgo === null ? '- Never revised on record.' : `- Last revised ${ago(f.lastRevisedDaysAgo)}.`);
   if (f.oldest) {
@@ -80,7 +88,7 @@ function passageText(label: string, f: RevoPassageFacts): string {
   return lines.join('\n');
 }
 
-function dayText(label: string, f: RevoDayFacts): string {
+function dayText(label: string, f: RevoDayFacts, smart = true): string {
   const today = f.daysAgo === 0;
   const lines = [`Attached: ${label}, ${ago(f.daysAgo)}. What the app shows for that day:`];
   const p = f.plan;
@@ -107,7 +115,9 @@ function dayText(label: string, f: RevoDayFacts): string {
   lines.push(f.readMinutes === null ? '- Reading with the timer: not known.' : `- Reading with the timer: ${f.readMinutes ? `${f.readMinutes} min` : 'none'}.`);
   lines.push(f.memorized.pages > 0 ? `- Marked memorized that day: ${count(f.memorized.pages, 'page')}${f.memorized.name ? ` (${f.memorized.name})` : ''}.` : '- Marked memorized that day: none.');
   const ra = f.ratings;
-  if (ra.weak + ra.moderate + ra.strong === 0) lines.push('- Ratings given: none.');
+  if (!smart) {
+    // Smart Tracking off (REVO-34): the day's ratings aren't told.
+  } else if (ra.weak + ra.moderate + ra.strong === 0) lines.push('- Ratings given: none.');
   else {
     const weak = ra.weak ? `${ra.weak} weak${ra.weakName ? ` (${ra.weakName}, ${ra.weakPages.length === 1 ? 'page' : 'pages'} ${ra.weakPages.join(', ')})` : ''}` : '0 weak';
     lines.push(`- Ratings given: ${weak}, ${ra.moderate} moderate, ${ra.strong} strong.`);
@@ -124,14 +134,15 @@ function dayText(label: string, f: RevoDayFacts): string {
 }
 
 /** An attachment of the kinds apps send from Nov 7 2026 in sentences; null for the older kinds. */
-export function attachedText(a: RevoAttachment): string | null {
+export function attachedText(a: RevoAttachment, opts: AttachTextOptions = {}): string | null {
+  const smart = opts.smartTracking ?? true;
   switch (a.kind) {
     case 'surah':
     case 'juz':
     case 'pages':
-      return passageText(a.label, a.facts);
+      return passageText(a.label, a.facts, smart);
     case 'revisionDay':
-      return dayText(a.label, a.facts);
+      return dayText(a.label, a.facts, smart);
     default:
       return null;
   }

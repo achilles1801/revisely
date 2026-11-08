@@ -241,7 +241,20 @@ function salvageText(raw: string): string | null {
  * The reply's parts. `allowed`: the pages in the context and attachments. Null when there is no
  * answer to show (the model's object had no text).
  */
-export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { firstTurn: boolean }): RevoReplyParts | null {
+/**
+ * With Smart Tracking off (REVO-34) nothing shows strength: a ratings chart is dropped, and a
+ * table loses its weak and strength columns (and goes when none are left).
+ */
+function withoutStrength(out: RevoReplyParts): void {
+  if (out.chart?.kind === 'pageRatings') delete out.chart;
+  if (out.visual?.kind === 'table') {
+    const columns = out.visual.columns.filter((c) => c !== 'weak' && c !== 'strength');
+    if (columns.length === 0) delete out.visual;
+    else out.visual = { ...out.visual, columns };
+  }
+}
+
+export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { firstTurn: boolean; smartTracking?: boolean }): RevoReplyParts | null {
   const t = unfenced(raw);
   const o = jsonObject(t);
   if (!o || typeof o.text !== 'string' || o.text.trim() === '') {
@@ -260,6 +273,7 @@ export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { fi
     const visual = checkNewChart(o.chart);
     if (visual) out.visual = visual;
   }
+  if (opts.smartTracking === false) withoutStrength(out);
   const textAfter = clean(o.textAfter, MAX_TEXT_AFTER);
   if (textAfter) out.textAfter = textAfter;
   // One action: an object, or the first valid one of a list.
