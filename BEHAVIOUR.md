@@ -283,6 +283,10 @@ How the tests are made: `tests/scenarios/README.md`.
   day's session never removes them. Each is deleted from the Revised block's menu ("Delete …, added by
   hand"), confirmed first, as every item is (ACT-7). (Nov 7 2026: a session save deleted them, and there
   was no way to delete one.)
+- **ACT-15.** Revised pages added by hand count for the streak as any credit does (SESS-6): a day whose
+  scheduled pages are all credited to it is done, hand-added pages included, and Home shows it when it
+  next comes into view. Pages added by hand never stand for what a day had scheduled: that stays its
+  session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
 
 ## Ask coach
 

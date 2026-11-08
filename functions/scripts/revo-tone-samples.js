@@ -41,6 +41,7 @@ if (!key && !DRY) {
 const { ANTHROPIC_URL, ANTHROPIC_VERSION } = require(path.join(lib, 'coach/call.js'));
 const { parseReply } = require(path.join(lib, 'revo/reply.js'));
 const { contextPages, validateContext } = require(path.join(lib, 'revo/validate.js'));
+const { barePageNumbers, replyWords } = require(path.join(lib, 'revo/pageWords.js'));
 const after = require(path.join(lib, 'revo/prompt.js'));
 
 /** The prompt module as it was at `ref`, compiled next to the built one (so its imports resolve). */
@@ -172,11 +173,12 @@ async function ask(build, ctx) {
 const words = (s) => (s ? s.trim().split(/\s+/).length : 0);
 // Surah-first (the owner's rule): does the answer name a surah or juz, and does it give page numbers?
 const SURAH_OR_JUZ = /\b(?:Al|An|At|As|Ash|Ad|Adh|Ar|Az)-[A-Z]|'Abasa|\bJuz \d/;
-const PAGE_NUMBER = /\bpages? \d|\bp\. ?\d/i;
+/** Page numbers on their own (NAME-1): a page number may only follow the surah's name ("Al-Hashr, p. 548"). */
+const barePages = (r) => (r.reply ? barePageNumbers(replyWords(r.reply)) : []);
 function namesNote(r) {
   if (!r.reply) return '';
-  const all = [r.reply.text, r.reply.textAfter, r.reply.action?.title, r.reply.action?.detail, r.reply.chart?.title].filter(Boolean).join(' ');
-  return ` · names a surah or juz: ${SURAH_OR_JUZ.test(all) ? 'yes' : 'no'} · page numbers: ${PAGE_NUMBER.test(all) ? 'yes' : 'none'}`;
+  const bare = barePages(r);
+  return ` · names a surah or juz: ${SURAH_OR_JUZ.test(replyWords(r.reply)) ? 'yes' : 'no'} · page numbers on their own: ${bare.length ? `❌ ${bare.join(', ')}` : 'none'}`;
 }
 
 function show(r) {
@@ -210,15 +212,23 @@ function show(r) {
     `Real replies from claude-sonnet-5-5, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. **Before**: the prompt at ${BEFORE_REF}, with ${SAME_CONTEXT ? 'the same context as after' : 'the context today’s app sends'}. **After**: the new prompt, with the context as the app will send it (today’s numbers as Home shows them, parts of the Qur’an named by surah and juz) written out in plain words. Made-up accounts, not anyone’s data. The day is a Thursday. Questions 1–2 are reconstructed from Majd’s screenshots.`,
     '',
   ];
+  const withPages = [];
   for (const [i, s] of SAMPLES.entries()) {
     const b = await ask.call(s, before.buildAskRequest, SAME_CONTEXT ? s.ctx : older(s.ctx));
     const a = await ask.call(s, after.buildAskRequest, s.ctx);
     lines.push(`## ${i + 1}. “${s.q}”${s.note ? ` (${s.note})` : ''}`, '', '**Before**', '', show(b), '', '**After**', '', show(a), '');
-    console.log(`${i + 1}/${SAMPLES.length} ${s.q}: before ${words(b.reply?.text)} words, after ${words(a.reply?.text)}`);
+    if (barePages(a).length) withPages.push(i + 1);
+    console.log(`${i + 1}/${SAMPLES.length} ${s.q}: before ${words(b.reply?.text)} words, after ${words(a.reply?.text)}${barePages(a).length ? ` · PAGE NUMBERS: ${barePages(a).join(', ')}` : ''}`);
   }
+  // NAME-1: the new prompt's answers name the surah; a page number only after it.
+  lines.splice(4, 0, withPages.length ? `**❌ Page numbers on their own in the new prompt’s answers: ${withPages.join(', ')}.**` : '**✅ No page numbers on their own in the new prompt’s answers.**', '');
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, lines.join('\n'));
   console.log(`Wrote ${OUT}`);
+  if (withPages.length) {
+    console.error(`Page numbers on their own (NAME-1) in answers ${withPages.join(', ')}.`);
+    process.exit(1);
+  }
 })().catch((err) => {
   console.error(String(err.message ?? err));
   process.exit(1);
