@@ -648,7 +648,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **HELP-1.** Screens that need explaining have a ? (testers, for now). Home's sits at the right of the Today
   post's header; the schedule editor's before Save; the reader's is a round button at the right of its
-  header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full). It opens
+  header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full);
+  Activity's is in its top bar before search, and explains the tab on show (Overview or Insights); a
+  day's is before +. It opens
   that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›" when the account has
   Revo (it opens Revo; nothing is counted until a question is sent), "Hide help buttons", and Done. The
   words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons are good".)

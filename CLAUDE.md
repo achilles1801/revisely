@@ -1465,7 +1465,8 @@ classic default), and a fresh install starts in light.
     the few screens that can't explain themselves get one ? (`components/help/HelpButton`; testers
     for now, `lib/help/availability`). Home's is in the Today post's header, the schedule editor's
     before Save, the reader's a round button at the right of its header, and a session's the last
-    row of its ⋯ menu (its header is full). Activity and a day follow. It opens a `v2/Sheet` of at
+    row of its ⋯ menu (its header is full), Activity's in its top bar before search (for the tab on
+    show: Overview or Insights), and a day's before +. It opens a `v2/Sheet` of at
     most four topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the
     account, `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding
     is one switch for every screen, kept on the phone per account; Settings → Support → Help buttons

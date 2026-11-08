@@ -59,5 +59,57 @@
     "SCHED-1": "e34c5d66002488e4",
     "SCHED-2": "9898aac73caf73d2",
     "SCHED-4": "cd9b1e2c930dc819"
+  },
+  "activity.calendar": {
+    "ACT-3": "9911173a493dc520",
+    "ACT-18": "c0205b0a2a3bd89b"
+  },
+  "activity.day": {
+    "DAY-9": "d1f48e9dc60411f1",
+    "DAY-2": "754b83b74bc2feda",
+    "ACT-1": "27b4c2094c950cdf"
+  },
+  "activity.adding": {
+    "ACT-5": "35b9fce4abcb5f16",
+    "ACT-17": "62b54494328e1e9d"
+  },
+  "insights.coverage": {
+    "ACT-4": "a304caca52f119a4",
+    "ACT-21": "b309872a5b9f1cb8",
+    "ACT-22": "a26141f2d1e9983e"
+  },
+  "insights.consistency": {
+    "ACT-4": "a304caca52f119a4",
+    "ACT-23": "bc761a4eb1d943b5"
+  },
+  "insights.weak": {
+    "ACT-12": "af7c5a40d965c592",
+    "ACT-8": "17530ba6416770ba",
+    "ACT-20": "e576925144fbc092"
+  },
+  "insights.pace": {
+    "ACT-4": "a304caca52f119a4",
+    "ACT-23": "bc761a4eb1d943b5"
+  },
+  "day.change": {
+    "ACT-6": "68186ff52bb557fb",
+    "ACT-7": "dfc907af582b6aee"
+  },
+  "day.pages": {
+    "ACT-20": "e576925144fbc092",
+    "ACT-8": "17530ba6416770ba"
+  },
+  "day.pages.off": {
+    "ACT-20": "e576925144fbc092",
+    "ACT-19": "26b92511a47d4f09"
+  },
+  "day.adding": {
+    "ACT-5": "35b9fce4abcb5f16",
+    "ACT-17": "62b54494328e1e9d"
+  },
+  "day.notes": {
+    "ACT-11": "d94a53dd57138182",
+    "ACT-6": "68186ff52bb557fb",
+    "LOG-2": "da9323046be62b09"
   }
 }

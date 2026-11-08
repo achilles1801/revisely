@@ -15,7 +15,9 @@ import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
-import { ActivityBlocksViews } from '../../components/activity/ActivityBlocksViews';
+import { ActivityBlocksViews, type ViewKind } from '../../components/activity/ActivityBlocksViews';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import type { PreviewBlock } from '../../components/activity/CalendarMonth';
 import { activityBlocksEnabled } from '../../components/activity/DayBlocks';
 import { ActivityItemRow, RecentSection } from '../../components/activity/ActivityItemRow';
@@ -98,6 +100,7 @@ export default function ActivityScreen() {
     [journal],
   );
   const blocks = activityBlocksEnabled(user);
+  const [view, setView] = useState<ViewKind>('calendar');
 
   const recentItems = items.slice(0, RECENT_ITEMS);
   const openItem = (it: ActivityItem) =>
@@ -110,7 +113,11 @@ export default function ActivityScreen() {
         onBack={() => navigation.goBack()}
         right={
           blocks ? (
-            <IconButton icon="search" label="Search" onPress={() => navigation.navigate('ActivityAll')} size={22} />
+            <>
+              {/* Its help (HELP-1) explains the tab on show. */}
+              <HelpButton screen={view === 'insights' ? 'insights' : 'activity'} />
+              <IconButton icon="search" label="Search" onPress={() => navigation.navigate('ActivityAll')} size={22} />
+            </>
           ) : (
             <IconButton icon="add" label="Log today" onPress={logToday} size={28} />
           )
@@ -145,6 +152,7 @@ export default function ActivityScreen() {
               onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
+              onViewChange={setView}
               onPlanIt={(weak) =>
                 planItAction(!!user?.customPlan) === 'plan-day'
                   ? navigation.navigate('PlanDayEdit', { dayIndex: PLAN_IT_DAY_INDEX, initialPages: weak })
@@ -199,6 +207,8 @@ export default function ActivityScreen() {
         onDismiss={() => setCarryToast(null)}
         bottomInset={tabFootprint}
       />
+      <HelpToast screen="activity" bottomInset={tabFootprint} />
+      <HelpToast screen="insights" bottomInset={tabFootprint} />
     </TopSafeAreaView>
   );
 }

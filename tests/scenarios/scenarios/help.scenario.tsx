@@ -6,10 +6,10 @@ import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester } from '../harness/admin';
-import { flatText, Home } from '../harness/screens';
+import { ActivityDayView, flatText, Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 
-/** Home, with the real Settings and session behind it (Home's stack holds them). */
+/** Home, with the real Settings, session, Activity and day behind it (Home's stack holds them). */
 function homeAndSettings(mods: Booted): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');
@@ -17,6 +17,8 @@ function homeAndSettings(mods: Booted): ReactElement {
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Settings = req<any>('src/screens/main/SettingsScreen').default;
   const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
+  const Activity = req<any>('src/screens/activity/ActivityScreen').default;
+  const ActivityDay = req<any>('src/screens/activity/ActivityDayScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   // Revo, as MainNavigator mounts it: "Ask Revo" opens it.
@@ -42,7 +44,9 @@ function homeAndSettings(mods: Booted): ReactElement {
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'Settings', component: Settings }),
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map(
+        h(Stack.Screen, { name: 'Activity', component: Activity }),
+        h(Stack.Screen, { name: 'ActivityDay', component: ActivityDay }),
+        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'JournalEntry', 'PagesByStrength', 'ListenBack'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),
@@ -206,6 +210,42 @@ describe('the help follows Smart Tracking', () => {
     await sessionHelp(app, home);
     expect(topicIds(app)).toContain('session.rating');
     expect(flatText(app.screen.getByTestId('help-sheet-session'))).toContain('Rate page strength');
+    await app.close();
+  });
+});
+
+describe('the help in Activity', () => {
+  it('[HELP-1] [HELP-3] Activity’s ? explains the tab on show: How Activity works on Overview, How Insights work on Insights (no Weak spots without Smart Tracking)', async () => {
+    const phone = await account(true, false);
+    const { app } = await openHome(phone, true);
+    await app.until(() => helpButton(app) != null, 'the ? on the Today post');
+    await press(app, 'open-activity');
+    await app.until(() => app.screen.queryByTestId('help-button-activity') != null, 'Activity’s ?');
+    await press(app, 'help-button-activity');
+    await app.until(() => app.screen.queryByTestId('help-sheet-activity') != null, 'How Activity works');
+    expect(topicIds(app)).toEqual(['activity.calendar', 'activity.day', 'activity.adding']);
+    await press(app, 'help-done');
+    await app.until(() => app.screen.queryByTestId('help-sheet-activity') == null, 'the sheet to close');
+
+    await press(app, 'pill-insights');
+    await app.until(() => app.screen.queryByTestId('help-button-insights') != null, 'the ? for Insights');
+    await press(app, 'help-button-insights');
+    await app.until(() => app.screen.queryByTestId('help-sheet-insights') != null, 'How Insights work');
+    expect(topicIds(app)).toEqual(['insights.coverage', 'insights.consistency', 'insights.pace']);
+    expect(flatText(app.screen.getByTestId('help-sheet-insights'))).not.toMatch(/\b(rate|rated|rating|weak|strong|strength)\b/i);
+    await app.close();
+  });
+
+  it('[HELP-1] [HELP-3] a day’s ? before +: with Smart Tracking on, the strip’s strength comes from ratings', async () => {
+    const phone = await account(true, true);
+    const { app } = await openHome(phone, true);
+    await app.until(() => helpButton(app) != null, 'the ? on the Today post');
+    await new ActivityDayView(app).open('2026-11-03');
+    await app.until(() => app.screen.queryByTestId('help-button-day') != null, 'the day’s ?');
+    await press(app, 'help-button-day');
+    await app.until(() => app.screen.queryByTestId('help-sheet-day') != null, 'How a day works');
+    expect(topicIds(app)).toEqual(['day.change', 'day.pages', 'day.adding', 'day.notes']);
+    expect(flatText(app.screen.getByTestId('help-sheet-day'))).toContain('come from your ratings');
     await app.close();
   });
 });

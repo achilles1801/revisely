@@ -34,7 +34,7 @@ const shiftDays = (day: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-type ViewKind = 'calendar' | 'insights';
+export type ViewKind = 'calendar' | 'insights';
 
 interface Props {
   today: string;
@@ -53,12 +53,17 @@ interface Props {
   noteDays: Set<string>;
   /** A day; at a block when a preview row opened it (ACT-18). */
   onOpenDay: (day: string, block?: PreviewBlock) => void;
+  /** The tab on show changed (Overview or Insights): the top bar's help explains that one. */
+  onViewChange?: (view: ViewKind) => void;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow }: Props) {
+export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking, firstTomorrow, onViewChange }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const [view, setView] = useState<ViewKind>('calendar');
+  const viewChange = useRef(onViewChange);
+  viewChange.current = onViewChange;
+  useEffect(() => viewChange.current?.(view), [view]);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [span, setSpanState] = useState<CalendarSpan>('month');
   const [week, setWeek] = useState(weekStartOf(today));

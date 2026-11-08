@@ -19,6 +19,8 @@ import { useRevoFootprint } from '../../lib/revo/presence';
 import { ReadingPagesSheet } from '../../components/activity/ReadingPagesSheet';
 import { DayBlocks, activityBlocksEnabled, type UndoOffer } from '../../components/activity/DayBlocks';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { useActivityReload } from '../../components/activity/useActivityReload';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -383,13 +385,17 @@ export default function ActivityDayScreen() {
             </View>
           }
           right={
-            <IconButton
-              icon="add"
-              label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
-              onPress={() => setAddOpen(true)}
-              size={28}
-              testID="day-add"
-            />
+            <>
+              {/* Its help (HELP-1), before +. */}
+              <HelpButton screen="day" />
+              <IconButton
+                icon="add"
+                label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
+                onPress={() => setAddOpen(true)}
+                size={28}
+                testID="day-add"
+              />
+            </>
           }
           separator
         />
@@ -521,6 +527,7 @@ export default function ActivityDayScreen() {
         onDismiss={() => setUndoOffer(null)}
         bottomInset={tabFootprint}
       />
+      <HelpToast screen="day" bottomInset={tabFootprint} />
       <ActionSheet
         visible={timedMenu != null}
         onClose={() => setTimedMenu(null)}
