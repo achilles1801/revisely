@@ -29,8 +29,13 @@ Signed in to the Google account whose Drive should hold the recordings:
 
 ## Running it
 
-- **Handing out links:** open the sheet "Revisely recording codes (private)" in your Drive. Give each person
-  one link and write their name next to it. `P00` is for testing.
+- **One link for everyone (a group chat):** the sheet's **Group link** tab. Each person who opens it types their
+  name and is given their own code, a new row on the first tab with their name in it, and their own link to
+  come back to (also kept on their phone). Opening the group link again on the same phone offers to carry on
+  as that person, or to start as someone else. To stop the group link, delete `GROUP_KEY` in the Apps Script's
+  Project Settings, Script properties (run `setup` again to make a new one).
+- **Personal links:** give a person one link from the first tab and write their name next to it. `P00` is for
+  testing.
 - **Closing a link:** delete its row. It stops working within 5 minutes.
 - **Deleting someone's recordings:** delete their `P..` folder in "Revisely recordings (private)".
 - **What arrives:** in each person's folder, `consent.json` (which box they ticked, when), `profile.json` (their
@@ -38,7 +43,8 @@ Signed in to the Google account whose Drive should hold the recordings:
   description holds its length, the chosen passage for `n8` and the phone. The latest take of an item counts.
 - **More links:** add rows to the sheet with a new code (`P41-` and 12 random letters and digits) and the link
   `https://revisely.app/record/#k=<code>`.
-- **Changing the Apps Script later:** Deploy, Manage deployments, edit, Version: New version. The URL stays.
+- **Changing the Apps Script later:** paste the new version, save, run `setup` (it only adds what's missing),
+  then Deploy, Manage deployments, the pencil, Version: New version, Deploy. The URL stays.
 
 ## Changing the script of items
 

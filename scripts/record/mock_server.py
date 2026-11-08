@@ -5,7 +5,8 @@ requests and answers as apps-script.gs), saving takes to a folder.
   python3 scripts/record/mock_server.py --out /tmp/record-test [--port 8790]
   open http://localhost:8790/record/?endpoint=http://localhost:8790/mock#k=P00-localtest01
 
-The page accepts ?endpoint= only on localhost. Valid codes here: P00-localtest01, P01-localtest02.
+The page accepts ?endpoint= only on localhost. Valid codes here: P00-localtest01, P01-localtest02; the group
+link is #g=localgroup01 (each join adds a code, and the names go to <out>/names.json).
 """
 import argparse
 import base64
@@ -17,6 +18,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 CODES = {'P00-localtest01', 'P01-localtest02'}
+GROUP_KEY = 'localgroup01'
 TYPES = {'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/webm': 'webm', 'audio/ogg': 'ogg'}
 
 
@@ -68,6 +70,20 @@ class Handler(SimpleHTTPRequestHandler):
             return
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
         try:
+            if body.get('op') == 'join':
+                if body.get('g') != GROUP_KEY:
+                    raise ValueError('bad_group')
+                name = ' '.join(str(body.get('name') or '').split())[:60]
+                if len(name) < 2:
+                    raise ValueError('bad_name')
+                n = max(int(c[1:].split('-')[0]) for c in CODES) + 1
+                code = f'P{n:02d}-localjoin{n:03d}'
+                CODES.add(code)
+                names = self.out / 'names.json'
+                known = json.loads(names.read_text()) if names.exists() else {}
+                known[code] = name
+                names.write_text(json.dumps(known))
+                return self.answer({'ok': True, 'code': code})
             folder = self.check(body.get('k'))
             op = body.get('op')
             if op == 'consent':

@@ -106,6 +106,9 @@
       font: 16px var(--font); padding: 10px 12px; border-radius: 12px; border: 1px solid var(--separator);
       background: var(--bg); color: var(--text); min-height: 44px;
     }
+    .field { width: 100%; font: 17px var(--font); padding: 12px 14px; border-radius: 12px; border: 1px solid var(--separator); background: var(--bg); color: var(--text); min-height: 48px; margin-top: 6px; }
+    .mylink { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid var(--separator); border-radius: 14px; padding: 12px 14px; margin: 14px 0; font-size: 15px; }
+    .mylink span { color: var(--secondary); }
     .pick { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 10px 0; }
     .pick .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .pick label { font-size: 13px; color: var(--secondary); display: grid; gap: 4px; }
@@ -172,6 +175,24 @@
     const m = (location.hash + '&' + location.search).match(/[#?&]k=([A-Za-z0-9-]+)/);
     const code = m && m[1];
     return code && /^P\d{2,3}-[a-z0-9]{8,24}$/i.test(code) ? code : null;
+  }
+
+  // One link for a group chat (#g=…): each person who opens it is given their own code.
+  const MINE = 'revisely-record:mine'; // the code this phone joined with
+  function readGroup() {
+    const m = (location.hash + '&' + location.search).match(/[#?&]g=([A-Za-z0-9]+)/);
+    return m && /^[a-z0-9]{8,32}$/i.test(m[1]) ? m[1] : null;
+  }
+  const myLink = () => `${location.origin}/record/#k=${S.code}`;
+  function linkBoxHtml() {
+    return `<div class="mylink"><span>Your own link, to come back later. It’s saved on this phone too.</span><button class="link" id="copy">Copy</button></div>`;
+  }
+  function wireLinkBox() {
+    const b = document.getElementById('copy');
+    if (!b) return;
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(myLink()); b.textContent = 'Copied'; } catch (e) { prompt('Your link:', myLink()); }
+    };
   }
 
   // A local test server (scripts/record/mock_server.py) can stand in, on localhost only.
@@ -371,7 +392,7 @@
 
   // ---------- screens ----------
   function render() {
-    const views = { nolink, badlink, closed, offline, welcome, about, mic, list, item, done };
+    const views = { nolink, badlink, closed, offline, join, back, welcome, about, mic, list, item, done };
     (views[S.view] || nolink)();
     window.scrollTo(0, 0);
   }
@@ -390,10 +411,53 @@
     document.getElementById('again').onclick = start;
   }
 
-  function welcome() {
+  function join() {
     app.innerHTML = `
       <h1>Help build Revisely’s recitation checker</h1>
-      <p>Revisely is building a checker that follows your recitation on the mushaf and points out mistakes. To make it accurate, it needs real people reciting, including some mistakes made on purpose.</p>
+      <p>Revisely is building a checker that follows your recitation on the mushaf and points out mistakes. To make it accurate, it needs real people reciting, including some mistakes made on purpose. It takes about 20 minutes, or 35 with the extra part.</p>
+      <label class="q" for="name">Your name</label>
+      <input class="field" id="name" type="text" autocomplete="name" maxlength="60" placeholder="Your first name is enough">
+      <p class="muted" style="margin-top:8px">Only the person who shared this link sees your name. Your recordings are filed under a code, not your name.</p>
+      <p class="err" id="err" hidden></p>
+      <button class="btn wide" id="go" disabled>Continue</button>`;
+    const name = document.getElementById('name'), go = document.getElementById('go'), err = document.getElementById('err');
+    name.oninput = () => { go.disabled = name.value.trim().length < 2; };
+    go.onclick = async () => {
+      go.disabled = true; err.hidden = true;
+      try {
+        const res = await api('join', { g: S.group, name: name.value.trim() });
+        if (res.ok) return useCode(res.code, true);
+        if (res.error === 'bad_group') { S.view = 'badlink'; return render(); }
+        err.textContent = res.error === 'full' ? 'Sorry, this link is full. Ask the person who shared it for another.' : 'That didn’t go through. Please try again.';
+      } catch (e) {
+        err.textContent = 'That didn’t go through. Please check your connection and try again.';
+      }
+      err.hidden = false; go.disabled = false;
+    };
+  }
+
+  function back() {
+    const pid = esc(S.mine.split('-')[0].toUpperCase());
+    app.innerHTML = `
+      <h1>Welcome back</h1>
+      <p>You joined on this phone as ${pid}. Carry on where you left off?</p>
+      <div class="row-btns"><button class="btn" id="cont">Continue as ${pid}</button></div>
+      <p style="margin-top:14px"><button class="link" id="new">I’m someone else</button></p>`;
+    document.getElementById('cont').onclick = () => useCode(S.mine, false);
+    document.getElementById('new').onclick = () => { S.view = 'join'; render(); };
+  }
+
+  function useCode(code, joined) {
+    try { localStorage.setItem(MINE, code); } catch (e) {}
+    history.replaceState(null, '', `${location.pathname}${location.search}#k=${code}`);
+    S.joined = joined;
+    start();
+  }
+
+  function welcome() {
+    app.innerHTML = `
+      <h1>${S.joined ? 'Welcome' : 'Help build Revisely’s recitation checker'}</h1>
+      ${S.joined ? linkBoxHtml() : '<p>Revisely is building a checker that follows your recitation on the mushaf and points out mistakes. To make it accurate, it needs real people reciting, including some mistakes made on purpose.</p>'}
       <p>Part 1 takes about 20 minutes, and Part 2 about 15 more if you have time. You can stop whenever you like and come back to this same link: what you’ve recorded is kept.</p>
       <div class="note">
         <p class="q">Before you start</p>
@@ -406,10 +470,10 @@
       <h2 style="margin-top:24px">What happens to your recordings</h2>
       <ul class="plain" style="margin-top:10px">
         <li><strong>What’s recorded:</strong> only what you record on this page, your answers to a few questions, and your phone type.</li>
-        <li><strong>No name:</strong> your link has a code, and only the person who sent it to you knows it’s yours.</li>
+        <li><strong>No name on them:</strong> your recordings are filed under a code (${esc(S.pid)}), not your name. Only the person who shared the link knows which code is yours.</li>
         <li><strong>Who hears them:</strong> Revisely’s developer, and the software that builds the checker. They are never published or shared.</li>
         <li><strong>What they’re for:</strong> building and testing Revisely’s recitation checking, including training its models. This may become a paid feature of the app.</li>
-        <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell the person who sent you the link, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
+        <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell the person who shared the link with you, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
       </ul>
       <div class="agree" role="radiogroup" aria-label="Agreement">
         <label><input type="radio" name="agree" value="adult"><span>I’m 18 or over, and I agree.</span></label>
@@ -417,6 +481,7 @@
       </div>
       <p class="err" id="err" hidden></p>
       <button class="btn wide" id="go" disabled>Agree and continue</button>`;
+    wireLinkBox();
     const go = document.getElementById('go');
     app.querySelectorAll('input[name="agree"]').forEach((r) => { r.onchange = () => { go.disabled = false; }; });
     go.onclick = async () => {
@@ -530,8 +595,10 @@
         html += '</ul>';
       }
     }
+    html += linkBoxHtml();
     html += `<p class="foot">Your code: ${esc(S.pid)} · ${esc(S.data.credit.split('·')[0])}· <a href="https://tanzil.net" rel="noopener">tanzil.net</a></p>`;
     app.innerHTML = html;
+    wireLinkBox();
     const nb = document.getElementById('next');
     if (nb) nb.onclick = () => openItem(next.id);
     app.querySelectorAll('.items button').forEach((b) => { b.onclick = () => openItem(b.dataset.id); });
@@ -709,7 +776,14 @@
   async function start() {
     S.code = readCode();
     S.endpoint = localEndpoint() || ENDPOINT;
-    if (!S.code) { S.view = 'nolink'; return render(); }
+    if (!S.code) {
+      S.group = readGroup();
+      if (!S.group) { S.view = 'nolink'; return render(); }
+      if (!S.endpoint) { S.view = 'closed'; return render(); }
+      try { S.mine = localStorage.getItem(MINE); } catch (e) { S.mine = null; }
+      S.view = S.mine && /^P\d{2,3}-[a-z0-9]{8,24}$/i.test(S.mine) ? 'back' : 'join';
+      return render();
+    }
     S.pid = S.code.split('-')[0].toUpperCase();
     document.getElementById('who').textContent = `Code ${S.pid}`;
     if (!S.endpoint) { S.view = 'closed'; return render(); }
@@ -725,6 +799,7 @@
       for (const [id, n] of Object.entries(status.takes || {})) S.local.takes[id] = Math.max(S.local.takes[id] || 0, n);
       if (status.consent) S.local.consent = true;
       store.save();
+      try { localStorage.setItem(MINE, S.code); } catch (e) {}
     } catch (e) {
       S.view = 'offline'; return render();
     }
