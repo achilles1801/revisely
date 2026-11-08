@@ -2,7 +2,7 @@
 // choice (a chip beside its title), not a second row of tabs; Today brings back today's month or week;
 // the picked day's whole preview opens the day. (Majd, Nov 8 2026.)
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityBlocksViews } from '../../../src/components/activity/ActivityBlocksViews';
@@ -62,6 +62,13 @@ function open() {
 }
 
 describe('Activity: Overview', () => {
+  // A sheet's closing animation ends on a timer: let it end while the test's world still stands.
+  afterEach(async () => {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400));
+    });
+  });
+
   beforeEach(async () => {
     await AsyncStorage.clear();
   });
