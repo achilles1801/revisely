@@ -1,15 +1,8 @@
-# Closes the v2/Sheet on show: its handle ("Close") on iOS, the back button on Android (the sheet's
-# Modal closes on it). On Android a tap on "Close" over a tall, scrolling sheet (the juz sheet) landed on
-# a page of its strip and opened the reader (E2E 09, Nov 8 2026).
+# Closes the v2/Sheet on show by its handle (id sheet-handle). Not by "Close": the full-screen backdrop
+# carries that label too and comes first, so Maestro tapped the middle of the screen, which on a tall,
+# scrolling sheet (the juz sheet) is the sheet itself: a page of its strip or a surah row opened the
+# reader (E2E 09, iOS and Android, Nov 8 2026).
 appId: com.revisionbuddy.app
 ---
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn: "Close"
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - back
+- tapOn:
+    id: sheet-handle
