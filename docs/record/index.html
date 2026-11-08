@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Record · Revisely</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap">
+  <style>
+    /* Volunteers recite into this page; each take goes to the developer's private Google Drive
+       through a Google Apps Script (scripts/record/apps-script.gs). Not linked from the site. */
+    .rec { max-width: 640px; margin: 0 auto; padding: 24px var(--gutter) 120px; }
+    .rec h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 12px; }
+    .rec h2 { font-size: 20px; line-height: 1.3; margin: 0; letter-spacing: -0.01em; }
+    .rec p { margin: 0 0 14px; }
+    .rec .muted { color: var(--secondary); font-size: 15px; }
+    .rec ul.plain { margin: 0 0 18px; padding-left: 20px; }
+    .rec ul.plain li { margin: 0 0 8px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 0 22px; border-radius: 999px; border: 0;
+      background: var(--primary); color: var(--on-primary);
+      font: 600 17px/1 var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn.quiet { background: var(--fill); color: var(--text); }
+    .btn.wide { width: 100%; }
+    .link { background: none; border: 0; padding: 8px 0; color: var(--accent); font: 600 16px var(--font); cursor: pointer; }
+    .row-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .row-btns .btn { flex: 1 1 140px; }
+
+    .choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 20px; }
+    .choice button {
+      min-height: 40px; padding: 0 14px; border-radius: 999px; cursor: pointer;
+      border: 1px solid var(--separator); background: var(--bg); color: var(--text); font: 15px var(--font);
+    }
+    .choice button[aria-pressed="true"] { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .q { font-weight: 600; margin: 0 0 2px; }
+
+    .agree { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+    .agree label {
+      display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 14px;
+      border: 1px solid var(--separator); cursor: pointer; font-size: 16px;
+    }
+    .agree input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--primary); flex: none; }
+
+    .progress { height: 4px; border-radius: 4px; background: var(--fill); overflow: hidden; margin: 6px 0 4px; }
+    .progress i { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
+
+    .group-title { margin: 28px 0 2px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--secondary); }
+    .items { list-style: none; margin: 0; padding: 0; }
+    .items button {
+      display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 0; text-align: left;
+      background: none; border: 0; border-bottom: 0.5px solid var(--separator); color: var(--text);
+      font: 16px/1.35 var(--font); cursor: pointer;
+    }
+    .items .t { flex: 1; }
+    .dot { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--separator); display: grid; place-items: center; }
+    .dot.done { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+    .dot.wait { border-color: var(--accent); border-style: dashed; }
+    .dot.skip { color: var(--secondary); font-size: 14px; }
+    .dot svg { width: 14px; height: 14px; }
+
+    .note { background: var(--fill); border-radius: 14px; padding: 14px 16px; margin: 14px 0; font-size: 16px; }
+    .say { margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--separator); }
+    .say .label { font-size: 13px; color: var(--secondary); font-weight: 600; }
+
+    .quran {
+      font-family: "Amiri Quran", "Amiri", "Geeza Pro", serif; font-size: 25px; line-height: 2.2;
+      direction: rtl; text-align: right; margin: 12px 0; word-spacing: 2px;
+    }
+    .say .quran { font-size: 27px; margin: 4px 0 0; color: var(--accent); }
+    .quran .w.hl { background: var(--accent-subtle); color: var(--accent); border-radius: 6px; padding: 0 3px; box-shadow: inset 0 -2px 0 var(--accent); }
+    .ar { font-family: "Amiri Quran", "Amiri", "Geeza Pro", serif; font-size: 1.25em; line-height: 1; direction: rtl; unicode-bidi: isolate; }
+    .quran .end { color: var(--secondary); font-size: 0.8em; padding: 0 2px; }
+    .quran .head { display: block; font-family: var(--font); direction: ltr; text-align: left; font-size: 13px; color: var(--secondary); line-height: 1.4; margin-top: 6px; }
+    .hidden-text { color: var(--secondary); font-size: 15px; margin: 12px 0; }
+
+    .recorder { margin: 22px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .big {
+      width: 84px; height: 84px; border-radius: 50%; border: 0; cursor: pointer;
+      background: var(--primary); display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
+    }
+    .big:disabled { opacity: 0.4; cursor: default; }
+    .big .ico { width: 30px; height: 30px; border-radius: 50%; background: var(--on-primary); }
+    .big.on { background: #d93636; }
+    .big.on .ico { border-radius: 6px; width: 26px; height: 26px; }
+    .clock { font: 600 20px var(--font); font-variant-numeric: tabular-nums; }
+    .meter { width: 180px; height: 6px; border-radius: 6px; background: var(--fill); overflow: hidden; }
+    .meter i { display: block; height: 100%; width: 0; background: var(--primary); transition: width 60ms linear; }
+    audio { width: 100%; margin-top: 4px; }
+
+    select, input[type="number"] {
+      font: 16px var(--font); padding: 10px 12px; border-radius: 12px; border: 1px solid var(--separator);
+      background: var(--bg); color: var(--text); min-height: 44px;
+    }
+    .pick { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 10px 0; }
+    .pick .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pick label { font-size: 13px; color: var(--secondary); display: grid; gap: 4px; }
+
+    .banner {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+      padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom));
+      background: var(--ink); color: var(--on-ink); font-size: 15px;
+      display: flex; gap: 12px; align-items: center; justify-content: space-between;
+    }
+    .banner button { background: none; border: 0; color: inherit; font: 600 15px var(--font); text-decoration: underline; cursor: pointer; }
+    .foot { margin-top: 40px; font-size: 13px; color: var(--secondary); }
+    .foot a { color: inherit; }
+    .err { color: #d93636; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <span class="brand" aria-label="Revisely">
+        <picture>
+          <source srcset="/assets/img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="/assets/img/logo-light.svg" width="108" height="32" alt="Revisely">
+        </picture>
+      </span>
+      <span class="muted" id="who" style="font-size:14px"></span>
+    </div>
+  </header>
+
+  <main id="app" class="rec" aria-live="polite"><p class="muted">Loading…</p></main>
+  <div id="banner" class="banner" hidden></div>
+
+  <script>
+  'use strict';
+  // Where takes go: the Apps Script web app's URL (scripts/record/README.md). Empty = not open yet.
+  const ENDPOINT = '';
+
+  const app = document.getElementById('app');
+  const bannerEl = document.getElementById('banner');
+  const MAX_SECONDS = 6 * 60;
+  const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+
+  const S = {
+    code: null, pid: null, endpoint: ENDPOINT, data: null,
+    local: { consent: false, profile: null, done: {}, takes: {}, choices: {}, skipped: {} },
+    stream: null, ctx: null, analyser: null, view: 'loading', item: null, pending: 0,
+  };
+
+  // ---------- small helpers ----------
+  // English with Arabic words in it: the Arabic in the Quran font, isolated so it reads right to left
+  const ARABIC_RUN = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+(?:\s+[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)*/g;
+  const mixed = (s) => esc(s).replace(ARABIC_RUN, (m) => `<span class="ar" lang="ar">${m}</span>`);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const arabicNumber = (n) => String(n).replace(/\d/g, (d) => ARABIC_DIGITS[d]);
+  const clock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const store = {
+    key: () => `revisely-record:${S.code}`,
+    load() { try { const v = JSON.parse(localStorage.getItem(this.key()) || 'null'); if (v) Object.assign(S.local, v); } catch (e) {} },
+    save() { try { localStorage.setItem(this.key(), JSON.stringify(S.local)); } catch (e) {} },
+  };
+
+  function readCode() {
+    const m = (location.hash + '&' + location.search).match(/[#?&]k=([A-Za-z0-9-]+)/);
+    const code = m && m[1];
+    return code && /^P\d{2,3}-[a-z0-9]{8,24}$/i.test(code) ? code : null;
+  }
+
+  // A local test server (scripts/record/mock_server.py) can stand in, on localhost only.
+  function localEndpoint() {
+    const m = location.search.match(/[?&]endpoint=([^&]+)/);
+    if (m && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return decodeURIComponent(m[1]);
+    return null;
+  }
+
+  // ---------- the server (Apps Script) ----------
+  async function api(op, body) {
+    if (body === undefined) {
+      const r = await fetch(`${S.endpoint}?op=${op}&k=${encodeURIComponent(S.code)}`);
+      return r.json();
+    }
+    // text/plain keeps it a simple request (no preflight), which Apps Script needs
+    const r = await fetch(S.endpoint, { method: 'POST', body: JSON.stringify({ op, k: S.code, ...body }) });
+    return r.json();
+  }
+
+  // ---------- takes waiting to upload (IndexedDB, so a closed tab loses nothing) ----------
+  const queue = {
+    db: null,
+    async open() {
+      if (this.db || !window.indexedDB) return this.db;
+      this.db = await new Promise((res) => {
+        const req = indexedDB.open('revisely-record', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('takes', { keyPath: 'key' });
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => res(null);
+      });
+      return this.db;
+    },
+    async tx(mode, fn) {
+      const db = await this.open();
+      if (!db) return null;
+      return new Promise((res) => {
+        try {
+          const t = db.transaction('takes', mode);
+          const out = fn(t.objectStore('takes'));
+          t.oncomplete = () => res(out && out.result !== undefined ? out.result : true);
+          t.onerror = () => res(null);
+          t.onabort = () => res(null);
+        } catch (e) { res(null); }
+      });
+    },
+    put(take) { return this.tx('readwrite', (s) => s.put(take)); },
+    remove(key) { return this.tx('readwrite', (s) => s.delete(key)); },
+    async all() { return (await this.tx('readonly', (s) => s.getAll())) || []; },
+  };
+  const memoryQueue = new Map(); // when IndexedDB isn't available
+
+  async function pendingTakes() {
+    const fromDb = (await queue.all()).filter((t) => t.code === S.code);
+    const keys = new Set(fromDb.map((t) => t.key));
+    return fromDb.concat([...memoryQueue.values()].filter((t) => !keys.has(t.key)));
+  }
+
+  function toBase64(blob) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1] || '');
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  let flushing = false;
+  async function flush() {
+    if (flushing) return;
+    flushing = true;
+    try {
+      for (const t of await pendingTakes()) {
+        try {
+          const data = await toBase64(t.blob);
+          const res = await api('upload', { item: t.item, take: t.take, mime: t.mime, ms: t.ms, choice: t.choice || null, ua: navigator.userAgent, data });
+          if (!res || !res.ok) throw new Error((res && res.error) || 'upload');
+          await queue.remove(t.key);
+          memoryQueue.delete(t.key);
+          if (S.waiting) S.waiting.delete(t.item);
+          S.local.done[t.item] = true;
+          store.save();
+        } catch (e) {
+          break; // try again later, in order
+        }
+      }
+    } finally {
+      flushing = false;
+      await updateBanner();
+      if (S.view === 'list') render();
+    }
+  }
+
+  let bannerSeq = 0;
+  async function updateBanner() {
+    const seq = ++bannerSeq;
+    const n = (await pendingTakes()).length;
+    if (seq !== bannerSeq) return; // a later count is on its way
+    S.pending = n;
+    if (!n) { bannerEl.hidden = true; return; }
+    bannerEl.hidden = false;
+    bannerEl.innerHTML = `<span>${n === 1 ? '1 recording is' : n + ' recordings are'} waiting to send. Keep this page open with a connection.</span><button type="button" id="retry">Try now</button>`;
+    document.getElementById('retry').onclick = flush;
+  }
+
+  // ---------- microphone ----------
+  async function getStream() {
+    if (S.stream && S.stream.getAudioTracks().some((t) => t.readyState === 'live')) return S.stream;
+    S.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
+    });
+    S.analyser = null;
+    return S.stream;
+  }
+
+  // Called at the start of a tap, before anything is awaited: iPhones only start audio inside the tap.
+  function wakeAudio() {
+    try {
+      if (!S.ctx) S.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (S.ctx.state === 'suspended') S.ctx.resume();
+    } catch (e) {}
+  }
+
+  function meter(el) {
+    try {
+      wakeAudio();
+      if (!S.analyser) {
+        S.analyser = S.ctx.createAnalyser();
+        S.analyser.fftSize = 1024;
+        S.ctx.createMediaStreamSource(S.stream).connect(S.analyser);
+      }
+    } catch (e) { return () => {}; }
+    const buf = new Float32Array(S.analyser.fftSize);
+    let on = true;
+    const tick = () => {
+      if (!on) return;
+      S.analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
+      el.style.width = `${Math.max(0, Math.min(100, (db + 60) * 1.8))}%`;
+      requestAnimationFrame(tick);
+    };
+    tick();
+    return () => { on = false; el.style.width = '0'; };
+  }
+
+  function recorderType() {
+    if (!window.MediaRecorder) return null;
+    const types = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+    return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+  }
+
+  // One take: start() resolves at once; stop() resolves with { blob, mime, ms }.
+  function startTake(stream) {
+    const type = recorderType();
+    const rec = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 96000 } : undefined);
+    const chunks = [];
+    const t0 = performance.now();
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const done = new Promise((res) => {
+      rec.onstop = () => {
+        const mime = (rec.mimeType || type || 'audio/mp4').split(';')[0];
+        res({ blob: new Blob(chunks, { type: mime }), mime, ms: Math.round(performance.now() - t0) });
+      };
+    });
+    rec.start();
+    return { t0, stop: () => { if (rec.state !== 'inactive') rec.stop(); return done; } };
+  }
+
+  // ---------- items ----------
+  const items = () => S.data.items;
+  const itemsOf = (part) => items().filter((x) => x.part === part);
+  const isDone = (id) => !!S.local.done[id];
+  const isHandled = (id) => isDone(id) || !!(S.local.skipped || {})[id];
+  function nextItem(after) {
+    const list = items();
+    const from = after ? list.findIndex((x) => x.id === after) + 1 : 0;
+    return list.slice(from).find((x) => !isHandled(x.id)) || list.find((x) => !isHandled(x.id)) || null;
+  }
+
+  function quranHtml(ayat, marks) {
+    const marked = new Set((marks || []).map((m) => `${m.s}:${m.a}:${m.w}`));
+    let html = '';
+    let lastSurah = null;
+    for (const v of ayat) {
+      if (v.s !== lastSurah) {
+        const sur = S.data.surahs[v.s - 1];
+        html += `<span class="head">${esc(sur.name)}</span>`;
+        lastSurah = v.s;
+      }
+      html += v.words.map((w, i) => `<span class="w${marked.has(`${v.s}:${v.a}:${i}`) ? ' hl' : ''}">${esc(w)}</span>`).join(' ');
+      html += ` <span class="end">﴿${arabicNumber(v.a)}﴾</span> `;
+    }
+    return html;
+  }
+
+  // ---------- screens ----------
+  function render() {
+    const views = { nolink, badlink, closed, offline, welcome, about, mic, list, item, done };
+    (views[S.view] || nolink)();
+    window.scrollTo(0, 0);
+  }
+
+  function nolink() {
+    app.innerHTML = `<h1>Recording</h1><p>This page is for invited reciters. Please open the personal link you were sent.</p>`;
+  }
+  function badlink() {
+    app.innerHTML = `<h1>This link isn’t working</h1><p>Please check you opened the whole link you were sent, or ask the person who sent it for a new one.</p>`;
+  }
+  function closed() {
+    app.innerHTML = `<h1>Not open yet</h1><p>Recording hasn’t started yet. Please try this link again later.</p>`;
+  }
+  function offline() {
+    app.innerHTML = `<h1>No connection</h1><p>This page needs the internet to start. Please check your connection.</p><div class="row-btns"><button class="btn" id="again">Try again</button></div>`;
+    document.getElementById('again').onclick = start;
+  }
+
+  function welcome() {
+    app.innerHTML = `
+      <h1>Help build Revisely’s recitation checker</h1>
+      <p>Revisely is building a checker that follows your recitation on the mushaf and points out mistakes. To make it accurate, it needs real people reciting, including some mistakes made on purpose.</p>
+      <p>Part 1 takes about 20 minutes, and Part 2 about 15 more if you have time. You can stop whenever you like and come back to this same link: what you’ve recorded is kept.</p>
+      <div class="note">
+        <p class="q">Before you start</p>
+        <ul class="plain" style="margin:6px 0 0">
+          <li>A quiet room, unless an item says otherwise.</li>
+          <li>Your phone’s own microphone: no earbuds or headphones.</li>
+          <li>Recite at your normal pace and in your normal voice.</li>
+        </ul>
+      </div>
+      <h2 style="margin-top:24px">What happens to your recordings</h2>
+      <ul class="plain" style="margin-top:10px">
+        <li><strong>What’s recorded:</strong> only what you record on this page, your answers to a few questions, and your phone type.</li>
+        <li><strong>No name:</strong> your link has a code, and only the person who sent it to you knows it’s yours.</li>
+        <li><strong>Who hears them:</strong> Revisely’s developer, and the software that builds the checker. They are never published or shared.</li>
+        <li><strong>What they’re for:</strong> building and testing Revisely’s recitation checking, including training its models. This may become a paid feature of the app.</li>
+        <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell the person who sent you the link, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
+      </ul>
+      <div class="agree" role="radiogroup" aria-label="Agreement">
+        <label><input type="radio" name="agree" value="adult"><span>I’m 18 or over, and I agree.</span></label>
+        <label><input type="radio" name="agree" value="guardian"><span>I’m under 18, and my parent or guardian has read this and agrees.</span></label>
+      </div>
+      <p class="err" id="err" hidden></p>
+      <button class="btn wide" id="go" disabled>Agree and continue</button>`;
+    const go = document.getElementById('go');
+    app.querySelectorAll('input[name="agree"]').forEach((r) => { r.onchange = () => { go.disabled = false; }; });
+    go.onclick = async () => {
+      const who = app.querySelector('input[name="agree"]:checked').value;
+      go.disabled = true;
+      try {
+        const res = await api('consent', { who, ua: navigator.userAgent, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, text: 'v1' });
+        if (!res.ok) throw new Error(res.error);
+        S.local.consent = true; store.save();
+        S.view = S.local.profile ? 'mic' : 'about'; render();
+      } catch (e) {
+        const err = document.getElementById('err');
+        err.hidden = false; err.textContent = 'That didn’t go through. Please check your connection and try again.';
+        go.disabled = false;
+      }
+    };
+  }
+
+  const QUESTIONS = [
+    ['memorized', 'How much of the Quran have you memorized?', [['all', 'All of it'], ['some', 'Some of it'], ['learning', 'I’m learning, or I read it']]],
+    ['arabic', 'Is Arabic your first language?', [['yes', 'Yes'], ['no', 'No']]],
+    ['riwaya', 'Which riwaya do you recite?', [['hafs', 'Ḥafṣ ʿan ʿĀṣim'], ['warsh', 'Warsh ʿan Nāfiʿ'], ['other', 'Another'], ['unsure', 'Not sure']]],
+    ['munfasil', 'How long do you hold the separated madd (as in بِمَآ أُنزِلَ)?', [['2', '2 counts'], ['4', '4 counts'], ['5', '5 counts'], ['unsure', 'Not sure']]],
+    ['sex', 'You are', [['m', 'Male'], ['f', 'Female']]],
+    ['age', 'Your age', [['u13', 'Under 13'], ['13-17', '13–17'], ['18-29', '18–29'], ['30-49', '30–49'], ['50+', '50 or over']]],
+  ];
+
+  function about() {
+    const p = S.local.profile || {};
+    app.innerHTML = `
+      <h1>A few questions</h1>
+      <p class="muted">They help us check the checker works for everyone. Skip any you like.</p>
+      ${QUESTIONS.map(([key, q, opts]) => `
+        <p class="q">${mixed(q)}</p>
+        <div class="choice" data-key="${key}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${p[key] === v}">${esc(l)}</button>`).join('')}</div>`).join('')}
+      <p class="err" id="err" hidden></p>
+      <button class="btn wide" id="go">Continue</button>`;
+    app.querySelectorAll('.choice').forEach((g) => {
+      g.onclick = (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        const on = b.getAttribute('aria-pressed') !== 'true';
+        g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+        b.setAttribute('aria-pressed', String(on));
+      };
+    });
+    document.getElementById('go').onclick = async () => {
+      const profile = {};
+      app.querySelectorAll('.choice').forEach((g) => {
+        const b = g.querySelector('button[aria-pressed="true"]');
+        if (b) profile[g.dataset.key] = b.dataset.v;
+      });
+      try {
+        const res = await api('profile', { profile, ua: navigator.userAgent });
+        if (!res.ok) throw new Error(res.error);
+      } catch (e) { /* answers are optional: keep going, they're kept on the phone */ }
+      S.local.profile = profile; store.save();
+      S.view = 'mic'; render();
+    };
+  }
+
+  function mic() {
+    app.innerHTML = `
+      <h1>Microphone check</h1>
+      <p>Your phone will ask to use the microphone: please allow it. Then say <span class="quran" style="font-size:22px;display:inline">بِسْمِ ٱللَّهِ</span> and watch the bar move.</p>
+      <div class="recorder">
+        <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
+        <p class="err" id="err" hidden></p>
+      </div>
+      <div class="row-btns"><button class="btn" id="allow">Turn on the microphone</button></div>`;
+    const allow = document.getElementById('allow');
+    allow.onclick = async () => {
+      wakeAudio();
+      const err = document.getElementById('err');
+      if (!navigator.mediaDevices || recorderType() === null) {
+        err.hidden = false; err.textContent = 'This browser can’t record. Please open the link in Safari (iPhone) or Chrome (Android).';
+        return;
+      }
+      try {
+        await getStream();
+        err.hidden = true;
+        meter(document.getElementById('lvl'));
+        allow.textContent = 'It works, continue';
+        allow.onclick = () => { S.view = 'list'; render(); };
+      } catch (e) {
+        err.hidden = false;
+        err.textContent = 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page.';
+      }
+    };
+  }
+
+  function list() {
+    const total = items().length;
+    const doneCount = items().filter((x) => isDone(x.id)).length;
+    const next = nextItem();
+    let html = `<h1>${doneCount === 0 ? 'Ready to record' : doneCount === total ? 'All done' : 'Your recordings'}</h1>
+      <p class="muted">${doneCount} of ${total} recorded.</p>
+      <div class="progress"><i style="width:${(100 * doneCount) / total}%"></i></div>
+      ${next ? `<div class="row-btns"><button class="btn wide" id="next">${doneCount ? 'Continue' : 'Start'}: ${esc(next.title)}</button></div>` : ''}`;
+    for (const part of S.data.parts) {
+      const its = itemsOf(part.n);
+      const n = its.filter((x) => isDone(x.id)).length;
+      html += `<h2 style="margin-top:32px">${esc(part.title)}</h2><p class="muted" style="margin:2px 0 0">About ${part.minutes} minutes${part.note ? '. ' + esc(part.note) : ''} · ${n} of ${its.length}</p>`;
+      for (const g of S.data.groups.filter((x) => x.part === part.n)) {
+        html += `<p class="group-title">${esc(g.title)}</p><ul class="items">`;
+        for (const it of its.filter((x) => x.group === g.id)) {
+          const waiting = S.waiting && S.waiting.has(it.id);
+          const skipped = !isDone(it.id) && isHandled(it.id);
+          html += `<li><button type="button" data-id="${it.id}"><span class="t">${esc(it.title)}${skipped ? ' <span class="muted">· skipped</span>' : ''}</span><span class="dot${isDone(it.id) ? ' done' : waiting ? ' wait' : skipped ? ' skip' : ''}">${isDone(it.id) ? CHECK : skipped ? '–' : ''}</span></button></li>`;
+        }
+        html += '</ul>';
+      }
+    }
+    html += `<p class="foot">Your code: ${esc(S.pid)} · ${esc(S.data.credit.split('·')[0])}· <a href="https://tanzil.net" rel="noopener">tanzil.net</a></p>`;
+    app.innerHTML = html;
+    const nb = document.getElementById('next');
+    if (nb) nb.onclick = () => openItem(next.id);
+    app.querySelectorAll('.items button').forEach((b) => { b.onclick = () => openItem(b.dataset.id); });
+    if (!next && !S.showList) { S.view = 'done'; render(); }
+  }
+
+  function openItem(id) { S.item = id; S.view = 'item'; render(); }
+
+  function item() {
+    const it = items().find((x) => x.id === S.item);
+    const its = itemsOf(it.part);
+    const pos = its.findIndex((x) => x.id === it.id) + 1;
+    const group = S.data.groups.find((g) => g.id === it.group);
+    const choice = S.local.choices[it.id] || null;
+    const textHtml = it.choose ? '' : (
+      `<div id="text" ${it.show ? '' : 'hidden'}>
+        ${it.istiadha ? `<p class="quran" style="color:var(--secondary);font-size:21px;margin-bottom:0">أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَـٰنِ ٱلرَّجِيمِ</p>` : ''}
+        <p class="quran">${quranHtml(it.ayat, it.marks)}</p>
+        ${it.then ? `<p class="muted" style="margin:0">Then, instead of Al-Baqarah 6:</p><p class="quran">${quranHtml(it.then, [])}</p>` : ''}
+      </div>
+      ${it.show ? '' : `<p class="hidden-text" id="hiddenText">Text hidden, so you recite from memory. <button class="link" id="show">Show text</button></p>`}`);
+    app.innerHTML = `
+      <button class="link" id="back">‹ All recordings</button>
+      <p class="muted" style="margin:6px 0 0">${esc(S.data.parts[it.part - 1].title)} · ${pos} of ${its.length} · ${esc(group.title)}</p>
+      <h1>${esc(it.title)}</h1>
+      <div class="note">${mixed(it.note)}${it.say ? `<div class="say"><span class="label">Say</span><p class="quran">${esc(it.say)}</p></div>` : ''}</div>
+      ${it.choose ? pickerHtml(choice) : ''}
+      ${textHtml}
+      <div class="recorder">
+        <button class="big" id="rec" aria-label="Record"><span class="ico"></span></button>
+        <div class="clock" id="clock">${isDone(it.id) ? 'Recorded' : 'Tap to record'}</div>
+        <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
+      </div>
+      <div id="after" hidden>
+        <audio id="play" controls preload="auto"></audio>
+        <div class="row-btns">
+          <button class="btn quiet" id="redo">Record again</button>
+          <button class="btn" id="save">Save and next</button>
+        </div>
+      </div>
+      <p class="err" id="err" hidden></p>
+      ${isDone(it.id) ? `<p class="muted" style="text-align:center">Already recorded. Recording again replaces it.</p>` : `<p style="text-align:center;margin-top:18px"><button class="link" id="skip" style="color:var(--secondary);font-weight:500">Skip this item</button></p>`}`;
+
+    document.getElementById('back').onclick = () => { stopAll(); S.view = 'list'; render(); };
+    const skip = document.getElementById('skip');
+    if (skip) skip.onclick = () => {
+      stopAll();
+      S.local.skipped = S.local.skipped || {}; S.local.skipped[it.id] = true; store.save();
+      const next = nextItem(it.id);
+      if (next) openItem(next.id); else { S.view = 'list'; render(); }
+    };
+    const show = document.getElementById('show');
+    if (show) show.onclick = () => { document.getElementById('text').hidden = false; document.getElementById('hiddenText').hidden = true; };
+    if (it.choose) wirePicker(it);
+    wireRecorder(it);
+  }
+
+  function pickerHtml(choice) {
+    const s = choice ? choice.s : 1;
+    const opts = S.data.surahs.map((x) => `<option value="${x.n}"${x.n === s ? ' selected' : ''}>${x.n} · ${esc(x.name)}</option>`).join('');
+    return `<div class="pick">
+      <label>Surah<select id="ps">${opts}</select></label>
+      <div class="two">
+        <label>From ayah<select id="pa1"></select></label>
+        <label>To ayah<select id="pa2"></select></label>
+      </div>
+    </div>`;
+  }
+
+  function wirePicker(it) {
+    const ps = document.getElementById('ps'), pa1 = document.getElementById('pa1'), pa2 = document.getElementById('pa2');
+    const saved = S.local.choices[it.id];
+    const fill = (sel, from, to, value) => {
+      sel.innerHTML = '';
+      for (let a = from; a <= to; a++) sel.add(new Option(String(a), String(a), false, a === value));
+    };
+    const refresh = (keep) => {
+      const n = S.data.surahs[Number(ps.value) - 1].ayat;
+      const a1 = keep && saved ? saved.a1 : Number(pa1.value) || 1;
+      fill(pa1, 1, n, Math.min(a1, n));
+      const a2 = keep && saved ? saved.a2 : Math.max(Number(pa2.value) || 0, Number(pa1.value));
+      fill(pa2, Number(pa1.value), n, Math.min(Math.max(a2, Number(pa1.value)), n));
+      S.local.choices[it.id] = { s: Number(ps.value), a1: Number(pa1.value), a2: Number(pa2.value) };
+      store.save();
+    };
+    ps.onchange = () => { pa1.value = '1'; pa2.value = '1'; refresh(false); };
+    pa1.onchange = () => refresh(false);
+    pa2.onchange = () => { S.local.choices[it.id].a2 = Number(pa2.value); store.save(); };
+    refresh(true);
+  }
+
+  let current = null; // the take being recorded
+  let stopMeter = () => {};
+  let ticker = null;
+  function stopAll() {
+    clearInterval(ticker);
+    stopMeter();
+    if (current) { current.stop(); current = null; }
+  }
+
+  function wireRecorder(it) {
+    const rec = document.getElementById('rec'), clk = document.getElementById('clock'), after = document.getElementById('after');
+    const play = document.getElementById('play'), err = document.getElementById('err');
+    let last = null;
+
+    const begin = async () => {
+      wakeAudio();
+      err.hidden = true;
+      after.hidden = true;
+      try { await getStream(); } catch (e) {
+        err.hidden = false; err.textContent = 'The microphone is blocked. Allow it for this site in your browser’s settings, then reload the page.';
+        return;
+      }
+      try { current = startTake(S.stream); } catch (e) {
+        err.hidden = false; err.textContent = 'Recording couldn’t start. Please reload the page and try again.';
+        return;
+      }
+      rec.classList.add('on'); rec.setAttribute('aria-label', 'Stop');
+      stopMeter = meter(document.getElementById('lvl'));
+      clk.textContent = '0:00';
+      ticker = setInterval(() => {
+        const ms = performance.now() - current.t0;
+        clk.textContent = clock(ms);
+        if (ms > MAX_SECONDS * 1000) end();
+      }, 250);
+    };
+    const end = async () => {
+      if (!current) return;
+      clearInterval(ticker); stopMeter();
+      const take = current; current = null;
+      rec.classList.remove('on'); rec.setAttribute('aria-label', 'Record');
+      last = await take.stop();
+      clk.textContent = clock(last.ms);
+      if (last.ms < 1500 || !last.blob.size) {
+        err.hidden = false; err.textContent = 'That was too short. Tap the button and recite, then tap again to stop.';
+        last = null; return;
+      }
+      play.src = URL.createObjectURL(last.blob);
+      after.hidden = false;
+    };
+    rec.onclick = () => (current ? end() : begin());
+    document.getElementById('redo').onclick = () => { last = null; after.hidden = true; begin(); };
+    document.getElementById('save').onclick = async () => {
+      if (!last) return;
+      if (it.choose && !S.local.choices[it.id]) return;
+      const takeNo = (S.local.takes[it.id] || 0) + 1;
+      S.local.takes[it.id] = takeNo;
+      if (S.local.skipped) delete S.local.skipped[it.id];
+      store.save();
+      const take = {
+        key: `${S.code}|${it.id}|${takeNo}`, code: S.code, item: it.id, take: takeNo,
+        mime: last.mime, ms: last.ms, blob: last.blob, choice: it.choose ? S.local.choices[it.id] : null,
+      };
+      let saved = null;
+      try { saved = await queue.put(take); } catch (e) { saved = null; }
+      if (saved === null) memoryQueue.set(take.key, take);
+      S.waiting = S.waiting || new Set(); S.waiting.add(it.id);
+      updateBanner();
+      flush();
+      const next = nextItem(it.id);
+      if (next && next.id !== it.id) openItem(next.id); else { S.view = 'list'; render(); }
+    };
+  }
+
+  function done() {
+    app.innerHTML = `
+      <h1>Jazākum Allāhu khayran</h1>
+      <p>You’ve been through every item. ${S.pending ? 'A few recordings are still sending: keep this page open until the bar at the bottom goes away.' : 'All of it has been sent.'}</p>
+      <p class="muted">You can close this page. If you want to redo an item, open your link again.</p>
+      <div class="row-btns"><button class="btn quiet" id="back">See your recordings</button></div>`;
+    document.getElementById('back').onclick = () => { S.view = 'list'; S.showList = true; list(); };
+  }
+
+  // ---------- start ----------
+  async function start() {
+    S.code = readCode();
+    S.endpoint = localEndpoint() || ENDPOINT;
+    if (!S.code) { S.view = 'nolink'; return render(); }
+    S.pid = S.code.split('-')[0].toUpperCase();
+    document.getElementById('who').textContent = `Code ${S.pid}`;
+    if (!S.endpoint) { S.view = 'closed'; return render(); }
+    store.load();
+    try {
+      const [data, status] = await Promise.all([
+        fetch('/record/items.json', { cache: 'no-cache' }).then((r) => r.json()),
+        api('status'),
+      ]);
+      S.data = data;
+      if (!status.ok) { S.view = status.error === 'closed' ? 'closed' : 'badlink'; return render(); }
+      for (const id of status.done || []) S.local.done[id] = true;
+      for (const [id, n] of Object.entries(status.takes || {})) S.local.takes[id] = Math.max(S.local.takes[id] || 0, n);
+      if (status.consent) S.local.consent = true;
+      store.save();
+    } catch (e) {
+      S.view = 'offline'; return render();
+    }
+    S.view = !S.local.consent ? 'welcome' : !S.local.profile ? 'about' : 'list';
+    render();
+    updateBanner();
+    flush();
+  }
+
+  window.addEventListener('online', flush);
+  setInterval(() => { if (S.pending) flush(); }, 30000);
+  window.addEventListener('hashchange', () => location.reload());
+  start();
+  </script>
+</body>
+</html>
