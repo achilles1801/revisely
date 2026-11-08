@@ -14,6 +14,7 @@ import { memorizeSuggestion } from '../../lib/activityAdd';
 import { parsePageRange } from '../../lib/memorizationLog';
 import { describePassage } from '../../lib/passages';
 import * as firestoreService from '../../services/firestoreService';
+import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import { typeV2 } from '../../theme/v2';
 import type { UserPage } from '../../types';
 import { BlockMark } from './BlockMark';
@@ -48,7 +49,8 @@ export function AddMemorizedSheet({
   const [what, setWhat] = useState<What>('pages');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [readings, setReadings] = useState<{ pages: number[]; startedAt: number }[]>([]);
-  const [usedReading, setUsedReading] = useState(false);
+  // The pages read, as used: exactly those, not every page from the first to the last (Nov 2026).
+  const [usedReading, setUsedReading] = useState<number[] | null>(null);
   const [saving, setSaving] = useState(false);
 
   // The pages read that day (timed sessions), offered when they are not memorized yet.
@@ -75,24 +77,24 @@ export function AddMemorizedSheet({
     readAt != null && Number.isFinite(readAt) ? `read ${partOfDay(readAt, dayName === 'today')}` : `read ${dayName}`,
   ].join(' · ');
 
-  const pageNumbers = parsePageRange(from, to) ?? [];
   const range = parsePageRange(from, to);
+  const pageNumbers = usedReading ?? range ?? [];
   const minutesValue = minutes.trim() === '' ? null : Number(minutes);
   const minutesOk = minutesValue === null || (Number.isInteger(minutesValue) && minutesValue >= 0);
   const canAdd = range != null && minutesOk && !saving && !!user;
 
   const useReading = () => {
-    if (suggestion.length === 0) return;
     if (usedReading) {
       setFrom('');
       setTo('');
-      setUsedReading(false);
+      setUsedReading(null);
       return;
     }
+    if (suggestion.length === 0) return;
     setWhat('pages');
     setFrom(String(suggestion[0]));
     setTo(String(suggestion[suggestion.length - 1]));
-    setUsedReading(true);
+    setUsedReading(suggestion);
   };
 
   const handleAdd = async () => {
@@ -100,12 +102,16 @@ export function AddMemorizedSheet({
     setSaving(true);
     try {
       const changed = pageNumbers.filter((p) => !memorized.has(p));
+      // Memorized on the day it is added to: now for today, that day (at noon, its own date in any
+      // zone) for an earlier one. It said today for every day (Nov 2026).
+      const [y, m, d] = day.split('-').map(Number);
+      const memorizedOn = day === getRevisionDayForUser(user) ? new Date().toISOString() : new Date(y, m - 1, d, 12).toISOString();
       if (changed.length > 0) {
         const inRange = new Set(pageNumbers);
         await updatePages(
           (pages ?? []).map((p: UserPage) =>
             inRange.has(p.pageNumber) && p.status !== 'memorized'
-              ? { ...p, status: 'memorized' as const, dateMemorized: new Date().toISOString() }
+              ? { ...p, status: 'memorized' as const, dateMemorized: memorizedOn }
               : p,
           ),
           changed,
@@ -121,7 +127,7 @@ export function AddMemorizedSheet({
       setFrom('');
       setTo('');
       setMinutes('');
-      setUsedReading(false);
+      setUsedReading(null);
       setWhat('pages');
       onClose();
     } finally {
@@ -174,11 +180,11 @@ export function AddMemorizedSheet({
             from={from}
             to={to}
             onFrom={(v) => {
-              setUsedReading(false);
+              setUsedReading(null);
               setFrom(v);
             }}
             onTo={(v) => {
-              setUsedReading(false);
+              setUsedReading(null);
               setTo(v);
             }}
             placeholders
@@ -207,7 +213,7 @@ export function AddMemorizedSheet({
         onUse={(r) => {
           setFrom(String(r.from));
           setTo(String(r.to));
-          setUsedReading(false);
+          setUsedReading(null);
         }}
       />
     </Sheet>

@@ -42,7 +42,7 @@ describe('Add to the day (ACT-13)', () => {
   it('[ACT-13] pages added as Revised show in the day’s Revised block as soon as the sheet closes', async () => {
     const app = await openToday(await account());
     expect(shown(app, 'activity-block-revised')).toBe(false);
-    await new AddToDay(app).revised(6, 7);
+    await new AddToDay(app).revisedElsewhere([6, 7]);
     await app.until(() => shown(app, 'activity-block-revised'), 'the Revised block', 10_000);
     await app.close();
   });
@@ -68,7 +68,7 @@ describe('Add to the day (ACT-13)', () => {
     const app = await openToday(phone);
     await phone.goOffline();
     const add = new AddToDay(app);
-    await add.revised(6, 7);
+    await add.revisedElsewhere([6, 7]);
     await app.until(() => shown(app, 'activity-block-revised'), 'the Revised block, offline', 10_000);
     await add.memorized(21, 22);
     await app.until(() => shown(app, 'activity-block-memorized'), 'the Memorized block, offline', 10_000);
