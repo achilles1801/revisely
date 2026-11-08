@@ -8,7 +8,7 @@ import { shiftDay } from '../../lib/journal';
 import { logger } from '../../lib/logger';
 import { revoBackAt } from '../../lib/revo/availability';
 import { REVO_MESSAGES, RevoError, revoBackend } from '../../lib/revo/backend';
-import { revoChips, revoGreeting } from '../../lib/revo/greeting';
+import { greetingState, revoChips, revoGreeting, type GreetingOpens } from '../../lib/revo/greeting';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal } from '../../lib/revo/types';
 import { atListEnd } from '../../lib/revo/sheetFit';
@@ -18,11 +18,12 @@ import { auth } from '../../lib/firebase';
 import { ChartCard, PlanCard } from './RevoCards';
 import { knownAction } from '../../lib/revo/screens';
 import { RevoComposer } from './RevoComposer';
-import { Chips, FeedbackRow, LimitCard, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
+import { Chips, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
 
 /**
- * A conversation with Revo. A new one opens on a line written from today's data (no call),
- * copy and thumbs, suggestions, and the composer. A question shows at once with Revo thinking;
+ * A conversation with Revo. A new one opens on a line written from today's data as it is now (no
+ * call; REVO-34), copy and thumbs, today's Day in review as a row until it is opened, suggestions,
+ * and the composer. A question shows at once with Revo thinking;
  * the answer comes with at most one small chart and one suggested action, which waits for a
  * tap. When the day's questions are used, the composer greys out and says when Revo is back.
  */
@@ -40,6 +41,9 @@ export function RevoChat({
   onAction,
   onOpenDay,
   onOff,
+  review = null,
+  onOpenReview,
+  opening = null,
 }: {
   uid: string;
   chatId: string | null;
@@ -59,11 +63,16 @@ export function RevoChat({
   onOpenDay?: (day: string) => void;
   /** The server says Revo is off for this account: show the opt-in (with what was asked kept for after). */
   onOff?: () => void;
+  /** Today's Day in review, not opened yet: when it was written. A new conversation offers it under the greeting. */
+  review?: { at: number } | null;
+  onOpenReview?: () => void;
+  /** This open of a new conversation, counted on the phone (RevoHost): a second open with nothing changed says something else (REVO-35). */
+  opening?: GreetingOpens | null;
 }) {
   const { palette } = useTheme();
   const haptics = useHaptics();
   const { user, saveUser } = useApp();
-  const { day, context, build, sources } = useRevoContext();
+  const { day, context, extras, build, sources } = useRevoContext();
   const backend = revoBackend();
   const [messages, setMessages] = useState<RevoMessage[]>([]);
   // A question sent and not answered yet (shown with Revo thinking).
@@ -95,9 +104,11 @@ export function RevoChat({
   const outOfQuestions = left === 0 || refusal?.kind === 'daily';
   const back = revoBackAt(user, new Date());
   const name = greetingName(user?.name, auth.currentUser?.displayName ?? null) || null;
-  const greeting = useMemo(() => (context ? revoGreeting(name, context) : null), [context, name]);
+  // How many times today's greeting opened in this state before (0 once anything changed).
+  const open = context && opening && opening.day === day && opening.state === greetingState(context) ? opening.n : 0;
+  const greeting = useMemo(() => (context ? revoGreeting(name, context, open, extras) : null), [context, name, open, extras]);
   const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
-  const chips = chatId ? (lastRevo?.chips ?? []) : context ? revoChips(context) : [];
+  const chips = chatId ? (lastRevo?.chips ?? []) : context ? revoChips(context, open, extras) : [];
 
   const ask = async (question: string) => {
     const ctx = build();
@@ -199,6 +210,7 @@ export function RevoChat({
           <View style={styles.revo}>
             <RevoText text={greeting} greeting testID="revo-greeting" />
             <FeedbackRow onCopy={() => copy(greeting)} testID="revo-greeting" />
+            {review && onOpenReview ? <ReviewRow at={review.at} onOpen={onOpenReview} /> : null}
           </View>
         ) : null}
         {messages.map((m) =>

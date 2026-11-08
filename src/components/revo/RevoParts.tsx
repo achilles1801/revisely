@@ -209,6 +209,35 @@ export function LimitCard({ title, body }: { title: string; body: string }) {
   );
 }
 
+/**
+ * Today's Day in review, under the greeting until it is opened (REVO-34): its time says it was
+ * written earlier, so the sheet never opens on it.
+ */
+export function ReviewRow({ at, onOpen }: { at: number; onOpen: () => void }) {
+  const { palette } = useTheme();
+  const time = new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return (
+    <Tap
+      onPress={onOpen}
+      style={[styles.review, { backgroundColor: palette.bubble }]}
+      accessibilityRole="button"
+      accessibilityLabel={`Day in review, ${time}`}
+      testID="revo-review"
+    >
+      <Ionicons name="moon-outline" size={22} color={palette.text} />
+      <View style={styles.reviewText}>
+        <Text style={[styles.reviewTitle, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
+          Day in review
+        </Text>
+        <Text style={[styles.reviewLine, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+          {time}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={palette.secondary} />
+    </Tap>
+  );
+}
+
 /** Revo is thinking: three dots that pulse (still with Reduce Motion). */
 export function Typing() {
   const { palette } = useTheme();
@@ -274,6 +303,10 @@ const styles = StyleSheet.create({
   limitHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   limitTitle: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
   limitBody: { fontSize: 15, lineHeight: 21 },
+  review: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  reviewText: { flex: 1, gap: 2 },
+  reviewTitle: { fontSize: 15, fontWeight: '600' },
+  reviewLine: { fontSize: 13 },
   typing: { flexDirection: 'row', gap: 6, paddingVertical: 10 },
   typingDot: { width: 7, height: 7, borderRadius: 3.5 },
 });

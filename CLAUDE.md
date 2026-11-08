@@ -1216,7 +1216,11 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   `lib/passages`), with the page numbers. The server writes the context out in plain words for the model
   (weekdays, never dates, field names or JSON). Attachments (`lib/revo/attachments`) go only with the question they were
   picked for; a recording is its length and pages, never audio. The greeting and chips are written on the
-  phone (`lib/revo/greeting`), no call. Charts are named by the model and drawn from the phone's own data
+  phone (`lib/revo/greeting`), no call. Every open is a new conversation on a greeting written then (REVO-34;
+  an old chat only from History, today's Day in review from a row under the greeting, never opened on). It
+  doesn't repeat itself (REVO-35): `RevoHost` counts the day's opens per state (`@revo_greeting_opens:<uid>`),
+  so "Today's N pages are done" comes once, then tomorrow's start, a weak part, the week, the share memorized in
+  turn (Majd, Nov 7 2026: the same done line on every open was "irrelevant now"). Charts are named by the model and drawn from the phone's own data
   (`lib/revo/charts`); an action ("Add to my plan": tomorrow's carry, `carryForTomorrow`) waits for a tap.
 - **Attachments** (+; REVO-32, REVO-33, Nov 7 2026): a surah, a juz, pages or a day go with their facts, worked out
   on the phone by `lib/revo/facts` from the sources Insights, Activity and the streak read, the way they read them

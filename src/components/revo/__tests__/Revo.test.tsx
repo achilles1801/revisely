@@ -67,11 +67,17 @@ function Chat({
   onAction = jest.fn(),
   onOff,
   attached = [],
+  review = null,
+  onOpenReview,
+  opening = null,
 }: {
   usage?: { day: string; count: number };
   onAction?: jest.Mock;
   onOff?: jest.Mock;
   attached?: import('../../../lib/revo/types').RevoAttachment[];
+  review?: { at: number } | null;
+  onOpenReview?: jest.Mock;
+  opening?: import('../../../lib/revo/greeting').GreetingOpens | null;
 }) {
   const [chatId, setChatId] = React.useState<string | null>(null);
   const [attachments, setAttachments] = React.useState(attached);
@@ -90,6 +96,9 @@ function Chat({
         onExpand={jest.fn()}
         onAction={onAction}
         onOff={onOff}
+        review={review}
+        onOpenReview={onOpenReview}
+        opening={opening}
       />
     </ThemeProvider>
   );
@@ -98,6 +107,34 @@ function Chat({
 const flush = () => act(async () => {});
 
 describe('Revo’s conversation', () => {
+  it('[REVO-34] a new conversation offers today’s Day in review as a row under the greeting, never as what it opens on; a tap opens it', async () => {
+    const onOpenReview = jest.fn();
+    const at = new Date(2026, 10, 3, 20, 5).getTime();
+    const { rerender } = render(<Chat review={{ at }} onOpenReview={onOpenReview} />);
+    await flush();
+    expect(screen.getByTestId('revo-greeting')).toBeTruthy();
+    const row = screen.getByTestId('revo-review');
+    expect(row.props.accessibilityLabel).toBe(`Day in review, ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+    fireEvent.press(row);
+    expect(onOpenReview).toHaveBeenCalledTimes(1);
+    // Opened (or none today): no row.
+    rerender(<Chat />);
+    await flush();
+    expect(screen.queryByTestId('revo-review')).toBeNull();
+  });
+
+  it('[REVO-35] the open counted on the phone picks the greeting: a second open in the same state says something else; a stale count (another state or day) doesn’t', async () => {
+    render(<Chat opening={{ day: DAY, state: 'todo:6', n: 1 }} />);
+    await flush();
+    expect(plainText(String(screen.getByTestId('revo-greeting').props.children))).toBe(
+      'Salaam Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. This week you’ve revised 6 pages on 1 day.',
+    );
+    screen.unmount();
+    render(<Chat opening={{ day: DAY, state: 'todo:2', n: 3 }} />);
+    await flush();
+    expect(plainText(String(screen.getByTestId('revo-greeting').props.children))).toMatch(/It’s rated weak\. Want a short plan for it\?$/);
+  });
+
   it('[REVO-24] the conversation keeps its end in view when the list gets shorter (the keyboard), unless scrolled up', async () => {
     render(<Chat />);
     await flush();
