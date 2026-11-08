@@ -1,7 +1,8 @@
 # A fresh install, its clock at CLOCK, with an onboarded account the app makes by itself at
 # launch (src/lib/e2e/account.ts): the calls the sign-up and onboarding screens make, in their
 # order, without the screens. Page 1 and Juz 30 memorized (24 pages), 10 pages a day, the day
-# resetting at BOUNDARY (midnight | fajr). Leaves the address in output.email, on Home.
+# resetting at BOUNDARY (midnight | fajr). Leaves the address in output.email, on Home, with all of
+# it on the server.
 # Through the screens this took 1.5–2.5 minutes of every flow (Nov 7 2026); 01-onboarding still
 # goes through them (signup.yaml, onboard.yaml).
 appId: com.revisionbuddy.app
@@ -57,3 +58,7 @@ appId: com.revisionbuddy.app
     file: clock.yaml
     env:
       AT: ${CLOCK}
+# The account is on the server before the flow goes on: the app sends what it made from its
+# outbox, and a step that reads or writes the server as its admin (server-account.js, the seeds)
+# would race it (subflows/app-sent.yaml).
+- runFlow: app-sent.yaml
