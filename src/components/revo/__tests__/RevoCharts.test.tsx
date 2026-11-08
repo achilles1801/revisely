@@ -495,7 +495,7 @@ describe('memorized by month', () => {
   });
 });
 
-describe('Smart Tracking off (REVO-34)', () => {
+describe('Smart Tracking off (REVO-36)', () => {
   it('a table leaves out weak and strength, and a row says when and how often instead of a strip', async () => {
     const tally = { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 };
     const t = { days: 2, minEach: 2, maxEach: 2 };

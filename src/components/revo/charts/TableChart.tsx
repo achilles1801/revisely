@@ -35,7 +35,7 @@ export function TableChart({
   userPages: readonly UserPage[];
   onReviseFirst?: (pages: number[]) => Promise<void>;
   onOpenPage?: (page: number) => void;
-  /** The account's Smart Tracking: off, no weak or strength column and no strip (REVO-34). */
+  /** The account's Smart Tracking: off, no weak or strength column and no strip (REVO-36). */
   smart?: boolean;
   testID?: string;
 }) {
@@ -143,7 +143,7 @@ function RowDetail({
   return (
     <View style={styles.detail} testID={`${testID}-detail`}>
       <DetailLine text={line} />
-      {/* Smart Tracking off: when and how often, in place of the strip (REVO-34). */}
+      {/* Smart Tracking off: when and how often, in place of the strip (REVO-36). */}
       {!smart && byJuz ? <DetailLine text={recencyLine(row.facts)} testID={`${testID}-recency`} /> : null}
       {/* Nothing rated (not memorized, or never revised): no strip, only where to go. */}
       {smart && strip.some((s) => s.band) ? (

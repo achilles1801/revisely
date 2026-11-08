@@ -2,7 +2,7 @@
  * Revo's Firestore store (firebase-admin). Only these functions write Revo's documents; the
  * rules let the owner read them and change only a few fields (firestore.rules).
  *   users/{uid}.previewTester                      read: the tester gate
- *   users/{uid}.smartTrackingEnabled               read: whether Revo speaks of ratings (REVO-34)
+ *   users/{uid}.smartTrackingEnabled               read: whether Revo speaks of ratings (REVO-36)
  *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn; optIn is the Ask coach's
  *   revoUsage/{uid}                                { uid, day, count }: questions on that revision day
  *   users/{uid}/revoChats/{chatId}                 { uid, kind, title, day, createdAt, updatedAt, turns, meta? }

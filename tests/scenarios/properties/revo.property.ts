@@ -507,11 +507,11 @@ describe('the model and the prompt (REVO-6)', () => {
   });
 });
 
-describe('Smart Tracking off (REVO-34)', () => {
+describe('Smart Tracking off (REVO-36)', () => {
   const allowed = new Set([548, 549, 550, 12]);
   const reply = (chart: unknown) => JSON.stringify({ text: 'Juz 28.', chart });
 
-  it('[REVO-34] a ratings chart is dropped; a table loses its weak and strength columns, or goes; the answer is kept', () => {
+  it('[REVO-36] a ratings chart is dropped; a table loses its weak and strength columns, or goes; the answer is kept', () => {
     const off = { firstTurn: false, smartTracking: false };
     expect(parseReply(reply({ kind: 'pageRatings', title: 'Two', pages: [548, 549] }), allowed, off)).toEqual({ text: 'Juz 28.', remember: [] });
     expect(parseReply(reply({ kind: 'table', title: 'Juz', juz: [27, 28], columns: ['lastRevised', 'weak', 'strength'] }), allowed, off)!.visual).toEqual({
@@ -523,7 +523,7 @@ describe('Smart Tracking off (REVO-34)', () => {
     expect(parseReply(reply({ kind: 'pageRatings', title: 'Two', pages: [548] }), allowed, { firstTurn: false, smartTracking: true })!.chart).toBeTruthy();
   });
 
-  it('[REVO-34] Revo isn’t told ratings or weak pages, and is told Smart Tracking is off', () => {
+  it('[REVO-36] Revo isn’t told ratings or weak pages, and is told Smart Tracking is off', () => {
     const on = contextText(DAY, context(), []);
     const off = contextText(DAY, context(), [], { smartTracking: false });
     expect(on).toMatch(/Ratings: 6 weak/);
@@ -535,7 +535,7 @@ describe('Smart Tracking off (REVO-34)', () => {
     expect(REVO_SYSTEM_PROMPT).toMatch(/When the context says Smart Tracking is off/);
   });
 
-  it('[REVO-34] an attached part goes without its ratings or weak spots', () => {
+  it('[REVO-36] an attached part goes without its ratings or weak spots', () => {
     const facts = {
       name: 'Juz 28', pages: 20, memorized: 20,
       revised: { last7: { days: 1, minEach: 1, maxEach: 1 }, last30: { days: 2, minEach: 2, maxEach: 2 }, all: { days: 4, minEach: 4, maxEach: 4 } },
@@ -552,7 +552,7 @@ describe('Smart Tracking off (REVO-34)', () => {
     expect(off).toContain('Last revised today');
   });
 
-  it('[REVO-34] the server reads the setting: the request says it is off, the reply loses its ratings chart, and the cache keeps them apart', async () => {
+  it('[REVO-36] the server reads the setting: the request says it is off, the reply loses its ratings chart, and the cache keeps them apart', async () => {
     const f = fakeStore({ smartTracking: false });
     const m = model(json({ chart: { kind: 'pageRatings', title: 'Two', pages: [548, 549] } }));
     const r = await handleRevoAsk(U, ask(), deps(f.store, m.call));

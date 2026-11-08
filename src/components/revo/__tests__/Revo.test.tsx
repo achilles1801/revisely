@@ -170,7 +170,7 @@ describe('Revo’s conversation', () => {
     expect(mockCopy).toHaveBeenCalledWith(expect.stringMatching(/^Salaam Maryam\./));
   });
 
-  it('[REVO-34] with Smart Tracking off, a ratings chart isn’t drawn: the answer and its plan still are', async () => {
+  it('[REVO-36] with Smart Tracking off, a ratings chart isn’t drawn: the answer and its plan still are', async () => {
     mockUser.smartTrackingEnabled = false;
     try {
       render(<Chat />);

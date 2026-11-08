@@ -32,7 +32,7 @@ export interface ChartHandlers {
  */
 export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVisual; day: string; sources?: () => FactSources | null } & ChartHandlers) {
   const { logs, pages, user } = useApp();
-  // Ratings mean something only with Smart Tracking on; off, the charts show recency (REVO-34).
+  // Ratings mean something only with Smart Tracking on; off, the charts show recency (REVO-36).
   const smart = smartTrackingOn(user);
   // What the plan had for each day, and a day's facts, as Revo's attachments read them.
   const reads = useMemo(() => {
@@ -94,7 +94,7 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
     return <WeeksChart title={chart.title} weeks={chart.weeks} today={day} logs={logs} facts={reads?.facts} planned={reads?.planned} onOpenDay={handlers.onOpenDay} />;
   }
   if (chart.kind === 'pageRatings') {
-    // Ratings over time: nothing to show without Smart Tracking (REVO-34).
+    // Ratings over time: nothing to show without Smart Tracking (REVO-36).
     if (!smart) return null;
     return <PageRatingsChart title={chart.title} pages={chart.pages} today={day} logs={logs} userPages={pages} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
   }

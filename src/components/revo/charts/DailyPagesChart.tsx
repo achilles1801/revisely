@@ -41,7 +41,7 @@ export function DailyPagesChart({
   facts?: (day: string) => RevoDayFacts | null;
   planPages?: (day: string) => readonly number[];
   onOpenDay?: (day: string) => void;
-  /** The account's Smart Tracking: off, no ratings strip (REVO-34). */
+  /** The account's Smart Tracking: off, no ratings strip (REVO-36). */
   smart?: boolean;
   testID?: string;
 }) {

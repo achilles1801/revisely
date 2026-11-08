@@ -36,7 +36,7 @@ export function JuzMapChart({
   preview?: (pages: number[]) => string | null;
   onReviseFirst?: (pages: number[]) => Promise<void>;
   onOpenPage?: (page: number) => void;
-  /** The account's Smart Tracking: off, no strength strip (REVO-34); `preview` says when and how often. */
+  /** The account's Smart Tracking: off, no strength strip (REVO-36); `preview` says when and how often. */
   smart?: boolean;
   testID?: string;
 }) {

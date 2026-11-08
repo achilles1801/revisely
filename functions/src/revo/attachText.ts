@@ -31,7 +31,7 @@ function planText(window: string, t: RevoPlanTally): string {
   return `${window}: on the plan on ${count(t.days, 'day')}, ${count(t.pages, 'page')} in all: ${parts.join(', ')}`;
 }
 
-/** What the model is told depends on Smart Tracking (REVO-34): off, it hears nothing of ratings. */
+/** What the model is told depends on Smart Tracking (REVO-36): off, it hears nothing of ratings. */
 export interface AttachTextOptions {
   smartTracking?: boolean;
 }
@@ -44,7 +44,7 @@ function passageText(label: string, f: RevoPassageFacts, smart = true): string {
   }
   lines.push(`- Memorized: ${f.memorized} of its ${count(f.pages, 'page')}.`);
 
-  // Smart Tracking off (REVO-34): no ratings and no weak spots; when and how often say the rest.
+  // Smart Tracking off (REVO-36): no ratings and no weak spots; when and how often say the rest.
   if (smart) {
     const s = f.strength;
     const rated = s.weak + s.moderate + s.strong;
@@ -116,7 +116,7 @@ function dayText(label: string, f: RevoDayFacts, smart = true): string {
   lines.push(f.memorized.pages > 0 ? `- Marked memorized that day: ${count(f.memorized.pages, 'page')}${f.memorized.name ? ` (${f.memorized.name})` : ''}.` : '- Marked memorized that day: none.');
   const ra = f.ratings;
   if (!smart) {
-    // Smart Tracking off (REVO-34): the day's ratings aren't told.
+    // Smart Tracking off (REVO-36): the day's ratings aren't told.
   } else if (ra.weak + ra.moderate + ra.strong === 0) lines.push('- Ratings given: none.');
   else {
     const weak = ra.weak ? `${ra.weak} weak${ra.weakName ? ` (${ra.weakName}, ${ra.weakPages.length === 1 ? 'page' : 'pages'} ${ra.weakPages.join(', ')})` : ''}` : '0 weak';

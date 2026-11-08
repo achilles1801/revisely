@@ -42,7 +42,7 @@ export function TimelineChart({
   today: string;
   logs: readonly RevisionLog[];
   onOpenDay?: (day: string) => void;
-  /** The account's Smart Tracking: off, the dots carry no rating (REVO-34). */
+  /** The account's Smart Tracking: off, the dots carry no rating (REVO-36). */
   smart?: boolean;
   testID?: string;
 }) {

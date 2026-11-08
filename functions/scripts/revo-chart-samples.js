@@ -10,7 +10,7 @@
  *   cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/revo-chart-samples.js \
  *     [--times 3] [--smart-tracking off] [--out <file.md>] [--dry]
  *
- * With `--smart-tracking off` the account has Smart Tracking off (REVO-34, Majd's own setting): the
+ * With `--smart-tracking off` the account has Smart Tracking off (REVO-36, Majd's own setting): the
  * requests say so, and it also exits 1 if the model picks a ratings chart or a weak or strength
  * column (which the server would drop).
  *

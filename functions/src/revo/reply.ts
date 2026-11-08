@@ -242,7 +242,7 @@ function salvageText(raw: string): string | null {
  * answer to show (the model's object had no text).
  */
 /**
- * With Smart Tracking off (REVO-34) nothing shows strength: a ratings chart is dropped, and a
+ * With Smart Tracking off (REVO-36) nothing shows strength: a ratings chart is dropped, and a
  * table loses its weak and strength columns (and goes when none are left).
  */
 function withoutStrength(out: RevoReplyParts): void {

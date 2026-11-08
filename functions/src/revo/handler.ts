@@ -72,7 +72,7 @@ export type ReserveResult = { ok: true; count: number } | { ok: false; reason: '
 export interface RevoStore {
   isPreviewTester(uid: string): Promise<boolean>;
   /**
-   * users/{uid}.smartTrackingEnabled, as the app reads it: off unless turned on (REVO-34). Left out
+   * users/{uid}.smartTrackingEnabled, as the app reads it: off unless turned on (REVO-36). Left out
    * (an older store), Revo answers as before the setting was read: with ratings.
    */
   smartTracking?(uid: string): Promise<boolean>;
@@ -157,7 +157,7 @@ const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
 /** The answer cache's key: the day, the question as typed (normalized), the context and the memory in use. */
 export function answerKey(day: string, question: string, context: RevoContext, memoryIds: readonly string[], smartTracking = true): string {
-  // With Smart Tracking off the answer differs (REVO-34); on, the key is what it always was.
+  // With Smart Tracking off the answer differs (REVO-36); on, the key is what it always was.
   const input = JSON.stringify({ day, question: norm(question), context, memory: [...memoryIds].sort(), ...(smartTracking ? {} : { smartTracking: false }) });
   return createHash('sha256').update(input).digest('hex');
 }
@@ -315,7 +315,7 @@ async function remember(
   return { ids: merged.after.map((m) => m.id), added: merged.add.length };
 }
 
-/** Whether the account has Smart Tracking on (REVO-34). */
+/** Whether the account has Smart Tracking on (REVO-36). */
 async function smartTrackingOf(deps: RevoDeps, uid: string): Promise<boolean> {
   return deps.store.smartTracking ? deps.store.smartTracking(uid) : true;
 }
