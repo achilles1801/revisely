@@ -4,19 +4,17 @@
 // Pure: the sheet (components/activity/JuzSheet) draws what this returns.
 
 import { getJuzForPage, getJuzRange, getSurahsForPage } from './quranData';
-import { ayahOf, ayahsOnPage, suraOf } from './ayahKeys';
+import { ayahOf, ayahsOnPage, pageOfAyah, suraOf } from './ayahKeys';
+import { memorizedAyahsOnPage, pageShare } from './memorizedAyahs';
 import { daysSince, lastRevisedWords, recencyLine, timesWord } from './recency';
 import { describeSurahs } from './pageRanges';
-import { pageRunEnds, surahName } from './passages';
+import { describeAyahs, pageRunEnds, surahName } from './passages';
 import { strengthOf, type Strength } from './activityDayParts';
 
 /** How recently a memorized page was revised: the Coverage tiles' bands (ACT-4). */
 export type Recency = 'week' | 'month' | 'older';
 
-/**
- * A page of the juz. `learning`: partly memorized (`in_progress`). The memorization session gives it
- * its own look ("being learned"); for now it is drawn as not memorized.
- */
+/** A page of the juz. `learning`: partly memorized (`in_progress`), drawn filled by its share (MEM-7). */
 export type JuzCellState = 'not-memorized' | 'learning' | Strength | Recency;
 
 export interface JuzSheetPage {
@@ -25,6 +23,8 @@ export interface JuzSheetPage {
   weaknessRating?: number;
   lastRevisedDate?: string | null;
   skipCount?: number;
+  /** A page in part: its memorized ayahs (MEM-1). */
+  verses?: number[] | null;
 }
 
 export interface JuzSheetInput {
@@ -67,15 +67,22 @@ export interface JuzSheetModel {
   times: string;
   /** Over 30 days since a memorized page of it was revised, or one never was (the untouched juz). */
   stale: boolean;
-  cells: { page: number; state: JuzCellState }[];
+  /** `share`: how much of a page being learned is memorized, 0–1 (MEM-7); absent for the rest. */
+  cells: { page: number; state: JuzCellState; share?: number }[];
   /** The strip's two ends, by surah. */
   ends: [string, string];
   /** Strength's counts (with Smart Tracking) or recency's, over the memorized pages. */
   counts: { state: Strength | Recency; n: number }[];
   surahs: JuzSurahRow[];
   memorizedPages: number[];
-  /** Pages being learned: the memorization session's "being learned" goes here. */
+  /** Pages being learned (in part, MEM-7). */
   learning: number[];
+  /** Begun but not revised yet: the headline is "Being learned", with `learningText` beside it. */
+  beingLearned: boolean;
+  /** "Al-Mulk 1–20 so far": what of the surahs being learned is memorized here; null with none. */
+  learningText: string | null;
+  /** The first ayah not memorized on a page being learned: "Al-Mulk 21", and its page. */
+  continueAt: { page: number; label: string } | null;
 }
 
 /** "3 times" for a count of skips (recency's "once", "twice" are for revisions: lib/recency). */
@@ -87,17 +94,21 @@ export function recencyOf(lastDay: string | null | undefined, today: string): Re
   return d < 7 ? 'week' : d < 30 ? 'month' : 'older';
 }
 
+/** Ayah numbers' first run: "17–24" ("5"), and ", …" when more follow. */
+function firstRun(nums: number[]): { text: string; one: boolean } {
+  const sorted = [...new Set(nums)].sort((a, b) => a - b);
+  let end = 0;
+  while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end++;
+  const more = end + 1 < sorted.length ? ', …' : '';
+  return sorted[0] === sorted[end] ? { text: `${sorted[0]}${more}`, one: true } : { text: `${sorted[0]}–${sorted[end]}${more}`, one: false };
+}
+
 /** The ayahs of some pages inside one surah, as "Ayahs 17–24" ("Ayah 5"); a second run is "…". */
 function ayahsIn(sura: number, pages: number[]): string {
   const keys = pages.flatMap((p) => ayahsOnPage(p)).filter((k) => suraOf(k) === sura).map(ayahOf);
   if (keys.length === 0) return '';
-  const sorted = [...new Set(keys)].sort((a, b) => a - b);
-  let end = 0;
-  while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end++;
-  const first = sorted[0];
-  const last = sorted[end];
-  const more = end + 1 < sorted.length ? ', …' : '';
-  return first === last ? `Ayah ${first}${more}` : `Ayahs ${first}–${last}${more}`;
+  const run = firstRun(keys);
+  return `${run.one ? 'Ayah' : 'Ayahs'} ${run.text}`;
 }
 
 const ORDER: Record<Strength, number> = { weak: 0, moderate: 1, strong: 2 };
@@ -153,7 +164,31 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     }
     oldest = Math.max(oldest, daysSince(d, today));
   }
-  const stale = memorized.length > 0 && (oldest == null || oldest >= 30);
+  const staleByDays = memorized.length > 0 && (oldest == null || oldest >= 30);
+
+  // Being learned (MEM-7): the surahs with ayahs memorized on a page in part, and what of them is
+  // memorized on the juz's pages, whole or in part.
+  const ayahsHere = (p: number) => {
+    const pg = byNumber.get(p);
+    return pg ? memorizedAyahsOnPage({ pageNumber: p, status: pg.status as 'memorized', verses: pg.verses }) : [];
+  };
+  const learningSuras = new Set(learning.flatMap((p) => ayahsHere(p).map(suraOf)));
+  const learned = new Set(juzPages.flatMap(ayahsHere).filter((k) => learningSuras.has(suraOf(k))));
+  const learningText = learned.size > 0 ? `${describeAyahs(learned, { form: 'compact' })} so far` : null;
+  let continueAt: JuzSheetModel['continueAt'] = null;
+  for (const p of learning) {
+    const mine = new Set(ayahsHere(p));
+    const next = ayahsOnPage(p).find((k) => !mine.has(k));
+    if (next != null) {
+      continueAt = { page: p, label: `${surahName(suraOf(next))} ${ayahOf(next)}` };
+      break;
+    }
+  }
+  // A juz begun (ayahs memorized on a page in part) but not revised yet reads as being learned, not
+  // as untouched. A page marked in progress with no ayahs saved has nothing memorized yet.
+  const newest = lastOf(memorized);
+  const beingLearned = learned.size > 0 && newest == null;
+  const stale = staleByDays && !beingLearned;
 
   // One wording with Revo (lib/recency): "Last revised 3 days ago · twice in 30 days".
   const inWords = input.windowWords ?? `in ${windowDays} days`;
@@ -171,7 +206,12 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
       : smartTracking
         ? strength(p)
         : recencyOf(last.get(p), today);
-  const cells = juzPages.map((page) => ({ page, state: cellState(page) }));
+  const cells = juzPages.map((page) => {
+    const state = cellState(page);
+    if (state !== 'learning') return { page, state };
+    const pg = byNumber.get(page)!;
+    return { page, state, share: pageShare({ pageNumber: page, status: 'in_progress', verses: pg.verses }) };
+  });
 
   const kinds: (Strength | Recency)[] = smartTracking ? ['weak', 'moderate', 'strong'] : ['week', 'month', 'older'];
   const counts = kinds.map((state) => ({ state, n: cells.filter((c) => c.state === state).length })).filter((c) => c.n > 0);
@@ -192,6 +232,17 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     const pages = pagesOfSura.get(sura)!;
     const mine = pages.filter((p) => memorizedSet.has(p));
     const base = { sura, name: surahName(sura), firstPage: pages[0] };
+    if (learningSuras.has(sura)) {
+      // Being learned: what is memorized of it here, and what is to go (MEM-7).
+      const all = [...new Set(pages.flatMap((p) => ayahsOnPage(p)).filter((k) => suraOf(k) === sura))].sort((a, b) => a - b);
+      const done = all.filter((k) => learned.has(k));
+      const toGo = all.filter((k) => !learned.has(k));
+      const doneRun = firstRun(done.map(ayahOf));
+      const text = [`${doneRun.one ? 'Ayah' : 'Ayahs'} ${doneRun.text}`, toGo.length > 0 ? `${firstRun(toGo.map(ayahOf)).text} to go` : null]
+        .filter(Boolean)
+        .join(' · ');
+      return { ...base, firstPage: toGo.length > 0 ? pageOfAyah(toGo[0]) : base.firstPage, text, alert: false, state: 'learning' as const };
+    }
     if (mine.length === 0) {
       const partly = pages.some((p) => byNumber.get(p)?.status === 'in_progress');
       return { ...base, text: 'Not memorized', alert: false, state: partly ? ('learning' as const) : ('not-memorized' as const) };
@@ -211,13 +262,12 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     return { ...base, text: recency(ago, n), alert: state === 'older', state };
   });
 
-  const newest = lastOf(memorized);
   return {
     juz,
     title: `Juz ${juz}`,
     subtitle: describeSurahs({ first: start, last: end }),
-    headline: memorized.length === 0 ? 'Not memorized yet' : lastRevisedWords(newest),
-    times: memorized.length === 0 || newest == null ? '' : timesText(daysOf(memorized)),
+    headline: beingLearned ? 'Being learned' : memorized.length === 0 ? 'Not memorized yet' : lastRevisedWords(newest),
+    times: memorized.length === 0 || newest == null || beingLearned ? '' : timesText(daysOf(memorized)),
     stale,
     cells,
     ends: pageRunEnds(start, end),
@@ -225,6 +275,9 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     surahs,
     memorizedPages: memorized,
     learning,
+    beingLearned,
+    learningText,
+    continueAt,
   };
 }
 

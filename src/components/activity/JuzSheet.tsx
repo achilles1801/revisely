@@ -153,10 +153,11 @@ export function JuzSheet({
       case 'older':
         return { borderWidth: 1.5, borderColor: palette.red };
       default:
-        // Not memorized; being learned is drawn the same until it gets its own look.
+        // Not memorized; a page being learned fills by its share over this (PartFill, MEM-7).
         return { backgroundColor: palette.heat[0] };
     }
   };
+  const partShown = model != null && model.cells.some((c) => c.state === 'learning' && (c.share ?? 0) > 0);
 
   return (
     <Sheet
@@ -178,7 +179,11 @@ export function JuzSheet({
               <ChromeText style={[typeV2.name, { color: model.stale ? palette.red : palette.text }]} testID="juz-sheet-headline">
                 {model.headline}
               </ChromeText>
-              {model.times ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`   ${model.times}`}</ChromeText> : null}
+              {model.beingLearned && model.learningText ? (
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]} testID="juz-sheet-learning">{`   ${model.learningText}`}</ChromeText>
+              ) : model.times ? (
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`   ${model.times}`}</ChromeText>
+              ) : null}
             </ChromeText>
             {model.stale && onPlanIt && allFirstTomorrow(model.memorizedPages, firstTomorrow ?? new Set()) ? (
               <View style={styles.doneRow}>
@@ -230,7 +235,12 @@ export function JuzSheet({
                 hitSlop={{ top: 6, bottom: 6 }}
                 style={[styles.cell, look(c.state)]}
                 testID={`juz-cell-${c.page}`}
-              />
+              >
+                {/* A page being learned: filled from the top by how much of it is memorized (MEM-7). */}
+                {c.state === 'learning' && (c.share ?? 0) > 0 ? (
+                  <View style={[styles.partFill, { height: `${Math.round((c.share ?? 0) * 100)}%`, backgroundColor: palette.done }]} testID={`juz-cell-part-${c.page}`} />
+                ) : null}
+              </Tap>
             ))}
           </View>
           <View style={styles.ends}>
@@ -241,7 +251,7 @@ export function JuzSheet({
               {model.ends[1]}
             </ChromeText>
           </View>
-          {model.counts.length > 0 ? (
+          {model.counts.length > 0 || partShown ? (
             <View style={styles.counts} testID="juz-sheet-counts">
               {model.counts.map((c) => (
                 <View key={c.state} style={styles.count}>
@@ -254,9 +264,26 @@ export function JuzSheet({
                   </ChromeText>
                 </View>
               ))}
+              {partShown ? (
+                <View style={styles.count}>
+                  <PartMark color={palette.done} />
+                  <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                    Part of a page
+                  </ChromeText>
+                </View>
+              ) : null}
             </View>
           ) : null}
-          {/* Being learned (model.learning) gets its own place here (the memorization flow). */}
+          {/* Being learned, in a juz revised before (MEM-7): what is memorized of it so far. */}
+          {model.learningText && !model.beingLearned ? (
+            <View style={styles.learning} testID="juz-sheet-learning">
+              <PartMark color={palette.done} />
+              <ChromeText style={[typeV2.meta, styles.learningText, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                <ChromeText style={{ color: palette.text, fontWeight: '600' }}>Being learned</ChromeText>
+                {`   ${model.learningText}`}
+              </ChromeText>
+            </View>
+          ) : null}
 
           <View style={[styles.rule, { backgroundColor: palette.separator }]} />
           {/* A row per surah: its state in words; each opens the reader at its first page here. */}
@@ -270,7 +297,11 @@ export function JuzSheet({
               style={[styles.row, i < model.surahs.length - 1 && { borderBottomWidth: layoutV2.hairline, borderBottomColor: palette.separator }]}
               testID={`juz-surah-${s.sura}`}
             >
-              <View style={[styles.dot, s.state === 'not-memorized' || s.state === 'learning' ? { backgroundColor: palette.heat[0] } : look(s.state)]} />
+              {s.state === 'learning' ? (
+                <PartMark color={palette.done} />
+              ) : (
+                <View style={[styles.dot, s.state === 'not-memorized' ? { backgroundColor: palette.heat[0] } : look(s.state)]} />
+              )}
               {/* The name, and what it is under it (recency's line is long: "Last revised … in 30 days"). */}
               <View style={styles.rowMain}>
                 <ChromeText style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
@@ -285,21 +316,44 @@ export function JuzSheet({
           ))}
 
           <View style={styles.foot}>
-            <PillButton
-              title="Open in the reader"
-              variant="outline"
-              size="sm"
-              onPress={() => {
-                const first = model.memorizedPages[0] ?? model.cells[0].page;
-                closeThen(() => onOpenPage(first));
-              }}
-              style={styles.footButton}
-              testID="juz-sheet-open"
-            />
+            {model.continueAt ? (
+              // Being learned: on from the first ayah not memorized yet (MEM-7).
+              <PillButton
+                title={`Continue at ${model.continueAt.label}`}
+                size="sm"
+                onPress={() => {
+                  const at = model.continueAt!.page;
+                  closeThen(() => onOpenPage(at));
+                }}
+                style={styles.footButton}
+                testID="juz-sheet-continue"
+              />
+            ) : (
+              <PillButton
+                title="Open in the reader"
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  const first = model.memorizedPages[0] ?? model.cells[0].page;
+                  closeThen(() => onOpenPage(first));
+                }}
+                style={styles.footButton}
+                testID="juz-sheet-open"
+              />
+            )}
           </View>
         </View>
       ) : null}
     </Sheet>
+  );
+}
+
+/** ◐: part of a page memorized (the legend, a surah being learned). */
+function PartMark({ color }: { color: string }) {
+  return (
+    <View style={[styles.partMark, { borderColor: color }]}>
+      <View style={[styles.partHalf, { backgroundColor: color }]} />
+    </View>
   );
 }
 
@@ -309,7 +363,12 @@ const styles = StyleSheet.create({
   planIt: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   doneRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 16, rowGap: 4 },
   strip: { flexDirection: 'row', gap: 3 },
-  cell: { flex: 1, height: 28, borderRadius: 5 },
+  cell: { flex: 1, height: 28, borderRadius: 5, overflow: 'hidden' },
+  partFill: { position: 'absolute', top: 0, left: 0, right: 0 },
+  partMark: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, overflow: 'hidden' },
+  partHalf: { position: 'absolute', top: 0, bottom: 0, left: 0, width: '50%' },
+  learning: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  learningText: { flexShrink: 1 },
   ends: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 6 },
   end: { flexShrink: 1 },
   endRight: { textAlign: 'right' },

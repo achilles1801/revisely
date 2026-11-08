@@ -145,3 +145,56 @@ describe('the juz sheet', () => {
     expect(juzOfPages([])).toBeNull();
   });
 });
+
+describe('a juz being learned (MEM-7, mock j1)', () => {
+  // Juz 29 is pages 562–581: Al-Mulk's first page memorized (ayahs 1–12), ayahs 13–20 of its second.
+  const JUZ29 = Array.from({ length: 20 }, (_, i) => 562 + i);
+  const alMulk = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => 67000 + from + i);
+  const learning = (extra: Partial<JuzSheetPage> = {}): JuzSheetPage[] =>
+    JUZ29.map((p) =>
+      p === 562
+        ? page(p, extra)
+        : p === 563
+          ? page(p, { status: 'in_progress', verses: alMulk(13, 20) })
+          : page(p, { status: 'not_memorized' }),
+    );
+
+  it('fills the page in part by its share, names what is learned so far, and where to continue', () => {
+    const m = juzSheetModel({ juz: 29, today: TODAY, pages: learning(), revised: [], windowDays: 30, smartTracking: false });
+    expect(m.headline).toBe('Being learned');
+    expect(m.stale).toBe(false);
+    expect(m.times).toBe('');
+    expect(m.learning).toEqual([563]);
+    const cell = m.cells.find((c) => c.page === 563)!;
+    expect(cell.state).toBe('learning');
+    expect(cell.share).toBeGreaterThan(0.4);
+    expect(cell.share).toBeLessThan(0.75);
+    expect(plainText(m.learningText ?? '')).toBe('Al-Mulk 1–20 so far');
+    expect(m.continueAt && { page: m.continueAt.page, label: plainText(m.continueAt.label) }).toEqual({ page: 563, label: 'Al-Mulk 21' });
+    const mulk = m.surahs.find((s) => s.sura === 67)!;
+    expect(mulk.state).toBe('learning');
+    expect(plainText(mulk.text)).toBe('Ayahs 1–20 · 21–30 to go');
+    expect(mulk.firstPage).toBe(563);
+    expect(m.surahs.find((s) => s.sura === 68)).toMatchObject({ text: 'Not memorized', state: 'not-memorized' });
+  });
+
+  it('keeps when it was revised once part of it has been, and still says what is being learned', () => {
+    const m = juzSheetModel({
+      juz: 29,
+      today: TODAY,
+      pages: learning({ lastRevisedDate: '2026-11-01' }),
+      revised: [{ countsFor: '2026-11-01', pages: [562] }],
+      windowDays: 30,
+      smartTracking: false,
+    });
+    expect(m.headline).toBe('Last revised 2 days ago');
+    expect(plainText(m.learningText ?? '')).toBe('Al-Mulk 1–20 so far');
+  });
+
+  it('has nothing being learned when no page is in part', () => {
+    const m = juzSheetModel({ juz: 28, today: TODAY, pages: JUZ28.map((p) => page(p)), revised: [], windowDays: 30, smartTracking: false });
+    expect(m.learningText).toBeNull();
+    expect(m.continueAt).toBeNull();
+    expect(m.cells.every((c) => c.share == null)).toBe(true);
+  });
+});

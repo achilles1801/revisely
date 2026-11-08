@@ -703,6 +703,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   tomorrow" (the cycle grows by a day). Either is an edit to Save, and the list leaves at once. The
   automatic schedule holds every memorized page, so it has no such list.
 
+- **MEM-7.** The juz sheet shows a juz being learned (testers' Activity). A page memorized in part is
+  filled by the share of it that is memorized ("Part of a page" in the legend). A surah with ayahs
+  memorized on such a page reads what is memorized and what is to go ("Ayahs 1–20 · 21–30 to go"),
+  and opens the reader where it goes on. The sheet says what is learned so far ("Al-Mulk 1–20 so far"):
+  as its headline, "Being learned", while nothing of the juz has been revised yet, and on a line of its
+  own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk 21").
+  A page marked in progress with no ayahs saved has nothing memorized, and reads as not memorized.
+
 ## Help
 
 - **HELP-1.** Screens that need explaining have a ? (testers, for now). Home's sits at the right of the Today
