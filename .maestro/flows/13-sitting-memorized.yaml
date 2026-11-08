@@ -168,7 +168,8 @@ appId: com.revisionbuddy.app
           timeout: 20000
       - tapOn:
           id: calendar-day-2026-11-03
-      - tapOn: "Open the day"
+      - tapOn:
+          id: preview-open
 - extendedWaitUntil:
     visible:
       id: activity-day-v2
