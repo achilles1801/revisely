@@ -720,6 +720,12 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **HELP-3.** Help follows Smart Tracking: with it off, no topic mentions ratings or strength. A session's
   Rating topic and the new plan's "weakest first" show only with it on. The hidden page's topic shows only
   where the hidden page is offered.
+- **HELP-4.** The ? buttons are on by default: an account that has help sees them on every phone where
+  its user hasn't hidden them, new or existing, with nothing stored. Only the user takes them away, with
+  "Hide help buttons" or Settings → Support → Help buttons (HELP-2); a setting that can't be read leaves
+  them on. Help is for testers until the release that brings it, then for every account. (Majd, Nov 8
+  2026: "the helper icons should be on by default for ex a new user account unless a user turns them
+  off manually".)
 
 ## Naming the Qur'an
 

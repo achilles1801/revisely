@@ -1473,7 +1473,8 @@ classic default), and a fresh install starts in light.
     rule). A label or a subtitle still says what a control does (e.g. Keep daily amount), and sheets
     hold no paragraphs of explanation (the Mushaf picker's was removed, Nov 3 2026). On top of that,
     the few screens that can't explain themselves get one ? (`components/help/HelpButton`; testers
-    for now, `lib/help/availability`). Home's is in the Today post's header, the schedule editor's
+    until the release sets `HELP_FOR_EVERYONE` in `lib/help/availability`). They are on by default, new
+    account or not; only the user hides them (HELP-4: Majd, Nov 8 2026). Home's is in the Today post's header, the schedule editor's
     before Save, the reader's a round button at the right of its header, and a session's the last
     row of its ⋯ menu (its header is full), Activity's in its top bar before search (for the tab on
     show: Overview or Insights), and a day's before +. It opens a `v2/Sheet` of at
