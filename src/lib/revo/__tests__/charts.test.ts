@@ -236,6 +236,8 @@ describe('words and touch', () => {
     expect(agoWords('2026-11-07', TODAY)).toBe('today');
     expect(agoWords('2026-11-06', TODAY)).toBe('yesterday');
     expect(agoWords('2026-11-03', TODAY)).toBe('4 days ago');
+    // A page's lastRevisedDate is a timestamp in the app (it showed "NaN days ago" on Android, Nov 8 2026).
+    expect(agoWords('2026-11-03T09:00:00.000Z', TODAY)).toBe('4 days ago');
     expect([1, 2, 3].map(timesWord)).toEqual(['once', 'twice', '3 times']);
     expect(dayMonth('2026-10-30')).toBe('30 October');
   });
