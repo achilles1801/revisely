@@ -1465,8 +1465,8 @@ classic default), and a fresh install starts in light.
     the few screens that can't explain themselves get one ? (`components/help/HelpButton`; testers
     for now, `lib/help/availability`). Home's is in the Today post's header; the session, the
     reader, Activity, a day and the schedule editor follow. It opens a `v2/Sheet` of at most four
-    topics, about two sentences each, then "Ask Revo ›" (only when `revoAvailable`) and "Hide help
-    buttons". Hiding is one switch for every screen, kept on the phone per account; Settings →
+    topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the account,
+    `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding is one switch for every screen, kept on the phone per account; Settings →
     Support → Help buttons turns it back on. BEHAVIOUR.md HELP-1, HELP-2. No first-run guides,
     tooltips, coach marks, or ⓘ beside single controls.
     - **All help text is in `src/lib/help/topics.ts`.** Each topic lists the BEHAVIOUR.md rules it

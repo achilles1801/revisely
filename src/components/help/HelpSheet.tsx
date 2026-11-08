@@ -7,7 +7,7 @@ import { typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from '../revo/RevoMark';
-import { revoAvailable } from '../../lib/revo/availability';
+import { useRevoPresent } from '../../lib/revo/presence';
 import { openRevo } from '../../lib/revo/open';
 import {
   HELP,
@@ -61,7 +61,7 @@ function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
 }
 
 /**
- * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (when the account has Revo; nothing is
+ * A screen's help (HELP-1): its few topics, then "Ask Revo ›" (while Revo is on for the account; nothing is
  * counted until a question is sent) and "Hide help buttons" (HELP-2), and Done. Both actions run once
  * the sheet has gone. The topics follow Smart Tracking (HELP-3). Topic text is reading text: it grows
  * all the way with Dynamic Type and the sheet scrolls; the title and the two actions stop at 1.4×.
@@ -84,7 +84,8 @@ export function HelpSheet({
   const pending = useRef<null | 'revo' | 'hide'>(null);
   const entry = HELP[screen];
   const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true });
-  const revo = revoAvailable(user);
+  // Revo is on for this account (RevoHost is mounted): it follows Revo's own switch, whoever that opens it to.
+  const revo = useRevoPresent();
   const marks = fontScale <= MARKS_UP_TO;
 
   const after = (action: 'revo' | 'hide') => {

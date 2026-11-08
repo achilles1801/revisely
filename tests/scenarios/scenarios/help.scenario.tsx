@@ -18,15 +18,23 @@ function homeAndSettings(mods: Booted): ReactElement {
   const Settings = req<any>('src/screens/main/SettingsScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
+  // Revo, as MainNavigator mounts it: "Ask Revo" opens it.
+  const { RevoHost } = req<any>('src/components/revo/RevoHost');
+  const { navigationRef } = req<any>('src/navigation/navigationRef');
   const Stack = createNativeStackNavigator();
   const h = React.createElement;
   const Elsewhere = () => null;
+  // The app's own ref (Revo reads the route from it) and the harness's (its screens use it).
+  const ref = (r: unknown) => {
+    nav.navigation.current = r;
+    navigationRef.current = r;
+  };
   return h(
     ReadingTimerProvider,
     null,
     h(
       NavigationContainer,
-      { ref: nav.navigation },
+      { ref },
       h(
         Stack.Navigator,
         { screenOptions: { headerShown: false, animation: 'none' } },
@@ -37,6 +45,7 @@ function homeAndSettings(mods: Booted): ReactElement {
         ),
       ),
     ),
+    h(RevoHost),
   );
 }
 
@@ -96,6 +105,13 @@ describe('the help on Home', () => {
     await press(app, 'help-done');
     await app.until(() => app.screen.queryByTestId('help-sheet-home') == null, 'the sheet to close');
     expect(helpButton(app)).not.toBeNull();
+
+    // Ask Revo opens Revo once the sheet has gone (Revo still off: its opt-in first).
+    await press(app, 'help-button-home');
+    await app.until(() => app.screen.queryByTestId('help-ask-revo') != null, 'Ask Revo');
+    await press(app, 'help-ask-revo');
+    await app.until(() => app.screen.queryByTestId('revo-turn-on') != null, 'Revo’s opt-in');
+    expect(app.screen.queryByTestId('help-sheet-home')).toBeNull();
     await app.close();
   });
 
