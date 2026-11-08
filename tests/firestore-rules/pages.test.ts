@@ -94,6 +94,22 @@ describe('users/{userId}/pages/{pageId}', () => {
       );
     });
 
+    it('owner can mark a page partly memorized with its ayahs, and clear them (MEM-1)', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(
+        updateDoc(doc(alice, `users/${ALICE}/pages/1`), { status: 'learning', verses: [1001, 1002, 1003] }),
+      );
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}/pages/1`), { status: 'memorized', verses: null }));
+    });
+
+    it('rejects ayahs that aren’t a short list', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}/pages/1`), { verses: 'all' } as any));
+      await assertFails(
+        updateDoc(doc(alice, `users/${ALICE}/pages/1`), { verses: Array.from({ length: 61 }, (_, i) => 2001 + i) }),
+      );
+    });
+
     it('rejects writes to non-allowlisted fields', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertFails(

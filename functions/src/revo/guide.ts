@@ -139,11 +139,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Activity and the daily log',
-    covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'ACT-14', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
+    covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'ACT-14', 'ACT-17', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
     routes: ['Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'ListenBack'],
     text: lines(
       '- Activity (Home’s pulse icon, or Settings → Activity → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings, recordings, memorized pages and notes.',
-      '- Testers: at the top, “Overview” (a calendar by “Month” or “Week”, ‹ › to step; each day has a ring for how much of its pages was revised and dots for memorized, read and a note) and “Insights”. The + adds: “Revised” (pages from and to, minutes, an optional strength; counts for today, outside the plan), “Memorized”, “Read” (opens the Read tab for a timed reading), “Note”, and “From your session” when today’s session skipped pages.',
+      '- Testers: at the top, “Overview” (a calendar by “Month” or “Week”, ‹ › to step; each day has a ring for how much of its pages was revised and dots for memorized, read and a note) and “Insights”. The + adds, for today and yesterday: “Revised elsewhere” (that day’s pages not revised yet, all ticked; untick the ones not done; they count on Home and for the streak), “Memorized” and “Note”. An older day’s + adds a note only. Reading is logged by the reader itself.',
       '- Tap a day to open it: its Revised, Memorized, Read and Notes blocks and its recordings. Hold a block’s header for Edit or Delete (it asks first; deleting a Memorized entry unmarks those pages).',
       '- The daily log (a day’s notes): open the day → “Write”, or Activity → + → “Note”. Each note stays on its own; edit or copy one from its menu; swipe one away to delete it (Undo for five seconds). A note can be shown under the day’s Revised, Memorized or Read item. A note written between midnight and Fajr belongs to the revision day.',
       '- “See all”: everything, searchable, with filters.',
@@ -151,7 +151,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Insights and page strength',
-    covers: ['ACT-4', 'ACT-8', 'ACT-12'],
+    covers: ['ACT-4', 'ACT-8', 'ACT-12', 'ACT-16'],
     routes: ['Activity', 'PagesByStrength'],
     text: lines(
       '- Testers: Activity → “Insights”. “Coverage”: a tile per juz revised in the last “7 days” or “30 days”, the share of memorized pages, and the juz “untouched the longest” with “Plan it”. “Consistency”: days with a revision or a read, of the last 7 and in the month, and the minutes by hour. “Weak spots”: pages weak now or skipped twice in 30 days, with “Revise … first tomorrow” and “Ask” (Revo). “Memorization”: pages memorized each month. “Pace”: minutes per page, shown from ten timed items.',
@@ -237,6 +237,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- For testers, off until turned on. Each question sends the numbers the app shows (today, the week, the streak, pages and ratings); 20 new questions a revision day, back after Fajr or at midnight. The same first question again that day is free.',
       '- + opens “Add to chat”: search a surah, a juz, ayahs, a day or a page, or pick from Surahs, Juz, Days (a month: tap a day, then “Add day”) and Pages; up to six go with one question, and a day goes with its daily-log notes. Revo answers about them from their figures (how often revised, what was missed, weak spots, what’s next; a day’s plan, minutes and notes). History keeps the conversations; Memory keeps up to 30 short facts (delete one, clear them, or turn memory off). A Day in review comes once, from the evening, on a day something was done.',
       '- Revo can’t change anything itself: a suggestion happens only when tapped (“Add to my plan” puts pages first in tomorrow’s session; a card can also open a screen, such as Jump to… or a Settings section). It answers how-to questions from this guide. It needs the internet.',
+      '- Its charts answer a touch: tap a bar, dot, tile or row (or slide along the bars) to see that day or passage, then “Open in Activity”, “Open in the reader” or “Revise first tomorrow” (only when tapped). A second tap or × puts it back; a table sorts by the heading tapped. The grey bar behind a day is its plan.',
       '- Settings → Revo AI → off deletes its conversations and memory.',
     ),
   },
@@ -275,6 +276,9 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-25': 'the button’s size and the room lists leave for it',
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
+  'MEM-1': 'memorizing by the ayah: no one can save ayahs yet; the Day’s Add to memorized brings it, with its own section here',
+  'MEM-2': 'a partly memorized page’s share in the %: nothing to ask until ayahs can be saved (MEM-1)',
+  'MEM-3': 'taking ayahs off the memorized: nothing to ask until ayahs can be saved (MEM-1)',
   'REC-1': 'the reader’s End also stopping its recording, and its one note (testers): nothing to ask',
   'REC-2': 'a sitting saved with the pages it held, named by them on the Day (testers): nothing to ask',
 };

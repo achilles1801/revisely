@@ -8,7 +8,7 @@ import { queueChange } from '../../../src/lib/offline/queue';
 jest.mock('../../../src/context/ThemeContext', () => ({
   useTheme: () => ({ palette: new Proxy({}, { get: () => '#000000' }), theme: new Proxy({}, { get: () => '#000000' }) }),
 }));
-jest.mock('../../../src/lib/offline/queue', () => ({ queueChange: jest.fn(async () => undefined) }));
+jest.mock('../../../src/lib/offline/queue', () => ({ queueChange: jest.fn(async () => undefined), currentAccount: () => null }));
 jest.mock('../../../src/services/firestoreService', () => ({
   getActivityItemsForDay: jest.fn(async () => ({
     revisions: [{ id: 'rev', day: '2026-11-03', countsFor: '2026-11-03' }],

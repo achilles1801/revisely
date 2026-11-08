@@ -55,6 +55,7 @@ import { RowText, ThreadRow } from '../../components/v2/ThreadRow';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { Tap } from '../../components/v2/Tap';
 import { dayOfMonth } from '../../lib/dayAgo';
+import { previousIsoDay } from '../../lib/streak';
 import { describePageRuns, describeRevised, pageRuns } from '../../lib/pageRanges';
 import { ownRevised } from '../../lib/activityItems';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -371,7 +372,15 @@ export default function ActivityDayScreen() {
               </Text>
             </View>
           }
-          right={<IconButton icon="add" label="Add" onPress={() => setAddOpen(true)} size={28} testID="day-add" />}
+          right={
+            <IconButton
+              icon="add"
+              label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
+              onPress={() => setAddOpen(true)}
+              size={28}
+              testID="day-add"
+            />
+          }
           separator
         />
       ) : (
@@ -491,9 +500,11 @@ export default function ActivityDayScreen() {
           visible={addOpen}
           onClose={() => setAddOpen(false)}
           day={date}
-          dayName={date === today ? 'today' : heading.title === 'Yesterday' ? 'yesterday' : heading.title}
+          dayName={date === today ? 'today' : date === previousIsoDay(today) ? 'yesterday' : heading.title}
           logs={logs}
-          onRead={() => (navigation.getParent() as { navigate: (name: string) => void } | undefined)?.navigate('Read')}
+          // Today and yesterday take Revised elsewhere, Memorized and a note; an older day only a
+          // note, so its history and the streak can't be rewritten (ACT-17).
+          noteOnly={date !== today && date !== previousIsoDay(today)}
         />
       )}
       <ReadingPagesSheet

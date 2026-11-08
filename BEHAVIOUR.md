@@ -247,17 +247,17 @@ How the tests are made: `tests/scenarios/README.md`.
   oldest, or never, among the juz at least half memorized (a juz under half is shown as being learned, so a
   page memorized today never makes its juz the one untouched longest).
 
-- **ACT-5.** The add menu has one add per kind (Revised, Memorized, Read, Note), each on its own tab. Revised
-  opens its own sheet: pages from and to, minutes, and an optional strength (Weak, Moderate, Strong) that rates
-  those pages 2, 3 or 4 (ACT-8's bins), written as each page's weakness rating. Adding it queues one manual
-  Revised item for today; it counts toward today's Revised block and carries no plan assignment. "From your
-  session" offers only the pages the session missed: its skipped pages not revised, among the memorized ones.
-  It never copies the session's own revised pages or minutes.
-  Note opens its own sheet: its text, and an optional "Show under" choice of the day's Revised, Memorized or
-  Read item (the note's tag). Add is a new note with its own id and time; an empty note cannot be added.
-  Memorized opens its own sheet: From and To, or a surah, and optional minutes. Add marks the pages memorized
-  (the composer's two writes) and records a Memorized item for today; its minutes join the day's item once (an
-  add sent again adds none). "From your reading" offers the pages read today that are not memorized yet.
+- **ACT-5.** The day's + offers, for today and yesterday, Revised elsewhere, Memorized and Note (Majd, Nov 7
+  2026: "yes trim it"). There is no Read (the reader logs reading by itself) and no free choice of pages to
+  mark revised. Revised elsewhere lists the day's scheduled pages (its session's assignment, or the plan's)
+  that are memorized and not revised for it yet, each ticked; untick the ones not done, and Add logs the
+  rest for that day by hand, with no strength and no minutes. A page already revised for the day is never
+  offered again; with none left it says so. Memorized opens its own sheet: From and To, or a surah, and
+  optional minutes. Add marks the pages memorized (the composer's two writes) and records a Memorized item
+  for that day, dated that day; its minutes join the day's item once (an add sent again adds none). "From
+  your reading" offers the pages read that day that are not memorized yet. Note opens its own sheet: its
+  text, and an optional "Show under" choice of the day's Revised, Memorized or Read item (the note's tag).
+  Add is a new note with its own id and time; an empty note cannot be added.
 - **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
   window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
   a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
@@ -293,7 +293,7 @@ How the tests are made: `tests/scenarios/README.md`.
   spots ends in "See all pages by strength": every revised page, weakest first, by page, surah or juz, filtered by
   juz and by strength (the Insights tab's Browse). Other accounts keep the Insights tab as before. (Majd, Nov 6
   2026; the line, Nov 7.)
-- **ACT-13.** What the day's + adds (Revised, Memorized, a note, or the session's skipped pages) shows on
+- **ACT-13.** What the day's + adds (pages revised elsewhere, Memorized, a note) shows on
   that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
   changes still waiting on the phone over what it read. Once the server has them, the day shows the
   server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
@@ -301,10 +301,20 @@ How the tests are made: `tests/scenarios/README.md`.
   day's session never removes them. Each is deleted from the Revised block's menu ("Delete …, added by
   hand"), confirmed first, as every item is (ACT-7). (Nov 7 2026: a session save deleted them, and there
   was no way to delete one.)
-- **ACT-15.** Revised pages added by hand count for the streak as any credit does (SESS-6): a day whose
-  scheduled pages are all credited to it is done, hand-added pages included, and Home shows it when it
-  next comes into view. Pages added by hand never stand for what a day had scheduled: that stays its
-  session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
+- **ACT-15.** Pages logged as revised elsewhere count as a session's pages do: for the streak (SESS-6: a day
+  whose scheduled pages are all credited to it is done, and a day restored within its grace window counts on
+  time), on Home's today ("N of 20", Done) and in its catch-up offer (a day's pages logged are not left
+  over). Home shows them when it next comes into view, offline too. A page counts once a day, whether a
+  session or a log revised it. Pages logged by hand never stand for what a day had scheduled: that stays
+  its session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
+- **ACT-17.** A day before yesterday offers only a note: its + opens the Note sheet at once, so old history
+  and streaks can't be rewritten. What is already logged there can still be seen and deleted. (Majd,
+  Nov 7 2026.)
+- **ACT-16.** Pages logged as revised elsewhere are revised that day: they count in each page's last revised
+  day and number of revisions (and clear its skips) as a session's pages do, at once and after every
+  launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
+  no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
+  pages were re-derived from sessions alone.)
 
 ## Ask coach
 
@@ -367,9 +377,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   why a reply stopped early, never a question, an answer or a note.
 
 - **REVO-7.** An answer has at most one small chart and one suggested action, each on pages Revo was given (anything
-  else is dropped, the answer kept). The app draws the chart from its own data. Revo never changes the plan itself:
-  "Add to my plan" puts the pages first in tomorrow's session only when tapped, and "Not now" changes nothing.
-  Attached text is never taken as an instruction.
+  else is dropped, the answer kept). The app draws the chart from its own data, and a kind it doesn't know isn't
+  drawn. A chart answers a touch: a tap (or a slide along the bars) picks a mark, the chart's header says what it is,
+  and a panel under it leads on: a day to that day in Activity, a passage to the reader or to "Revise first
+  tomorrow". Revo never changes the plan itself: "Add to my plan" and "Revise first tomorrow" put the pages first in
+  tomorrow's session only when tapped, and "Not now" changes nothing. Attached text is never taken as an instruction.
 
 - **REVO-8.** With memory on (the default), Revo keeps short facts from conversations (at most 30; the oldest go first)
   and sends them with later questions. The user sees every item, deletes one, clears them all or turns memory off
@@ -469,6 +481,21 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
   question's day, or whose place ("2 days ago") or figures don't match it.
 
+## Memorizing
+
+- **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7
+  2026). A page is memorized when every ayah on it is. A page with some of its ayahs memorized is partly
+  memorized, and keeps which ones. Adding a page's last ayah makes it memorized, whether it came in one
+  sitting or several. Adding ayahs to a memorized page, or ones already memorized, changes nothing.
+- **MEM-2.** How much is memorized is measured in pages. A partly memorized page counts for the share of
+  the page its memorized ayahs fill: their length on the page, not how many they are. This holds for
+  Home's % memorized and its juz dots, the manager's progress and a juz's share. Ayahs differ in length
+  (Juz 30 is 9% of the ayahs and under 4% of the pages), so the share follows the text. A surah is
+  memorized once every one of its own ayahs is, also when it ends partway down a page.
+- **MEM-3.** Taking ayahs off the memorized takes only those. A memorized page keeps its other ayahs as
+  partly memorized, and a page left with none is not memorized. Taking off just what was added puts every
+  page back as it was.
+
 ## Naming the Qur'an
 
 - **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers
@@ -478,7 +505,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   At-Takwir", "5 pages revised today") and Keep going. Amounts are fine ("20 pages"). Page numbers
   stay only as a quiet detail after the words (the › sheet's "… · pp. 542–561"), inside the reader
   and the session (the printed page), and where the user chooses by page (Jump to's Page tab, From
-  and To).
+  and To). Any ayahs, not only whole pages, are named the same way: whole surahs and juz by name,
+  the rest by surah and ayah ("Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15"). Whole pages and
+  the ayahs they hold read alike.
 
 ## Known bugs
 

@@ -3,10 +3,16 @@
 
 /**
  * "From your session" (default): what the session missed, i.e. its skipped pages not
- * revised, among the memorized ones. The session's revised pages are already there.
+ * revised, among the memorized ones. The session's revised pages are already there, and so are
+ * pages already added to the day by hand (`alreadyRevised`): offered again, a second tap added them
+ * twice ("22 of 20", Nov 2026).
  */
-export function missedFromSession(log: { pagesRevised: number[]; pagesSkipped: number[] }, memorized: Set<number>): number[] {
-  const revised = new Set(log.pagesRevised);
+export function missedFromSession(
+  log: { pagesRevised: number[]; pagesSkipped: number[] },
+  memorized: Set<number>,
+  alreadyRevised: Iterable<number> = [],
+): number[] {
+  const revised = new Set([...log.pagesRevised, ...alreadyRevised]);
   return [...new Set(log.pagesSkipped)].filter((p) => !revised.has(p) && memorized.has(p)).sort((a, b) => a - b);
 }
 
@@ -89,4 +95,18 @@ export class UndoQueue {
     if (h) this.timers.clearTimeout(h.timer);
     this.held.delete(key);
   }
+}
+
+/**
+ * The pages "Revised elsewhere" offers for `day` (ACT-5): the day's scheduled pages, as its session
+ * holds them (or the plan, with no session), that are memorized and not revised for it yet, in
+ * their order. `revised`: the pages credited to the day already, by sessions or logged by hand.
+ */
+export function revisedElsewhereChoices(input: {
+  due: readonly number[];
+  revised: Iterable<number>;
+  memorized: ReadonlySet<number>;
+}): number[] {
+  const done = new Set(input.revised);
+  return [...new Set(input.due)].filter((p) => input.memorized.has(p) && !done.has(p));
 }

@@ -1,4 +1,4 @@
-import { manualRevisionItem, pagesInRange, parsePageRange, STRENGTH_RATING } from '../manualRevision';
+import { isManualRevisionId, manualRevisionId, manualRevisionItem, pagesInRange, parsePageRange, STRENGTH_RATING } from '../manualRevision';
 
 describe('manual Revised items', () => {
   it('reads a page range: integers 1–604, From not after To', () => {
@@ -14,8 +14,9 @@ describe('manual Revised items', () => {
 
   it('builds a manual item for today, with no plan assignment or skips', () => {
     const item = manualRevisionItem({ uid: 'u1', day: '2026-11-03', now: 1000, pages: [557, 556], minutes: 8 });
+    expect(item.id).toMatch(/^manual-2026-11-03-1000-[0-9a-z]{6}$/);
     expect(item).toEqual({
-      id: 'manual-2026-11-03-1000',
+      id: item.id,
       uid: 'u1',
       day: '2026-11-03',
       occurredAt: 1000,
@@ -27,6 +28,14 @@ describe('manual Revised items', () => {
       minutes: 8,
       recordings: [],
     });
+  });
+
+  it('[ACT-14] two adds in the same millisecond get their own ids (they overwrote each other)', () => {
+    const a = manualRevisionId('2026-11-03', 1000);
+    const b = manualRevisionId('2026-11-03', 1000);
+    expect(a).not.toBe(b);
+    expect(isManualRevisionId(a)).toBe(true);
+    expect(isManualRevisionId('2026-11-03')).toBe(false);
   });
 
   it('maps strength to the weakness rating bins (ACT-8)', () => {

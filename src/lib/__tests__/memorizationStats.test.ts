@@ -12,6 +12,7 @@ describe('computeMemorizationStats', () => {
   it('is all zeros with nothing memorized', () => {
     expect(computeMemorizationStats([])).toEqual({
       pages: 0,
+      share: 0,
       completeJuz: 0,
       fractionalJuz: 0,
       surahs: 0,
