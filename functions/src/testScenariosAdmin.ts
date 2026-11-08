@@ -7,7 +7,7 @@
  */
 import type { Firestore, WriteBatch } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { BucketLike } from './testerResetAdmin';
+import { CREATE_ONLY, type BucketLike } from './testerResetAdmin';
 import { ScenarioWriter, SeedPlan, scenarioDocuments, silenceBytes } from './testScenarios';
 
 export function adminScenarioWriter(db: Firestore, bucket: BucketLike): ScenarioWriter {
@@ -32,7 +32,7 @@ export function adminScenarioWriter(db: Firestore, bucket: BucketLike): Scenario
       const audio = silenceBytes();
       for (const rec of plan.recordings) {
         for (const seg of rec.segments) {
-          await bucket.file(`recordings/${uid}/${seg.fileName}`).save(audio, { contentType: 'audio/mp4', resumable: false });
+          await bucket.file(`recordings/${uid}/${seg.fileName}`).save(audio, { contentType: 'audio/mp4', resumable: false, preconditionOpts: CREATE_ONLY });
           counts.files = (counts.files ?? 0) + 1;
         }
       }
