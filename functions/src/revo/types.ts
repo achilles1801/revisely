@@ -50,7 +50,8 @@ export interface RevoContext {
   localTime: string | null;
 }
 
-export const REVO_PASSAGE_KEYS = ['today', 'startsAt', 'next', 'nextAt', 'weakNext', 'weak'] as const;
+/** `memorizedToday`: what was added as memorized today, by surah and ayah ("Al-Mulk, ayahs 1–20"; MEM-1), from apps after Nov 8 2026. */
+export const REVO_PASSAGE_KEYS = ['today', 'startsAt', 'next', 'nextAt', 'weakNext', 'weak', 'memorizedToday'] as const;
 export type RevoPassageKey = (typeof REVO_PASSAGE_KEYS)[number];
 
 export const REVO_INSIGHTS = ['coverage', 'consistency', 'weakSpots', 'pace'] as const;
