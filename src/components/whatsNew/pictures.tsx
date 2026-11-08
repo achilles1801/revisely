@@ -120,9 +120,12 @@ function ElsewherePicture() {
     <BlockMark key="n" kind="notes" />,
   ];
   return (
-    <View>
-      {/* The day behind, dimmed. */}
-      <View style={[styles.behind, { backgroundColor: palette.overlay }]} />
+    <View style={styles.fill}>
+      {/* The day behind, dimmed, taking whatever room the sheet leaves. */}
+      <View style={StyleSheet.absoluteFill}>
+        <Day />
+      </View>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }]} />
       <View style={[styles.sheet, { backgroundColor: palette.sheet }]}>
         <View style={[styles.handle, { backgroundColor: palette.handle }]} />
         <Text style={[typeV2.sheetTitle, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1}>
@@ -154,7 +157,8 @@ function ElsewherePicture() {
 
 const BARS = [6, 10, 14, 9, 16, 12, 18, 11, 7, 15, 19, 13, 8, 12, 17, 10, 14, 9, 16, 11, 6, 13, 18, 12, 9, 15];
 
-function AyahPicture() {
+/** Today in Activity after a reader sitting: its Memorized block with the sitting and its recording. */
+function Day() {
   const { palette } = useTheme();
   const text = (style: object, children: React.ReactNode) => (
     <Text style={style} maxFontSizeMultiplier={1} numberOfLines={1}>
@@ -201,6 +205,10 @@ function AyahPicture() {
       </View>
     </View>
   );
+}
+
+function AyahPicture() {
+  return <Day />;
 }
 
 // ------------------------------------------------------------------ 4. Revo's sheet
@@ -290,8 +298,8 @@ const styles = StyleSheet.create({
   screen: { paddingHorizontal: 16, paddingTop: 14 },
   flex: { flex: 1, minWidth: 0 },
   center: { textAlign: 'center' },
-  behind: { height: 120 },
-  sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 16, paddingBottom: 10, marginTop: -20 },
+  fill: { flex: 1, justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 16, paddingBottom: 10 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 12 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   rowTitle: { fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.3 },
