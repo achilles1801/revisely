@@ -28,7 +28,7 @@ import { layoutV2, typeV2 } from "../../theme/v2";
 import { Tap } from "../v2/Tap";
 import { ActionSheet } from "../v2/ActionSheet";
 import { AudioWaveform } from "../v2/AudioWaveform";
-import { SwipeRow } from "../v2/SwipeRow";
+import { HoldRow } from "../v2/SwipeRow";
 
 interface RecordingsListProps {
   day: string;
@@ -180,12 +180,11 @@ export function RecordingsList({
         const highlighted = r.id === highlightId;
         const name = KIND_LABEL[r.kind];
         return (
-          <SwipeRow
+          // A hold opens its menu (Listen back, Delete); there is no swipe to delete (Majd, Nov 8 2026).
+          <HoldRow
             key={r.id}
             accessible={false}
             onHold={() => setMenuFor(r)}
-            onDelete={() => confirmDelete(r)}
-            deleteLabel="Delete recording"
             testID={`recording-${r.id}`}
           >
             <View style={block ? styles.blockRow : styles.row}>
@@ -255,6 +254,15 @@ export function RecordingsList({
                         : playing
                           ? "Pause recording"
                           : "Play recording"
+                    }
+                    // In a block there is no header row: VoiceOver finds Delete on the play button.
+                    accessibilityActions={block ? [{ name: "delete", label: "Delete recording" }] : undefined}
+                    onAccessibilityAction={
+                      block
+                        ? (e) => {
+                            if (e.nativeEvent.actionName === "delete") confirmDelete(r);
+                          }
+                        : undefined
                     }
                     testID={`recording-play-${r.id}`}
                   >
@@ -406,7 +414,7 @@ export function RecordingsList({
                 </View>
               ) : null}
             </View>
-          </SwipeRow>
+          </HoldRow>
         );
       })}
       <ActionSheet

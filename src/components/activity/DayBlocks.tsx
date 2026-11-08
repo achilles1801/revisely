@@ -65,6 +65,8 @@ interface Props {
   onDeleteRevised: (log: RevisionLog) => void;
   /** A memorization item of the day: deleting it un-marks its pages (the screen does that). */
   onDeleteMemorized: (item: { id: string; day: string; pages: number[] }) => void;
+  /** A memorization item's Edit: the memorized pages, opened at its pages (the screen navigates). */
+  onEditMemorized?: (pages: number[]) => void;
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
   /** Deletes a timed session (the screen confirms first). */
@@ -126,6 +128,7 @@ export function DayBlocks({
   revisedLog,
   onDeleteRevised,
   onDeleteMemorized,
+  onEditMemorized,
   onOpenRecording,
   onDeleteReading,
   onReviseTomorrow,
@@ -140,15 +143,15 @@ export function DayBlocks({
   const [undo, setUndo] = useState<{ text: string; added: AyahsAdded; itemPagesBefore: number[] } | null>(null);
   const { palette } = useTheme();
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
-  const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
+  const [menu, setMenu] = useState<{ title: string; text?: string; actions: SheetAction[] } | null>(null);
   // A block header holds a menu (Edit / Delete, confirmed where it deletes); VoiceOver offers the
   // same actions as custom actions. Sub-rows under a block have no hold and no swipe: notes are
   // edited and deleted in the daily log (Activity spec, row interactions).
-  const headerMenu = (title: string, actions: SheetAction[]) =>
+  const headerMenu = (title: string, actions: SheetAction[], text?: string) =>
     actions.length === 0
       ? {}
       : {
-          onLongPress: () => setMenu({ title, actions }),
+          onLongPress: () => setMenu({ title, text, actions }),
           a11yActions: actions.map((a) => ({ name: a.key, label: a.label })),
           onA11yAction: (name: string) => actions.find((a) => a.key === name)?.onPress(),
         };
@@ -238,20 +241,32 @@ export function DayBlocks({
   const readItems = view.blocks[2] as { items: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[] };
   const readMinutes = readItems.items.reduce((n, i) => n + (i.minutes ?? 0), 0);
 
+  // Memorized: Edit and Delete, nothing else (Majd, Nov 8 2026). Edit opens the memorized pages at
+  // the entry; with several entries each pair names its own.
+  const oneMemorized = memorized.items.length === 1;
   const memorizedMenu = headerMenu(
     'Memorized',
-    memorized.items.map((i) => ({
-      key: `delete-${i.id}`,
-      label: `Delete ${describePassage(i.pages, { form: 'short' })}`,
-      icon: 'trash-outline' as const,
-      destructive: true,
-      onPress: () =>
-        confirmDelete(
-          'Delete this memorization?',
-          `${describePassage(i.pages)} goes back to not memorized.`,
-          () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
-        ),
-    })),
+    memorized.items.flatMap((i) => {
+      const name = oneMemorized ? '' : ` ${describePassage(i.pages, { form: 'short' })}`;
+      return [
+        ...(onEditMemorized
+          ? [{ key: `edit-${i.id}`, label: `Edit${name}`, icon: 'create-outline' as const, onPress: () => onEditMemorized(i.pages) }]
+          : []),
+        {
+          key: `delete-${i.id}`,
+          label: `Delete${name}`,
+          icon: 'trash-outline' as const,
+          destructive: true,
+          onPress: () =>
+            confirmDelete(
+              'Delete this memorization?',
+              `${describePassage(i.pages)} goes back to not memorized.`,
+              () => onDeleteMemorized({ id: i.id, day, pages: i.pages }),
+            ),
+        },
+      ];
+    }),
+    oneMemorized ? describePassage(memorized.items[0].pages) : undefined,
   );
   const readMenu = headerMenu(
     'Read',
@@ -642,7 +657,7 @@ export function DayBlocks({
       <ContextMenu
         visible={menu != null}
         onClose={() => setMenu(null)}
-        preview={menu ? { label: menu.title } : undefined}
+        preview={menu ? { label: menu.title, text: menu.text } : undefined}
         actions={menu?.actions ?? []}
         testID="activity-row-menu"
       />

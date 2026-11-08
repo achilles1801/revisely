@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -40,6 +40,17 @@ export default function MemorizationScreen() {
 
   // From Home's Memorized line (and its menu), straight to editing.
   const [markMode, setMarkMode] = useState(route.params?.edit === true);
+  // From Activity's Memorized → Edit: the entry's pages, scrolled to once the rows are laid out.
+  const focusPages = route.params?.focusPages;
+  const scrollRef = useRef<ScrollView>(null);
+  const [browserY, setBrowserY] = useState<number | null>(null);
+  const [focusY, setFocusY] = useState<number | null>(null);
+  const scrolledToFocus = useRef(false);
+  useEffect(() => {
+    if (scrolledToFocus.current || browserY == null || focusY == null) return;
+    scrolledToFocus.current = true;
+    scrollRef.current?.scrollTo({ y: Math.max(0, browserY + focusY - 8), animated: true });
+  }, [browserY, focusY]);
   const [pendingChanges, setPendingChanges] = useState<
     Map<number, PageStatus>
   >(new Map());
@@ -168,6 +179,7 @@ export default function MemorizationScreen() {
         separator
       />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: markMode ? barFootprint + layoutV2.rowPad : layoutV2.rowPad }}
         testID="memorization-v2"
@@ -183,6 +195,7 @@ export default function MemorizationScreen() {
             <ProgressBar progress={(stats.share / 604) * 100} height={6} testID="memorization-progress" />
           </View>
         </View>
+        <View onLayout={(e) => setBrowserY(e.nativeEvent.layout.y)} testID="memorization-browser">
         <MemorizationBrowser
           pages={pages}
           pendingChanges={pendingChanges}
@@ -193,7 +206,10 @@ export default function MemorizationScreen() {
           markMode={markMode}
           onMarkModeChange={setMarkMode}
           hideMarkToggle
+          focusPages={focusPages}
+          onFocusOffset={setFocusY}
         />
+        </View>
       </ScrollView>
 
       {markMode && (

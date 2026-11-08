@@ -62,6 +62,21 @@ interface MemorizationBrowserProps {
   /** Hide the internal pencil/check button. Useful when the parent screen
    *  hosts its own mark-mode toggle in a header. */
   hideMarkToggle?: boolean;
+  /**
+   * An entry to open at (Activity's Memorized → Edit): its surah starts open and its pages are ringed.
+   * `onFocusOffset` gets the surah row's top within the browser once laid out, to scroll to.
+   */
+  focusPages?: number[];
+  onFocusOffset?: (y: number) => void;
+}
+
+/** The surah an entry's pages are mostly in (the earliest on a tie): the one to open at. */
+export function surahOfPages(pages: number[]): number | null {
+  const counts = new Map<number, number>();
+  for (const p of pages) for (const s of getSurahsForPage(p)) counts.set(s.number, (counts.get(s.number) ?? 0) + 1);
+  let best: number | null = null;
+  for (const [n, c] of counts) if (best == null || c > (counts.get(best) ?? 0) || (c === counts.get(best) && n < best)) best = n;
+  return best;
 }
 
 export function MemorizationBrowser({
@@ -76,7 +91,20 @@ export function MemorizationBrowser({
   markMode: controlledMarkMode,
   onMarkModeChange,
   hideMarkToggle = false,
+  focusPages,
+  onFocusOffset,
 }: MemorizationBrowserProps) {
+  const focusSurah = useMemo(() => (focusPages && focusPages.length > 0 ? surahOfPages(focusPages) : null), [focusPages]);
+  const focusSet = useMemo(() => new Set(focusPages ?? []), [focusPages]);
+  // The list's top within the browser (under the lens pills), then the focused row's within the list.
+  const [listY, setListY] = useState<number | null>(null);
+  const [rowY, setRowY] = useState<number | null>(null);
+  const reported = React.useRef(false);
+  React.useEffect(() => {
+    if (reported.current || listY == null || rowY == null) return;
+    reported.current = true;
+    onFocusOffset?.(listY + rowY);
+  }, [listY, rowY, onFocusOffset]);
   const [mode, setMode] = useState<BrowserMode>(initialMode);
   const [internalMarkMode, setInternalMarkMode] = useState(initialMarkMode);
   const markMode = controlledMarkMode ?? internalMarkMode;
@@ -87,7 +115,7 @@ export function MemorizationBrowser({
     },
     [controlledMarkMode, onMarkModeChange],
   );
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(focusSurah != null ? `surah-${focusSurah}` : null);
   const [expandedChildKey, setExpandedChildKey] = useState<string | null>(null);
 
   const surahTrackingEnabled = !!pendingSurahChanges && !!onSurahChange;
@@ -246,6 +274,7 @@ export function MemorizationBrowser({
       />
 
       {/* List body */}
+      <View onLayout={(e) => setListY(e.nativeEvent.layout.y)} testID="memorization-browser-list">
       {mode === 'chapter' && (
         <ChapterList
           markMode={markMode}
@@ -255,6 +284,9 @@ export function MemorizationBrowser({
           togglePage={togglePage}
           toggleSurah={toggleSurah}
           getStatus={getStatus}
+          focusSurah={focusSurah}
+          focusSet={focusSet}
+          onFocusRowLayout={setRowY}
         />
       )}
       {mode === 'juz' && (
@@ -285,6 +317,7 @@ export function MemorizationBrowser({
           getStatus={getStatus}
         />
       )}
+      </View>
     </View>
   );
 }
@@ -318,6 +351,9 @@ function ChapterList({
   togglePage,
   toggleSurah,
   getStatus,
+  focusSurah,
+  focusSet,
+  onFocusRowLayout,
 }: {
   markMode: boolean;
   expandedKey: string | null;
@@ -326,6 +362,9 @@ function ChapterList({
   togglePage: (page: number) => void;
   toggleSurah: (surah: number, pages: number[]) => void;
   getStatus: (page: number) => PageStatus;
+  focusSurah?: number | null;
+  focusSet?: Set<number>;
+  onFocusRowLayout?: (y: number) => void;
 }) {
   const all = getAllSurahs();
   return (
@@ -342,7 +381,11 @@ function ChapterList({
               : 'partial';
         const progress = surahPages.length > 0 ? memorized / surahPages.length : 0;
         return (
-          <View key={`c-${s.number}`}>
+          <View
+            key={`c-${s.number}`}
+            onLayout={s.number === focusSurah ? (e) => onFocusRowLayout?.(e.nativeEvent.layout.y) : undefined}
+            testID={s.number === focusSurah ? `surah-${s.number}-row` : undefined}
+          >
             <BaseRow
               number={s.number}
               englishTitle={s.name}
@@ -362,6 +405,7 @@ function ChapterList({
                 getStatus={getStatus}
                 markMode={markMode}
                 togglePage={togglePage}
+                focusSet={focusSet}
               />
             )}
           </View>
@@ -641,6 +685,8 @@ interface PageGridProps {
   markMode: boolean;
   togglePage: (page: number) => void;
   nested?: boolean;
+  /** The pages of the entry the editor was opened at: ringed in ink. */
+  focusSet?: Set<number>;
 }
 
 // ===== Groups =====
@@ -809,7 +855,7 @@ function BaseRow({
 }
 
 /** An open surah's pages: memorized ones filled ("done"); tappable in mark mode. */
-function PageGrid({ pages, getStatus, markMode, togglePage, nested }: PageGridProps) {
+function PageGrid({ pages, getStatus, markMode, togglePage, nested, focusSet }: PageGridProps) {
   const { palette } = useTheme();
   const haptics = useHaptics();
   return (
@@ -820,7 +866,9 @@ function PageGrid({ pages, getStatus, markMode, togglePage, nested }: PageGridPr
       <View style={v2s.chips}>
         {pages.map((p) => {
           const on = getStatus(p) === 'memorized';
-          const style = [v2s.chip, { backgroundColor: on ? palette.done : palette.fill }];
+          const focused = focusSet?.has(p) ?? false;
+          const style = [v2s.chip, { backgroundColor: on ? palette.done : palette.fill }, focused && { borderWidth: 2, borderColor: palette.text }];
+          const where = focused ? ', in the entry you opened' : '';
           const label = (
             <Text
               style={[typeV2.meta, typeV2.numeral, on && v2s.chipOn, { color: on ? palette.onDone : palette.text }]}
@@ -837,7 +885,7 @@ function PageGrid({ pages, getStatus, markMode, togglePage, nested }: PageGridPr
                 togglePage(p);
               }}
               accessibilityRole="checkbox"
-              accessibilityLabel={`Page ${p}`}
+              accessibilityLabel={`Page ${p}${where}`}
               accessibilityState={{ checked: on }}
               style={style}
               testID={`page-chip-${p}`}
@@ -849,7 +897,7 @@ function PageGrid({ pages, getStatus, markMode, togglePage, nested }: PageGridPr
               key={`pg-${p}`}
               style={style}
               accessible
-              accessibilityLabel={`Page ${p}, ${on ? 'memorized' : 'not memorized'}`}
+              accessibilityLabel={`Page ${p}${where}, ${on ? 'memorized' : 'not memorized'}`}
               testID={`page-chip-${p}`}
             >
               {label}
