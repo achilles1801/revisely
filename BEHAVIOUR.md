@@ -213,6 +213,15 @@ How the tests are made: `tests/scenarios/README.md`.
   closed) while a recording plays, it stops and its player is freed: nothing plays on with nothing
   on screen to stop it.
 
+## The reader
+
+- **REC-1.** A sitting in the reader (testers): ending the timer while a recording runs, or is paused,
+  ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
+  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
+  place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
+  it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
+  named. Stopping only the recording leaves the timer running.
+
 ## Activity
 
 - **ACT-1.** A memorized page is filed under the same revision day as everything else in Activity: the

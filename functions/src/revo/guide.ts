@@ -275,6 +275,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-25': 'the button’s size and the room lists leave for it',
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
+  'REC-1': 'the reader’s End also stopping its recording, and its one note (testers): nothing to ask',
 };
 
 /** The guide as Revo reads it. */

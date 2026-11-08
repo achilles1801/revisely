@@ -26,6 +26,7 @@ import {
   readingSessionFromTimer,
   resumeTimer,
   startTimer,
+  notePageOnScreen,
 } from '../lib/readingTimer';
 import { queueChange } from '../lib/offline/queue';
 import { autoId } from '../lib/offline/apply';
@@ -205,7 +206,8 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     (page: number) => {
       const t = timerRef.current;
       if (!t || t.runningSince == null) return;
-      const next = notePageVisited(t, page);
+      // The first time it is seen, and how long each page stays on screen (REC-1).
+      const next = notePageOnScreen(notePageVisited(t, page), page, Date.now());
       if (next !== t) setTimer(next);
     },
     [setTimer],

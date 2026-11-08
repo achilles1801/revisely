@@ -232,7 +232,34 @@ describe('<TimerControls /> in the new design', () => {
     expect(mockActions.finish).toHaveBeenCalled();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
     expect(onClose).toHaveBeenCalled();
-    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number));
+    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [] });
+  });
+
+  it('[REC-1] End waits for what runs before it (the reader’s recording), then tells the pages the sitting held', async () => {
+    const order: string[] = [];
+    mockActions.finish.mockImplementationOnce(async () => {
+      order.push('finish');
+      return true;
+    });
+    const beforeEnd = jest.fn(async () => {
+      order.push('recording saved');
+    });
+    const now = Date.now();
+    // Al-Mulk's first page 20 minutes, its second 15, the third a glance.
+    mockTimer.timer = running({
+      pagesVisited: [562, 563, 564],
+      pageTimes: { '562': 20 * 60_000, '563': 15 * 60_000 },
+      onPage: { page: 564, since: now - 20_000 },
+      runningSince: now - 40 * 60_000,
+    });
+    const onSaved = jest.fn();
+    v2(<TimerControls onClose={jest.fn()} onSaved={onSaved} beforeEnd={beforeEnd} />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Stop and save timer'));
+    });
+    expect(order).toEqual(['recording saved', 'finish']);
+    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [562, 563] });
   });
 
   it('paused: Resume, and "Paused" under the clock', async () => {
