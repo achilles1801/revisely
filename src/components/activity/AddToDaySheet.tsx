@@ -1,30 +1,24 @@
-// The day view's + (mock d5): "Add to today", the session's skipped pages on top when there are
-// any ("From your session", added in one tap), then one row per kind, each opening its own sheet.
+// The day view's + (Majd, Nov 7 2026: "yes trim it"): for today and yesterday, "Add to today" lists
+// Revised elsewhere (the day's pages not revised yet), Memorized and Note, each opening its own
+// sheet. An older day offers only a note, so history and streaks can't be rewritten (ACT-17): its +
+// opens the Note sheet straight away. Read is gone: the reader logs reading by itself.
 // The marks are the day blocks' own (BlockMark, RevisedMark), so a row looks like the block it adds to.
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
-import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { missedFromSession } from '../../lib/activityAdd';
-import { manualRevisionItem } from '../../lib/manualRevision';
-import { describePassage } from '../../lib/passages';
-import { queueChange } from '../../lib/offline/queue';
-import { logger } from '../../lib/logger';
 import { typeV2 } from '../../theme/v2';
+import type { RevisionLog } from '../../types';
 import { BlockMark, RevisedMark } from './BlockMark';
-import { AddRevisedSheet } from './AddRevisedSheet';
+import { RevisedElsewhereSheet } from './RevisedElsewhereSheet';
 import { AddMemorizedSheet } from './AddMemorizedSheet';
 import { AddNoteSheet } from './AddNoteSheet';
-import { Suggestion } from './AddSheetParts';
+import { revisedOnDay, useDayItems } from './useDayItems';
 
-type Log = { date: string; pagesRevised: number[]; pagesSkipped: number[]; assignedPages?: number[] };
-
-/** The skipped pages by surah (Majd, Nov 7 2026): "At-Taghabun", "Al-Baqarah, ayahs 142–176". */
-const passage = (pages: number[]) => describePassage(pages);
+type Row = 'revised' | 'memorized' | 'note';
 
 export function AddToDaySheet({
   visible,
@@ -32,97 +26,50 @@ export function AddToDaySheet({
   day,
   dayName,
   logs,
-  onRead,
+  noteOnly = false,
 }: {
   visible: boolean;
   onClose: () => void;
   day: string;
   /** How the menu and its sheets name the day: "today", "yesterday", "Sunday" ("Add to today"). */
   dayName: string;
-  logs: Log[];
-  /** Read: time it in the reader. */
-  onRead: () => void;
+  logs: RevisionLog[];
+  /** A day before yesterday: only a note can be added, and the + opens it at once (ACT-17). */
+  noteOnly?: boolean;
 }) {
-  const { user, pages } = useApp();
   const { palette } = useTheme();
-  const [open, setOpen] = useState<'revised' | 'memorized' | 'note' | null>(null);
-  const [adding, setAdding] = useState(false);
-
-  const memorized = useMemo(() => new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
+  const [open, setOpen] = useState<Row | null>(null);
+  // The Revised row's ring: how much of the day's assignment is revised, by its session or by hand.
+  const items = useDayItems(day, visible && !noteOnly);
   const log = logs.find((l) => l.date === day);
-  const missed = log ? missedFromSession(log, memorized) : [];
-  const assigned = log ? (log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages.length : log.pagesRevised.length + log.pagesSkipped.length) : 0;
-  const fraction = log && assigned > 0 ? log.pagesRevised.length / assigned : 0;
+  const assignedPages = log ? (log.assignedPages && log.assignedPages.length > 0 ? log.assignedPages : [...log.pagesRevised, ...log.pagesSkipped]) : [];
+  const assigned = new Set(assignedPages).size;
+  const doneSet = new Set([...(log?.pagesRevised ?? []), ...revisedOnDay(items, day)]);
+  const doneCount = new Set(assignedPages.filter((p) => doneSet.has(p))).size;
+
+  if (noteOnly) return <AddNoteSheet visible={visible} onClose={onClose} day={day} dayName={dayName} />;
 
   // The sheets open once this one has gone (one modal at a time).
-  const then = (next: 'revised' | 'memorized' | 'note') => {
+  const then = (next: Row) => {
     onClose();
     setTimeout(() => setOpen(next), 350);
   };
 
-  const addMissed = async () => {
-    if (!user || missed.length === 0 || adding) return;
-    setAdding(true);
-    try {
-      const item = manualRevisionItem({ uid: user.id, day, now: Date.now(), pages: missed, minutes: null });
-      await queueChange({ kind: 'revision.add', item });
-      onClose();
-    } catch (err) {
-      logger.warn('Could not add the session’s skipped pages', err);
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const rows: { key: string; mark: React.ReactNode; label: string; subtitle: string; onPress: () => void }[] = [
-    {
-      key: 'revised',
-      mark: <RevisedMark fraction={fraction} done={log != null && assigned > 0 && log.pagesRevised.length >= assigned} />,
-      label: 'Revised',
-      subtitle: 'Pages you revised outside a session',
-      onPress: () => then('revised'),
-    },
-    {
-      key: 'memorized',
-      mark: <BlockMark kind="memorized" />,
-      label: 'Memorized',
-      subtitle: dayName === 'today' ? 'New pages you learned today' : 'New pages you learned',
-      onPress: () => then('memorized'),
-    },
-    {
-      key: 'read',
-      mark: <BlockMark kind="read" />,
-      label: 'Read',
-      subtitle: 'Time it in the reader',
-      onPress: () => {
-        onClose();
-        onRead();
-      },
-    },
-    { key: 'note', mark: <BlockMark kind="notes" />, label: 'Note', subtitle: 'A thought, or a mistake to watch', onPress: () => then('note') },
+  const whose = dayName === 'today' ? 'Today’s' : `${dayName.charAt(0).toUpperCase()}${dayName.slice(1)}’s`;
+  const rows: { key: Row; mark: React.ReactNode; label: string; subtitle: string }[] = [
+    { key: 'revised', mark: <RevisedMark fraction={assigned > 0 ? doneCount / assigned : 0} done={assigned > 0 && doneCount >= assigned} />, label: 'Revised elsewhere', subtitle: `${whose} pages, revised away from a session` },
+    { key: 'memorized', mark: <BlockMark kind="memorized" />, label: 'Memorized', subtitle: dayName === 'today' ? 'New pages you learned today' : `New pages you learned ${dayName}` },
+    { key: 'note', mark: <BlockMark kind="notes" />, label: 'Note', subtitle: 'A thought, or a mistake to watch' },
   ];
 
   return (
     <>
       <Sheet visible={visible} onClose={onClose} title={`Add to ${dayName}`} headerRule="none" testID="activity-add-menu">
         <View style={styles.body}>
-          {missed.length > 0 && (
-            <View style={styles.session}>
-              <Suggestion
-                label="From your session"
-                text={`You skipped ${passage(missed)}. Revised it another way?`}
-                action="Add"
-                onAction={addMissed}
-                disabled={adding}
-                accessibilityLabel={`Add ${passage(missed)} as revised`}
-                testID="add-from-session"
-              />
-            </View>
-          )}
           {rows.map((r, i) => (
             <Tap
               key={r.key}
-              onPress={r.onPress}
+              onPress={() => then(r.key)}
               accessibilityRole="button"
               accessibilityLabel={`${r.label}, ${r.subtitle}`}
               style={[styles.row, i < rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.separator }]}
@@ -138,7 +85,7 @@ export function AddToDaySheet({
           ))}
         </View>
       </Sheet>
-      <AddRevisedSheet visible={open === 'revised'} onClose={() => setOpen(null)} day={day} dayName={dayName} logs={logs} />
+      <RevisedElsewhereSheet visible={open === 'revised'} onClose={() => setOpen(null)} day={day} dayName={dayName} logs={logs} />
       <AddMemorizedSheet visible={open === 'memorized'} onClose={() => setOpen(null)} day={day} dayName={dayName} />
       <AddNoteSheet visible={open === 'note'} onClose={() => setOpen(null)} day={day} dayName={dayName} />
     </>
@@ -147,7 +94,6 @@ export function AddToDaySheet({
 
 const styles = StyleSheet.create({
   body: { paddingBottom: 8 },
-  session: { marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   rowText: { flex: 1 },
   rowTitle: { fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.3 },

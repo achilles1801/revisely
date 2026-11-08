@@ -21,9 +21,12 @@ export function pagesInRange(range: { from: number; to: number }): number[] {
   return Array.from({ length: range.to - range.from + 1 }, (_, i) => range.from + i);
 }
 
-/** The id of a manual item: one per phone-side add, so a repeated send is the same item. */
-export function manualRevisionId(day: string, now: number): string {
-  return `manual-${day}-${now}`;
+/**
+ * The id of a manual item: made once per add, on the phone, so the outbox sending it again writes the
+ * same item. The random part keeps two adds in the same millisecond apart (they overwrote each other).
+ */
+export function manualRevisionId(day: string, now: number, random: () => number = Math.random): string {
+  return `manual-${day}-${now}-${Math.floor(random() * 36 ** 6).toString(36).padStart(6, '0')}`;
 }
 
 /** The Revised item for a manual add: counts for `day`, carries no plan assignment, no skips. */
@@ -47,4 +50,9 @@ export function manualRevisionItem(input: {
     minutes: input.minutes,
     recordings: [],
   };
+}
+
+/** Whether a Revised item was added by hand (its id, as manualRevisionId makes it). */
+export function isManualRevisionId(id: string): boolean {
+  return id.startsWith('manual-');
 }

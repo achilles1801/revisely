@@ -8,6 +8,7 @@ import { MessagesRequest } from '../coach/call';
 import { REVO_MODEL } from '../coach/pricing';
 import { attachedText } from './attachText';
 import { GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
+import { REVO_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, StoredMessage } from './types';
 
 export { REVO_MODEL };
@@ -65,16 +66,18 @@ export const REVO_SYSTEM_PROMPT = [
   'Reply with exactly one JSON object and nothing else: no code fence, no text before or after it.',
   '{"text": string, "chart": object or null, "textAfter": string or null, "action": object or null, "remember": [strings], "title": string, "chips": [strings]}',
   '- text: the answer, about 35 words, at most 400 characters. Always present.',
-  '- chart: null, or {"kind": "pageRatings", "title": string, "pages": [1 to 4 page numbers]} (the ratings of those pages), or {"kind": "dailyPages", "title": string, "days": 7 or 30} (pages revised per day). The app draws it from its own data. Add one only when it makes the answer clearer; a title at most 60 characters, naming surahs or juz, not pages.',
+  '- chart: null, or one chart the app draws from its own data (they can tap into it), when it makes the answer clearer. Every chart has a "title" (at most 60 characters, naming surahs or juz, not pages) and a "kind": "dailyPages" with "days" 7 or 30 (how a week or month went); "pageRatings" with "pages", 1 to 4 page numbers (why those pages slip); "juzMap" (which juz are overdue); "timeline" with "surah" 1–114 or "juz" 1–30, and "days" 30, 90 or 365 (how often one surah or juz is revised); "weeks" with "weeks" 4 to 12 (which days they miss); "table" with "juz" or "surahs", 2 to 8 numbers, and "columns", 1 to 3 of lastRevised, times30, weak, strength, memorized (comparing parts).',
   '- textAfter: null, or one short sentence shown after the chart, for example “Here’s a plan:” before an action.',
   `- action: null, or one suggestion they can accept: {"kind": "reviseFirst", "title": string, "detail": string, "pages": [1 to 10 page numbers]} puts those pages at the front of tomorrow’s session; {"kind": "openPage", "title": string, "detail": string, "page": number} opens a page in the reader; {"kind": "startRevision", "title": string, "detail": string} starts today’s revision; ${OPEN_SCREEN_ACTION}. At most one action; title at most 80 characters, detail at most 100, both in plain words, naming surahs and juz rather than pages (“Revise the end of Al-Hashr first”).`,
-  '- The page numbers in a chart or an action (the JSON’s "pages" and "page") must be ones you were given: today’s next pages, the weak pages, or the pages of an attachment. Never any other page.',
+  '- The page numbers in a chart or an action (the JSON’s "pages" and "page") must be ones you were given: today’s next pages, the weak pages, or the pages of an attachment. Never any other page. A timeline or a table names surahs and juz by their numbers, not pages.',
   '- remember: up to 2 short facts worth keeping for later conversations, each at most 160 characters: only what they said about their goals, routine or preferences, for example “Revises after Fajr”. Never numbers the app already shows, never anything sensitive. Usually an empty list.',
   '- title: a short title for a new conversation, at most 60 characters, for example “Weak spots this week”.',
   '- chips: up to 3 short follow-up questions they might tap, each at most 40 characters.',
   '',
-  'Earlier replies in a conversation are shown to you in short form, with notes like “[chart: …]” and “[suggested: …]”. Always reply with the JSON object, whatever the earlier messages look like.',
+  'Earlier replies in a conversation are shown to you in short form, with notes like “[chart: …]” and “[suggested: …]”.',
   'For a day in review, write two short sentences: what went well that day, then one thing for tomorrow. Warm, plain, no numbers beyond the one that matters.',
+  '',
+  'Every reply is that one JSON object, from { to }, with nothing before or after it: also for a short answer, a how-to answer or a follow-up, whatever the earlier messages look like. Your words go in "text".',
 ].join('\n');
 
 /** An attachment as the model sees it: in sentences (attachText.ts); an older app's kinds as their label and fields. */
@@ -203,6 +206,11 @@ export function historyTurn(m: StoredMessage): { role: 'user' | 'assistant'; con
   const notes: string[] = [];
   if (m.chart?.kind === 'pageRatings') notes.push(`[chart: ratings of pages ${m.chart.pages.join(', ')}]`);
   if (m.chart?.kind === 'dailyPages') notes.push(`[chart: pages per day, last ${m.chart.days} days]`);
+  const v = m.visual;
+  if (v?.kind === 'juzMap') notes.push('[chart: juz by last revised]');
+  if (v?.kind === 'timeline') notes.push(`[chart: revisions of ${v.surah != null ? `surah ${v.surah}` : `juz ${v.juz}`}, last ${v.days} days]`);
+  if (v?.kind === 'weeks') notes.push(`[chart: days done or missed, last ${v.weeks} weeks]`);
+  if (v?.kind === 'table') notes.push(`[chart: table of ${v.juz ? `juz ${v.juz.join(', ')}` : `surahs ${(v.surahs ?? []).join(', ')}`}: ${v.columns.join(', ')}]`);
   if (m.action?.kind === 'reviseFirst') notes.push(`[suggested: revise pages ${m.action.pages.join(', ')} first tomorrow]`);
   if (m.action?.kind === 'openPage') notes.push(`[suggested: open page ${m.action.page}]`);
   if (m.action?.kind === 'startRevision') notes.push('[suggested: start today’s revision]');
@@ -223,6 +231,10 @@ function alternate(turns: { role: 'user' | 'assistant'; content: string }[], ope
   return out;
 }
 
+/**
+ * Every Revo request: the cached system prompt, the conversation, and structured output, so the
+ * reply is the one JSON object the app reads (revo/replySchema.ts; reply.ts still checks it).
+ */
 function request(messages: MessagesRequest['messages']): MessagesRequest {
   return {
     model: REVO_MODEL,
@@ -230,6 +242,7 @@ function request(messages: MessagesRequest['messages']): MessagesRequest {
     thinking: REVO_THINKING,
     system: [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages,
+    output_config: REVO_OUTPUT_CONFIG,
   };
 }
 

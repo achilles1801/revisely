@@ -1,112 +1,89 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { bandOf, dailyPagesData, pageRatingsData, shortDate, type RatingBand } from '../../lib/revo/charts';
-import { spokenText } from '../../lib/passages';
-import { passageShort } from '../../lib/revo/words';
+import { knownChart, passagePagesOf, plannedOf, tableRows } from '../../lib/revo/charts';
+import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
 import { SCREEN_BUTTON } from '../../lib/revo/screens';
-import type { RevoAction, RevoChart } from '../../lib/revo/types';
+import type { RevoAction, RevoVisual } from '../../lib/revo/types';
 import { PillButton } from '../v2/PillButton';
+import { DailyPagesChart } from './charts/DailyPagesChart';
+import { JuzMapChart } from './charts/JuzMapChart';
+import { PageRatingsChart } from './charts/PageRatingsChart';
+import { TableChart } from './charts/TableChart';
+import { TimelineChart } from './charts/TimelineChart';
+import { WeeksChart } from './charts/WeeksChart';
+
+/** Where a chart's panel can take the user (RevoChat wires them; RevoHost closes Revo first). */
+export interface ChartHandlers {
+  onOpenDay?: (day: string) => void;
+  onOpenPage?: (page: number) => void;
+  /** Puts these pages first in tomorrow's revision (as a reviseFirst plan does). */
+  onReviseFirst?: (pages: number[]) => Promise<void>;
+}
 
 /**
- * A chart Revo asked for, drawn from this account's own data (lib/revo/charts): ratings of up
- * to four pages over the month, or pages revised per day. `bubble` card, radius 16.
+ * A chart Revo asked for, drawn from this account's own data (lib/revo/charts), flat on the sheet
+ * like an Insights section. Each answers a touch: a tap (or a slide along the bars) picks a mark,
+ * and a panel under it leads on. A kind this app doesn't know draws nothing.
  */
-export function ChartCard({ chart, day }: { chart: RevoChart; day: string }) {
-  const { palette } = useTheme();
-  const { logs } = useApp();
-  const bandColor: Record<RatingBand, string> = { weak: palette.red, moderate: palette.secondary, strong: palette.good };
+export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVisual; day: string; sources?: () => FactSources | null } & ChartHandlers) {
+  const { logs, pages } = useApp();
+  // What the plan had for each day, and a day's facts, as Revo's attachments read them.
+  const reads = useMemo(() => {
+    const src = sources?.() ?? null;
+    if (!src) return null;
+    const prepared = prepare(src);
+    return {
+      planned: plannedOf(src),
+      facts: (d: string) => dayFacts(d, prepared),
+      planPages: (d: string) => (d === src.snapshot.day ? src.snapshot.pages : prepared.scheduled(d)),
+      preview: (pages: number[]) => (pages.length > 0 ? passagePreview(passageFacts(pages, prepared)) : null),
+      passage: (pages: number[], name: string) => passageFacts(pages, prepared, name),
+    };
+  }, [sources]);
+  const passage = useMemo(() => (chart.kind === 'timeline' && knownChart(chart) ? passagePagesOf(chart) : []), [chart]);
+  const rows = useMemo(() => (chart.kind === 'table' && knownChart(chart) && reads ? tableRows(chart, reads.passage) : null), [chart, reads]);
+  if (!knownChart(chart)) return null;
+  if (chart.kind === 'juzMap') {
+    return <JuzMapChart title={chart.title} today={day} logs={logs} userPages={pages} preview={reads?.preview} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
+  }
+  if (chart.kind === 'timeline') {
+    return <TimelineChart title={chart.title} passage={passage} days={chart.days} today={day} logs={logs} onOpenDay={handlers.onOpenDay} />;
+  }
+  if (chart.kind === 'table') {
+    // Its figures are what Revo's attachments say for each row: without the account's facts, no table.
+    if (!rows) return null;
+    return (
+      <TableChart
+        title={chart.title}
+        rows={rows}
+        columns={chart.columns}
+        byJuz={chart.juz != null}
+        userPages={pages}
+        onReviseFirst={handlers.onReviseFirst}
+        onOpenPage={handlers.onOpenPage}
+      />
+    );
+  }
+  if (chart.kind === 'weeks') {
+    return <WeeksChart title={chart.title} weeks={chart.weeks} today={day} logs={logs} facts={reads?.facts} planned={reads?.planned} onOpenDay={handlers.onOpenDay} />;
+  }
+  if (chart.kind === 'pageRatings') {
+    return <PageRatingsChart title={chart.title} pages={chart.pages} today={day} logs={logs} userPages={pages} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
+  }
   return (
-    <View style={[styles.card, { backgroundColor: palette.bubble }]} testID={`revo-chart-${chart.kind}`}>
-      <View style={styles.cardHead}>
-        <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={1.3}>
-          {chart.title}
-        </Text>
-        <Ionicons name="stats-chart-outline" size={20} color={palette.secondary} />
-      </View>
-      {chart.kind === 'pageRatings' ? (
-        (() => {
-          const data = pageRatingsData(logs, chart.pages, day);
-          return (
-            <View
-              accessible
-              accessibilityLabel={data.rows
-                .map((r) => `${spokenText(passageShort([r.page]))}: ${r.dots.length ? r.dots.map((d) => `${d.band} on ${shortDate(d.day)}`).join(', ') : 'no ratings'}`)
-                .join('. ')}
-            >
-              {data.rows.map((r) => (
-                <View key={r.page} style={styles.ratingRow}>
-                  {/* The part by surah, not the page number (lib/revo/words). */}
-                  <Text style={[styles.axis, { color: palette.secondary }]} numberOfLines={1}>
-                    {passageShort([r.page])}
-                  </Text>
-                  <View style={styles.track}>
-                    <View style={[styles.line, { backgroundColor: palette.separator }]} />
-                    {r.dots.map((d, i) => (
-                      <View
-                        key={`${d.day}-${i}`}
-                        style={[styles.dot, { left: `${d.at * 100}%`, backgroundColor: bandColor[d.band] }]}
-                        testID="revo-chart-dot"
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))}
-              <View style={styles.dates}>
-                {[data.start, null, data.end].map((d, i) => (
-                  <Text key={i} style={[styles.axis, { color: palette.secondary }]}>
-                    {d ? shortDate(d) : ''}
-                  </Text>
-                ))}
-              </View>
-              <View style={styles.legend}>
-                {(['weak', 'moderate', 'strong'] as const).map((b) => (
-                  <View key={b} style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: bandColor[b] }]} />
-                    <Text style={[styles.axis, { color: palette.secondary }]}>{b}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          );
-        })()
-      ) : (
-        (() => {
-          const data = dailyPagesData(logs, day, chart.days);
-          const max = Math.max(1, ...data.map((d) => d.pages));
-          return (
-            <View accessible accessibilityLabel={data.map((d) => `${shortDate(d.day)}: ${d.pages} pages`).join(', ')}>
-              <View style={styles.bars}>
-                {data.map((d) => (
-                  <View key={d.day} style={styles.barCol}>
-                    <View
-                      style={[
-                        styles.bar,
-                        { height: Math.max(3, Math.round((d.pages / max) * 72)), backgroundColor: d.pages > 0 ? palette.primary : palette.track },
-                      ]}
-                      testID="revo-chart-bar"
-                    />
-                    {chart.days === 7 ? (
-                      <Text style={[styles.axis, { color: palette.secondary }]}>
-                        {new Date(`${d.day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-              {chart.days === 30 ? (
-                <View style={styles.dates}>
-                  <Text style={[styles.axis, { color: palette.secondary }]}>{shortDate(data[0].day)}</Text>
-                  <Text style={[styles.axis, { color: palette.secondary }]}>{shortDate(data[data.length - 1].day)}</Text>
-                </View>
-              ) : null}
-            </View>
-          );
-        })()
-      )}
-    </View>
+    <DailyPagesChart
+      title={chart.title}
+      days={chart.days}
+      today={day}
+      logs={logs}
+      planned={reads?.planned}
+      facts={reads?.facts}
+      planPages={reads?.planPages}
+      onOpenDay={handlers.onOpenDay}
+    />
   );
 }
 
@@ -170,21 +147,6 @@ export function PlanCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, padding: 14, gap: 10 },
-  cardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  cardTitle: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
-  ratingRow: { marginBottom: 10 },
-  track: { height: 14, justifyContent: 'center', marginTop: 2 },
-  line: { height: StyleSheet.hairlineWidth * 2, position: 'absolute', left: 0, right: 0 },
-  dot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, marginLeft: -6 },
-  axis: { fontSize: 13, lineHeight: 17 },
-  dates: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  legend: { flexDirection: 'row', gap: 14, marginTop: 8 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 92 },
-  barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  bar: { width: '70%', borderRadius: 3 },
   plan: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 6 },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   planTitle: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
