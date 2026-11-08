@@ -265,6 +265,8 @@ describe('juz map', () => {
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     expect(text('revo-chart-juzMap-title')).toBe('Juz 1 · not memorized');
     expect(screen.queryByTestId('revo-chart-juzMap-revise')).toBeNull();
+    // Nothing rated in it: no strip (its first surah's name would label one).
+    expect(screen.queryByText('Al-Fatihah', { includeHiddenElements: true, normalizer: plainText })).toBeNull();
     expect(screen.getByTestId('revo-chart-juzMap-reader')).toBeTruthy();
     // Juz 30 is being learned.
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
@@ -344,6 +346,8 @@ describe('weeks grid', () => {
   it('a weekday’s letter picks its column: how many were missed, and which', async () => {
     await grid();
     expect(screen.getAllByTestId('revo-chart-week-day')).toHaveLength(28);
+    // Nov 4–6 have no plan here: the legend says what those cells are.
+    expect(screen.getByText('No plan', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByTestId('revo-chart-weeks-col-2'));
     expect(text('revo-chart-weeks-title')).toBe('Tuesdays · 1 missed of 1');
     expect(text('revo-chart-weeks-line')).toBe('Missed 3 Nov');
@@ -435,6 +439,10 @@ describe('table', () => {
     expect(onReviseFirst).toHaveBeenCalledWith(range(542));
     fireEvent.press(screen.getByTestId('revo-chart-table-row-28'));
     expect(screen.queryByTestId('revo-chart-table-detail')).toBeNull();
+    // Juz 26 has nothing rated on this account: no strip, only where to go.
+    fireEvent.press(screen.getByTestId('revo-chart-table-row-26'));
+    expect(screen.getByTestId('revo-chart-table-reader')).toBeTruthy();
+    expect(screen.queryByLabelText(/weak, .* moderate, .* strong/)).toBeNull();
   });
 });
 
