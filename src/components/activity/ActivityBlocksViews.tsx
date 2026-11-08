@@ -21,6 +21,7 @@ import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabel, rangeSpan, type InsightsRange } from '../../lib/insightsRange';
 import { journalFirstDay } from '../../lib/journal';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
@@ -170,7 +171,8 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   const ratingByPage = useMemo(() => new Map(pages.map((p) => [p.pageNumber, p.weaknessRating])), [pages]);
   // Each page's last revision on record, all time (what isn't covered says how long ago).
   const lastRevisedOn = useMemo(
-    () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, p.lastRevisedDate as string])),
+    // A page's record is a timestamp ("2026-11-02T09:00:00.000Z"): its day is what counts.
+    () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, (p.lastRevisedDate as string).slice(0, 10)])),
     [pages],
   );
   // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked.
@@ -258,7 +260,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             memorizations: yearOfMemorizing,
             capacity: user?.dailyPageCapacity ?? 20,
             revo: revoAvailable(user),
-            smartTracking: user?.smartTrackingEnabled ?? false,
+            smartTracking: smartTrackingOn(user),
             range,
             firstDay,
             lastRevisedOn,

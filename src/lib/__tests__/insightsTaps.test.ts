@@ -16,7 +16,7 @@ describe('what isn’t covered (i7)', () => {
 
   it('a whole memorized juz as one row, by its surahs and how long ago', () => {
     expect(rows[0]).toMatchObject({ kind: 'juz', juz: 4, label: 'Juz 4' });
-    expect(plainText(rows[0].detail)).toMatch(/^Ali 'Imran.* to An-Nisa.* · 41 days ago$/);
+    expect(plainText(rows[0].detail)).toMatch(/^Ali 'Imran.* to An-Nisa.* · Last revised 41 days ago$/);
   });
 
   it('a run memorized in the range and never revised says so', () => {
@@ -29,7 +29,7 @@ describe('what isn’t covered (i7)', () => {
     const end = rows.find((r) => r.juz === 30)!;
     expect(end.kind).toBe('passage');
     expect(end.pages).toEqual([600, 601, 602, 603, 604]);
-    expect(end.detail).toBe('Not revised yet');
+    expect(end.detail).toBe('Never revised');
   });
 
   it('nothing when every memorized page was revised in the range', () => {
