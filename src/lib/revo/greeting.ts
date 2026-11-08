@@ -82,8 +82,39 @@ export function nextOpens(prev: GreetingOpens | null, day: string, state: string
   return prev != null && prev.day === day && prev.state === state ? { day, state, n: prev.n + 1 } : { day, state, n: 0 };
 }
 
+/** Today's opens, each place counting its own (REVO-38, lib/revo/place placeKey). */
+export interface PlaceOpens {
+  day: string;
+  places: Record<string, { state: string; n: number }>;
+}
+
+/** The record after one more open from `key`: that place counts on in the same state, other places keep theirs. */
+export function nextPlaceOpens(prev: PlaceOpens | null, day: string, key: string, state: string): PlaceOpens {
+  const places = prev != null && prev.day === day ? prev.places : {};
+  const was = places[key];
+  const rec = nextOpens(was ? { day, state: was.state, n: was.n } : null, day, state);
+  return { day, places: { ...places, [key]: { state: rec.state, n: rec.n } } };
+}
+
+/** A stored record read back: today's per-place record, or one from before places (Home's), else null. */
+export function readPlaceOpens(raw: unknown): PlaceOpens | null {
+  if (raw == null || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.day !== 'string') return null;
+  if (r.places != null && typeof r.places === 'object') {
+    const places: PlaceOpens['places'] = {};
+    for (const [key, v] of Object.entries(r.places as Record<string, unknown>)) {
+      const o = v as { state?: unknown; n?: unknown } | null;
+      if (o && typeof o.state === 'string' && Number.isInteger(o.n)) places[key] = { state: o.state, n: o.n as number };
+    }
+    return { day: r.day, places };
+  }
+  if (typeof r.state === 'string' && Number.isInteger(r.n)) return { day: r.day, places: { home: { state: r.state, n: r.n as number } } };
+  return null;
+}
+
 /** One thing from the account's own data a greeting can lead with, and the suggestion that goes with it. */
-interface Aside {
+export interface Aside {
   kind: 'next' | 'weak' | 'week' | 'memorized' | 'streak';
   text: string;
   chip: string;
@@ -104,8 +135,8 @@ function weakToLookAt(ctx: RevoContext): number[] {
   return ctx.weakPages.includes(first + 1) ? [first, first + 1] : [first];
 }
 
-/** What a greeting can lead with besides today, in the order they take turns. */
-function asides(ctx: RevoContext, extras: GreetingExtras): Aside[] {
+/** What a greeting can lead with besides today, in the order they take turns (REVO-38's places take turns with them too). */
+export function asides(ctx: RevoContext, extras: GreetingExtras): Aside[] {
   const out: Aside[] = [];
   const next = extras.next;
   if (next) out.push({ kind: 'next', text: `${next.lead} starts at ${placeOfPage(next.first)}, ${plural(next.pages, 'page')}.`, chip: 'How do I revise ahead?' });

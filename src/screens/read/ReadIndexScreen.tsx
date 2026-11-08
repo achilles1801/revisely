@@ -23,7 +23,6 @@ import {
   ReadingHistoryEntry,
 } from '../../lib/readingHistory';
 import { useTabBarFootprint } from '../../navigation/TabBar';
-import { useRevoFootprint } from '../../lib/revo/presence';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
 import { ayahsInSurah, spokenText } from '../../lib/passages';
@@ -72,8 +71,8 @@ function fallbackDisplay(name: string, nameArabic: string): SurahDisplay {
 export default function ReadIndexScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { isDark, palette: v2Palette } = useTheme();
-  // Room for the tab bar (and the mini player) and for Revo's button.
-  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
+  // Room for the tab bar (and the mini player). Revo's button isn't on the Read tab (REVO-25).
+  const tabFootprint = useTabBarFootprint();
 
   const [recent, setRecent] = useState<ReadingHistoryEntry[]>([]);
   // Tapping the Read tab while on it scrolls the index back to the top.

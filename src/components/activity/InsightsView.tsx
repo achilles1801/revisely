@@ -682,7 +682,7 @@ function WeakSpots({
       right={
         data.revo ? (
           <Tap
-            onPress={() => openRevo({ attach: { kind: 'insight', label: 'Weak spots', insight: 'weakSpots' } })}
+            onPress={() => openRevo({ attach: { kind: 'insight', label: 'Weak spots', insight: 'weakSpots' }, place: { kind: 'weakSpots' } })}
             accessibilityRole="button"
             accessibilityLabel="Ask Revo about your weak spots"
             style={[styles.ask, { borderColor: palette.outline }]}

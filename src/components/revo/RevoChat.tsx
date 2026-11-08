@@ -8,7 +8,10 @@ import { shiftDay } from '../../lib/journal';
 import { logger } from '../../lib/logger';
 import { revoBackAt } from '../../lib/revo/availability';
 import { REVO_MESSAGES, RevoError, revoBackend } from '../../lib/revo/backend';
-import { greetingState, revoChips, revoGreeting, type GreetingOpens } from '../../lib/revo/greeting';
+import { greetingState, type GreetingOpens } from '../../lib/revo/greeting';
+import { placeFacts, revoOpener } from '../../lib/revo/openers';
+import { prepare } from '../../lib/revo/facts';
+import type { RevoPlace } from '../../lib/revo/place';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal } from '../../lib/revo/types';
 import { atListEnd } from '../../lib/revo/sheetFit';
@@ -45,6 +48,7 @@ export function RevoChat({
   review = null,
   onOpenReview,
   opening = null,
+  place = null,
 }: {
   uid: string;
   chatId: string | null;
@@ -69,6 +73,8 @@ export function RevoChat({
   onOpenReview?: () => void;
   /** This open of a new conversation, counted on the phone (RevoHost): a second open with nothing changed says something else (REVO-35). */
   opening?: GreetingOpens | null;
+  /** Where it was opened from: its first line is about that (REVO-38). */
+  place?: RevoPlace | null;
 }) {
   const { palette } = useTheme();
   const haptics = useHaptics();
@@ -108,9 +114,23 @@ export function RevoChat({
   const name = greetingName(user?.name, auth.currentUser?.displayName ?? null) || null;
   // How many times today's greeting opened in this state before (0 once anything changed).
   const open = context && opening && opening.day === day && opening.state === greetingState(context) ? opening.n : 0;
-  const greeting = useMemo(() => (context ? revoGreeting(name, context, open, extras) : null), [context, name, open, extras]);
+  // What the line says about where Revo was opened (REVO-38), from the sources + attaches from.
+  const strength = extras?.strength !== false;
+  const facts = useMemo(() => {
+    const src = context && place ? sources() : null;
+    if (!src || !context) return null;
+    try {
+      return placeFacts(place, prepare(src), context, strength);
+    } catch (err) {
+      // Home's line rather than none.
+      logger.warn('Revo: no line for where it was opened', { place: place?.kind, err });
+      return null;
+    }
+  }, [context, place, sources, strength]);
+  const opener = useMemo(() => (context ? revoOpener(name, context, facts, open, extras) : null), [context, name, facts, open, extras]);
+  const greeting = opener?.text ?? null;
   const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
-  const chips = chatId ? (lastRevo?.chips ?? []) : context ? revoChips(context, open, extras) : [];
+  const chips = chatId ? (lastRevo?.chips ?? []) : (opener?.chips ?? []);
 
   const ask = async (question: string) => {
     const ctx = build();
