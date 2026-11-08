@@ -64,8 +64,9 @@ import { useApp } from '../../context/AppContext';
 import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
-import { carryOverOn, generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
-import { catchUpDayOf, duePagesOf } from '../../lib/carryOver';
+import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
+import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { nextRevisionDayPlan, revisionDayPlan, weekdayLabel, type RevisionDayPlan } from '../../lib/aheadPlan';
 import { describePageRange, describePassage } from '../../lib/passages';
@@ -433,7 +434,7 @@ export default function ActiveRevisionScreen() {
     const revisionDay = sessionDay;
     // The pages that finish the day (SESS-7): its own; or, when Keep daily amount filled it with
     // catch-up pages, those (still credited to the days they were missed).
-    const assignedPages = duePagesOf(assignment.pages, user, revisionDay);
+    const assignedPages = duePagesOf(assignment.pages, user, revisionDay, revisablePages(pages));
     while (commitPromiseRef.current) await commitPromiseRef.current;
     const pending = Array.from(completedPages).filter(
       (p) => !silentlySavedRef.current.has(p),
@@ -761,7 +762,7 @@ export default function ActiveRevisionScreen() {
         const revisionDay = sessionDay ?? getCurrentRevisionDay(user!);
         await addLog({
           date: revisionDay,
-          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay),
+          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay, revisablePages(pages)),
           pagesRevised: sessionCredit(pagesRevised, pageDays, revisionDay).pagesRevised,
           pagesSkipped,
           weaknessUpdates: weaknessUpdatesArray,
@@ -939,8 +940,10 @@ export default function ActiveRevisionScreen() {
     />
   );
 
-  // Pages put in front by "Revise these first tomorrow" (Insights), labelled as such.
-  const fromInsights = !!sessionDay && carryOverOn(user, sessionDay)?.source === 'insights';
+  // Pages Insights put in front (ACT-24), named by their surahs or juz: "From Insights: Juz 1". It said
+  // "the weak pages first" whatever put them there, Plan it and "Revise them tomorrow" too (Nov 8 2026).
+  const insightsFirst = sessionDay ? [...insightsPagesOn(user, sessionDay)] : [];
+  const fromInsights = insightsFirst.length > 0;
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame
@@ -966,7 +969,7 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-from-insights"
               >
-                From Insights: the weak pages first
+                {`From Insights: ${describePassage(insightsFirst, { form: 'short' })}`}
               </Text>
             ) : null}
             {hidden ? (

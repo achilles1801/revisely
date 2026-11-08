@@ -204,7 +204,7 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const caughtUp = caughtUpOnDay(input.logs, day);
     // The pages that finish the day (SESS-7): its own; or the carried pages, when Keep daily
     // amount filled the day with them (they still count for the days they were missed).
-    const own = duePagesOf(assignment.pages, user, day);
+    const own = duePagesOf(assignment.pages, user, day, memorized);
     const total = own.length;
     const doneHere = needDoneCount(own, credited, caughtUp);
     const completed = needDone(own, credited, caughtUp);

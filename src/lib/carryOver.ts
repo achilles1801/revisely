@@ -11,7 +11,7 @@
 // Carrying over happens at most once per revision day.
 
 import { RevisionLog, User, UserPage } from '../types';
-import { carryOverOn, getPagesForDay, getPagesScheduledForDate, keepLaterCarry } from './algorithm';
+import { carryOverOn, getPagesForDay, getPagesScheduledForDate, keepLaterCarry, ownScheduledPages } from './algorithm';
 import { catchUpPagesOf, creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 
@@ -237,10 +237,21 @@ export function carriedPagesFor(user: User, day: string): Set<number> {
 /**
  * Today's OWN pages: the day's pages without the ones carried in from earlier days. Today is done
  * when these are credited to today; a catch-up page is credited to the day it was missed (SESS-7).
+ * A page Insights put first that the day has anyway is still its own (with `memorizedPages`, which
+ * the schedule is read from): Majd's phone, Nov 8 2026, put every page of the day first, so none was
+ * its own and the day could never be done ("28 of 28", Continue revision).
  */
-export function ownPagesOf(pages: readonly number[], user: User, day: string): number[] {
+export function ownPagesOf(pages: readonly number[], user: User, day: string, memorizedPages?: UserPage[]): number[] {
   const carried = carriedPagesFor(user, day);
-  return pages.filter((p) => !carried.has(p));
+  const insights = insightsPagesOn(user, day);
+  const scheduled =
+    memorizedPages && insights.size > 0 ? new Set(ownScheduledPages(user, parseDay(day), memorizedPages)) : null;
+  return pages.filter((p) => !carried.has(p) || (scheduled != null && insights.has(p) && scheduled.has(p)));
+}
+
+function parseDay(day: string): Date {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 /**
@@ -257,8 +268,7 @@ export function planDuePages(user: User, day: string, memorizedPages: UserPage[]
     const gave = carry.pages.filter((p) => from[String(p)] === day);
     if (gave.length > 0) return gave;
   }
-  const [y, m, d] = day.split('-').map(Number);
-  return duePagesOf(getPagesForDay(user, new Date(y, m - 1, d), memorizedPages), user, day);
+  return duePagesOf(getPagesForDay(user, parseDay(day), memorizedPages), user, day, memorizedPages);
 }
 
 /**
@@ -267,8 +277,8 @@ export function planDuePages(user: User, day: string, memorizedPages: UserPage[]
  * days they were missed; revising them in the day's session is what finishes the day (Majd, Nov 7
  * 2026: "let it be missed pages only"). Its own pages are the next day's, done by revising ahead.
  */
-export function duePagesOf(pages: readonly number[], user: User, day: string): number[] {
-  const own = ownPagesOf(pages, user, day);
+export function duePagesOf(pages: readonly number[], user: User, day: string, memorizedPages?: UserPage[]): number[] {
+  const own = ownPagesOf(pages, user, day, memorizedPages);
   if (own.length > 0) return own;
   const carry = carryOverOn(user, day);
   if (!carry || !(carry.skip && carry.skip > 0)) return own;
