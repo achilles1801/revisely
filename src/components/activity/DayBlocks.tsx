@@ -112,7 +112,7 @@ export function DayBlocks({
   onOpenRecording,
   onDeleteReading,
 }: Props) {
-  const { pages, user } = useApp();
+  const { pages, user, refreshPageStates } = useApp();
   const { palette } = useTheme();
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
@@ -288,7 +288,10 @@ export function DayBlocks({
       destructive: true,
       onPress: () =>
         confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
-          queueChange({ kind: 'revision.delete', day, id: a.id }).catch((err) => logger.warn('Could not delete pages added by hand', err));
+          queueChange({ kind: 'revision.delete', day, id: a.id })
+            // The pages' last revised day and count go back without it (ACT-16).
+            .then(() => refreshPageStates?.())
+            .catch((err) => logger.warn('Could not delete pages added by hand', err));
         }),
     })),
   ]);
