@@ -64,7 +64,8 @@ import { reviewPagesInOrder } from '../../lib/aheadCredit';
 import { ownRevised } from '../../lib/activityItems';
 import { nextRevisionDayPlan, revisionDayAfter, weekdayLabel } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
-import { loadActivityHistory, shareActivityHistory } from '../../lib/activityHistory';
+import { handLogsOf, loadActivityHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { pendingEntries } from '../../lib/offline/outbox';
 import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
@@ -92,7 +93,7 @@ export default function DashboardScreen() {
   const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser } = useApp();
+  const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser, pendingChanges } = useApp();
   const { firebaseUser } = useAuth();
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
 
@@ -199,12 +200,18 @@ export default function DashboardScreen() {
 
   // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
   // streak. Revo's context is built from the same function, so the two never disagree.
+  // With the pages logged by hand that are still waiting on this phone (offline, or not sent yet).
+  const counted = useMemo(
+    () => withPendingHandLogs(history, user ? pendingEntries(user.id) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history, user, pendingChanges],
+  );
   const snapshot = useMemo(
     () =>
       user && assignment
-        ? todaySnapshot({ user, pages, logs, day: revisionDay, assignment: assignment.pages, history, now: Date.now() })
+        ? todaySnapshot({ user, pages, logs, day: revisionDay, assignment: assignment.pages, history: counted, now: Date.now() })
         : null,
-    [user, pages, logs, revisionDay, assignment, history],
+    [user, pages, logs, revisionDay, assignment, counted],
   );
   const todayStatus = { status: snapshot?.status ?? ('not_started' as const) };
 
@@ -222,8 +229,9 @@ export default function DashboardScreen() {
   // they are in today's assignment.
   const leftovers = useMemo<Leftovers>(() => {
     if (!user || !assignment) return { pages: [], from: {}, days: [] };
-    return leftoversFor(user, logs, revisionDay, assignment.pages, revisablePages(pages));
-  }, [logs, revisionDay, assignment, pages, user]);
+    // Pages logged by hand for a day aren't left over from it (ACT-15).
+    return leftoversFor(user, [...logs, ...handLogsOf(counted)], revisionDay, assignment.pages, revisablePages(pages));
+  }, [logs, counted, revisionDay, assignment, pages, user]);
 
   // Today's pages that came from earlier days (they come first: "4 from yesterday first").
   const carriedToday = snapshot?.carried.length ?? 0;
