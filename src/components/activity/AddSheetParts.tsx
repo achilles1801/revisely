@@ -1,6 +1,7 @@
 // The pieces of Activity's add sheets (mocks d5–d8), as the mocks draw them: a section label, the
-// segmented What, a page range, the minutes field, a suggestion from the day, a tag chip and the
-// closing info line. Each sheet (Memorized, Note, Revised elsewhere) puts its own together.
+// segmented What, the minutes field, a suggestion from the day, a tag chip and the closing info
+// line. Each sheet (Memorized, Note, Revised elsewhere) puts its own together; the Memorized
+// sheet's From and To are RangeFields.
 
 import React from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -77,52 +78,6 @@ export function Segmented<T extends string>({
           </Tap>
         );
       })}
-    </View>
-  );
-}
-
-/** From and To: two `p.` fields with "to" between them. */
-export function PageRangeFields({
-  from,
-  to,
-  onFrom,
-  onTo,
-  placeholders,
-  testIDs,
-}: {
-  from: string;
-  to: string;
-  onFrom: (v: string) => void;
-  onTo: (v: string) => void;
-  /** "From" and "To" in the empty fields (the Memorized sheet). */
-  placeholders?: boolean;
-  testIDs: { from: string; to: string };
-}) {
-  const { palette, isDark } = useTheme();
-  const box = (value: string, set: (v: string) => void, placeholder: string, label: string, testID: string) => (
-    <View style={[styles.field, styles.flex, { backgroundColor: palette.bubble }]}>
-      <Text style={[styles.prefix, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-        p.
-      </Text>
-      <TextInput
-        testID={testID}
-        value={value}
-        onChangeText={(v) => set(v.replace(/[^0-9]/g, ''))}
-        placeholder={placeholders ? placeholder : undefined}
-        placeholderTextColor={palette.secondary}
-        keyboardType="number-pad"
-        keyboardAppearance={isDark ? 'dark' : 'light'}
-        accessibilityLabel={label}
-        maxFontSizeMultiplier={MAX_SCALE}
-        style={[styles.input, { color: palette.text }]}
-      />
-    </View>
-  );
-  return (
-    <View style={styles.pair}>
-      {box(from, onFrom, 'From', 'From page', testIDs.from)}
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>to</Text>
-      {box(to, onTo, 'To', 'To page', testIDs.to)}
     </View>
   );
 }
@@ -255,9 +210,7 @@ const styles = StyleSheet.create({
   segBtn: { flex: 1, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   segOn: { shadowOpacity: 0.12, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   segText: { fontSize: 14, lineHeight: 20, fontWeight: '600', letterSpacing: -0.23 },
-  pair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   field: { flexDirection: 'row', alignItems: 'center', height: 48, paddingHorizontal: 14, borderRadius: 14 },
-  prefix: { fontSize: 13, marginRight: 6 },
   input: { flex: 1, padding: 0, fontSize: 16, fontVariant: ['tabular-nums'] },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 14, paddingRight: 12, borderRadius: 16 },
   suggestionPill: { height: 32, paddingHorizontal: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

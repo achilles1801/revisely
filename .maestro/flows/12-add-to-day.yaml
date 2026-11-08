@@ -167,9 +167,27 @@ appId: com.revisionbuddy.app
     id: range-use
 - extendedWaitUntil:
     visible:
-      id: add-memorized-from
-      text: "1"
+      id: add-memorized-pages
+      text: "Al.Fatihah · 1 page"
     timeout: 10000
+# Whole pages' To: a wheel of pages, each row naming the surah the page starts in ("2 · Al-Baqarah"),
+# from From on. A flick moves it on (no assertion: how far a flick goes varies), for the screenshot.
+- tapOn:
+    id: add-memorized-to
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-to-picker-page
+    timeout: 5000
+- swipe:
+    from:
+      id: add-memorized-to-picker-page
+    direction: UP
+    duration: 400
+- waitForAnimationToEnd
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 12-add-memorized-pages
 - tapOn: "Cancel"
 - extendedWaitUntil:
     notVisible:

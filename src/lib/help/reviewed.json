@@ -36,7 +36,7 @@
   "reader.sitting": {
     "REC-1": "aa8d6fb7fcf6b756",
     "REC-2": "103f684e88e23182",
-    "MEM-5": "245fa58251083e73",
+    "MEM-5": "5f710a835a3d12fe",
     "DAY-9": "d1f48e9dc60411f1"
   },
   "schedule.cycle": {
@@ -70,7 +70,7 @@
     "ACT-1": "27b4c2094c950cdf"
   },
   "activity.adding": {
-    "ACT-5": "35b9fce4abcb5f16",
+    "ACT-5": "492efd0797908129",
     "ACT-17": "62b54494328e1e9d"
   },
   "insights.coverage": {
@@ -105,7 +105,7 @@
     "ACT-19": "26b92511a47d4f09"
   },
   "day.adding": {
-    "ACT-5": "35b9fce4abcb5f16",
+    "ACT-5": "492efd0797908129",
     "ACT-17": "62b54494328e1e9d"
   },
   "day.notes": {

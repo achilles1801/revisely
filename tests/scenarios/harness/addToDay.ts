@@ -66,11 +66,17 @@ export class AddToDay {
   async memorized(from: number, to: number): Promise<void> {
     await this.open();
     await this.choose('memorized');
-    // The sheet opens on Ayahs (MEM-1); pages are its Whole pages tab.
+    // The sheet opens on Ayahs (MEM-1); pages are its Whole pages tab, From and To on a wheel.
     await this.press('add-memorized-tab-pages');
-    await this.type('add-memorized-from', String(from));
-    await this.type('add-memorized-to', String(to));
+    await this.pickPage('from', from);
+    await this.pickPage('to', to);
     await this.add('memorized');
+  }
+
+  /** The Memorized sheet's Whole pages: `which` row's wheel (opened if it isn't), then `page`'s row. */
+  async pickPage(which: 'from' | 'to', page: number): Promise<void> {
+    if (this.app.screen.queryByTestId(`add-memorized-${which}-picker`) == null) await this.press(`add-memorized-${which}`);
+    await this.press(`add-memorized-${which}-picker-page-${page}`);
   }
 
   /** + → Note → `text` → Add. */
