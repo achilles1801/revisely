@@ -489,6 +489,12 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   Home, the widget and Revo name it by its memorized ayahs: with only An-Nas memorized on the Qur'an's
   last page, the day "Starts at An-Nas", not Al-Ikhlas.
 
+- **MEM-6.** The schedule editor (testers) lists, under "Not in your plan", the memorized and partly
+  memorized pages a custom plan doesn't hold, named by their ayahs. A custom plan never adds new pages by
+  itself. Add offers "With tomorrow's pages" (they join tomorrow's day) or "As a day of its own,
+  tomorrow" (the cycle grows by a day). Either is an edit to Save, and the list leaves at once. The
+  automatic schedule holds every memorized page, so it has no such list.
+
 ## Naming the Qur'an
 
 - **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers

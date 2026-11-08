@@ -471,3 +471,59 @@ describe('a new plan and today', () => {
     alert.mockRestore();
   });
 });
+
+describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
+  const today = new Date();
+  const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  // Pages 1–30 memorized, the plan holding 1–28; and An-Nas alone memorized on the last page.
+  const withPlan = (previewTester: boolean) => {
+    Object.assign(mockApp, {
+      user: { ...baseUser, previewTester, customPlan: { days: [range(1, 10), range(11, 20), range(21, 28)], cycleStartDate: day, direction: 'forward' } },
+      pages: [
+        ...memorized,
+        { ...memorized[0], pageNumber: 604, status: 'in_progress', verses: [114001, 114002, 114003, 114004, 114005, 114006] },
+      ],
+    });
+  };
+
+  it('[MEM-6] a tester sees them, named by their ayahs, and adds them to tomorrow’s pages', async () => {
+    withPlan(true);
+    await mount(<PlanEditScreen />);
+    expect(screen.getByText('Not in your plan')).toBeTruthy();
+    expect(screen.getByText(/Al.Baqarah .* and An.Nas/)).toBeTruthy();
+    expect(within(screen.getByTestId('plan-not-in-plan')).getByText('3 pages')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('plan-not-in-plan'));
+    await act(async () => {});
+    expect(screen.getByText('With tomorrow’s pages')).toBeTruthy();
+    expect(screen.getByText('10 pages, then 13 pages')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('sheet-action-tomorrow'));
+    // The action runs once the menu has gone (iOS: the modal's dismissal).
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+    // In the plan now (not saved yet): the section goes, and Save comes on.
+    expect(screen.queryByText('Not in your plan')).toBeNull();
+    expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+  });
+
+  it('[MEM-6] as a day of its own, tomorrow: the cycle grows by a day', async () => {
+    withPlan(true);
+    await mount(<PlanEditScreen />);
+    fireEvent.press(screen.getByTestId('plan-not-in-plan'));
+    await act(async () => {});
+    expect(screen.getByText('The cycle becomes 4 days')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('sheet-action-own'));
+    // The action runs once the menu has gone (iOS: the modal's dismissal).
+    await act(async () => {
+      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
+    });
+    expect(within(screen.getByTestId('plan-hero')).getByText('Repeats every 4 days')).toBeTruthy();
+  });
+
+  it('[MEM-6] not for others, nor on the automatic schedule', async () => {
+    withPlan(false);
+    await mount(<PlanEditScreen />);
+    expect(screen.queryByText('Not in your plan')).toBeNull();
+  });
+});

@@ -279,6 +279,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'MEM-1': 'memorizing by the ayah: no one can save ayahs yet; the Day’s Add to memorized brings it, with its own section here',
   'MEM-2': 'a partly memorized page’s share in the %: nothing to ask until ayahs can be saved (MEM-1)',
   'MEM-3': 'taking ayahs off the memorized: nothing to ask until ayahs can be saved (MEM-1)',
+  'MEM-6': 'the schedule editor’s Not in your plan (testers); the guide’s words are in Revo’s system prompt, so it comes with the next recording of Revo’s replies',
   'MEM-4': 'a partly memorized page in the revision cycle: nothing to ask until ayahs can be saved (MEM-1)',
 };
 
