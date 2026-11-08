@@ -454,6 +454,12 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r4-sheet-dark
+# The same answer as in light (the chart answers above set other replies, and a reply stays set).
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "The end of Al-Hashr and the start of Al-Mumtahanah slipped to weak twice this month, both coming late in a long session. Take them first tomorrow, while you are fresh.", "chart": {"kind": "pageRatings", "title": "End of Al-Hashr and start of Al-Mumtahanah", "pages": [548, 549]}, "textAfter": "Here is a plan:", "action": {"kind": "reviseFirst", "title": "The end of Al-Hashr first, tomorrow", "detail": "Then the start of Al-Mumtahanah, before the rest", "pages": [548, 549]}, "remember": ["You like short, practical plans.", "You usually revise after Fajr."], "title": "Pages that slip", "chips": ["How is my pace?"]}'
 - tapOn:
     id: revo-input
 - inputText: "Why do these two keep slipping?"

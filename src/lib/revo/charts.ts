@@ -55,9 +55,13 @@ const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from
 /** "once", "twice", "3 times". */
 export const timesWord = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
 
-/** "today", "yesterday", "4 days ago". */
+/**
+ * "today", "yesterday", "4 days ago". `day` may be a full timestamp: a page's lastRevisedDate is
+ * one in the app ("2026-11-02T09:00:00.000Z"); its first ten characters are the day, as AppContext
+ * reads it.
+ */
 export function agoWords(day: string, today: string): string {
-  const n = daysBetween(day, today);
+  const n = daysBetween(day.slice(0, 10), today);
   return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
 }
 
