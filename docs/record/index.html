@@ -416,8 +416,8 @@
       <h1>Help build Revisely’s recitation checker</h1>
       <p>Revisely is building a checker that follows your recitation on the mushaf and points out mistakes. To make it accurate, it needs real people reciting, including some mistakes made on purpose. It takes about 20 minutes, or 35 with the extra part.</p>
       <label class="q" for="name">Your name</label>
-      <input class="field" id="name" type="text" autocomplete="name" maxlength="60" placeholder="Your first name is enough">
-      <p class="muted" style="margin-top:8px">Only the person who shared this link sees your name. Your recordings are filed under a code, not your name.</p>
+      <input class="field" id="name" type="text" autocomplete="name" maxlength="60">
+      <p class="muted" style="margin-top:8px">Only Revisely’s developer can see your name. Your recordings are filed under a code, not your name.</p>
       <p class="err" id="err" hidden></p>
       <button class="btn wide" id="go" disabled>Continue</button>`;
     const name = document.getElementById('name'), go = document.getElementById('go'), err = document.getElementById('err');
@@ -470,10 +470,10 @@
       <h2 style="margin-top:24px">What happens to your recordings</h2>
       <ul class="plain" style="margin-top:10px">
         <li><strong>What’s recorded:</strong> only what you record on this page, your answers to a few questions, and your phone type.</li>
-        <li><strong>No name on them:</strong> your recordings are filed under a code (${esc(S.pid)}), not your name. Only the person who shared the link knows which code is yours.</li>
+        <li><strong>No name on them:</strong> your recordings are filed under a code (${esc(S.pid)}), not your name. Only Revisely’s developer knows which code is yours.</li>
         <li><strong>Who hears them:</strong> Revisely’s developer, and the software that builds the checker. They are never published or shared.</li>
         <li><strong>What they’re for:</strong> building and testing Revisely’s recitation checking, including training its models. This may become a paid feature of the app.</li>
-        <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell the person who shared the link with you, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
+        <li><strong>Stopping:</strong> you can stop at any time. To have your recordings deleted, tell Revisely’s developer, or email <a href="mailto:support@revisely.app">support@revisely.app</a> with your code (${esc(S.pid)}).</li>
       </ul>
       <div class="agree" role="radiogroup" aria-label="Agreement">
         <label><input type="radio" name="agree" value="adult"><span>I’m 18 or over, and I agree.</span></label>
