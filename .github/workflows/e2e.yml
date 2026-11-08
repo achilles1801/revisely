@@ -530,10 +530,17 @@ jobs:
             17
             21
 
-      - name: Gradle memory
+      # Memory, and two minutes for each download: Gradle waits 30 s for an answer by default, and
+      # a dependency served from GitHub's releases (the Kotlin compiler) timed out on a runner on
+      # Nov 8 2026. Gradle already tries a download three times.
+      - name: Gradle memory and timeouts
         run: |
           mkdir -p ~/.gradle
-          echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+          {
+            echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8'
+            echo 'systemProp.org.gradle.internal.http.connectionTimeout=120000'
+            echo 'systemProp.org.gradle.internal.http.socketTimeout=120000'
+          } >> ~/.gradle/gradle.properties
 
       # node_modules, kept per lockfile, patches, OS and Node: npm ci took 3–5
       # minutes on a macOS runner. Allowed here: this workflow holds no release
