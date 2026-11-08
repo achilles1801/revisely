@@ -1,5 +1,5 @@
-# The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month and
-# week, a day, the day's block menu, the add sheets and Insights, each a screenshot named
+# The Activity screens for the visual check (gap audit; activity-redesign/verify): Overview's month (with
+# Today, since October isn't today's month), its Week | Month menu and the week, a day, the day's block menu, the add sheets and Insights, each a screenshot named
 # 09-<screen>-${THEME}. The day as d1 (top, then scrolled), its menu (d10a), the + (d5), its Revised,
 # Memorized and Note sheets (d6–d8), a light day (d2), and Insights (d4: top, Weak spots, the end).
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
@@ -24,7 +24,20 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-overview-month-${THEME}
-- tapOn: "Week"
+# Week | Month is the chip beside the title (ACT-18): its menu, then the week holding the picked day.
+- tapOn:
+    id: calendar-span
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-week
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-overview-span-menu-${THEME}
+- tapOn:
+    id: sheet-action-week
 - extendedWaitUntil:
     visible:
       id: calendar-week
@@ -33,12 +46,30 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-overview-week-${THEME}
-- tapOn: "Month"
-# As the mock (d1): today, Tuesday 3 November. A tap picks the day; Open goes to it.
-- tapOn: "Next month"
+- tapOn:
+    id: calendar-span
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-month
+    timeout: 10000
+- tapOn:
+    id: sheet-action-month
+- extendedWaitUntil:
+    visible:
+      id: calendar-totals
+    timeout: 10000
+# As the mock (d1): today, Tuesday 3 November. Today brings back today's month with today picked; the
+# picked day's rows open it (ACT-18).
+- tapOn:
+    id: calendar-today
+- extendedWaitUntil:
+    notVisible:
+      id: calendar-today
+    timeout: 10000
 - tapOn:
     id: calendar-day-2026-11-03
-- tapOn: "Open the day"
+- tapOn:
+    id: preview-row-revised
 - extendedWaitUntil:
     visible:
       id: activity-day-v2
@@ -195,7 +226,8 @@ appId: com.revisionbuddy.app
 # A light day (d2): Sunday 1 November, stopped after 6 pages.
 - tapOn:
     id: calendar-day-2026-11-01
-- tapOn: "Open the day"
+- tapOn:
+    id: preview-open
 - extendedWaitUntil:
     visible:
       id: activity-day-v2

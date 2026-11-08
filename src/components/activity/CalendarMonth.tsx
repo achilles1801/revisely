@@ -1,8 +1,13 @@
 // The Activity calendar (gap audit §3, mock d3): a month, its four totals, the day cells, the legend, and
-// the picked day's blocks. The Week | Month toggle stays (Majd's decision after the mocks), in the
-// mock's ink pills. A tap on a day picks it; Open goes to the day.
+// the picked day's blocks. A tap on a day picks it; the picked day's whole preview opens it.
+//
+// Week or Month is the calendar's own choice, a chip beside its title that opens the two (ACT-18). Majd,
+// Nov 8 2026: a second row of pills for it read as "a whole tab just to show weeks instead of month".
+// One chip, not a segmented pair: the span is a preference kept on the phone, so it needn't spend the
+// room of both words, and the header stays one line on an SE with Today and the arrows beside it. It is
+// the same control as Insights' range chip, so both tabs read alike.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 import { monthGrid, monthTitle } from '../../lib/activityHeatmap';
 import { weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalendar';
-import { PillTabs } from '../v2/PillTabs';
+import { ActionSheet } from '../v2/ActionSheet';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
@@ -23,6 +28,9 @@ const MAX_SCALE = 1.4;
 
 /** From this text size the four totals go two by two: four in a row ran off the edge at the largest text. */
 const TOTALS_TWO_BY_TWO = 1.2;
+
+/** From this text size Today and the arrows take a line of their own under the title and its chip. */
+const HEADER_WRAPS = 1.2;
 
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -45,6 +53,7 @@ export function CalendarMonth({
   week,
   span,
   onSpan,
+  onToday,
   today,
   picked,
   data,
@@ -59,6 +68,8 @@ export function CalendarMonth({
   week: string;
   span: CalendarSpan;
   onSpan: (span: CalendarSpan) => void;
+  /** Shown when the calendar isn't on today's month or week: brings it back, with today picked. */
+  onToday?: () => void;
   today: string;
   picked: string | null;
   data: CalendarData;
@@ -70,6 +81,8 @@ export function CalendarMonth({
 }) {
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
+  const [spanMenu, setSpanMenu] = useState(false);
+  const unit = span === 'week' ? 'week' : 'month';
   const grid = monthGrid(month);
   const days = grid.flat().filter((d): d is string => d != null);
   const inMonth = (d: string) => d.startsWith(`${month}-`);
@@ -102,43 +115,72 @@ export function CalendarMonth({
 
   return (
     <View testID="calendar-month">
-      {/* Week | Month: ink pills that hug their labels (the choice is kept on the phone). */}
-      <View style={styles.spanRow}>
-        <PillTabs<CalendarSpan>
-          options={[
-            { value: 'week', label: 'Week' },
-            { value: 'month', label: 'Month' },
-          ]}
-          value={span}
-          onChange={onSpan}
-          tone="ink"
-          hug
-          testID="calendar-span"
-        />
-      </View>
-
-      {/* Header: the title on the left, the chevrons on the right (22, gap 22). The title gives way to
-          the chevrons (it pushed them off the screen at the largest text, Nov 2026). */}
-      <View style={styles.monthHead}>
-        <Text
-          style={[styles.monthTitle, { color: palette.text }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.6}
-          maxFontSizeMultiplier={MAX_SCALE}
-          testID="calendar-month-title"
-        >
-          {span === 'week' ? weekTitle(week) : monthTitle(month)}
-        </Text>
-        <View style={styles.chevrons}>
-          <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel="Previous month" hitSlop={8}>
-            <Ionicons name="chevron-back" size={22} color={palette.text} />
-          </Tap>
-          <Tap onPress={() => onStep(1)} accessibilityRole="button" accessibilityLabel="Next month" hitSlop={8}>
-            <Ionicons name="chevron-forward" size={22} color={palette.text} />
+      {/* Header: what you're looking at on the left (the title and its Week | Month chip), where to go
+          on the right (Today when away, the arrows). The title gives way first (it pushed the chevrons
+          off the screen at the largest text, Nov 2026); from 1.2× the right side takes its own line. */}
+      <View style={[styles.monthHead, fontScale >= HEADER_WRAPS && styles.monthHeadWrap]} testID="calendar-head">
+        <View style={styles.titleGroup}>
+          <Text
+            style={[styles.monthTitle, { color: palette.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            maxFontSizeMultiplier={MAX_SCALE}
+            accessibilityRole="header"
+            testID="calendar-month-title"
+          >
+            {span === 'week' ? weekTitle(week) : monthTitle(month)}
+          </Text>
+          <Tap
+            onPress={() => setSpanMenu(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${span === 'week' ? 'Week' : 'Month'} view`}
+            accessibilityHint="Choose week or month"
+            hitSlop={8}
+            style={[styles.spanChip, { borderColor: palette.outline }]}
+            testID="calendar-span"
+          >
+            <Text style={[typeV2.meta, styles.spanLabel, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+              {span === 'week' ? 'Week' : 'Month'}
+            </Text>
+            <Ionicons name="chevron-down" size={13} color={palette.secondary} />
           </Tap>
         </View>
+        <View style={styles.nav}>
+          {onToday ? (
+            <Tap
+              onPress={onToday}
+              accessibilityRole="button"
+              accessibilityLabel="Today"
+              accessibilityHint={`Shows this ${unit}`}
+              hitSlop={8}
+              testID="calendar-today"
+            >
+              <Text style={[typeV2.name, { color: palette.link }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                Today
+              </Text>
+            </Tap>
+          ) : null}
+          <View style={styles.chevrons}>
+            <Tap onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel={`Previous ${unit}`} hitSlop={8}>
+              <Ionicons name="chevron-back" size={22} color={palette.text} />
+            </Tap>
+            <Tap onPress={() => onStep(1)} accessibilityRole="button" accessibilityLabel={`Next ${unit}`} hitSlop={8}>
+              <Ionicons name="chevron-forward" size={22} color={palette.text} />
+            </Tap>
+          </View>
+        </View>
       </View>
+      <ActionSheet
+        visible={spanMenu}
+        onClose={() => setSpanMenu(false)}
+        title="Show the calendar by"
+        actions={[
+          { key: 'week', label: 'Week', subtitle: 'Seven days, each with what it held', selected: span === 'week', onPress: () => onSpan('week') },
+          { key: 'month', label: 'Month', subtitle: "The month's days and its totals", selected: span === 'month', onPress: () => onSpan('month') },
+        ]}
+        testID="calendar-span-menu"
+      />
 
       {/* Totals (the month): four equal columns (icon and label, then the value); two by two at large text. */}
       {span === 'month' ? <View style={styles.totals} testID="calendar-totals">
@@ -202,23 +244,40 @@ export function CalendarMonth({
 
       <View style={[styles.legendRule, { backgroundColor: palette.separator }]} />
 
-      {/* The picked day: its date and Open, then one row per block that has something. Chrome, so it
+      {/* The picked day: its date and Open, then one row per block that has something. The whole of it
+          opens the day (ACT-18; Majd, Nov 8 2026: Open alone was easy to miss): the date and
+          Open are one button, each row another, edge to edge with no gap between them. Chrome, so it
           stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
           screen and the rows clipped into each other (Nov 2026). */}
-      <View style={styles.preview}>
-        <View style={styles.previewHead}>
+      <View style={styles.preview} testID="calendar-preview">
+        <Tap
+          onPress={() => onOpen(shownDay)}
+          accessibilityRole="button"
+          accessibilityLabel="Open the day"
+          accessibilityValue={{ text: formatDayLong(shownDay) }}
+          style={styles.previewHead}
+          testID="preview-open"
+        >
           <Text style={[styles.previewDate, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
             {formatDayLong(shownDay)}
           </Text>
-          <Tap onPress={() => onOpen(shownDay)} accessibilityRole="button" accessibilityLabel="Open the day" style={styles.openRow}>
+          <View style={styles.openRow}>
             <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
               Open
             </Text>
             <Ionicons name="chevron-forward" size={16} color={palette.link} />
-          </Tap>
-        </View>
+          </View>
+        </Tap>
         {previewRows.map((r) => (
-          <View key={r.key} style={styles.previewRow}>
+          <Tap
+            key={r.key}
+            onPress={() => onOpen(shownDay)}
+            accessibilityRole="button"
+            accessibilityLabel={`${r.label}, ${r.value}${r.mics ? `, ${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}` : ''}`}
+            accessibilityHint="Opens the day"
+            style={styles.previewRow}
+            testID={`preview-row-${r.key}`}
+          >
             {r.kind === 'revised' ? <RevisedMark fraction={dayMarks(shownDay, data).ring ?? 0} done={(dayMarks(shownDay, data).ring ?? 0) >= 1} size={26} /> : <BlockMark kind={r.kind} size={26} />}
             <Text style={[typeV2.body, { color: palette.text, minWidth: 84 }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {r.label}
@@ -241,7 +300,7 @@ export function CalendarMonth({
                 </Text>
               </View>
             ) : null}
-          </View>
+          </Tap>
         ))}
       </View>
     </View>
@@ -380,10 +439,14 @@ function LegendItem({ label, children }: { label: string; children: React.ReactN
 }
 
 const styles = StyleSheet.create({
-  spanRow: { paddingTop: 12, paddingHorizontal: 16 },
   summary: { minHeight: 40, flexDirection: 'row', alignItems: 'center' },
-  monthHead: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  monthHead: { minHeight: 44, paddingTop: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 12, rowGap: 8 },
+  monthHeadWrap: { flexWrap: 'wrap' },
+  titleGroup: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   monthTitle: { flexShrink: 1, fontSize: 20, lineHeight: 24, fontWeight: '700' },
+  spanChip: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 26, paddingLeft: 10, paddingRight: 8, borderRadius: 13, borderWidth: 1 },
+  spanLabel: { fontWeight: '600' },
+  nav: { flexShrink: 0, marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 18 },
   chevrons: { flexShrink: 0, flexDirection: 'row', gap: 22 },
   totals: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10, paddingHorizontal: 16, paddingTop: 4 },
   total: { flex: 1 },
@@ -406,10 +469,10 @@ const styles = StyleSheet.create({
   legendDot: { width: 6, height: 6, borderRadius: 3 },
   legendRule: { height: StyleSheet.hairlineWidth, marginTop: 10 },
   tabular: { fontVariant: ['tabular-nums'] },
-  preview: { paddingTop: 10, paddingHorizontal: 16 },
-  previewHead: { minHeight: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  preview: { paddingTop: 10 },
+  previewHead: { minHeight: 32, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   previewDate: { flexShrink: 1, fontSize: 16, lineHeight: 20, fontWeight: '600' },
   openRow: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  previewRow: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewRow: { minHeight: 36, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
   mics: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -2 },
 });
