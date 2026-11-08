@@ -225,6 +225,13 @@ How the tests are made: `tests/scenarios/README.md`.
   counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
   Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
   pages known reads "Timed in Read".
+- **REC-3.** On today or yesterday in Activity (testers), a sitting from the reader with nothing left to
+  memorize on its pages, that held pages of the day's revision not revised yet, offers Add to revised:
+  "At-Taghabun is the 2 pages left of today's revision" ("… is 2 of the 4 pages left …" when it held
+  some of them). Add logs exactly those pages for that day by hand, as Revised elsewhere does: they show
+  in the Revised block at once (ACT-13), carry no strength or minutes, and go from its menu (ACT-14).
+  A sitting offers one thing: pages not memorized come first (MEM-5). Pages not scheduled that day,
+  already revised, or on an older day were reading, and offer nothing.
 
 ## Activity
 

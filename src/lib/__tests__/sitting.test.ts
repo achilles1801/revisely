@@ -1,6 +1,6 @@
 import { HELD_MS, notePageOnScreen, pagesHeld, pageTimesAt, pauseTimer, readingSessionFromTimer, resumeTimer, startTimer } from '../readingTimer';
 import { plainText } from '../passages';
-import { sittingDayWord, sittingSavedText } from '../sitting';
+import { sittingDayWord, sittingSavedText, sittingToReviseText } from '../sitting';
 
 const MIN = 60_000;
 
@@ -43,5 +43,13 @@ describe('a sitting in the reader (REC-1)', () => {
     expect(readingSessionFromTimer(t, end).pages).toEqual([]);
     expect(readingSessionFromTimer({ ...t, pagesRevised: [10] }, end, { pagesHeld: true }).pages).toEqual([10]);
     expect(readingSessionFromTimer(t, end, { pagesHeld: true }).pagesVisited).toEqual([562, 563, 564]);
+  });
+});
+
+describe('a sitting’s Add to revised line (REC-3)', () => {
+  it('names the pages by surah and says how much of the day’s revision they are', () => {
+    expect(plainText(sittingToReviseText([556, 557], [556, 557], 'today'))).toBe('At-Taghabun is the 2 pages left of today’s revision.');
+    expect(plainText(sittingToReviseText([556, 557], [554, 555, 556, 557], 'today'))).toBe('At-Taghabun is 2 of the 4 pages left of today’s revision.');
+    expect(plainText(sittingToReviseText([562], [562], 'yesterday'))).toBe('Al-Mulk, ayahs 1–12 is the page left of yesterday’s revision.');
   });
 });

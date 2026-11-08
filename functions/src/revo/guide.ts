@@ -297,6 +297,9 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-25': 'the button’s size and the room lists leave for it',
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
+  // Not in the guide's sections yet: their words would change Revo's system prompt, so they come with the
+  // next recording of Revo's replies (functions/scripts/record-anthropic.js).
+  'REC-3': 'a sitting’s Add to revised on the Day (testers; Memorizing by the ayah’s section, next recording)',
 };
 
 /** The guide as Revo reads it. */

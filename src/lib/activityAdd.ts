@@ -110,3 +110,19 @@ export function revisedElsewhereChoices(input: {
   const done = new Set(input.revised);
   return [...new Set(input.due)].filter((p) => input.memorized.has(p) && !done.has(p));
 }
+
+/**
+ * A reader sitting's Add to revised (REC-3): of the pages it held, those the day still has to revise
+ * (as Revised elsewhere offers them), and all the day has left. Pages it held that aren't scheduled,
+ * already revised, or not memorized are reading, and aren't offered.
+ */
+export function sittingToRevise(input: {
+  held: readonly number[];
+  due: readonly number[];
+  revised: Iterable<number>;
+  memorized: ReadonlySet<number>;
+}): { pages: number[]; left: number[] } {
+  const left = revisedElsewhereChoices(input);
+  const held = new Set(input.held);
+  return { pages: left.filter((p) => held.has(p)), left };
+}

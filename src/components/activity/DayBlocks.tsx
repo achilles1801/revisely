@@ -33,6 +33,12 @@ import { onApplied } from '../../lib/offline/sync';
 import type { OutboxEntry } from '../../lib/offline/ops';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { currentAccount, queueChange } from '../../lib/offline/queue';
+import { sittingToRevise } from '../../lib/activityAdd';
+import { planDuePages } from '../../lib/carryOver';
+import { manualRevisionItem } from '../../lib/manualRevision';
+import { sittingToReviseText } from '../../lib/sitting';
+import { previousIsoDay } from '../../lib/streak';
+import { REVISED_ICON } from './BlockMark';
 import { isManualRevisionId } from '../../lib/manualRevision';
 import { describeAyahs } from '../../lib/passages';
 import { ayahsOnPage, sortedAyahs } from '../../lib/ayahKeys';
@@ -165,6 +171,8 @@ export function DayBlocks({
   const [sittingToAdd, setSittingToAdd] = useState<SittingToAdd | null>(null);
   // Mounted from the first Add on (so it can slide away after), never before: it loads the day's reads.
   const [sheetUsed, setSheetUsed] = useState(false);
+  // A sitting's Add to revised while it saves (REC-3): one tap logs it once.
+  const [revisingSitting, setRevisingSitting] = useState<string | null>(null);
   // The juz sheet (ACT-21), from the Revised block's header: mounted from its first opening on.
   const [juzShown, setJuzShown] = useState<number | null>(null);
   const [juzUsed, setJuzUsed] = useState(false);
@@ -500,11 +508,32 @@ export function DayBlocks({
     ...memorized.items.flatMap((i) => taggedTo('memorization', i.id).map(noteItem)),
     ...memorizationNotes.map(handItem),
   ];
+  // What the day still has to revise (REC-3), as Revised elsewhere reads it: today or yesterday, its
+  // session's assignment (the plan's pages without one), less what is revised for it already.
+  const reviseWord: 'today' | 'yesterday' | null = day === today ? 'today' : day === previousIsoDay(today) ? 'yesterday' : null;
+  const dueToRevise = reviseWord == null ? [] : revised.assigned.length > 0 ? revised.assigned : user ? planDuePages(user, day, pages.filter((p) => p.status === 'memorized')) : [];
+  const revisedForDay = [...revised.revised, ...doneAhead.flatMap((a) => a.pages)];
+  const addSittingRevised = async (id: string, toRevise: number[]) => {
+    if (!user || revisingSitting) return;
+    setRevisingSitting(id);
+    try {
+      // Logged by hand, as Revised elsewhere logs them (ACT-13, ACT-14): no strength, no minutes.
+      await queueChange({ kind: 'revision.add', item: manualRevisionItem({ uid: user.id, day, now: Date.now(), pages: toRevise, minutes: null }) });
+      refreshPageStates?.().catch((err) => logger.warn('Could not re-derive the pages after a log', err));
+    } catch (err) {
+      logger.warn('Could not add the sitting as revised', err);
+    } finally {
+      setRevisingSitting(null);
+    }
+  };
   const readItemNodes: React.ReactNode[] = [
     ...readHere.map((i, idx) => {
       const last = idx === readHere.length - 1;
-      // Pages it held that aren't all memorized: offer to add them (MEM-1). Testers see the Day.
+      // One offer per sitting. Pages it held that aren't all memorized: Add to memorized (MEM-1).
       const open = i.pages.filter((p) => pageByNumber.get(p)?.status !== 'memorized');
+      // Otherwise the day's pages it held that aren't revised yet: Add to revised (REC-3).
+      const toRevise =
+        open.length === 0 && reviseWord != null ? sittingToRevise({ held: i.pages, due: dueToRevise, revised: revisedForDay, memorized: memorizedSet }) : null;
       return (
         <View key={i.id}>
           {sittingRow(i)}
@@ -526,6 +555,22 @@ export function DayBlocks({
                 }}
                 style={styles.offerButton}
                 testID={`activity-add-memorized-${i.id}`}
+              />
+            </View>
+          ) : toRevise && toRevise.pages.length > 0 && reviseWord ? (
+            <View style={styles.offer} testID={`activity-sitting-offer-${i.id}`}>
+              <Text style={[typeV2.meta, { color: palette.secondary }]} testID={`activity-sitting-to-revise-${i.id}`}>
+                {sittingToReviseText(toRevise.pages, toRevise.left, reviseWord)}
+              </Text>
+              <PillButton
+                title="Add to revised"
+                variant="outline"
+                size="sm"
+                icon={REVISED_ICON}
+                disabled={revisingSitting != null}
+                onPress={() => void addSittingRevised(i.id, toRevise.pages)}
+                style={styles.offerButton}
+                testID={`activity-add-revised-${i.id}`}
               />
             </View>
           ) : null}
