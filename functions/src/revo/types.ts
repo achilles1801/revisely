@@ -141,8 +141,13 @@ export type RevoChart = { kind: 'pageRatings'; title: string; pages: number[] } 
  * a kind it didn't know. `chart` keeps carrying only the first two; newer apps draw
  * `visual ?? chart`. The app's side is src/lib/revo/types.ts.
  */
-export type RevoNewChart = { kind: 'juzMap'; title: string };
-export const REVO_NEW_CHART_KINDS = ['juzMap'] as const;
+export type RevoNewChart =
+  | { kind: 'juzMap'; title: string }
+  /** Each revision of one surah or one juz (exactly one of them) over the last `days`. */
+  | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: RevoTimelineDays };
+export const REVO_NEW_CHART_KINDS = ['juzMap', 'timeline'] as const;
+export const REVO_TIMELINE_DAYS = [30, 90, 365] as const;
+export type RevoTimelineDays = (typeof REVO_TIMELINE_DAYS)[number];
 export type RevoVisual = RevoChart | RevoNewChart;
 
 /**

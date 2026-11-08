@@ -172,7 +172,10 @@ export type RevoChart =
  * The charts after the first two, in a message's `visual` (the server's types.ts RevoNewChart):
  * apps before them don't read that field, so they show the words, never an empty chart.
  */
-export type RevoNewChart = { kind: 'juzMap'; title: string };
+export type RevoNewChart =
+  | { kind: 'juzMap'; title: string }
+  /** Each revision of one surah or one juz (exactly one of them) over the last `days`. */
+  | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: 30 | 90 | 365 };
 export type RevoVisual = RevoChart | RevoNewChart;
 
 /** The screens an `openScreen` action may open (REVO-31); the server has the same list. */

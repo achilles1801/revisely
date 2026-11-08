@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { knownChart, plannedOf } from '../../lib/revo/charts';
+import { knownChart, passagePagesOf, plannedOf } from '../../lib/revo/charts';
 import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
 import { SCREEN_BUTTON } from '../../lib/revo/screens';
 import type { RevoAction, RevoVisual } from '../../lib/revo/types';
@@ -11,6 +11,7 @@ import { PillButton } from '../v2/PillButton';
 import { DailyPagesChart } from './charts/DailyPagesChart';
 import { JuzMapChart } from './charts/JuzMapChart';
 import { PageRatingsChart } from './charts/PageRatingsChart';
+import { TimelineChart } from './charts/TimelineChart';
 
 /** Where a chart's panel can take the user (RevoChat wires them; RevoHost closes Revo first). */
 export interface ChartHandlers {
@@ -39,9 +40,13 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
       preview: (pages: number[]) => (pages.length > 0 ? passagePreview(passageFacts(pages, prepared)) : null),
     };
   }, [sources]);
+  const passage = useMemo(() => (chart.kind === 'timeline' && knownChart(chart) ? passagePagesOf(chart) : []), [chart]);
   if (!knownChart(chart)) return null;
   if (chart.kind === 'juzMap') {
     return <JuzMapChart title={chart.title} today={day} logs={logs} userPages={pages} preview={reads?.preview} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
+  }
+  if (chart.kind === 'timeline') {
+    return <TimelineChart title={chart.title} passage={passage} days={chart.days} today={day} logs={logs} onOpenDay={handlers.onOpenDay} />;
   }
   if (chart.kind === 'pageRatings') {
     return <PageRatingsChart title={chart.title} pages={chart.pages} today={day} logs={logs} userPages={pages} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;

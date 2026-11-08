@@ -524,8 +524,22 @@ describe('the reply (REVO-7)', () => {
     const week = parseReply(JSON.stringify({ text: 'A good week.', chart: { kind: 'dailyPages', title: 'This week', days: 7 } }), allowed, { firstTurn: false })!;
     expect(week.chart).toEqual({ kind: 'dailyPages', title: 'This week', days: 7 });
     expect(week.visual).toBeUndefined();
+    // A timeline: one surah or one juz, over 30, 90 or 365 days.
+    const line = parseReply(JSON.stringify({ text: 'Every 12 days.', chart: { kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 } }), allowed, { firstTurn: false })!;
+    expect(line.visual).toEqual({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 });
+    expect(parseReply(JSON.stringify({ text: 'x', chart: { kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 });
     // Anything wrong with it drops the chart and keeps the answer.
-    for (const bad of [{ kind: 'juzMap' }, { kind: 'juzMap', title: 'x'.repeat(61) }, { kind: 'pieChart', title: 'Pie' }, 'juzMap']) {
+    for (const bad of [
+      { kind: 'juzMap' },
+      { kind: 'juzMap', title: 'x'.repeat(61) },
+      { kind: 'pieChart', title: 'Pie' },
+      'juzMap',
+      { kind: 'timeline', title: 'Both', surah: 59, juz: 28, days: 30 },
+      { kind: 'timeline', title: 'Neither', days: 30 },
+      { kind: 'timeline', title: 'No surah 115', surah: 115, days: 30 },
+      { kind: 'timeline', title: 'Half a juz', juz: 4.5, days: 30 },
+      { kind: 'timeline', title: 'Two weeks', surah: 59, days: 14 },
+    ]) {
       expect(parseReply(JSON.stringify({ text: 'Words.', chart: bad }), allowed, { firstTurn: false })).toEqual({ text: 'Words.', remember: [] });
     }
   });

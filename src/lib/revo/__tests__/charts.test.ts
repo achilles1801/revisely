@@ -14,7 +14,9 @@ import {
   juzStrip,
   juzSummary,
   knownChart,
+  nearestMark,
   pageDetail,
+  passagePagesOf,
   pageRatingsData,
   plannedOf,
   ratingsDotReadout,
@@ -24,6 +26,10 @@ import {
   slotAt,
   stepIndex,
   stripEnds,
+  timelineData,
+  timelineDetail,
+  timelineHint,
+  timelineReadout,
   timesWord,
 } from '../charts';
 import { dayFacts, prepare, type FactSources } from '../facts';
@@ -85,6 +91,12 @@ describe('knownChart', () => {
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 7 })).toBe(true);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 30 })).toBe(true);
     expect(knownChart({ kind: 'juzMap', title: 'x' })).toBe(true);
+    expect(knownChart({ kind: 'timeline', title: 'x', surah: 59, days: 90 })).toBe(true);
+    expect(knownChart({ kind: 'timeline', title: 'x', juz: 30, days: 365 })).toBe(true);
+    expect(knownChart({ kind: 'timeline', title: 'x', surah: 59, juz: 28, days: 30 })).toBe(false);
+    expect(knownChart({ kind: 'timeline', title: 'x', days: 30 })).toBe(false);
+    expect(knownChart({ kind: 'timeline', title: 'x', juz: 31, days: 30 })).toBe(false);
+    expect(knownChart({ kind: 'timeline', title: 'x', surah: 59, days: 14 } as unknown as RevoChart)).toBe(false);
     // A newer server's kind, or a malformed one: no chart (the old app drew an empty bar chart).
     expect(knownChart({ kind: 'weeksAhead', title: 'x' } as unknown as RevoChart)).toBe(false);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 14 } as unknown as RevoChart)).toBe(false);
@@ -228,6 +240,55 @@ describe('juz map', () => {
     expect(juzSummary([t(1, 'month'), t(4, 'stale'), t(5, 'stale'), t(28, 'week'), t(29, 'none', true), t(10, 'none')])).toBe(
       'Revised this week: Juz 28. This month: Juz 1. Over 30 days ago: Juz 4, Juz 5. Being learned: Juz 29',
     );
+  });
+});
+
+describe('timeline', () => {
+  it('a surah’s pages, or a juz’s', () => {
+    expect(passagePagesOf({ surah: 59 })).toEqual([545, 546, 547, 548]);
+    expect(passagePagesOf({ juz: 28 })).toHaveLength(20);
+    expect(passagePagesOf({ juz: 28 })[0]).toBe(542);
+    expect(passagePagesOf({})).toEqual([]);
+  });
+
+  it('each day the passage was revised, from the first session, in its weakest rating, with the gaps', () => {
+    const t = timelineData(logs, [582, 583], TODAY, 30);
+    // The account's first session (Nov 1) starts the line, not 30 days back.
+    expect(t.start).toBe('2026-11-01');
+    expect(t.marks.map((m) => [m.day, m.band, m.gap])).toEqual([
+      ['2026-11-01', 'weak', null],
+      ['2026-11-05', 'moderate', 4],
+      ['2026-11-06', 'weak', 1],
+    ]);
+    expect(t.marks.map((m) => m.at)).toEqual([0, 4 / 6, 5 / 6]);
+    // A shorter window cuts the earlier ones.
+    expect(timelineData(logs, [582, 583], TODAY, 3).marks.map((m) => m.day)).toEqual(['2026-11-05', '2026-11-06']);
+    // Never revised: no marks.
+    expect(timelineData(logs, [600], TODAY, 30).marks).toEqual([]);
+  });
+
+  it('a picked revision: its day and rating, the gap before it, and what it was rated', () => {
+    const [first, second] = timelineData(logs, [582, 583], TODAY, 30).marks;
+    expect(timelineReadout(second)).toEqual({ title: 'Thursday 5 November · moderate', line: '4 days after the time before' });
+    expect(timelineReadout(first).line).toBe('The first time in this view');
+    const d = timelineDetail(first, logs);
+    expect(plainText(d.ratings ?? '')).toBe(`${plainText(describePassage([583], { form: 'short' }))} weak · ${plainText(describePassage([582], { form: 'short' }))} strong`);
+    expect(d.line).toBe('2 pages revised that day in 20 min');
+    expect(timelineDetail({ ...second, pages: [584] }, logs).ratings).toBeNull();
+  });
+
+  it('says what a tap does, or that it wasn’t revised', () => {
+    expect(timelineHint(timelineData(logs, [582, 583], TODAY, 30).marks, 30)).toBe('3 revisions · tap one to see it');
+    expect(timelineHint([], 30)).toBe('Not revised in 30 days');
+    expect(timelineHint([], 365)).toBe('Not revised in the last year');
+  });
+
+  it('the mark nearest a finger, within reach', () => {
+    const marks = [{ at: 0 }, { at: 0.5 }, { at: 1 }];
+    expect(nearestMark(marks, 140, 300)).toBe(1);
+    expect(nearestMark(marks, 80, 300, 22)).toBeNull();
+    expect(nearestMark(marks, 290, 300, 22)).toBe(2);
+    expect(nearestMark([], 10, 300)).toBeNull();
   });
 });
 

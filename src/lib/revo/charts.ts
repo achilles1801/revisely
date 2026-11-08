@@ -12,7 +12,7 @@ import { lastRevisedByPage } from '../activityInsights';
 import { juzTiles, type JuzTile } from '../insightsView';
 import { shiftDay } from '../journal';
 import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, pagesNote, surahName } from '../passages';
-import { getJuzRange } from '../quranData';
+import { getJuzRange, getSurah } from '../quranData';
 import { revisedItems } from './context';
 import type { FactSources } from './facts';
 import type { RevoDayFacts, RevoVisual } from './types';
@@ -33,6 +33,11 @@ export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
   if (c.kind === 'pageRatings') return Array.isArray(c.pages) && c.pages.length > 0 && c.pages.every((p) => Number.isInteger(p) && p >= 1 && p <= 604);
   if (c.kind === 'dailyPages') return c.days === 7 || c.days === 30;
   if (c.kind === 'juzMap') return true;
+  if (c.kind === 'timeline') {
+    const one = (c.surah == null) !== (c.juz == null);
+    const inRange = c.surah != null ? Number.isInteger(c.surah) && c.surah >= 1 && c.surah <= 114 : Number.isInteger(c.juz) && c.juz! >= 1 && c.juz! <= 30;
+    return one && inRange && (c.days === 30 || c.days === 90 || c.days === 365);
+  }
   return false;
 }
 
@@ -293,6 +298,105 @@ export function juzSummary(tiles: readonly JuzTile[]): string {
     .filter(([, v]) => v)
     .map(([k, v]) => `${k}: ${v}`)
     .join('. ');
+}
+
+// ---------------------------------------------------------------------------------------------
+// Timeline
+// ---------------------------------------------------------------------------------------------
+
+/** A surah's pages or a juz's, in the chosen print's page numbers. */
+export function passagePagesOf(c: { surah?: number; juz?: number }): number[] {
+  const range = c.surah != null ? getSurah(c.surah) : null;
+  const { start, end } = range ? { start: range.startPage, end: range.endPage } : c.juz != null ? getJuzRange(c.juz) : { start: 0, end: -1 };
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, i) => start + i);
+}
+
+export interface TimelineMark {
+  day: string;
+  /** Where on the line, 0 (the start) to 1 (today). */
+  at: number;
+  /** The weakest rating the passage's pages got that day (null: none rated). */
+  band: RatingBand | null;
+  /** Days since the revision before it in view (null for the first). */
+  gap: number | null;
+  /** The passage's pages revised that day. */
+  pages: number[];
+}
+
+/**
+ * Each day the passage was revised (any of its pages, in that day's sessions) over the last `days`,
+ * from the account's first session at the earliest.
+ */
+export function timelineData(logs: readonly RevisionLog[], passage: readonly number[], today: string, days: number): { start: string; end: string; marks: TimelineMark[] } {
+  const set = new Set(passage);
+  const first = logs.reduce<string | null>((m, l) => (m == null || l.date < m ? l.date : m), null);
+  const window = shiftDay(today, -(days - 1));
+  const start = first && first > window ? first : window;
+  const span = Math.max(0, daysBetween(start, today));
+  const daysIn = [...new Set(logs.map((l) => l.date))].filter((d) => d >= start && d <= today).sort();
+  const marks: TimelineMark[] = [];
+  for (const day of daysIn) {
+    const pages = [...reviewedOn(logs, day)].filter((p) => set.has(p)).sort((a, b) => a - b);
+    if (pages.length === 0) continue;
+    const rated = [...ratingsOn(logs, day)].filter(([p]) => set.has(p)).map(([, r]) => r);
+    const prev = marks[marks.length - 1];
+    marks.push({
+      day,
+      at: span > 0 ? daysBetween(start, day) / span : 1,
+      band: rated.length > 0 ? bandOf(Math.min(...rated)) : null,
+      gap: prev ? daysBetween(prev.day, day) : null,
+      pages,
+    });
+  }
+  return { start, end: today, marks };
+}
+
+/** "5 revisions · tap one to see it", or "Not revised in 30 days". */
+export function timelineHint(marks: readonly TimelineMark[], days: number): string {
+  if (marks.length > 0) return `${plural(marks.length, 'revision')} · tap one to see it`;
+  return days >= 365 ? 'Not revised in the last year' : `Not revised in ${days} days`;
+}
+
+/** A picked revision: "Friday 16 October · weak", "14 days after the time before". */
+export function timelineReadout(mark: TimelineMark): { title: string; line: string } {
+  return {
+    title: `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}`,
+    line: mark.gap != null ? `${plural(mark.gap, 'day')} after the time before` : 'The first time in this view',
+  };
+}
+
+/**
+ * Its panel: the ratings the passage got that day, weakest first ("Al-Hashr 17–24 weak · Al-Hashr
+ * 4–16 moderate"), and the day's revision ("20 pages revised that day in 27 min").
+ */
+export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[]): { ratings: string | null; line: string } {
+  const ratings = ratingsOn(logs, mark.day);
+  const byBand: Record<RatingBand, number[]> = { weak: [], moderate: [], strong: [] };
+  for (const p of mark.pages) {
+    const r = ratings.get(p);
+    if (r != null) byBand[bandOf(r)].push(p);
+  }
+  const parts = (['weak', 'moderate', 'strong'] as const).filter((b) => byBand[b].length > 0).map((b) => `${describePassage(byBand[b], { form: 'short' })} ${b}`);
+  const total = reviewedOn(logs, mark.day).size;
+  const minutes = logs.filter((l) => l.date === mark.day).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
+  return {
+    ratings: parts.length > 0 ? parts.join(' · ') : null,
+    line: `${plural(total, 'page')} revised that day${minutes > 0 ? ` in ${formatMinutesLong(minutes)}` : ''}`,
+  };
+}
+
+/** The mark nearest `x` (within `reach` points when given), or null. */
+export function nearestMark(marks: readonly { at: number }[], x: number, width: number, reach?: number): number | null {
+  let best: number | null = null;
+  let dist = reach ?? Infinity;
+  marks.forEach((m, i) => {
+    const d = Math.abs(m.at * width - x);
+    if (d <= dist) {
+      best = i;
+      dist = d;
+    }
+  });
+  return best;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -230,6 +230,44 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: revo-chart-juzMap-reader
 
+# The timeline (a `visual`): Al-Hashr, revised with Juz 28 every day the seed has. A tap picks a
+# revision, and its panel opens that day in Activity.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Most days this month.", "chart": {"kind": "timeline", "title": "Al-Hashr · last 30 days", "surah": 59, "days": 30}, "remember": [], "title": "Al-Hashr", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How often do I revise Al-Hashr?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-timeline
+    timeout: 15000
+- tapOn:
+    id: revo-chart-timeline-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-timeline-day
+    commands:
+      - tapOn:
+          id: revo-chart-timeline-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-timeline-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5f-chart-timeline
+- tapOn:
+    id: revo-chart-timeline-plot
+- assertNotVisible:
+    id: revo-chart-timeline-day
+
 # Tonight's Day in review, written by the real function (as the app asks for it on a day with
 # something done). The memory holds what the conversation's answer asked to remember.
 - runScript:

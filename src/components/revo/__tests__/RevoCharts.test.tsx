@@ -11,6 +11,7 @@ import type { RevisionLog, UserPage } from '../../../types';
 import { DailyPagesChart } from '../charts/DailyPagesChart';
 import { JuzMapChart } from '../charts/JuzMapChart';
 import { PageRatingsChart } from '../charts/PageRatingsChart';
+import { TimelineChart } from '../charts/TimelineChart';
 import { ChartCard } from '../RevoCards';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -258,6 +259,54 @@ describe('juz map', () => {
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
     expect(text('revo-chart-juzMap-title')).toBe('Juz 30 · being learned');
+  });
+});
+
+describe('timeline', () => {
+  // 582–583 revised Nov 1 (583 weak) and Nov 6 (583 weak): two dots, at 0 and 5/6 of the line.
+  const onOpenDay = jest.fn();
+  const line = (passage: number[] = [582, 583]) =>
+    mount(<TimelineChart title="End of An-Naba" passage={passage} days={30} today={TODAY} logs={logs} onOpenDay={onOpenDay} />, 'revo-chart-timeline');
+
+  it('a tap on a dot: its day, rating and the gap before it; the panel leads to that day', async () => {
+    await line();
+    expect(text('revo-chart-timeline-line')).toBe('2 revisions · tap one to see it');
+    expect(screen.getAllByTestId('revo-chart-revision')).toHaveLength(2);
+    // The line sits 7 in from each side of a 314-wide plot: 300 wide.
+    layout('revo-chart-timeline-plot', 314, 80);
+    tap('revo-chart-timeline-plot-tap', 7 + 250);
+    expect(text('revo-chart-timeline-title')).toBe('Friday 6 November · weak');
+    expect(text('revo-chart-timeline-line')).toBe('5 days after the time before');
+    fireEvent.press(screen.getByTestId('revo-chart-timeline-day'));
+    expect(onOpenDay).toHaveBeenCalledWith('2026-11-06');
+    // Away from any dot: nothing changes.
+    tap('revo-chart-timeline-plot-tap', 7 + 120);
+    expect(text('revo-chart-timeline-title')).toBe('Friday 6 November · weak');
+    tap('revo-chart-timeline-plot-tap', 7 + 2);
+    expect(text('revo-chart-timeline-line')).toBe('The first time in this view');
+  });
+
+  it('a slide runs from dot to dot, a tick for each', async () => {
+    await line();
+    layout('revo-chart-timeline-plot', 314, 80);
+    act(() =>
+      fireGestureHandler(getByGestureTestId('revo-chart-timeline-plot-pan'), [
+        { state: State.BEGAN, x: 10, y: 30 },
+        { state: State.ACTIVE, x: 10, y: 30 },
+        { state: State.ACTIVE, x: 100, y: 30 },
+        { state: State.ACTIVE, x: 240, y: 30 },
+        { state: State.END, x: 240, y: 30 },
+      ]),
+    );
+    expect(text('revo-chart-timeline-title')).toBe('Friday 6 November · weak');
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('never revised in the window: it says so, and has nothing to pick', async () => {
+    await line([600]);
+    expect(text('revo-chart-timeline-line')).toBe('Not revised in 30 days');
+    fireEvent(screen.getByTestId('revo-chart-timeline-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-timeline-title')).toBe('End of An-Naba');
   });
 });
 
