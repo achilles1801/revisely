@@ -349,6 +349,13 @@ How the tests are made: `tests/scenarios/README.md`.
   ("50 of 56 days since you started"). At 3 months Consistency shows a weeks grid by weekday and, when there
   is one, the missed days' pattern by weekday ("Every missed day was a Saturday"). (Majd, Nov 7 2026: "why is
   insights restricted to just the last 30 days?"; mocks i1 and i2.)
+- **ACT-23.** Insights answer a tap: a day's circle (or a day of the weeks grid) opens that day, a missed one
+  too (empty, with its +); Consistency's figure opens Overview at its month; Coverage's figure ("264 of 305
+  memorized pages in 30 days ›") lists what wasn't revised in the range, a memorized juz as one row ("Juz 4 …
+  41 days ago") and otherwise each run of pages ("Memorized today, not revised yet"), each row opening its juz
+  (ACT-21); a month's bar under Memorization turns the figure into that month ("9 pages in October · …") and
+  lists its memorizations, each opening its day, until the same bar is tapped again. (Majd, Nov 7 2026: "why's
+  none of the activity screen interactive?"; mocks i7 and i10.)
 
 ## Ask coach
 

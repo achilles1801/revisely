@@ -290,6 +290,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ACT-20': 'the day’s page strip opening the reader (ACT-18’s note: with the next recording)',
   'ACT-21': 'the juz sheet from a Coverage tile, the untouched row or a day’s Revised block (ACT-18’s note: with the next recording)',
   'ACT-22': 'Insights’ range chip (ACT-18’s note: with the next recording)',
+  'ACT-23': 'Insights’ one-line taps (ACT-18’s note: with the next recording)',
 };
 
 /** The guide as Revo reads it. */

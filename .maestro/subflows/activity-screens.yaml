@@ -3,8 +3,8 @@
 # strip in the reader, its juz (from the Revised header), the day's block menus (Revised, d10a;
 # Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
 # (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
-# from the untouched row, i5 and i6; the range's menu and 3 months, i1 and i2; Weak spots; the end). Each
-# is a screenshot named 09-<screen>-${THEME}.
+# from the untouched row, i5 and i6; the range's menu and 3 months, i1 and i2; what wasn't revised, i7;
+# Weak spots; a month's bar, i10; the end). Each is a screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -373,6 +373,23 @@ appId: com.revisionbuddy.app
     visible:
       text: ".*memorized pages in 30 days"
     timeout: 10000
+# Coverage's figure lists what wasn't revised (ACT-23, mock i7).
+- tapOn:
+    id: insights-coverage-figure
+- extendedWaitUntil:
+    visible:
+      id: insights-uncovered
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-uncovered-${THEME}
+- tapOn: "Close"
+- extendedWaitUntil:
+    notVisible:
+      id: insights-uncovered
+    timeout: 10000
 # Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
 - scrollUntilVisible:
     element:
@@ -384,6 +401,25 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-weak-${THEME}
+# A month's bar under Memorization (ACT-23, mock i10): October and its memorizations.
+- scrollUntilVisible:
+    element:
+      id: insights-month-2026-10
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-month-2026-10
+- extendedWaitUntil:
+    visible:
+      id: insights-month-list
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-month-${THEME}
+- tapOn:
+    id: insights-month-2026-10
 # The rest of Insights (d4 is taller than a screen): Weak spots to Pace.
 - scrollUntilVisible:
     element:

@@ -32,6 +32,8 @@ import { getPagesForJuz } from '../../lib/quranData';
 import { openRevo } from '../../lib/revo/open';
 import { spokenText } from '../../lib/passages';
 import { JuzSheet } from './JuzSheet';
+import { Sheet } from '../v2/Sheet';
+import { monthOfMemorizing, uncoveredRows, type UncoveredRow } from '../../lib/insightsTaps';
 import {
   activeDays,
   beforeWords,
@@ -64,6 +66,8 @@ export interface InsightsData {
   range?: InsightsRange;
   /** The account's first day: a range longer than the account counts from it. */
   firstDay?: string | null;
+  /** Each memorized page's last revision on record (all time), for how long ago a page was revised. */
+  lastRevisedOn?: Map<number, string>;
 }
 
 export function InsightsView({
@@ -73,6 +77,8 @@ export function InsightsView({
   onOpenPage,
   onSeeAllPages,
   onTurnOnSmartTracking,
+  onOpenDay,
+  onOpenCalendar,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -82,6 +88,10 @@ export function InsightsView({
   onSeeAllPages?: () => void;
   /** Smart Tracking off: the line in Weak spots' place, to Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
+  /** A day (Consistency's circles and grid, a month's memorizations: ACT-23). */
+  onOpenDay?: (day: string) => void;
+  /** Overview at a month (Consistency's figure: ACT-23). */
+  onOpenCalendar?: (month: string) => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -93,13 +103,13 @@ export function InsightsView({
   return (
     <View testID="activity-insights">
       <Coverage data={data} onPlanIt={onPlanIt} onOpenJuz={openJuz} />
-      <Consistency data={data} />
+      <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
       {data.smartTracking !== false ? (
         <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
       ) : onTurnOnSmartTracking ? (
         <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
       ) : null}
-      <Memorization data={data} />
+      <Memorization data={data} onOpenDay={onOpenDay} />
       <Pace data={data} />
       {juzUsed ? (
         <JuzSheet juz={juz} onClose={() => setJuz(null)} today={data.today} revised={data.revised} windowDays={data.range ?? 30} onOpenPage={onOpenPage} onPlanIt={onPlanIt} />
@@ -140,14 +150,43 @@ function Section({
   );
 }
 
-/** The big number and its inline words, on one baseline ("87%  265 of 305 …"). */
-function Figure({ value, text, right }: { value: string; text: string; right?: React.ReactNode }) {
+/**
+ * The big number and its inline words, on one baseline ("87%  265 of 305 …"). With `onPress` the whole
+ * line is a button and its words end in › (ACT-23).
+ */
+function Figure({
+  value,
+  text,
+  right,
+  onPress,
+  hint,
+  testID,
+}: {
+  value: string;
+  text: string;
+  right?: React.ReactNode;
+  onPress?: () => void;
+  hint?: string;
+  testID?: string;
+}) {
   const { palette } = useTheme();
-  return (
-    <View style={styles.figure}>
+  const inner = (
+    <>
       <Text style={[styles.big, { color: palette.text }]}>{value}</Text>
-      <Text style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{text}</Text>
+      <Text style={[typeV2.body, styles.flex, { color: palette.secondary }]}>
+        {text}
+        {onPress ? ' ›' : ''}
+      </Text>
       {right}
+    </>
+  );
+  return onPress ? (
+    <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={`${value} ${spokenText(text)}`} accessibilityHint={hint} style={styles.figure} testID={testID}>
+      {inner}
+    </Tap>
+  ) : (
+    <View style={styles.figure} testID={testID}>
+      {inner}
     </View>
   );
 }
@@ -162,6 +201,18 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
   const count = coverageCount(data.memorized, last, data.today, days);
   // Never 100% while a page is left (at 3 months, 304 of 305 rounded up).
   const pct = coveragePercent(count.revised, count.of);
+  // What isn't covered (i7): the figure opens it; each row opens its juz once this sheet has gone.
+  const [uncoveredOpen, setUncoveredOpen] = useState(false);
+  const [uncoveredUsed, setUncoveredUsed] = useState(false);
+  const thenJuz = React.useRef<number | null>(null);
+  const uncovered = useMemo(() => {
+    if (!uncoveredUsed) return [];
+    const merged = new Map(data.lastRevisedOn ?? []);
+    for (const [p, d] of last) if (!merged.has(p) || d > merged.get(p)!) merged.set(p, d);
+    const memorizedOn = new Map<number, string>();
+    for (const m of data.memorizations) for (const p of m.pages) if (!memorizedOn.has(p) || m.day > memorizedOn.get(p)!) memorizedOn.set(p, m.day);
+    return uncoveredRows({ memorized: data.memorized, last: merged, memorizedOn, today: data.today, window: days });
+  }, [uncoveredUsed, data.lastRevisedOn, data.memorizations, data.memorized, data.today, last, days]);
   const untouched = untouchedJuz(tiles);
   const tile = (t: JuzTile) => {
     const look =
@@ -208,7 +259,20 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
       detail="Which juz you've revised lately"
       testID="insights-coverage"
     >
-      <Figure value={`${pct}%`} text={`${count.revised} of ${count.of} memorized pages in ${rangeWords(days)}`} />
+      <Figure
+        value={`${pct}%`}
+        text={`${count.revised} of ${count.of} memorized pages in ${rangeWords(days)}`}
+        onPress={
+          count.revised < count.of
+            ? () => {
+                setUncoveredUsed(true);
+                setUncoveredOpen(true);
+              }
+            : undefined
+        }
+        hint="Shows what wasn't revised"
+        testID="insights-coverage-figure"
+      />
       <View style={styles.tiles}>
         {[0, 1, 2].map((row) => (
           <View key={row} style={styles.tileRow}>
@@ -260,13 +324,75 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
           </Tap>
         </View>
       ) : null}
+      {uncoveredUsed ? (
+        <Sheet
+          visible={uncoveredOpen}
+          onClose={() => setUncoveredOpen(false)}
+          title={`Not revised in ${rangeWords(days)}`}
+          message={`${count.of - count.revised} of ${count.of} memorized pages`}
+          scroll
+          onHidden={() => {
+            const j = thenJuz.current;
+            thenJuz.current = null;
+            if (j != null) onOpenJuz(j);
+          }}
+          testID="insights-uncovered"
+        >
+          {uncovered.map((r, i) => (
+            <UncoveredLine
+              key={`${r.juz}-${r.pages[0]}`}
+              row={r}
+              separator={i < uncovered.length - 1}
+              onPress={() => {
+                thenJuz.current = r.juz;
+                setUncoveredOpen(false);
+              }}
+            />
+          ))}
+          <Text style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
+            {`Every other memorized page was revised in the last ${rangeWords(days)}.`}
+          </Text>
+        </Sheet>
+      ) : null}
     </Section>
+  );
+}
+
+/** A row of what isn't covered: the juz's number (red) or a leaf for a passage, its words, ›. */
+function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separator: boolean; onPress: () => void }) {
+  const { palette } = useTheme();
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${spokenText(row.label)}, ${spokenText(row.detail)}`}
+      accessibilityHint={`Opens Juz ${row.juz}`}
+      style={[styles.uncoveredRow, separator && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.separator }]}
+      testID={`uncovered-${row.pages[0]}`}
+    >
+      <View style={[styles.uncoveredMark, { backgroundColor: palette.bubble }]}>
+        {row.kind === 'juz' ? (
+          <Text style={[typeV2.name, { color: palette.red }]}>{row.juz}</Text>
+        ) : (
+          <Ionicons name="leaf-outline" size={18} color={palette.text} />
+        )}
+      </View>
+      <View style={styles.flex}>
+        <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          {row.label}
+        </Text>
+        <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+          {row.detail}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+    </Tap>
   );
 }
 
 // ── Consistency ──────────────────────────────────────────────────────────
 
-function Consistency({ data }: { data: InsightsData }) {
+function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; onOpenDay?: (day: string) => void; onOpenCalendar?: (month: string) => void }) {
   const { palette } = useTheme();
   // ACT-4: a day counts with a revision or a read.
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
@@ -290,14 +416,22 @@ function Consistency({ data }: { data: InsightsData }) {
 
   return (
     <Section title="Consistency" detail="How often, and when" testID="insights-consistency">
-      <Figure value={String(range === 7 ? week.filter((d) => d.done).length : inRange.done)} text={figureText} />
+      <Figure
+        value={String(range === 7 ? week.filter((d) => d.done).length : inRange.done)}
+        text={figureText}
+        onPress={onOpenCalendar ? () => onOpenCalendar(range === 7 ? month : data.today.slice(0, 7)) : undefined}
+        hint="Opens the calendar"
+        testID="insights-consistency-figure"
+      />
       {grid ? (
         <View style={styles.grid} testID="insights-weeks-grid">
           {grid.map((col) => (
             <View key={col[0].day} style={styles.gridCol}>
               {col.map((c) => (
-                <View
+                <Tap
                   key={c.day}
+                  onPress={onOpenDay && (c.state === 'done' || c.state === 'missed') ? () => onOpenDay(c.day) : undefined}
+                  disabled={!onOpenDay || (c.state !== 'done' && c.state !== 'missed')}
                   style={[
                     styles.gridCell,
                     c.state === 'done'
@@ -307,7 +441,9 @@ function Consistency({ data }: { data: InsightsData }) {
                         : null,
                   ]}
                   accessible={c.state === 'done' || c.state === 'missed'}
+                  accessibilityRole="button"
                   accessibilityLabel={`${c.day}, ${c.state === 'done' ? 'revised or read' : 'missed'}`}
+                  testID={`insights-grid-${c.day}`}
                 />
               ))}
             </View>
@@ -316,12 +452,22 @@ function Consistency({ data }: { data: InsightsData }) {
       ) : (
       <View style={styles.circles}>
         {week.map((d) => (
-          <View key={d.day} style={styles.circleCol} accessible accessibilityLabel={`${d.day}, ${d.done ? 'revised or read' : 'missed'}`}>
+          // A day's circle opens that day; a missed one opens empty, with its + (ACT-23).
+          <Tap
+            key={d.day}
+            onPress={onOpenDay ? () => onOpenDay(d.day) : undefined}
+            disabled={!onOpenDay}
+            style={styles.circleCol}
+            accessibilityRole="button"
+            accessibilityLabel={`${d.day}, ${d.done ? 'revised or read' : 'missed'}`}
+            accessibilityHint="Opens the day"
+            testID={`insights-day-${d.day}`}
+          >
             <View style={[styles.circle, d.done ? { backgroundColor: palette.primary } : { borderWidth: 1.5, borderColor: palette.outline }]}>
               {d.done ? <Ionicons name="checkmark" size={16} color={palette.onPrimary} /> : null}
             </View>
             <Text style={[typeV2.meta, styles.letter, { color: palette.secondary }]}>{d.letter}</Text>
-          </View>
+          </Tap>
         ))}
       </View>
       )}
@@ -483,8 +629,13 @@ function WeakSpots({
 
 // ── Memorization ─────────────────────────────────────────────────────────
 
-function Memorization({ data }: { data: InsightsData }) {
+function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
   const { palette } = useTheme();
+  // A month's bar (i10): the figure becomes that month and its memorizations list under the bars;
+  // the same bar again clears it.
+  const [picked, setPicked] = useState<string | null>(null);
+  const [allShown, setAllShown] = useState(false);
+  const shownMonth = picked ? monthOfMemorizing(data.memorizations, picked) : null;
   const month = reportMonth(data.today);
   const months = useMemo(() => memorizationMonths(data.memorizations, month), [data.memorizations, month]);
   const range = data.range ?? 30;
@@ -494,29 +645,94 @@ function Memorization({ data }: { data: InsightsData }) {
   const share = quranShare(data.memorized.size);
   return (
     <Section title="Memorization" detail="Pages memorized each month" testID="insights-memorization">
-      <Figure
-        value={String(data.memorized.size)}
-        text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
-        right={added > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${added} in ${rangeWords(range)}`}</Text> : undefined}
-      />
+      {shownMonth ? (
+        <Figure
+          value={String(shownMonth.pages)}
+          text={[`${shownMonth.pages === 1 ? 'page' : 'pages'} in ${monthName(shownMonth.month)}`, shownMonth.passage || null].filter(Boolean).join(' · ')}
+          right={<Text style={[typeV2.meta, { color: palette.secondary }]}>{`${data.memorized.size} in all`}</Text>}
+          testID="insights-memorization-figure"
+        />
+      ) : (
+        <Figure
+          value={String(data.memorized.size)}
+          text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
+          right={added > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${added} in ${rangeWords(range)}`}</Text> : undefined}
+          testID="insights-memorization-figure"
+        />
+      )}
       <View style={styles.monthBars}>
         {months.map((m, i) => {
           const last = i === months.length - 1;
+          const lit = picked ? m.month === picked : last;
           return (
-            <View key={m.month} style={styles.monthCol} accessible accessibilityLabel={`${monthName(m.month)}, ${m.pages} pages`}>
-              {last && m.pages > 0 ? <Text style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{m.pages}</Text> : null}
-              <View style={[styles.monthBar, { height: Math.round((72 * m.pages) / top), backgroundColor: palette.primary, opacity: last ? 1 : 0.4 }]} />
-            </View>
+            <Tap
+              key={m.month}
+              onPress={() => {
+                setAllShown(false);
+                setPicked(picked === m.month ? null : m.month);
+              }}
+              style={styles.monthCol}
+              accessibilityRole="button"
+              accessibilityLabel={`${monthName(m.month)}, ${m.pages} pages`}
+              accessibilityState={{ selected: picked === m.month }}
+              testID={`insights-month-${m.month}`}
+            >
+              {lit && m.pages > 0 ? <Text style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{m.pages}</Text> : null}
+              <View style={[styles.monthBar, { height: Math.round((72 * m.pages) / top), backgroundColor: palette.primary, opacity: lit ? 1 : 0.4 }]} />
+            </Tap>
           );
         })}
       </View>
       <View style={styles.monthLabels}>
         {months.map((m, i) => (
-          <Text key={m.month} style={[typeV2.meta, styles.monthLabel, { color: palette.secondary }]}>
-            {monthLabel(m.month, i === 0 || i === months.length - 1)}
+          <Text
+            key={m.month}
+            style={[typeV2.meta, styles.monthLabel, { color: m.month === picked ? palette.text : palette.secondary, fontWeight: m.month === picked ? '600' : '400' }]}
+          >
+            {monthLabel(m.month, i === 0 || i === months.length - 1 || m.month === picked)}
           </Text>
         ))}
       </View>
+      {shownMonth ? (
+        <View style={styles.monthList} testID="insights-month-list">
+          {(allShown ? shownMonth.items : shownMonth.items.slice(0, 4)).map((it, i) => (
+            <Tap
+              key={it.day}
+              onPress={onOpenDay ? () => onOpenDay(it.day) : undefined}
+              disabled={!onOpenDay}
+              accessibilityRole="button"
+              accessibilityLabel={`${spokenText(it.label)}, ${it.when}`}
+              accessibilityHint="Opens the day"
+              style={[styles.uncoveredRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }, i === 0 && styles.monthListFirst]}
+              testID={`insights-month-item-${it.day}`}
+            >
+              <View style={[styles.uncoveredMark, { backgroundColor: palette.bubble }]}>
+                <Ionicons name="leaf-outline" size={18} color={palette.text} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                  {it.label}
+                </Text>
+                <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+                  {it.when}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+            </Tap>
+          ))}
+          {shownMonth.items.length === 0 ? (
+            <Text style={[typeV2.meta, styles.none, { color: palette.secondary }]}>{`Nothing memorized in ${monthName(shownMonth.month)}`}</Text>
+          ) : null}
+          {!allShown && shownMonth.items.length > 4 ? (
+            <Tap onPress={() => setAllShown(true)} accessibilityRole="button" hitSlop={8} style={styles.seeAll} testID="insights-month-more">
+              <Text style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+                {`${shownMonth.items.length - 4} more in ${monthName(shownMonth.month)}`}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={palette.link} />
+            </Tap>
+          ) : null}
+        </View>
+      ) : null}
     </Section>
   );
 }
@@ -588,6 +804,11 @@ const styles = StyleSheet.create({
   gridCol: { flex: 1, gap: 4 },
   gridCell: { aspectRatio: 1, borderRadius: 4 },
   pattern: { marginTop: 10 },
+  uncoveredRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  uncoveredMark: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  uncoveredFoot: { paddingTop: 12, paddingBottom: 8 },
+  monthList: { marginTop: 14 },
+  monthListFirst: {},
   circleCol: { flex: 1, alignItems: 'center' },
   circle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   letter: { marginTop: 5 },

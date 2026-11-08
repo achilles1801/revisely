@@ -166,6 +166,18 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   // Pages being learned (`in_progress`): a juz with some, and none memorized, gets the tile's dot.
   const learningSet = useMemo(() => new Set(pages.filter((p) => p.status === 'in_progress').map((p) => p.pageNumber)), [pages]);
   const ratingByPage = useMemo(() => new Map(pages.map((p) => [p.pageNumber, p.weaknessRating])), [pages]);
+  // Each page's last revision on record, all time (what isn't covered says how long ago).
+  const lastRevisedOn = useMemo(
+    () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, p.lastRevisedDate as string])),
+    [pages],
+  );
+  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked.
+  const openCalendar = (m: string) => {
+    setView('calendar');
+    setMonth(m);
+    setWeek(weekStartOf(m === today.slice(0, 7) ? today : `${m}-01`));
+    setPicked(null);
+  };
   const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, range), [logs, today, range]);
   // The account's first day: a range longer than the account counts from it ("50 of 56 days").
   const firstDay = useMemo(() => journalFirstDay(user, (data?.revisions ?? []).map((r) => ({ date: r.day }))), [user, data]);
@@ -245,7 +257,10 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             smartTracking: user?.smartTrackingEnabled ?? false,
             range,
             firstDay,
+            lastRevisedOn,
           }}
+          onOpenDay={onOpenDay}
+          onOpenCalendar={openCalendar}
           onReviseTomorrow={onReviseTomorrow}
           onPlanIt={onPlanIt}
           onOpenPage={onOpenPage}
