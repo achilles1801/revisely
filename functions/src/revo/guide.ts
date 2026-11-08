@@ -284,6 +284,8 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'MEM-5': 'the Day’s Add to memorized from a sitting (MEM-1’s section)',
   'REC-1': 'the reader’s End also stopping its recording, and its one note (MEM-1’s section)',
   'REC-2': 'a sitting saved with the pages it held (MEM-1’s section)',
+  // The interactive Activity (testers):
+  'ACT-18': 'the guide’s words are in Revo’s system prompt, so its lines on the interactive Activity (Week | Month as a chip, Today, the picked day opening the day) come with the next recording of Revo’s replies (functions/scripts/record-anthropic.js)',
 };
 
 /** The guide as Revo reads it. */
