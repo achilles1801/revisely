@@ -160,6 +160,11 @@ export class Home {
     return this.text('today-cta');
   }
 
+  /** The memorized line under it: "3.4% of the Quran memorized" (MEM-2). */
+  memorized(): string | null {
+    return this.text('today-memorized');
+  }
+
   /**
    * The streak beside "Today" ("Today · 8-day streak"): its days (0 when none
    * shows), and whether it is in grace (SESS-6: the ring for yesterday's missed

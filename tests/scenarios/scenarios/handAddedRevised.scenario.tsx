@@ -57,7 +57,7 @@ async function addNineTen(phone: Phone): Promise<{ app: OpenApp; home: Home }> {
   const home = new Home(app);
   await home.ready();
   await new ActivityDayView(app).open(TODAY);
-  await new AddToDay(app).revised(9, 10);
+  await new AddToDay(app).revisedElsewhere([9, 10]);
   await app.untilSynced();
   expect(await handAdded(app)).toEqual([[9, 10]]);
   return { app, home };

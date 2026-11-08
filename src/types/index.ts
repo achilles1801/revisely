@@ -133,6 +133,11 @@ export interface UserPage {
   lastRevisedDate: string | null;
   totalRevisionCount: number;
   skipCount: number;                // times scheduled but not revised
+  /**
+   * A partly memorized page (status 'in_progress', Firestore's 'learning'): its memorized ayahs,
+   * as sura × 1000 + ayah (lib/memorizedAyahs). Meaningless on any other status.
+   */
+  verses?: number[] | null;
 }
 
 // A revision session log

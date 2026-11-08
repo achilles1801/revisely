@@ -112,7 +112,7 @@ export function DayBlocks({
   onOpenRecording,
   onDeleteReading,
 }: Props) {
-  const { pages, user } = useApp();
+  const { pages, user, refreshPageStates } = useApp();
   const { palette } = useTheme();
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
@@ -288,7 +288,10 @@ export function DayBlocks({
       destructive: true,
       onPress: () =>
         confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
-          queueChange({ kind: 'revision.delete', day, id: a.id }).catch((err) => logger.warn('Could not delete pages added by hand', err));
+          queueChange({ kind: 'revision.delete', day, id: a.id })
+            // The pages' last revised day and count go back without it (ACT-16).
+            .then(() => refreshPageStates?.())
+            .catch((err) => logger.warn('Could not delete pages added by hand', err));
         }),
     })),
   ]);
@@ -376,6 +379,9 @@ export function DayBlocks({
   // A day that is over with pages left says how many, in the surahs' place (mock d2: "Juz 27 · 9 min ·
   // 14 not revised"); today, the strip shows what is left.
   const revisedSet = new Set(revised.revised);
+  // "18 of 20": of the pages assigned, those revised. A page added by hand that wasn't assigned shows in
+  // the counts below, not in this figure (it read "22 of 20", Nov 2026).
+  const assignedDone = revised.assigned.filter((p) => revisedSet.has(p)).length;
   const left = day < today ? new Set(revised.assigned.filter((p) => !revisedSet.has(p))).size : 0;
   const revisedSubline =
     left > 0
@@ -388,12 +394,12 @@ export function DayBlocks({
         <DayBlock
           mark={
             <RevisedMark
-              fraction={revised.assigned.length > 0 ? revised.revised.length / revised.assigned.length : 0}
-              done={revised.assigned.length > 0 && revised.revised.length >= revised.assigned.length}
+              fraction={revised.assigned.length > 0 ? assignedDone / revised.assigned.length : 0}
+              done={revised.assigned.length > 0 && assignedDone >= revised.assigned.length}
             />
           }
           title="Revised"
-          figure={revised.assigned.length > 0 ? `${revised.revised.length} of ${revised.assigned.length}` : undefined}
+          figure={revised.assigned.length > 0 ? `${assignedDone} of ${revised.assigned.length}` : undefined}
           subline={revisedSubline}
           summary={
             revised.assigned.length > 0 ? (

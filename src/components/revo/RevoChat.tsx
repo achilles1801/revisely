@@ -38,6 +38,7 @@ export function RevoChat({
   onMemory,
   onExpand,
   onAction,
+  onOpenDay,
   onOff,
 }: {
   uid: string;
@@ -54,13 +55,15 @@ export function RevoChat({
   onExpand: () => void;
   /** Open a page or today's session (the sheet closes first). */
   onAction: (action: RevoAction) => void;
+  /** A chart's day, in Activity (the sheet closes first). */
+  onOpenDay?: (day: string) => void;
   /** The server says Revo is off for this account: show the opt-in (with what was asked kept for after). */
   onOff?: () => void;
 }) {
   const { palette } = useTheme();
   const haptics = useHaptics();
   const { user, saveUser } = useApp();
-  const { day, context, build } = useRevoContext();
+  const { day, context, build, sources } = useRevoContext();
   const backend = revoBackend();
   const [messages, setMessages] = useState<RevoMessage[]>([]);
   // A question sent and not answered yet (shown with Revo thinking).
@@ -146,6 +149,13 @@ export function RevoChat({
     haptics.light();
   };
 
+  // A chart's "Revise first tomorrow": those pages lead tomorrow's revision, as a plan card's do.
+  const reviseFirst = async (pages: number[]) => {
+    if (!user) return;
+    await saveUser({ ...user, carryOver: carryForTomorrow(shiftDay(day, 1), pages, user.carryOver) });
+    haptics.success();
+  };
+
   const act = async (m: RevoMessage) => {
     if (!m.action || !chatId) return;
     const a = m.action;
@@ -197,7 +207,16 @@ export function RevoChat({
           ) : (
             <View key={m.id} style={styles.revo} testID="revo-answer">
               <RevoText text={m.text} />
-              {m.chart ? <ChartCard chart={m.chart} day={day} /> : null}
+              {m.visual ?? m.chart ? (
+                <ChartCard
+                  chart={(m.visual ?? m.chart)!}
+                  day={day}
+                  sources={sources}
+                  onOpenDay={onOpenDay}
+                  onOpenPage={(page) => onAction({ kind: 'openPage', title: '', detail: '', page })}
+                  onReviseFirst={reviseFirst}
+                />
+              ) : null}
               {m.textAfter ? <RevoText text={m.textAfter} /> : null}
               {knownAction(m.action) ? (
                 <PlanCard

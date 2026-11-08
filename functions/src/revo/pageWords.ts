@@ -22,7 +22,7 @@ export function barePageNumbers(text: string): string[] {
   return out;
 }
 
-/** Everything of a reply the user reads, for the check: text, the chart's title, the card, the chips. */
-export function replyWords(reply: Pick<RevoReplyParts, 'text' | 'textAfter' | 'chart' | 'action' | 'chips'>): string {
-  return [reply.text, reply.textAfter, reply.chart?.title, reply.action?.title, reply.action?.detail, ...(reply.chips ?? [])].filter(Boolean).join('\n');
+/** Everything of a reply the user reads, for the check: text, the chart's title (either kind), the card, the chips. */
+export function replyWords(reply: Pick<RevoReplyParts, 'text' | 'textAfter' | 'chart' | 'visual' | 'action' | 'chips'>): string {
+  return [reply.text, reply.textAfter, reply.chart?.title, reply.visual?.title, reply.action?.title, reply.action?.detail, ...(reply.chips ?? [])].filter(Boolean).join('\n');
 }

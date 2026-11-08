@@ -59,7 +59,7 @@ it('[ACT-13] a Revised add the server has taken stays on the day when a read com
   const app = await openToday();
   const release = await holdReadsAtNow(app);
   const add = new AddToDay(app);
-  await add.revised(6, 7);
+  await add.revisedElsewhere([6, 7]);
   await app.until(() => app.screen.queryByTestId('activity-block-revised') != null, 'the Revised block');
   await app.untilSynced();
   await app.idle(500);

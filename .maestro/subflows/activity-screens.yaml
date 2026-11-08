@@ -69,25 +69,14 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-add-menu-${THEME}
-# Revised (d6): the session's skipped pages filled in, 8 minutes, Moderate.
+# Revised elsewhere (the trimmed +, Nov 7 2026): today's two pages not revised (At-Taghabun), ticked.
 - tapOn:
     id: sheet-action-revised
 - extendedWaitUntil:
     visible:
-      id: add-revised-from-session
-    timeout: 10000
-- tapOn:
-    id: add-revised-from-session
-- tapOn:
-    id: add-revised-minutes
-- inputText: "8"
-# Choosing a strength puts the number pad away (iOS's has no return key).
-- tapOn:
-    id: add-revised-strength-moderate
-- extendedWaitUntil:
-    visible:
       id: add-revised-info
-    timeout: 5000
+    timeout: 10000
+- waitForAnimationToEnd
 - runFlow:
     file: shot.yaml
     env:
