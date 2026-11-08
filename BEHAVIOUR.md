@@ -334,6 +334,13 @@ How the tests are made: `tests/scenarios/README.md`.
   Smart Tracking, or else what the strip shows ("18 revised · 2 skipped"). A tap on a page opens it in the
   reader over the day, and back returns to the day; a weak spot in Insights opens the reader the same way.
   (Majd, Nov 8 2026: "you'd think u can atleast click on it".)
+- **ACT-21.** One juz opens in a sheet from its Coverage tile, from the untouched row (whose Plan it stays its
+  own button), and from a day's Revised block (the juz most of its pages were in). It names the juz by its
+  surahs and says when a memorized page of it was last revised and on how many days in the last 30. A strip
+  of its pages and a row per surah follow: strength with Smart Tracking ("Ayahs 17–24 weak", "Strong ·
+  skipped 3 times"), recency without it ("3 days ago · 4 times"; ACT-19). A page, a row and Open in the
+  reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
+  (Majd, Nov 7 2026: "not being able to click on anything in coverage"; mocks i5 and i6.)
 
 ## Ask coach
 

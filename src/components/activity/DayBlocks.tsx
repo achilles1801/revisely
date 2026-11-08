@@ -39,6 +39,8 @@ import { ayahsOnPage, sortedAyahs } from '../../lib/ayahKeys';
 import { memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../lib/memorizedAyahs';
 import { scheduledDaysFrom } from '../../lib/algorithm';
 import { AddMemorizedSheet, type SittingToAdd } from './AddMemorizedSheet';
+import { JuzSheet } from './JuzSheet';
+import { juzOfPages } from '../../lib/juzSheet';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
 
@@ -162,6 +164,9 @@ export function DayBlocks({
   const [sittingToAdd, setSittingToAdd] = useState<SittingToAdd | null>(null);
   // Mounted from the first Add on (so it can slide away after), never before: it loads the day's reads.
   const [sheetUsed, setSheetUsed] = useState(false);
+  // The juz sheet (ACT-21), from the Revised block's header: mounted from its first opening on.
+  const [juzShown, setJuzShown] = useState<number | null>(null);
+  const [juzUsed, setJuzUsed] = useState(false);
   const { palette } = useTheme();
   // Strength only with Smart Tracking: without it no page is rated (ACT-19).
   const smartTracking = user?.smartTrackingEnabled === true;
@@ -554,6 +559,8 @@ export function DayBlocks({
   // the counts below, not in this figure (it read "22 of 20", Nov 2026).
   const assignedDone = revised.assigned.filter((p) => revisedSet.has(p)).length;
   const left = day < today ? new Set(revised.assigned.filter((p) => !revisedSet.has(p))).size : 0;
+  // The Revised header opens the juz the day's pages were mostly in.
+  const dayJuz = onOpenPage ? juzOfPages(revised.assigned.length > 0 ? revised.assigned : revised.revised) : null;
   const strip = stripCells(
     revised.assigned,
     revised.revised,
@@ -593,6 +600,15 @@ export function DayBlocks({
           }
           items={revisedItems}
           header={revisedMenu}
+          onPress={
+            dayJuz != null
+              ? () => {
+                  setJuzUsed(true);
+                  setJuzShown(dayJuz);
+                }
+              : undefined
+          }
+          pressHint={dayJuz != null ? `Opens Juz ${dayJuz}` : undefined}
           onLayout={layoutFor('revised')}
           testID="activity-block-revised"
         />
@@ -663,6 +679,7 @@ export function DayBlocks({
         />
       )}
       <WindowFooter text={footerText} />
+      {juzUsed && onOpenPage ? <JuzSheet juz={juzShown} onClose={() => setJuzShown(null)} today={today} onOpenPage={onOpenPage} /> : null}
       {sheetUsed ? (
       <AddMemorizedSheet
         visible={sittingToAdd != null}
