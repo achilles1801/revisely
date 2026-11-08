@@ -65,10 +65,16 @@ export const REVO_SYSTEM_PROMPT = [
   'Reply with exactly one JSON object and nothing else: no code fence, no text before or after it.',
   '{"text": string, "chart": object or null, "textAfter": string or null, "action": object or null, "remember": [strings], "title": string, "chips": [strings]}',
   '- text: the answer, about 35 words, at most 400 characters. Always present.',
-  '- chart: null, or {"kind": "pageRatings", "title": string, "pages": [1 to 4 page numbers]} (the ratings of those pages), or {"kind": "dailyPages", "title": string, "days": 7 or 30} (pages revised per day). The app draws it from its own data. Add one only when it makes the answer clearer; a title at most 60 characters, naming surahs or juz, not pages.',
+  '- chart: null, or one of these. The app draws each from its own data, and they can tap into it. Add one only when it makes the answer clearer; a title at most 60 characters, naming surahs or juz, not pages.',
+  '  {"kind": "dailyPages", "title": string, "days": 7 or 30}: pages revised each day against the plan. For how a week or a month went.',
+  '  {"kind": "pageRatings", "title": string, "pages": [1 to 4 page numbers]}: those pages’ ratings over the month. For why particular pages keep slipping.',
+  '  {"kind": "juzMap", "title": string}: all 30 juz by when each was last revised. For which juz haven’t been revised lately, or where they stand.',
+  '  {"kind": "timeline", "title": string, "surah": 1–114 or "juz": 1–30 (one of them), "days": 30, 90 or 365}: each revision of that surah or juz, with the gaps. For how often, or when last, they revised it.',
+  '  {"kind": "weeks", "title": string, "weeks": 4 to 12}: each day done, in part or missed, by weekday. For which days they miss, or how consistent they are.',
+  '  {"kind": "table", "title": string, "juz": [2 to 8 juz] or "surahs": [2 to 8 surah numbers], "columns": 1 to 3 of "lastRevised", "times30", "weak", "strength", "memorized"}: those parts side by side. For comparing juz or surahs.',
   '- textAfter: null, or one short sentence shown after the chart, for example “Here’s a plan:” before an action.',
   `- action: null, or one suggestion they can accept: {"kind": "reviseFirst", "title": string, "detail": string, "pages": [1 to 10 page numbers]} puts those pages at the front of tomorrow’s session; {"kind": "openPage", "title": string, "detail": string, "page": number} opens a page in the reader; {"kind": "startRevision", "title": string, "detail": string} starts today’s revision; ${OPEN_SCREEN_ACTION}. At most one action; title at most 80 characters, detail at most 100, both in plain words, naming surahs and juz rather than pages (“Revise the end of Al-Hashr first”).`,
-  '- The page numbers in a chart or an action (the JSON’s "pages" and "page") must be ones you were given: today’s next pages, the weak pages, or the pages of an attachment. Never any other page.',
+  '- The page numbers in a chart or an action (the JSON’s "pages" and "page") must be ones you were given: today’s next pages, the weak pages, or the pages of an attachment. Never any other page. A timeline or a table names surahs and juz by their numbers, not pages.',
   '- remember: up to 2 short facts worth keeping for later conversations, each at most 160 characters: only what they said about their goals, routine or preferences, for example “Revises after Fajr”. Never numbers the app already shows, never anything sensitive. Usually an empty list.',
   '- title: a short title for a new conversation, at most 60 characters, for example “Weak spots this week”.',
   '- chips: up to 3 short follow-up questions they might tap, each at most 40 characters.',
@@ -203,6 +209,11 @@ export function historyTurn(m: StoredMessage): { role: 'user' | 'assistant'; con
   const notes: string[] = [];
   if (m.chart?.kind === 'pageRatings') notes.push(`[chart: ratings of pages ${m.chart.pages.join(', ')}]`);
   if (m.chart?.kind === 'dailyPages') notes.push(`[chart: pages per day, last ${m.chart.days} days]`);
+  const v = m.visual;
+  if (v?.kind === 'juzMap') notes.push('[chart: juz by last revised]');
+  if (v?.kind === 'timeline') notes.push(`[chart: revisions of ${v.surah != null ? `surah ${v.surah}` : `juz ${v.juz}`}, last ${v.days} days]`);
+  if (v?.kind === 'weeks') notes.push(`[chart: days done or missed, last ${v.weeks} weeks]`);
+  if (v?.kind === 'table') notes.push(`[chart: table of ${v.juz ? `juz ${v.juz.join(', ')}` : `surahs ${(v.surahs ?? []).join(', ')}`}: ${v.columns.join(', ')}]`);
   if (m.action?.kind === 'reviseFirst') notes.push(`[suggested: revise pages ${m.action.pages.join(', ')} first tomorrow]`);
   if (m.action?.kind === 'openPage') notes.push(`[suggested: open page ${m.action.page}]`);
   if (m.action?.kind === 'startRevision') notes.push('[suggested: start today’s revision]');

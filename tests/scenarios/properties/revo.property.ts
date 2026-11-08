@@ -574,6 +574,16 @@ describe('the reply (REVO-7)', () => {
     expect(again.reply.visual).toEqual({ kind: 'juzMap', title: 'Your juz' });
   });
 
+  it('[REVO-7] the prompt names every chart kind and when to use it; a newer chart shows in the history as a short note', () => {
+    for (const kind of ['dailyPages', 'pageRatings', 'juzMap', 'timeline', 'weeks', 'table']) expect(REVO_SYSTEM_PROMPT).toContain(`"kind": "${kind}"`);
+    const said = (visual: StoredMessage['visual']) => historyTurn({ id: 'm', uid: 'u', role: 'revo', text: 'Here.', at: 1, visual }).content;
+    expect(said({ kind: 'juzMap', title: 'Your juz' })).toBe('Here.\n[chart: juz by last revised]');
+    expect(said({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 })).toContain('[chart: revisions of surah 59, last 90 days]');
+    expect(said({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 })).toContain('[chart: revisions of juz 4, last 365 days]');
+    expect(said({ kind: 'weeks', title: 'Weeks', weeks: 8 })).toContain('[chart: days done or missed, last 8 weeks]');
+    expect(said({ kind: 'table', title: 'Juz', juz: [26, 27], columns: ['lastRevised', 'weak'] })).toContain('[chart: table of juz 26, 27: lastRevised, weak]');
+  });
+
   it('[REVO-7] a reply that isn’t JSON is shown as written; a fenced one is read; at most one action', () => {
     expect(parseReply('Plain words.', allowed, { firstTurn: true })).toEqual({ text: 'Plain words.', remember: [] });
     const fenced = parseReply('```json\n{"text": "Fenced.", "action": [{"kind": "startRevision", "title": "Start", "detail": ""}, {"kind": "openPage", "title": "Open", "detail": "", "page": 12}]}\n```', allowed, { firstTurn: false })!;
