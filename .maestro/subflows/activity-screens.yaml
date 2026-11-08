@@ -78,6 +78,39 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-day-${THEME}
+# A page of the strip opens the reader over the day; back returns to the day (ACT-20, Majd, Nov 8
+# 2026). E2E builds load no page images, so the reader shows "page-missing"; a tap high on the page
+# brings its controls.
+- tapOn:
+    id: strip-page-548
+- extendedWaitUntil:
+    visible:
+      id: "page-(image|missing)"
+    timeout: 20000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-strip-reader-${THEME}
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: reader-back
+          commands:
+            - tapOn:
+                point: 50%, 30%
+      - extendedWaitUntil:
+          visible:
+            id: reader-back
+          timeout: 5000
+- tapOn:
+    id: reader-back
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 10000
 # The Revised block's menu (d10a): a hold on its header.
 - longPressOn:
     id: activity-block-revised-header

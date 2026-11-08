@@ -16,6 +16,7 @@ import { useRevoFootprint } from '../../lib/revo/presence';
 import { useActivitySources } from '../../components/activity/useActivitySources';
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
 import { ActivityBlocksViews } from '../../components/activity/ActivityBlocksViews';
+import type { PreviewBlock } from '../../components/activity/CalendarMonth';
 import { activityBlocksEnabled } from '../../components/activity/DayBlocks';
 import { ActivityItemRow, RecentSection } from '../../components/activity/ActivityItemRow';
 import { ActivityItem, buildActivityItems } from '../../lib/activityItems';
@@ -72,7 +73,7 @@ export default function ActivityScreen() {
   // The calendar steps back no further than the account's first day.
   const firstDay = useMemo(() => journalFirstDay(user, days), [user, days]);
 
-  const openDay = (date: string) => navigation.navigate('ActivityDay', { date });
+  const openDay = (date: string, focusBlock?: PreviewBlock) => navigation.navigate('ActivityDay', { date, ...(focusBlock ? { focusBlock } : {}) });
   const logToday = () => navigation.navigate('JournalEntry', { date: today });
   // Days with a note in the log (the flagged calendar's note dot).
   const noteDays = useMemo(
@@ -122,7 +123,8 @@ export default function ActivityScreen() {
               noteDays={noteDays}
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
-              onOpenPage={(page) => (navigation.navigate as (name: string, params: object) => void)('Read', { screen: 'QuranReader', params: { pageNumber: page } })}
+              // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
+              onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onPlanIt={(weak) =>

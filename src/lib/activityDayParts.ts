@@ -37,3 +37,15 @@ export function strengthCounts(revised: number[], ratingOf: (page: number) => nu
   return out;
 }
 
+
+/** What the strip shows, in words: "18 revised · 2 skipped" ("· 4 not reached"); parts with none left out. */
+export function stripSummary(cells: StripCell[]): string {
+  const n = (state: CellState) => cells.filter((c) => c.state === state).length;
+  return [
+    n('revised') > 0 ? `${n('revised')} revised` : null,
+    n('skipped') > 0 ? `${n('skipped')} skipped` : null,
+    n('not-reached') > 0 ? `${n('not-reached')} not reached` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}

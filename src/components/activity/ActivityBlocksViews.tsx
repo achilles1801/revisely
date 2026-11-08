@@ -21,7 +21,7 @@ import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
-import type { RecordingCounts } from './CalendarMonth';
+import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
 
 const WINDOW_DAYS = 90;
 const shiftDays = (day: string, n: number) => {
@@ -45,7 +45,8 @@ interface Props {
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
   noteDays: Set<string>;
-  onOpenDay: (day: string) => void;
+  /** A day; at a block when a preview row opened it (ACT-18). */
+  onOpenDay: (day: string, block?: PreviewBlock) => void;
 }
 
 export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking }: Props) {

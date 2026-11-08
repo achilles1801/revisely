@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityBlocksViews } from '../../../src/components/activity/ActivityBlocksViews';
+import { DayBlocks } from '../../../src/components/activity/DayBlocks';
 
 jest.mock('../../../src/context/ThemeContext', () => ({
   useTheme: () => ({ palette: new Proxy({}, { get: () => '#000000' }), theme: new Proxy({}, { get: () => '#000000' }), isDark: false }),
@@ -13,6 +14,13 @@ jest.mock('../../../src/context/ThemeContext', () => ({
 jest.mock('../../../src/context/AppContext', () => ({ useApp: () => ({ pages: [], user: { smartTrackingEnabled: false }, logs: [] }) }));
 const TODAY = '2026-11-05';
 jest.mock('../../../src/services/firestoreService', () => ({
+  getActivityItemsForDay: jest.fn(() =>
+    Promise.resolve({
+      revisions: [{ id: '2026-11-05', day: '2026-11-05', countsFor: '2026-11-05', pages: [1, 2], skipped: [], assigned: [1, 2], minutes: 12, occurredAt: null }],
+      memorized: [],
+      reads: [{ id: 'r', day: '2026-11-05', pages: [562], minutes: 8, occurredAt: null }],
+    }),
+  ),
   getActivityItemsBetween: jest.fn(() =>
     Promise.resolve({
       revisions: [{ id: '2026-11-05', day: '2026-11-05', countsFor: '2026-11-05', pages: [1, 2], skipped: [], assigned: [1, 2], minutes: 12, occurredAt: null }],
@@ -87,13 +95,42 @@ describe('Activity: Overview', () => {
     expect(screen.getByTestId('preview-date').props.children).toBe('Thursday 5 November');
   });
 
-  it('[ACT-18] the picked day’s whole preview opens the day: its date, Open and each row', async () => {
+  it('[ACT-18] the picked day’s whole preview opens the day: its date and Open at the top, each row at its block', async () => {
     const { onOpenDay } = open();
     const revised = await screen.findByTestId('preview-row-revised');
     fireEvent.press(revised);
     fireEvent.press(screen.getByTestId('preview-row-read'));
     fireEvent.press(screen.getByTestId('preview-date'));
     fireEvent.press(screen.getByLabelText('Open the day'));
-    expect(onOpenDay.mock.calls).toEqual([[TODAY], [TODAY], [TODAY], [TODAY]]);
+    expect(onOpenDay.mock.calls).toEqual([[TODAY, 'revised'], [TODAY, 'read'], [TODAY], [TODAY]]);
+  });
+
+  it('[ACT-18] the day opened at a block tells where that block is, once, to scroll to', async () => {
+    const onFocusBlockLayout = jest.fn();
+    const noop = jest.fn();
+    render(
+      <DayBlocks
+        day={TODAY}
+        revisionNotes={[]}
+        memorizationNotes={[]}
+        readings={[]}
+        notes={[]}
+        onEditReading={noop}
+        onOpenLog={noop}
+        revisedLog={null}
+        onDeleteRevised={noop}
+        onDeleteMemorized={noop}
+        onOpenRecording={noop}
+        onDeleteReading={noop}
+        focusBlock="read"
+        onFocusBlockLayout={onFocusBlockLayout}
+      />,
+    );
+    const read = await screen.findByTestId('activity-block-read');
+    const layout = (y: number) => ({ nativeEvent: { layout: { x: 0, y, width: 393, height: 120 } } });
+    fireEvent(screen.getByTestId('activity-block-revised'), 'layout', layout(0));
+    fireEvent(read, 'layout', layout(240));
+    fireEvent(read, 'layout', layout(260));
+    expect(onFocusBlockLayout.mock.calls).toEqual([[240]]);
   });
 });

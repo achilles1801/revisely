@@ -21,7 +21,7 @@ interface RoundButtonProps {
  * icon; `active` (the page marked revised) is the one coloured thing on
  * screen, a jade "done" circle.
  */
-export function RoundButton({ icon, label, onPress, palette, active }: RoundButtonProps) {
+export function RoundButton({ icon, label, onPress, palette, active, testID }: RoundButtonProps & { testID?: string }) {
   const { palette: v2 } = useTheme();
   return (
     <Tap
@@ -31,7 +31,7 @@ export function RoundButton({ icon, label, onPress, palette, active }: RoundButt
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={active != null ? { selected: active } : undefined}
-      testID={active ? 'round-button-active' : undefined}
+      testID={testID ?? (active ? 'round-button-active' : undefined)}
     >
       <Ionicons
         name={active ? 'checkmark' : icon}

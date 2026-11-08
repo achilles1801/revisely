@@ -35,6 +35,9 @@ const HEADER_WRAPS = 1.2;
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+/** The picked day's preview rows, each the block of the day it opens at (DayBlocks' DayBlockKind). */
+export type PreviewBlock = 'revised' | 'memorized' | 'read' | 'notes';
+
 /** A day's recordings on this phone: revision ones (the Revised row) and reading ones (Read). */
 export interface RecordingCounts {
   revision: number;
@@ -75,7 +78,8 @@ export function CalendarMonth({
   data: CalendarData;
   onStep: (delta: number) => void;
   onPick: (day: string) => void;
-  onOpen: (day: string) => void;
+  /** Opens a day; a preview row passes its block, so the day opens at it (ACT-18). */
+  onOpen: (day: string, block?: PreviewBlock) => void;
   /** Recordings by day: the preview's mic and count beside the block they belong to. */
   recordings?: Map<string, RecordingCounts>;
 }) {
@@ -271,10 +275,10 @@ export function CalendarMonth({
         {previewRows.map((r) => (
           <Tap
             key={r.key}
-            onPress={() => onOpen(shownDay)}
+            onPress={() => onOpen(shownDay, r.kind)}
             accessibilityRole="button"
             accessibilityLabel={`${r.label}, ${r.value}${r.mics ? `, ${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}` : ''}`}
-            accessibilityHint="Opens the day"
+            accessibilityHint={`Opens the day at ${r.label}`}
             style={styles.previewRow}
             testID={`preview-row-${r.key}`}
           >

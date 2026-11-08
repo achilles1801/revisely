@@ -40,6 +40,7 @@ MOCK_FOR = {
     "09-overview-week": (None, None),  # the mocks show the month only
     "09-day": ("d1-day-full", "top"),
     "09-day-end": ("d1-day-full", "bottom"),
+    "09-strip-reader": (None, None),  # a page of the strip in the reader (ACT-20): no mock
     "09-day-sunday": ("d2-day-light", None),
     "09-menu-revised": ("d10a-long-press", None),
     "09-menu-memorized": (None, None),  # Edit and Delete (ACT-6, Nov 8 2026): no mock

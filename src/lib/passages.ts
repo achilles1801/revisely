@@ -437,6 +437,19 @@ export function pagesNote(pages: Iterable<number>, opts: Pick<PassageOptions, 'o
   return `${one ? 'p.' : 'pp.'}${NBSP}${shown}${runs.length > 3 ? ', …' : ''}`;
 }
 
+/**
+ * The two ends of a run of pages, for a strip's labels (Activity's day): the surahs it starts and ends
+ * in ("Al-Mujadila", "At-Tahrim"), or, inside one surah, its first and last ayahs ("Al-Baqarah 142",
+ * "Al-Baqarah 176").
+ */
+export function pageRunEnds(first: number, last: number, edition: MushafEditionId = getMushafEdition()): [string, string] {
+  if (!validPage(first) || !validPage(last)) return ['', ''];
+  const a = firstVerseOfPage(first, edition);
+  const b = lastVerseOfPage(last, edition);
+  if (a.sura === b.sura) return [`${surahName(a.sura)}${NBSP}${a.ayah}`, `${surahName(b.sura)}${NBSP}${b.ayah}`];
+  return [surahName(a.sura), surahName(b.sura)];
+}
+
 /** The text with ordinary spaces and hyphens (notifications, logs, tests). */
 export function plainText(text: string): string {
   return text.split(NBSP).join(' ').split(NBHY).join('-');

@@ -322,8 +322,18 @@ How the tests are made: `tests/scenarios/README.md`.
   a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
   the picked day (or else today) on screen. When the calendar shows another month or week than today's,
   Today, beside the arrows, brings back today's with today picked. The picked day's whole preview opens
-  that day: its date, Open and each of its rows. (Majd, Nov 8 2026: Week and Month as a second row of
-  pills was "a whole tab just to show weeks instead of month"; Open alone was easy to miss.)
+  that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
+  that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
+  weeks instead of month"; Open alone was easy to miss.)
+- **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
+  strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
+  stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
+  strength shows as before (ACT-8). (Majd, Nov 8 2026: the strength displays mean nothing without it.)
+- **ACT-20.** A day's Revised block has a strip of the day's assigned pages, each revised, skipped or not
+  reached. Its ends are named by surah (NAME-1), and the line under it gives the pages' strength with
+  Smart Tracking, or else what the strip shows ("18 revised · 2 skipped"). A tap on a page opens it in the
+  reader over the day, and back returns to the day; a weak spot in Insights opens the reader the same way.
+  (Majd, Nov 8 2026: "you'd think u can atleast click on it".)
 
 ## Ask coach
 
