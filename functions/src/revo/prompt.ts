@@ -8,6 +8,7 @@ import { MessagesRequest } from '../coach/call';
 import { REVO_MODEL } from '../coach/pricing';
 import { attachedText } from './attachText';
 import { GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
+import { REVO_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, StoredMessage } from './types';
 
 export { REVO_MODEL };
@@ -230,6 +231,10 @@ function alternate(turns: { role: 'user' | 'assistant'; content: string }[], ope
   return out;
 }
 
+/**
+ * Every Revo request: the cached system prompt, the conversation, and structured output, so the
+ * reply is the one JSON object the app reads (revo/replySchema.ts; reply.ts still checks it).
+ */
 function request(messages: MessagesRequest['messages']): MessagesRequest {
   return {
     model: REVO_MODEL,
@@ -237,6 +242,7 @@ function request(messages: MessagesRequest['messages']): MessagesRequest {
     thinking: REVO_THINKING,
     system: [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages,
+    output_config: REVO_OUTPUT_CONFIG,
   };
 }
 

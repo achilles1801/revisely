@@ -5,6 +5,7 @@
  * checkout's prompt, against a made-up tester account (no user's data). Counts the replies that are
  * the one JSON object, those wrapped in a fence or words, and those in plain prose (no chart, no
  * action, no chips), and which chart each picks. Exits 1 if any reply isn't the bare JSON object.
+ * The requests are the functions' own (buildAskRequest), structured output included.
  *
  *   cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/revo-chart-samples.js \
  *     [--times 3] [--out <file.md>] [--dry]
@@ -123,7 +124,8 @@ async function ask(q) {
     body: JSON.stringify(request(q)),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(`Anthropic answered ${res.status}: ${json?.error?.type ?? 'error'}`);
+  // The API's own message (never the key): a 400 here says which part of the request it refused.
+  if (!res.ok) throw new Error(`Anthropic answered ${res.status}: ${json?.error?.type ?? 'error'}${json?.error?.message ? ` (${String(json.error.message).slice(0, 300)})` : ''}`);
   const raw = (json.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
   // As the handler reads it: charts and actions only on pages the context named.
   const reply = parseReply(raw, new Set(contextPages(context)), { firstTurn: true });

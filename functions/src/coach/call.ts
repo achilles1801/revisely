@@ -31,6 +31,8 @@ export interface MessagesRequest {
   thinking?: { type: 'between_tools' } | { type: 'adaptive' };
   system: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[];
   messages: { role: 'user' | 'assistant'; content: string }[];
+  /** Revo's requests only: structured output, its reply as one JSON object (revo/replySchema.ts). The coach sends none. */
+  output_config?: { format: { type: 'json_schema'; schema: Record<string, unknown> } };
 }
 
 export interface CoachReply {
