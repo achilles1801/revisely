@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { ScreenSafeAreaView } from '../../components/SafeAreaView';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -39,7 +39,7 @@ export default function JourneySelectScreen() {
   // The two answers are rows on hairlines, each with its mark; the chosen
   // one carries a check. The one action sits at the foot.
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="journey-select">
+    <ScreenSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="journey-select">
       <TopBar onBack={() => navigation.goBack()} center={<Stepper total={totalSteps} current={1} />} />
       <ScrollView contentContainerStyle={v2.scroll}>
         <Text
@@ -88,7 +88,7 @@ export default function JourneySelectScreen() {
       <View style={v2.footer}>
         <PillButton title="Continue" size="lg" onPress={handleContinue} testID="journey-continue" />
       </View>
-    </SafeAreaView>
+    </ScreenSafeAreaView>
   );
 }
 

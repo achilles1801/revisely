@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { SafeAreaView } from '../../components/SafeAreaView';
+import { ScreenSafeAreaView } from '../../components/SafeAreaView';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -55,7 +55,7 @@ export default function WelcomeScreen() {
   // words in the middle and the one action at the foot. The middle scrolls,
   // so the largest text sizes never push "Begin" off the screen.
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="welcome">
+    <ScreenSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="welcome">
       <HeroGlow />
       <ScrollView contentContainerStyle={v2.scroll} showsVerticalScrollIndicator={false}>
         <Animated.View style={[v2.top, bismillahAnim]}>
@@ -94,7 +94,7 @@ export default function WelcomeScreen() {
           testID="welcome-begin"
         />
       </Animated.View>
-    </SafeAreaView>
+    </ScreenSafeAreaView>
   );
 }
 
