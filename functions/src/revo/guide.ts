@@ -282,6 +282,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'MEM-3': 'taking ayahs off the memorized (MEM-1’s section)',
   'MEM-4': 'a partly memorized page in the revision cycle (MEM-1’s section)',
   'MEM-5': 'the Day’s Add to memorized from a sitting (MEM-1’s section)',
+  'MEM-6': 'the schedule editor’s Not in your plan (MEM-1’s section)',
   'REC-1': 'the reader’s End also stopping its recording, and its one note (MEM-1’s section)',
   'REC-2': 'a sitting saved with the pages it held (MEM-1’s section)',
   // The interactive Activity (testers):
