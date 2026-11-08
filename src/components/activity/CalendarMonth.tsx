@@ -16,6 +16,7 @@ import { Tap } from '../v2/Tap';
 import { monthGrid, monthTitle } from '../../lib/activityHeatmap';
 import { weekDays, weekTitle, type CalendarSpan } from '../../lib/activityCalendar';
 import { ActionSheet } from '../v2/ActionSheet';
+import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
@@ -135,20 +136,13 @@ export function CalendarMonth({
           >
             {span === 'week' ? weekTitle(week) : monthTitle(month)}
           </Text>
-          <Tap
+          <ChoiceChip
+            label={span === 'week' ? 'Week' : 'Month'}
             onPress={() => setSpanMenu(true)}
-            accessibilityRole="button"
             accessibilityLabel={`${span === 'week' ? 'Week' : 'Month'} view`}
             accessibilityHint="Choose week or month"
-            hitSlop={8}
-            style={[styles.spanChip, { borderColor: palette.outline }]}
             testID="calendar-span"
-          >
-            <Text style={[typeV2.meta, styles.spanLabel, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-              {span === 'week' ? 'Week' : 'Month'}
-            </Text>
-            <Ionicons name="chevron-down" size={13} color={palette.secondary} />
-          </Tap>
+          />
         </View>
         <View style={styles.nav}>
           {onToday ? (
@@ -448,8 +442,6 @@ const styles = StyleSheet.create({
   monthHeadWrap: { flexWrap: 'wrap' },
   titleGroup: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   monthTitle: { flexShrink: 1, fontSize: 20, lineHeight: 24, fontWeight: '700' },
-  spanChip: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 26, paddingLeft: 10, paddingRight: 8, borderRadius: 13, borderWidth: 1 },
-  spanLabel: { fontWeight: '600' },
   nav: { flexShrink: 0, marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 18 },
   chevrons: { flexShrink: 0, flexDirection: 'row', gap: 22 },
   totals: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10, paddingHorizontal: 16, paddingTop: 4 },
