@@ -644,6 +644,17 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   tomorrow" (the cycle grows by a day). Either is an edit to Save, and the list leaves at once. The
   automatic schedule holds every memorized page, so it has no such list.
 
+## Help
+
+- **HELP-1.** Screens that need explaining have a ? (testers, for now). Home's sits at the right of the Today
+  post's header. It opens that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›"
+  when the account has Revo (it opens Revo; nothing is counted until a question is sent), "Hide help
+  buttons", and Done. The words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons
+  are good".)
+- **HELP-2.** "Hide help buttons" removes every ? at once, for this account on this phone, and they stay
+  hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Support
+  brings them back." with Undo. Settings → Support → Help buttons turns them back on, or off again.
+
 ## Naming the Qur'an
 
 - **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers

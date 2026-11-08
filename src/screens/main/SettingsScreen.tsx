@@ -43,6 +43,8 @@ import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../l
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
+import { HELP_ICON } from '../../components/help/HelpButton';
+import { useHelpButtons } from '../../components/help/useHelpButtons';
 import { SettingIcon } from '../../components/settings/SettingIcon';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -249,6 +251,7 @@ export default function SettingsScreen() {
     [scrollToWanted],
   );
   const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
+  const help = useHelpButtons();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
@@ -907,6 +910,21 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Support">
+          {help.available ? (
+            <Row
+              icon={HELP_ICON}
+              label="Help buttons"
+              subtitle="A ? on screens that need explaining"
+              rightSlot={
+                <SettingSwitch
+                  value={help.shown}
+                  onValueChange={help.setShown}
+                  accessibilityLabel="Help buttons on screens"
+                  testID="settings-help-buttons"
+                />
+              }
+            />
+          ) : null}
           <Row
             icon={shareIcon}
             label="Share Revisely"

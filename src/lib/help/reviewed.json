@@ -1,0 +1,21 @@
+{
+  "home.today": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-2": "9898aac73caf73d2",
+    "SCHED-3": "29523ed2e8b9d054",
+    "JUMP-1": "694fd82b135f59f3"
+  },
+  "home.missed": {
+    "SCHED-5": "1c59745b0f18a785",
+    "CARRY-1": "e82fd9775315574d",
+    "CARRY-4": "179a7d1058862b14"
+  },
+  "home.streak": {
+    "SESS-2": "ed190cc5b1bd8cc9",
+    "SESS-6": "f01af02cce55efc5"
+  },
+  "home.memorized": {
+    "MEM-1": "c433d43bc16e7ffb",
+    "MEM-2": "fa6bccea850e23b7"
+  }
+}
