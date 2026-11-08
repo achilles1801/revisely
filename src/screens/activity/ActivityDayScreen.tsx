@@ -111,6 +111,7 @@ export default function ActivityDayScreen() {
   const route = useRoute<ScreenRoute>();
   const date = route.params.date;
   const focusRecordingId = route.params.focusRecordingId;
+  const focusBlock = route.params.focusBlock;
   const scrollRef = useRef<ScrollView>(null);
   const scrolledToRecordingRef = useRef(false);
   const { user, logs, updateLog, deleteLog, pages, updatePages, saveUser } = useApp();
@@ -439,6 +440,11 @@ export default function ActivityDayScreen() {
               }}
               onDeleteMemorized={onDeleteMemorized}
               onEditMemorized={(focusPages) => navigation.navigate('Memorization', { edit: true, focusPages })}
+              // The reader over the day, so back returns here (ACT-20).
+              onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
+              // Opened at a block (ACT-18): scrolled to it once it is laid out.
+              focusBlock={focusBlock}
+              onFocusBlockLayout={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true })}
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
               onDeleteReading={removeReading}
               // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.

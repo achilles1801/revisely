@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, shiftWeek, weekDays, type CalendarSpan } from '../../lib/activityCalendar';
+import { CALENDAR_SCREEN_LABEL, CALENDAR_SPAN_KEY, parseSpan, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarSpan } from '../../lib/activityCalendar';
 import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
 import { StyleSheet, View as RNView } from 'react-native';
 import { useApp } from '../../context/AppContext';
@@ -21,7 +21,7 @@ import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
-import type { RecordingCounts } from './CalendarMonth';
+import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
 
 const WINDOW_DAYS = 90;
 const shiftDays = (day: string, n: number) => {
@@ -45,7 +45,8 @@ interface Props {
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
   noteDays: Set<string>;
-  onOpenDay: (day: string) => void;
+  /** A day; at a block when a preview row opened it (ACT-18). */
+  onOpenDay: (day: string, block?: PreviewBlock) => void;
 }
 
 export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onOpenPage, onSeeAllPages, onTurnOnSmartTracking }: Props) {
@@ -61,9 +62,19 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
       .then((v) => setSpanState(parseSpan(v)))
       .catch(() => undefined);
   }, []);
+  // Switching keeps you where you were: the picked day (or today) stays on screen.
   const setSpan = (next: CalendarSpan) => {
+    const period = periodForSpan(next, { span, month, week, picked, today });
+    setMonth(period.month);
+    setWeek(period.week);
     setSpanState(next);
     AsyncStorage.setItem(CALENDAR_SPAN_KEY, next).catch(() => undefined);
+  };
+  // Today (ACT-18): back to today's month or week, with today picked.
+  const toToday = () => {
+    setMonth(today.slice(0, 7));
+    setWeek(weekStartOf(today));
+    setPicked(null);
   };
   const [data, setData] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsBetween>> | null>(null);
 
@@ -167,6 +178,7 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             week={week}
             span={span}
             onSpan={setSpan}
+            onToday={showsToday(span, { month, week }, today) ? undefined : toToday}
             today={today}
             picked={picked}
             data={{ revised, memorized, read, noteDays }}

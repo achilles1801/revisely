@@ -7,7 +7,7 @@
 // ends at the centre of its item's first line. A hairline closes every block.
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
@@ -39,6 +39,7 @@ export function DayBlock({
   summary,
   items,
   header,
+  onLayout,
   testID,
 }: {
   mark: React.ReactNode;
@@ -50,6 +51,8 @@ export function DayBlock({
   /** What hangs off the thread line: recordings, notes, hand entries, timed reads. */
   items: React.ReactNode[];
   header?: BlockHeaderActions;
+  /** Where the block sits (the day scrolls to it when opened at it). */
+  onLayout?: (e: LayoutChangeEvent) => void;
   testID?: string;
 }) {
   const { palette } = useTheme();
@@ -62,7 +65,7 @@ export function DayBlock({
   items.forEach((node, i) => rows.push({ node, top: ITEM_TOP, rail: i === items.length - 1 ? 'last' : 'mid', key: `item-${i}` }));
 
   return (
-    <View style={[styles.block, { borderBottomColor: palette.separator }]} testID={testID}>
+    <View style={[styles.block, { borderBottomColor: palette.separator }]} onLayout={onLayout} testID={testID}>
       <Tap
         onLongPress={header?.onLongPress}
         disabled={!header?.onLongPress && !header?.a11yActions}

@@ -196,7 +196,7 @@ export default function QuranReaderScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} />
+            <RoundButton icon="chevron-back" label="Back" onPress={() => navigation.goBack()} palette={palette} testID="reader-back" />
             <View style={styles.titleCol}>
               <SurahName surah={firstSurah} palette={palette} />
               <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>

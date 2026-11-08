@@ -10,9 +10,9 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as firestoreService from '../../services/firestoreService';
 import { buildDayView, type DayView, type RevisedBlock } from '../../lib/activityDayView';
-import { stripCells, strengthCounts } from '../../lib/activityDayParts';
+import { stripCells, strengthCounts, stripSummary } from '../../lib/activityDayParts';
 import { getFajrTimeFor } from '../../lib/fajrBoundary';
-import { PageStrip, StrengthCounts, WindowFooter } from './DayParts';
+import { PageStrip, StrengthCounts, StripSummary, WindowFooter } from './DayParts';
 import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
 import { BlockMark, RevisedMark } from './BlockMark';
 import { creditLine, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
@@ -45,6 +45,9 @@ import type { UserPage } from '../../types';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
+/** The day's blocks, by the names Overview's preview rows use for them. */
+export type DayBlockKind = 'revised' | 'memorized' | 'read' | 'notes';
+
 /** Whether the Activity blocks show (the preview testers, while C2 is built). */
 export const activityBlocksEnabled = (user: { previewTester?: boolean } | null | undefined) => user?.previewTester === true;
 
@@ -67,6 +70,11 @@ interface Props {
   onDeleteMemorized: (item: { id: string; day: string; pages: number[] }) => void;
   /** A memorization item's Edit: the memorized pages, opened at its pages (the screen navigates). */
   onEditMemorized?: (pages: number[]) => void;
+  /** A page of the strip: the reader at it, over the day (ACT-20). */
+  onOpenPage?: (page: number) => void;
+  /** Opened at a block (a row of Overview's picked day, ACT-18): where that block sits, once laid out. */
+  focusBlock?: DayBlockKind;
+  onFocusBlockLayout?: (y: number) => void;
   /** Opens a recording (Listen back). */
   onOpenRecording: (id: string) => void;
   /** Deletes a timed session (the screen confirms first). */
@@ -129,6 +137,9 @@ export function DayBlocks({
   onDeleteRevised,
   onDeleteMemorized,
   onEditMemorized,
+  onOpenPage,
+  focusBlock,
+  onFocusBlockLayout,
   onOpenRecording,
   onDeleteReading,
   onReviseTomorrow,
@@ -142,6 +153,18 @@ export function DayBlocks({
   const [sheetUsed, setSheetUsed] = useState(false);
   const [undo, setUndo] = useState<{ text: string; added: AyahsAdded; itemPagesBefore: number[] } | null>(null);
   const { palette } = useTheme();
+  // Strength only with Smart Tracking: without it no page is rated (ACT-19).
+  const smartTracking = user?.smartTrackingEnabled === true;
+  // Opened at a block: its place is told once, the first time it is laid out.
+  const focusTold = useRef(false);
+  const layoutFor = (kind: DayBlockKind) =>
+    kind === focusBlock && onFocusBlockLayout
+      ? (e: { nativeEvent: { layout: { y: number } } }) => {
+          if (focusTold.current) return;
+          focusTold.current = true;
+          onFocusBlockLayout(e.nativeEvent.layout.y);
+        }
+      : undefined;
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; text?: string; actions: SheetAction[] } | null>(null);
   // A block header holds a menu (Edit / Delete, confirmed where it deletes); VoiceOver offers the
@@ -521,6 +544,12 @@ export function DayBlocks({
   // the counts below, not in this figure (it read "22 of 20", Nov 2026).
   const assignedDone = revised.assigned.filter((p) => revisedSet.has(p)).length;
   const left = day < today ? new Set(revised.assigned.filter((p) => !revisedSet.has(p))).size : 0;
+  const strip = stripCells(
+    revised.assigned,
+    revised.revised,
+    revised.skipped,
+    smartTracking ? new Set(revised.assigned.filter((p) => (ratingByPage.get(p) ?? 4) <= 2)) : new Set<number>(),
+  );
   const revisedSubline =
     left > 0
       ? subline([revised.juzLabel, revised.minutes != null ? formatMinutesLong(revised.minutes) : null, `${left} not revised`])
@@ -542,20 +571,19 @@ export function DayBlocks({
           summary={
             revised.assigned.length > 0 ? (
               <>
-                <PageStrip
-                  cells={stripCells(
-                    revised.assigned,
-                    revised.revised,
-                    revised.skipped,
-                    new Set(revised.assigned.filter((p) => (ratingByPage.get(p) ?? 4) <= 2)),
-                  )}
-                />
-                <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
+                <PageStrip cells={strip} onOpenPage={onOpenPage} />
+                {/* Strength with Smart Tracking (ACT-8); without it, what the strip shows (ACT-19). */}
+                {smartTracking ? (
+                  <StrengthCounts counts={strengthCounts(revised.revised, (p) => ratingByPage.get(p))} />
+                ) : (
+                  <StripSummary text={stripSummary(strip)} />
+                )}
               </>
             ) : undefined
           }
           items={revisedItems}
           header={revisedMenu}
+          onLayout={layoutFor('revised')}
           testID="activity-block-revised"
         />
       )}
@@ -598,6 +626,7 @@ export function DayBlocks({
           }
           items={memorizedItems}
           header={memorizedMenu}
+          onLayout={layoutFor('memorized')}
           testID="activity-block-memorized"
         />
       )}
@@ -609,6 +638,7 @@ export function DayBlocks({
           subline={subline([surahsOf(readHere.flatMap((i) => i.pages)), readHere.reduce((n, i) => n + (i.minutes ?? 0), 0) > 0 ? formatMinutesLong(readHere.reduce((n, i) => n + (i.minutes ?? 0), 0)) : null])}
           items={readItemNodes}
           header={readMenu}
+          onLayout={layoutFor('read')}
           testID="activity-block-read"
         />
       )}
@@ -618,6 +648,7 @@ export function DayBlocks({
           title="Notes"
           figure={String(notesBlock.length)}
           items={notesItems}
+          onLayout={layoutFor('notes')}
           testID="activity-block-notes"
         />
       )}
