@@ -18,6 +18,8 @@
   <style>
     /* Volunteers recite into this page; each take goes to the developer's private Google Drive
        through a Google Apps Script (scripts/record/apps-script.gs). Not linked from the site. */
+    /* A class's display (the banner's flex) must not override the hidden attribute. */
+    [hidden] { display: none !important; }
     .rec { max-width: 640px; margin: 0 auto; padding: 24px var(--gutter) 120px; }
     .rec h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 12px; }
     .rec h2 { font-size: 20px; line-height: 1.3; margin: 0; letter-spacing: -0.01em; }
