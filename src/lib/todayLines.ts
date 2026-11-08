@@ -149,6 +149,8 @@ export function todayLines(
   carried = 0,
   carriedLeft = 0,
   partial: PartialPages = NONE,
+  /** The carried pages came from Insights ("Revise these first tomorrow"), not from yesterday. */
+  carriedFromInsights = false,
 ): TodayLines {
   const ordered = [...new Set(list)];
   const total = ordered.length;
@@ -209,7 +211,7 @@ export function todayLines(
   const title = `Starts at ${placeOf(start, partial)}`;
   let detail: string;
   if (carried > 0) {
-    detail = `${pages(total)} · ${carried} from yesterday first`;
+    detail = `${pages(total)} · ${carried} from ${carriedFromInsights ? 'Insights' : 'yesterday'} first`;
   } else if (runs.length > 1) {
     detail = `${pages(total)} · then ${placeOf(runs[1].first, partial)}`;
   } else {

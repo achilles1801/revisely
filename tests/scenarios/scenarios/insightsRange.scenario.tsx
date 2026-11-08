@@ -137,6 +137,9 @@ describe('Insights’ range', () => {
     expect(screen.getByText(/^of 66 days since 1 September( ›)?$/)).toBeTruthy();
     expect(screen.getByTestId('insights-weeks-grid')).toBeTruthy();
     expect(screen.getByText('Minutes by hour, since 1 September')).toBeTruthy();
+    // Pace week by week, in place of a comparison.
+    expect(screen.getByTestId('insights-pace-weeks')).toBeTruthy();
+    expect(screen.getByText(/^Week by week: [\d.]+ → [\d.]+ min a page$/)).toBeTruthy();
     // Read from the account's first day (90 days at least).
     const froms = (firestoreService.getActivityItemsBetween as jest.Mock).mock.calls.map((c) => c[0]);
     expect(froms.length).toBeGreaterThan(0);

@@ -27,7 +27,7 @@ function creditedTo(app: OpenApp, day: string): number[] {
   return [...ahead.creditedOnDay(app.app.logs, day)].sort((a, b) => a - b);
 }
 
-it('[SESS-7] [CARRY-2] Partly done today: Add to today, then "Revise these first tomorrow": today keeps its catch-up pages, credited to yesterday, and tomorrow starts with the weak pages', async () => {
+it('[SESS-7] [CARRY-2] [ACT-24] Partly done today: Add to today, then "Revise these first tomorrow": today keeps its catch-up pages, credited to yesterday, and tomorrow starts with the weak pages', async () => {
   const { phone, app, D } = await scenarioPhone('partial-today');
   const home = new Home(app);
   await home.ready();
@@ -52,6 +52,8 @@ it('[SESS-7] [CARRY-2] Partly done today: Add to today, then "Revise these first
   const next = await phone.open(homeStack);
   const tomorrow = new Home(next);
   await tomorrow.ready();
+  // Home names where they came from: Insights, not yesterday (ACT-24).
+  expect(plain(tomorrow.detail() ?? '')).toMatch(/ 2 from Insights first$/);
   const s2 = await tomorrow.startSession();
   expect(s2.pages().slice(0, 2)).toEqual([600, 601]);
   expect(next.screen.queryByTestId('session-from-insights')).not.toBeNull();

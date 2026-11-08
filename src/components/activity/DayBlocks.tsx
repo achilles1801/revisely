@@ -44,6 +44,8 @@ import { describeAyahs } from '../../lib/passages';
 import { ayahsOnPage, sortedAyahs } from '../../lib/ayahKeys';
 import { memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../lib/memorizedAyahs';
 import { scheduledDaysFrom } from '../../lib/algorithm';
+import { allFirstTomorrow, firstTomorrowPages } from '../../lib/weakSpotActions';
+import { shiftDay } from '../../lib/journal';
 import { AddMemorizedSheet, type SittingToAdd } from './AddMemorizedSheet';
 import { JuzSheet } from './JuzSheet';
 import { smartTrackingOn } from '../../lib/smartTracking';
@@ -459,11 +461,14 @@ export function DayBlocks({
         : at === 0
           ? 'tomorrow'
           : new Date(y, m - 1, d + 1 + at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    // Already first tomorrow (its link was tapped, or Insights put them there): it says so, and the link
+    // goes, so it can't be tapped twice (ACT-24).
+    const first = allFirstTomorrow(mine, firstTomorrowPages(user, shiftDay(today, 1)));
     const links = [
-      ...(onReviseTomorrow && at !== 0 ? [{ label: 'Revise them tomorrow', arrow: false, onPress: () => onReviseTomorrow(mine), id: 'activity-revise-tomorrow' }] : []),
+      ...(onReviseTomorrow && at !== 0 && !first ? [{ label: 'Revise them tomorrow', arrow: false, onPress: () => onReviseTomorrow(mine), id: 'activity-revise-tomorrow' }] : []),
       ...(onEditSchedule ? [{ label: 'Edit schedule', arrow: true, onPress: onEditSchedule, id: 'activity-edit-schedule' }] : []),
     ];
-    return { title: when ? `In your revision from ${when}` : 'In your revision', links };
+    return { title: first ? 'First in tomorrow’s revision' : when ? `In your revision from ${when}` : 'In your revision', links };
   })();
   const sittingRow = (i: { id: string; pages: number[]; minutes: number | null; occurredAt?: number | null }) => {
     const session = readings.find((r) => r.id === i.id);
@@ -682,6 +687,8 @@ export function DayBlocks({
                 {pageRuns(memorizedPages).map((run) => (
                   <PageChip
                     key={`${run.first}-${run.last}`}
+                    onPress={onOpenPage ? () => onOpenPage(run.first) : undefined}
+                    testID={`activity-memorized-chip-${run.first}`}
                     label={describePassage(Array.from({ length: run.last - run.first + 1 }, (_, k) => run.first + k), { form: 'short' })}
                   />
                 ))}
