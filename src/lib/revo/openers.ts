@@ -12,7 +12,7 @@ import { getJuzForPage, getSurahForPage } from '../quranData';
 import { timesWord } from '../recency';
 import { juzPages } from './attachments';
 import { dayFacts, daysBetween, passageFacts, type Prepared } from './facts';
-import { asides, revoChips, revoGreeting, todayDone, type Aside, type GreetingExtras } from './greeting';
+import { asides, revoChips, revoGreeting, revoHello, todayDone, type Aside, type GreetingExtras } from './greeting';
 import type { RevoPlace } from './place';
 import type { RevoContext, RevoDayFacts, RevoPassageFacts } from './types';
 import { passageLong, passageShort } from './words';
@@ -366,7 +366,6 @@ export interface Opener {
   chips: string[];
 }
 
-const hello = (name: string | null) => (name ? `Salaam ${name}.` : 'Salaam.');
 const uniq = (list: (string | null | undefined)[]) => [...new Set(list.filter((c): c is string => !!c))].slice(0, 3);
 
 /**
@@ -386,7 +385,7 @@ export function revoOpener(
     const lines = insightLines(facts, ctx);
     if (lines.length === 0) return { text: revoGreeting(name, ctx, open, extras), chips: revoChips(ctx, open, extras) };
     const pick = lines[open % lines.length];
-    return { text: [hello(name), ...pick.lines.map((l) => l.text)].join(' '), chips: uniq(pick.chips) };
+    return { text: [revoHello(name), ...pick.lines.map((l) => l.text)].join(' '), chips: uniq(pick.chips) };
   }
   const built =
     facts.kind === 'day'
@@ -399,5 +398,5 @@ export function revoOpener(
   const turns = [...built.turns, ...placeTurns(ctx, extras)];
   // Opened again with nothing changed: the second sentence takes its turn, so two opens in a row differ.
   const second = open > 0 && turns.length > 0 ? turns[(open - 1) % turns.length] : built.second;
-  return { text: [hello(name), built.lead, second?.text].filter(Boolean).join(' '), chips: uniq(built.chips) };
+  return { text: [revoHello(name), built.lead, second?.text].filter(Boolean).join(' '), chips: uniq(built.chips) };
 }

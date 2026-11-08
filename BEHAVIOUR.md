@@ -516,7 +516,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   its conversations, memory and kept answers (the day's count stays); deleting the account deletes all of it.
 
 - **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and,
-  with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Its own words name
+  with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Every first line
+  starts "Assalamu alaikum, Majd." with the account's first name, or "Assalamu alaikum." without one (Majd, Nov 8
+  2026: "revos greeting should be Assalamu alaikum not just salam"). Its own words name
   parts of the Qur'an by surah and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
   The context also carries each part it names in those words, for Revo's answers (REVO-27). A day with nothing
   left to revise reads as done, even before it is marked done, and no greeting or suggestion names an empty passage

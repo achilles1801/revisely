@@ -107,7 +107,7 @@ it('[REVO-38] [REVO-25] Revo opened from a past day says what that day held and 
     // Yesterday's day in Activity: what it held, by surah, then today's next part.
     await new ActivityDayView(app).open('2026-11-02');
     const day = await greeting('yesterday');
-    expect(day).toMatch(/^Salaam\b.*\. Yesterday you revised all 5 pages, Al-Fatihah to Al-Baqarah \d+[^.]*\. Today, [^.]+ is next\.$/);
+    expect(day).toMatch(/^Assalamu alaikum\b.*\. Yesterday you revised all 5 pages, Al-Fatihah to Al-Baqarah \d+[^.]*\. Today, [^.]+ is next\.$/);
     expect(day).not.toMatch(/\bpages? \d|\bp\. ?\d/);
     expect(app.screen.queryByTestId('revo-chip-How did yesterday go?')).not.toBeNull();
     // The day goes with the question, as + would attach it; × could take it away.
@@ -129,7 +129,7 @@ it('[REVO-38] [REVO-25] Revo opened from a past day says what that day held and 
     });
     await app.until(() => app.screen.queryByTestId('activity-v2') != null, 'Activity');
     const month = await greeting('the Overview');
-    expect(month).toMatch(/^Salaam\b.*\. This month you’ve revised on 1 of 3 days, 5 pages in all\. Today, [^.]+ is next\.$/);
+    expect(month).toMatch(/^Assalamu alaikum\b.*\. This month you’ve revised on 1 of 3 days, 5 pages in all\. Today, [^.]+ is next\.$/);
     expect(app.screen.queryAllByTestId('revo-context-chip')).toHaveLength(0);
     await closeRevo();
 
@@ -138,7 +138,7 @@ it('[REVO-38] [REVO-25] Revo opened from a past day says what that day held and 
       nav.current.navigate('Dashboard');
     });
     await home.ready();
-    expect(await greeting('Home')).toMatch(/^Salaam\b.*\. Today is 5 pages, starting at /);
+    expect(await greeting('Home')).toMatch(/^Assalamu alaikum\b.*\. Today is 5 pages, starting at /);
     await app.close();
   } finally {
     asks.restore();

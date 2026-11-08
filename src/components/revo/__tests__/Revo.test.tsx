@@ -129,7 +129,7 @@ describe('Revo’s conversation', () => {
     render(<Chat opening={{ day: DAY, state: 'todo:6', n: 1 }} />);
     await flush();
     expect(plainText(String(screen.getByTestId('revo-greeting').props.children))).toBe(
-      'Salaam Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. This week you’ve revised 6 pages on 1 day.',
+      'Assalamu alaikum, Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. This week you’ve revised 6 pages on 1 day.',
     );
     screen.unmount();
     render(<Chat opening={{ day: DAY, state: 'todo:2', n: 3 }} />);
@@ -164,12 +164,12 @@ describe('Revo’s conversation', () => {
     render(<Chat />);
     await flush();
     expect(plainText(String(screen.getByTestId('revo-greeting').props.children))).toBe(
-      'Salaam Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. It’s rated weak. Want a short plan for it?',
+      'Assalamu alaikum, Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. It’s rated weak. Want a short plan for it?',
     );
     expect(screen.getByTestId('revo-chip-Plan Al-Hashr to Al-Mumtahanah')).toBeTruthy();
     expect(backend.state().usage.count).toBe(0);
     fireEvent.press(screen.getByTestId('revo-greeting-copy'));
-    expect(mockCopy).toHaveBeenCalledWith(expect.stringMatching(/^Salaam Maryam\./));
+    expect(mockCopy).toHaveBeenCalledWith(expect.stringMatching(/^Assalamu alaikum, Maryam\./));
   });
 
   it('[REVO-36] with Smart Tracking off, a ratings chart isn’t drawn: the answer and its plan still are', async () => {

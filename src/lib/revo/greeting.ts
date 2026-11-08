@@ -163,9 +163,17 @@ interface Opening {
   chip: string | null;
 }
 
+/**
+ * How every first line starts (REVO-20): "Assalamu alaikum, Majd.", or "Assalamu alaikum." without a
+ * name (Majd, Nov 8 2026: "revos greeting should be Assalamu alaikum not just salam").
+ */
+export function revoHello(name: string | null): string {
+  return name ? `Assalamu alaikum, ${name}.` : 'Assalamu alaikum.';
+}
+
 /** `open` counts the opens before this one, today, in the same state (0: the first; nextOpens). */
 function opening(name: string | null, ctx: RevoContext, open: number, extras: GreetingExtras): Opening {
-  const hello = name ? `Salaam ${name}.` : 'Salaam.';
+  const hello = revoHello(name);
   const { plannedPages, revisedPages } = ctx.today;
   const done = todayDone(ctx);
   const extra = asides(ctx, extras);

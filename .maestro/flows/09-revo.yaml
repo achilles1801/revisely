@@ -49,7 +49,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-greeting
-      text: "Salaam.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
+      text: "Assalamu alaikum.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
     timeout: 10000
 # The first suggestion is about them, by surah.
 - assertVisible:
