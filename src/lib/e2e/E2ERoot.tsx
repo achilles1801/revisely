@@ -9,7 +9,8 @@
 // screenshots don't change with it.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, GestureResponderEvent, Platform, StyleSheet, Text, View } from 'react-native';
+import { touchLine } from './taps';
 import { e2eReady } from './install';
 import { clockLabel, onClockChange } from './clock';
 import { isOffline, onNetworkChange } from './network';
@@ -125,6 +126,14 @@ function VerseOverlay() {
   );
 }
 
+// Every touch that reaches JavaScript on the app's root, in the app's log (./taps, touchLine).
+/* eslint-disable no-console */
+const logTouch = (kind: string) => (e: GestureResponderEvent) => console.log(touchLine(kind, e));
+const onTouchStart = logTouch('start');
+const onTouchEnd = logTouch('end');
+const onTouchCancel = logTouch('cancel');
+/* eslint-enable no-console */
+
 export function withE2E<P extends object>(App: React.ComponentType<P>): React.ComponentType<P> {
   return function E2ERoot(props: P) {
     const [ready, setReady] = useState(false);
@@ -151,7 +160,7 @@ export function withE2E<P extends object>(App: React.ComponentType<P>): React.Co
       });
     }, []);
     return (
-      <View ref={root} style={styles.root} onLayout={onLayout}>
+      <View ref={root} style={styles.root} onLayout={onLayout} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
         {ready ? <App {...props} /> : null}
         {ready ? <VerseOverlay /> : null}
         <Status />
