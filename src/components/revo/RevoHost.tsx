@@ -73,8 +73,8 @@ function useKeyboardUp(): boolean {
 
 /**
  * Revo in the app (the accounts its release opens it to: config/app.revo, REVO-37): its button on
- * the main screens and its sheet. The first tap opens the opt-in; after that, every open is a new conversation on a greeting written
- * then (REVO-34). An earlier one shows only when picked: in History, or today's Day in review from
+ * the main screens and its sheet. The first tap opens the opt-in; after that, every open is a new
+ * conversation on a greeting written then (REVO-34). An earlier one shows only when picked: in History, or today's Day in review from
  * its row under the greeting, which the button's dot points to until it is opened. Each evening
  * with something done, the day's review is written once (it never counts toward the day's questions).
  */
