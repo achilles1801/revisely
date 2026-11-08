@@ -9,13 +9,14 @@ import { markPreviewTester } from '../harness/admin';
 import { flatText, Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 
-/** Home, with the real Settings screen behind its gear (Home's stack holds both). */
+/** Home, with the real Settings and session behind it (Home's stack holds them). */
 function homeAndSettings(mods: Booted): ReactElement {
   const { React, require: req } = mods;
   const { NavigationContainer } = req<any>('@react-navigation/native');
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Settings = req<any>('src/screens/main/SettingsScreen').default;
+  const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   // Revo, as MainNavigator mounts it: "Ask Revo" opens it.
@@ -40,7 +41,8 @@ function homeAndSettings(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'Settings', component: Settings }),
-        ...['ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map(
+        h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
+        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),
@@ -49,11 +51,14 @@ function homeAndSettings(mods: Booted): ReactElement {
   );
 }
 
-async function account(tester: boolean): Promise<Phone> {
+async function account(tester: boolean, smartTracking = false): Promise<Phone> {
   setZone(ZONES.london);
   setNow('2026-11-03 19:00');
   const phone = new Phone();
-  const app = await newAccount(phone, { memorized: pagesRange(542, 604), user: { dailyPageCapacity: 20 } });
+  const app = await newAccount(phone, {
+    memorized: pagesRange(542, 604),
+    user: { dailyPageCapacity: 20, smartTrackingEnabled: smartTracking },
+  });
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
@@ -159,6 +164,48 @@ describe('the help on Home', () => {
       navigation.current.goBack();
     });
     await app.until(() => helpButton(app) != null, 'the ? back on Home');
+    await app.close();
+  });
+});
+
+/** The topics on the help sheet showing, by id. */
+const topicIds = (app: OpenApp) =>
+  app.screen.queryAllByTestId(/^help-topic-/).map((t) => String(t.props.testID).replace('help-topic-', ''));
+
+/** Today's session, then its ⋯ → How a session works. */
+async function sessionHelp(app: OpenApp, home: Home): Promise<void> {
+  const session = await home.startSession();
+  // The controls hide while reading; a tap on the page brings them back.
+  if (!app.screen.queryByLabelText('Session menu')) await session.tapPage();
+  const { fireEvent } = app.mods.rtl;
+  await app.act(async () => {
+    fireEvent.press(app.screen.getByLabelText('Session menu'));
+  });
+  await app.until(() => app.screen.queryByTestId('sheet-action-help') != null, 'How a session works in ⋯');
+  await press(app, 'sheet-action-help');
+  await app.until(() => app.screen.queryByTestId('help-sheet-session') != null, 'How a session works');
+}
+
+describe('the help follows Smart Tracking', () => {
+  it('[HELP-1] [HELP-3] a session’s ⋯ → How a session works: with Smart Tracking off, nothing about rating', async () => {
+    const phone = await account(true, false);
+    const { app, home } = await openHome(phone, true);
+    await app.until(() => helpButton(app) != null, 'the ? on the Today post');
+    await sessionHelp(app, home);
+    const ids = topicIds(app);
+    expect(ids).toEqual(expect.arrayContaining(['session.marking', 'session.stopping']));
+    expect(ids).not.toContain('session.rating');
+    expect(flatText(app.screen.getByTestId('help-sheet-session'))).not.toMatch(/\b(rate|rated|rating|weak|strong|strength)\b/i);
+    await app.close();
+  });
+
+  it('[HELP-3] with Smart Tracking on, the session’s help says how to rate a page', async () => {
+    const phone = await account(true, true);
+    const { app, home } = await openHome(phone, true);
+    await app.until(() => helpButton(app) != null, 'the ? on the Today post');
+    await sessionHelp(app, home);
+    expect(topicIds(app)).toContain('session.rating');
+    expect(flatText(app.screen.getByTestId('help-sheet-session'))).toContain('Rate page strength');
     await app.close();
   });
 });

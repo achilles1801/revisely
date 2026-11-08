@@ -17,10 +17,13 @@ import type { Ionicons } from '@expo/vector-icons';
 export type HelpIcon = keyof typeof Ionicons.glyphMap;
 
 /** The screens with help. */
-export type HelpScreen = 'home';
+export type HelpScreen = 'home' | 'session' | 'reader' | 'schedule';
 
-/** When a topic shows: only with Smart Tracking on, or only with it off. */
-export type HelpWhen = 'smartTracking' | 'noSmartTracking';
+/**
+ * When a topic shows: only with Smart Tracking on, only with it off, or only where the hidden page
+ * (recite mode, the session's eye) is offered.
+ */
+export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'recite';
 
 export interface HelpTopic {
   id: string;
@@ -29,6 +32,11 @@ export interface HelpTopic {
   text: string;
   /** The BEHAVIOUR.md rules it explains. */
   covers: readonly string[];
+  /**
+   * For a topic no rule covers yet: why. The drift check can't watch it, so it's kept to what the
+   * screen itself shows; a rule for it (with a scenario) turns this into `covers`.
+   */
+  unruled?: string;
   when?: HelpWhen;
 }
 
@@ -88,16 +96,144 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
       },
     ],
   },
+  session: {
+    title: 'How a session works',
+    topics: [
+      {
+        id: 'session.marking',
+        icon: 'checkmark-circle-outline',
+        title: 'Marking pages',
+        text:
+          'Swipe on and the page you leave is marked revised; swipe onto the end card for the last. ' +
+          '[[check]] marks or unmarks this page.',
+        covers: ['SESS-1'],
+      },
+      {
+        id: 'session.stopping',
+        icon: 'chevron-back-circle-outline',
+        title: 'Stopping',
+        text:
+          "Back saves what you've marked, and {{Continue revision}} on Home picks up from there. " +
+          'The day is done when every page is marked.',
+        covers: ['SESS-3', 'SESS-2'],
+      },
+      {
+        id: 'session.rating',
+        icon: 'fitness-outline',
+        title: 'Rating',
+        text: '[[more]] → {{Rate page strength}}. Pages you rate weak show in Insights, and a new plan can put them first.',
+        covers: ['ACT-8', 'ACT-12'],
+        when: 'smartTracking',
+      },
+      {
+        id: 'session.hidden',
+        icon: 'eye-off-outline',
+        title: 'Hidden page',
+        text:
+          "[[eye]] hides the page so you recite from memory. Each verse appears when you pause; " +
+          "{{Next verse}} shows one if you're stuck.",
+        covers: [],
+        unruled: 'recite mode needs on-device speech recognition, which the scenarios can’t run',
+        when: 'recite',
+      },
+    ],
+  },
+  reader: {
+    title: 'How the reader works',
+    topics: [
+      {
+        id: 'reader.hold',
+        icon: 'hand-left-outline',
+        title: 'Hold a verse',
+        text: 'Hold a verse to play it, read its translation, or copy or share it.',
+        covers: [],
+        unruled: 'the reader isn’t in the scenarios yet (its page images and gestures)',
+      },
+      {
+        id: 'reader.turning',
+        icon: 'swap-horizontal-outline',
+        title: 'Turning pages',
+        text: 'Tap the page to show or hide the controls. Swipe to turn pages; slide the bar at the bottom to go further.',
+        covers: [],
+        unruled: 'the reader isn’t in the scenarios yet (its page images and gestures)',
+      },
+      {
+        id: 'reader.recitation',
+        icon: 'play-circle-outline',
+        title: 'Recitation',
+        text: '[[play]] plays from this page. [[options]] sets the reciter, speed, which ayahs and repeats. It plays on when you leave.',
+        covers: [],
+        unruled: 'no rule describes the player yet (AUDIO-* are about Android’s notification)',
+      },
+      {
+        id: 'reader.sitting',
+        icon: 'stopwatch-outline',
+        title: 'Recording and timer',
+        text: '[[mic]] records you and [[timer]] times you. {{End}} saves both to the day in Activity, where you can add what you memorized.',
+        covers: ['REC-1', 'REC-2', 'MEM-5', 'DAY-9'],
+      },
+    ],
+  },
+  schedule: {
+    title: 'How the schedule works',
+    topics: [
+      {
+        id: 'schedule.cycle',
+        icon: 'repeat-outline',
+        title: 'The cycle',
+        text:
+          'Your days run in order, then start again, so each memorized page comes round once a cycle. ' +
+          "Missed days don't push it back.",
+        covers: ['SCHED-1', 'SCHED-3', 'SCHED-5'],
+      },
+      {
+        id: 'schedule.rest',
+        icon: 'cafe-outline',
+        title: 'Rest days',
+        text: "A rest day is a day of the cycle, so it comes back every round. It isn't a pause.",
+        covers: ['SCHED-3'],
+      },
+      {
+        id: 'schedule.days',
+        icon: 'reorder-three-outline',
+        title: 'Changing days',
+        text:
+          'Tap a day to change it, hold and drag to move it, swipe left to delete it. ' +
+          'Saving leaves today as it is unless you edited today.',
+        covers: ['CARRY-5'],
+      },
+      {
+        id: 'schedule.new',
+        icon: 'sparkles-outline',
+        title: 'New plan',
+        text: '{{Create new plan}} makes a fresh cycle: even pages, whole juz or weakest first, forwards or in reverse.',
+        covers: ['SCHED-1', 'SCHED-2', 'SCHED-4'],
+        when: 'smartTracking',
+      },
+      {
+        id: 'schedule.new.off',
+        icon: 'sparkles-outline',
+        title: 'New plan',
+        text: '{{Create new plan}} makes a fresh cycle: even pages or whole juz, forwards or in reverse.',
+        covers: ['SCHED-1', 'SCHED-2', 'SCHED-4'],
+        when: 'noSmartTracking',
+      },
+    ],
+  },
 };
 
 /** At most this many topics show on a screen. */
 export const MAX_TOPICS = 4;
 
-/** A screen's topics for this account: the Smart Tracking ones only with it on, and the others only with it off. */
-export function topicsFor(screen: HelpScreen, opts: { smartTracking: boolean }): HelpTopic[] {
+/**
+ * A screen's topics for this account (HELP-3): the Smart Tracking ones only with it on, their
+ * stand-ins only with it off, and the hidden page's only where it's offered.
+ */
+export function topicsFor(screen: HelpScreen, opts: { smartTracking: boolean; recite?: boolean }): HelpTopic[] {
   return HELP[screen].topics.filter((t) => {
     if (t.when === 'smartTracking') return opts.smartTracking;
     if (t.when === 'noSmartTracking') return !opts.smartTracking;
+    if (t.when === 'recite') return opts.recite === true;
     return true;
   });
 }

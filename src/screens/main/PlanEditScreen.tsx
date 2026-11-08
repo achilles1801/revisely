@@ -47,6 +47,9 @@ import { InlineStepper } from '../../components/plan/InlineStepper';
 import { DAY_ROW_INSET } from '../../components/plan/DayRow';
 import { ReorderableDayList, ScrollLink } from '../../components/plan/ReorderableDayList';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
+import { useHelpButtons } from '../../components/help/useHelpButtons';
 import {
   PlanBuilderHandle,
   PlanBuilderSheet,
@@ -92,6 +95,7 @@ export default function PlanEditScreen() {
   // Outcomes only (a save, a load).
   const haptics = useHaptics();
   const { user, pages, logs, saveUser } = useApp();
+  const helpShown = useHelpButtons().shown;
   // "Today" in the editor is the revision day (it starts at fajr when that is
   // on). It is fixed once the account is loaded: the draft is rotated to that
   // day, so it must not move while the editor is open. Read before the account
@@ -509,16 +513,21 @@ export default function PlanEditScreen() {
         title="Schedule"
         onBack={() => navigation.goBack()}
         right={
-          <PillButton
-            title="Save"
-            size="sm"
-            onPress={handleSave}
-            disabled={!canSave}
-            busy={saving}
-            accessibilityLabel="Save schedule"
-            testID="plan-save"
-          />
+          <>
+            <HelpButton screen="schedule" />
+            <PillButton
+              title="Save"
+              size="sm"
+              onPress={handleSave}
+              disabled={!canSave}
+              busy={saving}
+              accessibilityLabel="Save schedule"
+              testID="plan-save"
+            />
+          </>
         }
+        // The ? beside Save needs a little more room than Save alone; both sides stay equal.
+        sideWidth={helpShown ? 112 : undefined}
         separator
       />
 
@@ -688,6 +697,7 @@ export default function PlanEditScreen() {
         </GroupedSection>
       </Animated.ScrollView>
 
+      <HelpToast screen="schedule" bottomInset={insets.bottom} />
       <UndoToast
         key={removed?.seq ?? 0}
         visible={removed != null}

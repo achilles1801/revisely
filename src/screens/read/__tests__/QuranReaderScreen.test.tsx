@@ -39,7 +39,7 @@ jest.mock('react-native-safe-area-context', () =>
 );
 // What a test sets: the account, the timer, the recorder's phase; and what End calls, in order.
 const mockState: {
-  user: { previewTester?: boolean } | null;
+  user: { previewTester?: boolean; id?: string } | null;
   timer: unknown;
   phase: string;
   calls: string[];
@@ -150,6 +150,21 @@ describe('QuranReaderScreen: reading, and the controls on a tap', () => {
     await open();
     fireEvent.press(byTestId('reader-background'));
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(false);
+  });
+
+  it('a tester’s header has a round ? at its right, which opens How the reader works (HELP-1)', async () => {
+    mockState.user = { previewTester: true, id: 'u1' };
+    await open();
+    fireEvent.press(screen.getByLabelText('The page'));
+    fireEvent.press(await screen.findByTestId('help-button-reader'));
+    expect(await screen.findByTestId('help-sheet-reader')).toBeTruthy();
+    expect(screen.getByText('How the reader works')).toBeTruthy();
+    expect(screen.getByTestId('help-topic-reader.hold')).toBeTruthy();
+  });
+
+  it('no ? for anyone else: the same room keeps the title centred', async () => {
+    await open();
+    expect(screen.queryByTestId('help-button-reader')).toBeNull();
   });
 
   it('holding a verse still works (the page passes it on)', async () => {

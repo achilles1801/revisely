@@ -1463,20 +1463,24 @@ classic default), and a fresh install starts in light.
     rule). A label or a subtitle still says what a control does (e.g. Keep daily amount), and sheets
     hold no paragraphs of explanation (the Mushaf picker's was removed, Nov 3 2026). On top of that,
     the few screens that can't explain themselves get one ? (`components/help/HelpButton`; testers
-    for now, `lib/help/availability`). Home's is in the Today post's header; the session, the
-    reader, Activity, a day and the schedule editor follow. It opens a `v2/Sheet` of at most four
-    topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the account,
-    `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding is one switch for every screen, kept on the phone per account; Settings →
-    Support → Help buttons turns it back on. BEHAVIOUR.md HELP-1, HELP-2. No first-run guides,
+    for now, `lib/help/availability`). Home's is in the Today post's header, the schedule editor's
+    before Save, the reader's a round button at the right of its header, and a session's the last
+    row of its ⋯ menu (its header is full). Activity and a day follow. It opens a `v2/Sheet` of at
+    most four topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the
+    account, `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding
+    is one switch for every screen, kept on the phone per account; Settings → Support → Help buttons
+    turns it back on. BEHAVIOUR.md HELP-1 to HELP-3. No first-run guides,
     tooltips, coach marks, or ⓘ beside single controls.
     - **All help text is in `src/lib/help/topics.ts`.** Each topic lists the BEHAVIOUR.md rules it
       explains (`covers`). `src/lib/help/__tests__/topics.test.ts` keeps a hash of each covered rule
       in `reviewed.json` and fails when a rule changes until its topic is reviewed: read the topic
-      against the rule, fix the words, then `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`.
+      against the rule, fix the words, then `UPDATE_HELP_REVIEWED=1 npx jest src/lib/help`. A topic
+      no rule covers yet says why (`unruled`: the reader's gestures and player, the hidden page); the
+      check can't watch those, so a rule with a scenario for one turns it into `covers`.
     - A change to something a topic describes (a label, a gesture, where a button is) updates the
       topic in the same PR. `{{labels}}` must be text the app shows (the test checks `src/`).
-    - With Smart Tracking off, no topic mentions ratings or strength (`when`). Surahs and juz, never
-      page numbers.
+    - With Smart Tracking off, no topic mentions ratings or strength (`when`; HELP-3). The hidden
+      page's topic shows only where it's offered. Surahs and juz, never page numbers.
 - **Accents** (Settings → Appearance → Accent, a row like Theme: label on the left, the three pills
   on the right, swatches only on narrow screens or large text): **Indigo (the default)**, Crimson and Jade. The
   choice is the user doc's `accent` field (rules allow `indigo|crimson|jade`), so it follows the
