@@ -16,7 +16,7 @@ async function onServer(app: OpenApp, day: string): Promise<string[]> {
   return days.find((d) => d.date === day)?.entries.map((e) => e.text) ?? [];
 }
 
-it('[ACT-6] [LOG-2] a note swiped away goes at once, with Undo; undone it stays; otherwise it is deleted after five seconds, or on leaving the log', async () => {
+it('[ACT-6] [LOG-2] a note swiped away goes at once, with an Undo that is seen; undone it stays; otherwise it is deleted after five seconds, or on leaving the log', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-05 12:00');
   const phone = new Phone();
@@ -52,6 +52,13 @@ it('[ACT-6] [LOG-2] a note swiped away goes at once, with Undo; undone it stays;
   expect(asked).toEqual([]);
   expect(log.entries().map((e) => e.text)).toEqual(['second', 'third']);
   expect(app.screen.queryByTestId('undo-toast-action')).not.toBeNull();
+  // Seen, not only there: fully opaque from its first frame. It used to fade in from 0, and on
+  // Android the fade was now and then never applied, leaving an Undo nobody could see (E2E 05).
+  const { StyleSheet } = app.mods.require<typeof import('react-native')>('react-native');
+  for (const id of ['undo-toast', 'undo-toast-bar']) {
+    const style = StyleSheet.flatten(app.screen.getByTestId(id).props.style) ?? {};
+    expect({ id, opacity: style.opacity ?? 1 }).toEqual({ id, opacity: 1 });
+  }
   await app.act(async () => {
     fireEvent.press(app.screen.getByTestId('undo-toast-action'));
   });
