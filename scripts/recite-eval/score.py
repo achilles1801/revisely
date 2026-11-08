@@ -20,7 +20,8 @@ False alarms (the number that matters most)
 Detection (mode 2, memorization mistakes; one count per planted mistake)
   strict          del/sub: that word flagged; swap: either word; askip/mut: at least half the words
   near            a flag on the mistake's words or within one word of them
-  ins             an extra word; the app's tracker never reports extra words, so it is always missed
+  ins             an extra word: caught when the engine reports one after that word (res['extras']); the
+                  app's tracker has no way to report extra words, so for it this is always missed
   latency         when the flag appeared minus when the mistake happened, seconds
   precision       flagged words that are on or next to a real mistake, of all flagged words
 """
@@ -86,8 +87,13 @@ def score_item(truth, res):
         ws = ev.get('words') or []
         t_event = None
         if ev['type'] == 'ins':
-            hit_s = hit_n = False
+            # engines that report extra words give res['extras'] = [{'after': word, 't': seconds}]
+            ex = [x for x in res.get('extras', []) if abs(int(x['after']) - ev['after']) <= 1]
+            hit_s = any(int(x['after']) == ev['after'] for x in ex)
+            hit_n = bool(ex)
             t_event = labels.get(ev['after'], {}).get('end')
+            if ex and t_event is not None:
+                det.append(('lat', min(x['t'] for x in ex) - t_event))
         else:
             fl = [w for w in ws if w in flagged]
             around = set()
