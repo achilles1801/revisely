@@ -73,6 +73,14 @@ describe('a sitting memorized from the Day (MEM-1, MEM-3, MEM-5)', () => {
     expect(plain(finishes)).toBe('Al-Mulk 21–26 finishes the page');
     expect(app.screen.queryByTestId('activity-block-read')).toBeNull();
 
+    // Undo sits on the screen, not at the end of the day's scrolling list (where a long day hid it).
+    await app.until(() => app.screen.queryByTestId('undo-toast-bar') != null, 'the Undo toast');
+    const holders: string[] = [];
+    for (let el = app.screen.getByTestId('undo-toast-bar').parent; el; el = el.parent) {
+      if (typeof el.props.testID === 'string') holders.push(el.props.testID);
+    }
+    expect(holders).not.toContain('activity-day-v2');
+
     // Undo: every page back, the ayahs out of the day.
     await press('undo-toast-action');
     await app.untilSynced();

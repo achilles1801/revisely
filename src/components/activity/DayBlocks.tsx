@@ -38,10 +38,9 @@ import { describeAyahs } from '../../lib/passages';
 import { ayahsOnPage, sortedAyahs } from '../../lib/ayahKeys';
 import { memorizedAyahsOnPage, memorizedPageShare, revisablePages } from '../../lib/memorizedAyahs';
 import { scheduledDaysFrom } from '../../lib/algorithm';
-import { AddMemorizedSheet, type AyahsAdded, type SittingToAdd } from './AddMemorizedSheet';
+import { AddMemorizedSheet, type SittingToAdd } from './AddMemorizedSheet';
 import { JuzSheet } from './JuzSheet';
 import { juzOfPages } from '../../lib/juzSheet';
-import { UndoToast } from '../revision/UndoToast';
 import { PillButton } from '../v2/PillButton';
 import type { UserPage } from '../../types';
 
@@ -87,7 +86,15 @@ interface Props {
   onEditSchedule?: () => void;
   /** Memorized today, on a custom plan: put the pages on a day of it (tomorrow's day in the editor). */
   onAddToPlan?: (pages: number[]) => void;
+  /**
+   * An add that can be undone (MEM-3): the screen shows its toast, on the screen rather than at the
+   * end of this list, where a long day hid it. Null takes it away.
+   */
+  onUndoOffer?: (offer: UndoOffer | null) => void;
 }
+
+/** "Al-Mulk, ayahs 1–20 marked memorized · Undo": the toast's words and what Undo does. */
+export type UndoOffer = { text: string; undo: () => void };
 
 /**
  * "8:05 – 8:23 AM": from the start to the start plus the minutes, the AM/PM said once when both
@@ -147,13 +154,16 @@ export function DayBlocks({
   onReviseTomorrow,
   onEditSchedule,
   onAddToPlan,
+  onUndoOffer,
 }: Props) {
   const { pages, user, updatePages, refreshPageStates } = useApp();
+  // Undo runs seconds after the add: it reads the pages as they are then.
+  const pagesNow = useRef(pages);
+  pagesNow.current = pages;
   // A sitting's Add to memorized (MEM-1): the sheet, opened on its pages, and the add's Undo.
   const [sittingToAdd, setSittingToAdd] = useState<SittingToAdd | null>(null);
   // Mounted from the first Add on (so it can slide away after), never before: it loads the day's reads.
   const [sheetUsed, setSheetUsed] = useState(false);
-  const [undo, setUndo] = useState<{ text: string; added: AyahsAdded; itemPagesBefore: number[] } | null>(null);
   // The juz sheet (ACT-21), from the Revised block's header: mounted from its first opening on.
   const [juzShown, setJuzShown] = useState<number | null>(null);
   const [juzUsed, setJuzUsed] = useState(false);
@@ -677,31 +687,20 @@ export function DayBlocks({
         day={day}
         dayName={day === today ? 'today' : undefined}
         sitting={sittingToAdd}
-        onAdded={(added) =>
-          setUndo({
+        onAdded={(added) => {
+          const itemPagesBefore = memorizedPages;
+          onUndoOffer?.({
             text: `${describeAyahs(added.ayahs)} marked memorized`,
-            added,
-            itemPagesBefore: memorizedPages,
-          })
-        }
+            undo: () => {
+              // Each page back as it was, and the ayahs out of the day's item (MEM-3).
+              const before = new Map(added.previous.map((p) => [p.pageNumber, p] as const));
+              void updatePages((pagesNow.current ?? []).map((p) => before.get(p.pageNumber) ?? p), [...before.keys()]);
+              void queueChange({ kind: 'memorization.unmark', pages: added.pages.filter((p) => !itemPagesBefore.includes(p)), verses: added.ayahs });
+            },
+          });
+        }}
       />
       ) : null}
-      <UndoToast
-        visible={undo != null}
-        message={undo?.text ?? ''}
-        actionLabel="Undo"
-        duration={6000}
-        onUndo={() => {
-          const u = undo;
-          setUndo(null);
-          if (!u) return;
-          // Each page back as it was, and the ayahs out of the day's item (MEM-3).
-          const before = new Map(u.added.previous.map((p) => [p.pageNumber, p] as const));
-          void updatePages(pages.map((p) => before.get(p.pageNumber) ?? p), [...before.keys()]);
-          void queueChange({ kind: 'memorization.unmark', pages: u.added.pages.filter((p) => !u.itemPagesBefore.includes(p)), verses: u.added.ayahs });
-        }}
-        onDismiss={() => setUndo(null)}
-      />
       <ContextMenu
         visible={menu != null}
         onClose={() => setMenu(null)}
