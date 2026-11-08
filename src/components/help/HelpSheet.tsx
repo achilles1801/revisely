@@ -71,19 +71,22 @@ export function HelpSheet({
   visible,
   onClose,
   onHide,
+  recite = false,
 }: {
   screen: HelpScreen;
   visible: boolean;
   onClose: () => void;
   /** "Hide help buttons": runs after the sheet has gone. */
   onHide: () => void;
+  /** The hidden page (recite mode) is offered here: its topic shows. */
+  recite?: boolean;
 }) {
   const { palette } = useTheme();
   const { user } = useApp();
   const { fontScale } = useWindowDimensions();
   const pending = useRef<null | 'revo' | 'hide'>(null);
   const entry = HELP[screen];
-  const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true });
+  const topics = topicsFor(screen, { smartTracking: user?.smartTrackingEnabled === true, recite });
   // Revo is on for this account (RevoHost is mounted): it follows Revo's own switch, whoever that opens it to.
   const revo = useRevoPresent();
   const marks = fontScale <= MARKS_UP_TO;

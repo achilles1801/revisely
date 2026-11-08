@@ -69,8 +69,12 @@ describe('the help reads BEHAVIOUR.md', () => {
     expect(rules.get('SESS-6')).toMatch(/grace window/);
   });
 
-  it('every topic covers at least one rule, and only rules that exist', () => {
-    expect(topics.filter((t) => t.covers.length === 0).map((t) => t.id)).toEqual([]);
+  it('every topic covers a rule, or says why no rule covers it yet (and not both)', () => {
+    expect(topics.filter((t) => t.covers.length === 0 && !t.unruled?.trim()).map((t) => t.id)).toEqual([]);
+    expect(topics.filter((t) => t.covers.length > 0 && t.unruled).map((t) => t.id)).toEqual([]);
+  });
+
+  it('covers only rules that exist', () => {
     const unknown = topics.flatMap((t) => t.covers.filter((id) => !rules.has(id)).map((id) => `${t.id}: ${id}`));
     expect(unknown).toEqual([]);
   });
@@ -128,11 +132,15 @@ describe('the help names what the app has', () => {
 });
 
 describe('the help stays short and plain', () => {
-  it(`shows at most ${MAX_TOPICS} topics a screen, with Smart Tracking on or off`, () => {
+  it(`shows at most ${MAX_TOPICS} topics a screen, with Smart Tracking on or off, the hidden page offered or not`, () => {
     for (const s of screens) {
-      expect(topicsFor(s, { smartTracking: true }).length).toBeLessThanOrEqual(MAX_TOPICS);
-      expect(topicsFor(s, { smartTracking: false }).length).toBeLessThanOrEqual(MAX_TOPICS);
-      expect(topicsFor(s, { smartTracking: false }).length).toBeGreaterThan(0);
+      for (const smartTracking of [true, false]) {
+        for (const recite of [true, false]) {
+          const n = topicsFor(s, { smartTracking, recite }).length;
+          expect(n).toBeLessThanOrEqual(MAX_TOPICS);
+          expect(n).toBeGreaterThan(0);
+        }
+      }
     }
   });
 
@@ -152,7 +160,7 @@ describe('the help stays short and plain', () => {
 
   it('says nothing about ratings or strength with Smart Tracking off', () => {
     const words = /\b(rat(e|ed|es|ing|ings)|weak|weaker|weakest|moderate|strong|strength)\b/i;
-    const off = screens.flatMap((s) => topicsFor(s, { smartTracking: false }));
+    const off = screens.flatMap((s) => topicsFor(s, { smartTracking: false, recite: true }));
     expect(off.filter((t) => words.test(t.text) || words.test(t.title)).map((t) => t.id)).toEqual([]);
   });
 });

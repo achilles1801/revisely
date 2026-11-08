@@ -7,6 +7,8 @@ import { MushafScrubber } from '../../components/MushafScrubber';
 import { useVerseActions } from '../../components/verse/useVerseActions';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HELP_ICON, HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
@@ -203,8 +205,14 @@ export default function QuranReaderScreen() {
                 Page {currentPage} · Juz {juz} · Hizb {hizb}
               </Text>
             </View>
-            {/* Keeps the title centred. */}
-            <View style={{ width: ROUND_BUTTON_SIZE }} />
+            {/* Its help (HELP-1), a round button like Back; hidden, the same room keeps the title centred. */}
+            <HelpButton
+              screen="reader"
+              render={(open, label) => (
+                <RoundButton icon={HELP_ICON} label={label} onPress={open} palette={palette} testID="help-button-reader" />
+              )}
+              placeholder={<View style={{ width: ROUND_BUTTON_SIZE }} />}
+            />
           </View>
         }
         footer={
@@ -285,6 +293,7 @@ export default function QuranReaderScreen() {
         bottomInset={insets.bottom - spacing.sm}
       />
 
+      <HelpToast screen="reader" bottomInset={insets.bottom - spacing.sm} />
       {verseActions.overlay}
     </View>
   );

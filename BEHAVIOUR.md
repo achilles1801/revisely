@@ -647,13 +647,17 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 ## Help
 
 - **HELP-1.** Screens that need explaining have a ? (testers, for now). Home's sits at the right of the Today
-  post's header. It opens that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›"
-  when the account has Revo (it opens Revo; nothing is counted until a question is sent), "Hide help
-  buttons", and Done. The words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons
-  are good".)
+  post's header; the schedule editor's before Save; the reader's is a round button at the right of its
+  header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full). It opens
+  that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›" when the account has
+  Revo (it opens Revo; nothing is counted until a question is sent), "Hide help buttons", and Done. The
+  words name surahs and juz, never page numbers. (Majd, Nov 8 2026: "helper buttons are good".)
 - **HELP-2.** "Hide help buttons" removes every ? at once, for this account on this phone, and they stay
   hidden across launches. The screen they were hidden from says "Help buttons hidden. Settings → Support
   brings them back." with Undo. Settings → Support → Help buttons turns them back on, or off again.
+- **HELP-3.** Help follows Smart Tracking: with it off, no topic mentions ratings or strength. A session's
+  Rating topic and the new plan's "weakest first" show only with it on. The hidden page's topic shows only
+  where the hidden page is offered.
 
 ## Naming the Qur'an
 

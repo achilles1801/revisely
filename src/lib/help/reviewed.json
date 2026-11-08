@@ -17,5 +17,47 @@
   "home.memorized": {
     "MEM-1": "c433d43bc16e7ffb",
     "MEM-2": "fa6bccea850e23b7"
+  },
+  "session.marking": {
+    "SESS-1": "09cd1f564f7eac99"
+  },
+  "session.stopping": {
+    "SESS-3": "4227fa695c15768c",
+    "SESS-2": "ed190cc5b1bd8cc9"
+  },
+  "session.rating": {
+    "ACT-8": "17530ba6416770ba",
+    "ACT-12": "af7c5a40d965c592"
+  },
+  "session.hidden": {},
+  "reader.hold": {},
+  "reader.turning": {},
+  "reader.recitation": {},
+  "reader.sitting": {
+    "REC-1": "aa8d6fb7fcf6b756",
+    "REC-2": "103f684e88e23182",
+    "MEM-5": "fb64e1f6b76c4753",
+    "DAY-9": "d1f48e9dc60411f1"
+  },
+  "schedule.cycle": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-3": "29523ed2e8b9d054",
+    "SCHED-5": "1c59745b0f18a785"
+  },
+  "schedule.rest": {
+    "SCHED-3": "29523ed2e8b9d054"
+  },
+  "schedule.days": {
+    "CARRY-5": "a16d57685246f888"
+  },
+  "schedule.new": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-2": "9898aac73caf73d2",
+    "SCHED-4": "cd9b1e2c930dc819"
+  },
+  "schedule.new.off": {
+    "SCHED-1": "e34c5d66002488e4",
+    "SCHED-2": "9898aac73caf73d2",
+    "SCHED-4": "cd9b1e2c930dc819"
   }
 }

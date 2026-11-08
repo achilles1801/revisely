@@ -21,6 +21,8 @@ import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
 import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HELP_ICON, useHelpSheet } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { HiddenPageOverlay } from '../../components/recite/HiddenPageOverlay';
 import { RecitePanel } from '../../components/recite/RecitePanel';
@@ -260,6 +262,8 @@ export default function ActiveRevisionScreen() {
   // the 1405 pages only, for now.
   const edition = useMushafEdition();
   const reciteAvailable = reciteModeEnabled(user) && mushafEdition(edition).reciteData;
+  // The session's help (HELP-1): a row of ⋯, since the header already holds four round buttons.
+  const help = useHelpSheet('session', { recite: reciteAvailable });
   const [hidden, setHidden] = useState(false);
   const [reveal, setReveal] = useState<RevealState>(NOTHING_REVEALED);
   const [listenOn, setListenOn] = useState(true);
@@ -917,6 +921,7 @@ export default function ActiveRevisionScreen() {
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
+    ...(help.shown ? [{ key: 'help', label: 'How a session works', icon: HELP_ICON, onPress: help.open }] : []),
   ];
 
   const palette = getReadPalette(isDark);
@@ -1167,6 +1172,9 @@ export default function ActiveRevisionScreen() {
         onDismiss={() => setUndoState(null)}
         bottomInset={insets.bottom - spacing.sm}
       />
+
+      <HelpToast screen="session" bottomInset={insets.bottom - spacing.sm} />
+      {help.sheet}
 
       <SessionMenuSheet
         visible={menuOpen}

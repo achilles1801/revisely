@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useAuth } from '../../context/AuthContext';
 import { helpAvailable } from '../../lib/help/availability';
 import { hideHelpFrom, setHelpHidden, useHelpHidden } from '../../lib/help/state';
 import type { HelpScreen } from '../../lib/help/topics';
@@ -18,8 +17,8 @@ export function useHelpButtons(): {
   setShown: (shown: boolean) => void;
 } {
   const { user } = useApp();
-  const { firebaseUser, provisionalUid } = useAuth();
-  const uid = firebaseUser?.uid ?? provisionalUid ?? null;
+  // The account's id from the app's own user (its uid); not AuthContext, which screens' tests don't mock.
+  const uid = user?.id ?? null;
   const available = helpAvailable(user) && !!uid;
   const hidden = useHelpHidden(available ? uid : null);
   const hideFrom = useCallback((screen: HelpScreen) => uid && hideHelpFrom(uid, screen), [uid]);
