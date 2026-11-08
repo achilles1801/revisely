@@ -575,7 +575,9 @@ describe('the reply (REVO-7)', () => {
   });
 
   it('[REVO-7] the prompt names every chart kind and when to use it; a newer chart shows in the history as a short note', () => {
-    for (const kind of ['dailyPages', 'pageRatings', 'juzMap', 'timeline', 'weeks', 'table']) expect(REVO_SYSTEM_PROMPT).toContain(`"kind": "${kind}"`);
+    for (const kind of ['dailyPages', 'pageRatings', 'juzMap', 'timeline', 'weeks', 'table']) expect(REVO_SYSTEM_PROMPT).toContain(`"${kind}"`);
+    // The one-object rule is the prompt's last word (Nov 8 2026: a longer chart list left "How was my week?" in plain prose).
+    expect(REVO_SYSTEM_PROMPT.trim().split('\n').pop()).toMatch(/^Every reply is that one JSON object/);
     const said = (visual: StoredMessage['visual']) => historyTurn({ id: 'm', uid: 'u', role: 'revo', text: 'Here.', at: 1, visual }).content;
     expect(said({ kind: 'juzMap', title: 'Your juz' })).toBe('Here.\n[chart: juz by last revised]');
     expect(said({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 })).toContain('[chart: revisions of surah 59, last 90 days]');
