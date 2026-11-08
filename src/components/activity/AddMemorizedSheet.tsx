@@ -2,8 +2,9 @@
 // (MEM-1: most people memorize ayahs, not pages), then whole pages or a surah. Adding marks them
 // memorized (a page whose last ayah comes in becomes memorized, one started is partly memorized)
 // and records a Memorized item for the day, with its minutes when given (ACT-5). "From your
-// reading" offers the pages read that day that are not memorized yet. Opened from a sitting on the
-// Day, its ayahs stay inside the pages the sitting held.
+// reading" offers the pages read that day that are not memorized yet. Whole pages picks From and To on
+// a wheel of pages, as Ayahs does with its surah and ayah wheels. Opened from a sitting on the Day,
+// its ayahs and pages stay inside the pages the sitting held.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -13,17 +14,17 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { memorizeSuggestion } from '../../lib/activityAdd';
-import { parsePageRange } from '../../lib/memorizationLog';
 import { describeAyahs, describePassage } from '../../lib/passages';
 import { AyahKey, ayahsBetween, ayahsOfPages, LAST_AYAH, pageOfAyah } from '../../lib/ayahKeys';
 import { addAyahs, memorizedAyahs, memorizedPageShare } from '../../lib/memorizedAyahs';
 import { AyahRangeFields } from './AyahRangeFields';
+import { PageRangeFields } from './PageRangeFields';
 import * as firestoreService from '../../services/firestoreService';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import { typeV2 } from '../../theme/v2';
 import type { UserPage } from '../../types';
 import { BlockMark } from './BlockMark';
-import { FormLabel, InfoLine, DismissArea, MinutesField, PageRangeFields, Segmented, Suggestion } from './AddSheetParts';
+import { FormLabel, InfoLine, DismissArea, MinutesField, Segmented, Suggestion } from './AddSheetParts';
 
 type What = 'ayahs' | 'pages' | 'surah';
 
@@ -73,8 +74,6 @@ export function AddMemorizedSheet({
 }) {
   const { user, pages, updatePages } = useApp();
   const { palette } = useTheme();
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
   const [minutes, setMinutes] = useState('');
   const [what, setWhat] = useState<What>('ayahs');
   // The ayahs: inside the sitting's pages, or the whole Qur'an.
@@ -84,6 +83,13 @@ export function AddMemorizedSheet({
   }, [sitting]);
   const [fromAyah, setFromAyah] = useState<AyahKey>(range.lo);
   const [toAyah, setToAyah] = useState<AyahKey>(range.lo);
+  // The whole pages: the sitting's, or every page.
+  const pageBounds = useMemo(() => {
+    const held = (sitting?.pages ?? []).filter((p) => Number.isInteger(p) && p >= 1 && p <= 604);
+    return held.length > 0 ? { lo: Math.min(...held), hi: Math.max(...held) } : { lo: 1, hi: 604 };
+  }, [sitting]);
+  const [fromPage, setFromPage] = useState(pageBounds.lo);
+  const [toPage, setToPage] = useState(pageBounds.lo);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [readings, setReadings] = useState<{ pages: number[]; startedAt: number }[]>([]);
   // The pages read, as used: exactly those, not every page from the first to the last (Nov 2026).
@@ -104,18 +110,27 @@ export function AddMemorizedSheet({
 
   const memorized = useMemo(() => new Set((pages ?? []).filter((p) => p.status === 'memorized').map((p) => p.pageNumber)), [pages]);
   const memorizedNow = useMemo(() => new Set(memorizedAyahs(pages ?? [])), [pages]);
-  // Each time it opens: From at the first ayah not memorized in the range, To at the sitting's end
-  // (one flick of To sets where it stopped), and the sitting's minutes.
+  // Whole pages from the first page not memorized, to the sitting's last page (or that one page).
+  const openPages = () => {
+    let first = pageBounds.lo;
+    while (first < pageBounds.hi && memorized.has(first)) first++;
+    if (memorized.has(first)) first = pageBounds.lo;
+    setFromPage(first);
+    setToPage(sitting ? pageBounds.hi : first);
+  };
+  // Each time it opens: From at the first ayah (and page) not memorized in the range, To at the
+  // sitting's end (one flick of To sets where it stopped), and the sitting's minutes.
   useEffect(() => {
     if (!visible) return;
     const open = ayahsBetween(range.lo, range.hi).find((k) => !memorizedNow.has(k)) ?? range.lo;
     setWhat('ayahs');
     setFromAyah(open);
     setToAyah(sitting ? range.hi : open);
+    openPages();
     if (sitting?.minutes != null && sitting.minutes > 0) setMinutes(String(sitting.minutes));
     // Only when it opens: what is memorized changes as it adds.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, range]);
+  }, [visible, range, pageBounds]);
   const suggestion = memorizeSuggestion(
     readings.flatMap((r) => r.pages),
     memorized,
@@ -127,12 +142,12 @@ export function AddMemorizedSheet({
     readAt != null && Number.isFinite(readAt) ? `read ${partOfDay(readAt, dayName === 'today')}` : `read ${dayName}`,
   ].join(' · ');
 
-  const pageRange = parsePageRange(from, to);
-  const pageNumbers = usedReading ?? pageRange ?? [];
+  const pageRange = useMemo(() => Array.from({ length: Math.max(0, toPage - fromPage + 1) }, (_, i) => fromPage + i), [fromPage, toPage]);
+  const pageNumbers = usedReading ?? pageRange;
   const minutesValue = minutes.trim() === '' ? null : Number(minutes);
   const minutesOk = minutesValue === null || (Number.isInteger(minutesValue) && minutesValue >= 0);
   const ayahs = useMemo(() => ayahsBetween(fromAyah, toAyah), [fromAyah, toAyah]);
-  const canAdd = (what === 'ayahs' ? ayahs.length > 0 : pageRange != null) && minutesOk && !saving && !!user;
+  const canAdd = (what === 'ayahs' ? ayahs.length > 0 : pageNumbers.length > 0) && minutesOk && !saving && !!user;
   // How much is memorized now, and after adding (MEM-2): "50.3% → 50.6% of the Quran".
   const shareNow = useMemo(() => memorizedPageShare(pages ?? []), [pages]);
   const shareAfter = useMemo(
@@ -142,8 +157,7 @@ export function AddMemorizedSheet({
 
   const useReading = () => {
     if (usedReading) {
-      setFrom('');
-      setTo('');
+      openPages();
       setUsedReading(null);
       return;
     }
@@ -153,13 +167,13 @@ export function AddMemorizedSheet({
     setWhat('ayahs');
     setFromAyah(read.find((k) => !memorizedNow.has(k)) ?? read[0]);
     setToAyah(read[read.length - 1]);
-    setFrom(String(suggestion[0]));
-    setTo(String(suggestion[suggestion.length - 1]));
+    setFromPage(suggestion[0]);
+    setToPage(suggestion[suggestion.length - 1]);
     setUsedReading(suggestion);
   };
 
   const handleAdd = async () => {
-    if (!user || (what === 'ayahs' ? ayahs.length === 0 : !pageRange)) return;
+    if (!user || (what === 'ayahs' ? ayahs.length === 0 : pageNumbers.length === 0)) return;
     setSaving(true);
     try {
       // Memorized on the day it is added to: now for today, that day (at noon, its own date in any
@@ -206,8 +220,6 @@ export function AddMemorizedSheet({
         at: Date.now(),
         ...(minutesValue != null && minutesValue > 0 ? { minutes: minutesValue } : {}),
       });
-      setFrom('');
-      setTo('');
       setMinutes('');
       setUsedReading(null);
       setWhat('ayahs');
@@ -281,28 +293,27 @@ export function AddMemorizedSheet({
             </Text>
           </View>
         ) : (
-        <View style={styles.fields}>
-          <PageRangeFields
-            from={from}
-            to={to}
-            onFrom={(v) => {
-              setUsedReading(null);
-              setFrom(v);
-            }}
-            onTo={(v) => {
-              setUsedReading(null);
-              setTo(v);
-            }}
-            placeholders
-            testIDs={{ from: 'add-memorized-from', to: 'add-memorized-to' }}
-          />
-        </View>
+          <View style={styles.fields}>
+            <PageRangeFields
+              from={fromPage}
+              to={toPage}
+              lo={pageBounds.lo}
+              hi={pageBounds.hi}
+              onFrom={(p) => {
+                setUsedReading(null);
+                setFromPage(p);
+              }}
+              onTo={(p) => {
+                setUsedReading(null);
+                setToPage(p);
+              }}
+              testIDs={{ from: 'add-memorized-from', to: 'add-memorized-to' }}
+            />
+            <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]} testID="add-memorized-pages">
+              {`${describePassage(pageNumbers, { form: 'compact' })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
+            </Text>
+          </View>
         )}
-        {what !== 'ayahs' && pageRange ? (
-          <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]}>
-            {`${describePassage(pageNumbers, { form: 'compact' })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
-          </Text>
-        ) : null}
 
         <FormLabel text="MINUTES" />
         <MinutesField value={minutes} onChange={setMinutes} testID="add-memorized-minutes" />
@@ -331,8 +342,10 @@ export function AddMemorizedSheet({
           setWhat((w) => (w === 'surah' ? 'pages' : w));
         }}
         onUse={(r) => {
-          setFrom(String(r.from));
-          setTo(String(r.to));
+          // A surah's or juz's pages, inside the sitting's when opened from one.
+          const clamp = (p: number) => Math.min(pageBounds.hi, Math.max(pageBounds.lo, p));
+          setFromPage(clamp(r.from));
+          setToPage(Math.max(clamp(r.from), clamp(r.to)));
           setUsedReading(null);
         }}
       />

@@ -295,7 +295,10 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   that are memorized and not revised for it yet, each ticked; untick the ones not done, and Add logs the
   rest for that day by hand, with no strength and no minutes. A page already revised for the day is never
   offered again; with none left it says so. Memorized opens its own sheet: From and To, or a surah, and
-  optional minutes. Add marks the pages memorized (the composer's two writes) and records a Memorized item
+  optional minutes. From and To are rows that open wheels, the same on its Ayahs and Whole pages tabs
+  (Majd, Nov 8 2026): a surah and an ayah wheel, or one wheel of pages whose rows name the surah each page
+  starts in ("542 · Al-Mujadila"). To is never before From, and each opens on the first ayah or page not
+  yet memorized. Under them, the passage in words and how many ayahs or pages. Add marks the pages memorized (the composer's two writes) and records a Memorized item
   for that day, dated that day; its minutes join the day's item once (an add sent again adds none). "From
   your reading" offers the pages read that day that are not memorized yet. Note opens its own sheet: its
   text, and an optional "Show under" choice of the day's Revised, Memorized or Read item (the note's tag).
@@ -690,7 +693,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **MEM-5.** On a day in Activity (testers), a sitting from the reader whose pages aren't all memorized
   offers Add to memorized. The Memorized sheet opens on Ayahs, From and To never outside the pages the
   sitting held. From starts at the first ayah not yet memorized there, To at the end of those pages, and
-  the sitting's minutes come with it. Whole pages and Surah are its other tabs.
+  the sitting's minutes come with it. Whole pages and Surah are its other tabs; Whole pages keeps to the
+  sitting's pages too, from the first not yet memorized to its last.
   - After adding, the sitting stands under Memorized. The block counts in ayahs when part of a page was
     memorized ("20 ayahs"), and says what finishes the page ("Al-Mulk 21–26 finishes the page").
   - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).

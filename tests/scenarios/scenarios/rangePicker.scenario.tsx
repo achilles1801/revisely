@@ -9,6 +9,7 @@ import { markPreviewTester } from '../harness/admin';
 import { ActivityDayView, Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
 import { parentFlexDirection } from '../../../jest/scrollable';
+import { plainText } from '../../../src/lib/passages';
 
 const TODAY = '2026-11-03';
 
@@ -42,6 +43,9 @@ async function openSheet(app: OpenApp, row: 'memorized'): Promise<void> {
   await app.until(() => app.screen.queryByTestId(`add-${row}-sheet`) != null, `the ${row} sheet`);
 }
 
+/** What the Whole pages tab's From or To row says (its words for VoiceOver). */
+const says = (app: OpenApp, which: 'from' | 'to'): string => plainText(app.screen.getByTestId(`add-memorized-${which}`).props.accessibilityLabel);
+
 /** The wheel shows: it shares a row, where `flex: 1` gives it the width and its own height. */
 function expectWheelShown(app: OpenApp): void {
   expect(parentFlexDirection(app.screen.getByTestId('range-wheel') as never)).toBe('row');
@@ -56,8 +60,8 @@ describe('the Memorized sheet’s Surah / Juz picker (ACT-5)', () => {
     expectWheelShown(app);
     await press(app, 'range-wheel-surah-67');
     await press(app, 'range-use');
-    await app.until(() => app.screen.getByTestId('add-memorized-from').props.value === '562', 'From to be 562');
-    expect(app.screen.getByTestId('add-memorized-to').props.value).toBe('564');
+    await app.until(() => says(app, 'from') === 'From, Page 562 · Al-Mulk', 'From to be 562');
+    expect(says(app, 'to')).toBe('To, Page 564 · Al-Mulk');
     await app.close();
   });
 
@@ -70,8 +74,8 @@ describe('the Memorized sheet’s Surah / Juz picker (ACT-5)', () => {
     expectWheelShown(app);
     await press(app, 'range-wheel-juz-2');
     await press(app, 'range-use');
-    await app.until(() => app.screen.getByTestId('add-memorized-from').props.value === '22', 'From to be 22');
-    expect(app.screen.getByTestId('add-memorized-to').props.value).toBe('41');
+    await app.until(() => says(app, 'from') === 'From, Page 22 · Al-Baqarah', 'From to be 22');
+    expect(says(app, 'to')).toBe('To, Page 41 · Al-Baqarah');
     await app.close();
   });
 });

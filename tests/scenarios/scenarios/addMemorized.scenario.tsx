@@ -1,5 +1,6 @@
 // The Memorized add sheet (ACT-5): From and To (or a surah) mark those pages memorized, and record
-// a Memorized item for today: the same two writes the composer makes.
+// a Memorized item for today: the same two writes the composer makes. Whole pages picks From and To
+// on a wheel of pages, as the Ayahs tab does with its surah and ayah wheels.
 import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { plainText } from '../../../src/lib/passages';
@@ -40,6 +41,15 @@ function flatText(el: { props: { children?: unknown } }): string {
   return walk(el.props.children);
 }
 
+/** Whole pages: `which` row's wheel (opened if it isn't), then the row for `page`. */
+function pickPage(screen: ReturnType<typeof render>, which: 'from' | 'to', page: number) {
+  if (!screen.queryByTestId(`add-memorized-${which}-picker`)) fireEvent.press(screen.getByTestId(`add-memorized-${which}`));
+  fireEvent.press(screen.getByTestId(`add-memorized-${which}-picker-page-${page}`));
+}
+
+/** What a From or To row says, as VoiceOver reads it. */
+const rowSays = (screen: ReturnType<typeof render>, which: 'from' | 'to') => plainText(screen.getByTestId(`add-memorized-${which}`).props.accessibilityLabel);
+
 async function flush() {
   for (let i = 0; i < 5; i++) {
     await act(async () => {
@@ -58,8 +68,8 @@ describe('Memorized add sheet (ACT-5)', () => {
     const screen = render(<AddMemorizedSheet visible onClose={jest.fn()} day="2026-11-03" />);
     // It opens on Ayahs (MEM-1); pages are the Whole pages tab.
     fireEvent.press(screen.getByTestId('add-memorized-tab-pages'));
-    fireEvent.changeText(screen.getByTestId('add-memorized-from'), '21');
-    fireEvent.changeText(screen.getByTestId('add-memorized-to'), '25');
+    pickPage(screen, 'from', 21);
+    pickPage(screen, 'to', 25);
     fireEvent.press(screen.getByTestId('sheet-right'));
     await flush();
     expect(queueChange).toHaveBeenCalledWith({ kind: 'memorization.mark', day: '2026-11-03', pages: [21, 22, 23, 24, 25], at: expect.any(Number) });
@@ -72,8 +82,8 @@ describe('Memorized add sheet (ACT-5)', () => {
     const screen = render(<AddMemorizedSheet visible onClose={jest.fn()} day="2026-11-03" />);
     // It opens on Ayahs (MEM-1); pages are the Whole pages tab.
     fireEvent.press(screen.getByTestId('add-memorized-tab-pages'));
-    fireEvent.changeText(screen.getByTestId('add-memorized-from'), '1');
-    fireEvent.changeText(screen.getByTestId('add-memorized-to'), '3');
+    pickPage(screen, 'from', 1);
+    pickPage(screen, 'to', 3);
     fireEvent.press(screen.getByTestId('sheet-right'));
     await flush();
     expect(mockUpdatePages).not.toHaveBeenCalled();
@@ -84,12 +94,51 @@ describe('Memorized add sheet (ACT-5)', () => {
     const screen = render(<AddMemorizedSheet visible onClose={jest.fn()} day="2026-11-03" />);
     // It opens on Ayahs (MEM-1); pages are the Whole pages tab.
     fireEvent.press(screen.getByTestId('add-memorized-tab-pages'));
-    fireEvent.changeText(screen.getByTestId('add-memorized-from'), '562');
-    fireEvent.changeText(screen.getByTestId('add-memorized-to'), '562');
+    pickPage(screen, 'from', 562);
+    pickPage(screen, 'to', 562);
     fireEvent.changeText(screen.getByTestId('add-memorized-minutes'), '25');
     fireEvent.press(screen.getByTestId('sheet-right'));
     await flush();
     expect(queueChange).toHaveBeenCalledWith({ kind: 'memorization.mark', day: '2026-11-03', pages: [562], at: expect.any(Number), minutes: 25 });
+  });
+
+  it('[ACT-5] Whole pages opens on the first page not yet memorized; its wheel names each page’s surah, and To is never before From', async () => {
+    const screen = render(<AddMemorizedSheet visible onClose={jest.fn()} day="2026-11-03" />);
+    await flush();
+    fireEvent.press(screen.getByTestId('add-memorized-tab-pages'));
+    // Pages 1 to 3 are memorized: it opens on page 4, one page.
+    expect(rowSays(screen, 'from')).toBe('From, Page 4 · Al-Baqarah');
+    expect(rowSays(screen, 'to')).toBe('To, Page 4 · Al-Baqarah');
+    expect(plainText(flatText(screen.getByTestId('add-memorized-pages')))).toBe('Al-Baqarah 17–24 · 1 page');
+    // The wheel's rows: the page, then the surah it starts in.
+    fireEvent.press(screen.getByTestId('add-memorized-from'));
+    expect(plainText(flatText(screen.getByTestId('add-memorized-from-picker-page-542')))).toBe('542 · Al-Mujadila');
+    // From past To takes To with it.
+    pickPage(screen, 'from', 562);
+    expect(rowSays(screen, 'to')).toBe('To, Page 562 · Al-Mulk');
+    // To's wheel starts at From: no page before it.
+    fireEvent.press(screen.getByTestId('add-memorized-to'));
+    expect(screen.queryByTestId('add-memorized-to-picker-page-561')).toBeNull();
+    expect(screen.getByTestId('add-memorized-to-picker-page-562')).toBeTruthy();
+    pickPage(screen, 'to', 564);
+    expect(plainText(flatText(screen.getByTestId('add-memorized-pages')))).toBe('Al-Mulk to Al-Qalam 15 · 3 pages');
+  });
+
+  it('[MEM-5] from a sitting, Whole pages keeps to the pages it held', async () => {
+    const screen = render(<AddMemorizedSheet visible onClose={jest.fn()} day="2026-11-03" sitting={{ pages: [562, 563], minutes: 41 }} />);
+    await flush();
+    fireEvent.press(screen.getByTestId('add-memorized-tab-pages'));
+    // From the first page not memorized there to the sitting's last page.
+    expect(rowSays(screen, 'from')).toBe('From, Page 562 · Al-Mulk');
+    expect(rowSays(screen, 'to')).toBe('To, Page 563 · Al-Mulk');
+    fireEvent.press(screen.getByTestId('add-memorized-from'));
+    expect(screen.queryByTestId('add-memorized-from-picker-page-561')).toBeNull();
+    expect(screen.queryByTestId('add-memorized-from-picker-page-564')).toBeNull();
+    pickPage(screen, 'from', 563);
+    expect(rowSays(screen, 'to')).toBe('To, Page 563 · Al-Mulk');
+    fireEvent.press(screen.getByTestId('sheet-right'));
+    await flush();
+    expect(queueChange).toHaveBeenCalledWith({ kind: 'memorization.mark', day: '2026-11-03', pages: [563], at: expect.any(Number), minutes: 41 });
   });
 
   it('[MEM-1] from a sitting it opens on Ayahs inside the pages it held; To set to where it stopped adds a page and the top of the next', async () => {

@@ -1,17 +1,14 @@
-// From and To, as ayahs (MEM-1): two rows, each opening a surah wheel and an ayah wheel (the
-// wheels Audio Options uses), never outside `lo`–`hi` and To never before From. The Memorized
-// sheet's Ayahs tab; from a sitting, `lo`–`hi` are the pages it held.
+// From and To, as ayahs (MEM-1): two rows (RangeFields), each opening a surah wheel and an ayah
+// wheel (the wheels Audio Options uses), never outside `lo`–`hi` and To never before From. The
+// Memorized sheet's Ayahs tab; from a sitting, `lo`–`hi` are the pages it held.
 
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../context/ThemeContext';
+import React, { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { AyahKey, ayahCount, ayahKey, ayahOf, suraOf } from '../../lib/ayahKeys';
 import { placeOfAyah } from '../../lib/passages';
 import { getSurahDisplay } from '../../lib/quranData';
-import { layoutV2, typeV2 } from '../../theme/v2';
-import { Tap } from '../v2/Tap';
 import { WheelItem, WheelPicker } from '../v2/WheelPicker';
+import { RangeFields, type RangeWheelProps } from './RangeFields';
 
 /** The surahs from `lo`'s to `hi`'s, and for one of them the ayahs inside `lo`–`hi`. */
 function bounds(lo: AyahKey, hi: AyahKey, sura: number): { first: number; last: number } {
@@ -23,7 +20,7 @@ function bounds(lo: AyahKey, hi: AyahKey, sura: number): { first: number; last: 
 /** "Al-Mulk, ayah 20". */
 export const ayahLabel = (key: AyahKey) => (ayahOf(key) === 1 ? `${placeOfAyah(key)}, ayah 1` : placeOfAyah(key));
 
-function AyahWheels({ value, lo, hi, onChange, testID }: { value: AyahKey; lo: AyahKey; hi: AyahKey; onChange: (k: AyahKey) => void; testID: string }) {
+function AyahWheels({ value, lo, hi, onChange, testID }: RangeWheelProps) {
   const firstSura = suraOf(lo);
   const lastSura = suraOf(hi);
   const sura = suraOf(value);
@@ -77,50 +74,9 @@ export function AyahRangeFields({
   onTo: (k: AyahKey) => void;
   testIDs: { from: string; to: string };
 }) {
-  const { palette } = useTheme();
-  const [open, setOpen] = useState<'from' | 'to' | null>(null);
-  const row = (which: 'from' | 'to', title: string, value: AyahKey, testID: string) => (
-    <Tap
-      onPress={() => setOpen((o) => (o === which ? null : which))}
-      accessibilityRole="button"
-      accessibilityLabel={`${title}, ${ayahLabel(value)}`}
-      accessibilityHint="Shows a picker"
-      style={styles.row}
-      testID={testID}
-    >
-      <Text style={[typeV2.body, styles.title, { color: palette.text }]}>{title}</Text>
-      <Text style={[typeV2.body, { color: open === which ? palette.text : palette.secondary }]} numberOfLines={1}>
-        {ayahLabel(value)}
-      </Text>
-      <Ionicons name={open === which ? 'chevron-down' : 'chevron-forward'} size={16} color={palette.secondary} />
-    </Tap>
-  );
-  const rule = <View style={[styles.rule, { backgroundColor: palette.separator }]} />;
-  return (
-    <View>
-      {row('from', 'From', from, testIDs.from)}
-      {open === 'from' ? (
-        <AyahWheels
-          value={from}
-          lo={lo}
-          hi={hi}
-          onChange={(k) => {
-            onFrom(k);
-            if (k > to) onTo(k);
-          }}
-          testID={`${testIDs.from}-picker`}
-        />
-      ) : null}
-      {rule}
-      {row('to', 'To', to, testIDs.to)}
-      {open === 'to' ? <AyahWheels value={to} lo={from} hi={hi} onChange={onTo} testID={`${testIDs.to}-picker`} /> : null}
-    </View>
-  );
+  return <RangeFields from={from} to={to} lo={lo} hi={hi} onFrom={onFrom} onTo={onTo} label={ayahLabel} Wheels={AyahWheels} testIDs={testIDs} />;
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 50, gap: 8 },
-  title: { flex: 1 },
-  rule: { height: layoutV2.hairline },
   wheels: { flexDirection: 'row', gap: 8, marginVertical: 4 },
 });
