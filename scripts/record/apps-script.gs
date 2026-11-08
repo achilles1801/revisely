@@ -10,17 +10,22 @@
  *   "Revisely recordings (private)"        one folder per code (P01, P02 …), the takes and a consent
  *                                         and profile file each. No names anywhere in it.
  *   "Revisely recording codes (private)"  a sheet, outside that folder: each code, its personal link,
- *                                         and a Name column only you fill in. Delete a row to close a link.
+ *                                         and a Name column only you see. Delete a row to close a link.
+ *                                         Its "Group link" tab holds one link anyone can join with: each
+ *                                         person who opens it gets a new code (a new row) and types their
+ *                                         name, which goes only into this sheet.
  */
 
 var FOLDER_NAME = 'Revisely recordings (private)';
 var SHEET_NAME = 'Revisely recording codes (private)';
 var LINK = 'https://revisely.app/record/#k=';
+var GROUP_LINK = 'https://revisely.app/record/#g=';
+var MAX_ROWS = 400; // a group link can't add more people than this
 var CODES = 40; // P01–P40, plus P00 for testing
 var MAX_BYTES = 25 * 1024 * 1024;
 var TYPES = { 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/webm': 'webm', 'audio/ogg': 'ogg' };
 
-/** Run once from the editor: makes the folder and the codes sheet, and logs their links. */
+/** Run from the editor (again after updating the script): makes what's missing and logs the links. */
 function setup() {
   var props = PropertiesService.getScriptProperties();
   if (!props.getProperty('FOLDER_ID')) {
@@ -39,8 +44,21 @@ function setup() {
     sheet.autoResizeColumns(1, 4);
     props.setProperty('SHEET_ID', ss.getId());
   }
+  if (!props.getProperty('GROUP_KEY')) {
+    props.setProperty('GROUP_KEY', Utilities.getUuid().replace(/-/g, '').slice(0, 16));
+  }
+  var group = GROUP_LINK + props.getProperty('GROUP_KEY');
+  var book = SpreadsheetApp.openById(props.getProperty('SHEET_ID'));
+  var tab = book.getSheetByName('Group link') || book.insertSheet('Group link', 1);
+  tab.getRange(1, 1, 3, 1).setValues([
+    ['One link for everyone (a group chat): each person who opens it gets their own code on the first tab.'],
+    [group],
+    ['To stop it working, delete GROUP_KEY in the script\'s Project Settings > Script properties.'],
+  ]);
+  tab.autoResizeColumns(1, 1);
   Logger.log('Recordings folder: ' + DriveApp.getFolderById(props.getProperty('FOLDER_ID')).getUrl());
-  Logger.log('Codes sheet: ' + SpreadsheetApp.openById(props.getProperty('SHEET_ID')).getUrl());
+  Logger.log('Codes sheet: ' + book.getUrl());
+  Logger.log('Group link (share this one): ' + group);
 }
 
 function doGet(e) {
@@ -55,6 +73,7 @@ function doGet(e) {
 function doPost(e) {
   return handle_(function () {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (body.op === 'join') return join_(body);
     var pid = check_(body.k);
     var folder = folderOf_(pid);
     var now = new Date().toISOString();
@@ -96,6 +115,38 @@ function handle_(fn) {
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
+/** Someone opened the group link: a new row with a new code, and their name in it. */
+function join_(body) {
+  var key = PropertiesService.getScriptProperties().getProperty('GROUP_KEY');
+  if (!key || String(body.g || '') !== key) throw new Error('bad_group');
+  var name = String(body.name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (name.length < 2) throw new Error('bad_name');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var sheet = codesSheet_();
+    var last = sheet.getLastRow();
+    if (last > MAX_ROWS) throw new Error('full');
+    var codes = last > 1 ? sheet.getRange(2, 1, last - 1, 1).getValues() : [];
+    var n = 0;
+    codes.forEach(function (r) {
+      var m = /^P(\d+)-/.exec(String(r[0]));
+      if (m) n = Math.max(n, Number(m[1]));
+    });
+    n += 1;
+    var code = 'P' + (n < 10 ? '0' : '') + n + '-' + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+    sheet.appendRow([code, LINK + code, name, 'Joined ' + new Date().toISOString().slice(0, 10) + ' with the group link']);
+    CacheService.getScriptCache().remove('codes');
+    return { ok: true, code: code };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function codesSheet_() {
+  return SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID')).getSheets()[0];
+}
+
 /** The code must be a row of the codes sheet; returns its participant id (P07). */
 function check_(code) {
   code = String(code || '');
@@ -103,7 +154,7 @@ function check_(code) {
   var cache = CacheService.getScriptCache();
   var list = cache.get('codes');
   if (!list) {
-    var sheet = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID')).getSheets()[0];
+    var sheet = codesSheet_();
     var values = sheet.getRange(2, 1, Math.max(sheet.getLastRow() - 1, 1), 1).getValues();
     list = values.map(function (r) { return String(r[0]).trim(); }).filter(String).join('\n');
     cache.put('codes', list, 300);
