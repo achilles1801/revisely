@@ -2,7 +2,7 @@
 // or more while it ran, over any order of page turns, pauses and resumes.
 
 import fc from 'fast-check';
-import { HELD_MS, notePageOnScreen, pagesHeld, pageTimesAt, pauseTimer, resumeTimer, startTimer } from '../../../src/lib/readingTimer';
+import { HELD_MS, notePageOnScreen, pagesHeld, pageTimesAt, pauseTimer, readingSessionFromTimer, resumeTimer, startTimer } from '../../../src/lib/readingTimer';
 import { runs } from './fixtures';
 
 type Step = { kind: 'page'; page: number; after: number } | { kind: 'pause'; after: number } | { kind: 'resume'; after: number };
@@ -14,7 +14,7 @@ const stepArb: fc.Arbitrary<Step> = fc.oneof(
 );
 
 describe('a sitting in the reader (REC-1)', () => {
-  it('[REC-1] names the pages on screen a minute or more, never one glanced at, and counts no paused time', () => {
+  it('[REC-1] [REC-2] names the pages on screen a minute or more, never one glanced at, counts no paused time, and saves them', () => {
     fc.assert(
       fc.property(fc.array(stepArb, { maxLength: 40 }), fc.integer({ min: 0, max: 3 * 60_000 }), (steps, tail) => {
         let now = 0;
@@ -50,6 +50,8 @@ describe('a sitting in the reader (REC-1)', () => {
         if (Object.keys(times).length > 0) {
           expect(held).toEqual(t.pagesVisited.filter((p) => (mine.get(p) ?? 0) >= HELD_MS));
         }
+        // [REC-2] saved with exactly the pages it held.
+        expect(readingSessionFromTimer(t, now, { pagesHeld: true }).pages).toEqual(held);
       }),
       { numRuns: runs(300) },
     );

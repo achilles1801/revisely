@@ -91,14 +91,16 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
     else AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
   }, []);
 
+  // A sitting in the reader is saved with the pages it held (REC-2, testers).
+  const holdPages = user?.previewTester === true;
   const save = useCallback(async (t: ActiveReadingTimer, now: number) => {
-    const session = readingSessionFromTimer(t, now);
+    const session = readingSessionFromTimer(t, now, { pagesHeld: holdPages });
     const { durationSeconds } = session;
     if (durationSeconds < MIN_SESSION_SECONDS) return null;
     // Saved on the phone at once; it reaches the server when it can.
     await queueChange({ kind: 'reading.add', id: autoId(), session });
     return durationSeconds;
-  }, []);
+  }, [holdPages]);
 
   const finish = useCallback(async () => {
     const t = timerRef.current;

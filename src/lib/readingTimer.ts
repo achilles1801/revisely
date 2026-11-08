@@ -155,7 +155,9 @@ export function noteRevisedPages(timer: ActiveReadingTimer, pages: number[]): Ac
 export function readingSessionFromTimer(
   timer: ActiveReadingTimer,
   now: number,
+  opts: { pagesHeld?: boolean } = {},
 ): Omit<ReadingSession, 'id'> {
+  const revised = timer.pagesRevised ?? [];
   return {
     date: timer.date,
     startedAt: timer.startedAt,
@@ -163,9 +165,10 @@ export function readingSessionFromTimer(
     durationSeconds: Math.round(elapsedMs(timer, now) / 1000),
     mode: timer.mode,
     targetSeconds: timer.targetSeconds,
-    // Pages marked revised while it ran are known; reading pages are
-    // assigned afterwards from the day in Activity.
-    pages: timer.pagesRevised ?? [],
+    // Pages marked revised while it ran are known. A sitting in the reader is saved with the pages
+    // it held (REC-2, testers: `pagesHeld`); otherwise reading pages are assigned afterwards from
+    // the day in Activity.
+    pages: revised.length > 0 ? revised : opts.pagesHeld ? pagesHeld(timer, now) : [],
     pagesVisited: timer.pagesVisited,
   };
 }

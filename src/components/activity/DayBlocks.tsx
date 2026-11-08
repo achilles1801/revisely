@@ -79,6 +79,9 @@ export const timeRange = (start: number | null | undefined, minutes: number | nu
   return a && b && a[1] === b[1] ? `${from.replace(period, '')} – ${to}` : `${from} – ${to}`;
 };
 
+/** A timed sitting by what it held: "Al-Mulk, ayahs 1–26" (REC-2); "Timed in Read" with no pages. */
+const sittingName = (pages: number[]) => (pages.length > 0 ? describePassage(pages) : 'Timed in Read');
+
 /** "1 page", "18 pages". */
 const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
 /** The surahs the pages fall in ("Al-Mulk 1–12"), or nothing. */
@@ -338,9 +341,10 @@ export function DayBlocks({
       const last = idx === readItems.items.length - 1;
       return (
         <View key={i.id}>
-          <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel="Timed in Read. Edit pages">
+          <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`${sittingName(i.pages)}. Edit pages`}>
             <ItemLine icon="stopwatch-outline" right={timeRange(i.occurredAt, i.minutes)}>
-              <Text style={[typeV2.body, { color: palette.text }]}>Timed in Read</Text>
+              {/* What the sitting held, by surah and ayah (REC-2), or "Timed in Read" when no pages are known. */}
+              <Text style={[typeV2.body, { color: palette.text }]}>{sittingName(i.pages)}</Text>
             </ItemLine>
           </Tap>
           {/* Its recording hangs under it, with no line of its own. */}

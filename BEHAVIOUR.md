@@ -221,6 +221,10 @@ How the tests are made: `tests/scenarios/README.md`.
   place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
   it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
   named. Stopping only the recording leaves the timer running.
+- **REC-2.** A sitting in the reader (testers) is saved with the pages it held, so the Day's Read block
+  counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
+  Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
+  pages known reads "Timed in Read".
 
 ## Activity
 
