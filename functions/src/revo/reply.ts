@@ -5,7 +5,7 @@
  * its own text, and nothing else (a reply cut off mid-object keeps its text when it arrived whole).
  */
 import { screenFromText } from './screenText';
-import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TIMELINE_DAYS, RevoAction, RevoChart, RevoNewChart, RevoReplyParts } from './types';
+import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TIMELINE_DAYS, REVO_WEEKS, RevoAction, RevoChart, RevoNewChart, RevoReplyParts } from './types';
 
 export const MAX_TEXT = 1500;
 export const MAX_TEXT_AFTER = 300;
@@ -70,6 +70,7 @@ export function checkNewChart(v: unknown): RevoNewChart | null {
     if (surah !== null) return wholeIn(surah, 1, 114) ? { kind: 'timeline', title, surah, days } : null;
     return wholeIn(juz, 1, 30) ? { kind: 'timeline', title, juz, days } : null;
   }
+  if (v.kind === 'weeks') return wholeIn(v.weeks, REVO_WEEKS.min, REVO_WEEKS.max) ? { kind: 'weeks', title, weeks: v.weeks } : null;
   return null;
 }
 

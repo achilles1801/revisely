@@ -12,6 +12,8 @@ import { DailyPagesChart } from '../charts/DailyPagesChart';
 import { JuzMapChart } from '../charts/JuzMapChart';
 import { PageRatingsChart } from '../charts/PageRatingsChart';
 import { TimelineChart } from '../charts/TimelineChart';
+import { WeeksChart } from '../charts/WeeksChart';
+import type { RevoDayFacts } from '../../../lib/revo/types';
 import { ChartCard } from '../RevoCards';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -307,6 +309,60 @@ describe('timeline', () => {
     expect(text('revo-chart-timeline-line')).toBe('Not revised in 30 days');
     fireEvent(screen.getByTestId('revo-chart-timeline-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     expect(text('revo-chart-timeline-title')).toBe('End of An-Naba');
+  });
+});
+
+describe('weeks grid', () => {
+  // Saturday Nov 7; the first session Nov 1. Sunday done, Monday in part, Tuesday missed.
+  const facts = (day: string): RevoDayFacts | null => {
+    const plan = { '2026-11-01': [2, 0, true], '2026-11-02': [2, 1, false], '2026-11-03': [2, 2, false] }[day] as [number, number, boolean] | undefined;
+    return {
+      daysAgo: 0,
+      plan: plan ? { pages: plan[0], carried: 0, onDay: plan[0] - plan[1], ahead: 0, late: 0, notDone: plan[1], done: plan[2] } : null,
+      revised: { pages: 0, forLater: 0, forEarlier: 0 },
+      minutes: day === '2026-11-01' ? 20 : null,
+      readMinutes: null,
+      memorized: { pages: 0 },
+      ratings: { weak: 0, moderate: 0, strong: 0, weakPages: [] },
+      recordings: null,
+      notes: null,
+    };
+  };
+  const onOpenDay = jest.fn();
+  const grid = () => mount(<WeeksChart title="Since 1 November" weeks={4} today={TODAY} logs={logs} facts={facts} onOpenDay={onOpenDay} />, 'revo-chart-weeks');
+
+  it('a weekday’s letter picks its column: how many were missed, and which', async () => {
+    await grid();
+    expect(screen.getAllByTestId('revo-chart-week-day')).toHaveLength(28);
+    fireEvent.press(screen.getByTestId('revo-chart-weeks-col-2'));
+    expect(text('revo-chart-weeks-title')).toBe('Tuesdays · 1 missed of 1');
+    expect(text('revo-chart-weeks-line')).toBe('Missed 3 Nov');
+    expect(screen.getByLabelText('Tuesdays').props.accessibilityState).toEqual({ selected: true });
+    fireEvent.press(screen.getByTestId('revo-chart-weeks-col-2'));
+    expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
+  });
+
+  it('a cell picks its day, with that day in Activity; days before the first session can’t be picked', async () => {
+    await grid();
+    layout('revo-chart-weeks-plot', 370, 100);
+    // Sunday of the last row: x past the month column, y in the fourth row.
+    tap('revo-chart-weeks-plot-tap', 39 + 10, 90);
+    expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
+    expect(text('revo-chart-weeks-line')).toBe('Done · 2 of 2 pages · 20 min');
+    fireEvent.press(screen.getByTestId('revo-chart-weeks-day'));
+    expect(onOpenDay).toHaveBeenCalledWith('2026-11-01');
+    fireEvent.press(screen.getByTestId('revo-chart-weeks-close'));
+    tap('revo-chart-weeks-plot-tap', 39 + 10, 10);
+    expect(text('revo-chart-weeks-title')).toBe('Since 1 November');
+  });
+
+  it('VoiceOver steps through the days from the first session', async () => {
+    await grid();
+    const plot = screen.getByTestId('revo-chart-weeks-plot');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-weeks-title')).toBe('Monday 2 November');
   });
 });
 

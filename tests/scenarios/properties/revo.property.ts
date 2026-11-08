@@ -528,8 +528,13 @@ describe('the reply (REVO-7)', () => {
     const line = parseReply(JSON.stringify({ text: 'Every 12 days.', chart: { kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 } }), allowed, { firstTurn: false })!;
     expect(line.visual).toEqual({ kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 90 });
     expect(parseReply(JSON.stringify({ text: 'x', chart: { kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 });
+    // A weeks grid: 4 to 12 weeks.
+    expect(parseReply(JSON.stringify({ text: 'Saturdays.', chart: { kind: 'weeks', title: 'Since 9 September', weeks: 8 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'weeks', title: 'Since 9 September', weeks: 8 });
     // Anything wrong with it drops the chart and keeps the answer.
     for (const bad of [
+      { kind: 'weeks', title: 'Too few', weeks: 3 },
+      { kind: 'weeks', title: 'Too many', weeks: 13 },
+      { kind: 'weeks', title: 'Half', weeks: 6.5 },
       { kind: 'juzMap' },
       { kind: 'juzMap', title: 'x'.repeat(61) },
       { kind: 'pieChart', title: 'Pie' },

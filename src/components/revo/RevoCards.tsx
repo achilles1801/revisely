@@ -12,6 +12,7 @@ import { DailyPagesChart } from './charts/DailyPagesChart';
 import { JuzMapChart } from './charts/JuzMapChart';
 import { PageRatingsChart } from './charts/PageRatingsChart';
 import { TimelineChart } from './charts/TimelineChart';
+import { WeeksChart } from './charts/WeeksChart';
 
 /** Where a chart's panel can take the user (RevoChat wires them; RevoHost closes Revo first). */
 export interface ChartHandlers {
@@ -47,6 +48,9 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
   }
   if (chart.kind === 'timeline') {
     return <TimelineChart title={chart.title} passage={passage} days={chart.days} today={day} logs={logs} onOpenDay={handlers.onOpenDay} />;
+  }
+  if (chart.kind === 'weeks') {
+    return <WeeksChart title={chart.title} weeks={chart.weeks} today={day} logs={logs} facts={reads?.facts} planned={reads?.planned} onOpenDay={handlers.onOpenDay} />;
   }
   if (chart.kind === 'pageRatings') {
     return <PageRatingsChart title={chart.title} pages={chart.pages} today={day} logs={logs} userPages={pages} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;

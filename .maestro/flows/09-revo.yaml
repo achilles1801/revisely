@@ -268,6 +268,51 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: revo-chart-timeline-day
 
+# The weeks grid (a `visual`): six weeks of days. A tap in the grid picks a day (its middle is a
+# seeded day in October), and its panel opens it in Activity; a weekday's letter picks its column.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Saturdays, mostly.", "chart": {"kind": "weeks", "title": "The last six weeks", "weeks": 6}, "remember": [], "title": "Missed days", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "Which days do I usually miss?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-weeks
+    timeout: 15000
+- tapOn:
+    id: revo-chart-weeks-plot
+- runFlow:
+    when:
+      notVisible:
+        id: revo-chart-weeks-day
+    commands:
+      - tapOn:
+          id: revo-chart-weeks-plot
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-weeks-day
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5g-chart-weeks
+- tapOn:
+    id: revo-chart-weeks-plot
+- assertNotVisible:
+    id: revo-chart-weeks-day
+- tapOn:
+    id: revo-chart-weeks-col-6
+- assertVisible:
+    id: revo-chart-weeks-title
+    text: "Saturdays.*"
+- tapOn:
+    id: revo-chart-weeks-col-6
+
 # Tonight's Day in review, written by the real function (as the app asks for it on a day with
 # something done). The memory holds what the conversation's answer asked to remember.
 - runScript:

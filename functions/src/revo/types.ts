@@ -144,8 +144,11 @@ export type RevoChart = { kind: 'pageRatings'; title: string; pages: number[] } 
 export type RevoNewChart =
   | { kind: 'juzMap'; title: string }
   /** Each revision of one surah or one juz (exactly one of them) over the last `days`. */
-  | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: RevoTimelineDays };
-export const REVO_NEW_CHART_KINDS = ['juzMap', 'timeline'] as const;
+  | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: RevoTimelineDays }
+  /** The last `weeks` weeks (4–12), a day a cell: done, in part or missed. */
+  | { kind: 'weeks'; title: string; weeks: number };
+export const REVO_NEW_CHART_KINDS = ['juzMap', 'timeline', 'weeks'] as const;
+export const REVO_WEEKS = { min: 4, max: 12 } as const;
 export const REVO_TIMELINE_DAYS = [30, 90, 365] as const;
 export type RevoTimelineDays = (typeof REVO_TIMELINE_DAYS)[number];
 export type RevoVisual = RevoChart | RevoNewChart;

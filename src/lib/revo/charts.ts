@@ -8,6 +8,7 @@
 import type { RevisionLog, UserPage } from '../../types';
 import { reviewedOn } from '../aheadCredit';
 import { formatDayLong, formatMinutesLong } from '../activityFormat';
+import { weekStart } from '../activityHeatmap';
 import { lastRevisedByPage } from '../activityInsights';
 import { juzTiles, type JuzTile } from '../insightsView';
 import { shiftDay } from '../journal';
@@ -38,6 +39,7 @@ export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
     const inRange = c.surah != null ? Number.isInteger(c.surah) && c.surah >= 1 && c.surah <= 114 : Number.isInteger(c.juz) && c.juz! >= 1 && c.juz! <= 30;
     return one && inRange && (c.days === 30 || c.days === 90 || c.days === 365);
   }
+  if (c.kind === 'weeks') return Number.isInteger(c.weeks) && c.weeks >= 4 && c.weeks <= 12;
   return false;
 }
 
@@ -397,6 +399,88 @@ export function nearestMark(marks: readonly { at: number }[], x: number, width: 
     }
   });
   return best;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Weeks grid
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A day in the weeks grid: its plan done, done in part, missed, or a day without a plan (rest);
+ * today while it is under way; before the account's first session; or still to come.
+ */
+export type WeekCell = 'done' | 'part' | 'missed' | 'rest' | 'today' | 'before' | 'future';
+
+/**
+ * The last `weeks` weeks, Sunday to Saturday as Activity's calendar has them, a row a week, ending
+ * with this one. `planOf` says how a day's plan went (lib/revo/facts dayFacts).
+ */
+export function weeksData(
+  weeks: number,
+  today: string,
+  first: string | null,
+  planOf: (day: string) => RevoDayFacts['plan'],
+): { day: string; cell: WeekCell }[][] {
+  const top = weekStart(shiftDay(today, -7 * (weeks - 1)));
+  return Array.from({ length: weeks }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const day = shiftDay(top, w * 7 + d);
+      if (day > today) return { day, cell: 'future' as const };
+      if (first == null || day < first) return { day, cell: 'before' as const };
+      const plan = planOf(day);
+      const cell: WeekCell = plan == null ? 'rest' : plan.done ? 'done' : day === today ? 'today' : plan.pages - plan.notDone > 0 ? 'part' : 'missed';
+      return { day, cell };
+    }),
+  );
+}
+
+const counted = (c: WeekCell) => c === 'done' || c === 'part' || c === 'missed';
+
+/** "45 of 50 days revised · tap a day or a weekday": days with a plan, before today. */
+export function weeksHint(rows: readonly { cell: WeekCell }[][]): string {
+  const cells = rows.flat().filter((c) => counted(c.cell));
+  const revised = cells.filter((c) => c.cell !== 'missed').length;
+  return cells.length > 0 ? `${revised} of ${plural(cells.length, 'day')} revised · tap a day or a weekday` : 'Tap a day to see it';
+}
+
+/** "26 Sep, 10, 17 and 24 Oct": days grouped by month, in order. */
+export function daysList(days: readonly string[]): string {
+  const groups: { month: string; dates: number[] }[] = [];
+  for (const day of [...days].sort()) {
+    const date = new Date(`${day}T00:00:00`);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const last = groups[groups.length - 1];
+    if (last && last.month === month) last.dates.push(date.getDate());
+    else groups.push({ month, dates: [date.getDate()] });
+  }
+  const total = groups.reduce((n, g) => n + g.dates.length, 0);
+  let seen = 0;
+  return groups
+    .map((g) => {
+      const parts = g.dates.map((d) => {
+        seen++;
+        return seen === total && total > 1 ? `and ${d}` : String(d);
+      });
+      // "10, 17 and 24": the "and" joins with a space, the rest with commas.
+      const text = parts.reduce((out, p, i) => (i === 0 ? p : p.startsWith('and ') ? `${out} ${p}` : `${out}, ${p}`), '');
+      return `${text} ${g.month}`;
+    })
+    .reduce((out, g, i) => (i === 0 ? g : g.startsWith('and ') ? `${out} ${g}` : `${out}, ${g}`), '');
+}
+
+/** A picked weekday: "Saturdays · 4 missed of 8", "Missed 26 Sep, 10, 17 and 24 Oct · part of 31 Oct". */
+export function weekdayReadout(rows: readonly { day: string; cell: WeekCell }[][], column: number): { title: string; line: string } {
+  const cells = rows.map((r) => r[column]).filter((c) => counted(c.cell));
+  const name = `${new Date(`${rows[0][column].day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}s`;
+  const missed = cells.filter((c) => c.cell === 'missed').map((c) => c.day);
+  const part = cells.filter((c) => c.cell === 'part').map((c) => c.day);
+  const done = cells.filter((c) => c.cell === 'done').length;
+  const title = missed.length > 0 ? `${name} · ${missed.length} missed of ${cells.length}` : `${name} · ${done} of ${cells.length} done`;
+  const parts: string[] = [];
+  if (missed.length > 0) parts.push(`Missed ${daysList(missed)}`);
+  if (part.length > 0) parts.push(`${missed.length > 0 ? 'part' : 'Part'} of ${daysList(part)}`);
+  if (parts.length === 0) parts.push(cells.length > 0 ? 'None missed' : 'No plan on these days');
+  return { title, line: parts.join(' · ') };
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -175,7 +175,9 @@ export type RevoChart =
 export type RevoNewChart =
   | { kind: 'juzMap'; title: string }
   /** Each revision of one surah or one juz (exactly one of them) over the last `days`. */
-  | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: 30 | 90 | 365 };
+  | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: 30 | 90 | 365 }
+  /** The last `weeks` weeks (4–12), a day a cell: done, in part or missed. */
+  | { kind: 'weeks'; title: string; weeks: number };
 export type RevoVisual = RevoChart | RevoNewChart;
 
 /** The screens an `openScreen` action may open (REVO-31); the server has the same list. */

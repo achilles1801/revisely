@@ -9,6 +9,7 @@ import {
   dailyPagesData,
   dayDetail,
   dayMonth,
+  daysList,
   juzMapData,
   juzReadout,
   juzStrip,
@@ -31,6 +32,9 @@ import {
   timelineHint,
   timelineReadout,
   timesWord,
+  weekdayReadout,
+  weeksData,
+  weeksHint,
 } from '../charts';
 import { dayFacts, prepare, type FactSources } from '../facts';
 import type { RevoChart } from '../types';
@@ -97,6 +101,9 @@ describe('knownChart', () => {
     expect(knownChart({ kind: 'timeline', title: 'x', days: 30 })).toBe(false);
     expect(knownChart({ kind: 'timeline', title: 'x', juz: 31, days: 30 })).toBe(false);
     expect(knownChart({ kind: 'timeline', title: 'x', surah: 59, days: 14 } as unknown as RevoChart)).toBe(false);
+    expect(knownChart({ kind: 'weeks', title: 'x', weeks: 8 })).toBe(true);
+    expect(knownChart({ kind: 'weeks', title: 'x', weeks: 13 })).toBe(false);
+    expect(knownChart({ kind: 'weeks', title: 'x', weeks: 4.5 })).toBe(false);
     // A newer server's kind, or a malformed one: no chart (the old app drew an empty bar chart).
     expect(knownChart({ kind: 'weeksAhead', title: 'x' } as unknown as RevoChart)).toBe(false);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 14 } as unknown as RevoChart)).toBe(false);
@@ -289,6 +296,54 @@ describe('timeline', () => {
     expect(nearestMark(marks, 80, 300, 22)).toBeNull();
     expect(nearestMark(marks, 290, 300, 22)).toBe(2);
     expect(nearestMark([], 10, 300)).toBeNull();
+  });
+});
+
+describe('weeks grid', () => {
+  type Plan = NonNullable<ReturnType<typeof dayFacts>['plan']>;
+  const plan = (pages: number, notDone: number, done: boolean): Plan => ({ pages, carried: 0, onDay: pages - notDone, ahead: 0, late: 0, notDone, done });
+  const plans: Record<string, Plan | null> = {
+    '2026-11-01': plan(2, 0, true),
+    '2026-11-02': plan(2, 1, false),
+    '2026-11-03': plan(2, 2, false),
+    '2026-11-04': null,
+    '2026-11-05': plan(2, 0, true),
+    '2026-11-06': plan(2, 0, true),
+    '2026-11-07': plan(2, 2, false),
+  };
+  // Saturday Nov 7: four weeks are Oct 11 to Nov 7, Sunday to Saturday.
+  const rows = weeksData(4, TODAY, '2026-11-01', (d) => plans[d] ?? null);
+
+  it('a row a week, Sunday to Saturday, ending with this one; nothing before the first session', () => {
+    expect(rows.map((r) => r[0].day)).toEqual(['2026-10-11', '2026-10-18', '2026-10-25', '2026-11-01']);
+    expect(rows[0].every((c) => c.cell === 'before')).toBe(true);
+    expect(rows[3].map((c) => c.cell)).toEqual(['done', 'part', 'missed', 'rest', 'done', 'done', 'today']);
+    // Mid-week: the rest of the week is still to come.
+    expect(weeksData(4, '2026-11-04', '2026-11-01', (d) => plans[d] ?? null)[3].slice(4).every((c) => c.cell === 'future')).toBe(true);
+    // From the account's own facts.
+    const prepared = prepare(sources());
+    const real = weeksData(4, TODAY, '2026-11-01', (d) => dayFacts(d, prepared).plan);
+    expect(real[3][0].cell).toBe('done');
+    expect(real[3][2].cell).toBe('missed');
+  });
+
+  it('says how many planned days were revised, and what a tap does', () => {
+    expect(weeksHint(rows)).toBe('4 of 5 days revised · tap a day or a weekday');
+    expect(weeksHint(weeksData(4, TODAY, null, () => null))).toBe('Tap a day to see it');
+  });
+
+  it('a picked weekday: how many were missed, and which', () => {
+    expect(weekdayReadout(rows, 2)).toEqual({ title: 'Tuesdays · 1 missed of 1', line: 'Missed 3 Nov' });
+    expect(weekdayReadout(rows, 1)).toEqual({ title: 'Mondays · 0 of 1 done', line: 'Part of 2 Nov' });
+    expect(weekdayReadout(rows, 0)).toEqual({ title: 'Sundays · 1 of 1 done', line: 'None missed' });
+    expect(weekdayReadout(rows, 3)).toEqual({ title: 'Wednesdays · 0 of 0 done', line: 'No plan on these days' });
+  });
+
+  it('lists days by month, the way a sentence would', () => {
+    expect(daysList(['2026-10-24', '2026-09-26', '2026-10-10', '2026-10-17'])).toBe('26 Sep, 10, 17 and 24 Oct');
+    expect(daysList(['2026-09-26', '2026-10-10'])).toBe('26 Sep and 10 Oct');
+    expect(daysList(['2026-10-10', '2026-10-17'])).toBe('10 and 17 Oct');
+    expect(daysList(['2026-10-31'])).toBe('31 Oct');
   });
 });
 
