@@ -391,6 +391,9 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: t02-picker-dark
+# The picker away (⋯ closes it), so the verse shows.
+- tapOn:
+    id: verse-more
 - runFlow:
     file: ../subflows/verse-link.yaml
     env:
