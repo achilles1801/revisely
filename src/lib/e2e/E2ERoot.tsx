@@ -86,9 +86,10 @@ function VerseOverlay() {
   const { pageOfVerse } = require('../verses') as typeof import('../verses');
   /* eslint-enable @typescript-eslint/no-var-requires */
   return (
-    // The window's insets from the first frame, as the app's own provider has them: without them the
-    // expanded sheet ran up under iOS's status bar (only here; the reader's sheet has the app's).
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+    // Over the whole window, so the provider measures the window's insets: laid out after the app, it
+    // had no height and gave a top inset of 0, and the expanded sheet ran up under iOS's status bar
+    // (only here; the reader's sheet has the app's provider, at the root).
+    <SafeAreaProvider initialMetrics={initialWindowMetrics} style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <DesignProvider>
         <ThemeProvider>
           <VerseSheet
