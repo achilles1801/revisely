@@ -85,7 +85,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'The streak',
-    covers: ['SESS-2', 'SESS-6', 'SESS-7'],
+    covers: ['SESS-2', 'SESS-6', 'SESS-7', 'ACT-15'],
     routes: ['Dashboard'],
     text: lines(
       '- A revision day counts when every page scheduled for it is revised and credited to that day (in its own session, or revised ahead before it came). Home then says Done.',
@@ -139,7 +139,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Activity and the daily log',
-    covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
+    covers: ['DAY-9', 'ACT-1', 'ACT-2', 'ACT-3', 'ACT-5', 'ACT-6', 'ACT-7', 'ACT-11', 'ACT-14', 'LOG-1', 'LOG-2', 'LOG-3', 'LOG-4'],
     routes: ['Activity', 'ActivityDay', 'ActivityAll', 'JournalEntry', 'ListenBack'],
     text: lines(
       '- Activity (Home’s pulse icon, or Settings → Activity → “Activity”): everything done, day by day, on the revision day it was done: sessions, pages revised ahead (listed on the day they were revised), timed readings, recordings, memorized pages and notes.',
@@ -260,6 +260,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
+  'ACCOUNT-3': 'how long Delete account waits for the server; the app says what happened itself',
   'RESET-1': 'the owner’s reset script',
   'ACT-9': 'when a day’s items load',
   'ACT-13': 'an add from the day’s + shows there at once, offline too; nothing to ask (the + itself is in Activity’s section)',
@@ -278,6 +279,8 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'MEM-2': 'a partly memorized page’s share in the %: nothing to ask until ayahs can be saved (MEM-1)',
   'MEM-3': 'taking ayahs off the memorized: nothing to ask until ayahs can be saved (MEM-1)',
   'MEM-4': 'a partly memorized page in the revision cycle: nothing to ask until ayahs can be saved (MEM-1)',
+  'REC-1': 'the reader’s End also stopping its recording, and its one note (testers): nothing to ask',
+  'REC-2': 'a sitting saved with the pages it held, named by them on the Day (testers): nothing to ask',
 };
 
 /** The guide as Revo reads it. */

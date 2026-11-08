@@ -18,6 +18,9 @@ interface TimerChipProps {
   onOpenQuran?: () => void;
   /** Crowded: the clock without its icon. */
   compact?: boolean;
+  /** Passed to the card's controls: how a saved session is told, and what runs before End (REC-1). */
+  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  beforeEnd?: () => Promise<void>;
 }
 
 /**
@@ -26,7 +29,7 @@ interface TimerChipProps {
  * progress for a timed one). Tapping grows it into the timer's card
  * (TimerCard), which shrinks back into it when closed: the chip is the bubble.
  */
-export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
+export function TimerChip({ onOpenQuran, compact, onSaved, beforeEnd }: TimerChipProps) {
   const { palette } = useTheme();
   const { timer } = useReadingTimer();
   const [open, setOpen] = useState(false);
@@ -111,6 +114,8 @@ export function TimerChip({ onOpenQuran, compact }: TimerChipProps) {
         origin={origin}
         onClose={() => setOpen(false)}
         onHidden={() => setAway(false)}
+        onSaved={onSaved}
+        beforeEnd={beforeEnd}
         onOpenQuran={
           onOpenQuran
             ? () => {

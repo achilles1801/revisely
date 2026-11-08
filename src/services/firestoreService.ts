@@ -62,6 +62,7 @@ import { JournalEntry, JournalNote, ReadingSession } from '../types';
 import { journalDayFromEntries, legacyJournalNotes, LEGACY_NOTE_ID } from '../lib/journal';
 import { db, auth } from '../lib/firebase';
 import { logger } from '../lib/logger';
+import { isDeadlineError, withTimeLimit } from '../lib/timeLimit';
 import { memorizedMinutesAfter } from '../lib/activityAdd';
 
 // ============================================================================
@@ -578,10 +579,18 @@ export async function addRevisionItem(item: RevisionItem, userId?: string): Prom
   await setDoc(doc(collection(db, 'users', uid, 'revisions'), item.id), item);
 }
 
+/** Deletes a Revised item added by hand (the day's Revised block, ACT-7). */
+export async function deleteRevisionItem(id: string, userId?: string): Promise<void> {
+  const uid = userId || getCurrentUserId();
+  await deleteDoc(doc(collection(db, 'users', uid, 'revisions'), id));
+}
+
 /**
- * Makes a day's Revised items (users/{uid}/revisions) exactly `items`: each is
- * written, and any other item of that day is deleted (an edit that dropped an
- * ahead credit, or a deleted session). Items of other days are not touched.
+ * Makes a day's session items (users/{uid}/revisions) exactly `items`: each is
+ * written, and any other session item of that day is deleted (an edit that
+ * dropped an ahead credit, or a deleted session). Items added by hand
+ * (source 'manual') are the user's own and stay (ACT-14: a session save deleted
+ * them, Nov 2026). Items of other days are not touched.
  */
 export async function replaceRevisionItems(day: string, items: RevisionItem[], userId?: string): Promise<void> {
   const uid = userId || getCurrentUserId();
@@ -590,7 +599,7 @@ export async function replaceRevisionItems(day: string, items: RevisionItem[], u
   const keep = new Set(items.map((i) => i.id));
   const batch = writeBatch(db);
   for (const item of items) batch.set(doc(itemsRef, item.id), item);
-  for (const d of existing.docs) if (!keep.has(d.id)) batch.delete(d.ref);
+  for (const d of existing.docs) if (!keep.has(d.id) && d.data().source !== 'manual') batch.delete(d.ref);
   await batch.commit();
 }
 
@@ -833,7 +842,8 @@ export async function getActivityItemsForDay(
   userId?: string,
 ): Promise<{
   revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
-  memorized: { id: string; day: string; pages: number[]; minutes?: number | null }[];
+  /** `updatedAt`: when the item last took minutes from an add (ms), so the same add is never counted twice. */
+  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Pages revised in an earlier session, credited to this day ("done ahead"). */
   doneAhead: { fromDay: string; pages: number[] }[];
@@ -858,7 +868,13 @@ export async function getActivityItemsForDay(
         minutes: x.minutes ?? null,
       };
     }),
-    memorized: mem.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null })),
+    memorized: mem.docs.map((d) => ({
+      id: d.id,
+      day: d.data().day,
+      pages: d.data().pages ?? [],
+      minutes: d.data().minutes ?? null,
+      updatedAt: typeof d.data().updatedAt === 'number' ? d.data().updatedAt : null,
+    })),
     reads: read.docs.map((d) => ({ id: d.id, day: d.data().day, pages: d.data().pages ?? [], minutes: d.data().minutes ?? null, occurredAt: d.data().occurredAt ?? null })),
     doneAhead: ahead.docs
       .filter((d) => d.data().day !== day)
@@ -1071,20 +1087,51 @@ export function isDeletingAccount(uid: string | undefined | null): boolean {
   return uid != null && uid === deletingUid;
 }
 
+/**
+ * How long the app waits for deleteUserAccount. It takes a second or two (its
+ * own limit is 60 s); without a limit, an answer lost on the way back kept the
+ * phone on the spinner for good (ACCOUNT-3).
+ */
+export const DELETE_ACCOUNT_TIMEOUT_MS = 30_000;
+/** How long the app waits for Auth to say whether the account still exists. */
+export const ACCOUNT_CHECK_TIMEOUT_MS = 10_000;
+
 export async function deleteAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No signed-in user.');
   deletingUid = user.uid;
   try {
-    await deleteAccountOnServer(user);
+    await callFunction(user, 'deleteUserAccount', {}, { timeoutMs: DELETE_ACCOUNT_TIMEOUT_MS });
   } catch (err) {
+    // The server may have deleted it all the same: its answer lost, or a retry
+    // after it had. The account is gone when Auth no longer knows it.
+    if (await accountGone(user)) return;
     deletingUid = null;
+    if (isDeadlineError(err)) {
+      throw Object.assign(
+        new Error("The server didn't answer in time, so your account may not be deleted. Check your connection and try again."),
+        { code: 'deadline-exceeded' },
+      );
+    }
     throw err;
   }
 }
 
-async function deleteAccountOnServer(user: NonNullable<typeof auth.currentUser>): Promise<void> {
-  await callFunction(user, 'deleteUserAccount', {});
+/**
+ * Whether Auth no longer knows this account. The server deletes the sign-in last,
+ * after everything else, so a sign-in gone means the delete finished. Still
+ * there, or no answer (offline, or not within ACCOUNT_CHECK_TIMEOUT_MS): false.
+ */
+async function accountGone(user: NonNullable<typeof auth.currentUser>): Promise<boolean> {
+  try {
+    await withTimeLimit(user.reload(), ACCOUNT_CHECK_TIMEOUT_MS);
+    return false;
+  } catch (err) {
+    // The JS SDK reports a deleted account (USER_NOT_FOUND from the token and
+    // lookup endpoints) as auth/user-token-expired, and signs the phone out.
+    const code = (err as { code?: unknown } | null)?.code;
+    return code === 'auth/user-token-expired' || code === 'auth/user-not-found';
+  }
 }
 
 // The account whose data is being reset (Settings → Reset my data, testers):
@@ -1148,11 +1195,33 @@ export async function loadTestScenarioOnServer(data: {
   return out.result;
 }
 
-/** Call one of our callable Cloud Functions with the account's ID token and App Check. */
+/**
+ * Call one of our callable Cloud Functions with the account's ID token and App Check.
+ * `timeoutMs` limits the whole call (the fresh token, App Check, the request and its
+ * answer); past it the request is aborted and the call rejects with code
+ * `deadline-exceeded`. Without it, the call waits as long as the network does.
+ */
 export async function callFunction(
   user: NonNullable<typeof auth.currentUser>,
   name: string,
   data: Record<string, unknown>,
+  opts: { timeoutMs?: number } = {},
+): Promise<unknown> {
+  if (!opts.timeoutMs) return callFunctionNow(user, name, data);
+  const controller = new AbortController();
+  return withTimeLimit(
+    callFunctionNow(user, name, data, controller.signal),
+    opts.timeoutMs,
+    `${name} didn't answer in time.`,
+    () => controller.abort(),
+  );
+}
+
+async function callFunctionNow(
+  user: NonNullable<typeof auth.currentUser>,
+  name: string,
+  data: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const idToken = await user.getIdToken(/* forceRefresh */ true);
 
@@ -1189,6 +1258,7 @@ export async function callFunction(
     method: 'POST',
     headers,
     body: JSON.stringify({ data }),
+    ...(signal ? { signal } : {}),
   });
 
   if (!resp.ok) {

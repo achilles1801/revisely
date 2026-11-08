@@ -4,7 +4,7 @@
 // daily log (revision and memorization kinds) appear under their block instead of
 // as a parallel row. Shown only with the Activity blocks flag (previewTester).
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,9 +28,12 @@ import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
 type SheetAction = ContextMenuAction;
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
-import { joinedSince, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { joinedSince, keepTaken, overlayDayItems, type DayItems } from '../../lib/offline/dayItems';
+import { onApplied } from '../../lib/offline/sync';
+import type { OutboxEntry } from '../../lib/offline/ops';
 import { pendingEntries } from '../../lib/offline/outbox';
-import { currentAccount } from '../../lib/offline/queue';
+import { currentAccount, queueChange } from '../../lib/offline/queue';
+import { isManualRevisionId } from '../../lib/manualRevision';
 
 const EMPTY_DAY: DayItems = { revisions: [], memorized: [], reads: [], doneAhead: [] };
 
@@ -75,6 +78,9 @@ export const timeRange = (start: number | null | undefined, minutes: number | nu
   const b = to.match(period);
   return a && b && a[1] === b[1] ? `${from.replace(period, '')} – ${to}` : `${from} – ${to}`;
 };
+
+/** A timed sitting by what it held: "Al-Mulk, ayahs 1–26" (REC-2); "Timed in Read" with no pages. */
+const sittingName = (pages: number[]) => (pages.length > 0 ? describePassage(pages) : 'Timed in Read');
 
 /** "1 page", "18 pages". */
 const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
@@ -137,6 +143,15 @@ export function DayBlocks({
   // The server's last answer for this day, under the changes still waiting, and those changes' ids.
   const served = useRef<{ day: string; items: DayItems } | null>(null);
   const waiting = useRef<Set<string>>(new Set());
+  // Changes to this day the server has taken while it shows: laid over every answer, so a read that
+  // comes back without one never hides it (lib/offline/dayItems keepTaken).
+  const taken = useRef<{ day: string; entries: OutboxEntry[] }>({ day, entries: [] });
+  useEffect(() => {
+    taken.current = { day, entries: [] };
+    return onApplied((uid, entry) => {
+      if (uid === currentAccount()) keepTaken(taken.current.entries, entry, day);
+    });
+  }, [day]);
   const load = useCallback(() => {
     const n = ++loads.current;
     // What the server has, with the changes still waiting on this phone laid over it (ACT-13): an
@@ -145,7 +160,8 @@ export function DayBlocks({
     const pending = uid ? pendingEntries(uid) : [];
     const withPending = (items: DayItems) => {
       const now = currentAccount();
-      return now ? overlayDayItems(items, pendingEntries(now), day, now) : items;
+      const kept = taken.current.day === day ? taken.current.entries : [];
+      return now ? overlayDayItems(items, [...kept, ...pendingEntries(now)], day, now) : items;
     };
     // At once, from the last answer, when a change has just joined: an add shows without waiting for
     // the read below. (One that left is in what's shown already.)
@@ -246,23 +262,39 @@ export function DayBlocks({
 
   const hasRevised = revised.revised.length > 0 || revised.credits.length > 0 || revisionNotes.length > 0 || revRecs.length > 0 || doneAhead.length > 0 || taggedTo('revision').length > 0;
   const hasMemorized = memorized.items.length > 0 || memorizationNotes.length > 0 || taggedTo('memorization').length > 0;
-  // The block headers' menus: Revised (its session), Memorized (each entry), Read (each timed session).
-  const revisedMenu = revisedLog
-    ? headerMenu('Revised', [
-        {
-          key: 'delete',
-          label: 'Delete this session',
-          icon: 'trash-outline' as const,
-          destructive: true,
-          onPress: () =>
-            confirmDelete(
-              'Delete this session?',
-              `Its ${revised.revised.length} revised ${revised.revised.length === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
-              () => onDeleteRevised(revisedLog),
-            ),
-        },
-      ])
-    : {};
+  // The block headers' menus: Revised (its session, and each entry added by hand), Memorized (each
+  // entry), Read (each timed session). Every item can be deleted, confirmed first (ACT-6, ACT-7): an
+  // entry added by hand had no way out before (Nov 2026).
+  const sessionRevised = revisedLog ? new Set(revisedLog.pagesRevised).size : 0;
+  const handAdded = (items?.revisions ?? []).filter((r) => r.day === day && r.countsFor === day && isManualRevisionId(r.id) && r.pages.length > 0);
+  const revisedMenu = headerMenu('Revised', [
+    ...(revisedLog
+      ? [
+          {
+            key: 'delete',
+            label: 'Delete this session',
+            icon: 'trash-outline' as const,
+            destructive: true,
+            onPress: () =>
+              confirmDelete(
+                'Delete this session?',
+                `Its ${sessionRevised} revised ${sessionRevised === 1 ? 'page' : 'pages'} leave the day’s Revised block.`,
+                () => onDeleteRevised(revisedLog),
+              ),
+          },
+        ]
+      : []),
+    ...handAdded.map((a) => ({
+      key: `delete-${a.id}`,
+      label: `Delete ${describePassage(a.pages, { form: 'short' })}, added by hand`,
+      icon: 'trash-outline' as const,
+      destructive: true,
+      onPress: () =>
+        confirmDelete('Delete these pages?', `${describePassage(a.pages)} leaves the day’s Revised block.`, () => {
+          queueChange({ kind: 'revision.delete', day, id: a.id }).catch((err) => logger.warn('Could not delete pages added by hand', err));
+        }),
+    })),
+  ]);
   const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
   const noteItem = (n: JournalNote) => (
@@ -309,9 +341,10 @@ export function DayBlocks({
       const last = idx === readItems.items.length - 1;
       return (
         <View key={i.id}>
-          <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel="Timed in Read. Edit pages">
+          <Tap onPress={() => session && onEditReading(session)} accessibilityRole="button" accessibilityLabel={`${sittingName(i.pages)}. Edit pages`}>
             <ItemLine icon="stopwatch-outline" right={timeRange(i.occurredAt, i.minutes)}>
-              <Text style={[typeV2.body, { color: palette.text }]}>Timed in Read</Text>
+              {/* What the sitting held, by surah and ayah (REC-2), or "Timed in Read" when no pages are known. */}
+              <Text style={[typeV2.body, { color: palette.text }]}>{sittingName(i.pages)}</Text>
             </ItemLine>
           </Tap>
           {/* Its recording hangs under it, with no line of its own. */}

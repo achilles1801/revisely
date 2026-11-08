@@ -169,7 +169,17 @@ export default function DashboardScreen() {
 
   // The streak's history: the Activity items of the last 400 days (C5), read when the day or the
   // number of sessions changes, and shared with Revo (lib/activityHistory), which builds from it too.
+  // Also each time Home comes back into view: pages added by hand in Activity change no session, and
+  // the streak didn't move until the next session (ACT-15, Nov 2026).
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
+  const focusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusedOnce.current) setHistoryKey((k) => k + 1);
+      focusedOnce.current = true;
+    }, []),
+  );
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -185,7 +195,7 @@ export default function DashboardScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user, revisionDay, logs.length]);
+  }, [user, revisionDay, logs.length, historyKey]);
 
   // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
   // streak. Revo's context is built from the same function, so the two never disagree.

@@ -189,6 +189,11 @@ How the tests are made: `tests/scenarios/README.md`.
 - **ACCOUNT-1.** Delete account (Settings, confirmed twice) removes the account from the server with everything of it
   (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
   the server refuses (App Check), nothing is deleted and the user stays signed in.
+- **ACCOUNT-3.** Delete account always ends, in "Account deleted" (signed out) or an error with Try again: never an
+  endless spinner. The app waits for the server at most 30 seconds. With no answer (lost, or offline), it asks whether
+  the account still exists: gone, it is deleted; there, or no way to tell, the error says the account may not be deleted
+  and to try again. A Try again after the server had deleted it ends in "Account deleted". Once the server has deleted
+  it, nothing on the phone (its copy, signing out) keeps the spinner up more than a few seconds.
 - **ACCOUNT-2.** A sign-up or sign-in that fails (an address already registered, a wrong password, Google or Apple
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
@@ -207,6 +212,19 @@ How the tests are made: `tests/scenarios/README.md`.
 - **AUDIO-4.** When the day's recordings or Listen back go away (another day picked, the screen
   closed) while a recording plays, it stops and its player is freed: nothing plays on with nothing
   on screen to stop it.
+
+## The reader
+
+- **REC-1.** A sitting in the reader (testers): ending the timer while a recording runs, or is paused,
+  ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
+  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · View". It takes the
+  place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
+  it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
+  named. Stopping only the recording leaves the timer running.
+- **REC-2.** A sitting in the reader (testers) is saved with the pages it held, so the Day's Read block
+  counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
+  Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
+  pages known reads "Timed in Read".
 
 ## Activity
 
@@ -279,6 +297,14 @@ How the tests are made: `tests/scenarios/README.md`.
   that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
   changes still waiting on the phone over what it read. Once the server has them, the day shows the
   server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
+- **ACT-14.** Revised pages added by hand (the day's +) are the user's own: saving, editing or deleting the
+  day's session never removes them. Each is deleted from the Revised block's menu ("Delete …, added by
+  hand"), confirmed first, as every item is (ACT-7). (Nov 7 2026: a session save deleted them, and there
+  was no way to delete one.)
+- **ACT-15.** Revised pages added by hand count for the streak as any credit does (SESS-6): a day whose
+  scheduled pages are all credited to it is done, hand-added pages included, and Home shows it when it
+  next comes into view. Pages added by hand never stand for what a day had scheduled: that stays its
+  session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
 
 ## Ask coach
 
@@ -496,6 +522,7 @@ Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 | CARRY-2, SESS-7, SESS-2 | Keep daily amount with as many leftovers as today holds or more made today the leftovers alone, with no pages of its own: once they were all revised, Home still said "Continue at … 6 of 6", never Done, and today never counted for the streak. | A day the carried pages fill is finished by them (`duePagesOf`, `src/lib/carryOver.ts`): they are its session's assignment, and its session revising them finishes it while they stay credited to the days they were missed (`needDone`, `src/lib/aheadCredit.ts`). |
 | SESS-6, CARRY-2 | A day missed entirely, added to today with Keep daily amount and revised, didn't come back: with no session of its own, the streak read it from the plan the carry had moved, which gave it other pages. | A day the last carry took pages from is read from the carry (`planDuePages`, `src/lib/carryOver.ts`). |
 | SESS-6 | A streak brought back in the grace window lasted a day: the next morning it fell back (6 to 1), because the run behind yesterday counted only days done on their own day. | A day restored in its grace window counts as on time from then on (`graceEndMs`, `src/lib/streakFromItems.ts`). |
+| ACCOUNT-3 | Delete account could stay on the spinner for good (Android E2E, Nov 7 2026): the server deleted the account in a second, its answer never reached the phone, and the call had no time limit, nor had the steps after it. | `deleteUserAccount` gets 30 s (`callFunction`'s `timeoutMs`), then Auth is asked whether the account still exists (`src/services/firestoreService.ts`); each later step has its own limit (`src/context/AuthContext.tsx`); Settings offers Try again. |
 | ACCOUNT-2 | A sign-up or sign-in that failed emptied the form: the attempt showed the launch spinner in place of the sign-in screen, so a failure mounted it again from scratch, back on "Sign in" with only the error left. | An attempt has its own flag (`isSigningIn`, `src/context/AuthContext.tsx`); the screen stays and shows it on its button. |
 | SESS-7 | A session's first save holding catch-up pages alone lost their credit: the empty session was written without it. | `mergeSessionAdd` keeps it (`src/lib/offline/ops.ts`). |
 | SYNC-4 | A new account could stay on "loading" until the app was relaunched. | Page and session listeners hear when the server confirms the cache (`onQuerySnapshot`, `src/services/firestoreService.ts`). |
