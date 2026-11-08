@@ -189,6 +189,15 @@ export function getPagesScheduledForDate(
   return scheduledFrom(user, date, memorizedPages, 0);
 }
 
+/**
+ * The pages a day holds of its own: its scheduled pages after the first `skip` that carried leftovers
+ * stand in for (getPagesForDay before the carried pages are taken out of them).
+ */
+export function ownScheduledPages(user: User, date: Date, memorizedPages: UserPage[]): number[] {
+  const carry = carryOverOn(user, dateToISODay(date));
+  return scheduledFrom(user, date, memorizedPages, carry?.skip ?? 0);
+}
+
 /** The day's scheduled pages after its first `skip` slots (see shiftedCycleDay). */
 function scheduledFrom(
   user: User,

@@ -311,6 +311,15 @@ describe('[ACT-24] [CARRY-1] leftovers beside the pages from Insights', () => {
     expect(user.carryOver?.next).toEqual({ day: '2026-10-18', pages: [8], source: 'insights' });
   });
 
+  it('a page put first that the day has anyway is still its own (Nov 8 2026: none was, and the day was never done)', () => {
+    // Oct 18 = [6, 7]; Insights put [9, 6, 7] first.
+    const user: User = { ...baseUser, customPlan: big, carryOver: { day: '2026-10-18', pages: [9, 6, 7], skip: 0, source: 'insights' } };
+    const oct18 = generateDailyAssignment(memorized, [], user, new Date(2026, 9, 18)).pages;
+    expect(oct18).toEqual([9, 6, 7]);
+    expect(duePagesOf(oct18, user, '2026-10-18', memorized)).toEqual([6, 7]);
+    expect(planDuePages(user, '2026-10-18', memorized)).toEqual([6, 7]);
+  });
+
   it('pages from Insights held beside yesterday’s carry (its next) join today’s', () => {
     const held: User = { ...baseUser, customPlan: big, carryOver: { day: '2026-10-16', pages: [1], skip: 0, next: { day: TODAY, pages: [9], source: 'insights' } } };
     const user = applyCarryOver(held, memorized, [3], today, from);

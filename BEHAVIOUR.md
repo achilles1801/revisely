@@ -399,8 +399,11 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   the juz sheet's "Plan it for tomorrow first" and the Day's "Revise them tomorrow" put the pages in front of
   tomorrow's session (Insights' carry). They come in addition to tomorrow's scheduled pages, never in place
   of any: nothing shifts, whatever Keep daily amount says, and tomorrow is done (for the streak and Home's
-  Done) when its own pages are, with or without them. The session labels them From Insights, and Home says
-  "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
+  Done) when its own pages are, with or without them. A page tomorrow has anyway stays one of its own, put
+  first; a day with no pages of its own (an off day) is done once the pages from Insights are revised.
+  (Nov 8 2026: with every page of the day put first, none was its own, and Home said "28 of 28" and Continue
+  revision for good.) The session names them ("From Insights: Juz 1"; it said "the weak pages" whatever put
+  them there), and Home says "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
   with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button
   becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026: "the buttons on the activity
   screen don't work": they saved, silently.)
