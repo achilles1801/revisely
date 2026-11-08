@@ -13,7 +13,8 @@ import { JuzMapChart } from '../charts/JuzMapChart';
 import { PageRatingsChart } from '../charts/PageRatingsChart';
 import { TimelineChart } from '../charts/TimelineChart';
 import { WeeksChart } from '../charts/WeeksChart';
-import type { RevoDayFacts } from '../../../lib/revo/types';
+import { TableChart } from '../charts/TableChart';
+import type { RevoDayFacts, RevoPassageFacts } from '../../../lib/revo/types';
 import { ChartCard } from '../RevoCards';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -363,6 +364,68 @@ describe('weeks grid', () => {
     expect(text('revo-chart-weeks-title')).toBe('Sunday 1 November');
     fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     expect(text('revo-chart-weeks-title')).toBe('Monday 2 November');
+  });
+});
+
+describe('table', () => {
+  const tally = { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 };
+  const times = { days: 2, minEach: 2, maxEach: 2 };
+  const facts = (weak: number, daysAgo: number): RevoPassageFacts => ({
+    name: 'x',
+    pages: 20,
+    memorized: 20,
+    revised: { last7: times, last30: times, all: times },
+    lastRevisedDaysAgo: daysAgo,
+    oldest: null,
+    neverRevised: 0,
+    plan: { last7: tally, last30: tally },
+    strength: { weak, moderate: 0, strong: 20 - weak, unrated: 0, average: 4 },
+    weakSpots: [],
+    today: null,
+    next: null,
+  });
+  const range = (a: number) => Array.from({ length: 20 }, (_, i) => a + i);
+  const rows = [
+    { key: 26, name: 'Juz 26', pages: range(502), facts: facts(0, 2) },
+    { key: 27, name: 'Juz 27', pages: range(522), facts: facts(1, 1) },
+    { key: 28, name: 'Juz 28', pages: range(542), facts: facts(2, 0) },
+  ];
+  const userPages = range(542).map((p) => page(p, { lastRevisedDate: '2026-11-07', weaknessRating: p === 548 || p === 549 ? 2 : 4 }));
+  const onReviseFirst = jest.fn(async () => undefined);
+  const onOpenPage = jest.fn();
+  const table = () =>
+    mount(
+      <TableChart title="Juz 26–28" rows={rows} columns={['lastRevised', 'weak']} byJuz userPages={userPages} onReviseFirst={onReviseFirst} onOpenPage={onOpenPage} />,
+      'revo-chart-table',
+    );
+  const order = () => screen.getAllByTestId(/^revo-chart-table-row-/).map((r) => r.props.testID);
+
+  it('a heading sorts what needs care first, and again the other way', async () => {
+    await table();
+    expect(order()).toEqual(['revo-chart-table-row-26', 'revo-chart-table-row-27', 'revo-chart-table-row-28']);
+    expect(text('revo-chart-table-line')).toBe('Tap a heading to sort, a row to see it');
+    fireEvent.press(screen.getByTestId('revo-chart-table-sort-weak'));
+    expect(order()).toEqual(['revo-chart-table-row-28', 'revo-chart-table-row-27', 'revo-chart-table-row-26']);
+    expect(text('revo-chart-table-line')).toBe('Sorted by weak · tap a row to see it');
+    fireEvent.press(screen.getByTestId('revo-chart-table-sort-weak'));
+    expect(order()).toEqual(['revo-chart-table-row-26', 'revo-chart-table-row-27', 'revo-chart-table-row-28']);
+    // Oldest first.
+    fireEvent.press(screen.getByTestId('revo-chart-table-sort-lastRevised'));
+    expect(order()[0]).toBe('revo-chart-table-row-26');
+  });
+
+  it('a row opens under itself: its strip, Revise first tomorrow and Open in the reader', async () => {
+    await table();
+    expect(screen.getByLabelText('Juz 28: Last revised Today, Weak 2').props.accessibilityState).toEqual({ expanded: false });
+    fireEvent.press(screen.getByTestId('revo-chart-table-row-28'));
+    expect(screen.getByTestId('revo-chart-table-detail')).toBeTruthy();
+    expect(screen.getByLabelText('2 weak, 0 moderate, 18 strong')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('revo-chart-table-reader'));
+    expect(onOpenPage).toHaveBeenCalledWith(542);
+    fireEvent.press(screen.getByTestId('revo-chart-table-revise'));
+    expect(onReviseFirst).toHaveBeenCalledWith(range(542));
+    fireEvent.press(screen.getByTestId('revo-chart-table-row-28'));
+    expect(screen.queryByTestId('revo-chart-table-detail')).toBeNull();
   });
 });
 

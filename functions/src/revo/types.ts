@@ -146,9 +146,16 @@ export type RevoNewChart =
   /** Each revision of one surah or one juz (exactly one of them) over the last `days`. */
   | { kind: 'timeline'; title: string; surah?: number; juz?: number; days: RevoTimelineDays }
   /** The last `weeks` weeks (4–12), a day a cell: done, in part or missed. */
-  | { kind: 'weeks'; title: string; weeks: number };
-export const REVO_NEW_CHART_KINDS = ['juzMap', 'timeline', 'weeks'] as const;
+  | { kind: 'weeks'; title: string; weeks: number }
+  /** Juz or surahs (exactly one list, 2–8 of them) side by side, in 1–3 of the columns. */
+  | { kind: 'table'; title: string; juz?: number[]; surahs?: number[]; columns: RevoTableColumn[] };
+export const REVO_NEW_CHART_KINDS = ['juzMap', 'timeline', 'weeks', 'table'] as const;
 export const REVO_WEEKS = { min: 4, max: 12 } as const;
+/** A table's columns, each worked out on the phone (lib/revo/facts passageFacts). */
+export const REVO_TABLE_COLUMNS = ['lastRevised', 'times30', 'weak', 'strength', 'memorized'] as const;
+export type RevoTableColumn = (typeof REVO_TABLE_COLUMNS)[number];
+export const REVO_TABLE_ROWS = { min: 2, max: 8 } as const;
+export const REVO_TABLE_MAX_COLUMNS = 3;
 export const REVO_TIMELINE_DAYS = [30, 90, 365] as const;
 export type RevoTimelineDays = (typeof REVO_TIMELINE_DAYS)[number];
 export type RevoVisual = RevoChart | RevoNewChart;

@@ -313,6 +313,39 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: revo-chart-weeks-col-6
 
+# The table (a `visual`): Juz 27 and 28 side by side. A heading sorts; a row opens under itself
+# with Open in the reader.
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: reply
+      REPLY: '{"text": "Juz 28 needs the most care.", "chart": {"kind": "table", "title": "Juz 27–28", "juz": [27, 28], "columns": ["lastRevised", "weak"]}, "remember": [], "title": "Two juz", "chips": []}'
+- tapOn:
+    id: revo-input
+- inputText: "How are Juz 27 and 28 doing?"
+- tapOn:
+    id: revo-send
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-table
+    timeout: 15000
+- tapOn:
+    id: revo-chart-table-sort-weak
+- tapOn:
+    id: revo-chart-table-row-28
+- extendedWaitUntil:
+    visible:
+      id: revo-chart-table-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: r5h-chart-table
+- tapOn:
+    id: revo-chart-table-row-28
+- assertNotVisible:
+    id: revo-chart-table-reader
+
 # Tonight's Day in review, written by the real function (as the app asks for it on a day with
 # something done). The memory holds what the conversation's answer asked to remember.
 - runScript:

@@ -530,8 +530,21 @@ describe('the reply (REVO-7)', () => {
     expect(parseReply(JSON.stringify({ text: 'x', chart: { kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'timeline', title: 'Juz 4', juz: 4, days: 365 });
     // A weeks grid: 4 to 12 weeks.
     expect(parseReply(JSON.stringify({ text: 'Saturdays.', chart: { kind: 'weeks', title: 'Since 9 September', weeks: 8 } }), allowed, { firstTurn: false })!.visual).toEqual({ kind: 'weeks', title: 'Since 9 September', weeks: 8 });
+    // A table: juz or surahs (2–8), in 1–3 known columns.
+    const table = { kind: 'table', title: 'Juz 24–28', juz: [24, 25, 26, 27, 28], columns: ['lastRevised', 'weak'] };
+    expect(parseReply(JSON.stringify({ text: 'Juz 28.', chart: table }), allowed, { firstTurn: false })!.visual).toEqual(table);
+    const surahs = { kind: 'table', title: 'Three surahs', surahs: [59, 60, 61], columns: ['strength', 'times30', 'memorized'] };
+    expect(parseReply(JSON.stringify({ text: 'x', chart: surahs }), allowed, { firstTurn: false })!.visual).toEqual(surahs);
     // Anything wrong with it drops the chart and keeps the answer.
     for (const bad of [
+      { kind: 'table', title: 'One row', juz: [28], columns: ['weak'] },
+      { kind: 'table', title: 'Nine rows', juz: [20, 21, 22, 23, 24, 25, 26, 27, 28], columns: ['weak'] },
+      { kind: 'table', title: 'Twice', juz: [28, 28], columns: ['weak'] },
+      { kind: 'table', title: 'Both', juz: [27, 28], surahs: [59, 60], columns: ['weak'] },
+      { kind: 'table', title: 'No juz 31', juz: [30, 31], columns: ['weak'] },
+      { kind: 'table', title: 'No columns', juz: [27, 28], columns: [] },
+      { kind: 'table', title: 'Four columns', juz: [27, 28], columns: ['weak', 'strength', 'times30', 'memorized'] },
+      { kind: 'table', title: 'Colour', juz: [27, 28], columns: ['colour'] },
       { kind: 'weeks', title: 'Too few', weeks: 3 },
       { kind: 'weeks', title: 'Too many', weeks: 13 },
       { kind: 'weeks', title: 'Half', weeks: 6.5 },

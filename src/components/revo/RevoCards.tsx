@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { knownChart, passagePagesOf, plannedOf } from '../../lib/revo/charts';
+import { knownChart, passagePagesOf, plannedOf, tableRows } from '../../lib/revo/charts';
 import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } from '../../lib/revo/facts';
 import { SCREEN_BUTTON } from '../../lib/revo/screens';
 import type { RevoAction, RevoVisual } from '../../lib/revo/types';
@@ -11,6 +11,7 @@ import { PillButton } from '../v2/PillButton';
 import { DailyPagesChart } from './charts/DailyPagesChart';
 import { JuzMapChart } from './charts/JuzMapChart';
 import { PageRatingsChart } from './charts/PageRatingsChart';
+import { TableChart } from './charts/TableChart';
 import { TimelineChart } from './charts/TimelineChart';
 import { WeeksChart } from './charts/WeeksChart';
 
@@ -39,15 +40,32 @@ export function ChartCard({ chart, day, sources, ...handlers }: { chart: RevoVis
       facts: (d: string) => dayFacts(d, prepared),
       planPages: (d: string) => (d === src.snapshot.day ? src.snapshot.pages : prepared.scheduled(d)),
       preview: (pages: number[]) => (pages.length > 0 ? passagePreview(passageFacts(pages, prepared)) : null),
+      passage: (pages: number[], name: string) => passageFacts(pages, prepared, name),
     };
   }, [sources]);
   const passage = useMemo(() => (chart.kind === 'timeline' && knownChart(chart) ? passagePagesOf(chart) : []), [chart]);
+  const rows = useMemo(() => (chart.kind === 'table' && knownChart(chart) && reads ? tableRows(chart, reads.passage) : null), [chart, reads]);
   if (!knownChart(chart)) return null;
   if (chart.kind === 'juzMap') {
     return <JuzMapChart title={chart.title} today={day} logs={logs} userPages={pages} preview={reads?.preview} onReviseFirst={handlers.onReviseFirst} onOpenPage={handlers.onOpenPage} />;
   }
   if (chart.kind === 'timeline') {
     return <TimelineChart title={chart.title} passage={passage} days={chart.days} today={day} logs={logs} onOpenDay={handlers.onOpenDay} />;
+  }
+  if (chart.kind === 'table') {
+    // Its figures are what Revo's attachments say for each row: without the account's facts, no table.
+    if (!rows) return null;
+    return (
+      <TableChart
+        title={chart.title}
+        rows={rows}
+        columns={chart.columns}
+        byJuz={chart.juz != null}
+        userPages={pages}
+        onReviseFirst={handlers.onReviseFirst}
+        onOpenPage={handlers.onOpenPage}
+      />
+    );
   }
   if (chart.kind === 'weeks') {
     return <WeeksChart title={chart.title} weeks={chart.weeks} today={day} logs={logs} facts={reads?.facts} planned={reads?.planned} onOpenDay={handlers.onOpenDay} />;

@@ -5,7 +5,20 @@
  * its own text, and nothing else (a reply cut off mid-object keeps its text when it arrived whole).
  */
 import { screenFromText } from './screenText';
-import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TIMELINE_DAYS, REVO_WEEKS, RevoAction, RevoChart, RevoNewChart, RevoReplyParts } from './types';
+import {
+  REVO_SCREENS,
+  REVO_SETTINGS_SECTIONS,
+  REVO_TABLE_COLUMNS,
+  REVO_TABLE_MAX_COLUMNS,
+  REVO_TABLE_ROWS,
+  REVO_TIMELINE_DAYS,
+  REVO_WEEKS,
+  RevoAction,
+  RevoChart,
+  RevoNewChart,
+  RevoReplyParts,
+  RevoTableColumn,
+} from './types';
 
 export const MAX_TEXT = 1500;
 export const MAX_TEXT_AFTER = 300;
@@ -71,7 +84,26 @@ export function checkNewChart(v: unknown): RevoNewChart | null {
     return wholeIn(juz, 1, 30) ? { kind: 'timeline', title, juz, days } : null;
   }
   if (v.kind === 'weeks') return wholeIn(v.weeks, REVO_WEEKS.min, REVO_WEEKS.max) ? { kind: 'weeks', title, weeks: v.weeks } : null;
+  if (v.kind === 'table') return checkTable(v, title);
   return null;
+}
+
+/** Distinct whole numbers in [min, max], `count.min`..`count.max` of them; else null. */
+function distinctWhole(v: unknown, min: number, max: number, count: { min: number; max: number }): number[] | null {
+  if (!Array.isArray(v) || v.length < count.min || v.length > count.max) return null;
+  if (!v.every((x) => wholeIn(x, min, max)) || new Set(v).size !== v.length) return null;
+  return v as number[];
+}
+
+function checkTable(v: Obj, title: string): RevoNewChart | null {
+  const hasJuz = v.juz != null;
+  if (hasJuz === (v.surahs != null)) return null;
+  const rows = hasJuz ? distinctWhole(v.juz, 1, 30, REVO_TABLE_ROWS) : distinctWhole(v.surahs, 1, 114, REVO_TABLE_ROWS);
+  const cols = v.columns;
+  if (!rows || !Array.isArray(cols) || cols.length < 1 || cols.length > REVO_TABLE_MAX_COLUMNS || new Set(cols).size !== cols.length) return null;
+  if (!cols.every((c) => (REVO_TABLE_COLUMNS as readonly unknown[]).includes(c))) return null;
+  const columns = cols as RevoTableColumn[];
+  return hasJuz ? { kind: 'table', title, juz: rows, columns } : { kind: 'table', title, surahs: rows, columns };
 }
 
 export function checkAction(v: unknown, allowed: ReadonlySet<number>): RevoAction | null {

@@ -17,6 +17,7 @@ import {
   knownChart,
   nearestMark,
   pageDetail,
+  pagesStrip,
   passagePagesOf,
   pageRatingsData,
   plannedOf,
@@ -25,8 +26,11 @@ import {
   ratingsRowReadout,
   revisedBefore,
   slotAt,
+  sortRows,
   stepIndex,
   stripEnds,
+  tableCell,
+  tableRows,
   timelineData,
   timelineDetail,
   timelineHint,
@@ -36,8 +40,8 @@ import {
   weeksData,
   weeksHint,
 } from '../charts';
-import { dayFacts, prepare, type FactSources } from '../facts';
-import type { RevoChart } from '../types';
+import { dayFacts, passageFacts, prepare, type FactSources } from '../facts';
+import type { RevoChart, RevoPassageFacts } from '../types';
 
 const user = {
   id: 'u1',
@@ -104,6 +108,12 @@ describe('knownChart', () => {
     expect(knownChart({ kind: 'weeks', title: 'x', weeks: 8 })).toBe(true);
     expect(knownChart({ kind: 'weeks', title: 'x', weeks: 13 })).toBe(false);
     expect(knownChart({ kind: 'weeks', title: 'x', weeks: 4.5 })).toBe(false);
+    expect(knownChart({ kind: 'table', title: 'x', juz: [26, 27, 28], columns: ['lastRevised', 'weak'] })).toBe(true);
+    expect(knownChart({ kind: 'table', title: 'x', surahs: [59, 60], columns: ['strength'] })).toBe(true);
+    expect(knownChart({ kind: 'table', title: 'x', juz: [26], columns: ['weak'] })).toBe(false);
+    expect(knownChart({ kind: 'table', title: 'x', juz: [26, 31], columns: ['weak'] })).toBe(false);
+    expect(knownChart({ kind: 'table', title: 'x', juz: [26, 27], surahs: [59, 60], columns: ['weak'] })).toBe(false);
+    expect(knownChart({ kind: 'table', title: 'x', juz: [26, 27], columns: ['colour'] } as unknown as RevoChart)).toBe(false);
     // A newer server's kind, or a malformed one: no chart (the old app drew an empty bar chart).
     expect(knownChart({ kind: 'weeksAhead', title: 'x' } as unknown as RevoChart)).toBe(false);
     expect(knownChart({ kind: 'dailyPages', title: 'x', days: 14 } as unknown as RevoChart)).toBe(false);
@@ -344,6 +354,73 @@ describe('weeks grid', () => {
     expect(daysList(['2026-09-26', '2026-10-10'])).toBe('26 Sep and 10 Oct');
     expect(daysList(['2026-10-10', '2026-10-17'])).toBe('10 and 17 Oct');
     expect(daysList(['2026-10-31'])).toBe('31 Oct');
+  });
+});
+
+describe('table', () => {
+  const tally = { days: 0, pages: 0, onDay: 0, late: 0, ahead: 0, skipped: 0, skippedDays: 0 };
+  const facts = (over: Partial<RevoPassageFacts> = {}): RevoPassageFacts => ({
+    name: 'x',
+    pages: 20,
+    memorized: 20,
+    revised: { last7: { days: 1, minEach: 1, maxEach: 1 }, last30: { days: 2, minEach: 2, maxEach: 3 }, all: { days: 5, minEach: 4, maxEach: 6 } },
+    lastRevisedDaysAgo: 3,
+    oldest: null,
+    neverRevised: 0,
+    plan: { last7: tally, last30: tally },
+    strength: { weak: 0, moderate: 2, strong: 18, unrated: 0, average: 3.9 },
+    weakSpots: [],
+    today: null,
+    next: null,
+    ...over,
+  });
+
+  it('rows from what the app shows for each juz or surah, in the order Revo gave them', () => {
+    const prepared = prepare(sources());
+    const rows = tableRows({ juz: [30, 29] }, (pages, name) => passageFacts(pages, prepared, name));
+    expect(rows.map((r) => [plainText(r.name), r.pages.length])).toEqual([
+      ['Juz 30', 23],
+      ['Juz 29', 20],
+    ]);
+    expect(tableCell('memorized', rows[0].facts).text).toBe('10 of 23');
+    expect(tableCell('lastRevised', rows[0].facts).text).toBe('Yesterday');
+    // Two of its memorized pages were never revised: it wasn't revised in full in 30 days.
+    expect(tableCell('times30', rows[0].facts).text).toBe('0×');
+    // Juz 29 isn't memorized: nothing to say but how much is.
+    expect(tableCell('lastRevised', rows[1].facts)).toEqual({ text: '—', key: null });
+    expect(tableCell('memorized', rows[1].facts).text).toBe('0 of 20');
+    expect(plainText(tableRows({ surahs: [59] }, (p, name) => facts({ name }))[0].name)).toBe('Al-Hashr');
+  });
+
+  it('each cell’s words', () => {
+    expect(tableCell('lastRevised', facts({ lastRevisedDaysAgo: 0 })).text).toBe('Today');
+    expect(tableCell('lastRevised', facts({ lastRevisedDaysAgo: 41 })).text).toBe('41 days');
+    expect(tableCell('lastRevised', facts({ lastRevisedDaysAgo: null })).text).toBe('Never');
+    expect(tableCell('times30', facts()).text).toBe('2×');
+    expect(tableCell('times30', facts({ memorized: 1 })).text).toBe('3×');
+    expect(tableCell('weak', facts({ strength: { weak: 2, moderate: 0, strong: 18, unrated: 0, average: 3.8 } }))).toEqual({ text: '2', key: 2, alert: true });
+    expect(tableCell('strength', facts()).text).toBe('3.9');
+    expect(tableCell('strength', facts({ strength: { weak: 0, moderate: 0, strong: 0, unrated: 20, average: null } })).text).toBe('—');
+  });
+
+  it('sorts what needs care first, or the other way; parts with nothing to say stay last', () => {
+    const row = (key: number, f: RevoPassageFacts) => ({ key, name: `Juz ${key}`, pages: [], facts: f });
+    const rows = [
+      row(24, facts({ lastRevisedDaysAgo: 4, strength: { weak: 1, moderate: 0, strong: 19, unrated: 0, average: 3.9 } })),
+      row(25, facts({ lastRevisedDaysAgo: 2 })),
+      row(29, facts({ memorized: 0, lastRevisedDaysAgo: null })),
+      row(28, facts({ lastRevisedDaysAgo: 0, strength: { weak: 2, moderate: 4, strong: 14, unrated: 0, average: 3.6 } })),
+    ];
+    const keys = (rs: { key: number }[]) => rs.map((r) => r.key);
+    expect(keys(sortRows(rows, 'weak', true))).toEqual([28, 24, 25, 29]);
+    expect(keys(sortRows(rows, 'weak', false))).toEqual([25, 24, 28, 29]);
+    expect(keys(sortRows(rows, 'lastRevised', true))).toEqual([24, 25, 28, 29]);
+    expect(keys(sortRows(rows, 'strength', true))).toEqual([28, 24, 25, 29]);
+  });
+
+  it('a strip for any pages: memorized and revised ones in their ratings’ colours', () => {
+    expect(pagesStrip([583, 592], pages).map((s) => s.memorized)).toEqual([true, false]);
+    expect(pagesStrip([592], pages)[0].band).toBeNull();
   });
 });
 

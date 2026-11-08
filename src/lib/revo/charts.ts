@@ -12,11 +12,11 @@ import { weekStart } from '../activityHeatmap';
 import { lastRevisedByPage } from '../activityInsights';
 import { juzTiles, type JuzTile } from '../insightsView';
 import { shiftDay } from '../journal';
-import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, pagesNote, surahName } from '../passages';
+import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, NBSP, pagesNote, surahName } from '../passages';
 import { getJuzRange, getSurah } from '../quranData';
 import { revisedItems } from './context';
 import type { FactSources } from './facts';
-import type { RevoDayFacts, RevoVisual } from './types';
+import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
 
 export type RatingBand = 'weak' | 'moderate' | 'strong';
@@ -40,6 +40,14 @@ export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
     return one && inRange && (c.days === 30 || c.days === 90 || c.days === 365);
   }
   if (c.kind === 'weeks') return Number.isInteger(c.weeks) && c.weeks >= 4 && c.weeks <= 12;
+  if (c.kind === 'table') {
+    const rows = c.juz ?? c.surahs;
+    const max = c.juz ? 30 : 114;
+    const one = (c.juz == null) !== (c.surahs == null);
+    const rowsOk = Array.isArray(rows) && rows.length >= 2 && rows.length <= 8 && rows.every((n) => Number.isInteger(n) && n >= 1 && n <= max);
+    const colsOk = Array.isArray(c.columns) && c.columns.length >= 1 && c.columns.length <= 3 && c.columns.every((k) => k in TABLE_HEADS);
+    return one && rowsOk && colsOk;
+  }
   return false;
 }
 
@@ -275,15 +283,20 @@ export function juzReadout(tile: JuzTile): { title: string; line: string } {
   return { title: `Juz ${tile.juz} · ${when}`, line: describePageRange(start, end, { wholeJuz: false }) };
 }
 
-/** A juz's pages for its strip: each memorized page that has been revised in its rating's band; the rest unrated. */
-export function juzStrip(juz: number, pages: readonly UserPage[]): { page: number; band: RatingBand | null; memorized: boolean }[] {
+/** Pages for a strip: each memorized page that has been revised in its rating's band; the rest unrated. */
+export function pagesStrip(of: readonly number[], pages: readonly UserPage[]): { page: number; band: RatingBand | null; memorized: boolean }[] {
   const byNumber = new Map(pages.map((p) => [p.pageNumber, p]));
-  const { start, end } = getJuzRange(juz);
-  return Array.from({ length: end - start + 1 }, (_, i) => {
-    const p = byNumber.get(start + i);
+  return of.map((page) => {
+    const p = byNumber.get(page);
     const memorized = p?.status === 'memorized';
-    return { page: start + i, memorized, band: memorized && p?.lastRevisedDate ? bandOf(p.weaknessRating) : null };
+    return { page, memorized, band: memorized && p?.lastRevisedDate ? bandOf(p.weaknessRating) : null };
   });
+}
+
+/** A juz's pages for its strip (pagesStrip). */
+export function juzStrip(juz: number, pages: readonly UserPage[]): { page: number; band: RatingBand | null; memorized: boolean }[] {
+  const { start, end } = getJuzRange(juz);
+  return pagesStrip(Array.from({ length: end - start + 1 }, (_, i) => start + i), pages);
 }
 
 const juzList = (js: number[]) => (js.length === 0 ? null : js.map((j) => `Juz ${j}`).join(', '));
@@ -481,6 +494,80 @@ export function weekdayReadout(rows: readonly { day: string; cell: WeekCell }[][
   if (part.length > 0) parts.push(`${missed.length > 0 ? 'part' : 'Part'} of ${daysList(part)}`);
   if (parts.length === 0) parts.push(cells.length > 0 ? 'None missed' : 'No plan on these days');
   return { title, line: parts.join(' · ') };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Table
+// ---------------------------------------------------------------------------------------------
+
+export const TABLE_HEADS: Record<RevoTableColumn, string> = {
+  lastRevised: 'Last revised',
+  times30: '30 days',
+  weak: 'Weak',
+  strength: 'Strength',
+  memorized: 'Memorized',
+};
+
+/** Which way puts what needs care first, per column: the oldest, the fewest, the most weak, the weakest. */
+export const WORST_FIRST: Record<RevoTableColumn, 'asc' | 'desc'> = {
+  lastRevised: 'desc',
+  times30: 'asc',
+  weak: 'desc',
+  strength: 'asc',
+  memorized: 'asc',
+};
+
+export interface TableRow {
+  key: number;
+  name: string;
+  pages: number[];
+  facts: RevoPassageFacts;
+}
+
+/** A table's rows, in the order Revo gave them: each juz or surah with what the app shows for it. */
+export function tableRows(c: { juz?: number[]; surahs?: number[] }, factsOf: (pages: number[], name: string) => RevoPassageFacts): TableRow[] {
+  const juz = c.juz != null;
+  return (c.juz ?? c.surahs ?? []).map((n) => {
+    const pages = passagePagesOf(juz ? { juz: n } : { surah: n });
+    const name = juz ? `Juz${NBSP}${n}` : surahName(n);
+    return { key: n, name, pages, facts: factsOf(pages, name) };
+  });
+}
+
+/**
+ * A cell: its words, and the number it sorts by (null: nothing to say, as for a part not memorized,
+ * which always sorts last). `alert`: weak pages, in red.
+ */
+export function tableCell(col: RevoTableColumn, f: RevoPassageFacts): { text: string; key: number | null; alert?: boolean } {
+  if (col === 'memorized') return { text: `${f.memorized} of ${f.pages}`, key: f.pages > 0 ? f.memorized / f.pages : 0 };
+  if (f.memorized === 0) return { text: '—', key: null };
+  switch (col) {
+    case 'lastRevised': {
+      const d = f.lastRevisedDaysAgo;
+      return { text: d == null ? 'Never' : d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d} days`, key: d ?? Number.MAX_SAFE_INTEGER };
+    }
+    case 'times30': {
+      // Revised in full (every memorized page) that many times, as Revo's attachments say it.
+      const n = f.memorized === 1 ? f.revised.last30.maxEach : f.revised.last30.minEach;
+      return { text: `${n}×`, key: n };
+    }
+    case 'weak':
+      return { text: String(f.strength.weak), key: f.strength.weak, alert: f.strength.weak > 0 };
+    case 'strength':
+      return f.strength.average == null ? { text: '—', key: null } : { text: f.strength.average.toFixed(1), key: f.strength.average };
+  }
+}
+
+/** The rows by a column: what needs care first, or the other way; rows with nothing to say last, the order kept on ties. */
+export function sortRows(rows: readonly TableRow[], col: RevoTableColumn, worstFirst: boolean): TableRow[] {
+  const dir = (WORST_FIRST[col] === 'desc') === worstFirst ? -1 : 1;
+  return rows
+    .map((r, i) => ({ r, i, k: tableCell(col, r.facts).key }))
+    .sort((a, b) => {
+      if (a.k == null || b.k == null) return a.k == null && b.k == null ? a.i - b.i : a.k == null ? 1 : -1;
+      return a.k === b.k ? a.i - b.i : (a.k - b.k) * dir;
+    })
+    .map((x) => x.r);
 }
 
 // ---------------------------------------------------------------------------------------------
