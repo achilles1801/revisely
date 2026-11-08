@@ -15,13 +15,14 @@ import sys
 RAW, OUT = sys.argv[1], sys.argv[2]
 WIDTH = 600  # 2x the phone frame's width on the page
 
+# 'plan' and 'carry' (Home) left the page on 2026-11-07: they showed Home from before 1.0.3, and
+# the page uses the App Store screenshots there instead (stills.py). Their flows are still in
+# flows/. The activity clip's first cut starts at 8.02 (not 6.19), past the old Home.
 CLIPS = {
-    'plan': [(7.29, 10.29), (12.4, 13.5), (14.59, 16.59), (17.69, 19.99), (21.29, 23.09)],
     'reader': [(9.73, 13.13), (16.23, 19.73), (20.83, 25.53), (27.13, 28.13), (29.48, 33.93)],
-    'carry': [(14.27, 20.07)],
-    'activity': [(6.19, 9.03), (10.33, 12.63), (13.58, 15.98), (17.08, 19.06), (19.64, 22.33)],
+    'activity': [(8.02, 9.03), (10.33, 12.63), (13.58, 15.98), (17.08, 19.06), (19.64, 22.33)],
 }
-POSTER = {'plan': 0.3, 'reader': 5.6, 'carry': 1.0, 'activity': 4.6}
+POSTER = {'reader': 5.6, 'activity': 2.77}
 
 
 def run(*args):
