@@ -83,6 +83,9 @@ $PY -I scripts/recite-eval/checker.py --bench $LAB/data/bench-v0 --run $LAB/runs
 $PY scripts/recite-eval/score.py --bench $LAB/data/bench-v0 --run $LAB/runs/v0 --results checker.v0 --by condition
 ```
 
+- Look-alike words: each word also has up to 4 near-identical words of the Qur'an as alternatives (وَمَا for
+  وَمَن), from `cache/lexicon.json` (every distinct word and how it sounds alone; `checker.py --lexicon` builds
+  it once, ~40 s). Hearing one instead of the word marks it wrong, with the word heard. `alts: 0` turns it off.
 - `--params '{"sound_rule": "off"}'`: words only (said, skipped, extra, out of order).
 - `--params '{"sub_p": 1.01}'`: words, plus words that clearly don't match (no single-letter judgements).
 - The model's output is cached per recording (`<run>/logprobs/hisn/`), so a rerun with other settings takes

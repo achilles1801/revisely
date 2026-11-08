@@ -21,6 +21,7 @@ wrong, letter by letter.
 Writes results in replay.ts's format (score.py reads them), plus the decoded path for inspection.
 Offline: decisions are made on the whole recording, so the times are estimates (word end + delay).
 
+  python checker.py --lexicon            # once: every distinct word of the Qur'an and how it sounds alone
   python checker.py --bench DIR --run DIR --name NAME [--only SUBSTR] [--jobs N] [--params JSON]
 """
 import argparse
@@ -58,6 +59,8 @@ DEFAULTS = {
     'edge_free': 99,    # sounds heard at each edge of a word's span that may belong to its neighbours...
     'edge_frames': 99,  # ...if they peak within this many frames of the span's edge
     'mean_gop': -6.0,   # a word whose sounds fit this badly on average is wrong (None: off)
+    'alts': 4,          # look-alike words listened for in place of each word (وما for ومن); 0: none
+    'alt_pen': -5.0,    # the cost of hearing a look-alike instead of the word itself
     'extra_min': 0.35,  # a filler shorter than this (seconds) is not reported as an extra word
     'delay': 1.0,       # seconds after a word ends that a streaming checker would decide it
 }
@@ -141,6 +144,25 @@ class Hisn:
 
 
 # ---------------------------------------------------------------- the answer key
+
+def norm_sounds(snd):
+    """Sounds as mode 2 hears them: nasal holds as plain ن/م, tajweed-only marks dropped, a held long vowel
+    written once."""
+    out = []
+    for ch in snd:
+        ch = {'ں': 'ن', '۾': 'م'}.get(ch, ch)
+        if ch in 'ڇۜـٲؙ۪':
+            continue
+        if out and ch == out[-1] and ch in FOLD | {'ن', 'م'}:
+            continue
+        out.append(ch)
+    return ''.join(out)
+
+
+def core(norm):
+    """Without a final short vowel: how a word sounds when stopped on."""
+    return norm.rstrip('َُِ')
+
 
 class Key:
     """Expected sounds for each word of a passage, from the phonetizer."""
@@ -232,8 +254,50 @@ class Key:
             out.append(dict(self._labels(snd), form=name))
         return out
 
-    def passage(self, lo, hi):
-        """For app words lo..hi-1: [{'word', 'text', 'forms': [{labels, fold, counts, sounds, form}]}]."""
+    def _lexicon(self):
+        """Every distinct word of the Qur'an and how it sounds alone (cache/lexicon.json, made once), bucketed
+        by the length of its normalized sounds."""
+        if not hasattr(self, '_lex'):
+            path = LAB / 'cache/lexicon.json'
+            if not path.exists():
+                raise FileNotFoundError(f'{path}: build it first (python checker.py --lexicon)')
+            self._lex = {}
+            for e in json.loads(path.read_text()):
+                e['norm'] = norm_sounds(e['sounds'])
+                self._lex.setdefault(len(e['norm']), []).append(e)
+            self._alt_cache = {}
+        return self._lex
+
+    def lookalikes(self, text, forms, k):
+        """Up to k other words that sound almost the same (one or two sounds apart), nearest first. A word
+        that differs only by a final vowel (as when stopping on it) doesn't count."""
+        import Levenshtein
+        if text in getattr(self, '_alt_cache', {}):
+            return self._alt_cache[text][:k]
+        lex = self._lexicon()
+        norms = {norm_sounds(f['sounds']) for f in forms}
+        cores = {core(n) for n in norms}
+        found = {}
+        for n in norms:
+            maxd = 2 if len(n) <= 10 else 3
+            for ln in range(len(n) - maxd, len(n) + maxd + 1):
+                for e in lex.get(ln, ()):
+                    if e['text'] == text or e['norm'] in norms or core(e['norm']) in cores:
+                        continue
+                    d = Levenshtein.distance(n, e['norm'], score_cutoff=maxd)
+                    if d <= maxd and (e['text'] not in found or d < found[e['text']][0]):
+                        found[e['text']] = (d, -e['n'], e)
+        ranked, seen = [], set()
+        for _, _, e in sorted(found.values(), key=lambda x: (x[0], x[1])):
+            if e['norm'] not in seen:  # spellings that sound the same are one alternative
+                seen.add(e['norm'])
+                ranked.append(e)
+        out = [dict(self._labels(e['sounds']), form='alt', text=e['text']) for e in ranked[:8]]
+        self._alt_cache[text] = out
+        return out[:k]
+
+    def passage(self, lo, hi, alts=0):
+        """For app words lo..hi-1: [{'word', 'text', 'forms': [{labels, fold, counts, sounds, form}], 'alts'}]."""
         out = []
         for w in range(lo, hi):
             s, a, p = self.where(w)
@@ -244,7 +308,8 @@ class Key:
             fs = self.forms(ayah, p)
             if not fs:
                 raise ValueError(f'no sounds for {s}:{a} word {p}')
-            out.append({'word': w, 'text': ayah[p], 'forms': fs, 'sounds': fs[0]['sounds']})
+            alt = self.lookalikes(ayah[p], fs, alts) if alts else []
+            out.append({'word': w, 'text': ayah[p], 'forms': fs, 'sounds': fs[0]['sounds'], 'alts': alt})
         return out
 
 
@@ -256,25 +321,30 @@ class Graph:
 
     def __init__(self, key_words):
         self.W = W = len(key_words)
-        lab, word_of, chain_of, kind, madd_back = [], [], [], [], []
+        lab, word_of, chain_of, kind, madd_back, alt_of = [], [], [], [], [], []
         entries = [[] for _ in range(W)]
+        entry_alt = [[] for _ in range(W)]
         exits = [[] for _ in range(W)]
         chain = 0
         for wi, kw in enumerate(key_words):
-            for f in kw['forms']:
+            chains = [(f, -1) for f in kw['forms']] + [(f, ai) for ai, f in enumerate(kw.get('alts') or [])]
+            for f, ai in chains:
                 b0 = len(lab)
-                lab.append(0); word_of.append(wi); chain_of.append(chain); kind.append(0)
+                lab.append(0); word_of.append(wi); chain_of.append(chain); kind.append(0); alt_of.append(ai)
                 for li, l in enumerate(f['labels']):
-                    lab.append(l); word_of.append(wi); chain_of.append(chain); kind.append(1)
+                    lab.append(l); word_of.append(wi); chain_of.append(chain); kind.append(1); alt_of.append(ai)
                     if f['fold'][li]:
                         madd_back.append(len(lab) - 1)
-                    lab.append(0); word_of.append(wi); chain_of.append(chain); kind.append(2)
-                entries[wi] += [b0] + ([b0 + 1] if f['labels'] else [])
+                    lab.append(0); word_of.append(wi); chain_of.append(chain); kind.append(2); alt_of.append(ai)
+                new = [b0] + ([b0 + 1] if f['labels'] else [])
+                entries[wi] += new
+                entry_alt[wi] += [ai >= 0] * len(new)
                 exits[wi] += ([len(lab) - 2] if f['labels'] else []) + [len(lab) - 1]
                 chain += 1
         self.S = S = len(lab)
         self.lab = np.array(lab + [0], np.int64)  # one spare state (index S) pads the tables below
         self.word_of = np.array(word_of + [-1], np.int64)
+        self.alt_of = np.array(alt_of + [-1], np.int64)
         self.kind = np.array(kind + [-1], np.int8)
         ch = np.array(chain_of + [-1], np.int64)
         k = self.kind
@@ -287,9 +357,11 @@ class Graph:
         ne = max(len(e) for e in entries)
         nx = max(len(e) for e in exits)
         self.entries = np.full((W, ne), S, np.int64)
+        self.entry_alt = np.zeros((W, ne), bool)
         self.exits = np.full((W, nx), S, np.int64)
         for wi in range(W):
             self.entries[wi, :len(entries[wi])] = entries[wi]
+            self.entry_alt[wi, :len(entries[wi])] = entry_alt[wi]
             self.exits[wi, :len(exits[wi])] = exits[wi]
         self.is_exit = np.zeros(S + 1, bool)
         self.is_exit[self.exits.ravel()] = True
@@ -317,6 +389,7 @@ def viterbi(lp, g, P):
     backs = min(int(P['back_max']), W - 1)
     rows = np.arange(W)
     pen = np.full(W + 1, P['fill']); pen[0] = pen[W] = P['edge']
+    alt_pen = np.where(g.entry_alt, P['alt_pen'], 0.0)
     for t in range(1, T):
         e = lp[t]
         vals = d[g.exits]
@@ -358,7 +431,7 @@ def viterbi(lp, g, P):
         b = c > nd; nd[b] = c[b]; code[b] = 2
         c = np.full(S + 1, NEG); c[:-1] = d[1:]; c[~g.madd] = NEG
         b = c > nd; nd[b] = c[b]; code[b] = 3
-        ce = np.broadcast_to(cand[:, None], g.entries.shape)
+        ce = cand[:, None] + alt_pen
         cur = nd[g.entries]
         b = ce > cur
         nd[g.entries[b]] = ce[b]
@@ -504,9 +577,11 @@ def decide(key_words, g, lp, path, P, vocab=None):
             if g.kind[s] == 1:
                 per.setdefault(s, []).append(lp[t, g.lab[s]] - nonblank_best[t])
         states = sorted({s for _, s in frames if g.kind[s] == 1})
+        alts = [int(g.alt_of[s]) for _, s in frames]
         visits[w].append({'start': frames[0][0], 'end': end, 'ok_exit': left_normally,
                           'scores': [float(np.mean(v)) for _, v in sorted(per.items())],
-                          'labels': [int(g.lab[s]) for s in states]})
+                          'labels': [int(g.lab[s]) for s in states],
+                          'alt': max(set(alts), key=alts.count)})
 
     cur_w, frames, cur_gap, gstart, prev = None, [], None, None, None
     for t, s, entered in path:
@@ -564,6 +639,14 @@ def decide(key_words, g, lp, path, P, vocab=None):
                 v['subs'] = []
                 v['bad'] = P['sound_rule'] == 'gop' and bool(v['scores']) and min(v['scores']) < P['gop']
 
+    for w, vs in enumerate(visits):  # a look-alike word heard instead of this one
+        for v in vs:
+            if v['alt'] >= 0:
+                v['bad'] = True
+                v['why'] = ['lookalike']
+                v['heard'] = key_words[w]['alts'][v['alt']]['text']
+                v.setdefault('subs', [])
+
     furthest = max((w for w in range(W) if visits[w]), default=-1)
     statuses, flagged, shown, decided = {}, {}, {}, {}
     replaced = set()
@@ -607,8 +690,9 @@ def decide(key_words, g, lp, path, P, vocab=None):
             bad = v['bad'] or w in replaced
             statuses[app_w] = 'wrong' if bad else 'correct'
             if bad:
-                flagged[app_w] = {'t': end_s + P['delay'], 'kind': 'replaced' if w in replaced else 'sound',
-                                  'worst': worst, 'subs': v['subs'], 'why': v.get('why', [])}
+                kind = 'replaced' if w in replaced else 'lookalike' if v['alt'] >= 0 else 'sound'
+                flagged[app_w] = {'t': end_s + P['delay'], 'kind': kind, 'worst': worst, 'subs': v.get('subs', []),
+                                  'why': v.get('why', []), 'heard': v.get('heard')}
             elif any(x['bad'] for x in vs[:-1]):
                 statuses[app_w] = 'corrected'
         elif w in replaced:
@@ -650,7 +734,7 @@ def run_item(item_path, run, name, P, ear_name='hisn'):
         lp = ear.logprobs(x)
         cache.parent.mkdir(parents=True, exist_ok=True)
         np.save(cache, lp.astype(np.float16))
-    kws = KEY.passage(start_at, stop_at)
+    kws = KEY.passage(start_at, stop_at, int(P['alts']))
     g = Graph(kws)
     t0 = time.perf_counter()
     path, score = viterbi(lp, g, P)
@@ -696,7 +780,20 @@ def main():
     ap.add_argument('--jobs', type=int, default=4)
     ap.add_argument('--threads', type=int, default=2)
     ap.add_argument('--params', default='{}', help='JSON overrides of DEFAULTS')
+    ap.add_argument('--lexicon', action='store_true', help='build cache/lexicon.json (every distinct word, alone)')
     args = ap.parse_args()
+    if args.lexicon:
+        from quran_transcript import Aya
+        key = Key(Hisn())
+        counts = {}
+        for (s, a) in key.words.vindex:
+            for w in Aya(s, a).get().uthmani.split(' '):
+                counts[w] = counts.get(w, 0) + 1
+        lex = [{'text': w, 'sounds': key.phonetize([w])[0], 'n': n} for w, n in counts.items()]
+        (LAB / 'cache').mkdir(exist_ok=True)
+        (LAB / 'cache/lexicon.json').write_text(json.dumps(lex, ensure_ascii=False))
+        print(f'{len(lex)} words -> {LAB / "cache/lexicon.json"}')
+        return
     P = dict(DEFAULTS, **json.loads(args.params))
     run = pathlib.Path(args.run)
     items = sorted(pathlib.Path(args.bench, 'items').glob('*.json'))
