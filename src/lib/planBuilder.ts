@@ -318,3 +318,20 @@ export function applyGroupSelection(
     .sort((a, b) => a - b);
   return [...kept, ...appended];
 }
+
+/** Memorized (and partly memorized) pages a custom plan's days don't hold, ascending (MEM-6). */
+export function pagesOutsidePlan(days: readonly (readonly number[])[], memorized: readonly number[]): number[] {
+  const planned = new Set(days.flat());
+  return [...new Set(memorized)].filter((p) => !planned.has(p)).sort((a, b) => a - b);
+}
+
+/**
+ * Pages added to a plan whose day 0 is today (MEM-6): with tomorrow's pages (day 1, or today's in a
+ * one-day plan), or as a day of their own, tomorrow (the cycle grows by a day).
+ */
+export function addPagesToPlan(days: readonly (readonly number[])[], pages: readonly number[], how: 'tomorrow' | 'own'): number[][] {
+  if (pages.length === 0) return days.map((d) => [...d]);
+  if (how === 'own' || days.length === 0) return insertDay(days.map((d) => [...d]), Math.min(1, days.length), [...pages]);
+  const at = Math.min(1, days.length - 1);
+  return days.map((d, i) => (i === at ? [...d, ...pages.filter((p) => !d.includes(p))] : [...d]));
+}

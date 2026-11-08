@@ -207,9 +207,12 @@ export function weakSpotRows(input: {
   revisions: { day: string; skipped: number[] }[];
   today: string;
   window?: number;
+  /** The window in words ("in 30 days", "since 9 September"); `in ${window} days` when not given. */
+  inWords?: string;
   limit?: number;
 }): WeakSpotRow[] {
   const window = input.window ?? 30;
+  const span = input.inWords ?? `in ${window} days`;
   const skips = new Map<number, number>();
   for (const r of input.revisions) {
     if (!within(r.day, input.today, window)) continue;
@@ -228,8 +231,8 @@ export function weakSpotRows(input: {
     const skipped = Math.max(...run.map((p) => skips.get(p) ?? 0));
     const parts = [
       weakNow ? 'Weak now' : null,
-      weakNow && ratedWeak >= 2 ? `rated weak ${ratedWeak} times in ${window} days` : null,
-      skipped >= 2 ? `${weakNow ? 'skipped' : 'Skipped'} ${skipped} times in ${window} days` : null,
+      weakNow && ratedWeak >= 2 ? `rated weak ${ratedWeak} times ${span}` : null,
+      skipped >= 2 ? `${weakNow ? 'skipped' : 'Skipped'} ${skipped} times ${span}` : null,
     ].filter(Boolean);
     rows.push({
       surah: surahOf(run[0]),

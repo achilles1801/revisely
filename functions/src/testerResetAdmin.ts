@@ -23,12 +23,28 @@ export interface BucketLike {
 export interface FileLike {
   name: string;
   metadata: { md5Hash?: string; size?: string | number; contentType?: string; metadata?: unknown; updated?: string };
-  save(data: string | Buffer, options?: { contentType?: string; resumable?: boolean }): Promise<unknown>;
+  save(data: string | Buffer, options?: { contentType?: string; resumable?: boolean; preconditionOpts?: CreateOnly }): Promise<unknown>;
   download(): Promise<[Buffer, ...unknown[]]>;
-  copy(destination: string): Promise<unknown>;
+  copy(destination: string, options?: { preconditionOpts?: CreateOnly }): Promise<unknown>;
   getMetadata(): Promise<[FileLike['metadata'], ...unknown[]]>;
   delete(): Promise<unknown>;
 }
+
+/**
+ * Writes that only create: each backup file (and each seeded recording) has a name of its own, so
+ * one that exists is never written over. It also makes them safe to send again, so the Storage
+ * client retries one whose connection broke (EPIPE, ECONNRESET), as it does reads. Without a
+ * precondition it never retries an upload: a backup upload's connection broke in RESET-3 on #374's
+ * CI ("write EPIPE"), and the whole reset failed.
+ *
+ * Every Storage write in functions/ must be one of these (storageWrites.test.ts): one save without
+ * a precondition turns retries off for the whole client until the process ends
+ * (@google-cloud/storage 7.19's File.save never turns them back on), and then none of these would
+ * be retried either. Checked through a proxy that cuts an upload's connection: create-only is
+ * saved on the retry, and fails like any other once a plain save has run on that client.
+ */
+export type CreateOnly = { ifGenerationMatch: 0 };
+export const CREATE_ONLY: CreateOnly = { ifGenerationMatch: 0 };
 
 /** Firestore values as JSON, with their types (reset-account.js's encode). */
 export function encode(v: unknown): unknown {
@@ -92,13 +108,13 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
       if (userSnap.exists) docs.push({ path: ref.path, data: encode(userSnap.data()) });
       await walk(ref, docs);
       const body = JSON.stringify({ uid, exportedAt: stampIso, reason: 'tester reset (resetMyData or loadTestScenario)', docs });
-      await bucket.file(`${dir}/firestore.json`).save(body, { contentType: 'application/json', resumable: false });
+      await bucket.file(`${dir}/firestore.json`).save(body, { contentType: 'application/json', resumable: false, preconditionOpts: CREATE_ONLY });
 
       const [files] = await bucket.getFiles({ prefix: recordingPrefix(uid) });
       const listing = [];
       for (const f of files) {
         const dest = `${dir}/files/${f.name}`;
-        await f.copy(dest);
+        await f.copy(dest, { preconditionOpts: CREATE_ONLY });
         const [copied] = await bucket.file(dest).getMetadata();
         if (f.metadata.md5Hash && copied.md5Hash !== f.metadata.md5Hash) {
           throw new Error(`The copy of ${f.name} doesn't match it.`);
@@ -114,7 +130,7 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
       }
       await bucket
         .file(`${dir}/storage.json`)
-        .save(JSON.stringify(listing), { contentType: 'application/json', resumable: false });
+        .save(JSON.stringify(listing), { contentType: 'application/json', resumable: false, preconditionOpts: CREATE_ONLY });
 
       // Read it back before anything is changed.
       const [raw] = await bucket.file(`${dir}/firestore.json`).download();

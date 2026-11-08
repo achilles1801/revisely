@@ -10,14 +10,18 @@ import { reviewedOn } from '../aheadCredit';
 import { formatDayLong, formatMinutesLong } from '../activityFormat';
 import { weekStart } from '../activityHeatmap';
 import { lastRevisedByPage } from '../activityInsights';
-import { juzTiles, type JuzTile } from '../insightsView';
+import { juzTiles, memorizationMonths, monthName, type JuzTile } from '../insightsView';
+import { ayahsOfPages } from '../ayahKeys';
 import { shiftDay } from '../journal';
-import { describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, NBSP, pagesNote, surahName } from '../passages';
+import { describeAyahs, describePageRange, describePassage, firstVerseOfPage, lastVerseOfPage, NBSP, pagesNote, surahName } from '../passages';
 import { getJuzRange, getSurah } from '../quranData';
 import { revisedItems } from './context';
 import type { FactSources } from './facts';
 import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
+import { daysSince, lastRevisedWords, recencyLine as recencyWords, timesWord } from '../recency';
+
+export { timesWord };
 
 export type RatingBand = 'weak' | 'moderate' | 'strong';
 export const bandOf = (rating: number): RatingBand => (rating <= 2 ? 'weak' : rating === 3 ? 'moderate' : 'strong');
@@ -48,6 +52,7 @@ export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
     const colsOk = Array.isArray(c.columns) && c.columns.length >= 1 && c.columns.length <= 3 && c.columns.every((k) => k in TABLE_HEADS);
     return one && rowsOk && colsOk;
   }
+  if (c.kind === 'memorized') return c.months === 6 || c.months === 12;
   return false;
 }
 
@@ -60,8 +65,6 @@ const DAY_MS = 86_400_000;
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / DAY_MS);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
-/** "once", "twice", "3 times". */
-export const timesWord = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
 
 /**
  * "today", "yesterday", "4 days ago". `day` may be a full timestamp: a page's lastRevisedDate is
@@ -69,7 +72,7 @@ export const timesWord = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : 
  * reads it.
  */
 export function agoWords(day: string, today: string): string {
-  const n = daysBetween(day.slice(0, 10), today);
+  const n = daysSince(day, today);
   return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
 }
 
@@ -256,6 +259,24 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
 }
 
 // ---------------------------------------------------------------------------------------------
+// Recency (Smart Tracking off)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * When a part was last revised and how often, for an account without Smart Tracking (REVO-36: no
+ * strength without ratings): "Last revised 4 days ago · 2 times in 30 days". How often counts
+ * revisions of every memorized page (in full), as Revo's attachments do.
+ */
+export function recencyLine(f: RevoPassageFacts): string {
+  if (f.memorized === 0) return 'Not memorized';
+  const t = f.revised.last30;
+  const times = f.memorized === 1 ? t.maxEach : t.minEach;
+  // Revised in part only (some pages, never all of them): the shared wording can't say "in full".
+  const line = times === 0 && t.days > 0 ? `${lastRevisedWords(f.lastRevisedDaysAgo)} · partly in the last 30 days` : recencyWords(f.lastRevisedDaysAgo, times, 30);
+  return f.memorized < f.pages ? `${line} · ${f.memorized} of ${f.pages} pages memorized` : line;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Juz map
 // ---------------------------------------------------------------------------------------------
 
@@ -377,9 +398,10 @@ export function timelineHint(marks: readonly TimelineMark[], days: number): stri
 }
 
 /** A picked revision: "Friday 16 October · weak", "14 days after the time before". */
-export function timelineReadout(mark: TimelineMark): { title: string; line: string } {
+export function timelineReadout(mark: TimelineMark, smart = true): { title: string; line: string } {
   return {
-    title: `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}`,
+    // Smart Tracking off (REVO-36): the day alone, no rating.
+    title: smart ? `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}` : formatDayLong(mark.day),
     line: mark.gap != null ? `${plural(mark.gap, 'day')} after the time before` : 'The first time in this view',
   };
 }
@@ -388,7 +410,7 @@ export function timelineReadout(mark: TimelineMark): { title: string; line: stri
  * Its panel: the ratings the passage got that day, weakest first ("Al-Hashr 17–24 weak · Al-Hashr
  * 4–16 moderate"), and the day's revision ("20 pages revised that day in 27 min").
  */
-export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[]): { ratings: string | null; line: string } {
+export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[], smart = true): { ratings: string | null; line: string } {
   const ratings = ratingsOn(logs, mark.day);
   const byBand: Record<RatingBand, number[]> = { weak: [], moderate: [], strong: [] };
   for (const p of mark.pages) {
@@ -399,7 +421,7 @@ export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[])
   const total = reviewedOn(logs, mark.day).size;
   const minutes = logs.filter((l) => l.date === mark.day).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
   return {
-    ratings: parts.length > 0 ? parts.join(' · ') : null,
+    ratings: smart && parts.length > 0 ? parts.join(' · ') : null,
     line: `${plural(total, 'page')} revised that day${minutes > 0 ? ` in ${formatMinutesLong(minutes)}` : ''}`,
   };
 }
@@ -582,6 +604,48 @@ export function sortRows(rows: readonly TableRow[], col: RevoTableColumn, worstF
       return a.k === b.k ? a.i - b.i : (a.k - b.k) * dir;
     })
     .map((x) => x.r);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Memorized by month
+// ---------------------------------------------------------------------------------------------
+
+/** A day's memorization record, as Insights loads them (firestoreService getMemorizationsBetween). */
+export interface MemorizedDay {
+  day: string;
+  pages: number[];
+}
+
+/** Pages memorized in each of the last `months` months, oldest first: Insights' own count (memorizationMonths). */
+export function memorizedMonthsData(items: readonly MemorizedDay[], today: string, months: 6 | 12): { month: string; pages: number }[] {
+  return memorizationMonths([...items], today.slice(0, 7)).slice(-months);
+}
+
+/** Some pages named by their ayahs, the memorization model's way (lib/passages describeAyahs): "Al-Ma'idah 32–82". */
+const ayahWords = (pages: readonly number[]) => describeAyahs(ayahsOfPages(pages), { form: 'compact' });
+
+/** A month's days that memorized something, oldest first: each named by its ayahs. */
+export function monthDays(items: readonly MemorizedDay[], month: string): { day: string; name: string; pages: number }[] {
+  const byDay = new Map<string, Set<number>>();
+  for (const i of items) {
+    if (i.day.slice(0, 7) !== month) continue;
+    const set = byDay.get(i.day) ?? new Set<number>();
+    for (const p of i.pages) set.add(p);
+    byDay.set(i.day, set);
+  }
+  return [...byDay]
+    .filter(([, pages]) => pages.size > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, pages]) => ({ day, name: ayahWords([...pages]), pages: pages.size }));
+}
+
+/** A picked month: "October · 9 pages", "Al-Ma'idah 32–82" (or that nothing was memorized). */
+export function monthReadout(bar: { month: string; pages: number }, items: readonly MemorizedDay[]): { title: string; line: string } {
+  const pages = [...new Set(items.filter((i) => i.day.slice(0, 7) === bar.month).flatMap((i) => i.pages))];
+  return {
+    title: `${monthName(bar.month)} · ${plural(bar.pages, 'page')}`,
+    line: pages.length > 0 ? ayahWords(pages) : `Nothing memorized in ${monthName(bar.month)}`,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------

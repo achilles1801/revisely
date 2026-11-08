@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import type { UserPage } from '../../../types';
-import { pagesStrip, sortRows, stripEnds, TABLE_HEADS, tableCell, WORST_FIRST, type RatingBand, type TableRow } from '../../../lib/revo/charts';
+import { pagesStrip, recencyLine, sortRows, stripEnds, TABLE_HEADS, tableCell, WORST_FIRST, type RatingBand, type TableRow } from '../../../lib/revo/charts';
 import { passagePreview } from '../../../lib/revo/facts';
 import { describePageRange, spokenText } from '../../../lib/passages';
 import type { RevoTableColumn } from '../../../lib/revo/types';
@@ -24,6 +24,7 @@ export function TableChart({
   userPages,
   onReviseFirst,
   onOpenPage,
+  smart = true,
   testID = 'revo-chart-table',
 }: {
   title: string;
@@ -34,9 +35,14 @@ export function TableChart({
   userPages: readonly UserPage[];
   onReviseFirst?: (pages: number[]) => Promise<void>;
   onOpenPage?: (page: number) => void;
+  /** The account's Smart Tracking: off, no weak or strength column and no strip (REVO-36). */
+  smart?: boolean;
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // Without ratings, strength means nothing: when and how often stand in for it.
+  const strengthless = columns.filter((c) => c !== 'weak' && c !== 'strength');
+  const shownColumns: readonly RevoTableColumn[] = smart ? columns : strengthless.length > 0 ? strengthless : ['lastRevised', 'times30'];
   const [sort, setSort] = useState<{ col: RevoTableColumn; worst: boolean } | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const shown = useMemo(() => (sort ? sortRows(rows, sort.col, sort.worst) : rows), [rows, sort]);
@@ -71,12 +77,12 @@ export function TableChart({
         <Text style={[styles.head, styles.name, { color: palette.secondary }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
           {byJuz ? 'Juz' : 'Surah'}
         </Text>
-        {columns.map(head)}
+        {shownColumns.map(head)}
         <View style={styles.chevron} />
       </View>
       {shown.map((r) => {
         const isOpen = open === r.key;
-        const cells = columns.map((c) => ({ c, ...tableCell(c, r.facts) }));
+        const cells = shownColumns.map((c) => ({ c, ...tableCell(c, r.facts) }));
         return (
           <View key={r.key} style={[styles.item, { borderBottomColor: palette.separator }]}>
             <Tap
@@ -102,7 +108,7 @@ export function TableChart({
               ))}
               <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={15} color={palette.secondary} style={styles.chevron} />
             </Tap>
-            {isOpen ? <RowDetail row={r} byJuz={byJuz} userPages={userPages} onReviseFirst={onReviseFirst} onOpenPage={onOpenPage} testID={testID} /> : null}
+            {isOpen ? <RowDetail row={r} byJuz={byJuz} smart={smart} userPages={userPages} onReviseFirst={onReviseFirst} onOpenPage={onOpenPage} testID={testID} /> : null}
           </View>
         );
       })}
@@ -113,6 +119,7 @@ export function TableChart({
 function RowDetail({
   row,
   byJuz,
+  smart,
   userPages,
   onReviseFirst,
   onOpenPage,
@@ -120,6 +127,7 @@ function RowDetail({
 }: {
   row: TableRow;
   byJuz: boolean;
+  smart: boolean;
   userPages: readonly UserPage[];
   onReviseFirst?: (pages: number[]) => Promise<void>;
   onOpenPage?: (page: number) => void;
@@ -131,12 +139,14 @@ function RowDetail({
   for (const s of strip) if (s.band) counts[s.band]++;
   const ends = stripEnds(row.pages);
   // A juz is named by its surahs; a surah (already named) by what the app shows for it.
-  const line = byJuz ? describePageRange(row.pages[0], row.pages[row.pages.length - 1], { wholeJuz: false }) : passagePreview(row.facts);
+  const line = byJuz ? describePageRange(row.pages[0], row.pages[row.pages.length - 1], { wholeJuz: false }) : smart ? passagePreview(row.facts) : recencyLine(row.facts);
   return (
     <View style={styles.detail} testID={`${testID}-detail`}>
       <DetailLine text={line} />
+      {/* Smart Tracking off: when and how often, in place of the strip (REVO-36). */}
+      {!smart && byJuz ? <DetailLine text={recencyLine(row.facts)} testID={`${testID}-recency`} /> : null}
       {/* Nothing rated (not memorized, or never revised): no strip, only where to go. */}
-      {strip.some((s) => s.band) ? (
+      {smart && strip.some((s) => s.band) ? (
         <>
           <RatingStrip cells={strip.map((s) => s.band)} first={ends.first} last={ends.last} />
           <RatingCounts counts={counts} />

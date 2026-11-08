@@ -10,13 +10,17 @@ import type { FirestorePage, FirestoreSession, FirestoreUser } from '../../types
 import type { OutboxEntry } from '../../lib/offline/ops';
 
 // ---- the signed-in account (AuthContext) and Firebase Auth's current user
-const mockAuth: { firebaseUser: { uid: string } | null; provisionalUid: string | null } = {
+const mockAuth: { firebaseUser: { uid: string } | null; provisionalUid: string | null; appGone?: boolean } = {
   firebaseUser: { uid: 'u1' },
   provisionalUid: null,
 };
 jest.mock('../AuthContext', () => ({ useAuth: () => mockAuth }));
 jest.mock('firebase/auth', () => ({
-  getAuth: () => ({ currentUser: mockAuth.firebaseUser }),
+  getAuth: () => {
+    // Firebase's app deleted (a scenario's phone closed): Auth can't be asked any more.
+    if (mockAuth.appGone) throw new Error("Firebase: No Firebase App '[DEFAULT]' has been created (app/no-app).");
+    return { currentUser: mockAuth.firebaseUser };
+  },
 }));
 
 // ---- Firestore's listeners: the test plays the server (or its absence)
@@ -36,6 +40,7 @@ const mockService = {
   getUserFromServer: jest.fn(),
   getAllPagesFromServer: jest.fn(),
   getRecentSessionsFromServer: jest.fn(),
+  createMissingPages: jest.fn(async () => 0),
 };
 jest.mock('../../services/firestoreService', () => {
   const actual = jest.requireActual('../../services/firestoreService');
@@ -43,6 +48,8 @@ jest.mock('../../services/firestoreService', () => {
     userUpdateFields: actual.userUpdateFields,
     isDeletingAccount: () => false,
     isResettingAccount: () => false,
+    isInitializingPages: () => false,
+    createMissingPages: (...a: unknown[]) => mockService.createMissingPages(...(a as [])),
     subscribeToUser: (cb: never, _uid: string, onError: never) => {
       mockListeners.user = cb;
       mockListeners.userError = onError;
@@ -176,6 +183,7 @@ beforeEach(async () => {
   resetSyncForTests();
   mockAuth.firebaseUser = { uid: 'u1' };
   mockAuth.provisionalUid = null;
+  mockAuth.appGone = false;
   mockServer.online = false;
   mockServer.applied = [];
   Object.values(mockService).forEach((f) => f.mockClear());
@@ -647,5 +655,37 @@ describe('online, as before', () => {
     await settle();
     expect(mockService.userDocExistsOnServer).toHaveBeenCalledWith('u1');
     expect(mockService.createUser).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }));
+  });
+});
+
+describe('closing while missing pages are being created', () => {
+  it('a failure that comes after the screen has gone schedules nothing and asks Firebase nothing', async () => {
+    jest.useFakeTimers();
+    let fail!: (err: unknown) => void;
+    mockService.createMissingPages.mockImplementationOnce(
+      () =>
+        new Promise<number>((_resolve, reject) => {
+          fail = reject;
+        }),
+    );
+    const { unmount } = view();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10);
+    });
+    // A sign-up that stopped between its batches: 450 of the 604 pages, so the rest are created.
+    act(() => mockListeners.user!(fsUser, { fromCache: false }));
+    act(() => mockListeners.pages!(fsPages.slice(0, 450), { fromCache: false }));
+    expect(mockService.createMissingPages).toHaveBeenCalledTimes(1);
+
+    // Closed while that is on its way; it fails afterwards (Firestore shutting down). Its retry
+    // used to be scheduled anyway, after the timers were cleared, and asked Auth with no app
+    // there: a scenario that ran next failed with "No Firebase App" (Preview run 42443712061, Nov 8 2026).
+    unmount();
+    mockAuth.appGone = true;
+    await act(async () => {
+      fail(Object.assign(new Error('Firestore shutting down'), { code: 'aborted' }));
+      await jest.advanceTimersByTimeAsync(120_000);
+    });
+    expect(mockService.createMissingPages).toHaveBeenCalledTimes(1);
   });
 });

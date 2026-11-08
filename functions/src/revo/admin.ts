@@ -2,6 +2,7 @@
  * Revo's Firestore store (firebase-admin). Only these functions write Revo's documents; the
  * rules let the owner read them and change only a few fields (firestore.rules).
  *   users/{uid}.previewTester                      read: the tester gate
+ *   users/{uid}.smartTrackingEnabled               read: whether Revo speaks of ratings (REVO-36)
  *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn; optIn is the Ask coach's
  *   revoUsage/{uid}                                { uid, day, count }: questions on that revision day
  *   users/{uid}/revoChats/{chatId}                 { uid, kind, title, day, createdAt, updatedAt, turns, meta? }
@@ -90,6 +91,11 @@ export function adminRevoStore(db: Firestore): RevoStore {
     async isPreviewTester(uid) {
       const snap = await db.doc(`users/${uid}`).get();
       return snap.exists && snap.get('previewTester') === true;
+    },
+    // As the app reads it (AppContext: `smartTrackingEnabled ?? false`): off unless turned on.
+    async smartTracking(uid) {
+      const snap = await db.doc(`users/${uid}`).get();
+      return snap.exists && snap.get('smartTrackingEnabled') === true;
     },
     async getSettings(uid) {
       const snap = await settingsRef(uid).get();

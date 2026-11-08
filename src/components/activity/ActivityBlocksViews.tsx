@@ -17,13 +17,17 @@ import { revoAvailable } from '../../lib/revo/availability';
 import { logger } from '../../lib/logger';
 import { layoutV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
+import { ActionSheet } from '../v2/ActionSheet';
+import { ChoiceChip } from './ChoiceChip';
+import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabel, rangeSpan, type InsightsRange } from '../../lib/insightsRange';
+import { journalFirstDay } from '../../lib/journal';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useActivityReload } from './useActivityReload';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import type { PreviewBlock, RecordingCounts } from './CalendarMonth';
 
-const WINDOW_DAYS = 90;
 const shiftDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -76,14 +80,29 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     setWeek(weekStartOf(today));
     setPicked(null);
   };
+  // Insights' range (ACT-22): one for the whole tab, kept on the phone like Week | Month.
+  const [range, setRangeState] = useState<InsightsRange>(30);
+  const [rangeMenu, setRangeMenu] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(INSIGHTS_RANGE_KEY)
+      .then((v) => setRangeState(parseRange(v)))
+      .catch(() => undefined);
+  }, []);
+  const setRange = (next: InsightsRange) => {
+    setRangeState(next);
+    AsyncStorage.setItem(INSIGHTS_RANGE_KEY, String(next)).catch(() => undefined);
+  };
   const [data, setData] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsBetween>> | null>(null);
 
-  // The days on screen (the month grid) and the 90 days the insights read.
+  // The days on screen (the month grid) and the days the insights read: the range and as long before
+  // it (Pace compares the two), 90 days at least.
   const shown = useMemo(
     () => (span === 'week' ? weekDays(week) : monthGrid(month).flat().filter((d): d is string => d != null)),
     [span, week, month],
   );
-  const rangeFrom = [shiftDays(today, -WINDOW_DAYS), ...shown].sort()[0];
+  // All time reads from the account's first day (its creation; the items go back that far).
+  const accountStart = useMemo(() => journalFirstDay(user, []), [user]);
+  const rangeFrom = [shiftDays(today, -daysToLoad(range, today, accountStart)), ...shown].sort()[0];
   const rangeTo = [today, ...shown].sort().reverse()[0];
   const load = useCallback(() => {
     firestoreService
@@ -150,7 +169,22 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
   // Pages being learned (`in_progress`): a juz with some, and none memorized, gets the tile's dot.
   const learningSet = useMemo(() => new Set(pages.filter((p) => p.status === 'in_progress').map((p) => p.pageNumber)), [pages]);
   const ratingByPage = useMemo(() => new Map(pages.map((p) => [p.pageNumber, p.weaknessRating])), [pages]);
-  const ratedWeak = useMemo(() => ratedWeakCounts(logs, today), [logs, today]);
+  // Each page's last revision on record, all time (what isn't covered says how long ago).
+  const lastRevisedOn = useMemo(
+    // A page's record is a timestamp ("2026-11-02T09:00:00.000Z"): its day is what counts.
+    () => new Map(pages.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, (p.lastRevisedDate as string).slice(0, 10)])),
+    [pages],
+  );
+  // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked.
+  const openCalendar = (m: string) => {
+    setView('calendar');
+    setMonth(m);
+    setWeek(weekStartOf(m === today.slice(0, 7) ? today : `${m}-01`));
+    setPicked(null);
+  };
+  // The account's first day: a range longer than the account counts from it ("50 of 56 days").
+  const firstDay = useMemo(() => journalFirstDay(user, (data?.revisions ?? []).map((r) => ({ date: r.day }))), [user, data]);
+  const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, rangeSpan(range, today, firstDay).window), [logs, today, range, firstDay]);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
   const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
@@ -170,7 +204,32 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
           tone="ink"
           hug
         />
+        {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
+        {view === 'insights' ? (
+          <ChoiceChip
+            label={rangeLabel(range)}
+            onPress={() => setRangeMenu(true)}
+            accessibilityLabel={`Insights for ${rangeLabel(range)}`}
+            accessibilityHint="Choose how far back Insights look"
+            size="md"
+            testID="insights-range"
+          />
+        ) : null}
       </RNView>
+      <ActionSheet
+        visible={rangeMenu}
+        onClose={() => setRangeMenu(false)}
+        title="Insights for"
+        actions={INSIGHTS_RANGES.map((r) => ({
+          key: `range-${r}`,
+          label: rangeLabel(r),
+          // All time names where it starts (the NOTE: "Since 9 September").
+          subtitle: r === 'all' && firstDay ? `Since ${dayAndMonth(firstDay)}` : undefined,
+          selected: r === range,
+          onPress: () => setRange(r),
+        }))}
+        testID="insights-range-menu"
+      />
       {view === 'calendar' ? (
         <RNView {...swipe.panHandlers} testID="activity-calendar">
           <CalendarMonth
@@ -201,8 +260,13 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             memorizations: yearOfMemorizing,
             capacity: user?.dailyPageCapacity ?? 20,
             revo: revoAvailable(user),
-            smartTracking: user?.smartTrackingEnabled ?? false,
+            smartTracking: smartTrackingOn(user),
+            range,
+            firstDay,
+            lastRevisedOn,
           }}
+          onOpenDay={onOpenDay}
+          onOpenCalendar={openCalendar}
           onReviseTomorrow={onReviseTomorrow}
           onPlanIt={onPlanIt}
           onOpenPage={onOpenPage}
@@ -215,5 +279,5 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
 }
 
 const styles = StyleSheet.create({
-  switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad },
+  switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
 });

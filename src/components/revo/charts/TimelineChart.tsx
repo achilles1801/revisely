@@ -32,6 +32,7 @@ export function TimelineChart({
   today,
   logs,
   onOpenDay,
+  smart = true,
   testID = 'revo-chart-timeline',
 }: {
   title: string;
@@ -41,6 +42,8 @@ export function TimelineChart({
   today: string;
   logs: readonly RevisionLog[];
   onOpenDay?: (day: string) => void;
+  /** The account's Smart Tracking: off, the dots carry no rating (REVO-36). */
+  smart?: boolean;
   testID?: string;
 }) {
   const { palette } = useTheme();
@@ -51,8 +54,8 @@ export function TimelineChart({
   const pickedRef = useRef<number | null>(null);
   const [width, setWidth] = useState(0);
   const mark = picked != null ? data.marks[picked] : null;
-  const readout = mark ? timelineReadout(mark) : null;
-  const detail = mark ? timelineDetail(mark, logs) : null;
+  const readout = mark ? timelineReadout(mark, smart) : null;
+  const detail = mark ? timelineDetail(mark, logs, smart) : null;
   const last = data.marks[data.marks.length - 1];
   // Smaller dots when revisions crowd the line; the ring around a picked one stays 4pt out.
   const dot = width > 0 ? dotSizeFor(data.marks, width) : 14;
@@ -83,7 +86,7 @@ export function TimelineChart({
     >
       <ChartPlot
         testID={`${testID}-plot`}
-        label={`${title}. ${data.marks.length ? data.marks.map((m) => `${shortDate(m.day)}${m.band ? `, ${m.band}` : ''}`).join('; ') : timelineHint(data.marks, days)}`}
+        label={`${title}. ${data.marks.length ? data.marks.map((m) => `${shortDate(m.day)}${smart && m.band ? `, ${m.band}` : ''}`).join('; ') : timelineHint(data.marks, days)}`}
         value={readout ? spokenText(`${readout.title}, ${readout.line}`) : 'Swipe up or down to pick a revision'}
         onStep={(by) => pick(stepIndex(picked, by, data.marks.length))}
         onActivate={() => pick(picked == null && data.marks.length > 0 ? data.marks.length - 1 : null)}
@@ -131,7 +134,7 @@ export function TimelineChart({
             <React.Fragment key={m.day}>
               {picked === i ? <View style={[styles.ring, ringStyle, { left: `${m.at * 100}%`, borderColor: palette.text }]} /> : null}
               <View
-                style={[styles.dot, dotStyle, { left: `${m.at * 100}%`, backgroundColor: color(m.band), opacity: picked != null && picked !== i ? 0.3 : 1 }]}
+                style={[styles.dot, dotStyle, { left: `${m.at * 100}%`, backgroundColor: smart ? color(m.band) : palette.primary, opacity: picked != null && picked !== i ? 0.3 : 1 }]}
                 testID="revo-chart-revision"
               />
             </React.Fragment>
@@ -146,14 +149,16 @@ export function TimelineChart({
           </Text>
         </View>
       </ChartPlot>
-      <Legend
-        items={[
-          { color: color('weak'), label: 'weak', round: true },
-          { color: color('moderate'), label: 'moderate', round: true },
-          { color: color('strong'), label: 'strong', round: true },
-          { color: color(null), label: 'not rated', round: true },
-        ]}
-      />
+      {smart ? (
+        <Legend
+          items={[
+            { color: color('weak'), label: 'weak', round: true },
+            { color: color('moderate'), label: 'moderate', round: true },
+            { color: color('strong'), label: 'strong', round: true },
+            { color: color(null), label: 'not rated', round: true },
+          ]}
+        />
+      ) : null}
     </ChartFrame>
   );
 }

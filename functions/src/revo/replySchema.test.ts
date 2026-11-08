@@ -4,7 +4,7 @@ import { buildCoachRequest } from '../coach/prompt';
 import { buildAskRequest, buildReviewRequest } from './prompt';
 import { parseReply } from './reply';
 import { ACTION_SCHEMAS, CHART_SCHEMAS, REVO_OUTPUT_CONFIG, REVO_REPLY_SCHEMA } from './replySchema';
-import { REVO_NEW_CHART_KINDS, REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TABLE_COLUMNS, REVO_TIMELINE_DAYS, RevoContext } from './types';
+import { REVO_MEMORIZED_MONTHS, REVO_NEW_CHART_KINDS, REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TABLE_COLUMNS, REVO_TIMELINE_DAYS, RevoContext } from './types';
 
 type Schema = Record<string, unknown>;
 
@@ -55,6 +55,7 @@ const charts = [
   { kind: 'weeks', title: 'Eight weeks', weeks: 8 },
   { kind: 'table', title: 'Juz 26–28', juz: [26, 27, 28], columns: ['lastRevised', 'weak'] },
   { kind: 'table', title: 'Three surahs', surahs: [59, 60, 61], columns: ['strength'] },
+  { kind: 'memorized', title: 'Pages memorized', months: 12 },
 ];
 const actions = [
   { kind: 'reviseFirst', title: 'The end of Al-Hashr first', detail: 'Before the rest', pages: [548] },
@@ -70,7 +71,7 @@ describe('Revo’s reply schema', () => {
     expect(Object.keys(CHART_SCHEMAS).sort()).toEqual(['dailyPages', 'pageRatings', ...REVO_NEW_CHART_KINDS].sort());
     expect(Object.keys(ACTION_SCHEMAS).sort()).toEqual(['openPage', 'openScreen', 'reviseFirst', 'startRevision']);
     const enums = walk(REVO_REPLY_SCHEMA).filter((s) => Array.isArray(s.enum)).map((s) => s.enum);
-    expect(enums).toEqual(expect.arrayContaining([[...REVO_SCREENS], [...REVO_SETTINGS_SECTIONS], [...REVO_TABLE_COLUMNS], [...REVO_TIMELINE_DAYS], [7, 30]]));
+    expect(enums).toEqual(expect.arrayContaining([[...REVO_SCREENS], [...REVO_SETTINGS_SECTIONS], [...REVO_TABLE_COLUMNS], [...REVO_TIMELINE_DAYS], [...REVO_MEMORIZED_MONTHS], [7, 30]]));
   });
 
   it('every reply reply.ts keeps is one the schema allows, and the other way round', () => {
@@ -94,6 +95,7 @@ describe('Revo’s reply schema', () => {
       { ...base, chart: { kind: 'dailyPages', title: 'Two weeks', days: 14 } },
       { ...base, chart: { kind: 'timeline', title: 'Al-Hashr', surah: 59, days: 60 } },
       { ...base, chart: { kind: 'table', title: 'x', juz: [26, 27], columns: ['colour'] } },
+      { ...base, chart: { kind: 'memorized', title: 'Pages memorized', months: 3 } },
       { ...base, action: { kind: 'openScreen', title: 'x', detail: '', screen: 'nowhere' } },
       { ...base, action: { kind: 'teleport', title: 'x', detail: '' } },
       { ...base, extra: true },

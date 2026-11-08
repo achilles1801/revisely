@@ -339,6 +339,36 @@ const SAMPLES = [
     note: 'not possible',
     facts: [F('not possible (yet)', /not possible|can’t|cannot|not yet|isn’t (?:possible|something)|no way|there’s no/i), UNSURE],
   },
+  // The interactive Activity and memorizing by the ayah (ACT-18 to ACT-23, MEM-1 to MEM-6, REC-1/2; Nov 8 2026).
+  {
+    q: 'How do I see a week instead of the whole month in Activity?',
+    ctx: steady,
+    facts: [F('the chip beside the calendar’s title', /chip|“?Month”?|⌄/i, true), F('Week', /week/i, true)],
+    screen: 'activity',
+  },
+  {
+    q: 'Can I see my insights for the last 3 months instead of 30 days?',
+    ctx: steady,
+    facts: [F('yes: the range chip on Insights', /chip|30 days/i, true), F('3 months (or All time)', /3 months|all time/i, true)],
+    screen: 'insights',
+  },
+  {
+    q: 'I memorized the first half of Al-Mulk. How do I add just those ayahs?',
+    ctx: steady,
+    facts: [F('Activity → + → Memorized', /memorized/i, true), F('Ayahs, From and To', /ayahs|from and to|from .* to/i, true)],
+    screen: 'activity',
+  },
+  {
+    q: 'I recorded myself reciting in the reader. Where did it go, and how do I add it as memorized?',
+    ctx: steady,
+    facts: [F('saved to that day in Activity', /activity|that day|today/i, true), F('“Add to memorized” on the sitting', /add to memorized/i, true)],
+  },
+  {
+    q: 'How do I open one of the pages I revised yesterday from Activity?',
+    ctx: steady,
+    facts: [F('open the day', /day/i, true), F('tap a page in the Revised strip', /strip|tap (?:a|the) page/i, true), F('it opens in the reader', /reader/i, true)],
+    screen: 'activity',
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------

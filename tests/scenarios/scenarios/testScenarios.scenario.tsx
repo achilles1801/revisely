@@ -31,6 +31,26 @@ const localDate = (day: string) => {
   return new Date(y, m - 1, d);
 };
 
+/**
+ * Whether the phone shows the scenario's plan: the user document's schedule fields, which the
+ * server writes last (after the pages and sessions). Two scenarios can memorize the same pages, so
+ * the pages and sessions alone came in first: RESET-3 then checked "beginner"'s sessions against
+ * "new"'s plan, which starts today (SCHED-5, #400's CI).
+ */
+function planShown(user: Record<string, unknown> | null | undefined, want: Record<string, unknown>): boolean {
+  if (!user) return false;
+  for (const key of ['scheduleMode', 'dailyPageCapacity', 'dailyJuzCount', 'scheduleAnchorDate', 'fajrBoundaryEnabled', 'smartTrackingEnabled']) {
+    if (key in want && user[key] !== want[key]) return false;
+  }
+  if ('customPlan' in want) {
+    const plan = want.customPlan as { cycleStartDate: string; direction: string } | null;
+    const shown = user.customPlan as { days?: unknown[]; cycleStartDate?: string; direction?: string } | null | undefined;
+    if (plan === null) return !shown || !shown.days?.length;
+    return shown?.cycleStartDate === plan.cycleStartDate && shown?.direction === plan.direction;
+  }
+  return true;
+}
+
 /** Loads `scenario` the way Settings does, and waits for the phone to show it. */
 async function load(app: OpenApp, scenario: ScenarioId): Promise<SeedPlan> {
   const lib = app.mods.require<Lib>('src/lib/testScenarios');
@@ -42,6 +62,7 @@ async function load(app: OpenApp, scenario: ScenarioId): Promise<SeedPlan> {
   const dates = plan.sessions.map((s) => s.date).join();
   await app.until(
     () =>
+      planShown(app.app.user as unknown as Record<string, unknown> | null, plan.user) &&
       app.app.onboardingComplete &&
       app.app.pages.filter((p) => p.status === 'memorized').length === plan.pages.length &&
       [...app.app.logs]

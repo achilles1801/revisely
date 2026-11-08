@@ -30,8 +30,10 @@ import { userWithNewSchedule } from '../../lib/planChange';
 import {
   defaultStartPage,
   effectiveDailyPages,
+  addPagesToPlan,
   insertDay,
   moveDay,
+  pagesOutsidePlan,
   PlanDirection,
   planStats,
   removeDay,
@@ -56,7 +58,8 @@ import { ActionSheet } from '../../components/v2/ActionSheet';
 import { useHaptics } from '../../design/haptics';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { getRevisionDateForUser } from '../../lib/fajrBoundary';
-import { revisablePages } from '../../lib/memorizedAyahs';
+import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
+import { describePagesToRevise } from '../../lib/passages';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PlanEdit'>;
 type RouteProps = RouteProp<HomeStackParamList, 'PlanEdit'>;
@@ -170,6 +173,8 @@ export default function PlanEditScreen() {
   const [tempJuzCount, setTempJuzCount] = useState(user?.dailyJuzCount ?? 1);
   // Menus are v2/ActionSheet: a saved plan's Load / Delete.
   const [menuPlan, setMenuPlan] = useState<SavedPlan | null>(null);
+  // "Not in your plan" (MEM-6): its Add's choices.
+  const [notInPlanOpen, setNotInPlanOpen] = useState(false);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
 
   const savedPlans = useMemo(
@@ -200,6 +205,23 @@ export default function PlanEditScreen() {
     () => direction !== initialState.direction || !sameDays(days, initialState.days),
     [days, direction, initialState],
   );
+
+  // Memorized pages a custom plan doesn't hold (MEM-6, testers): it never adds new pages by itself
+  // (pruneCustomPlanForMemorized), so they wait here, named by their ayahs, until added. Read from
+  // the days being edited, so a page added here leaves the list at once.
+  const outsidePlan = useMemo(() => {
+    if (!user?.customPlan || user.previewTester !== true) return [];
+    return pagesOutsidePlan(days, memorizedNumbers);
+  }, [user, days, memorizedNumbers]);
+  const outsideName = useMemo(
+    () => (outsidePlan.length > 0 ? describePagesToRevise(outsidePlan, partlyMemorizedAyahs(pages), { max: 2 }) : ''),
+    [outsidePlan, pages],
+  );
+  // Tomorrow is the cycle's second day: the editor keeps today first.
+  const addOutsideTo = (how: 'tomorrow' | 'own') => {
+    const pagesToAdd = outsidePlan;
+    if (pagesToAdd.length > 0) setDays((prev) => addPagesToPlan(prev, pagesToAdd, how));
+  };
 
   // ---- Leaving with unsaved edits ------------------------------------------
   // Native swipe-back can't be intercepted, so it's disabled while dirty; the
@@ -524,6 +546,23 @@ export default function PlanEditScreen() {
           ) : null}
         </View>
 
+        {outsidePlan.length > 0 ? (
+          <GroupedSection
+            header="Not in your plan"
+            footer="Your custom plan doesn’t add new pages by itself. Add them where they fit, then Save."
+          >
+            <GroupedRow
+              title={outsideName}
+              subtitle={pageCountLabel(outsidePlan.length)}
+              icon="leaf-outline"
+              value="Add"
+              accessory="chevron"
+              onPress={() => setNotInPlanOpen(true)}
+              testID="plan-not-in-plan"
+            />
+          </GroupedSection>
+        ) : null}
+
         {days.length > 0 ? (
           <GroupedSection
             header="Cycle"
@@ -671,6 +710,29 @@ export default function PlanEditScreen() {
         buildWeakest={buildWeakest}
         onApply={applyBuiltPlan}
         longCycleDays={LONG_CYCLE_DAYS}
+      />
+
+      <ActionSheet
+        visible={notInPlanOpen}
+        onClose={() => setNotInPlanOpen(false)}
+        title={`Add ${outsideName}`}
+        actions={[
+          {
+            key: 'tomorrow',
+            label: 'With tomorrow’s pages',
+            subtitle: days.length > 1 ? `${pageCountLabel(days[1].length)}, then ${pageCountLabel(days[1].length + outsidePlan.length)}` : undefined,
+            icon: 'add-circle-outline',
+            onPress: () => addOutsideTo('tomorrow'),
+          },
+          {
+            key: 'own',
+            label: 'As a day of its own, tomorrow',
+            subtitle: `The cycle becomes ${days.length + 1} days`,
+            icon: 'calendar-outline',
+            onPress: () => addOutsideTo('own'),
+          },
+        ]}
+        testID="plan-not-in-plan-menu"
       />
 
       <ActionSheet

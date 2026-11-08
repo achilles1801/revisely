@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 /**
- * Does Revo still answer with its JSON object, and pick a fitting chart, now that it has six chart
- * kinds? Eight chart-shaped questions, each asked a few times of the real model with this
+ * Does Revo still answer with its JSON object, and pick a fitting chart, now that it has seven chart
+ * kinds? Nine chart-shaped questions, each asked a few times of the real model with this
  * checkout's prompt, against a made-up tester account (no user's data). Counts the replies that are
  * the one JSON object, those wrapped in a fence or words, and those in plain prose (no chart, no
  * action, no chips), and which chart each picks. Exits 1 if any reply isn't the bare JSON object.
  * The requests are the functions' own (buildAskRequest), structured output included.
  *
  *   cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/revo-chart-samples.js \
- *     [--times 3] [--out <file.md>] [--dry]
+ *     [--times 3] [--smart-tracking off] [--out <file.md>] [--dry]
+ *
+ * With `--smart-tracking off` the account has Smart Tracking off (REVO-36, Majd's own setting): the
+ * requests say so, and it also exits 1 if the model picks a ratings chart or a weak or strength
+ * column (which the server would drop).
  *
  * The key is read from the environment, sent only to api.anthropic.com, and never written or
- * printed. 24 requests to claude-sonnet-5-5 by default (the system prompt cached after the first):
+ * printed. 27 requests to claude-sonnet-5-5 by default (the system prompt cached after the first):
  * a few cents.
  */
 const fs = require('fs');
@@ -23,7 +27,8 @@ const arg = (name, fallback) => {
   return i >= 0 ? process.argv[i + 1] : fallback;
 };
 const TIMES = Math.max(1, Number(arg('--times', '3')) || 3);
-const OUT = arg('--out', path.join(os.homedir(), 'Documents/revisely-today-mocks/revo/charts/chart-samples.md'));
+const SMART = arg('--smart-tracking', 'on') !== 'off';
+const OUT = arg('--out', path.join(os.homedir(), `Documents/revisely-today-mocks/revo/charts/chart-samples${SMART ? '' : '-smart-off'}.md`));
 const DRY = process.argv.includes('--dry');
 
 const lib = path.join(__dirname, '..', 'lib');
@@ -94,10 +99,25 @@ const SAMPLES = [
   { q: 'How often do I revise Al-Hashr?', fits: ['timeline'] },
   { q: 'Which days do I usually miss?', fits: ['weeks'] },
   { q: 'Compare Juz 26, 27 and 28.', fits: ['table'] },
-  { q: 'Why do the end of Al-Hashr and the start of Al-Mumtahanah keep slipping?', fits: ['pageRatings', 'timeline'] },
+  { q: 'Why do the end of Al-Hashr and the start of Al-Mumtahanah keep slipping?', fits: SMART ? ['pageRatings', 'timeline'] : ['timeline'] },
+  { q: 'How much have I memorized this year?', fits: ['memorized'] },
 ];
 
-const request = (q) => buildAskRequest({ day: DAY, question: q, context, attach: null, attached: [], memory: [], history: [] });
+const request = (q) => buildAskRequest({ day: DAY, question: q, context, attach: null, attached: [], memory: [], history: [], smartTracking: SMART });
+
+/** A chart the model chose that shows strength (its raw pick, before the server drops it). */
+function strengthPick(raw) {
+  try {
+    const t = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const c = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)).chart;
+    if (!c || typeof c !== 'object') return null;
+    if (c.kind === 'pageRatings') return 'pageRatings';
+    if (c.kind === 'table' && Array.isArray(c.columns) && c.columns.some((k) => k === 'weak' || k === 'strength')) return `table [${c.columns.join(',')}]`;
+  } catch {
+    // not JSON: counted as such elsewhere
+  }
+  return null;
+}
 
 /**
  * What the reply is: the bare JSON object (as the prompt asks), the object in a fence or with words
@@ -128,14 +148,14 @@ async function ask(q) {
   if (!res.ok) throw new Error(`Anthropic answered ${res.status}: ${json?.error?.type ?? 'error'}${json?.error?.message ? ` (${String(json.error.message).slice(0, 300)})` : ''}`);
   const raw = (json.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
   // As the handler reads it: charts and actions only on pages the context named.
-  const reply = parseReply(raw, new Set(contextPages(context)), { firstTurn: true });
+  const reply = parseReply(raw, new Set(contextPages(context)), { firstTurn: true, smartTracking: SMART });
   const chart = reply?.visual ?? reply?.chart ?? null;
-  return { raw, reply, chart, shape: shapeOf(raw), stop: json.stop_reason, out: json.usage?.output_tokens };
+  return { raw, reply, chart, shape: shapeOf(raw), strength: SMART ? null : strengthPick(raw), stop: json.stop_reason, out: json.usage?.output_tokens };
 }
 
 const describe = (c) => {
   if (!c) return 'none';
-  const extra = c.kind === 'dailyPages' ? ` ${c.days}d` : c.kind === 'timeline' ? ` ${c.surah ? `surah ${c.surah}` : `juz ${c.juz}`} ${c.days}d` : c.kind === 'weeks' ? ` ${c.weeks}w` : c.kind === 'table' ? ` ${c.juz ? `juz ${c.juz.join(',')}` : `surahs ${c.surahs.join(',')}`} [${c.columns.join(',')}]` : c.kind === 'pageRatings' ? ` ${c.pages.join(',')}` : '';
+  const extra = c.kind === 'memorized' ? ` ${c.months}m` : c.kind === 'dailyPages' ? ` ${c.days}d` : c.kind === 'timeline' ? ` ${c.surah ? `surah ${c.surah}` : `juz ${c.juz}`} ${c.days}d` : c.kind === 'weeks' ? ` ${c.weeks}w` : c.kind === 'table' ? ` ${c.juz ? `juz ${c.juz.join(',')}` : `surahs ${c.surahs.join(',')}`} [${c.columns.join(',')}]` : c.kind === 'pageRatings' ? ` ${c.pages.join(',')}` : '';
   return `${c.kind}${extra}`;
 };
 
@@ -151,11 +171,12 @@ const describe = (c) => {
   const lines = [
     '# Revo’s charts: does it still answer in JSON, and which chart does it pick?',
     '',
-    `Real replies from claude-sonnet-5-5 with this checkout’s prompt, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. Each question asked ${TIMES} times; a made-up account (Juz 28, 20 pages a day, the end of Al-Hashr weak).`,
+    `Real replies from claude-sonnet-5-5 with this checkout’s prompt, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. Each question asked ${TIMES} times; a made-up account (Juz 28, 20 pages a day, the end of Al-Hashr weak), Smart Tracking ${SMART ? 'on' : 'off'}.`,
     '',
   ];
   const off = [];
   const fitsMissed = [];
+  const strengthPicks = [];
   for (const s of SAMPLES) {
     lines.push(`## “${s.q}” (fits: ${s.fits.join(' or ')})`, '');
     for (let i = 1; i <= TIMES; i++) {
@@ -163,6 +184,7 @@ const describe = (c) => {
       counts[r.shape]++;
       const fits = r.chart ? s.fits.includes(r.chart.kind) : false;
       if (r.shape !== 'json') off.push(`“${s.q}” #${i}: ${r.shape}`);
+      if (r.strength) strengthPicks.push(`“${s.q}” #${i}: ${r.strength}`);
       if (!fits) fitsMissed.push(`“${s.q}” #${i}: ${describe(r.chart)}`);
       const bare = r.reply ? barePageNumbers(replyWords(r.reply)) : [];
       console.log(`${s.q} #${i}: ${r.shape} · chart ${describe(r.chart)}${fits ? '' : ' (doesn’t fit)'} · ${r.out} tokens${bare.length ? ` · PAGE NUMBERS: ${bare.join(', ')}` : ''}`);
@@ -180,13 +202,15 @@ const describe = (c) => {
     '',
     fitsMissed.length ? `Charts that don’t fit the question (or none): ${fitsMissed.length} of ${total}:\n${fitsMissed.map((x) => `- ${x}`).join('\n')}` : 'Every reply picked a fitting chart.',
     '',
+    ...(SMART ? [] : [strengthPicks.length ? `❌ Strength picked with Smart Tracking off: ${strengthPicks.length}:\n${strengthPicks.map((x) => `- ${x}`).join('\n')}` : '✅ No strength picked with Smart Tracking off.', '']),
   ];
   lines.splice(4, 0, ...summary);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, lines.join('\n'));
   console.log(`\n${summary.join('\n')}\nWrote ${OUT}`);
-  if (off.length) {
-    console.error(`Not the bare JSON object:\n${off.join('\n')}`);
+  if (off.length || strengthPicks.length) {
+    if (off.length) console.error(`Not the bare JSON object:\n${off.join('\n')}`);
+    if (strengthPicks.length) console.error(`Strength with Smart Tracking off:\n${strengthPicks.join('\n')}`);
     process.exit(1);
   }
 })().catch((err) => {

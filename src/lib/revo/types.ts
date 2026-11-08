@@ -179,7 +179,9 @@ export type RevoNewChart =
   /** The last `weeks` weeks (4–12), a day a cell: done, in part or missed. */
   | { kind: 'weeks'; title: string; weeks: number }
   /** Juz or surahs (exactly one list, 2–8 of them) side by side, in 1–3 of the columns. */
-  | { kind: 'table'; title: string; juz?: number[]; surahs?: number[]; columns: RevoTableColumn[] };
+  | { kind: 'table'; title: string; juz?: number[]; surahs?: number[]; columns: RevoTableColumn[] }
+  /** Pages memorized each month, over the last 6 or 12. */
+  | { kind: 'memorized'; title: string; months: 6 | 12 };
 export const REVO_TABLE_COLUMNS = ['lastRevised', 'times30', 'weak', 'strength', 'memorized'] as const;
 export type RevoTableColumn = (typeof REVO_TABLE_COLUMNS)[number];
 export type RevoVisual = RevoChart | RevoNewChart;

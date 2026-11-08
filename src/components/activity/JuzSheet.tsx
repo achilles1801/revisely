@@ -18,6 +18,7 @@ import { prepare } from '../../lib/revo/facts';
 import { juzAttachment } from '../../lib/revo/attachments';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { logger } from '../../lib/logger';
+import { smartTrackingOn } from '../../lib/smartTracking';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Sheet } from '../v2/Sheet';
 import { Tap } from '../v2/Tap';
@@ -53,6 +54,8 @@ export function JuzSheet({
   today,
   revised,
   windowDays = 30,
+  windowWords,
+  windowInTheLast,
   onOpenPage,
   onPlanIt,
 }: {
@@ -63,6 +66,10 @@ export function JuzSheet({
   /** Revision items covering the window, when the host has them; otherwise the sheet reads them. */
   revised?: Revised;
   windowDays?: number;
+  /** The window in words ("in 30 days", "since 9 September"). */
+  windowWords?: string;
+  /** "in the last 30 days", "since 9 September". */
+  windowInTheLast?: string;
   /** The reader at a page (pushed over the screen, so back returns: ACT-20). */
   onOpenPage: (page: number) => void;
   /** A stale juz: put its memorized pages first tomorrow (the untouched row's Plan it). */
@@ -89,13 +96,13 @@ export function JuzSheet({
       live = false;
     };
   }, [juz, revised, today, windowDays]);
-  const smartTracking = user?.smartTrackingEnabled === true;
+  const smartTracking = smartTrackingOn(user);
   const model = useMemo(
     () =>
       shown == null
         ? null
-        : juzSheetModel({ juz: shown, today, pages, revised: revised ?? loaded ?? [], windowDays, smartTracking }),
-    [shown, today, pages, revised, loaded, windowDays, smartTracking],
+        : juzSheetModel({ juz: shown, today, pages, revised: revised ?? loaded ?? [], windowDays, windowWords, windowInTheLast, smartTracking }),
+    [shown, today, pages, revised, loaded, windowDays, windowWords, windowInTheLast, smartTracking],
   );
   // What a tap leads to runs once the sheet has gone (iOS can't present Revo, or move the stack
   // cleanly, while the sheet's modal is being dismissed).
@@ -234,18 +241,15 @@ export function JuzSheet({
               testID={`juz-surah-${s.sura}`}
             >
               <View style={[styles.dot, s.state === 'not-memorized' || s.state === 'learning' ? { backgroundColor: palette.heat[0] } : look(s.state)]} />
-              <Text style={[typeV2.name, styles.rowName, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
-                {s.name}
-              </Text>
-              <Text
-                style={[typeV2.meta, styles.rowText, { color: s.alert ? palette.red : palette.secondary }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                maxFontSizeMultiplier={MAX_SCALE}
-              >
-                {s.text}
-              </Text>
+              {/* The name, and what it is under it (recency's line is long: "Last revised … in 30 days"). */}
+              <View style={styles.rowMain}>
+                <Text style={[typeV2.name, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                  {s.name}
+                </Text>
+                <Text style={[typeV2.meta, { color: s.alert ? palette.red : palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                  {s.text}
+                </Text>
+              </View>
               <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
             </Tap>
           ))}
@@ -285,8 +289,7 @@ const styles = StyleSheet.create({
   rule: { height: StyleSheet.hairlineWidth, marginTop: 16 },
   row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  rowName: { flexShrink: 1 },
-  rowText: { flex: 1, textAlign: 'right' },
+  rowMain: { flex: 1 },
   foot: { paddingTop: 16, paddingBottom: 8 },
   footButton: { alignSelf: 'flex-start' },
 });

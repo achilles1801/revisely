@@ -1,0 +1,264 @@
+# A tester's sitting in the reader, then part of it added as memorized from the Day, by the ayah, and
+# undone (the memorization flow approved Nov 7 2026). In the reader, the timer and a recording run
+# together; End stops both and one note says what was saved ("Saved to today: Al-Mulk, ayahs 1–12,
+# 1 min · View"), with no "Recording saved" of its own. View opens the Day: the sitting, named by its
+# ayahs, offers Add to memorized. The sheet opens on its ayahs; To moved back a few ayahs, Add shows
+# them at once ("Memorized, 8 ayahs", what finishes the page), and Undo takes them off again.
+# Rules (BEHAVIOUR.md): REC-1, REC-2, MEM-1, MEM-3, MEM-5
+# The account: onboarded (Juz 30 and Al-Fatihah memorized, so Al-Mulk's first page, 562, is not), then
+# marked a tester through the emulator, as the owner's script does: sittings are testers' only.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T12:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+
+# The reader at Al-Mulk (page 562): Read → the surah's row.
+- tapOn:
+    id: tab-Read
+- extendedWaitUntil:
+    visible:
+      id: read-index-v2
+    timeout: 15000
+# Centred: found at the list's foot, a row can sit behind the tab bar, and the tap then lands on Read,
+# which scrolls the list back to the top (Android, Nov 8 2026).
+- scrollUntilVisible:
+    element:
+      id: surah-67
+    direction: DOWN
+    timeout: 60000
+    centerElement: true
+- tapOn:
+    id: surah-67
+# The reader opens with its controls hidden; a tap high on the page shows them (E2E builds load no
+# page images, and "Try again" sits in the middle).
+- extendedWaitUntil:
+    visible:
+      id: reader-quiet-footer
+    timeout: 15000
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: timer-chip-idle
+          commands:
+            - tapOn:
+                point: 50%, 30%
+      - extendedWaitUntil:
+          visible:
+            id: timer-chip-idle
+          timeout: 5000
+- assertVisible: "Page 562.*"
+
+# The stopwatch: the chip grows into the card; Start; the card goes back into the chip.
+- tapOn:
+    id: timer-chip-idle
+- extendedWaitUntil:
+    visible:
+      id: timer-start
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: timer-start
+- extendedWaitUntil:
+    visible:
+      id: timer-end
+    timeout: 10000
+# A tap outside the card shrinks it back (its backdrop: "Close timer" is in Android's tree, not iOS's).
+- tapOn:
+    point: 50%, 25%
+- extendedWaitUntil:
+    visible:
+      id: timer-chip-running
+    timeout: 10000
+
+# A recording beside it. While recording, the screen never settles (a live timer and waveform):
+# don't wait for it after these taps. If the microphone's alert comes up (its grant didn't take: CI),
+# Allow, as a user would, and record if that didn't start it.
+- tapOn:
+    id: record-start
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: record-stop
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: record-stop
+    commands:
+      - runFlow: ../subflows/system-alert.yaml
+      - extendedWaitUntil:
+          visible:
+            id: record-stop
+          timeout: 3000
+          optional: true
+      - tapOn:
+          id: record-start
+          optional: true
+          waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: record-stop
+    timeout: 10000
+
+# A page counts as read once it has been on screen a minute (HELD_MS, lib/readingTimer): about 65 s
+# on page 562 (Maestro has no sleep).
+- extendedWaitUntil:
+    visible:
+      id: e2e-never-shown
+    timeout: 65000
+    optional: true
+
+# End (REC-1): the timer's End stops the recording too, and one note says what was saved.
+- tapOn:
+    id: timer-chip-running
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: timer-end
+    timeout: 10000
+- tapOn:
+    id: timer-end
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "Saved to today: Al.Mulk, ayahs.1.12, [1-3].min"
+    timeout: 15000
+- assertNotVisible:
+    id: record-stop
+- assertNotVisible: "Recording saved"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 13-reader-saved
+# The backup notice can come up about now (the first recording); a tap on View under it would be lost.
+- runFlow: ../subflows/backup-notice.yaml
+
+# View opens the Day, while the note is up (6 s). On a slow simulator it can go before the tap: then
+# the way a user finds the day later, Activity → the day.
+- runFlow:
+    when:
+      visible: "Saved to today: .*"
+    commands:
+      - tapOn:
+          text: "View"
+          optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: activity-day-v2
+    commands:
+      - tapOn: "Back"
+      - tapOn:
+          id: tab-Home
+      - tapOn:
+          id: open-activity
+      - extendedWaitUntil:
+          visible:
+            id: activity-blocks-views
+          timeout: 20000
+      - tapOn:
+          id: calendar-day-2026-11-03
+      - tapOn: "Open the day"
+- extendedWaitUntil:
+    visible:
+      id: activity-day-v2
+    timeout: 15000
+
+# The Day (REC-2): the sitting is named by what it held, its recording hangs under it, and its page
+# not memorized yet is offered (MEM-1).
+- extendedWaitUntil:
+    visible: "Read, 1 page"
+    timeout: 15000
+# The row is one button for VoiceOver: its name and what a tap does read together.
+- assertVisible: "Al.Mulk, ayahs.1.12(. Edit pages)?"
+- assertVisible:
+    id: recording-play-.*
+- assertVisible: "Al.Mulk, ayahs.1.12 isn’t memorized yet."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 13-day-sitting
+
+# Add to memorized: the sheet opens on the Ayahs tab, on the sitting's ayahs (all 12).
+- tapOn:
+    id: activity-add-memorized-.*
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-sheet
+    timeout: 10000
+- waitForAnimationToEnd
+- assertVisible:
+    id: add-memorized-ayahs
+    text: "Al.Mulk.1.12 · 12 ayahs"
+# Already on the sitting's ayahs: no "From your reading" offering them again.
+- assertNotVisible:
+    id: add-memorized-from-reading
+# To, a few ayahs back: its wheels, then the ayah wheel flicked down (it moves to earlier ayahs). The
+# wheel is one adjustable element on iOS, so it is moved by a swipe, not a tap on a row; again if a
+# flick didn't take.
+- tapOn:
+    id: add-memorized-to-ayah
+- extendedWaitUntil:
+    visible:
+      id: add-memorized-to-ayah-picker-ayah
+    timeout: 5000
+- repeat:
+    while:
+      visible:
+        id: add-memorized-ayahs
+        text: ".* · 12 ayahs"
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: add-memorized-to-ayah-picker-ayah
+          direction: DOWN
+          duration: 400
+      - waitForAnimationToEnd
+- assertVisible:
+    id: add-memorized-ayahs
+    text: "Al.Mulk.1.([1-9]|1[01]) · ([1-9]|1[01]) ayahs?"
+- assertVisible:
+    id: add-memorized-share
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 13-add-memorized
+- tapOn:
+    id: add-memorized-add
+- extendedWaitUntil:
+    notVisible:
+      id: add-memorized-sheet
+    timeout: 10000
+
+# At once (MEM-1, MEM-5): the Day counts ayahs (part of a page), says what finishes the page, and
+# offers Undo.
+- extendedWaitUntil:
+    visible: "Memorized, ([1-9]|1[01]) ayahs?"
+    timeout: 10000
+- assertVisible:
+    id: activity-finishes-page
+    text: "Al.Mulk.*12 finishes the page"
+- assertVisible: ".*marked memorized"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 13-day-memorized
+
+# Undo (MEM-3): the ayahs come off; the Day has nothing memorized again and offers the page.
+- tapOn: "Undo"
+- extendedWaitUntil:
+    notVisible:
+      id: activity-block-memorized
+    timeout: 10000
+- assertVisible: "Al.Mulk, ayahs.1.12 isn’t memorized yet."

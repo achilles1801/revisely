@@ -71,6 +71,11 @@ export type ReserveResult = { ok: true; count: number } | { ok: false; reason: '
 
 export interface RevoStore {
   isPreviewTester(uid: string): Promise<boolean>;
+  /**
+   * users/{uid}.smartTrackingEnabled, as the app reads it: off unless turned on (REVO-36). Left out
+   * (an older store), Revo answers as before the setting was read: with ratings.
+   */
+  smartTracking?(uid: string): Promise<boolean>;
   /** coachSettings/{uid}: Revo's own switch (`revoOn`, read as optIn; the Ask coach's optIn is separate), memoryOn (default true). */
   getSettings(uid: string): Promise<RevoSettings>;
   setSettings(uid: string, patch: Partial<RevoSettings>): Promise<RevoSettings>;
@@ -151,8 +156,9 @@ const utcDay = (now: Date) => now.toISOString().slice(0, 10);
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
 /** The answer cache's key: the day, the question as typed (normalized), the context and the memory in use. */
-export function answerKey(day: string, question: string, context: RevoContext, memoryIds: readonly string[]): string {
-  const input = JSON.stringify({ day, question: norm(question), context, memory: [...memoryIds].sort() });
+export function answerKey(day: string, question: string, context: RevoContext, memoryIds: readonly string[], smartTracking = true): string {
+  // With Smart Tracking off the answer differs (REVO-36); on, the key is what it always was.
+  const input = JSON.stringify({ day, question: norm(question), context, memory: [...memoryIds].sort(), ...(smartTracking ? {} : { smartTracking: false }) });
   return createHash('sha256').update(input).digest('hex');
 }
 
@@ -309,8 +315,14 @@ async function remember(
   return { ids: merged.after.map((m) => m.id), added: merged.add.length };
 }
 
+/** Whether the account has Smart Tracking on (REVO-36). */
+async function smartTrackingOf(deps: RevoDeps, uid: string): Promise<boolean> {
+  return deps.store.smartTracking ? deps.store.smartTracking(uid) : true;
+}
+
 export async function handleRevoAsk(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoAskResult> {
   const { uid, settings } = await gate(auth, deps, true);
+  const smartTracking = await smartTrackingOf(deps, uid);
   const b = body(data, ['chatId', 'day', 'question', 'context', 'attach', 'attachments']);
   const started = deps.now();
   const chatId = checked(() => validateChatId(b.chatId));
@@ -332,7 +344,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   // A first question with nothing attached: the same one again today is free.
   const cacheable = !chat && attached.length === 0;
   if (cacheable) {
-    const hit = await deps.store.getAnswer(uid, answerKey(day, question, context, memory.map((m) => m.id)));
+    const hit = await deps.store.getAnswer(uid, answerKey(day, question, context, memory.map((m) => m.id), smartTracking));
     if (hit) {
       const id = deps.store.newId();
       const q = userMessage(deps.store.newId(), uid, atAsk, question, []);
@@ -351,7 +363,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
     throw new RevoError('resource-exhausted', MESSAGES.daily, { reason: 'daily' });
   }
 
-  const request = buildAskRequest({ day, question, context, attached, memory: memory.map((m) => m.text), history, chat });
+  const request = buildAskRequest({ day, question, context, attached, memory: memory.map((m) => m.text), history, chat, smartTracking });
   let result: Awaited<ReturnType<typeof metered>>;
   try {
     result = await metered(deps, request, 'answer');
@@ -365,7 +377,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   }
 
   const allowed = new Set([...contextPages(context), ...attached.flatMap(attachmentPages), ...history.flatMap((m) => attachmentsOf(m).flatMap(attachmentPages))]);
-  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat });
+  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking });
   if (!parts) {
     await deps.store.releaseQuestion(uid, day);
     deps.log({ event: 'failed', code: 'no-text' });
@@ -390,7 +402,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   // Kept under the memory as it is now, which the same question asks with next time.
   if (cacheable) {
     const { remember: _r, title: _t, ...reply } = parts;
-    await deps.store.setAnswer(uid, answerKey(day, question, context, memoryIds), day, { title, reply });
+    await deps.store.setAnswer(uid, answerKey(day, question, context, memoryIds, smartTracking), day, { title, reply });
   }
   deps.log({ event: 'saved', attach: attached.map((a) => a.kind).join(',') || undefined, history: history.length, memory: memory.length, remembered: added });
   return {
@@ -418,6 +430,7 @@ async function existingReview(deps: RevoDeps, uid: string, chat: RevoChat): Prom
 /** Once per account and revision day; not counted against the day's questions; none when capped. */
 export async function handleDayInReview(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoReviewResult> {
   const { uid, settings } = await gate(auth, deps, true);
+  const smartTracking = await smartTrackingOf(deps, uid);
   const b = body(data, ['day', 'context']);
   const now = deps.now();
   const day = revisionDay(b.day, now);
@@ -430,9 +443,9 @@ export async function handleDayInReview(auth: { uid: string } | undefined, data:
   if (t.revisedPages === 0 && t.memorizedPages === 0 && t.minutes === 0) return { none: true };
 
   const memory = settings.memoryOn ? (await deps.store.listMemory(uid, REVO_MEMORY_CAP * 2)).slice(0, REVO_MEMORY_CAP) : [];
-  const result = await metered(deps, buildReviewRequest({ day, context, memory: memory.map((m) => m.text) }), 'review');
+  const result = await metered(deps, buildReviewRequest({ day, context, memory: memory.map((m) => m.text), smartTracking }), 'review');
   if (result === 'capped') return { none: true };
-  const parts = parseReply(result.reply.text, new Set(contextPages(context)), { firstTurn: false });
+  const parts = parseReply(result.reply.text, new Set(contextPages(context)), { firstTurn: false, smartTracking });
   if (!parts) {
     deps.log({ event: 'failed', code: 'no-text' });
     throw new RevoError('unavailable', MESSAGES.noAnswer);
