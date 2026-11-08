@@ -128,7 +128,7 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-juz-day-${THEME}
-- tapOn: "Close"
+- runFlow: close-sheet.yaml
 - extendedWaitUntil:
     notVisible:
       id: juz-sheet-strip
@@ -319,7 +319,7 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-juz-sheet-${THEME}
-- tapOn: "Close"
+- runFlow: close-sheet.yaml
 - extendedWaitUntil:
     notVisible:
       id: juz-sheet-strip
@@ -335,7 +335,7 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-juz-stale-${THEME}
-- tapOn: "Close"
+- runFlow: close-sheet.yaml
 - extendedWaitUntil:
     notVisible:
       id: juz-sheet-strip
@@ -403,7 +403,7 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-uncovered-${THEME}
-- tapOn: "Close"
+- runFlow: close-sheet.yaml
 - extendedWaitUntil:
     notVisible:
       id: insights-uncovered
@@ -464,4 +464,4 @@ appId: com.revisionbuddy.app
           file: shot.yaml
           env:
             NAME: 09-insights-pace-${THEME}
-      - tapOn: "Close"
+      - runFlow: close-sheet.yaml
