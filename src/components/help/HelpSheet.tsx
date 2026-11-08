@@ -46,7 +46,14 @@ function TopicText({ text }: { text: string }) {
 function TopicRow({ topic, marks }: { topic: HelpTopic; marks: boolean }) {
   const { palette } = useTheme();
   return (
-    <View style={styles.topic} testID={`help-topic-${topic.id}`} accessible>
+    // One element for VoiceOver and TalkBack: the title, then the words. Its own label, since iOS
+    // otherwise built one from every text inside, the mark's icon glyph first ("\uf539, Missed days").
+    <View
+      style={styles.topic}
+      testID={`help-topic-${topic.id}`}
+      accessible
+      accessibilityLabel={`${topic.title}, ${helpPlainText(topic.text)}`}
+    >
       {marks ? (
         <View style={[styles.mark, { backgroundColor: palette.fill }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Ionicons name={topic.icon} size={16} color={palette.text} />

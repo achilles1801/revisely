@@ -100,6 +100,11 @@ describe('the help on Home', () => {
     expect(app.screen.queryByText('How Home works')).not.toBeNull();
     const topics = app.screen.queryAllByTestId(/^help-topic-/).map((t) => t.props.testID);
     expect(topics).toEqual(['help-topic-home.today', 'help-topic-home.missed', 'help-topic-home.streak', 'help-topic-home.memorized']);
+    // Each topic is one element for VoiceOver and TalkBack: its title, then its words, and no icon
+    // glyph (iOS read the mark's font character first: "\uf539, Missed days, …").
+    const labels = app.screen.queryAllByTestId(/^help-topic-/).map((t) => String(t.props.accessibilityLabel));
+    expect(labels.map((l) => l.split(', ')[0])).toEqual(['Today', 'Missed days', 'Streak', 'Memorized']);
+    expect(labels.filter((l) => /[\uE000-\uF8FF]/.test(l))).toEqual([]);
     const text = flatText(app.screen.getByTestId('help-sheet-home'));
     // The labels it names are the ones Home shows; no page numbers (NAME-1).
     expect(text).toContain('Jump to…');
