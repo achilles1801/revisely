@@ -107,7 +107,13 @@ export function ChartPlot({
       .maxDistance(10)
       .runOnJS(true)
       .onEnd((e, ok) => {
-        if (ok) latest.current.onTap(e.x, e.y, size.current);
+        if (!ok) return;
+        // The pick waits a frame, for the touch to end in React Native too. A pick that put a
+        // panel away shrank the chat while the touch was still down there: on iOS the scroll it
+        // caused gave the chat's ScrollView the touch, whose end never came, and it kept it, so
+        // the next tap anywhere did nothing (flow 09, Nov 8 2026).
+        const { x, y } = e;
+        requestAnimationFrame(() => latest.current.onTap(x, y, size.current));
       })
       .withTestId(`${testID}-tap`);
     if (!slides) return tap;
