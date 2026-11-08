@@ -451,6 +451,16 @@ appId: com.revisionbuddy.app
     env:
       NAME: 09-insights-end-${THEME}
 # Pace's timed revisions (ACT-23, mock i11). (The hours scrub is a press that slides: no Maestro step.)
+# To the middle first: left at the foot of the screen, the link sat partly under the tab bar, and a
+# tap on its centre landed on the bar's Read half (Android, #328's run 42462860603: the app went to
+# Read and tabs-merge-screens.yaml found no Insights).
+- scrollUntilVisible:
+    element:
+      id: insights-pace-revisions
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    optional: true
 - tapOn:
     id: insights-pace-revisions
     optional: true
