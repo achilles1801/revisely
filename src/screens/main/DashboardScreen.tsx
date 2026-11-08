@@ -40,7 +40,7 @@ import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
-import { TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
+import { HEADER_MAX_SCALE, TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
@@ -69,6 +69,8 @@ import { pendingEntries } from '../../lib/offline/outbox';
 import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
+import { HelpButton } from '../../components/help/HelpButton';
+import { HelpToast } from '../../components/help/HelpToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
 import type { User } from '../../types';
 import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
@@ -561,6 +563,7 @@ export default function DashboardScreen() {
           carrying={carrying}
           ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
           onAhead={() => aheadNext && navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day })}
+          help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
         />
 
         {showKahfCard && (
@@ -604,6 +607,7 @@ export default function DashboardScreen() {
         revisionDate={revisionDate}
         onJump={handleJump}
       />
+      <HelpToast screen="home" bottomInset={tabFootprint} />
       <UndoToast
         visible={!!jumped}
         message={jumped?.message ?? ''}

@@ -280,6 +280,8 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 
 /** Rules with nothing for a user to ask Revo about, on purpose, and why. */
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
+  'HELP-1': 'the help buttons (testers); the guide gets them with its next re-record',
+  'HELP-2': 'hiding the help buttons (testers); the guide gets it with its next re-record',
   'ONBOARD-2': 'the server repairs a sign-up stopped half way; nothing to do',
   'SYNC-4': 'a new account loads with no relaunch; nothing to do',
   'ACCOUNT-2': 'the sign-in screen keeps what was typed after a failed attempt; Revo is for signed-in users',
