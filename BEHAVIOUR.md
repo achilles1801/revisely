@@ -443,6 +443,21 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   notes as written. What couldn't be read is sent as not known, never as nothing. The server refuses a day after the
   question's day, or whose place ("2 days ago") or figures don't match it.
 
+## Memorizing
+
+- **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7
+  2026). A page is memorized when every ayah on it is. A page with some of its ayahs memorized is partly
+  memorized, and keeps which ones. Adding a page's last ayah makes it memorized, whether it came in one
+  sitting or several. Adding ayahs to a memorized page, or ones already memorized, changes nothing.
+- **MEM-2.** How much is memorized is measured in pages. A partly memorized page counts for the share of
+  the page its memorized ayahs fill: their length on the page, not how many they are. This holds for
+  Home's % memorized and its juz dots, the manager's progress and a juz's share. Ayahs differ in length
+  (Juz 30 is 9% of the ayahs and under 4% of the pages), so the share follows the text. A surah is
+  memorized once every one of its own ayahs is, also when it ends partway down a page.
+- **MEM-3.** Taking ayahs off the memorized takes only those. A memorized page keeps its other ayahs as
+  partly memorized, and a page left with none is not memorized. Taking off just what was added puts every
+  page back as it was.
+
 ## Naming the Qur'an
 
 - **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers
@@ -452,7 +467,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   At-Takwir", "5 pages revised today") and Keep going. Amounts are fine ("20 pages"). Page numbers
   stay only as a quiet detail after the words (the › sheet's "… · pp. 542–561"), inside the reader
   and the session (the printed page), and where the user chooses by page (Jump to's Page tab, From
-  and To).
+  and To). Any ayahs, not only whole pages, are named the same way: whole surahs and juz by name,
+  the rest by surah and ayah ("Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15"). Whole pages and
+  the ayahs they hold read alike.
 
 ## Known bugs
 

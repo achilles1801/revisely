@@ -368,6 +368,11 @@ export interface FirestorePage {
   totalRevisionCount: number;
   /** Number of times this page was assigned but skipped */
   skipCount: number;
+  /**
+   * A 'learning' page's memorized ayahs, sura × 1000 + ayah (lib/memorizedAyahs). Read only while
+   * the status is 'learning': a build before ayahs (1.0.3) re-marking the page leaves them behind.
+   */
+  verses?: number[];
   /** Last time any field was updated */
   updatedAt: Timestamp;
 }

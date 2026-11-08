@@ -28,7 +28,8 @@ export function formatPercent(fraction: number): string {
 /** How much is memorized: "17.9% of the Quran memorized", and each juz's share (the dots). */
 export function memorizedText(pages: UserPage[]) {
   const stats = computeMemorizationStats(pages);
-  const fraction = stats.pages / 604;
+  // A partly memorized page counts by its share of the page (MEM-2).
+  const fraction = stats.share / 604;
   return {
     body: `${formatPercent(fraction)} of the Quran memorized`,
     /** Of the 604 pages. */

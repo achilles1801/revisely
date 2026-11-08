@@ -30,6 +30,7 @@
 // tests), `spokenText` reads it for VoiceOver ("ayahs 142 to 176").
 
 import pageVerseTable from '../data/pageVerses.json';
+import { ayahOf, ayahRuns, firstAyahOfPage, lastAyahOfPage, nextAyah, pageOfAyah, previousAyah, suraOf } from './ayahKeys';
 import { getMushafEdition, MushafEditionId } from './mushafEdition';
 import { getJuzForPage, getJuzRange, getSurah, getSurahDisplay } from './quranData';
 
@@ -94,7 +95,6 @@ export function surahName(sura: number): string {
 const juzLabel = (a: number, b: number) => (a === b ? `Juz${NBSP}${a}` : `Juz${NBSP}${a}–${b}`);
 const juzStart = (j: number) => getJuzRange(j).start;
 const juzEnd = (j: number) => getJuzRange(j).end;
-const endsJuz = (page: number) => page === juzEnd(getJuzForPage(page));
 
 interface Run {
   first: number;
@@ -123,17 +123,36 @@ function runsOf(pages: Iterable<number>, order: 'mushaf' | 'given'): Run[] {
   return runs;
 }
 
+/** A run of ayahs, first to last (sura × 1000 + ayah, lib/ayahKeys). */
+interface AyahRun {
+  from: number;
+  to: number;
+}
+
+/** A run of pages as its ayahs: its first page's first to its last page's last. */
+const ayahsOfRun = (run: Run, edition: MushafEditionId): AyahRun => ({
+  from: firstAyahOfPage(run.first, edition),
+  to: lastAyahOfPage(run.last, edition),
+});
+
+/** The ayahs a juz span holds: its first page's first ayah to its last page's last. */
+const juzAyahs = (a: number, b: number, edition: MushafEditionId): AyahRun => ({
+  from: firstAyahOfPage(juzStart(a), edition),
+  to: lastAyahOfPage(juzEnd(b), edition),
+});
+
 /**
- * One run of pages, in words; may begin "the start of" / "the end of". `alone`:
+ * One run of ayahs, in words; may begin "the start of" / "the end of". `alone`:
  * the only part named ("Al-Baqarah, ayahs 142–176"); in a list it loses the
- * comma ("Juz 21–28 and Al-Mulk 1–12").
+ * comma ("Juz 21–28 and Al-Mulk 1–12"). A run of whole pages is the ayahs they hold.
  */
-function runPhrase(run: Run, form: PassageForm, wholeJuz: boolean, edition: MushafEditionId, alone = true): string {
-  const ja = getJuzForPage(run.first);
-  const jb = getJuzForPage(run.last);
-  if (wholeJuz && run.first === juzStart(ja) && run.last === juzEnd(jb)) return juzLabel(ja, jb);
-  const f = firstVerseOfPage(run.first, edition);
-  const l = lastVerseOfPage(run.last, edition);
+function ayahPhrase(run: AyahRun, form: PassageForm, wholeJuz: boolean, edition: MushafEditionId, alone = true): string {
+  const ja = getJuzForPage(pageOfAyah(run.from, edition));
+  const jb = getJuzForPage(pageOfAyah(run.to, edition));
+  const juz = juzAyahs(ja, jb, edition);
+  if (wholeJuz && run.from === juz.from && run.to === juz.to) return juzLabel(ja, jb);
+  const f = { sura: suraOf(run.from), ayah: ayahOf(run.from) };
+  const l = { sura: suraOf(run.to), ayah: ayahOf(run.to) };
   const a = surahName(f.sura);
   const b = surahName(l.sura);
   const startsSurah = f.ayah === 1;
@@ -150,39 +169,55 @@ function runPhrase(run: Run, form: PassageForm, wholeJuz: boolean, edition: Mush
   }
   if (form === 'short') return `${a} to ${b}`;
   const from = startsSurah ? a : `${a}${NBSP}${f.ayah}`;
-  const to = endsSurah ? b : endsJuz(run.last) ? `the end of Juz${NBSP}${jb}` : `${b}${NBSP}${l.ayah}`;
+  const endsJuz = run.to === lastAyahOfPage(juzEnd(jb), edition);
+  const to = endsSurah ? b : endsJuz ? `the end of Juz${NBSP}${jb}` : `${b}${NBSP}${l.ayah}`;
   return `${from} to ${to}`;
 }
 
+/** One run of pages, in words (ayahPhrase on the ayahs it holds). */
+function runPhrase(run: Run, form: PassageForm, wholeJuz: boolean, edition: MushafEditionId, alone = true): string {
+  return ayahPhrase(ayahsOfRun(run, edition), form, wholeJuz, edition, alone);
+}
+
 interface Part {
-  run: Run;
+  run: AyahRun;
   juz?: [number, number];
 }
 
 /**
- * A run of a set (memorized pages, say) in parts: the whole juz inside it apart
+ * A run of a set (memorized ayahs, say) in parts: the whole juz inside it apart
  * from what is left at either end ("Juz 21–28 and Al-Mulk 1–12"). Only when the
  * run holds two whole juz or more, spans surahs and can't be named by surahs
  * alone: "At-Tahrim to An-Nas" and "Adh-Dhariyat 7 to Al-Hadid" stay as they are,
  * and so does a run inside one surah ("Al-Baqarah, ayahs 127–269", not "the end
  * of Juz 1, Juz 2 and …").
  */
-function runParts(run: Run, wholeJuz: boolean, edition: MushafEditionId): Part[] {
+function runParts(run: AyahRun, wholeJuz: boolean, edition: MushafEditionId): Part[] {
   const whole: Part[] = [{ run }];
   if (!wholeJuz) return whole;
-  const f = firstVerseOfPage(run.first, edition);
-  const l = lastVerseOfPage(run.last, edition);
-  if (f.sura === l.sura) return whole;
-  if (f.ayah === 1 && l.ayah === ayahCount(l.sura)) return whole;
-  let ja = getJuzForPage(run.first);
-  if (juzStart(ja) < run.first) ja += 1;
-  let jb = getJuzForPage(run.last);
-  if (juzEnd(jb) > run.last) jb -= 1;
-  if (jb - ja < 1 || (run.first === juzStart(ja) && run.last === juzEnd(jb))) return whole;
+  const fs = suraOf(run.from);
+  const ls = suraOf(run.to);
+  if (fs === ls) return whole;
+  if (ayahOf(run.from) === 1 && ayahOf(run.to) === ayahCount(ls)) return whole;
+  // The whole pages inside the run: a juz can only be whole on them.
+  const fp = pageOfAyah(run.from, edition);
+  const lp = pageOfAyah(run.to, edition);
+  const firstWhole = run.from === firstAyahOfPage(fp, edition) ? fp : fp + 1;
+  const lastWhole = run.to === lastAyahOfPage(lp, edition) ? lp : lp - 1;
+  if (lastWhole < firstWhole) return whole;
+  let ja = getJuzForPage(firstWhole);
+  if (juzStart(ja) < firstWhole) ja += 1;
+  let jb = getJuzForPage(lastWhole);
+  if (juzEnd(jb) > lastWhole) jb -= 1;
+  if (jb - ja < 1) return whole;
+  const juz = juzAyahs(ja, jb, edition);
+  if (run.from === juz.from && run.to === juz.to) return whole;
   const parts: Part[] = [];
-  if (run.first < juzStart(ja)) parts.push({ run: { first: run.first, last: juzStart(ja) - 1 } });
-  parts.push({ run: { first: juzStart(ja), last: juzEnd(jb) }, juz: [ja, jb] });
-  if (run.last > juzEnd(jb)) parts.push({ run: { first: juzEnd(jb) + 1, last: run.last } });
+  const before = previousAyah(juz.from);
+  const after = nextAyah(juz.to);
+  if (run.from < juz.from && before != null) parts.push({ run: { from: run.from, to: before } });
+  parts.push({ run: juz, juz: [ja, jb] });
+  if (run.to > juz.to && after != null) parts.push({ run: { from: after, to: run.to } });
   return parts;
 }
 
@@ -227,15 +262,49 @@ export function describePassage(pages: Iterable<number>, opts: PassageOptions = 
   } else if (order === 'given') {
     text = runPhrase(runs[0], form, wholeJuz, edition);
   } else {
-    const parts = runs.flatMap((r) => runParts(r, wholeJuz, edition));
-    const alone = parts.length === 1;
-    text = andList(
-      more(parts.map((p) => (p.juz ? juzLabel(p.juz[0], p.juz[1]) : runPhrase(p.run, form, wholeJuz, edition, alone)))),
-    );
+    text = partsText(runs.map((r) => ayahsOfRun(r, edition)), form, wholeJuz, edition, more);
   }
 
   if (opts.juz && !text.includes(`Juz${NBSP}`)) {
     const juz = juzOfPages(list);
+    if (juz) text = `${text} · ${juz}`;
+  }
+  return finish(text, opts.sentence);
+}
+
+/** Runs of ayahs in mushaf order, joined "A, B and C", whole juz carved out (runParts). */
+function partsText(
+  runs: AyahRun[],
+  form: PassageForm,
+  wholeJuz: boolean,
+  edition: MushafEditionId,
+  more: (parts: string[]) => string[],
+): string {
+  const parts = runs.flatMap((r) => runParts(r, wholeJuz, edition));
+  const alone = parts.length === 1;
+  return andList(more(parts.map((p) => (p.juz ? juzLabel(p.juz[0], p.juz[1]) : ayahPhrase(p.run, form, wholeJuz, edition, alone)))));
+}
+
+/**
+ * Any ayahs in words, not only whole pages (sura × 1000 + ayah, lib/ayahKeys):
+ * "Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15", "Juz 1–6, Juz 21–28 and
+ * Al-Mulk 1–20". Named exactly as describePassage names the same ayahs: whole
+ * surahs and juz by name, the rest by surah and ayah. Always in mushaf order.
+ * '' for none.
+ */
+export function describeAyahs(keys: Iterable<number>, opts: Omit<PassageOptions, 'order'> = {}): string {
+  const form = opts.form ?? 'long';
+  const wholeJuz = opts.wholeJuz ?? true;
+  const edition = opts.edition ?? getMushafEdition();
+  const max = Math.max(1, opts.max ?? 3);
+  const runs = ayahRuns(keys);
+  if (runs.length === 0) return '';
+  const more = (parts: string[]) =>
+    parts.length > max ? [...parts.slice(0, max - 1), `${parts.length - max + 1} more`] : parts;
+  let text = partsText(runs, form, wholeJuz, edition, more);
+  if (opts.juz && !text.includes(`Juz${NBSP}`)) {
+    const pages = runs.flatMap((r) => [pageOfAyah(r.from, edition), pageOfAyah(r.to, edition)]);
+    const juz = juzOfPages(pages);
     if (juz) text = `${text} · ${juz}`;
   }
   return finish(text, opts.sentence);
