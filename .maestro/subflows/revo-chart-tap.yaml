@@ -5,17 +5,38 @@
 #   env ID: the element's id
 appId: com.revisionbuddy.app
 ---
-# First the keyboard goes. With it up, the list ends just above the middle of the screen, where
-# Maestro starts every scroll (scrollUntilVisible's, and hideKeyboard's on iOS), so nothing moved
-# and the chart stayed under the header (iOS run 42440690949). A tap at the foot of the list, in
-# its blank bottom padding (or beside the last answer's icons, which sit on the left), is one no
-# control takes, so the list puts the keyboard away (keyboardShouldPersistTaps="handled"). The list
-# is at its end after every answer and every tap on a chart, so with the keyboard down it does nothing.
-- tapOn:
-    id: revo-messages
-    point: '50%,97%'
-- waitForAnimationToEnd:
-    timeout: 2000
+# First the keyboard goes. With it up, the list ends above the middle of the screen, where Maestro
+# starts every scroll (scrollUntilVisible's, and hideKeyboard's on iOS): on iOS nothing moved and
+# the chart stayed under the header (run 42440690949); on Android the centring scroll pushed a
+# table row behind the composer, and the tap focused the text field instead (#328's run 42443281434).
+# A tap at the foot of the list, in its blank bottom padding (or beside the last answer's icons,
+# which sit on the left), is one no control takes, so the list puts the keyboard away
+# (keyboardShouldPersistTaps="handled"). Only while the keyboard is up, which is right after a
+# question, with the list at its end: after a scroll the foot can hold a chart's row.
+# Keyboard up: iOS lists the keyboard's keys (shift) with the app; Android marks the field focused.
+- runFlow:
+    when:
+      platform: iOS
+      visible:
+        id: shift
+    commands:
+      - tapOn:
+          id: revo-messages
+          point: '50%,97%'
+      - waitForAnimationToEnd:
+          timeout: 2000
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        id: revo-input
+        focused: true
+    commands:
+      - tapOn:
+          id: revo-messages
+          point: '50%,97%'
+      - waitForAnimationToEnd:
+          timeout: 2000
 - scrollUntilVisible:
     element:
       id: ${ID}
