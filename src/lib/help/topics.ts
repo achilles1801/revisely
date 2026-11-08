@@ -274,7 +274,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'alert-circle-outline',
         title: 'Weak spots',
         text: 'Pages you rated weak, or often skipped. Tap one to read it; the button under them puts them first tomorrow.',
-        covers: ['ACT-12', 'ACT-8', 'ACT-20'],
+        covers: ['ACT-12', 'ACT-8', 'ACT-20', 'ACT-24'],
         when: 'smartTracking',
       },
       {

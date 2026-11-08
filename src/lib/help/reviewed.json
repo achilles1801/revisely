@@ -62,7 +62,7 @@
   },
   "activity.calendar": {
     "ACT-3": "9911173a493dc520",
-    "ACT-18": "c0205b0a2a3bd89b"
+    "ACT-18": "bf9231cef3097199"
   },
   "activity.day": {
     "DAY-9": "d1f48e9dc60411f1",
@@ -76,7 +76,7 @@
   "insights.coverage": {
     "ACT-4": "a304caca52f119a4",
     "ACT-21": "b309872a5b9f1cb8",
-    "ACT-22": "a26141f2d1e9983e"
+    "ACT-22": "c9c5d346459454a8"
   },
   "insights.consistency": {
     "ACT-4": "a304caca52f119a4",
@@ -85,7 +85,8 @@
   "insights.weak": {
     "ACT-12": "af7c5a40d965c592",
     "ACT-8": "17530ba6416770ba",
-    "ACT-20": "e576925144fbc092"
+    "ACT-20": "e576925144fbc092",
+    "ACT-24": "e0ad1d847229e20f"
   },
   "insights.pace": {
     "ACT-4": "a304caca52f119a4",
