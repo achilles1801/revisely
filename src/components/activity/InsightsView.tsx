@@ -38,11 +38,11 @@ import { PaceSheet } from './PaceSheet';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
-  beforeWords,
+  coverageCycles,
   coveragePercent,
   memorizedIn,
   missedPattern,
-  rangeWords,
+  rangeSpan,
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
@@ -64,7 +64,7 @@ export interface InsightsData {
   revo: boolean;
   /** Smart Tracking: without it no page is rated, so Weak spots is hidden (ACT-12). Unset counts as on. */
   smartTracking?: boolean;
-  /** The range every section reads (ACT-22): 7 days, 30 days (unset) or 3 months. */
+  /** The range every section reads (ACT-22): 7 days, 30 days (unset), 3 months or All time. */
   range?: InsightsRange;
   /** The account's first day: a range longer than the account counts from it. */
   firstDay?: string | null;
@@ -114,7 +114,16 @@ export function InsightsView({
       <Memorization data={data} onOpenDay={onOpenDay} />
       <Pace data={data} onOpenDay={onOpenDay} />
       {juzUsed ? (
-        <JuzSheet juz={juz} onClose={() => setJuz(null)} today={data.today} revised={data.revised} windowDays={data.range ?? 30} onOpenPage={onOpenPage} onPlanIt={onPlanIt} />
+        <JuzSheet
+          juz={juz}
+          onClose={() => setJuz(null)}
+          today={data.today}
+          revised={data.revised}
+          windowDays={rangeSpan(data.range ?? 30, data.today, data.firstDay).window}
+          windowWords={rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}
+          onOpenPage={onOpenPage}
+          onPlanIt={onPlanIt}
+        />
       ) : null}
     </View>
   );
@@ -197,7 +206,8 @@ function Figure({
 
 function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt: (pages: number[]) => void; onOpenJuz: (juz: number) => void }) {
   const { palette } = useTheme();
-  const days = data.range ?? 30;
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const days = span.window;
   const last = useMemo(() => lastRevisedByPage(data.revised, data.today), [data.revised, data.today]);
   const tiles = useMemo(() => juzTiles(data.memorized, data.learning, last, data.today), [data.memorized, data.learning, last, data.today]);
   const count = coverageCount(data.memorized, last, data.today, days);
@@ -262,8 +272,13 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
       testID="insights-coverage"
     >
       <Figure
-        value={`${pct}%`}
-        text={`${count.revised} of ${count.of} memorized pages in ${rangeWords(days)}`}
+        // All time in cycles: over a long range the share nears 100%, so how many times round says more.
+        value={span.all ? coverageCycles(data.revised, data.today, count.of) : `${pct}%`}
+        text={
+          span.all
+            ? `${coverageCycles(data.revised, data.today, count.of) === '1' ? 'cycle' : 'cycles'} of your ${count.of} memorized pages ${span.inWords}`
+            : `${count.revised} of ${count.of} memorized pages ${span.inWords}`
+        }
         onPress={
           count.revised < count.of
             ? () => {
@@ -330,7 +345,7 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
         <Sheet
           visible={uncoveredOpen}
           onClose={() => setUncoveredOpen(false)}
-          title={`Not revised in ${rangeWords(days)}`}
+          title={`Not revised ${span.inWords}`}
           message={`${count.of - count.revised} of ${count.of} memorized pages`}
           scroll
           onHidden={() => {
@@ -352,7 +367,7 @@ function Coverage({ data, onPlanIt, onOpenJuz }: { data: InsightsData; onPlanIt:
             />
           ))}
           <Text style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
-            {`Every other memorized page was revised in the last ${rangeWords(days)}.`}
+            {`Every other memorized page was revised ${span.inTheLast}.`}
           </Text>
         </Sheet>
       ) : null}
@@ -399,20 +414,25 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   // ACT-4: a day counts with a revision or a read.
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
   const range = data.range ?? 30;
+  const span = rangeSpan(range, data.today, data.firstDay);
   const week = weekCircles(active, data.today);
   const month = reportMonth(data.today);
   const m = monthCount(active, month, data.today);
-  const inRange = activeDays(active, data.today, range, data.firstDay);
-  // 3 months: a weeks grid by weekday and the missed days' pattern; 7 and 30 days: the week's circles.
-  const grid = range === 90 ? weeksGrid(active, data.today, 13, data.firstDay) : null;
-  const pattern = range === 90 ? missedPattern(active, data.today, range, data.firstDay) : null;
+  const inRange = activeDays(active, data.today, span.window, data.firstDay);
+  // 3 months and All time: a weeks grid by weekday (up to half a year) and the missed days' pattern;
+  // 7 and 30 days: the week's circles.
+  const gridWeeks = range === 90 ? 13 : span.all ? Math.min(26, Math.ceil(span.window / 7) + 1) : 0;
+  const grid = gridWeeks > 0 ? weeksGrid(active, data.today, gridWeeks, data.firstDay) : null;
+  const pattern = gridWeeks > 0 ? missedPattern(active, data.today, span.window, data.firstDay) : null;
   const figureText =
     range === 7
       ? `of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`
-      : inRange.sinceStart
-        ? `of ${inRange.of} days since you started`
-        : `of the last ${inRange.of} days`;
-  const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, range), [data.revised, data.read, data.today, range]);
+      : span.all
+        ? `of ${inRange.of} days ${span.inWords}`
+        : inRange.sinceStart
+          ? `of ${inRange.of} days since you started`
+          : `of the last ${inRange.of} days`;
+  const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, span.window), [data.revised, data.read, data.today, span.window]);
   // The hours scrub (i8): a press that slides picks the hour under the finger; letting go puts it back.
   const [heldHour, setHeldHour] = useState<number | null>(null);
   const barsWidth = React.useRef(0);
@@ -430,7 +450,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  const held = heldHour == null ? null : hourDetail([...data.revised, ...data.read], data.today, range, rangeWords(range), heldHour);
+  const held = heldHour == null ? null : hourDetail([...data.revised, ...data.read], data.today, span.window, span.inWords, heldHour);
   const busiest = busiestHours(hours);
   const max = Math.max(1, ...hours);
 
@@ -502,7 +522,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
           <Text style={[typeV2.name, { color: palette.text }]} testID="insights-hours-title">
             {held ? held.title : busiest}
           </Text>
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : `Minutes by hour, last ${rangeWords(range)}`}</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : `Minutes by hour, ${span.lastWords}`}</Text>
           <GestureDetector gesture={scrub}>
             <View style={styles.hourBars} onLayout={(e) => (barsWidth.current = e.nativeEvent.layout.width)} testID="insights-hour-bars">
               {hours.map((v, h) => (
@@ -519,7 +539,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
                       : { height: 3, backgroundColor: palette.track },
                   ]}
                   accessible
-                  accessibilityLabel={`${hourDetail([], data.today, range, rangeWords(range), h).title}, ${v > 0 ? minutesWords(v) : 'nothing timed'}`}
+                  accessibilityLabel={`${hourDetail([], data.today, span.window, span.inWords, h).title}, ${v > 0 ? minutesWords(v) : 'nothing timed'}`}
                 />
               ))}
             </View>
@@ -579,14 +599,14 @@ function WeakSpots({
     ratedWeak: data.ratedWeak,
     revisions: data.revised.filter((r) => r.day === r.countsFor),
     today: data.today,
-    window: data.range ?? 30,
-    windowWords: rangeWords(data.range ?? 30),
+    window: rangeSpan(data.range ?? 30, data.today, data.firstDay).window,
+    inWords: rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords,
   });
   const pages = rows.flatMap((r) => r.pages);
   return (
     <Section
       title="Weak spots"
-      detail={`Weak now, or skipped most in ${rangeWords(data.range ?? 30)}`}
+      detail={`Weak now, or skipped most ${rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}`}
       right={
         data.revo ? (
           <Tap
@@ -669,9 +689,9 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
   const shownMonth = picked ? monthOfMemorizing(data.memorizations, picked) : null;
   const month = reportMonth(data.today);
   const months = useMemo(() => memorizationMonths(data.memorizations, month), [data.memorizations, month]);
-  const range = data.range ?? 30;
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   // The figure follows the range ("+9 in 30 days"); the twelve months of bars stay.
-  const added = memorizedIn(data.memorizations, data.today, range);
+  const added = memorizedIn(data.memorizations, data.today, span.window);
   const top = Math.max(10, ...months.map((m) => m.pages));
   const share = quranShare(data.memorized.size);
   return (
@@ -687,7 +707,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
         <Figure
           value={String(data.memorized.size)}
           text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
-          right={added > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${added} in ${rangeWords(range)}`}</Text> : undefined}
+          right={added > 0 ? <Text style={[typeV2.name, { color: palette.good }]}>{`+${added} ${span.inWords}`}</Text> : undefined}
           testID="insights-memorization-figure"
         />
       )}
@@ -772,7 +792,8 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
 
 function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
   const { palette } = useTheme();
-  const range = data.range ?? 30;
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const range = span.window;
   // "From 24 timed revisions ›" (i11): each one, as dots and a list.
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetUsed, setSheetUsed] = useState(false);
@@ -780,11 +801,11 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
   // Hidden under ten items with minutes (ACT-4).
   if (!p) return null;
   const change =
-    p.before == null
+    p.before == null || !span.before
       ? null
       : Math.abs(p.perPage - p.before) < 0.05
-        ? `The same as ${beforeWords(range)}`
-        : `${p.perPage < p.before ? 'Down' : 'Up'} from ${formatPace(p.before)} ${beforeWords(range)}`;
+        ? `The same as ${span.before}`
+        : `${p.perPage < p.before ? 'Down' : 'Up'} from ${formatPace(p.before)} ${span.before}`;
   return (
     <Section title="Pace" detail="Minutes per page" testID="insights-pace">
       <View style={styles.paceTiles}>
@@ -793,7 +814,7 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
             <Text style={[styles.paceNumber, { color: palette.text }]}>{formatPace(p.perPage)}</Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]}>min a page</Text>
           </View>
-          <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[`Revising, last ${rangeWords(range)}.`, change].filter(Boolean).join(' ')}</Text>
+          <Text style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[`Revising, ${span.lastWords}.`, change].filter(Boolean).join(' ')}</Text>
         </View>
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
@@ -826,10 +847,10 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
           revised={data.revised}
           today={data.today}
           range={range}
-          rangeWords={rangeWords(range)}
-          beforeWords={beforeWords(range)}
+          inWords={span.inWords}
+          beforeWords={span.before}
           perPage={p.perPage}
-          before={p.before}
+          before={span.before ? p.before : null}
           onOpenDay={onOpenDay}
         />
       ) : null}

@@ -19,7 +19,7 @@ import { layoutV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
-import { daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeWords, type InsightsRange } from '../../lib/insightsRange';
+import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabel, rangeSpan, type InsightsRange } from '../../lib/insightsRange';
 import { journalFirstDay } from '../../lib/journal';
 import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
@@ -99,7 +99,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     () => (span === 'week' ? weekDays(week) : monthGrid(month).flat().filter((d): d is string => d != null)),
     [span, week, month],
   );
-  const rangeFrom = [shiftDays(today, -daysToLoad(range)), ...shown].sort()[0];
+  // All time reads from the account's first day (its creation; the items go back that far).
+  const accountStart = useMemo(() => journalFirstDay(user, []), [user]);
+  const rangeFrom = [shiftDays(today, -daysToLoad(range, today, accountStart)), ...shown].sort()[0];
   const rangeTo = [today, ...shown].sort().reverse()[0];
   const load = useCallback(() => {
     firestoreService
@@ -178,9 +180,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
     setWeek(weekStartOf(m === today.slice(0, 7) ? today : `${m}-01`));
     setPicked(null);
   };
-  const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, range), [logs, today, range]);
   // The account's first day: a range longer than the account counts from it ("50 of 56 days").
   const firstDay = useMemo(() => journalFirstDay(user, (data?.revisions ?? []).map((r) => ({ date: r.day }))), [user, data]);
+  const ratedWeak = useMemo(() => ratedWeakCounts(logs, today, rangeSpan(range, today, firstDay).window), [logs, today, range, firstDay]);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
   const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
@@ -203,9 +205,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
         {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
         {view === 'insights' ? (
           <ChoiceChip
-            label={rangeWords(range)}
+            label={rangeLabel(range)}
             onPress={() => setRangeMenu(true)}
-            accessibilityLabel={`Insights for ${rangeWords(range)}`}
+            accessibilityLabel={`Insights for ${rangeLabel(range)}`}
             accessibilityHint="Choose how far back Insights look"
             size="md"
             testID="insights-range"
@@ -218,7 +220,9 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
         title="Insights for"
         actions={INSIGHTS_RANGES.map((r) => ({
           key: `range-${r}`,
-          label: rangeWords(r),
+          label: rangeLabel(r),
+          // All time names where it starts (the NOTE: "Since 9 September").
+          subtitle: r === 'all' && firstDay ? `Since ${dayAndMonth(firstDay)}` : undefined,
           selected: r === range,
           onPress: () => setRange(r),
         }))}

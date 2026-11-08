@@ -142,7 +142,8 @@ export function hourDetail(
   items: { day: string; occurredAt?: number | null; minutes: number | null }[],
   today: string,
   window: number,
-  windowWords: string,
+  /** "in 30 days", "since 9 September". */
+  inWords: string,
   hour: number,
 ): { title: string; detail: string } {
   let minutes = 0;
@@ -169,7 +170,7 @@ export function hourDetail(
   const a = hourWord(hour);
   const b = hourWord((hour + 1) % 24);
   const range = a.p === b.p ? `${a.n}–${b.n} ${b.p}` : `${a.n} ${a.p}–${b.n} ${b.p}`;
-  if (sessions === 0) return { title: range, detail: `Nothing timed in ${windowWords}` };
+  if (sessions === 0) return { title: range, detail: `Nothing timed ${inWords}` };
   const last = days.sort().pop()!;
   const ago = daysBetween(last, today);
   const when =
@@ -182,7 +183,7 @@ export function hourDetail(
           : `on ${formatDayLong(last)}`;
   return {
     title: `${range} · ${minutesWords(minutes)}`,
-    detail: `${sessions} ${sessions === 1 ? 'session' : 'sessions'} in ${windowWords}, the last ${when}`,
+    detail: `${sessions} ${sessions === 1 ? 'session' : 'sessions'} ${inWords}, the last ${when}`,
   };
 }
 

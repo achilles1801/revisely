@@ -66,9 +66,9 @@ describe('the hours scrub (i8)', () => {
     { day: '2026-08-01', occurredAt: at('2026-08-01', 6, 0), minutes: 60 },
   ];
   it('the hour’s minutes, its sessions and the last', () => {
-    expect(hourDetail(items, TODAY, 30, '30 days', 6)).toEqual({ title: '6–7 AM · 1 h 20 min', detail: '2 sessions in 30 days, the last yesterday' });
-    expect(hourDetail(items, TODAY, 30, '30 days', 22)).toEqual({ title: '10–11 PM · 20 min', detail: '1 session in 30 days, the last today' });
-    expect(hourDetail(items, TODAY, 30, '30 days', 11)).toEqual({ title: '11 AM–12 PM', detail: 'Nothing timed in 30 days' });
+    expect(hourDetail(items, TODAY, 30, 'in 30 days', 6)).toEqual({ title: '6–7 AM · 1 h 20 min', detail: '2 sessions in 30 days, the last yesterday' });
+    expect(hourDetail(items, TODAY, 30, 'in 30 days', 22)).toEqual({ title: '10–11 PM · 20 min', detail: '1 session in 30 days, the last today' });
+    expect(hourDetail(items, TODAY, 30, 'in 30 days', 11)).toEqual({ title: '11 AM–12 PM', detail: 'Nothing timed in 30 days' });
   });
   it('minutes in words', () => {
     expect(minutesWords(54)).toBe('54 min');

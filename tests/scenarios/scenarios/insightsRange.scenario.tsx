@@ -123,4 +123,24 @@ describe('Insights’ range', () => {
     expect(screen.getByText(/^of the last 7 days · /)).toBeTruthy();
     expect(screen.queryByTestId('insights-weeks-grid')).toBeNull();
   });
+
+  it('[ACT-22] All time: since the account’s first day, Coverage in cycles, the grid from the start; read from the first day', async () => {
+    open();
+    await screen.findByText('November 2026');
+    fireEvent.press(screen.getByTestId('pill-insights'));
+    await screen.findByTestId('insights-range');
+    fireEvent.press(screen.getByTestId('insights-range'));
+    expect(await screen.findByText('Since 1 September')).toBeTruthy();
+    fireEvent.press(screen.getByText('All time'));
+    sheetGone();
+    await waitFor(() => expect(screen.getByText(/^cycles? of your 23 memorized pages since 1 September( ›)?$/)).toBeTruthy());
+    expect(screen.getByText(/^of 66 days since 1 September( ›)?$/)).toBeTruthy();
+    expect(screen.getByTestId('insights-weeks-grid')).toBeTruthy();
+    expect(screen.getByText('Minutes by hour, since 1 September')).toBeTruthy();
+    // Read from the account's first day (90 days at least).
+    const froms = (firestoreService.getActivityItemsBetween as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(froms.length).toBeGreaterThan(0);
+    expect(froms.every((d: string) => d <= '2026-09-01')).toBe(true);
+    expect(await AsyncStorage.getItem('activity.insightsRange')).toBe('all');
+  });
 });

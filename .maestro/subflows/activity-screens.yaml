@@ -3,9 +3,9 @@
 # strip in the reader, its juz (from the Revised header), the day's block menus (Revised, d10a;
 # Memorized, whose Edit opens the memorized pages), the + (d5), its Revised, Memorized and Note sheets
 # (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
-# from the untouched row, i5 and i6; the range's menu and 3 months, i1 and i2; what wasn't revised, i7;
-# Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a screenshot named
-# 09-<screen>-${THEME}.
+# from the untouched row, i5 and i6; the range's menu, 3 months and All time, i1, i2 and i4; what wasn't
+# revised, i7; Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a
+# screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
@@ -362,6 +362,23 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: 09-insights-3-months-${THEME}
+# All time (mock i4): Coverage in cycles since the account's first day.
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-all
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-all
+- extendedWaitUntil:
+    visible:
+      text: ".*cycles? of your .*"
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-all-time-${THEME}
 - tapOn:
     id: insights-range
 - extendedWaitUntil:
