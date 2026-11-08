@@ -88,7 +88,7 @@ describe('Insights’ range', () => {
     expect(await screen.findByTestId('insights-range')).toBeTruthy();
     expect(screen.getByLabelText('Insights for 30 days')).toBeTruthy();
     expect(screen.queryByTestId('coverage-window')).toBeNull();
-    await waitFor(() => expect(screen.getByText(/memorized pages in 30 days$/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/memorized pages in 30 days( ›)?$/)).toBeTruthy());
     fireEvent.press(screen.getByTestId('insights-range'));
     expect(await screen.findByText('Insights for')).toBeTruthy();
     for (const label of ['7 days', '30 days', '3 months']) expect(screen.getByTestId(`sheet-action-range-${label === '3 months' ? 90 : label.split(' ')[0]}`)).toBeTruthy();
@@ -100,9 +100,9 @@ describe('Insights’ range', () => {
     fireEvent.press(screen.getByTestId('pill-insights'));
     await screen.findByTestId('insights-range');
     await choose('3 months');
-    await waitFor(() => expect(screen.getByText(/memorized pages in 3 months$/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/memorized pages in 3 months( ›)?$/)).toBeTruthy());
     // The account is 66 days old: the days count from its start.
-    expect(screen.getByText('of 66 days since you started')).toBeTruthy();
+    expect(screen.getByText(/^of 66 days since you started( ›)?$/)).toBeTruthy();
     expect(screen.getByTestId('insights-weeks-grid')).toBeTruthy();
     expect(screen.getByTestId('insights-pattern').props.children).toBe('Every missed day was a Saturday');
     expect(screen.getByText('Minutes by hour, last 3 months')).toBeTruthy();
@@ -119,7 +119,7 @@ describe('Insights’ range', () => {
     await screen.findByText('November 2026');
     fireEvent.press(screen.getByTestId('pill-insights'));
     expect(await screen.findByLabelText('Insights for 7 days')).toBeTruthy();
-    await waitFor(() => expect(screen.getByText(/memorized pages in 7 days$/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/memorized pages in 7 days( ›)?$/)).toBeTruthy());
     expect(screen.getByText(/^of the last 7 days · /)).toBeTruthy();
     expect(screen.queryByTestId('insights-weeks-grid')).toBeNull();
   });

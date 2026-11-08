@@ -356,7 +356,7 @@ appId: com.revisionbuddy.app
     id: sheet-action-range-90
 - extendedWaitUntil:
     visible:
-      text: ".*memorized pages in 3 months"
+      text: ".*memorized pages in 3 months.*"
     timeout: 10000
 - runFlow:
     file: shot.yaml
@@ -372,7 +372,7 @@ appId: com.revisionbuddy.app
     id: sheet-action-range-30
 - extendedWaitUntil:
     visible:
-      text: ".*memorized pages in 30 days"
+      text: ".*memorized pages in 30 days.*"
     timeout: 10000
 # Coverage's figure lists what wasn't revised (ACT-23, mock i7).
 - tapOn:
