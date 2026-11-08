@@ -43,6 +43,10 @@ import { finishWhatsNew, saveCard, savedCard, setWhatsNewShowing } from '../../l
 import { logger } from '../../lib/logger';
 import { useNeedOpen } from './needs';
 import { pictureFor } from './pictures';
+import { RevoMoment } from './RevoMoment';
+import { auth } from '../../lib/firebase';
+import { greetingName } from '../../lib/displayName';
+import { smartTrackingOn } from '../../lib/smartTracking';
 
 export type WhatsNewMode = 'required' | 'forced' | 'replay';
 
@@ -237,6 +241,31 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
 
   if (!card) return null;
   const chrome = Math.min(fontScale, CHROME_MAX_SCALE);
+  const advance = () => (last ? done() : go(index + 1));
+
+  // A moment plays full screen and ends on its own buttons (past 1.6× text, its words as any card's).
+  if (card.moment === 'revo' && fontScale <= PICTURE_UP_TO) {
+    return (
+      <View style={[styles.screen, { backgroundColor: palette.bg }]} testID={`whats-new-${mode}`}>
+        <GestureDetector gesture={Gesture.Race(back, forward)}>
+          <View style={styles.flex} testID={`whats-new-card-${card.id}`}>
+            <RevoMoment
+              key={card.id}
+              step={index + 1}
+              total={cards.length}
+              title={card.title}
+              text={card.text ?? ''}
+              firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
+              smartTracking={smartTrackingOn(user)}
+              closable={mode === 'replay'}
+              onNext={advance}
+              onClose={onClose}
+            />
+          </View>
+        </GestureDetector>
+      </View>
+    );
+  }
 
   return (
     <TopSafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} testID={`whats-new-${mode}`}>
@@ -272,7 +301,7 @@ export function WhatsNewScreen({ mode, onClose }: { mode: WhatsNewMode; onClose?
         <PillButton
           title={last ? 'Done' : 'Next'}
           size="lg"
-          onPress={() => (last ? done() : go(index + 1))}
+          onPress={advance}
           testID={last ? 'whats-new-done' : 'whats-new-next'}
         />
       </View>

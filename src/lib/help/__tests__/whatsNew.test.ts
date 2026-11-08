@@ -54,13 +54,14 @@ describe("What's new: its releases", () => {
     }
   });
 
-  it('a card has words and a picture, or rows', () => {
+  it('a card has words and a picture or a moment, or rows', () => {
     for (const r of RELEASES) {
       for (const c of r.cards) {
         if (c.rows) expect(c.text).toBeUndefined();
         else {
           expect(c.text?.length).toBeGreaterThan(0);
-          expect(c.picture).toBeDefined();
+          // One or the other: a moment is the whole screen.
+          expect([c.picture, c.moment].filter(Boolean)).toHaveLength(1);
         }
       }
     }

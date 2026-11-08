@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler } from 'react-native';
+import { BackHandler, Dimensions } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -128,6 +128,32 @@ describe('<WhatsNewScreen />', () => {
     expect(screen.getByTestId('whats-new-row-offline')).toBeTruthy();
     expect(screen.queryByTestId('whats-new-row-help')).toBeNull();
     expect(screen.getByTestId('whats-new-done')).toBeTruthy();
+  });
+
+  it('[NEW-2] Revo’s card plays full screen: a tap takes it to its end, and Later goes on', async () => {
+    // Jest's screen has 2× text; at an ordinary size the card is the moment.
+    jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 402, height: 874, scale: 3, fontScale: 1 });
+    await show('required');
+    const revo = CURRENT_RELEASE.cards.findIndex((c) => c.moment === 'revo');
+    for (let i = 0; i < revo; i++) await next();
+    expect(screen.getByTestId('whats-new-revo-moment')).toBeTruthy();
+    expect(screen.getByTestId('whats-new-card-revo')).toBeTruthy();
+    expect(screen.queryByTestId('stepper')).toBeNull();
+    fireEvent.press(screen.getByTestId('whats-new-moment'));
+    await act(async () => {});
+    expect(screen.getByTestId('whats-new-title').props.accessibilityLabel).toBe(`Step ${revo + 1} of ${titles.length}. Meet Revo`);
+    await next();
+    expect(title()).toBe(titles[revo + 1]);
+    jest.restoreAllMocks();
+  });
+
+  it('past 1.6× text, Revo’s card is its words and Next, as any card', async () => {
+    await show('required');
+    const revo = CURRENT_RELEASE.cards.findIndex((c) => c.moment === 'revo');
+    for (let i = 0; i < revo; i++) await next();
+    expect(title()).toBe('Meet Revo');
+    expect(screen.queryByTestId('whats-new-revo-moment')).toBeNull();
+    expect(screen.getByTestId('whats-new-next')).toBeTruthy();
   });
 
   it('reads a row as its words, never a glyph', async () => {

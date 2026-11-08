@@ -21,7 +21,13 @@ import { helpPlainText, helpTextParts, type HelpIcon, type HelpTextPart } from '
 export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations';
 
 /** The pictures (components/whatsNew/pictures): a part of the screen the card is about. */
-export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'revo';
+export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah';
+
+/**
+ * A card that plays as a full-screen moment instead of a picture over words (components/whatsNew):
+ * 'revo' is RevoMoment (lib/whatsNew/revoMoment), ending on Turn on Revo or Later.
+ */
+export type WhatsNewMoment = 'revo';
 
 export interface WhatsNewRow {
   id: string;
@@ -35,9 +41,11 @@ export interface WhatsNewRow {
 export interface WhatsNewCard {
   id: string;
   title: string;
-  /** A card with a picture has words; the last card ("Also new") has rows instead. */
+  /** A card with a picture or a moment has words; the last card ("Also new") has rows instead. */
   text?: string;
   picture?: WhatsNewPicture;
+  /** Plays full screen, its words on its last frame (past 1.6× text, the words alone, as any card). */
+  moment?: WhatsNewMoment;
   rows?: readonly WhatsNewRow[];
   /** The BEHAVIOUR.md rules its words describe (a rows card: each row's own). */
   covers: readonly string[];
@@ -95,8 +103,8 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       {
         id: 'revo',
         title: 'Meet Revo',
-        text: 'Ask about your revision, or how anything in the app works. Tap [[revo]] at the bottom of the screen to start.',
-        picture: 'revo',
+        text: 'Ask about your revision, or how anything in the app works.',
+        moment: 'revo',
         covers: ['REVO-1', 'REVO-30'],
         needs: 'revo',
       },

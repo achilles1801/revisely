@@ -24,14 +24,8 @@ describe('the pictures', () => {
     }
   });
 
-  it("Revo's question and chips are its greeting's, and its field is the composer's", () => {
-    const greeting = source('src/lib/revo/greeting.ts');
-    for (const chip of [PICTURE_WORDS.revoQuestion, ...PICTURE_WORDS.revoChips]) expect(greeting).toContain(`'${plain(chip)}'`);
-    expect(source('src/components/revo/RevoComposer.tsx')).toContain(`'${PICTURE_WORDS.revoPlaceholder}'`);
-  });
-
   it('each draws, hidden from VoiceOver and never touched', async () => {
-    for (const p of ['activity', 'elsewhere', 'ayah', 'revo'] as const) {
+    for (const p of ['activity', 'elsewhere', 'ayah'] as const) {
       render(
         <DesignProvider initial={{}}>
           <ThemeProvider>{pictureFor(p)}</ThemeProvider>
