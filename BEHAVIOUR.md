@@ -500,7 +500,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **REVO-20.** Revo opens on a line written on the phone from today's data (where today stands, what is next and,
   with Smart Tracking on, which of it is weak), with suggestions; neither is a question or a call. Its own words name
   parts of the Qur'an by surah and juz (`lib/passages`): the greeting, the suggestions, a chart's rows and the + picker, never a page number alone.
-  The context also carries each part it names in those words, for Revo's answers (REVO-27).
+  The context also carries each part it names in those words, for Revo's answers (REVO-27). A day with nothing
+  left to revise reads as done, even before it is marked done, and no greeting or suggestion names an empty passage
+  (Majd's phone, Nov 8 2026: "You're 28 pages into today, and  is next.").
 
 - **REVO-34.** Each time Revo's sheet opens (its button, or another screen opening it), it opens on a new
   conversation with a greeting written from what the phone shows at that moment (REVO-20): after a session, pages
