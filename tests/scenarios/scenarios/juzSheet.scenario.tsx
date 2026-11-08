@@ -146,6 +146,51 @@ describe('the juz sheet', () => {
     expect(onOpenPage).toHaveBeenLastCalledWith(542);
   });
 
+  it('[MEM-7] a juz being learned: its page in part filled by its share, what is learned so far, and Continue at', async () => {
+    // Juz 29: Al-Mulk's first page memorized today (not revised yet), ayahs 13–20 of its second.
+    mockApp.pages = [
+      { ...page(562, ''), lastRevisedDate: null },
+      { pageNumber: 563, status: 'in_progress', verses: Array.from({ length: 8 }, (_, i) => 67013 + i), weaknessRating: 4, lastRevisedDate: null, skipCount: 0 },
+    ];
+    mockApp.user = { smartTrackingEnabled: false };
+    const onOpenPage = jest.fn();
+    const data: InsightsData = {
+      today: TODAY,
+      memorized: new Set([562]),
+      learning: new Set([563]),
+      rating: () => 4,
+      ratedWeak: new Map(),
+      revised: [],
+      read: [],
+      memorizations: [],
+      capacity: 20,
+      revo: false,
+      smartTracking: false,
+    };
+    render(
+      <SafeAreaProvider initialMetrics={METRICS}>
+        <InsightsView data={data} onReviseTomorrow={jest.fn()} onPlanIt={jest.fn()} onOpenPage={onOpenPage} />
+      </SafeAreaProvider>,
+    );
+    fireEvent.press(screen.getByTestId('juz-tile-29'));
+    await flush();
+    expect(screen.getByTestId('juz-sheet-headline').props.children).toBe('Being learned');
+    expect(plainText(String(screen.getByTestId('juz-sheet-learning').props.children)).trim()).toBe('Al-Mulk 1–20 so far');
+    // The page in part is filled by how much of it is memorized; the legend says what that means.
+    const fill = Number(String(screen.getByTestId('juz-cell-part-563').props.style.flat().find((x: { height?: string }) => x?.height)?.height).replace('%', ''));
+    expect(fill).toBeGreaterThan(40);
+    expect(fill).toBeLessThan(75);
+    expect(screen.queryByTestId('juz-cell-part-564')).toBeNull();
+    expect(screen.getByText('Part of a page')).toBeTruthy();
+    // Its row, as VoiceOver reads it (ranges spoken: "1 to 20").
+    expect(plainText(String(screen.getByTestId('juz-surah-67').props.accessibilityLabel))).toBe('Al-Mulk, Ayahs 1 to 20 · 21 to 30 to go');
+    // Continue at the first ayah not memorized, once the sheet has gone.
+    expect(screen.queryByTestId('juz-sheet-open')).toBeNull();
+    fireEvent.press(screen.getByTestId('juz-sheet-continue'));
+    sheetGone();
+    expect(onOpenPage).toHaveBeenLastCalledWith(563);
+  });
+
   it('[ACT-21] the untouched row opens its juz, stale, and plans it for tomorrow', async () => {
     const { onPlanIt } = insights(false);
     fireEvent.press(screen.getByTestId('insights-untouched'));

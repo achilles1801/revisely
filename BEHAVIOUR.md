@@ -556,6 +556,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
     they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
     add new pages by itself, it offers Add to your plan (tomorrow's day of it).
 
+- **MEM-7.** The juz sheet shows a juz being learned (testers' Activity). A page memorized in part is
+  filled by the share of it that is memorized ("Part of a page" in the legend). A surah with ayahs
+  memorized on such a page reads what is memorized and what is to go ("Ayahs 1–20 · 21–30 to go"),
+  and opens the reader where it goes on. The sheet says what is learned so far ("Al-Mulk 1–20 so far"):
+  as its headline, "Being learned", while nothing of the juz has been revised yet, and on a line of its
+  own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk 21").
+  A page marked in progress with no ayahs saved has nothing memorized, and reads as not memorized.
+
 ## Naming the Qur'an
 
 - **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers

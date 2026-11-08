@@ -277,6 +277,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'REVO-26': 'how Revo’s context is built',
   'REVO-27': 'how Revo words its answers (its tone, in the prompt)',
   // Memorizing by the ayah and the reader's sittings (testers):
+  'MEM-7': 'the juz sheet’s look for a juz being learned (MEM-1’s section)',
   'MEM-1': 'the guide’s words are in Revo’s system prompt, so its section on memorizing by the ayah comes with the next recording of Revo’s replies (functions/scripts/record-anthropic.js)',
   'MEM-2': 'a partly memorized page’s share in the % (MEM-1’s section)',
   'MEM-3': 'taking ayahs off the memorized (MEM-1’s section)',
