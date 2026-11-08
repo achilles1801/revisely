@@ -1,6 +1,6 @@
 // Every flow runs in a full E2E run: each file in .maestro/flows is in exactly one of e2e.yml's
 // `full` jobs. Flows 12 and 13 were in none for a day (Nov 7–8 2026): develop's pushes, PRs into
-// main and the nightly run never ran them, and nothing said so.
+// main and the nightly run never ran them, and nothing said so. It caught 15 the same way.
 
 const fs = require('fs');
 const path = require('path');
@@ -48,7 +48,7 @@ it('names each job by the flows it runs', () => {
 });
 
 it('reads globs the way the shell does', () => {
-  expect(globRegex('.maestro/flows/1[0234]-*.yaml').test('.maestro/flows/13-sitting-memorized.yaml')).toBe(true);
+  expect(globRegex('.maestro/flows/1[02345]-*.yaml').test('.maestro/flows/13-sitting-memorized.yaml')).toBe(true);
   expect(globRegex('.maestro/flows/1[04]-*.yaml').test('.maestro/flows/12-add-to-day.yaml')).toBe(false);
   expect(globRegex('.maestro/flows/0?-*.yaml').test('.maestro/flows/09-revo.yaml')).toBe(true);
 });
