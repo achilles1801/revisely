@@ -2,7 +2,7 @@
 // Writes src/lib/e2e/fixtures/translations.json: Al-Ikhlas (112, on page 604) in one QuranEnc
 // translation per script the app shows, as QuranEnc.com's API gives it, and page 604's Arabic as
 // alquran.cloud gives it. E2E builds are hermetic (no translation can be fetched there), so they
-// write these to the phone (src/lib/e2e/demoTranslations.ts) for flow 14-translations, which takes
+// write these to the phone (src/lib/e2e/demoTranslations.ts) for flow 15-translations, which takes
 // a screenshot of the verse sheet in each. Versions are the catalogue's, so the app keeps them.
 //
 //   node scripts/e2e/record-translations.js
