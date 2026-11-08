@@ -26,11 +26,14 @@ appId: com.revisionbuddy.app
     visible:
       id: read-index-v2
     timeout: 15000
+# Centred: found at the list's foot, a row can sit behind the tab bar, and the tap then lands on Read,
+# which scrolls the list back to the top (Android, Nov 8 2026).
 - scrollUntilVisible:
     element:
       id: surah-67
     direction: DOWN
     timeout: 60000
+    centerElement: true
 - tapOn:
     id: surah-67
 # The reader opens with its controls hidden; a tap high on the page shows them (E2E builds load no
@@ -194,7 +197,10 @@ appId: com.revisionbuddy.app
 - waitForAnimationToEnd
 - assertVisible:
     id: add-memorized-ayahs
-    text: "Al.Mulk 1.12 · 12 ayahs"
+    text: "Al.Mulk.1.12 · 12 ayahs"
+# Already on the sitting's ayahs: no "From your reading" offering them again.
+- assertNotVisible:
+    id: add-memorized-from-reading
 # To, a few ayahs back: its wheels, then the ayah wheel flicked down (it moves to earlier ayahs). The
 # wheel is one adjustable element on iOS, so it is moved by a swipe, not a tap on a row; again if a
 # flick didn't take.
@@ -219,7 +225,7 @@ appId: com.revisionbuddy.app
       - waitForAnimationToEnd
 - assertVisible:
     id: add-memorized-ayahs
-    text: "Al.Mulk 1.([1-9]|1[01]) · ([1-9]|1[01]) ayahs?"
+    text: "Al.Mulk.1.([1-9]|1[01]) · ([1-9]|1[01]) ayahs?"
 - assertVisible:
     id: add-memorized-share
 - runFlow:
@@ -240,7 +246,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: activity-finishes-page
-    text: "Al.Mulk .*12 finishes the page"
+    text: "Al.Mulk.*12 finishes the page"
 - assertVisible: ".*marked memorized"
 - runFlow:
     file: ../subflows/shot.yaml

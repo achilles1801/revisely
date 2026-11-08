@@ -55,6 +55,10 @@ describe('a sitting memorized from the Day (MEM-1, MEM-3, MEM-5)', () => {
     };
     await press('activity-add-memorized-sitting-1');
     await app.until(() => app.screen.queryByTestId('add-memorized-ayahs') != null, 'the Ayahs tab');
+    // Already on the sitting's ayahs: no "From your reading" offering the same pages again. (The
+    // day's readings load as the sheet opens.)
+    await app.idle(600);
+    expect(app.screen.queryByTestId('add-memorized-from-reading')).toBeNull();
     await press('add-memorized-to-ayah');
     await press('add-memorized-to-ayah-picker-ayah-20');
     await press('add-memorized-add');
