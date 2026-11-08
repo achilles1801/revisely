@@ -391,6 +391,16 @@ export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[])
   };
 }
 
+/**
+ * How big a timeline's dots can be: 14pt, smaller when revisions crowd the line (one a day for a
+ * month is 27 dots in 360pt), never under 6pt, so that neighbours keep 2pt between them.
+ */
+export function dotSizeFor(marks: readonly { at: number }[], width: number): number {
+  let closest = Infinity;
+  for (let i = 1; i < marks.length; i++) closest = Math.min(closest, (marks[i].at - marks[i - 1].at) * width);
+  return Math.max(6, Math.min(14, Math.floor(closest - 2)));
+}
+
 /** The mark nearest `x` (within `reach` points when given), or null. */
 export function nearestMark(marks: readonly { at: number }[], x: number, width: number, reach?: number): number | null {
   let best: number | null = null;

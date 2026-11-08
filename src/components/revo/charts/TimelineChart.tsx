@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { useHaptics } from '../../../design/haptics';
 import type { RevisionLog } from '../../../types';
-import { nearestMark, shortDate, stepIndex, timelineData, timelineDetail, timelineHint, timelineReadout } from '../../../lib/revo/charts';
+import { dotSizeFor, nearestMark, shortDate, stepIndex, timelineData, timelineDetail, timelineHint, timelineReadout } from '../../../lib/revo/charts';
 import { spokenText } from '../../../lib/passages';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailLine, DetailTitle, Legend, useBandColor } from './ChartParts';
@@ -54,6 +54,10 @@ export function TimelineChart({
   const readout = mark ? timelineReadout(mark) : null;
   const detail = mark ? timelineDetail(mark, logs) : null;
   const last = data.marks[data.marks.length - 1];
+  // Smaller dots when revisions crowd the line; the ring around a picked one stays 4pt out.
+  const dot = width > 0 ? dotSizeFor(data.marks, width) : 14;
+  const dotStyle = { top: LINE_Y - dot / 2, width: dot, height: dot, borderRadius: dot / 2, marginLeft: -dot / 2 };
+  const ringStyle = { top: LINE_Y - dot / 2 - 4, width: dot + 8, height: dot + 8, borderRadius: dot / 2 + 4, marginLeft: -dot / 2 - 4 };
 
   const pick = (i: number | null) => {
     pickedRef.current = i;
@@ -125,9 +129,9 @@ export function TimelineChart({
             : null}
           {data.marks.map((m, i) => (
             <React.Fragment key={m.day}>
-              {picked === i ? <View style={[styles.ring, { left: `${m.at * 100}%`, borderColor: palette.text }]} /> : null}
+              {picked === i ? <View style={[styles.ring, ringStyle, { left: `${m.at * 100}%`, borderColor: palette.text }]} /> : null}
               <View
-                style={[styles.dot, { left: `${m.at * 100}%`, backgroundColor: color(m.band), opacity: picked != null && picked !== i ? 0.3 : 1 }]}
+                style={[styles.dot, dotStyle, { left: `${m.at * 100}%`, backgroundColor: color(m.band), opacity: picked != null && picked !== i ? 0.3 : 1 }]}
                 testID="revo-chart-revision"
               />
             </React.Fragment>
@@ -161,8 +165,8 @@ const styles = StyleSheet.create({
   dash: { width: 3, height: 2 },
   today: { position: 'absolute', right: -4, top: LINE_Y - 4, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   gap: { position: 'absolute', top: LINE_Y - 30, width: 60, textAlign: 'center', fontSize: 12, lineHeight: 16 },
-  dot: { position: 'absolute', top: LINE_Y - 7, width: 14, height: 14, borderRadius: 7, marginLeft: -7 },
-  ring: { position: 'absolute', top: LINE_Y - 11, width: 22, height: 22, borderRadius: 11, marginLeft: -11, borderWidth: 2 },
+  dot: { position: 'absolute' },
+  ring: { position: 'absolute', borderWidth: 2 },
   dates: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
   axis: { fontSize: 13, lineHeight: 17 },
 });

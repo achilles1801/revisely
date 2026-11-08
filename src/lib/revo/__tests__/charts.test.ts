@@ -14,6 +14,7 @@ import {
   juzReadout,
   juzStrip,
   juzSummary,
+  dotSizeFor,
   knownChart,
   nearestMark,
   pageDetail,
@@ -288,6 +289,14 @@ describe('timeline', () => {
     expect(timelineHint(timelineData(logs, [582, 583], TODAY, 30).marks, 30)).toBe('3 revisions · tap one to see it');
     expect(timelineHint([], 30)).toBe('Not revised in 30 days');
     expect(timelineHint([], 365)).toBe('Not revised in the last year');
+  });
+
+  it('dots shrink when revisions crowd the line, never under 6pt', () => {
+    expect(dotSizeFor([{ at: 0 }, { at: 0.5 }], 360)).toBe(14);
+    // Daily for a month: about 13pt apart.
+    expect(dotSizeFor(Array.from({ length: 28 }, (_, i) => ({ at: i / 27 })), 360)).toBe(11);
+    expect(dotSizeFor([{ at: 0 }, { at: 0.001 }], 360)).toBe(6);
+    expect(dotSizeFor([{ at: 0.5 }], 360)).toBe(14);
   });
 
   it('the mark nearest a finger, within reach', () => {
