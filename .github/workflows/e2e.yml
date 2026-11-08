@@ -402,7 +402,14 @@ jobs:
         if: matrix.shard.flows != ''
         run: |
           npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
-          [ -x "$HOME/.maestro/bin/maestro" ] || curl -fsSL "https://get.maestro.mobile.dev" | bash
+          # The installer to a file first: piped into bash, a failed download (get.maestro.mobile.dev
+          # answered 504 once) ran an empty script, the step passed, and every flow then failed
+          # with "maestro: No such file or directory".
+          if [ ! -x "$HOME/.maestro/bin/maestro" ]; then
+            curl -fsSL -o "$RUNNER_TEMP/install-maestro.sh" "https://get.maestro.mobile.dev"
+            bash "$RUNNER_TEMP/install-maestro.sh"
+          fi
+          "$HOME/.maestro/bin/maestro" --version
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Start the Firebase emulators
@@ -639,7 +646,14 @@ jobs:
         if: matrix.shard.flows != ''
         run: |
           npm install -g "firebase-tools@$FIREBASE_TOOLS_VERSION"
-          [ -x "$HOME/.maestro/bin/maestro" ] || curl -fsSL "https://get.maestro.mobile.dev" | bash
+          # The installer to a file first: piped into bash, a failed download (get.maestro.mobile.dev
+          # answered 504 once) ran an empty script, the step passed, and every flow then failed
+          # with "maestro: No such file or directory".
+          if [ ! -x "$HOME/.maestro/bin/maestro" ]; then
+            curl -fsSL -o "$RUNNER_TEMP/install-maestro.sh" "https://get.maestro.mobile.dev"
+            bash "$RUNNER_TEMP/install-maestro.sh"
+          fi
+          "$HOME/.maestro/bin/maestro" --version
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       # The emulator sees this computer's 127.0.0.1 as 10.0.2.2.
