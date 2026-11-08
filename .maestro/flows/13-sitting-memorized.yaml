@@ -26,14 +26,15 @@ appId: com.revisionbuddy.app
     visible:
       id: read-index-v2
     timeout: 15000
-# Centred: found at the list's foot, a row can sit behind the tab bar, and the tap then lands on Read,
-# which scrolls the list back to the top (Android, Nov 8 2026).
+# Down until Al-Haqqah (69), two rows below, is in view, then Al-Mulk: a row found at the list's foot
+# can sit behind the tab bar, and the tap then lands on Read, which scrolls the list back to the top
+# (Android, Nov 8 2026). Two rows up it is clear of the bar. (Centring the row instead never settled
+# on iOS: Maestro gave up after a minute with Al-Mulk mid-screen.)
 - scrollUntilVisible:
     element:
-      id: surah-67
+      id: surah-69
     direction: DOWN
     timeout: 60000
-    centerElement: true
 - tapOn:
     id: surah-67
 # The reader opens with its controls hidden; a tap high on the page shows them (E2E builds load no
@@ -168,7 +169,8 @@ appId: com.revisionbuddy.app
           timeout: 20000
       - tapOn:
           id: calendar-day-2026-11-03
-      - tapOn: "Open the day"
+      - tapOn:
+          id: preview-open
 - extendedWaitUntil:
     visible:
       id: activity-day-v2

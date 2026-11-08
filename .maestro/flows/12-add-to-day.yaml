@@ -24,7 +24,8 @@ appId: com.revisionbuddy.app
     timeout: 20000
 - tapOn:
     id: calendar-day-2026-11-03
-- tapOn: "Open the day"
+- tapOn:
+    id: preview-open
 # A block's header is one element for VoiceOver: its title and figure read together ("Revised, 18 of 20").
 - extendedWaitUntil:
     visible: "Revised, 18 of 20"
@@ -193,7 +194,8 @@ appId: com.revisionbuddy.app
     timeout: 20000
 - tapOn:
     id: calendar-day-2026-11-02
-- tapOn: "Open the day"
+- tapOn:
+    id: preview-open
 - extendedWaitUntil:
     visible:
       id: activity-day-v2
@@ -215,7 +217,8 @@ appId: com.revisionbuddy.app
     timeout: 20000
 - tapOn:
     id: calendar-day-2026-11-01
-- tapOn: "Open the day"
+- tapOn:
+    id: preview-open
 - extendedWaitUntil:
     visible: "Revised, 6 of 20"
     timeout: 15000
