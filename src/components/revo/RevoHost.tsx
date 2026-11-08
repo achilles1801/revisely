@@ -293,6 +293,10 @@ function RevoHostInner() {
               }}
               onExpand={() => setFull(true)}
               onAction={doAction}
+              onOpenDay={(date) => {
+                close();
+                if (navigationRef.isReady()) navigationRef.navigate('Home', { screen: 'ActivityDay', params: { date }, initial: false });
+              }}
               onOff={() => {
                 setView({ name: 'optin' });
                 setFull(true);

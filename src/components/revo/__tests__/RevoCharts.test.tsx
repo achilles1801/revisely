@@ -1,0 +1,222 @@
+// Revo's charts answer a touch (Majd, Nov 7 2026): a tap or a slide picks a mark, the header
+// becomes its readout, and a panel under it leads on. VoiceOver steps through the same marks.
+import React from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
+import { State } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import { ThemeProvider } from '../../../context/ThemeContext';
+import { plainText } from '../../../lib/passages';
+import type { RevisionLog, UserPage } from '../../../types';
+import { DailyPagesChart } from '../charts/DailyPagesChart';
+import { PageRatingsChart } from '../charts/PageRatingsChart';
+import { ChartCard } from '../RevoCards';
+
+jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
+jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn(async () => undefined), notificationAsync: jest.fn(async () => undefined), NotificationFeedbackType: {}, ImpactFeedbackStyle: {} }));
+jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ logs: [], pages: [] }) }));
+
+const TODAY = '2026-11-07';
+const log = (date: string, pagesRevised: number[], extra: Partial<RevisionLog> = {}): RevisionLog => ({
+  id: date,
+  date,
+  pagesRevised,
+  pagesSkipped: [],
+  weaknessUpdates: [],
+  durationMinutes: null,
+  ...extra,
+});
+const logs: RevisionLog[] = [
+  log('2026-11-01', [582, 583], { durationMinutes: 20, weaknessUpdates: [{ page: 583, rating: 2 }] }),
+  log('2026-11-02', [584, 585]),
+  log('2026-11-06', [583], { weaknessUpdates: [{ page: 583, rating: 1 }] }),
+];
+const page = (pageNumber: number, extra: Partial<UserPage> = {}): UserPage => ({
+  pageNumber,
+  status: 'memorized',
+  dateMemorized: '2026-09-01T09:00:00',
+  weaknessRating: 4,
+  lastRevisedDate: null,
+  totalRevisionCount: 0,
+  skipCount: 0,
+  ...extra,
+});
+
+/** Renders inside the theme, once it has loaded (ThemeProvider shows nothing before). */
+async function mount(el: React.ReactElement, id: string) {
+  const out = render(<ThemeProvider>{el}</ThemeProvider>);
+  await screen.findByTestId(id);
+  return out;
+}
+const text = (id: string) => plainText(String(screen.getByTestId(id).props.children));
+const layout = (id: string, width: number, height: number, y = 0) =>
+  fireEvent(screen.getByTestId(id), 'layout', { nativeEvent: { layout: { x: 0, y, width, height } } });
+const tap = (id: string, x: number, y = 40) =>
+  act(() =>
+    fireGestureHandler(getByGestureTestId(id), [
+      { state: State.BEGAN, x, y },
+      { state: State.ACTIVE, x, y },
+      { state: State.END, x, y },
+    ]),
+  );
+
+beforeEach(() => jest.clearAllMocks());
+
+describe('pages per day', () => {
+  const onOpenDay = jest.fn();
+  const week = () =>
+    mount(
+      <DailyPagesChart title="Pages revised this week" days={7} today={TODAY} logs={logs} planned={() => 2} onOpenDay={onOpenDay} />,
+      'revo-chart-dailyPages',
+    );
+
+  it('at rest: the title, what a tap does, a bar for each day and the plan behind it', async () => {
+    await week();
+    expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+    expect(text('revo-chart-dailyPages-line')).toBe('5 pages · tap a day to see it');
+    expect(screen.getAllByTestId('revo-chart-bar')).toHaveLength(7);
+    expect(screen.getByText('Planned', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('revo-chart-dailyPages-detail')).toBeNull();
+  });
+
+  it('a tap picks the day under the finger; its panel leads to that day in Activity; × puts it back', async () => {
+    await week();
+    layout('revo-chart-dailyPages-plot', 350, 130);
+    tap('revo-chart-dailyPages-plot-tap', 20);
+    expect(text('revo-chart-dailyPages-title')).toBe('Sunday 1 November');
+    // No facts given: what was revised.
+    expect(text('revo-chart-dailyPages-line')).toBe('2 pages revised');
+    expect(screen.getByTestId('revo-chart-dailyPages-passage')).toBeTruthy();
+    expect(screen.getByLabelText('1 weak, 0 moderate, 0 strong')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('revo-chart-dailyPages-day'));
+    expect(onOpenDay).toHaveBeenCalledWith('2026-11-01');
+
+    fireEvent.press(screen.getByTestId('revo-chart-dailyPages-close'));
+    expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+    expect(screen.queryByTestId('revo-chart-dailyPages-detail')).toBeNull();
+  });
+
+  it('tapping the picked day again puts it back', async () => {
+    await week();
+    layout('revo-chart-dailyPages-plot', 350, 130);
+    tap('revo-chart-dailyPages-plot-tap', 70);
+    expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
+    tap('revo-chart-dailyPages-plot-tap', 60);
+    expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+  });
+
+  it('a slide runs along the days with a tick for each new one, and leaves the last one open', async () => {
+    await week();
+    layout('revo-chart-dailyPages-plot', 350, 130);
+    act(() =>
+      fireGestureHandler(getByGestureTestId('revo-chart-dailyPages-plot-pan'), [
+        { state: State.BEGAN, x: 20, y: 40 },
+        { state: State.ACTIVE, x: 20, y: 40 },
+        { state: State.ACTIVE, x: 30, y: 40 },
+        { state: State.ACTIVE, x: 70, y: 40 },
+        { state: State.ACTIVE, x: 120, y: 40 },
+        { state: State.END, x: 120, y: 40 },
+      ]),
+    );
+    expect(text('revo-chart-dailyPages-title')).toBe('Tuesday 3 November');
+    expect(text('revo-chart-dailyPages-line')).toBe('Nothing revised');
+    // Sunday, Monday, Tuesday: one tick each (the second Sunday sample adds none).
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(3);
+    expect(screen.getByTestId('revo-chart-dailyPages-detail')).toBeTruthy();
+  });
+
+  it('VoiceOver: one adjustable element; swiping steps through the days, a double tap puts the pick back', async () => {
+    await week();
+    const plot = screen.getByTestId('revo-chart-dailyPages-plot');
+    expect(plot.props.accessibilityRole).toBe('adjustable');
+    expect(plot.props.accessibilityLabel).toContain('2 pages of 2 planned');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-dailyPages-title')).toBe('Sunday 1 November');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(text('revo-chart-dailyPages-title')).toBe('Monday 2 November');
+    expect(screen.getByTestId('revo-chart-dailyPages-plot').props.accessibilityValue.text).toContain('Monday 2 November');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    expect(text('revo-chart-dailyPages-title')).toBe('Sunday 1 November');
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    expect(text('revo-chart-dailyPages-title')).toBe('Pages revised this week');
+  });
+
+  it('30 days: dates instead of letters, and no grey bars when the plan isn’t known', async () => {
+    await mount(<DailyPagesChart title="This month" days={30} today={TODAY} logs={logs} />, 'revo-chart-dailyPages');
+    expect(screen.getAllByTestId('revo-chart-bar')).toHaveLength(30);
+    expect(screen.queryByText('Planned', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('revo-chart-dailyPages-day')).toBeNull();
+  });
+});
+
+describe('page ratings', () => {
+  const onReviseFirst = jest.fn(async () => undefined);
+  const onOpenPage = jest.fn();
+  const ratings = () =>
+    mount(
+      <PageRatingsChart
+          title="Two that slip"
+          pages={[583, 584]}
+          today={TODAY}
+          logs={logs}
+          userPages={[page(583, { weaknessRating: 1, lastRevisedDate: '2026-11-06' }), page(584)]}
+          onReviseFirst={onReviseFirst}
+          onOpenPage={onOpenPage}
+        />,
+      'revo-chart-pageRatings',
+    );
+  const rows = () => {
+    layout('revo-chart-pageRatings-plot', 310, 140);
+    const [a, b] = screen.getAllByTestId('revo-chart-pageRatings-row');
+    fireEvent(a, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 310, height: 45 } } });
+    fireEvent(b, 'layout', { nativeEvent: { layout: { x: 0, y: 45, width: 310, height: 45 } } });
+  };
+
+  it('a tap on a dot: its rating, its day and the gap before it; the panel names the passage', async () => {
+    await ratings();
+    rows();
+    // 6 November sits at 30/30 of the line: x = 310.
+    tap('revo-chart-pageRatings-plot-tap', 305, 30);
+    expect(text('revo-chart-pageRatings-title')).toMatch(/ · weak$/);
+    expect(text('revo-chart-pageRatings-line')).toBe('6 November, 5 days after the time before');
+    expect(text('revo-chart-pageRatings-passage')).toMatch(/· Juz 30/);
+    expect(screen.getByText('Weak now · rated weak twice in 31 days · revised yesterday')).toBeTruthy();
+  });
+
+  it('a tap on a row away from its dots picks the row', async () => {
+    await ratings();
+    rows();
+    tap('revo-chart-pageRatings-plot-tap', 150, 70);
+    expect(text('revo-chart-pageRatings-line')).toBe('No ratings in 31 days');
+  });
+
+  it('Revise first tomorrow waits for the tap, then says so; Open in the reader opens the page', async () => {
+    await ratings();
+    rows();
+    tap('revo-chart-pageRatings-plot-tap', 150, 20);
+    fireEvent.press(screen.getByTestId('revo-chart-pageRatings-reader'));
+    expect(onOpenPage).toHaveBeenCalledWith(583);
+    expect(onReviseFirst).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('revo-chart-pageRatings-revise'));
+    expect(onReviseFirst).toHaveBeenCalledWith([583]);
+    expect(await screen.findByTestId('revo-chart-pageRatings-revise-added')).toBeTruthy();
+  });
+});
+
+describe('ChartCard', () => {
+  it('draws nothing for a kind this app doesn’t know', async () => {
+    render(
+      <ThemeProvider>
+        <ChartCard chart={{ kind: 'juzMap', title: 'Your juz' } as never} day={TODAY} />
+        <ChartCard chart={{ kind: 'dailyPages', title: 'Week', days: 7 }} day={TODAY} />
+      </ThemeProvider>,
+    );
+    await screen.findByTestId('revo-chart-dailyPages');
+    expect(screen.queryByText('Your juz')).toBeNull();
+  });
+
+  it('draws the kinds it knows, flat (no card behind them)', async () => {
+    await mount(<ChartCard chart={{ kind: 'dailyPages', title: 'Week', days: 7 }} day={TODAY} />, 'revo-chart-dailyPages');
+    expect(screen.getByTestId('revo-chart-dailyPages').props.style).not.toEqual(expect.objectContaining({ backgroundColor: expect.anything() }));
+  });
+});
