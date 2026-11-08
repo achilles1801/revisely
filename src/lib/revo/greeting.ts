@@ -39,6 +39,15 @@ function upNext(ctx: RevoContext): number[] {
 }
 
 /**
+ * Today is done: marked so, or with nothing left to revise. Every page revised but the day not yet
+ * marked done (Majd's phone, Nov 8 2026: Insights' credits never reached Done, #431) left no next
+ * pages, and Revo said "You're 28 pages into today, and  is next." (REVO-20).
+ */
+export function todayDone(ctx: RevoContext): boolean {
+  return ctx.today.done || (ctx.today.plannedPages > 0 && ctx.today.nextPages.length === 0);
+}
+
+/**
  * What the phone knows beside Revo's context, for the greeting only (never sent): Home's
  * "Done · N" and the next revision day's start (Home's "Tomorrow starts at …").
  */
@@ -57,7 +66,7 @@ export interface GreetingExtras {
 /** Where today stands, so a sheet opened again with nothing changed can say something else (REVO-35). */
 export function greetingState(ctx: RevoContext): string {
   if (ctx.today.plannedPages === 0) return 'none';
-  if (ctx.today.done) return 'done';
+  if (todayDone(ctx)) return 'done';
   return `todo:${ctx.today.revisedPages}`;
 }
 
@@ -126,7 +135,8 @@ interface Opening {
 /** `open` counts the opens before this one, today, in the same state (0: the first; nextOpens). */
 function opening(name: string | null, ctx: RevoContext, open: number, extras: GreetingExtras): Opening {
   const hello = name ? `Salaam ${name}.` : 'Salaam.';
-  const { plannedPages, revisedPages, done } = ctx.today;
+  const { plannedPages, revisedPages } = ctx.today;
+  const done = todayDone(ctx);
   const extra = asides(ctx, extras);
   // Nothing new since the last open: lead with something else, in turn, so two opens in a row differ.
   const turn = (list: Aside[]) => (list.length > 0 ? list[(open - 1) % list.length] : null);
@@ -188,6 +198,6 @@ export function revoChips(ctx: RevoContext, open = 0, extras: GreetingExtras = {
   if (weakNext.length > 0) out.push(`Plan ${passageShort(weakNext)}`);
   else if (strength && ctx.weakPages.length > 0) out.push('Which parts are weakest?');
   out.push('How was my week?');
-  out.push(ctx.today.done ? 'What should I revise next?' : 'How is my pace?');
+  out.push(todayDone(ctx) ? 'What should I revise next?' : 'How is my pace?');
   return [...new Set(out)].slice(0, 3);
 }
