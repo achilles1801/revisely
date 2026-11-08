@@ -17,7 +17,7 @@ import type { Ionicons } from '@expo/vector-icons';
 export type HelpIcon = keyof typeof Ionicons.glyphMap;
 
 /** The screens with help. */
-export type HelpScreen = 'home' | 'session' | 'reader' | 'schedule';
+export type HelpScreen = 'home' | 'session' | 'reader' | 'schedule' | 'activity' | 'insights' | 'day';
 
 /**
  * When a topic shows: only with Smart Tracking on, only with it off, or only where the hidden page
@@ -217,6 +217,118 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         text: '{{Create new plan}} makes a fresh cycle: even pages or whole juz, forwards or in reverse.',
         covers: ['SCHED-1', 'SCHED-2', 'SCHED-4'],
         when: 'noSmartTracking',
+      },
+    ],
+  },
+  activity: {
+    title: 'How Activity works',
+    topics: [
+      {
+        id: 'activity.calendar',
+        icon: 'calendar-outline',
+        title: 'The calendar',
+        text:
+          "A day's ring fills as you revise its pages; dots show memorizing, reading and notes. " +
+          'Tap a day, then its summary, to open it.',
+        covers: ['ACT-3', 'ACT-18'],
+      },
+      {
+        id: 'activity.day',
+        icon: 'sunny-outline',
+        title: 'Which day',
+        text:
+          'Everything goes on the revision day it was done. With {{Start day at fajr}} on, anything before Fajr ' +
+          'counts for the day before.',
+        covers: ['DAY-9', 'DAY-2', 'ACT-1'],
+      },
+      {
+        id: 'activity.adding',
+        icon: 'add-circle-outline',
+        title: 'Adding',
+        text: 'Open today or yesterday and tap [[plus]] to log pages revised elsewhere, new memorization or a note.',
+        covers: ['ACT-5', 'ACT-17'],
+      },
+    ],
+  },
+  insights: {
+    title: 'How Insights work',
+    topics: [
+      {
+        id: 'insights.coverage',
+        icon: 'grid-outline',
+        title: 'Coverage',
+        text:
+          "How much of what you've memorized you revised in the range at the top, juz by juz. " +
+          'Tap a juz to see its surahs.',
+        covers: ['ACT-4', 'ACT-21', 'ACT-22'],
+      },
+      {
+        id: 'insights.consistency',
+        icon: 'ellipse-outline',
+        title: 'Consistency',
+        text: 'The days you revised or read, and the hours you usually do it. Tap a day’s circle to open that day.',
+        covers: ['ACT-4', 'ACT-23'],
+      },
+      {
+        id: 'insights.weak',
+        icon: 'alert-circle-outline',
+        title: 'Weak spots',
+        text: 'Pages you rated weak, or often skipped. Tap one to read it; the button under them puts them first tomorrow.',
+        covers: ['ACT-12', 'ACT-8', 'ACT-20', 'ACT-24'],
+        when: 'smartTracking',
+      },
+      {
+        id: 'insights.pace',
+        icon: 'speedometer-outline',
+        title: 'Pace',
+        text: 'Minutes a page, once ten revisions or readings were timed. Tap the count under it to see each one.',
+        covers: ['ACT-4', 'ACT-23'],
+      },
+    ],
+  },
+  day: {
+    title: 'How a day works',
+    topics: [
+      {
+        id: 'day.change',
+        icon: 'hand-left-outline',
+        title: 'Changing an entry',
+        text:
+          "Hold a block's title, or a recording, for its menu. Deleting a Memorized entry takes what it added " +
+          'off your memorized.',
+        covers: ['ACT-6', 'ACT-7'],
+      },
+      {
+        id: 'day.pages',
+        icon: 'albums-outline',
+        title: 'The pages',
+        text:
+          "The strip is the day's pages: revised, skipped or not reached. Tap one to read it. " +
+          'Weak, moderate and strong come from your ratings.',
+        covers: ['ACT-20', 'ACT-8'],
+        when: 'smartTracking',
+      },
+      {
+        id: 'day.pages.off',
+        icon: 'albums-outline',
+        title: 'The pages',
+        text: "The strip is the day's pages: revised, skipped or not reached. Tap one to open it in the reader.",
+        covers: ['ACT-20', 'ACT-19'],
+        when: 'noSmartTracking',
+      },
+      {
+        id: 'day.adding',
+        icon: 'add-circle-outline',
+        title: 'Adding',
+        text: 'On today and yesterday, [[plus]] logs pages revised elsewhere, new memorization or a note. Earlier days take notes only.',
+        covers: ['ACT-5', 'ACT-17'],
+      },
+      {
+        id: 'day.notes',
+        icon: 'document-text-outline',
+        title: 'Notes',
+        text: 'A note sits under the block it’s about, or in Notes. Tap one in Notes to open the daily log, where notes are edited and deleted.',
+        covers: ['ACT-11', 'ACT-6', 'LOG-2'],
       },
     ],
   },
