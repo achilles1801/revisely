@@ -85,7 +85,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'The streak',
-    covers: ['SESS-2', 'SESS-6', 'SESS-7'],
+    covers: ['SESS-2', 'SESS-6', 'SESS-7', 'ACT-15'],
     routes: ['Dashboard'],
     text: lines(
       '- A revision day counts when every page scheduled for it is revised and credited to that day (in its own session, or revised ahead before it came). Home then says Done.',

@@ -279,6 +279,10 @@ How the tests are made: `tests/scenarios/README.md`.
   that day the moment its sheet closes, without leaving the screen, and offline too: the day lays the
   changes still waiting on the phone over what it read. Once the server has them, the day shows the
   server's copy. (Nov 7 2026: every add saved, but the day showed it only once it was opened again.)
+- **ACT-15.** Revised pages added by hand count for the streak as any credit does (SESS-6): a day whose
+  scheduled pages are all credited to it is done, hand-added pages included, and Home shows it when it
+  next comes into view. Pages added by hand never stand for what a day had scheduled: that stays its
+  session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
 
 ## Ask coach
 
