@@ -47,11 +47,13 @@ appId: com.revisionbuddy.app
 
 # REVO-20: the greeting, from today's plan, and suggestions, once revoSetOptions has answered. By
 # surah, never page numbers (lib/passages; no-break hyphens and spaces inside, so "." between words).
+# 30 s, as for answers: on an iOS runner revoSetOptions has taken 14 s and 20 s (#328's run
+# 42498597405; the greeting showed just after these waits ran out at 10 s).
 - extendedWaitUntil:
     visible:
       id: revo-greeting
       text: "Assalamu alaikum.* 6 pages into today, and Al.Hashr.17.to.Al.Mumtahanah.5 is next\\. It.s rated weak.*"
-    timeout: 10000
+    timeout: 30000
 # The first suggestion is about them, by surah.
 - assertVisible:
     id: "revo-chip-Plan Al-Hashr to Al-Mumtahanah"
@@ -568,7 +570,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: revo-greeting
-    timeout: 10000
+    timeout: 30000
 - runFlow:
     file: ../subflows/shot.yaml
     env:

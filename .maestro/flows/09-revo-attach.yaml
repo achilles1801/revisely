@@ -37,10 +37,11 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - tapOn:
     id: revo-turn-on
+# Once revoSetOptions has answered: 30 s, as in 09-revo.
 - extendedWaitUntil:
     visible:
       id: revo-greeting
-    timeout: 10000
+    timeout: 30000
 - runFlow:
     file: ../subflows/revo-attach-screens.yaml
     env:
