@@ -162,6 +162,8 @@ export function WeeksChart({
           { color: palette.heat[2], label: 'Done' },
           { color: palette.heat[1], label: 'Part' },
           { color: palette.track, label: 'Missed', outline: true },
+          // Days the plan gave nothing (a rest day, or before the plan began): the streak skips them too.
+          ...(rows.some((r) => r.some((c) => c.cell === 'rest')) ? [{ color: palette.heat[0], label: 'No plan' }] : []),
         ]}
       />
     </ChartFrame>
